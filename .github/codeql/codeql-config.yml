@@ -48,10 +48,9 @@ paths-ignore:
 # suppression comments through the source or - worse - "fixed" by changes that
 # would make the product less robust.
 #
-# Every id below is a cs/ rule, so these filters are no-ops for the C++
-# analysis. Nothing has been excluded for C++: it has never been scanned, so
-# there is no measured count to exclude anything on, and an exclusion without a
-# count is a guess. Add one after the first run, with the number, or not at all.
+# The cs/ ids below are no-ops for the C++ analysis. One cpp/ rule is excluded,
+# last in the list, with its measured count and the reason; nothing else has
+# been excluded for C++, and an exclusion without a count is a guess.
 query-filters:
   # 160 hits, essentially all in the Control Panel. It is a COM-interop desktop
   # application: almost every call crosses into the hMailServer service and can
@@ -102,3 +101,22 @@ query-filters:
   # late-bound COM property is written down anywhere.
   - exclude:
       id: cs/useless-upcast
+
+  # 10 hits, one per boost::asio::ssl::context in the tree, and every one of them
+  # a false positive by construction - verified with the query's source and a
+  # local run of it against this tree on 6 September 2026. The query accepts a
+  # context only when EVERY set_options call reachable from its constructor
+  # carries no_sslv3, no_tlsv1 and no_tlsv1_1 as a compile-time constant (a
+  # forex over the calls, on Expr.getValue). Boost.Asio's own constructor ends
+  # with set_options(no_compression) - boost/asio/ssl/impl/context.ipp - and
+  # set_options(o) delegates to set_options(o, ec) with a parameter for an
+  # argument, and both are calls the flow reaches; header-only Boost puts them
+  # in every database. So no program built against a real Boost of the last
+  # decade can satisfy the query, whatever it sets. What the query is for is
+  # done anyway: every context here is built with HM_TLS_CONTEXT_FLOOR (see
+  # SslContextInitializer.h) - SSLv2, SSLv3, TLS 1.0 and TLS 1.1 off as one
+  # constant expression - and the administrator's protocol toggles act on the
+  # mail listeners and the mail client afterwards, natively. The ten alerts of
+  # the 6 September scan were dismissed as false positives with this reason.
+  - exclude:
+      id: cpp/boost/tls-settings-misconfiguration

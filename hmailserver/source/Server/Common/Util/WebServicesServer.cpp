@@ -645,7 +645,7 @@ namespace HM
 
                auto context = std::shared_ptr<boost::asio::ssl::context>(
                   new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
-               context->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
+               context->set_options(HM_TLS_CONTEXT_FLOOR);
 
                if (SslContextInitializer::InitServer(*context, certificate, bind_address, https_port))
                {
@@ -927,7 +927,7 @@ namespace HM
                if (!RequestArrivedOverHttps_(request, over_tls))
                   return RefusePlainHttpProfile_(host, path, query);
 
-               return HandleMobileConfig_(host, query);
+               return HandleAppleProfile_(host, query);
             }
 
             // Outlook autodiscover (POX). Outlook POSTs; accept GET too.
@@ -1730,7 +1730,7 @@ namespace HM
    }
 
    AnsiString
-   WebServicesServer::HandleMobileConfig_(const AnsiString &host, const AnsiString &query)
+   WebServicesServer::HandleAppleProfile_(const AnsiString &host, const AnsiString &query)
    {
       AnsiString clientHost;
       ProtocolEndpoint imap, pop3, smtp;

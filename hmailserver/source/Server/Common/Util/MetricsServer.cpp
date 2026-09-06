@@ -725,7 +725,7 @@ namespace HM
 
          auto built = std::shared_ptr<boost::asio::ssl::context>(
             new boost::asio::ssl::context(boost::asio::ssl::context::sslv23));
-         built->set_options(boost::asio::ssl::context::default_workarounds | boost::asio::ssl::context::no_sslv2 | boost::asio::ssl::context::no_sslv3);
+         built->set_options(HM_TLS_CONTEXT_FLOOR);
 
          if (!SslContextInitializer::InitServer(*built, certificate, bind_address, port))
             return false;

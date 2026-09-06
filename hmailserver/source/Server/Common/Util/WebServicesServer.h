@@ -130,7 +130,7 @@ namespace HM
 
       // Apple .mobileconfig configuration profile, built from the same
       // GetClientAccessSettings_ data the two XML handlers use.
-      static AnsiString HandleMobileConfig_(const AnsiString &host, const AnsiString &query);
+      static AnsiString HandleAppleProfile_(const AnsiString &host, const AnsiString &query);
 
       // RFC 6764 well-known redirect. calendar selects caldav over carddav.
       static AnsiString HandleWellKnownDavRedirect_(bool calendar);
