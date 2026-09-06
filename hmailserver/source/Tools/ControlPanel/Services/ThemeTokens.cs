@@ -163,6 +163,19 @@ namespace hMailServer.ControlPanel.Services
          return Color.FromArgb((byte)(argb >> 24), (byte)(argb >> 16), (byte)(argb >> 8), (byte)argb);
       }
 
+      /// <summary>
+      /// Whether the application is in High Contrast: Windows says so, or
+      /// HMAILCP_HIGH_CONTRAST=1 in the environment says to behave as if it did.
+      /// The variable exists for one reason - the High Contrast theme changes
+      /// every control in the application, and a change like that has to be looked
+      /// at, so build/capture-cp.ps1 -HighContrast launches the Control Panel with
+      /// it set and captures the result on an ordinary desktop. It is read once.
+      /// </summary>
+      public static bool IsHighContrast => SystemParameters.HighContrast || ForcedHighContrast;
+
+      private static readonly bool ForcedHighContrast =
+         string.Equals(Environment.GetEnvironmentVariable("HMAILCP_HIGH_CONTRAST"), "1", StringComparison.Ordinal);
+
       /// <summary>Recomputes every token colour for the current theme.</summary>
       public static void Refresh()
       {
@@ -172,11 +185,11 @@ namespace hMailServer.ControlPanel.Services
          // Snapshot what the charts need before we start branching, so there is
          // exactly one decision about which theme is in force.
          CurrentSystemColors = ReadSystemColors();
-         CurrentChartTheme = SystemParameters.HighContrast
+         CurrentChartTheme = IsHighContrast
             ? ChartTheme.HighContrast
             : IsLight() ? ChartTheme.Light : ChartTheme.Dark;
 
-         if (SystemParameters.HighContrast)
+         if (IsHighContrast)
          {
             brand = info = logApp = SystemColors.HighlightColor;
             success = warning = danger = SystemColors.WindowTextColor;

@@ -6,7 +6,11 @@
 param(
     [string]$Out = 'C:\Dev\cp-shot.png',
     [string]$Nav = '',
-    [switch]$Launch
+    [switch]$Launch,
+    # Launch the Control Panel as if Windows were in High Contrast
+    # (HMAILCP_HIGH_CONTRAST=1, read by ThemeTokens.IsHighContrast), so that
+    # Wpf.Ui's High Contrast dictionary can be looked at on an ordinary desktop.
+    [switch]$HighContrast
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,7 +32,9 @@ if ($Launch) {
     Stop-Process -Name hMailCP -Force -ErrorAction SilentlyContinue
     Start-Sleep 1
     $exe = Join-Path $PSScriptRoot '..\hmailserver\source\Tools\ControlPanel\bin\Release\net10.0-windows\hMailCP.exe'
+    if ($HighContrast) { $env:HMAILCP_HIGH_CONTRAST = '1' } else { Remove-Item Env:HMAILCP_HIGH_CONTRAST -ErrorAction SilentlyContinue }
     Start-Process $exe -ArgumentList '/connect','localhost','Administrator','testar' | Out-Null
+    Remove-Item Env:HMAILCP_HIGH_CONTRAST -ErrorAction SilentlyContinue
     Start-Sleep 10
 }
 
