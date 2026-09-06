@@ -170,6 +170,16 @@ namespace RegressionTests.Infrastructure
          lock (_lock)
             _requests.Add(headers);
 
+         // TELL is acknowledged the way spamd acknowledges it: headers only, no
+         // message back, DidSet naming the store that changed.
+         if (headers["Request"].StartsWith("TELL", StringComparison.OrdinalIgnoreCase))
+         {
+            var acknowledgement = Encoding.ASCII.GetBytes("SPAMD/1.1 0 EX_OK\r\nDidSet: local\r\n\r\n");
+            stream.Write(acknowledgement, 0, acknowledgement.Length);
+            stream.Flush();
+            return;
+         }
+
          // The reply spamd gives for PROCESS on a message it did not tag: the message
          // back, unchanged, behind the headers the server parses.
          var reply = "SPAMD/1.1 0 EX_OK\r\nContent-length: " + read + "\r\nSpam: False ; 0.0 / 5.0\r\n\r\n";

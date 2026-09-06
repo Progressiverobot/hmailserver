@@ -66,6 +66,7 @@ namespace HM
       samin_timeout_(0),
       samax_timeout_(0),
       spamassassin_user_from_recipient_(false),
+      spamassassin_learn_on_move_(false),
       clam_min_timeout_(0),
       clam_max_timeout_(0),
       samove_vs_copy_(false),
@@ -350,6 +351,7 @@ namespace HM
          }
       }
       spamassassin_user_from_recipient_ = ReadIniSettingInteger_("Settings", "SpamAssassinUserFromRecipient", 0) == 1;
+      spamassassin_learn_on_move_ = ReadIniSettingInteger_("Settings", "SpamAssassinLearnOnMove", 0) == 1;
       // Upper bound, in seconds, on the accept/save work that runs after end-of-data
       // and holds the thread that sends the "250". Past this the message is refused
       // with a temporary 451 so the sending MTA retries, rather than the reply

@@ -205,6 +205,7 @@ EXIT 0
     <ClCompile Include="..\Common\AntiSpam\DMARC\DMARC.cpp" />
     <ClCompile Include="..\Common\AntiSpam\DMARC\SpamTestDMARC.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinClient.cpp" />
+    <ClCompile Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinLearner.cpp" />
     <ClCompile Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinTestConnect.cpp" />
     <ClCompile Include="..\Common\AntiSpam\AuthenticationResults.cpp" />
     <ClCompile Include="..\Common\AntiSpam\DKIM\SpamTestArc.cpp" />
@@ -804,6 +805,7 @@ EXIT 0
     <ClInclude Include="..\Common\AntiSpam\DMARC\DMARC.h" />
     <ClInclude Include="..\Common\AntiSpam\DMARC\SpamTestDMARC.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinClient.h" />
+    <ClInclude Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinLearner.h" />
     <ClInclude Include="..\Common\AntiSpam\SpamAssassin\SpamAssassinTestConnect.h" />
     <ClInclude Include="..\Common\AntiSpam\AuthenticationResults.h" />
     <ClInclude Include="..\Common\AntiSpam\DKIM\SpamTestArc.h" />

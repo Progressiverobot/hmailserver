@@ -64,6 +64,25 @@ namespace HM
       // We'll handle all incoming data as binary.
       SetReceiveBinary(true);
       message_size_ = FileUtilities::FileSize(message_file_);
+      if (learning_)
+      {
+         // spamc's TELL: the message and its class, into the local Bayes store
+         // ("Set: local"). spamd answers "SPAMD/1.x 0 EX_OK" and "DidSet: local"
+         // when the store changed; it refuses the command unless started with
+         // --allow-tell, which is why the setting behind this is off by default.
+         EnqueueWrite("TELL SPAMC/1.4\r\n");
+         String learnLength;
+         learnLength.Format(_T("Content-length: %I64d\r\n"), message_size_);
+         EnqueueWrite(learnLength);
+         EnqueueWrite(learn_spam_ ? "Message-class: spam\r\n" : "Message-class: ham\r\n");
+         EnqueueWrite("Set: local\r\n");
+         if (!user_.IsEmpty())
+            EnqueueWrite("User: " + user_ + "\r\n");
+         EnqueueWrite("\r\n");
+         SendFileContents_(message_file_);
+         return;
+      }
+
       EnqueueWrite("PROCESS SPAMC/1.2\r\n");
      //LOG_DEBUG("SENT: PROCESS SPAMC/1.2");
      String sConLen;
@@ -158,6 +177,26 @@ namespace HM
       // Captured before ParseFirstBuffer_ strips the header: a completed read that
       // delivered no bytes means spamd closed the connection (EOF).
       size_t incoming_bytes = pBuf ? pBuf->GetSize() : 0;
+
+      if (learning_)
+      {
+         // The reply to TELL is headers only: read until the blank line (or until
+         // spamd closes), then judge it. No message comes back, so nothing is
+         // written to disk and nothing replaces the file.
+         if (pBuf && incoming_bytes > 0)
+            learn_reply_.append(pBuf->GetCharBuffer(), incoming_bytes);
+
+         if (learn_reply_.find("\r\n\r\n") == std::string::npos && incoming_bytes > 0)
+         {
+            EnqueueRead("");
+            return;
+         }
+
+         const bool acknowledged = learn_reply_.StartsWith("SPAMD/") && learn_reply_.FindNoCase("EX_OK") >= 0;
+         *test_completed_ = acknowledged;
+         LOG_DEBUG(Formatter::Format("SpamAssassin's reply to TELL: {0}", String(learn_reply_).Left(200)));
+         return;
+      }
 
       if (!result_)
       {

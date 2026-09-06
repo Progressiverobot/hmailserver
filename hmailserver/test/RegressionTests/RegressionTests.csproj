@@ -352,6 +352,7 @@
     <Compile Include="AntiSpam\PerAccountSpamSettings.cs" />
     <Compile Include="AntiSpam\SpamAssassin.cs" />
     <Compile Include="AntiSpam\SpamAssassinUserHeader.cs" />
+    <Compile Include="AntiSpam\SpamAssassinLearning.cs" />
     <Compile Include="API\Basics.cs" />
     <Compile Include="Infrastructure\Cache.cs" />
     <Compile Include="Infrastructure\CustomAsserts.cs" />

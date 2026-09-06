@@ -273,6 +273,12 @@ namespace HM
       // message has exactly one; see SpamTestSpamAssassin::RunTest for why one is the limit.
       String GetSpamAssassinUser() const { return spamassassin_user_; }
       bool GetSpamAssassinUserFromRecipient() const { return spamassassin_user_from_recipient_; }
+
+      // [Settings] SpamAssassinLearnOnMove=1: a message moved into the user's Junk
+      // folder is told to spamd as spam and one moved out of it as ham (spamc TELL,
+      // Set: local). Off by default - TELL is a command spamd refuses unless started
+      // with --allow-tell. See SpamAssassinLearner.
+      bool GetSpamAssassinLearnOnMove() const { return spamassassin_learn_on_move_; }
       int GetFinalizationTimeout () {return finalization_timeout_; }
       int GetClamMinTimeout () {return clam_min_timeout_; }
       int GetClamMaxTimeout () {return clam_max_timeout_; }
@@ -1017,6 +1023,7 @@ namespace HM
       int samax_timeout_;
       String spamassassin_user_;
       bool spamassassin_user_from_recipient_;
+      bool spamassassin_learn_on_move_;
       int finalization_timeout_;
       int clam_min_timeout_;
       int clam_max_timeout_;
