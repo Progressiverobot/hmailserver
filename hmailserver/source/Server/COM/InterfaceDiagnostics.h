@@ -62,6 +62,7 @@ public:
 
    STDMETHOD(get_AssertionsEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(TriggerAssertion)();
+   STDMETHOD(DnssecChainStatus)(BSTR sName, BSTR sType, long *pVal);
 
    HM::Diagnostic diagnostics_;
 };

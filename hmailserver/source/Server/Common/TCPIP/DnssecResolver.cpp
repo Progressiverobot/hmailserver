@@ -46,6 +46,10 @@ namespace HM
       const unsigned short DnsTypeRrsig = 46;
       const unsigned short DnsTypeDnskey = 48;
       const unsigned short DnsTypeTlsa = 52;
+      const unsigned short DnsTypeNs = 2;
+      const unsigned short DnsTypeSoa = 6;
+      const unsigned short DnsTypeNsec = 47;
+      const unsigned short DnsTypeNsec3 = 50;
 
       const DWORD DnsTimeoutMilliseconds = 5000;
       const int MaxChainDepth = 16;
@@ -73,6 +77,9 @@ namespace HM
          std::vector<unsigned char> packet;
          int rcode = -1;
          std::vector<ParsedRr> answers;
+         // The AUTHORITY section: where a negative answer carries the NSEC or NSEC3
+         // records, and their RRSIGs, that prove the absence.
+         std::vector<ParsedRr> authority;
       };
 
       struct RrsigInfo
@@ -325,9 +332,11 @@ namespace HM
          out.packet = packet;
          out.rcode = packet[3] & 0x0F;
          out.answers.clear();
+         out.authority.clear();
 
          size_t questionCount = (static_cast<size_t>(packet[4]) << 8) | packet[5];
          size_t answerCount = (static_cast<size_t>(packet[6]) << 8) | packet[7];
+         size_t authorityCount = (static_cast<size_t>(packet[8]) << 8) | packet[9];
 
          size_t offset = 12;
 
@@ -342,33 +351,40 @@ namespace HM
                return false;
          }
 
-         for (size_t i = 0; i < answerCount; i++)
+         // The answer section, then the authority section: the same record shape,
+         // read the same way, kept apart because they mean different things.
+         for (size_t section = 0; section < 2; section++)
          {
-            ParsedRr record;
+            size_t count = section == 0 ? answerCount : authorityCount;
+            std::vector<ParsedRr> &records = section == 0 ? out.answers : out.authority;
+            for (size_t i = 0; i < count; i++)
+            {
+               ParsedRr record;
 
-            if (!ReadName(packet, offset, record.owner))
-               return false;
+               if (!ReadName(packet, offset, record.owner))
+                  return false;
 
-            if (offset + 10 > packet.size())
-               return false;
+               if (offset + 10 > packet.size())
+                  return false;
 
-            record.type = (static_cast<unsigned short>(packet[offset]) << 8) | packet[offset + 1];
-            record.rr_class = (static_cast<unsigned short>(packet[offset + 2]) << 8) | packet[offset + 3];
-            record.ttl = Read32(packet.data() + offset + 4);
+               record.type = (static_cast<unsigned short>(packet[offset]) << 8) | packet[offset + 1];
+               record.rr_class = (static_cast<unsigned short>(packet[offset + 2]) << 8) | packet[offset + 3];
+               record.ttl = Read32(packet.data() + offset + 4);
 
-            size_t rdataLength = (static_cast<size_t>(packet[offset + 8]) << 8) | packet[offset + 9];
+               size_t rdataLength = (static_cast<size_t>(packet[offset + 8]) << 8) | packet[offset + 9];
 
-            offset += 10;
+               offset += 10;
 
-            if (offset + rdataLength > packet.size())
-               return false;
+               if (offset + rdataLength > packet.size())
+                  return false;
 
-            record.rdata_offset = offset;
-            record.rdata.assign(packet.begin() + offset, packet.begin() + offset + rdataLength);
+               record.rdata_offset = offset;
+               record.rdata.assign(packet.begin() + offset, packet.begin() + offset + rdataLength);
 
-            offset += rdataLength;
+               offset += rdataLength;
 
-            out.answers.push_back(record);
+            records.push_back(record);
+            }
          }
 
          return true;
@@ -1066,6 +1082,369 @@ namespace HM
 
       InternalStatus ValidateZoneKeys(const AnsiString &zone, int depth, std::vector<std::vector<unsigned char>> &keys);
 
+      // ----------------------------------------------------------------
+      // Denial of existence (RFC 4035 section 5.2, RFC 5155 section 8)
+      //
+      // A DS RRset that is absent has to be proved absent by the parent zone
+      // before "no DS" may be read as "an unsigned delegation": an NSEC or an
+      // NSEC3 in the authority section, signed by the parent, whose owner is
+      // the delegation name (or its hash) with NS set and DS clear - or, for
+      // NSEC3, a record with the Opt-Out flag covering the hashed name. Without
+      // the proof, "no DS" is exactly what a resolver would be shown by anyone
+      // who took the record out of the answer, and the whole point of DNSSEC
+      // is that the record cannot be taken out unnoticed. So the delegation is
+      // then Bogus, not Insecure.
+      // ----------------------------------------------------------------
+
+      // RFC 4034 4.1.2: is a type present in the window-block bitmap that starts
+      // at rdata[start]?
+      bool TypeBitmapHas(const std::vector<unsigned char> &rdata, size_t start, unsigned short type)
+      {
+         size_t offset = start;
+         while (offset + 2 <= rdata.size())
+         {
+            unsigned char window = rdata[offset];
+            unsigned char length = rdata[offset + 1];
+            offset += 2;
+            if (length == 0 || length > 32 || offset + length > rdata.size())
+               return false;
+            if (window == static_cast<unsigned char>(type >> 8))
+            {
+               unsigned char low = static_cast<unsigned char>(type & 0xFF);
+               size_t byteIndex = low >> 3;
+               if (byteIndex >= length)
+                  return false;
+               return (rdata[offset + byteIndex] & (0x80 >> (low & 7))) != 0;
+            }
+            offset += length;
+         }
+         return false;
+      }
+
+      // RFC 4034 6.1: canonical ordering of names - label by label from the
+      // right, as octets, a name that is a proper suffix of another first.
+      // Both names are lowercase and dotted, "" the root.
+      int CompareCanonicalNames(const AnsiString &left, const AnsiString &right)
+      {
+         std::vector<AnsiString> leftLabels;
+         std::vector<AnsiString> rightLabels;
+         for (const AnsiString &label : StringParser::SplitString(left, "."))
+            if (!label.IsEmpty())
+               leftLabels.push_back(label);
+         for (const AnsiString &label : StringParser::SplitString(right, "."))
+            if (!label.IsEmpty())
+               rightLabels.push_back(label);
+
+         int leftIndex = static_cast<int>(leftLabels.size()) - 1;
+         int rightIndex = static_cast<int>(rightLabels.size()) - 1;
+         while (leftIndex >= 0 && rightIndex >= 0)
+         {
+            int order = leftLabels[leftIndex].Compare(rightLabels[rightIndex]);
+            if (order != 0)
+               return order < 0 ? -1 : 1;
+            leftIndex--;
+            rightIndex--;
+         }
+         if (leftIndex < 0 && rightIndex < 0)
+            return 0;
+         return leftIndex < 0 ? -1 : 1;
+      }
+
+      // RFC 5155 5: SHA-1 over the canonical name and the salt, iterated. More
+      // iterations than a resolver is asked to tolerate (RFC 9276) is no proof.
+      bool ComputeNsec3Hash(const AnsiString &name, unsigned char algorithm, unsigned short iterations,
+                            const std::vector<unsigned char> &salt, std::vector<unsigned char> &out)
+      {
+         if (algorithm != 1 || iterations > 150)
+            return false;
+
+         std::vector<unsigned char> input;
+         if (!AppendName(input, name))
+            return false;
+         input.insert(input.end(), salt.begin(), salt.end());
+
+         unsigned char digest[SHA_DIGEST_LENGTH];
+         SHA1(input.data(), input.size(), digest);
+         for (unsigned short i = 0; i < iterations; i++)
+         {
+            std::vector<unsigned char> again(digest, digest + SHA_DIGEST_LENGTH);
+            again.insert(again.end(), salt.begin(), salt.end());
+            SHA1(again.data(), again.size(), digest);
+         }
+         out.assign(digest, digest + SHA_DIGEST_LENGTH);
+         return true;
+      }
+
+      // RFC 4648 base32hex, uppercase, no padding - the spelling of an NSEC3
+      // owner label, which sorts exactly as the hash's octets do.
+      AnsiString Base32Hex(const std::vector<unsigned char> &data)
+      {
+         static const char alphabet[] = "0123456789ABCDEFGHIJKLMNOPQRSTUV";
+         AnsiString result;
+         unsigned long buffer = 0;
+         int bits = 0;
+         for (unsigned char byte : data)
+         {
+            buffer = (buffer << 8) | byte;
+            bits += 8;
+            while (bits >= 5)
+            {
+               result += alphabet[(buffer >> (bits - 5)) & 31];
+               bits -= 5;
+            }
+         }
+         if (bits > 0)
+            result += alphabet[(buffer << (5 - bits)) & 31];
+         return result;
+      }
+
+      enum class DsDenial
+      {
+         NoProof,             // nothing in the authority section speaks to it
+         UnsignedDelegation,  // a verified record: the name is a delegation without a DS
+         NotADelegation,      // a verified record: the name exists but is not a zone cut
+         Nonexistent,         // a verified record: the name does not exist
+         Invalid              // records were there, but none verified or none applied
+      };
+
+      // What one verified NSEC or NSEC3 record says about a DS RRset at the name.
+      DsDenial ReadDsDenial(const AnsiString &name, const ParsedRr &record, const DnsResponse &response)
+      {
+         if (record.type == DnsTypeNsec)
+         {
+            AnsiString next;
+            size_t offset = record.rdata_offset;
+            if (!ReadName(response.packet, offset, next))
+               return DsDenial::Invalid;
+            size_t bitmapStart = offset - record.rdata_offset;
+
+            if (record.owner == name)
+            {
+               // The parent's own apex is not a delegation, and a bitmap that has DS in
+               // it says the record exists - which contradicts the answer it came with.
+               if (TypeBitmapHas(record.rdata, bitmapStart, DnsTypeDs) || TypeBitmapHas(record.rdata, bitmapStart, DnsTypeSoa))
+                  return DsDenial::Invalid;
+               return TypeBitmapHas(record.rdata, bitmapStart, DnsTypeNs) ? DsDenial::UnsignedDelegation : DsDenial::NotADelegation;
+            }
+
+            // Covering: owner before the name and the name before next - or the next
+            // name wrapping round to the apex, in which case everything after the
+            // owner is covered.
+            bool ownerBefore = CompareCanonicalNames(record.owner, name) < 0;
+            bool nameBeforeNext = CompareCanonicalNames(name, next) < 0;
+            bool wraps = CompareCanonicalNames(next, record.owner) <= 0;
+            if (ownerBefore && (nameBeforeNext || wraps))
+               return DsDenial::Nonexistent;
+            return DsDenial::Invalid;
+         }
+
+         // NSEC3: hash algorithm, flags, iterations, salt, the next hashed owner,
+         // then the bitmap.
+         const std::vector<unsigned char> &rdata = record.rdata;
+         if (rdata.size() < 6)
+            return DsDenial::Invalid;
+         unsigned char algorithm = rdata[0];
+         unsigned char flags = rdata[1];
+         unsigned short iterations = (static_cast<unsigned short>(rdata[2]) << 8) | rdata[3];
+         size_t saltLength = rdata[4];
+         if (rdata.size() < 5 + saltLength + 1)
+            return DsDenial::Invalid;
+         std::vector<unsigned char> salt(rdata.begin() + 5, rdata.begin() + 5 + saltLength);
+         size_t hashLengthOffset = 5 + saltLength;
+         size_t hashLength = rdata[hashLengthOffset];
+         if (rdata.size() < hashLengthOffset + 1 + hashLength)
+            return DsDenial::Invalid;
+         std::vector<unsigned char> nextHash(rdata.begin() + hashLengthOffset + 1, rdata.begin() + hashLengthOffset + 1 + hashLength);
+         size_t bitmapStart = hashLengthOffset + 1 + hashLength;
+
+         std::vector<unsigned char> hash;
+         if (!ComputeNsec3Hash(name, algorithm, iterations, salt, hash))
+            return DsDenial::Invalid;
+
+         int dot = record.owner.Find('.');
+         AnsiString ownerLabel = dot >= 0 ? record.owner.Left(dot) : record.owner;
+         ownerLabel.MakeUpper();
+         AnsiString hashed = Base32Hex(hash);
+         AnsiString nextLabel = Base32Hex(nextHash);
+
+         if (ownerLabel == hashed)
+         {
+            if (TypeBitmapHas(rdata, bitmapStart, DnsTypeDs) || TypeBitmapHas(rdata, bitmapStart, DnsTypeSoa))
+               return DsDenial::Invalid;
+            return TypeBitmapHas(rdata, bitmapStart, DnsTypeNs) ? DsDenial::UnsignedDelegation : DsDenial::NotADelegation;
+         }
+
+         bool ownerBefore = ownerLabel.Compare(hashed) < 0;
+         bool hashBeforeNext = hashed.Compare(nextLabel) < 0;
+         bool wraps = nextLabel.Compare(ownerLabel) <= 0;
+         if (!(ownerBefore && (hashBeforeNext || wraps)))
+            return DsDenial::Invalid;
+
+         // Covered. With Opt-Out the span may hold unsigned delegations, and this is
+         // read as one (RFC 5155 8.9); without it the name does not exist.
+         return (flags & 0x01) != 0 ? DsDenial::UnsignedDelegation : DsDenial::Nonexistent;
+      }
+
+      InternalStatus ValidateZoneKeys(const AnsiString &zone, int depth, std::vector<std::vector<unsigned char>> &keys);
+
+      // The authority section's NSEC and NSEC3 records, each verified against its
+      // signer's keys - the signer has to be a proper ancestor of the name - and
+      // read for what they say about a DS RRset at the name.
+      DsDenial EvaluateDsDenial(const AnsiString &name, const DnsResponse &response, int depth)
+      {
+         std::vector<ParsedRr> proofs;
+         std::vector<RrsigInfo> signatures;
+         for (const ParsedRr &record : response.authority)
+         {
+            if (record.type == DnsTypeNsec || record.type == DnsTypeNsec3)
+            {
+               proofs.push_back(record);
+            }
+            else if (record.type == DnsTypeRrsig)
+            {
+               RrsigInfo info;
+               if (ParseRrsig(response, record, info) &&
+                   (info.type_covered == DnsTypeNsec || info.type_covered == DnsTypeNsec3))
+               {
+                  signatures.push_back(info);
+               }
+            }
+         }
+         if (proofs.empty())
+            return DsDenial::NoProof;
+
+         for (const ParsedRr &proof : proofs)
+         {
+            // The RRset the record belongs to - every record of its type under its
+            // owner - is what its RRSIG covers.
+            std::vector<ParsedRr> rrset;
+            for (const ParsedRr &candidate : proofs)
+               if (candidate.type == proof.type && candidate.owner == proof.owner)
+                  rrset.push_back(candidate);
+
+            bool verified = false;
+            for (const RrsigInfo &sig : signatures)
+            {
+               if (verified)
+                  break;
+               if (sig.type_covered != proof.type)
+                  continue;
+               if (sig.signer == name || !IsSubdomainOrEqual(name, sig.signer) || !IsSubdomainOrEqual(proof.owner, sig.signer))
+                  continue;
+
+               std::vector<std::vector<unsigned char>> keys;
+               InternalStatus signerStatus = ValidateZoneKeys(sig.signer, depth + 1, keys);
+               if (signerStatus == InternalStatus::Insecure)
+               {
+                  // The parent itself is unsigned; nothing below it can be signed
+                  // as far as this resolver is concerned.
+                  return DsDenial::UnsignedDelegation;
+               }
+               if (signerStatus != InternalStatus::Secure)
+                  continue;
+
+               for (const std::vector<unsigned char> &key : keys)
+               {
+                  if (key.size() < 5 || key[3] != sig.algorithm || ComputeKeyTag(key) != sig.key_tag)
+                     continue;
+                  if (VerifyRrsigOverSet(response, rrset, sig, key))
+                  {
+                     verified = true;
+                     break;
+                  }
+               }
+            }
+            if (!verified)
+               continue;
+
+            DsDenial reading = ReadDsDenial(name, proof, response);
+            if (reading != DsDenial::Invalid)
+               return reading;
+         }
+         return DsDenial::Invalid;
+      }
+
+      // "No DS" with a proof: Insecure. "No DS" without one: what the parent is
+      // decides - unsigned above means unsigned here, and a signed zone above that
+      // offered no proof means the record was taken away, which is Bogus.
+      InternalStatus ProveNoDs(const AnsiString &zone, const DnsResponse &response, int depth)
+      {
+         switch (EvaluateDsDenial(zone, response, depth))
+         {
+         case DsDenial::UnsignedDelegation:
+            return InternalStatus::Insecure;
+         case DsDenial::NotADelegation:
+         case DsDenial::Nonexistent:
+            // Records were signed in the name of a zone the parent, signed, says is
+            // not a zone cut - or not a name at all.
+            LOG_DEBUG("DNSSEC: the parent of " + String(zone) + " proves it is not a delegation, yet records are signed as its zone; treating the delegation as bogus.");
+            return InternalStatus::Bogus;
+         case DsDenial::Invalid:
+            LOG_DEBUG("DNSSEC: " + String(zone) + " has no DS and the denial that came with the answer does not verify or does not apply; treating the delegation as bogus.");
+            return InternalStatus::Bogus;
+         case DsDenial::NoProof:
+            break;
+         }
+
+         AnsiString ancestor = zone;
+         for (int hop = 0; hop < MaxChainDepth; hop++)
+         {
+            if (ancestor.IsEmpty())
+               break;
+            int dot = ancestor.Find('.');
+            ancestor = dot >= 0 ? ancestor.Mid(dot + 1) : AnsiString("");
+
+            if (ancestor.IsEmpty())
+            {
+               // The root is signed by definition - the trust anchors - and nothing
+               // between it and the zone proved an unsigned cut.
+               LOG_DEBUG("DNSSEC: " + String(zone) + " has no DS and no NSEC or NSEC3 proof that none exists, all the way to the root; treating the delegation as bogus.");
+               return InternalStatus::Bogus;
+            }
+
+            DnsResponse dsResponse;
+            if (!RunQuery(ancestor, DnsTypeDs, dsResponse))
+               return InternalStatus::Insecure; // transport failure - degrade, as everywhere
+
+            bool hasDs = false;
+            for (const ParsedRr &record : dsResponse.answers)
+            {
+               if (record.owner == ancestor && record.type == DnsTypeDs)
+               {
+                  hasDs = true;
+                  break;
+               }
+            }
+
+            if (hasDs)
+            {
+               // A signed delegation above, with nothing between it and the zone
+               // proved unsigned: that zone should have proved the DS absent.
+               std::vector<std::vector<unsigned char>> keys;
+               InternalStatus status = ValidateZoneKeys(ancestor, depth + 1, keys);
+               if (status == InternalStatus::Secure)
+               {
+                  LOG_DEBUG("DNSSEC: " + String(zone) + " has no DS, and " + String(ancestor) + " is signed but gave no NSEC or NSEC3 proof that none exists; treating the delegation as bogus.");
+                  return InternalStatus::Bogus;
+               }
+               return status;
+            }
+
+            switch (EvaluateDsDenial(ancestor, dsResponse, depth + 1))
+            {
+            case DsDenial::UnsignedDelegation:
+               return InternalStatus::Insecure;
+            case DsDenial::Invalid:
+               LOG_DEBUG("DNSSEC: " + String(ancestor) + ", above " + String(zone) + ", has no DS and a denial that does not verify; treating the delegation as bogus.");
+               return InternalStatus::Bogus;
+            default:
+               break; // not a delegation, or nothing said: further up
+            }
+         }
+
+         return InternalStatus::Bogus;
+      }
+
       // Fetches and validates the DS RRset for a zone (served by the
       // parent). Secure fills dsRecords; Insecure means an unsigned
       // delegation was found.
@@ -1096,7 +1475,7 @@ namespace HM
          }
 
          if (dsRrset.empty())
-            return InternalStatus::Insecure; // no DS - unsigned delegation
+            return ProveNoDs(zone, response, depth);
 
          bool sawInsecureParent = false;
 
