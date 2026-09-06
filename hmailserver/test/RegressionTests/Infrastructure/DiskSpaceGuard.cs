@@ -268,6 +268,7 @@ namespace RegressionTests.Infrastructure
          {
             remoteServer.StartListen();
 
+            hMailServer.FetchAccount fetchAccount = null;
             try
             {
                ServerIniFile.SetSetting(FloorSetting, LargerThanAnyVolume);
@@ -276,7 +277,7 @@ namespace RegressionTests.Infrastructure
                var restartedAccount = SingletonProvider<TestSetup>.Instance.GetApp()
                   .Domains.get_ItemByName("example.test").Accounts.get_ItemByAddress(accountAddress);
 
-               var fetchAccount = restartedAccount.FetchAccounts.Add();
+               fetchAccount = restartedAccount.FetchAccounts.Add();
                fetchAccount.Enabled = true;
                fetchAccount.MinutesBetweenFetch = 60;
                fetchAccount.Name = "DiskFullPause";
@@ -317,7 +318,28 @@ namespace RegressionTests.Infrastructure
             }
             finally
             {
+               // The paused fetch left the account due, and the restart that lifts the
+               // floor would run it at once - against a scripted server about to be
+               // disposed, delivering "should stay remote" to a mailbox the next test's
+               // setup is about to delete. That delivery reported HM5165 into the next
+               // setup's clean-log check in the 6.2.25 release gate. Off before the
+               // restart, so nothing is fetched once the floor is gone; then the queue
+               // is drained, in case a fetch raced the switch.
+               try
+               {
+                  if (fetchAccount != null)
+                  {
+                     fetchAccount.Enabled = false;
+                     fetchAccount.Save();
+                  }
+               }
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+               {
+                  // Deliberately ignored: the account proxy may already be gone, and the restart below reads the ini afresh either way.
+               }
+
                RestoreDefaultsAndRestart();
+               CustomAsserts.AssertRecipientsInDeliveryQueue(0);
             }
          }
       }
