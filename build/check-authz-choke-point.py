@@ -17,7 +17,6 @@ and the line, before it can be merged.
 Run from the repository root: python3 build/check-authz-choke-point.py
 """
 import os
-import re
 import sys
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hmailserver", "source", "Server")

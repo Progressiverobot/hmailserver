@@ -179,7 +179,7 @@ namespace RegressionTests.Shared
             if (string.IsNullOrEmpty(more))
                return null;
 
-            _pending += more;
+            _pending = string.Concat(_pending, more); // one socket read at a time; a line or a chunk, never a document
          }
       }
 
@@ -198,7 +198,7 @@ namespace RegressionTests.Shared
             if (string.IsNullOrEmpty(more))
                break;
 
-            _pending += more;
+            _pending = string.Concat(_pending, more); // one socket read at a time; a line or a chunk, never a document
          }
       }
 
@@ -353,7 +353,7 @@ namespace RegressionTests.Shared
                if (string.IsNullOrEmpty(more))
                   return true;
 
-               _pending += more;
+               _pending = string.Concat(_pending, more); // one socket read at a time; a line or a chunk, never a document
             }
 
             MessageData += _pending.Substring(0, size);

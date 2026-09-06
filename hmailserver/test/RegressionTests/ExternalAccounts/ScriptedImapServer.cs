@@ -12,8 +12,8 @@ namespace RegressionTests.ExternalAccounts
 {
    /// <summary>
    ///    An IMAP server for the external-account fetcher to collect from, scripted the way
-   ///    ScriptedPop3Server is: which messages exist lives in the caller's list, so a second
-   ///    session sees what the first one did to the mailbox, and every way a remote server
+   ///    ScriptedPop3Server is: which messages exist lives in the caller's mailbox, so a
+   ///    second session sees what the first one did to it, and every way a remote server
    ///    can disappoint the fetcher is a knob - a refused logon, a message that is gone
    ///    between the SEARCH and its FETCH, a download cut short, a STORE refused.
    ///    <para />
@@ -36,16 +36,61 @@ namespace RegressionTests.ExternalAccounts
          public string Text { get; private set; }
       }
 
-      private readonly List<RemoteMessage> _messages;
+      /// <summary>
+      ///    The simulated remote INBOX. Owned by the test and handed to each session's
+      ///    server in turn, so what one session expunges the next one no longer lists.
+      /// </summary>
+      public sealed class RemoteMailbox
+      {
+         private readonly List<RemoteMessage> _messages = new List<RemoteMessage>();
+
+         public int Count
+         {
+            get { return _messages.Count; }
+         }
+
+         public void Add(RemoteMessage message)
+         {
+            _messages.Add(message);
+         }
+
+         internal IEnumerable<int> Uids
+         {
+            get { return _messages.Select(message => message.Uid); }
+         }
+
+         internal RemoteMessage Find(int uid)
+         {
+            return _messages.FirstOrDefault(message => message.Uid == uid);
+         }
+
+         /// <summary>The message's sequence number in this mailbox, 1-based, as a FETCH response names it.</summary>
+         internal int SequenceOf(RemoteMessage message)
+         {
+            return _messages.IndexOf(message) + 1;
+         }
+
+         internal void Remove(int uid)
+         {
+            _messages.RemoveAll(message => message.Uid == uid);
+         }
+
+         internal int NextUid
+         {
+            get { return _messages.Count == 0 ? 1 : _messages.Max(message => message.Uid) + 1; }
+         }
+      }
+
+      private readonly RemoteMailbox _mailbox;
 
       // \Deleted flags the client has set. Applied to the mailbox on EXPUNGE, as a real
       // server does, so a session that never reaches EXPUNGE leaves the mailbox intact.
       private readonly List<int> _flaggedForDeletion = new List<int>();
 
-      public ScriptedImapServer(int port, List<RemoteMessage> messages)
+      public ScriptedImapServer(int port, RemoteMailbox mailbox)
          : base(1, port, eConnectionSecurity.eCSNone)
       {
-         _messages = messages;
+         _mailbox = mailbox;
          UidValidity = 7;
          FetchedUids = new List<int>();
          StoredDeletedUids = new List<int>();
@@ -91,6 +136,8 @@ namespace RegressionTests.ExternalAccounts
 
          while (ProcessCommand(Receive()))
          {
+            // One command per iteration; ProcessCommand answers false when the
+            // session is over - LOGOUT, a dropped connection, or a deliberate cut.
          }
       }
 
@@ -133,10 +180,10 @@ namespace RegressionTests.ExternalAccounts
 
          if (upper.StartsWith("SELECT "))
          {
-            Send("* " + _messages.Count + " EXISTS\r\n" +
+            Send("* " + _mailbox.Count + " EXISTS\r\n" +
                  "* 0 RECENT\r\n" +
                  "* OK [UIDVALIDITY " + UidValidity + "] UIDs valid\r\n" +
-                 "* OK [UIDNEXT " + NextUid() + "] Predicted next UID\r\n" +
+                 "* OK [UIDNEXT " + _mailbox.NextUid + "] Predicted next UID\r\n" +
                  "* FLAGS (\\Seen \\Deleted)\r\n" +
                  tag + " OK [READ-WRITE] SELECT completed\r\n");
             return true;
@@ -144,7 +191,7 @@ namespace RegressionTests.ExternalAccounts
 
          if (upper.StartsWith("UID SEARCH"))
          {
-            var uids = string.Join(" ", _messages.Select(message => message.Uid.ToString()));
+            var uids = string.Join(" ", _mailbox.Uids.Select(uid => uid.ToString()));
             Send("* SEARCH" + (uids.Length > 0 ? " " + uids : "") + "\r\n" +
                  tag + " OK SEARCH completed\r\n");
             return true;
@@ -160,7 +207,7 @@ namespace RegressionTests.ExternalAccounts
          {
             ExpungeCount++;
             foreach (var uid in _flaggedForDeletion)
-               _messages.RemoveAll(message => message.Uid == uid);
+               _mailbox.Remove(uid);
             _flaggedForDeletion.Clear();
 
             Send(tag + " OK EXPUNGE completed\r\n");
@@ -188,7 +235,7 @@ namespace RegressionTests.ExternalAccounts
          var uid = ParseUid(rest);
          FetchedUids.Add(uid);
 
-         var message = _messages.FirstOrDefault(candidate => candidate.Uid == uid);
+         var message = _mailbox.Find(uid);
 
          if (message == null || VanishedUids.Contains(uid))
          {
@@ -199,7 +246,7 @@ namespace RegressionTests.ExternalAccounts
          }
 
          var length = Encoding.UTF8.GetByteCount(message.Text);
-         var sequence = _messages.IndexOf(message) + 1;
+         var sequence = _mailbox.SequenceOf(message);
 
          if (TruncateFetchAfterBytes > 0 && TruncateFetchAfterBytes < length)
          {
@@ -238,11 +285,6 @@ namespace RegressionTests.ExternalAccounts
          var parts = rest.Split(' ');
          int uid;
          return parts.Length >= 3 && int.TryParse(parts[2], out uid) ? uid : 0;
-      }
-
-      private int NextUid()
-      {
-         return _messages.Count == 0 ? 1 : _messages.Max(message => message.Uid) + 1;
       }
    }
 }
