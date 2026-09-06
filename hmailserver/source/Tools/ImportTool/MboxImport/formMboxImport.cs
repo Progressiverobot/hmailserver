@@ -31,7 +31,7 @@ namespace ImportTool.MboxImport
 
       private void wizard_PageChanged(int currentPage, int lastPage)
       {
-         Text = "Import mbox files - Step " + currentPage + " of " + lastPage;
+         Text = "Import messages - Step " + currentPage + " of " + lastPage;
       }
    }
 }

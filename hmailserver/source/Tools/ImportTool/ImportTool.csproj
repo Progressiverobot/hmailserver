@@ -29,4 +29,8 @@
     </Reference>
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="ImportTool.Tests" />
+  </ItemGroup>
+
 </Project>

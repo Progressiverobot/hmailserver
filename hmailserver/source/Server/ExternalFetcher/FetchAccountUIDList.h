@@ -20,6 +20,10 @@ namespace HM
       bool IsUIDInList(const String&sUID) const;
       void DeleteUID(const String &sUID);
       void DeleteUIDsNotInSet(std::set<String> &vecUIDs);
+      // The same, but only among the records whose key starts with prefix: one
+      // mailbox's records while the others' are untouched. An empty prefix is
+      // every record.
+      void DeleteUIDsNotInSetWithPrefix(const String &prefix, std::set<String> &vecUIDs);
       void AddUID(const String &sUIDValue);
 
       std::shared_ptr<FetchAccountUID> GetUID(const String &sUID);

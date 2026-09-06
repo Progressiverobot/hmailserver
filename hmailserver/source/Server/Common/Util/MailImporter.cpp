@@ -220,6 +220,13 @@ namespace HM
       if (!PersistentMessage::SaveObject(pMessage))
          return false;
 
+      // A session with the folder open holds its message list in the cache and
+      // would not see the import until something else refreshed it - the Import
+      // Tool runs while clients are connected. Told to refresh, it does, on its
+      // next command, exactly as it learns of a delivery.
+      if (pMessage->GetFolderID() > 0)
+         MessagesContainer::Instance()->SetFolderNeedsRefresh(pMessage->GetFolderID());
+
       return true;
    }
 

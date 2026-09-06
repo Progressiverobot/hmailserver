@@ -380,6 +380,7 @@ create table hm_fetchaccounts
     fauseantispam smallint not null,
     fauseantivirus smallint not null,
     faenablerouterecipients smallint not null,
+    famirrorfolders smallint not null DEFAULT 0,
 	famimerecipientheaders varchar(255) not null DEFAULT 'To,CC,X-RCPT-TO,X-Envelope-To'
 );
 
@@ -1027,4 +1028,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6030);
+insert into hm_dbversion values (6031);

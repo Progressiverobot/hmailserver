@@ -102,11 +102,24 @@ namespace HM
    void 
    FetchAccountUIDList::DeleteUIDsNotInSet(std::set<String> &setUIDs)
    {
+      DeleteUIDsNotInSetWithPrefix(_T(""), setUIDs);
+   }
+
+   void
+   FetchAccountUIDList::DeleteUIDsNotInSetWithPrefix(const String &prefix, std::set<String> &setUIDs)
+   {
       auto iterFA = fetched_uids_.begin();
       auto iterEnd = fetched_uids_.end();
       while (iterFA != iterEnd)
       {
          std::shared_ptr<FetchAccountUID> pUID = (*iterFA).second;
+
+         if (!prefix.IsEmpty() && !pUID->GetUID().StartsWith(prefix))
+         {
+            // Another mailbox's record; not this pruning's business.
+            iterFA++;
+            continue;
+         }
 
          if (setUIDs.find(pUID->GetUID()) == setUIDs.end())
          {

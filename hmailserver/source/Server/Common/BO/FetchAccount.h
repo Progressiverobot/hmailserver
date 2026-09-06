@@ -84,6 +84,14 @@ namespace HM
       bool GetEnableRouteRecipients() const {return enable_route_recipients_;}
       void SetEnableRouteRecipients(bool enable) {enable_route_recipients_ = enable;}
 
+      // ServerType IMAP only. Every folder the remote server lists is collected into
+      // a local folder of the same name - the message verbatim, with its flags and its
+      // internal date, filed straight into the folder rather than delivered - which is
+      // a migration, not a collection. Off, the INBOX alone is collected and delivered.
+      // See IMAPClientConnection.
+      bool GetMirrorFolders() const {return mirror_folders_; }
+      void SetMirrorFolders(bool bNewVal) {mirror_folders_ = bNewVal; }
+
       bool XMLStore(XNode *pFetchAccountsNode, int iOptions);
       bool XMLLoad(XNode *pNode, int iOptions);
       bool XMLLoadSubItems(XNode *pNode, int iOptions);
@@ -112,6 +120,7 @@ namespace HM
       bool use_anti_virus_;
 
       bool enable_route_recipients_;
+      bool mirror_folders_;
 
       ConnectionSecurity connection_security_;
    };
