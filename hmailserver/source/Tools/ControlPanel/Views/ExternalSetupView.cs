@@ -14,6 +14,7 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -81,14 +82,13 @@ namespace hMailServer.ControlPanel.Views
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "External setup" };
+         var title = new TextBlock { Text = L("External setup") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "What this server needs done outside it - DNS records, key and CA files, trusted lists. "
-                   + "Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing."
+            Text = L("What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -96,11 +96,11 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "_Refresh",
+            Content = L("_Refresh"),
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(refresh, "Re-check the external prerequisites");
+         System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-check the external prerequisites"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "external-setup-refresh");
          refresh.Click += (s, e) => Reload();
          Grid.SetColumn(refresh, 1);
@@ -157,11 +157,11 @@ namespace hMailServer.ControlPanel.Views
          checks_ = ExternalSetupChecks.Run();
 
          baseStatus_ = checks_.FailedReads == 0
-            ? "Checked against the server. Everything is re-checked every time this page is opened."
-            : checks_.FailedReads + " value(s) could not be read — " + checks_.FirstError + " The items above may be incomplete.";
+            ? L("Checked against the server. Everything is re-checked every time this page is opened.")
+            : F("{0} value(s) could not be read — {1} The items above may be incomplete.", checks_.FailedReads, checks_.FirstError);
 
          RenderItems(checks_.DnsLookupCount > 0
-            ? " " + checks_.DnsLookupCount + " DNS record(s) are being looked up in the background; the rows marked \"checking\" will update."
+            ? F(" {0} DNS record(s) are being looked up in the background; the rows marked \"checking\" will update.", checks_.DnsLookupCount)
             : "");
 
          if (checks_.DnsLookupCount == 0)
@@ -184,7 +184,7 @@ namespace hMailServer.ControlPanel.Views
                   return;
 
                checks.ApplyDnsResults();
-               RenderItems(" DNS records checked through the Windows resolver.");
+               RenderItems(L(" DNS records checked through the Windows resolver."));
             }));
          });
       }
@@ -202,8 +202,7 @@ namespace hMailServer.ControlPanel.Views
          int done = checks_.Items.Count(i => i.State == SetupItemState.Done);
          int unused = checks_.Items.Count(i => i.State == SetupItemState.NotNeeded);
 
-         summary_.Text = action + " need action, " + unknown + " cannot be told from here, "
-                         + done + " done, " + unused + " not needed.";
+         summary_.Text = F("{0} need action, {1} cannot be told from here, {2} done, {3} not needed.", action, unknown, done, unused);
 
          status_.Text = baseStatus_ + dnsNote;
       }
@@ -261,8 +260,8 @@ namespace hMailServer.ControlPanel.Views
 
          if (item.Page != null)
          {
-            FrameworkElement link = PageLink(item.Page, "Settings…",
-               "Open " + NavigationMap.TitleOf(item.Page) + ", which owns the settings for: " + item.Title);
+            FrameworkElement link = PageLink(item.Page, L("Settings…"),
+               F("Open {0}, which owns the settings for: {1}", L(NavigationMap.TitleOf(item.Page)), L(item.Title)));
             link.VerticalAlignment = VerticalAlignment.Top;
             Grid.SetColumn(link, 3);
             header.Children.Add(link);
@@ -316,7 +315,7 @@ namespace hMailServer.ControlPanel.Views
                TextWrapping = TextWrapping.Wrap,
                Margin = new Thickness(19, 10, 0, 0)
             };
-            action.Inlines.Add(new Run("What to do: ") { FontWeight = FontWeights.SemiBold });
+            action.Inlines.Add(new Run(L("What to do: ")) { FontWeight = FontWeights.SemiBold });
             action.Inlines.Add(new Run(item.Action));
             content.Children.Add(action);
          }

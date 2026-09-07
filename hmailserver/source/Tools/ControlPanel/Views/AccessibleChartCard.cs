@@ -21,6 +21,7 @@ using LiveChartsCore.SkiaSharpView.Painting.Effects;
 using LiveChartsCore.SkiaSharpView.WPF;
 using SkiaSharp;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -63,8 +64,8 @@ namespace hMailServer.ControlPanel.Views
       // which returns null rather than a substitute when it is absent, and only
       // then take classic Segoe UI, which every supported Windows has.
       private static readonly SKTypeface AxisTypeface =
-         SKFontManager.Default.MatchFamily("Segoe UI Variable Text")
-         ?? SKTypeface.FromFamilyName("Segoe UI");
+         SKFontManager.Default.MatchFamily("Segoe UI Variable Text") // no-loc
+         ?? SKTypeface.FromFamilyName("Segoe UI"); // no-loc
 
       private readonly ChartDefinition definition_;
       private readonly int historyLength_;
@@ -180,7 +181,7 @@ namespace hMailServer.ControlPanel.Views
       private string WindowDescription_()
       {
          if (times_.Count < 2)
-            return "collecting";
+            return L("collecting");
 
          TimeSpan span = times_[times_.Count - 1] - times_[0];
 
@@ -258,12 +259,10 @@ namespace hMailServer.ControlPanel.Views
          copyButton_.Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary;
          copyButton_.FontSize = Typography.Caption;
          copyButton_.Padding = new Thickness(10, 4, 10, 4);
-         copyButton_.Content = "Copy";   // per card: no access key, the rows are reached with the arrow keys
+         copyButton_.Content = L("Copy");   // per card: no access key, the rows are reached with the arrow keys
          copyButton_.Margin = new Thickness(6, 0, 0, 0);
-         copyButton_.ToolTip = "Copy every sample of " + definition_.Title.ToLowerInvariant()
-            + " to the clipboard as tab-separated text";
-         AutomationProperties.SetName(copyButton_, "Copy the " + definition_.Title.ToLowerInvariant()
-            + " data to the clipboard");
+         copyButton_.ToolTip = F("Copy every sample of {0} to the clipboard as tab-separated text", L(definition_.Title).ToLowerInvariant());
+         AutomationProperties.SetName(copyButton_, F("Copy the {0} data to the clipboard", L(definition_.Title).ToLowerInvariant()));
          AutomationProperties.SetAutomationId(copyButton_, definition_.Id + ".copy");
          copyButton_.Click += Copy_Click;
 
@@ -287,7 +286,7 @@ namespace hMailServer.ControlPanel.Views
          placeholder_.HorizontalAlignment = HorizontalAlignment.Center;
          placeholder_.VerticalAlignment = VerticalAlignment.Center;
          placeholder_.FontSize = Typography.Body;
-         placeholder_.Text = "No data yet";
+         placeholder_.Text = L("No data yet");
 
          BuildTable_();
 
@@ -355,7 +354,7 @@ namespace hMailServer.ControlPanel.Views
          table_.ItemsSource = tableRows_;
          table_.Visibility = Visibility.Collapsed;
          table_.Margin = new Thickness(0, 8, 0, 0);
-         AutomationProperties.SetName(table_, definition_.Title + " data table");
+         AutomationProperties.SetName(table_, F("{0} data table", L(definition_.Title)));
          AutomationProperties.SetAutomationId(table_, definition_.Id + ".table");
 
          var numeric = new Style(typeof(TextBlock));
@@ -790,7 +789,7 @@ namespace hMailServer.ControlPanel.Views
             string spoken = series.Name + " latest "
                + ChartDataTable.Format(series.Latest, definition_.ValueFormat);
             if (series.Peak.HasValue)
-               spoken += ", peak " + ChartDataTable.Format(series.Peak, definition_.ValueFormat);
+               spoken += F(", peak {0}", ChartDataTable.Format(series.Peak, definition_.ValueFormat));
             if (definition_.Unit.Length > 0)
                spoken += " " + definition_.Unit;
 
@@ -864,13 +863,14 @@ namespace hMailServer.ControlPanel.Views
 
       private void UpdateViewButton_()
       {
-         viewButton_.Content = tableVisible_ ? "Show chart" : "Show table";   // per card: no access key, the rows are reached with the arrow keys
+         viewButton_.Content = tableVisible_ ? L("Show chart") : L("Show table");   // per card: no access key, the rows are reached with the arrow keys
+         string title = L(definition_.Title).ToLowerInvariant();
          viewButton_.ToolTip = tableVisible_
-            ? "Show " + definition_.Title.ToLowerInvariant() + " as a chart"
-            : "Show every " + definition_.Title.ToLowerInvariant() + " sample as a table of numbers";
+            ? F("Show {0} as a chart", title)
+            : F("Show every {0} sample as a table of numbers", title);
          AutomationProperties.SetName(viewButton_, tableVisible_
-            ? "Show " + definition_.Title.ToLowerInvariant() + " as a chart"
-            : "Show " + definition_.Title.ToLowerInvariant() + " as a data table");
+            ? F("Show {0} as a chart", title)
+            : F("Show {0} as a data table", title));
          AutomationProperties.SetAutomationId(viewButton_, definition_.Id + ".view");
       }
 
@@ -882,9 +882,8 @@ namespace hMailServer.ControlPanel.Views
          {
             Clipboard.SetText(table.ToDelimitedText());
             Toast.Info(table.Rows.Count == 1
-               ? "1 sample copied to the clipboard."
-               : table.Rows.Count.ToString("N0", CultureInfo.CurrentCulture)
-                 + " samples copied to the clipboard.", definition_.Title);
+               ? L("1 sample copied to the clipboard.")
+               : F("{0} samples copied to the clipboard.", table.Rows.Count.ToString("N0", CultureInfo.CurrentCulture)), L(definition_.Title));
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {

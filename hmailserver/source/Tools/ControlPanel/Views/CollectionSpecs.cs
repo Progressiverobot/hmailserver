@@ -151,7 +151,7 @@ namespace hMailServer.ControlPanel.Views
       {
          Title = L("Server messages"),
          Subtitle = L("The text templates the server returns to clients (greetings, bounce and error messages). These are a fixed set you can edit."),
-         ItemNoun = L("message"),
+         ItemNoun = L("server message"),
          CanAdd = false,
          CanDelete = false,
          GetCollection = () => Settings.ServerMessages,

@@ -15,6 +15,7 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -55,14 +56,13 @@ namespace hMailServer.ControlPanel.Views
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "Transport encryption overview" };
+         var title = new TextBlock { Text = L("Transport encryption overview") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "What every listener protects, what it presents to prove who it is, and what can still be "
-                   + "negotiated. Nothing on this page can be edited — each row opens the page that owns the setting."
+            Text = L("What every listener protects, what it presents to prove who it is, and what can still be negotiated. Nothing on this page can be edited — each row opens the page that owns the setting.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -70,11 +70,11 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "_Refresh",
+            Content = L("_Refresh"),
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(refresh, "Re-read the transport security configuration from the server");
+         System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the transport security configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "tls-overview-refresh");
          refresh.Click += (s, e) => Reload();
          Grid.SetColumn(refresh, 1);
@@ -255,10 +255,10 @@ namespace hMailServer.ControlPanel.Views
                   int protocol = (int)port.Protocol;
                   string protocolName = protocol switch
                   {
-                     1 => "SMTP",
+                     1 => "SMTP", // no-loc
                      3 => "POP3",
-                     5 => "IMAP",
-                     _ => "Unknown (" + protocol + ")"
+                     5 => "IMAP", // no-loc
+                     _ => F("Unknown ({0})", protocol)
                   };
 
                   int certificateId = (int)port.SSLCertificateID;
@@ -381,9 +381,8 @@ namespace hMailServer.ControlPanel.Views
             body_.Children.Add(NotesCard(notes));
 
          status_.Text = failedReads_ == 0
-            ? "Read from the server. Values are read again every time this page is opened."
-            : failedReads_ + " value(s) could not be read — " + firstError_
-              + " The rows above may be incomplete.";
+            ? L("Read from the server. Values are read again every time this page is opened.")
+            : F("{0} value(s) could not be read — {1} The rows above may be incomplete.", failedReads_, firstError_);
       }
 
       private static Border Card(string title, out StackPanel content)
@@ -407,14 +406,11 @@ namespace hMailServer.ControlPanel.Views
 
       private static Border VerdictCard(TlsPostureConfig config)
       {
-         Border card = Card("Where this server stands", out StackPanel content);
+         Border card = Card(L("Where this server stands"), out StackPanel content);
 
          content.Children.Add(Paragraph(TlsPosture.Verdict(config), Typography.Body));
 
-         content.Children.Add(Paragraph(
-            "Port 25 is judged differently from the rest and deliberately so: the peer there is normally another "
-            + "mail server, and requiring encryption on it refuses mail from senders that cannot offer any. "
-            + "On every other port the peer is a client with a password.",
+         content.Children.Add(Paragraph(L("Port 25 is judged differently from the rest and deliberately so: the peer there is normally another mail server, and requiring encryption on it refuses mail from senders that cannot offer any. On every other port the peer is a client with a password."),
             Typography.Caption));
 
          return card;
@@ -422,7 +418,7 @@ namespace hMailServer.ControlPanel.Views
 
       private Border ListenersCard(TlsPostureConfig config)
       {
-         Border card = Card("Listeners", out StackPanel content);
+         Border card = Card(L("Listeners"), out StackPanel content);
 
          var grid = new Grid();
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // protocol + port
@@ -439,14 +435,14 @@ namespace hMailServer.ControlPanel.Views
 
          if (row == 0)
          {
-            content.Children.Add(Paragraph("No listeners are configured.", Typography.Body));
+            content.Children.Add(Paragraph(L("No listeners are configured."), Typography.Body));
          }
          else
          {
             content.Children.Add(grid);
          }
 
-         content.Children.Add(PageLink("ports", "Ports…", "Open TCP/IP ports, which owns the per-listener security setting"));
+         content.Children.Add(PageLink("ports", L("Ports…"), L("Open TCP/IP ports, which owns the per-listener security setting")));
 
          return card;
       }
@@ -468,7 +464,7 @@ namespace hMailServer.ControlPanel.Views
          // automation peer, so a screen reader hears one statement rather than three
          // fragments to reassemble.
          System.Windows.Automation.AutomationProperties.SetName(name,
-            listener.Protocol + " on port " + listener.Port + ", " + verdict.Word + ". " + verdict.Detail);
+            F("{0} on port {1}, {2}. {3}", listener.Protocol, listener.Port, verdict.Word, verdict.Detail));
 
          identity.Children.Add(name);
 
@@ -496,7 +492,7 @@ namespace hMailServer.ControlPanel.Views
          text.Children.Add(new TextBlock
          {
             Text = string.IsNullOrWhiteSpace(listener.CertificateName)
-               ? (listener.Security == TlsListenerSecurity.None ? "No certificate needed" : "No certificate assigned")
+               ? (listener.Security == TlsListenerSecurity.None ? L("No certificate needed") : L("No certificate assigned"))
                : "Certificate: " + listener.CertificateName,
             FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
@@ -540,11 +536,11 @@ namespace hMailServer.ControlPanel.Views
 
       private Border CertificatesCard(TlsPostureConfig config)
       {
-         Border card = Card("Certificates", out StackPanel content);
+         Border card = Card(L("Certificates"), out StackPanel content);
 
          if (config.Certificates.Count == 0)
          {
-            content.Children.Add(Paragraph("No certificates are configured.", Typography.Body));
+            content.Children.Add(Paragraph(L("No certificates are configured."), Typography.Body));
          }
          else
          {
@@ -556,13 +552,11 @@ namespace hMailServer.ControlPanel.Views
 
          if (!config.CertificateFilesReadable)
          {
-            content.Children.Add(Paragraph(
-               "Expiry cannot be read from here: the certificate files are on the server and this Control Panel is "
-               + "connected to it remotely. Everything else on this page comes over COM and is accurate.",
+            content.Children.Add(Paragraph(L("Expiry cannot be read from here: the certificate files are on the server and this Control Panel is connected to it remotely. Everything else on this page comes over COM and is accurate."),
                Typography.Caption));
          }
 
-         content.Children.Add(PageLink("certs", "Certificates…", "Open SSL certificates, which owns the certificate and key file paths"));
+         content.Children.Add(PageLink("certs", L("Certificates…"), L("Open SSL certificates, which owns the certificate and key file paths")));
 
          return card;
       }
@@ -581,22 +575,22 @@ namespace hMailServer.ControlPanel.Views
          }
          else if (!config.CertificateFilesReadable || certificate.DaysRemaining == null)
          {
-            detail = "expiry not checked from here";
+            detail = L("expiry not checked from here");
             level = StatusLevel.Normal;
          }
          else if (certificate.DaysRemaining < 0)
          {
-            detail = "expired " + Math.Abs(certificate.DaysRemaining.Value) + " day(s) ago";
+            detail = F("expired {0} day(s) ago", Math.Abs(certificate.DaysRemaining.Value));
             level = certificate.InUse ? StatusLevel.Critical : StatusLevel.Warning;
          }
          else if (certificate.DaysRemaining <= TlsPosture.ExpiryWarningDays)
          {
-            detail = "expires in " + certificate.DaysRemaining.Value + " day(s)";
+            detail = F("expires in {0} day(s)", certificate.DaysRemaining.Value);
             level = certificate.InUse ? StatusLevel.Warning : StatusLevel.Information;
          }
          else
          {
-            detail = "expires in " + certificate.DaysRemaining.Value + " day(s)";
+            detail = F("expires in {0} day(s)", certificate.DaysRemaining.Value);
             level = StatusLevel.Good;
          }
 
@@ -606,7 +600,7 @@ namespace hMailServer.ControlPanel.Views
          ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
          row.Children.Add(mark);
 
-         string usage = certificate.InUse ? "in use by a listener" : "not used by any listener";
+         string usage = certificate.InUse ? L("in use by a listener") : L("not used by any listener");
 
          var text = new TextBlock
          {
@@ -624,54 +618,46 @@ namespace hMailServer.ControlPanel.Views
 
       private Border NegotiationCard(TlsPostureConfig config)
       {
-         Border card = Card("What can be negotiated", out StackPanel content);
+         Border card = Card(L("What can be negotiated"), out StackPanel content);
 
-         content.Children.Add(Paragraph("Protocol versions enabled: " + TlsPosture.VersionSummary(config), Typography.Body));
+         content.Children.Add(Paragraph(F("Protocol versions enabled: {0}", TlsPosture.VersionSummary(config)), Typography.Body));
 
          content.Children.Add(Paragraph(
             TlsPosture.IsAeadOnlyPreset(config.CipherList)
-               ? "Cipher list: the AEAD-ONLY preset — forward-secret AEAD suites only, with every CBC-mode suite and "
-                 + "static-RSA key exchange excluded. This governs TLS 1.2 and below; TLS 1.3 has its own list and is "
-                 + "AEAD by construction."
+               ? L("Cipher list: the AEAD-ONLY preset — forward-secret AEAD suites only, with every CBC-mode suite and static-RSA key exchange excluded. This governs TLS 1.2 and below; TLS 1.3 has its own list and is AEAD by construction.")
                : string.IsNullOrWhiteSpace(config.CipherList)
-                  ? "Cipher list: OpenSSL defaults for TLS 1.2 and below. TLS 1.3 has its own separate list."
-                  : "Cipher list for TLS 1.2 and below: " + config.CipherList
-                    + ". TLS 1.3 suites are configured separately and are not restricted by this.",
+                  ? L("Cipher list: OpenSSL defaults for TLS 1.2 and below. TLS 1.3 has its own separate list.")
+                  : F("Cipher list for TLS 1.2 and below: {0}. TLS 1.3 suites are configured separately and are not restricted by this.", config.CipherList),
             Typography.Caption));
 
-         content.Children.Add(PageLink("tls", "Versions and ciphers…", "Open SSL/TLS, which owns the protocol versions and cipher lists"));
+         content.Children.Add(PageLink("tls", L("Versions and ciphers…"), L("Open SSL/TLS, which owns the protocol versions and cipher lists")));
 
          return card;
       }
 
       private Border AuthenticationCard(TlsPostureConfig config)
       {
-         Border card = Card("Passwords, and what is allowed to carry them", out StackPanel content);
+         Border card = Card(L("Passwords, and what is allowed to carry them"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.RangesTotal == 0
-               ? "No IP ranges are configured."
+               ? L("No IP ranges are configured.")
                : config.RangesRequiringTlsForAuth == 0
-                  ? "None of the " + config.RangesTotal + " IP range(s) requires TLS before authentication, so a "
-                    + "plaintext password is accepted wherever a port permits one."
-                  : config.RangesRequiringTlsForAuth + " of " + config.RangesTotal
-                    + " IP range(s) refuse authentication until the session is encrypted.",
+                  ? F("None of the {0} IP range(s) requires TLS before authentication, so a plaintext password is accepted wherever a port permits one.", config.RangesTotal)
+                  : F("{0} of {1} IP range(s) refuse authentication until the session is encrypted.", config.RangesRequiringTlsForAuth, config.RangesTotal),
             Typography.Body));
 
-         content.Children.Add(Paragraph(
-            "This setting lives on each IP range rather than with the rest of TLS, which is the main reason it goes "
-            + "unnoticed. It is the only control that refuses a plaintext password regardless of what the port "
-            + "allows, so it is what makes an optional-STARTTLS port safe for clients.",
+         content.Children.Add(Paragraph(L("This setting lives on each IP range rather than with the rest of TLS, which is the main reason it goes unnoticed. It is the only control that refuses a plaintext password regardless of what the port allows, so it is what makes an optional-STARTTLS port safe for clients."),
             Typography.Caption));
 
-         content.Children.Add(PageLink("ipranges", "IP ranges…", "Open IP ranges, which owns the require-TLS-for-authentication setting"));
+         content.Children.Add(PageLink("ipranges", L("IP ranges…"), L("Open IP ranges, which owns the require-TLS-for-authentication setting")));
 
          return card;
       }
 
       private static Border NotesCard(IReadOnlyList<TlsPostureNote> notes)
       {
-         Border card = Card("Worth knowing about this configuration", out StackPanel content);
+         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
 
          foreach (TlsPostureNote note in notes)
          {

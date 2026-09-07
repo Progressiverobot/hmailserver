@@ -15,6 +15,7 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -51,14 +52,13 @@ namespace hMailServer.ControlPanel.Views
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "Spam filtering overview" };
+         var title = new TextBlock { Text = L("Spam filtering overview") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Every check in the order the server runs them, and what the score they add does to the message. "
-                   + "Nothing on this page can be edited - each row opens the page that owns the setting."
+            Text = L("Every check in the order the server runs them, and what the score they add does to the message. Nothing on this page can be edited - each row opens the page that owns the setting.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -66,11 +66,11 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "_Refresh",
+            Content = L("_Refresh"),
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(refresh, "Re-read the spam configuration from the server");
+         System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the spam configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "spam-overview-refresh");
          refresh.Click += (s, e) => Reload();
          Grid.SetColumn(refresh, 1);
@@ -267,9 +267,8 @@ namespace hMailServer.ControlPanel.Views
             body_.Children.Add(NotesCard(notes));
 
          status_.Text = failedReads_ == 0
-            ? "Read from the server. Values are read again every time this page is opened."
-            : failedReads_ + " value(s) could not be read — " + firstError_
-              + " The rows below may be incomplete.";
+            ? L("Read from the server. Values are read again every time this page is opened.")
+            : F("{0} value(s) could not be read — {1} The rows below may be incomplete.", failedReads_, firstError_);
       }
 
       private static Border Card(string title, out StackPanel content)
@@ -293,19 +292,17 @@ namespace hMailServer.ControlPanel.Views
 
       private static Border VerdictCard(SpamPipelineConfig config)
       {
-         Border card = Card("What happens to a message", out StackPanel content);
+         Border card = Card(L("What happens to a message"), out StackPanel content);
 
          content.Children.Add(Paragraph(SpamPipeline.Verdict(config), Typography.Body));
 
          int stop = SpamPipeline.StopScore(config);
          int? ceiling = SpamPipeline.HighestReachableScore(config);
 
-         content.Children.Add(Paragraph(
-            "The score is added up across both phases. The server stops testing within a phase as soon as the running "
-            + "total reaches " + stop + " - the higher of the two thresholds - so a check late in the order may never run."
+         content.Children.Add(Paragraph(F("The score is added up across both phases. The server stops testing within a phase as soon as the running total reaches {0} - the higher of the two thresholds - so a check late in the order may never run.", stop)
             + (ceiling != null
-               ? " With the checks currently enabled the highest total reachable is " + ceiling.Value + "."
-               : " The total is open-ended, because a list entry or SpamAssassin's own score can be any size."),
+               ? F(" With the checks currently enabled the highest total reachable is {0}.", ceiling.Value)
+               : L(" The total is open-ended, because a list entry or SpamAssassin's own score can be any size.")),
             Typography.Caption));
 
          return card;
@@ -313,15 +310,15 @@ namespace hMailServer.ControlPanel.Views
 
       private Border ChecksCard(SpamPipelineConfig config)
       {
-         Border card = Card("Checks, in the order the server runs them", out StackPanel content);
+         Border card = Card(L("Checks, in the order the server runs them"), out StackPanel content);
 
          foreach (SpamCheckPhase phase in new[] { SpamCheckPhase.BeforeTheBody, SpamCheckPhase.AfterTheBody })
          {
             content.Children.Add(new TextBlock
             {
                Text = phase == SpamCheckPhase.BeforeTheBody
-                  ? "At RCPT TO, before the body is transferred — a refusal here is a 550"
-                  : "After the body has been received — a refusal here is a 554",
+                  ? L("At RCPT TO, before the body is transferred — a refusal here is a 550")
+                  : L("After the body has been received — a refusal here is a 554"),
                FontSize = Typography.Label,
                FontWeight = FontWeights.SemiBold,
                Margin = new Thickness(0, 10, 0, 6),
@@ -382,7 +379,7 @@ namespace hMailServer.ControlPanel.Views
          // nothing ever reads. The five columns are otherwise announced as five
          // unrelated fragments and the listener has to reassemble the row.
          System.Windows.Automation.AutomationProperties.SetName(name,
-            check.Name + ", " + (check.Enabled ? "on" : "off") + ", score " + check.ScoreText + ". " + check.Detail);
+            F("{0}, {1}, score {2}. {3}", check.Name, check.Enabled ? L("On") : L("Off"), check.ScoreText, check.Detail));
 
          text.Children.Add(name);
 
@@ -401,7 +398,7 @@ namespace hMailServer.ControlPanel.Views
          // "On"/"Off" as words, coloured but never only coloured.
          var state = new TextBlock
          {
-            Text = check.Enabled ? "On" : "Off",
+            Text = check.Enabled ? L("On") : L("Off"),
             FontSize = Typography.Label,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 6, 14, 6),
@@ -426,8 +423,8 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(score, 3);
          grid.Children.Add(score);
 
-         FrameworkElement link = PageLink(check.Page, "Settings…",
-            "Open " + NavigationMap.TitleOf(check.Page) + ", which owns the " + check.Name + " settings");
+         FrameworkElement link = PageLink(check.Page, L("Settings…"),
+            F("Open {0}, which owns the {1} settings", L(NavigationMap.TitleOf(check.Page)), check.Name));
          link.Margin = new Thickness(0, 4, 0, 4);
          link.VerticalAlignment = VerticalAlignment.Top;
          Grid.SetRow(link, row);
@@ -437,23 +434,23 @@ namespace hMailServer.ControlPanel.Views
 
       private Border GreylistingCard(SpamPipelineConfig config)
       {
-         Border card = Card("Greylisting", out StackPanel content);
+         Border card = Card(L("Greylisting"), out StackPanel content);
 
          content.Children.Add(Paragraph(SpamPipeline.GreylistingSummary(config), Typography.Body));
-         content.Children.Add(PageLink("antispam", "Greylisting settings…",
-            "Open Anti-spam settings, which owns the greylisting settings"));
+         content.Children.Add(PageLink("antispam", L("Greylisting settings…"),
+            L("Open Anti-spam settings, which owns the greylisting settings")));
 
          return card;
       }
 
       private Border ListsCard(SpamPipelineConfig config)
       {
-         Border card = Card("The lists behind the checks", out StackPanel content);
+         Border card = Card(L("The lists behind the checks"), out StackPanel content);
 
-         content.Children.Add(ListRow("DNS blacklists", config.ActiveDnsBlackLists, config.TotalDnsBlackLists, "dnsbl"));
-         content.Children.Add(ListRow("SURBL servers", config.ActiveSurblServers, config.TotalSurblServers, "surbl"));
-         content.Children.Add(ListRow("Anti-spam white list", null, config.WhiteListEntries, "spamwhitelist"));
-         content.Children.Add(ListRow("Greylisting white list", null, config.GreylistWhiteListEntries, "greylistwhitelist"));
+         content.Children.Add(ListRow(L("DNS blacklists"), config.ActiveDnsBlackLists, config.TotalDnsBlackLists, "dnsbl"));
+         content.Children.Add(ListRow(L("SURBL servers"), config.ActiveSurblServers, config.TotalSurblServers, "surbl"));
+         content.Children.Add(ListRow(L("Anti-spam white list"), null, config.WhiteListEntries, "spamwhitelist"));
+         content.Children.Add(ListRow(L("Greylisting white list"), null, config.GreylistWhiteListEntries, "greylistwhitelist"));
 
          return card;
       }
@@ -465,8 +462,8 @@ namespace hMailServer.ControlPanel.Views
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          string count = active != null
-            ? active.Value + " active of " + total
-            : total + (total == 1 ? " entry" : " entries");
+            ? F("{0} active of {1}", active.Value, total)
+            : total == 1 ? F("{0} entry", total) : F("{0} entries", total);
 
          var text = new TextBlock
          {
@@ -477,7 +474,7 @@ namespace hMailServer.ControlPanel.Views
          };
          row.Children.Add(text);
 
-         FrameworkElement link = PageLink(page, "Open…", "Open " + NavigationMap.TitleOf(page));
+         FrameworkElement link = PageLink(page, L("Open…"), F("Open {0}", L(NavigationMap.TitleOf(page))));
          Grid.SetColumn(link, 1);
          row.Children.Add(link);
 
@@ -486,7 +483,7 @@ namespace hMailServer.ControlPanel.Views
 
       private static Border NotesCard(IReadOnlyList<SpamPipelineNote> notes)
       {
-         Border card = Card("Worth knowing about this configuration", out StackPanel content);
+         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
 
          foreach (SpamPipelineNote note in notes)
          {

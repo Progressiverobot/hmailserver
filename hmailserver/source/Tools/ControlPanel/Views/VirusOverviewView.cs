@@ -14,6 +14,7 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -56,14 +57,13 @@ namespace hMailServer.ControlPanel.Views
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "Virus scanning overview" };
+         var title = new TextBlock { Text = L("Virus scanning overview") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Which scanners can actually run, what they are asked to look at, and what happens to a message "
-                   + "one of them condemns. Nothing on this page can be edited — each row opens the page that owns the setting."
+            Text = L("Which scanners can actually run, what they are asked to look at, and what happens to a message one of them condemns. Nothing on this page can be edited — each row opens the page that owns the setting.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -71,11 +71,11 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "_Refresh",
+            Content = L("_Refresh"),
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(refresh, "Re-read the anti-virus configuration from the server");
+         System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the anti-virus configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "virus-overview-refresh");
          refresh.Click += (s, e) => Reload();
          Grid.SetColumn(refresh, 1);
@@ -325,9 +325,8 @@ namespace hMailServer.ControlPanel.Views
             body_.Children.Add(NotesCard(notes));
 
          status_.Text = failedReads_ == 0
-            ? "Read from the server. Values are read again every time this page is opened."
-            : failedReads_ + " value(s) could not be read — " + firstError_
-              + " The rows above may be incomplete, so treat a scanner shown as unusable here as unconfirmed.";
+            ? L("Read from the server. Values are read again every time this page is opened.")
+            : F("{0} value(s) could not be read — {1} The rows above may be incomplete, so treat a scanner shown as unusable here as unconfirmed.", failedReads_, firstError_);
       }
 
       private static Border Card(string title, out StackPanel content)
@@ -351,15 +350,11 @@ namespace hMailServer.ControlPanel.Views
 
       private static Border VerdictCard(VirusPipelineConfig config)
       {
-         Border card = Card("What happens to an infected message", out StackPanel content);
+         Border card = Card(L("What happens to an infected message"), out StackPanel content);
 
          content.Children.Add(Paragraph(VirusPipeline.Verdict(config), Typography.Body));
 
-         content.Children.Add(Paragraph(
-            "A scanner that cannot run does not refuse the message. The error is written to the log and the scan "
-            + "continues to the next scanner; when none of them can answer, the message is treated exactly as if it "
-            + "had been examined and found clean. That is why this page reports whether each scanner can run rather "
-            + "than whether it is switched on.",
+         content.Children.Add(Paragraph(L("A scanner that cannot run does not refuse the message. The error is written to the log and the scan continues to the next scanner; when none of them can answer, the message is treated exactly as if it had been examined and found clean. That is why this page reports whether each scanner can run rather than whether it is switched on."),
             Typography.Caption));
 
          return card;
@@ -367,7 +362,7 @@ namespace hMailServer.ControlPanel.Views
 
       private Border ScannersCard(VirusPipelineConfig config)
       {
-         Border card = Card("Scanners, in the order the server tries them", out StackPanel content);
+         Border card = Card(L("Scanners, in the order the server tries them"), out StackPanel content);
 
          var grid = new Grid();
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // order
@@ -385,9 +380,7 @@ namespace hMailServer.ControlPanel.Views
 
          content.Children.Add(grid);
 
-         content.Children.Add(Paragraph(
-            "The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in "
-            + "front of a fast one is paid for on every clean message.",
+         content.Children.Add(Paragraph(L("The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in front of a fast one is paid for on every clean message."),
             Typography.Caption));
 
          return card;
@@ -484,8 +477,8 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(statePanel, 2);
          grid.Children.Add(statePanel);
 
-         FrameworkElement link = PageLink(scanner.Page, "Settings…",
-            "Open " + NavigationMap.TitleOf(scanner.Page) + ", which owns the " + scanner.Name + " settings");
+         FrameworkElement link = PageLink(scanner.Page, L("Settings…"),
+            F("Open {0}, which owns the {1} settings", L(NavigationMap.TitleOf(scanner.Page)), scanner.Name));
          link.Margin = new Thickness(0, 4, 0, 4);
          link.VerticalAlignment = VerticalAlignment.Top;
          Grid.SetRow(link, row);
@@ -495,44 +488,35 @@ namespace hMailServer.ControlPanel.Views
 
       private Border WhatIsScannedCard(VirusPipelineConfig config)
       {
-         Border card = Card("What gets scanned", out StackPanel content);
+         Border card = Card(L("What gets scanned"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.MaxScanKilobytes > 0
-               ? "Messages up to " + VirusPipeline.Kilobytes(config.MaxScanKilobytes)
-                 + ". A larger message is delivered without being scanned — it is not refused, and nothing is logged."
-               : "Every message, whatever its size. The size limit is 0, which here means \"no limit\".",
+               ? F("Messages up to {0}. A larger message is delivered without being scanned — it is not refused, and nothing is logged.", VirusPipeline.Kilobytes(config.MaxScanKilobytes))
+               : L("Every message, whatever its size. The size limit is 0, which here means \"no limit\"."),
             Typography.Body));
 
-         content.Children.Add(Paragraph(
-            "Each message is scanned twice over: once as the whole file on disk, and then once per attachment, each "
-            + "written out to the temporary folder and handed to the scanner on its own. The second pass is what "
-            + "catches an attachment inside a structure the scanner does not decode for itself. If the message cannot "
-            + "be parsed as MIME the per-attachment pass is skipped and an error is logged.",
+         content.Children.Add(Paragraph(L("Each message is scanned twice over: once as the whole file on disk, and then once per attachment, each written out to the temporary folder and handed to the scanner on its own. The second pass is what catches an attachment inside a structure the scanner does not decode for itself. If the message cannot be parsed as MIME the per-attachment pass is skipped and an error is logged."),
             Typography.Caption));
 
          if (config.FetchAccountsTotal > 0)
          {
-            content.Children.Add(Paragraph(
-               "Mail collected from external POP3 accounts is scanned only when that fetch account says so — "
-               + config.FetchAccountsWithScanningOff + " of " + config.FetchAccountsTotal
-               + " currently have anti-virus switched off. That switch is on the account, not on this page."
+            content.Children.Add(Paragraph(F("Mail collected from external POP3 accounts is scanned only when that fetch account says so — {0} of {1} currently have anti-virus switched off. That switch is on the account, not on this page.", config.FetchAccountsWithScanningOff, config.FetchAccountsTotal)
                + (config.FetchAccountScanIncomplete
-                  ? " These are counts of the first " + MaxAccountsWalked
-                    + " accounts only; this page stops there rather than making you wait for the rest."
+                  ? F(" These are counts of the first {0} accounts only; this page stops there rather than making you wait for the rest.", MaxAccountsWalked)
                   : ""),
                Typography.Caption));
          }
 
-         content.Children.Add(PageLink("antivirus", "Size limit and scanners…",
-            "Open Anti-virus settings, which owns the maximum message size to scan"));
+         content.Children.Add(PageLink("antivirus", L("Size limit and scanners…"),
+            L("Open Anti-virus settings, which owns the maximum message size to scan")));
 
          return card;
       }
 
       private static Border InfectedCard(VirusPipelineConfig config)
       {
-         Border card = Card("When a scanner finds something", out StackPanel content);
+         Border card = Card(L("When a scanner finds something"), out StackPanel content);
 
          content.Children.Add(Paragraph(VirusPipeline.ActionSummary(config), Typography.Body));
 
@@ -541,32 +525,30 @@ namespace hMailServer.ControlPanel.Views
 
       private Border AttachmentsCard(VirusPipelineConfig config)
       {
-         Border card = Card("Attachment blocking, which is separate", out StackPanel content);
+         Border card = Card(L("Attachment blocking, which is separate"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.AttachmentBlockingEnabled
-               ? config.BlockedAttachmentPatterns + (config.BlockedAttachmentPatterns == 1 ? " pattern is" : " patterns are")
-                 + " stripped from every message by file name, whatever the scanners say."
-               : "Switched off. " + config.BlockedAttachmentPatterns
-                 + (config.BlockedAttachmentPatterns == 1 ? " pattern is" : " patterns are") + " configured and none is applied.",
+               ? (config.BlockedAttachmentPatterns == 1
+                  ? F("{0} pattern is stripped from every message by file name, whatever the scanners say.", config.BlockedAttachmentPatterns)
+                  : F("{0} patterns are stripped from every message by file name, whatever the scanners say.", config.BlockedAttachmentPatterns))
+               : (config.BlockedAttachmentPatterns == 1
+                  ? F("Switched off. {0} pattern is configured and none is applied.", config.BlockedAttachmentPatterns)
+                  : F("Switched off. {0} patterns are configured and none is applied.", config.BlockedAttachmentPatterns)),
             Typography.Body));
 
-         content.Children.Add(Paragraph(
-            "This runs before virus scanning and independently of it: it applies even with every scanner switched "
-            + "off, and it applies to messages the size limit above would skip. A matched attachment is replaced by a "
-            + "short text file explaining the removal rather than being deleted outright, so the recipient can tell "
-            + "something was taken out.",
+         content.Children.Add(Paragraph(L("This runs before virus scanning and independently of it: it applies even with every scanner switched off, and it applies to messages the size limit above would skip. A matched attachment is replaced by a short text file explaining the removal rather than being deleted outright, so the recipient can tell something was taken out."),
             Typography.Caption));
 
-         content.Children.Add(PageLink("blockedattachments", "Patterns…",
-            "Open Blocked attachments, which owns the list of file-name patterns"));
+         content.Children.Add(PageLink("blockedattachments", L("Patterns…"),
+            L("Open Blocked attachments, which owns the list of file-name patterns")));
 
          return card;
       }
 
       private static Border NotesCard(IReadOnlyList<VirusPipelineNote> notes)
       {
-         Border card = Card("Worth knowing about this configuration", out StackPanel content);
+         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
 
          foreach (VirusPipelineNote note in notes)
          {

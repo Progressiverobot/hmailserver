@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -49,10 +50,10 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var head = new StackPanel();
-         var title = new TextBlock { Text = "Event scripts" };
+         var title = new TextBlock { Text = L("Event scripts") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          head.Children.Add(title);
-         var sub = new TextBlock { Text = "Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine. The engine's on/off switch and its language are on the Advanced page." };
+         var sub = new TextBlock { Text = L("Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine. The engine's on/off switch and its language are on the Advanced page.") };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          head.Children.Add(sub);
          root.Children.Add(head);
@@ -70,14 +71,14 @@ namespace hMailServer.ControlPanel.Views
          // It also had no accessible name at all: a screen reader announced the
          // server's entire event-handler script as an unnamed "edit".
          System.Windows.Automation.AutomationProperties.SetName(editor_,
-            "Event handler script. Tab inserts a tab character; press Control and Tab together to move to the next control.");
-         editor_.ToolTip = "Tab indents. Use Ctrl+Tab to move focus out of the editor.";
+            L("Event handler script. Tab inserts a tab character; press Control and Tab together to move to the next control."));
+         editor_.ToolTip = L("Tab indents. Use Ctrl+Tab to move focus out of the editor.");
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 10) };
          Grid.SetRow(toolbar, 2);
 
          var templateCombo = new ComboBox { MinWidth = 240, VerticalAlignment = VerticalAlignment.Center };
-         templateCombo.Items.Add(new ComboBoxItem { Content = "Insert template\u2026", Tag = "" });
+         templateCombo.Items.Add(new ComboBoxItem { Content = L("Insert template\u2026"), Tag = "" });
          foreach ((string name, string body) in ScriptTemplates)
             templateCombo.Items.Add(new ComboBoxItem { Content = name, Tag = body });
          templateCombo.SelectedIndex = 0;
@@ -91,9 +92,9 @@ namespace hMailServer.ControlPanel.Views
          };
          toolbar.Children.Add(templateCombo);
 
-         toolbar.Children.Add(MakeButton("_Save & reload", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
-         toolbar.Children.Add(MakeButton("_Check syntax", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
-         toolbar.Children.Add(MakeButton("_Reload from disk", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
+         toolbar.Children.Add(MakeButton(L("_Save & reload"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
+         toolbar.Children.Add(MakeButton(L("_Check syntax"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
+         toolbar.Children.Add(MakeButton(L("_Reload from disk"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
@@ -122,7 +123,7 @@ namespace hMailServer.ControlPanel.Views
       // merged into a single Sub before saving.
       private static readonly (string Name, string Body)[] ScriptTemplates =
       {
-         ("OnAcceptMessage \u2192 external AV / DLP scanner",
+         (L("OnAcceptMessage \u2192 external AV / DLP scanner"),
 @"' --- Run an external AV / DLP scanner on the received message ----------------
 ' The message is already on disk at oMessage.Filename. A non-zero exit code is
 ' treated as ""infected/blocked"". Adjust the path and exit-code handling.
@@ -137,7 +138,7 @@ Sub OnAcceptMessage(oClient, oMessage)
    End If
 End Sub
 "),
-         ("OnAcceptMessage \u2192 webhook (SIEM / Slack / Teams)",
+         (L("OnAcceptMessage \u2192 webhook (SIEM / Slack / Teams)"),
 @"' --- Notify a webhook about the received message ----------------------------
 ' Fire-and-forget POST; delivery is not blocked if the webhook is unavailable.
 Sub OnAcceptMessage(oClient, oMessage)
@@ -154,7 +155,7 @@ Sub OnAcceptMessage(oClient, oMessage)
    On Error Goto 0
 End Sub
 "),
-         ("OnAcceptMessage \u2192 external HTTP API verdict",
+         (L("OnAcceptMessage \u2192 external HTTP API verdict"),
 @"' --- Ask an external API whether to block the message -----------------------
 ' Calls a classification/threat API and deletes the message on a 'block' verdict.
 Sub OnAcceptMessage(oClient, oMessage)
@@ -180,7 +181,7 @@ End Sub
          editor_.Text = editor_.Text + separator + body;
          editor_.CaretIndex = editor_.Text.Length;
          editor_.ScrollToEnd();
-         status_.Text = "Template appended. If you already have an OnAcceptMessage handler, merge the two into a single Sub before saving.";
+         status_.Text = L("Template appended. If you already have an OnAcceptMessage handler, merge the two into a single Sub before saving.");
       }
 
       private void LoadScript()
@@ -188,7 +189,7 @@ End Sub
          scriptPath_ = ResolveScriptPath();
          if (scriptPath_ == null)
          {
-            pathText_.Text = "Could not determine the event-script path.";
+            pathText_.Text = L("Could not determine the event-script path.");
             editor_.IsEnabled = false;
             return;
          }
@@ -197,7 +198,7 @@ End Sub
          try
          {
             editor_.Text = File.Exists(scriptPath_) ? File.ReadAllText(scriptPath_) : "";
-            status_.Text = File.Exists(scriptPath_) ? "Loaded from disk." : "File does not exist yet; saving will create it.";
+            status_.Text = File.Exists(scriptPath_) ? L("Loaded from disk.") : L("File does not exist yet; saving will create it.");
             editor_.IsEnabled = true;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
@@ -206,7 +207,7 @@ End Sub
             // save overwrite the file on disk with the empty text shown here.
             editor_.Text = "";
             editor_.IsEnabled = false;
-            status_.Text = "Could not read the file: " + ex.Message;
+            status_.Text = F("Could not read the file: {0}", ex.Message);
          }
       }
 
@@ -250,7 +251,7 @@ End Sub
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not write the script file: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not write the script file: {0}", ex.Message), L("Control Panel"));
             return;
          }
 
@@ -261,12 +262,12 @@ End Sub
             string result = "";
             try { result = (string)scripting.CheckSyntax(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
             status_.Text = string.IsNullOrWhiteSpace(result)
-               ? "Saved and reloaded at " + DateTime.Now.ToLongTimeString() + ". No syntax errors."
-               : "Saved. Compiler reported: " + result;
+               ? F("Saved and reloaded at {0}. No syntax errors.", DateTime.Now.ToLongTimeString())
+               : F("Saved. Compiler reported: {0}", result);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Saved, but reload failed: " + ex.Message;
+            status_.Text = F("Saved, but reload failed: {0}", ex.Message);
          }
          finally
          {
@@ -281,12 +282,12 @@ End Sub
          {
             string result = (string)scripting.CheckSyntax();
             status_.Text = string.IsNullOrWhiteSpace(result)
-               ? "No syntax errors reported."
-               : "Compiler reported: " + result;
+               ? L("No syntax errors reported.")
+               : F("Compiler reported: {0}", result);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Syntax check failed: " + ex.Message;
+            status_.Text = F("Syntax check failed: {0}", ex.Message);
          }
          finally
          {

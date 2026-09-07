@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -39,20 +40,20 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var head = new StackPanel();
-         var title = new TextBlock { Text = "Public folders" };
+         var title = new TextBlock { Text = L("Public folders") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          head.Children.Add(title);
-         var sub = new TextBlock { Text = "Shared IMAP folders that several accounts can access. Use the hierarchy delimiter to create sub-folders, and edit permissions to grant access." };
+         var sub = new TextBlock { Text = L("Shared IMAP folders that several accounts can access. Use the hierarchy delimiter to create sub-folders, and edit permissions to grant access.") };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          head.Children.Add(sub);
          root.Children.Add(head);
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 12) };
          Grid.SetRow(toolbar, 1);
-         toolbar.Children.Add(MakeButton("_Add folder", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
-         toolbar.Children.Add(MakeButton("_Permissions", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions()));
-         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder()));
-         toolbar.Children.Add(MakeButton("_Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton(L("_Add folder"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
+         toolbar.Children.Add(MakeButton(L("_Permissions"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions()));
+         toolbar.Children.Add(MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder()));
+         toolbar.Children.Add(MakeButton(L("_Refresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
@@ -90,11 +91,11 @@ namespace hMailServer.ControlPanel.Views
                list_.Items.Add((string)f.Name);
                ServerSession.Release(f);
             }
-            status_.Text = count + (count == 1 ? " public folder." : " public folders.");
+            status_.Text = count == 1 ? L("1 public folder.") : F("{0} public folders.", count);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Could not load public folders: " + ex.Message;
+            status_.Text = F("Could not load public folders: {0}", ex.Message);
          }
          finally
          {
@@ -104,7 +105,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void AddFolder()
       {
-         string name = InputDialog.Prompt(Window.GetWindow(this), "New public folder", "Folder name:");
+         string name = InputDialog.Prompt(Window.GetWindow(this), L("New public folder"), L("Folder name:"));
          if (string.IsNullOrWhiteSpace(name))
             return;
 
@@ -116,7 +117,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the folder: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the folder: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -129,10 +130,10 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not string name)
          {
-            status_.Text = "Select a folder first.";
+            status_.Text = L("Select a folder first.");
             return;
          }
-         if (MessageBox.Show("Delete the public folder '" + name + "' and all messages in it?", "Control Panel",
+         if (MessageBox.Show(F("Delete the public folder '{0}' and all messages in it?", name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -145,7 +146,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the folder: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the folder: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -158,7 +159,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not string name)
          {
-            status_.Text = "Select a folder first.";
+            status_.Text = L("Select a folder first.");
             return;
          }
          new FolderPermissionsDialog(Window.GetWindow(this), name).ShowDialog();

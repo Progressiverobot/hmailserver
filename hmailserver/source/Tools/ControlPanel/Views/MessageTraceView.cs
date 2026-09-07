@@ -5,6 +5,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -73,9 +74,7 @@ namespace hMailServer.ControlPanel.Views
       public MessageTraceView()
       {
          Build();
-         status_.Text = "Enter an address and search. The trace records nothing at all unless "
-                      + "MessageTraceEnabled is set in hMailServer.ini - it is off by default because it "
-                      + "stores who corresponds with whom.";
+         status_.Text = L("Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom.");
       }
 
       private dynamic OpenTrace()
@@ -119,7 +118,7 @@ namespace hMailServer.ControlPanel.Views
          list_.ItemsSource = rows;
 
          status_.Text = count == 0 ? emptyMessage
-            : count == 1 ? "1 event." : count + " events, newest first.";
+            : count == 1 ? L("1 event.") : F("{0} events, newest first.", count);
       }
 
       /// <summary>
@@ -145,8 +144,8 @@ namespace hMailServer.ControlPanel.Views
          public int QueueId { get; init; }
 
          public string FollowHint => QueueId == 0
-            ? "Refused before the message was queued, so there is no message to follow."
-            : "Queue id " + QueueId + " - select and choose \"Follow this message\".";
+            ? L("Refused before the message was queued, so there is no message to follow.")
+            : F("Queue id {0} - select and choose \"Follow this message\".", QueueId);
       }
 
       private void Search()
@@ -157,8 +156,7 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                trace.Search(address_.Text.Trim());
-               Fill(trace, "No events for that address. Either nothing has happened to it, or the trace "
-                         + "was switched off at the time - it records only while MessageTraceEnabled is set.");
+               Fill(trace, L("No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set."));
             }
             finally
             {
@@ -175,7 +173,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not TraceRow selected)
          {
-            status_.Text = "Select an event first.";
+            status_.Text = L("Select an event first.");
             return;
          }
 
@@ -183,8 +181,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (queueId == 0)
          {
-            status_.Text = "That event happened before the message was queued - a refusal during the SMTP "
-                         + "conversation - so there is no message to follow.";
+            status_.Text = L("That event happened before the message was queued - a refusal during the SMTP conversation - so there is no message to follow.");
             return;
          }
 
@@ -194,8 +191,8 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                trace.SearchByQueueID(queueId);
-               Fill(trace, "No events for that message.");
-               status_.Text = "Every event for queue id " + queueId + ", oldest first.";
+               Fill(trace, L("No events for that message."));
+               status_.Text = F("Every event for queue id {0}, oldest first.", queueId);
             }
             finally
             {
@@ -218,9 +215,8 @@ namespace hMailServer.ControlPanel.Views
                int removed = (int)trace.DeleteExpired();
 
                status_.Text = removed == 0
-                  ? "Nothing was old enough to remove. The window is MessageTraceRetentionDays, and 0 "
-                    + "means never."
-                  : removed + " event(s) past the retention window were removed.";
+                  ? L("Nothing was old enough to remove. The window is MessageTraceRetentionDays, and 0 means never.")
+                  : F("{0} event(s) past the retention window were removed.", removed);
             }
             finally
             {
@@ -240,14 +236,13 @@ namespace hMailServer.ControlPanel.Views
          // which is exactly how a design system erodes: newest pages first.
          var root = new StackPanel { Margin = new Thickness(26, 20, 26, 20) };
 
-         var title = new TextBlock { Text = "Message trace" };
+         var title = new TextBlock { Text = L("Message trace") };
          title.SetResourceReference(FrameworkElement.StyleProperty, "PageTitle");
          root.Children.Add(title);
 
          var hint = new TextBlock
          {
-            Text = "What happened to a particular message. Search by any address - it matches senders and "
-                 + "recipients - then follow one row to see every event for that message in order.",
+            Text = L("What happened to a particular message. Search by any address - it matches senders and recipients - then follow one row to see every event for that message in order."),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
          };
@@ -257,15 +252,15 @@ namespace hMailServer.ControlPanel.Views
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
          toolbar.Children.Add(new TextBlock
          {
-            Text = "Address",
+            Text = L("Address"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
          });
          address_.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Search(); };
          toolbar.Children.Add(address_);
-         toolbar.Children.Add(MakeButton("_Search", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
-         toolbar.Children.Add(MakeButton("_Follow this message", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected()));
-         toolbar.Children.Add(MakeButton("_Remove expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
+         toolbar.Children.Add(MakeButton(L("_Search"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
+         toolbar.Children.Add(MakeButton(L("_Follow this message"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected()));
+         toolbar.Children.Add(MakeButton(L("_Remove expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
          root.Children.Add(toolbar);
 
          BuildColumns();
@@ -299,7 +294,7 @@ namespace hMailServer.ControlPanel.Views
       {
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Time",
+            Header = L("Time"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.OccurredTime)),
             // Auto, not SizeToCells. SizeToCells measures the CELLS only, so on an
             // empty grid the column collapses to zero and its header disappears
@@ -312,28 +307,28 @@ namespace hMailServer.ControlPanel.Views
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Event",
+            Header = L("Event"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.EventName)),
             Width = DataGridLength.Auto
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Sender",
+            Header = L("Sender"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.Sender)),
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Recipient",
+            Header = L("Recipient"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.Recipient)),
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Status",
+            Header = L("Status"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.StatusCode)),
             Width = DataGridLength.Auto
          });

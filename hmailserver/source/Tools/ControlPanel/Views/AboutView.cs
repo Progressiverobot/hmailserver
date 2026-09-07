@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using hMailServer.ControlPanel.Services;
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -20,7 +21,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 880, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = "About" };
+         var title = new TextBlock { Text = L("About") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          panel.Children.Add(title);
 
@@ -31,7 +32,7 @@ namespace hMailServer.ControlPanel.Views
 
          inner.Children.Add(new TextBlock
          {
-            Text = "hMailServer Control Panel",
+            Text = L("hMailServer Control Panel"),
             // Card headings across the application are SectionHeading +
             // SemiBold; 17 was off the 12/14/20/28 ramp entirely.
             FontSize = Typography.SectionHeading,
@@ -40,8 +41,7 @@ namespace hMailServer.ControlPanel.Views
          });
          inner.Children.Add(new TextBlock
          {
-            Text = "Version " + (System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?")
-                 + "  -  .NET " + Environment.Version,
+            Text = F("Version {0}  -  .NET {1}", System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?", Environment.Version),
             FontSize = Typography.Label,
             Opacity = 0.65,
             Margin = new Thickness(0, 0, 0, 12)
@@ -54,9 +54,7 @@ namespace hMailServer.ControlPanel.Views
 
          inner.Children.Add(new TextBlock
          {
-            Text = "A modern administration app for hMailServer: live dashboard, domains "
-                 + "and accounts, delivery queue, log streaming, full server settings and "
-                 + "the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME).",
+            Text = L("A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)."),
             FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
@@ -81,8 +79,7 @@ namespace hMailServer.ControlPanel.Views
 
          inner.Children.Add(new TextBlock
          {
-            Text = "hMailServer is free and open source software, licensed under the GNU AGPLv3. "
-                 + "This Control Panel is built with WPF-UI (Fluent design) and LiveCharts2 on .NET 10.",
+            Text = L("hMailServer is free and open source software, licensed under the GNU AGPLv3. This Control Panel is built with WPF-UI (Fluent design) and LiveCharts2 on .NET 10."),
             FontSize = Typography.Caption,
             Opacity = 0.5,
             TextWrapping = TextWrapping.Wrap,
@@ -99,21 +96,21 @@ namespace hMailServer.ControlPanel.Views
 
          dev.Children.Add(new TextBlock
          {
-            Text = "Developed & maintained by",
+            Text = L("Developed & maintained by"),
             FontSize = Typography.Caption,
             Opacity = 0.6,
             Margin = new Thickness(0, 0, 0, 6)
          });
          dev.Children.Add(new TextBlock
          {
-            Text = "Christopher Holloway",
+            Text = "Christopher Holloway", // no-loc
             FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 2)
          });
          dev.Children.Add(new TextBlock
          {
-            Text = "Progressive Robot Ltd",
+            Text = "Progressive Robot Ltd", // no-loc
             FontSize = Typography.Body,
             FontWeight = FontWeights.SemiBold,
             Opacity = 0.85,
@@ -122,31 +119,21 @@ namespace hMailServer.ControlPanel.Views
 
          dev.Children.Add(new TextBlock
          {
-            Text = "Progressive Robot Ltd is a software engineering company that builds and "
-                 + "modernizes production software \u2014 taking mature, real-world systems and "
-                 + "bringing them up to current standards of security, reliability and tooling.",
+            Text = L("Progressive Robot Ltd is a software engineering company that builds and modernizes production software \u2014 taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling."),
             FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 10)
          });
          dev.Children.Add(new TextBlock
          {
-            Text = "The hMailServer 6.x line is one such effort. The original open-source mail "
-                 + "server has been rebuilt on a current toolchain (Visual Studio 2026 / MSVC v145 "
-                 + "and .NET 10), re-armed with modern cryptography (PBKDF2 / Argon2id, SCRAM-SHA-256, "
-                 + "OAuth2) and the transport-security standards expected of a mail server today "
-                 + "(DANE + DNSSEC, MTA-STS, ARC, Ed25519 DKIM, TLS-RPT and ACME / Let's Encrypt). "
-                 + "It has been hardened against protocol and denial-of-service defects, given "
-                 + "Sieve / ManageSieve filtering, health and OpenTelemetry observability, broad "
-                 + "MySQL / MariaDB / MS SQL / PostgreSQL support, and this modern Fluent-design "
-                 + "Control Panel in place of the legacy administrator.",
+            Text = L("The hMailServer 6.x line is one such effort. The original open-source mail server has been rebuilt on a current toolchain (Visual Studio 2026 / MSVC v145 and .NET 10), re-armed with modern cryptography (PBKDF2 / Argon2id, SCRAM-SHA-256, OAuth2) and the transport-security standards expected of a mail server today (DANE + DNSSEC, MTA-STS, ARC, Ed25519 DKIM, TLS-RPT and ACME / Let's Encrypt). It has been hardened against protocol and denial-of-service defects, given Sieve / ManageSieve filtering, health and OpenTelemetry observability, broad MySQL / MariaDB / MS SQL / PostgreSQL support, and this modern Fluent-design Control Panel in place of the legacy administrator."),
             FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
          });
 
          var web = new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 2) };
-         web.Inlines.Add(new Run("Web  ") { FontWeight = FontWeights.SemiBold });
+         web.Inlines.Add(new Run(L("Web  ")) { FontWeight = FontWeights.SemiBold });
          var webLink = new Hyperlink(new Run("www.progressiverobot.com"))
          {
             NavigateUri = new Uri("https://www.progressiverobot.com")
@@ -161,9 +148,7 @@ namespace hMailServer.ControlPanel.Views
 
          dev.Children.Add(new TextBlock
          {
-            Text = "Copyright \u00A9 2026 Christopher Holloway / Progressive Robot Ltd. "
-                 + "hMailServer is a trademark of its respective owners; this is an independent, "
-                 + "community-maintained fork.",
+            Text = L("Copyright \u00A9 2026 Christopher Holloway / Progressive Robot Ltd. hMailServer is a trademark of its respective owners; this is an independent, community-maintained fork."),
             FontSize = Typography.Caption,
             Opacity = 0.5,
             TextWrapping = TextWrapping.Wrap,
@@ -180,9 +165,7 @@ namespace hMailServer.ControlPanel.Views
       {
          try
          {
-            serverVersion_.Text = "Connected server: hMailServer " +
-               (string)ServerSession.Current.Application.Version +
-               " @ " + ServerSession.Current.Host;
+            serverVersion_.Text = F("Connected server: hMailServer {0} @ {1}", (string)ServerSession.Current.Application.Version, ServerSession.Current.Host);
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
