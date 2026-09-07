@@ -88,6 +88,10 @@ LOCALISED = {
    "Views/StatusView.xaml.cs",
    "Views/TcpIpPortsView.xaml",
    "Views/TcpIpPortsView.xaml.cs",
+   "Views/DnsRecordsView.cs",
+   "Views/LdapSettingsView.cs",
+   "Views/DirectorySyncView.cs",
+   "Views/ApiKeysView.cs",
    "Views/DomainDialog.cs",
    "Views/AccountDialog.cs",
    "Views/CollectionSpecs.cs",
@@ -269,7 +273,7 @@ def is_caption(text):
 
 NON_UI_CALL = re.compile(
    r"\b(?:GetMetricHistory|TryGetProperty|GetProperty|ReadString|WriteString|ReadBool|WriteBool|ReadInt|WriteInt"
-   r"|GetValue|SetValue|ReadFrom|WriteTo|ReadValue|LiveBool_|LiveText_|LiveInt_|SecretConfigured_|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
+   r"|GetValue|SetValue|ReadFrom|WriteTo|ReadValue|IniRead_|IniWrite_|IniReadInt_|IniWriteInt_|IniReadBool_|IniWriteBool_|LiveBool_|LiveText_|LiveInt_|SecretConfigured_|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
    r"|Split|Replace|IndexOf|TryParse|TryParseExact|ParseExact|GetFiles|Path\.Join|Path\.Combine|nameof|Debug\.Fail"
    r"|Debug\.Assert|LogException|RunUpdateAction_|NavigateTo|Slug|GetString|Equals|Compare|Regex|Match|\w+Exception)\s*\(")
 NON_UI_CONTEXT = re.compile(r"(?:\bcase\s|==|!=|\bis\s|\[|\bTag\s*=|\bKey\s*=|\bPath\s*=|\bProp\s*=|\bconst\s)\s*$")

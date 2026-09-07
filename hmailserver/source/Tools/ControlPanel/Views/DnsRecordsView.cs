@@ -25,6 +25,7 @@ using Typography = hMailServer.ControlPanel.Services.Typography;
 // the drawing one; the file APIs used here (File) are unambiguous.
 using Path = System.Windows.Shapes.Path;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -111,15 +112,13 @@ namespace hMailServer.ControlPanel.Views
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "DNS records" };
+         var title = new TextBlock { Text = L("DNS records") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "The records this server needs published in each domain's DNS zone: type, host and value, ready to copy "
-                   + "into your DNS provider's console, with a check for whether each one is really live. Checks use this "
-                   + "machine's Windows resolver - the same one the DKIM rotation check uses."
+            Text = L("The records this server needs published in each domain's DNS zone: type, host and value, ready to copy into your DNS provider's console, with a check for whether each one is really live. Checks use this machine's Windows resolver - the same one the DKIM rotation check uses.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -127,11 +126,11 @@ namespace hMailServer.ControlPanel.Views
 
          var refresh = new Wpf.Ui.Controls.Button
          {
-            Content = "_Refresh",
+            Content = L("_Refresh"),
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(12, 4, 0, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(refresh, "Re-read the domains and server configuration");
+         System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the domains and server configuration"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "dns-records-refresh");
          refresh.Click += (s, e) => Reload();
          Grid.SetColumn(refresh, 1);
@@ -142,12 +141,12 @@ namespace hMailServer.ControlPanel.Views
          var domainRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
          var domainLabel = new TextBlock
          {
-            Text = "Domain:",
+            Text = L("Domain:"),
             FontSize = Typography.Body,
             VerticalAlignment = VerticalAlignment.Center
          };
          domainRow.Children.Add(domainLabel);
-         System.Windows.Automation.AutomationProperties.SetName(domainCombo_, "Domain whose DNS records are shown");
+         System.Windows.Automation.AutomationProperties.SetName(domainCombo_, L("Domain whose DNS records are shown"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(domainCombo_, "dns-records-domain");
          domainCombo_.SelectionChanged += (s, e) => BuildCards();
          domainRow.Children.Add(domainCombo_);
@@ -201,7 +200,7 @@ namespace hMailServer.ControlPanel.Views
          {
             domainCombo_.Items.Add(new ComboBoxItem
             {
-               Content = domain.Name + (domain.Active ? "" : " (inactive)"),
+               Content = domain.Name + (domain.Active ? "" : L(" (inactive)")),
                Tag = domain.Name,
                FontSize = Typography.Body
             });
@@ -221,8 +220,8 @@ namespace hMailServer.ControlPanel.Views
          }
 
          status_.Text = failedReads_ == 0
-            ? "Configuration read from the server. Records are re-derived every time this page is opened; press Check to query DNS."
-            : failedReads_ + " value(s) could not be read — " + firstError_ + " The cards below may be incomplete.";
+            ? L("Configuration read from the server. Records are re-derived every time this page is opened; press Check to query DNS.")
+            : F("{0} value(s) could not be read — {1} The cards below may be incomplete.", failedReads_, firstError_);
       }
 
       private string SelectedDomainName()
@@ -345,13 +344,13 @@ namespace hMailServer.ControlPanel.Views
          {
             var none = new TextBlock
             {
-               Text = "No domains are configured, so there are no per-domain records to produce. Add a domain first.",
+               Text = L("No domains are configured, so there are no per-domain records to produce. Add a domain first."),
                FontSize = Typography.Body,
                TextWrapping = TextWrapping.Wrap,
                Margin = new Thickness(0, 16, 0, 0)
             };
             body_.Children.Add(none);
-            body_.Children.Add(PageLink("domains", "Open Domains…", "Open Domains, where domains are added"));
+            body_.Children.Add(PageLink("domains", L("Open Domains…"), L("Open Domains, where domains are added")));
          }
          else
          {
@@ -381,41 +380,32 @@ namespace hMailServer.ControlPanel.Views
       /// makes receivers reject legitimate mail outright.
       /// </summary>
       private string SuggestedSpf()
-         => serverHostName_.Length > 0 ? "v=spf1 mx a:" + serverHostName_ + " ~all" : "v=spf1 mx ~all";
+         => serverHostName_.Length > 0 ? "v=spf1 mx a:" + serverHostName_ + " ~all" : "v=spf1 mx ~all"; // no-loc: a DNS record
 
       private Border SpfCard(DomainInfo domain)
       {
-         Border card = Card("SPF — which machines may send mail as " + domain.Name, out StackPanel content);
+         Border card = Card(L("SPF — which machines may send mail as ") + domain.Name, out StackPanel content);
 
-         content.Children.Add(Paragraph(
-            "This server only CHECKS SPF on incoming mail; publishing the record is for everyone else - it tells "
-            + "receiving servers which machines are allowed to send mail claiming to be from " + domain.Name + ".",
+         content.Children.Add(Paragraph(L("This server only CHECKS SPF on incoming mail; publishing the record is for everyone else - it tells receiving servers which machines are allowed to send mail claiming to be from ") + domain.Name + ".",
             Typography.Caption));
 
          string suggested = SuggestedSpf();
 
          string provenance;
          if (!serverHostNameKnown_)
-            provenance = "The server's host name could not be read, so the suggestion authorises only the domain's MX hosts (\"mx\").";
+            provenance = L("The server's host name could not be read, so the suggestion authorises only the domain's MX hosts (\"mx\").");
          else if (serverHostName_.Length > 0)
-            provenance = "\"mx\" authorises whatever " + domain.Name + "'s MX records point at; \"a:" + serverHostName_
-                         + "\" authorises the address of the host name this server announces in HELO/EHLO "
-                         + "(Delivery of e-mail > Host name). \"~all\" soft-fails everything else - deliberately softer than \"-all\" "
-                         + "until you are sure the list is complete.";
+            provenance = F("\"mx\" authorises whatever {0}'s MX records point at; \"a:{1}\" authorises the address of the host name this server announces in HELO/EHLO (Delivery of e-mail > Host name). \"~all\" soft-fails everything else - deliberately softer than \"-all\" until you are sure the list is complete.", domain.Name, serverHostName_);
          else
-            provenance = "The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in "
-                         + "HELO/EHLO - not a public DNS name - and no \"a:\" mechanism can honestly be offered. The suggestion "
-                         + "authorises only the domain's MX hosts. Set the host name first; several records on this page need it.";
+            provenance = L("The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no \"a:\" mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it.");
 
          content.Children.Add(Paragraph(provenance, Typography.Caption));
 
-         RecordBlock block = BuildRecordBlock(content, "dns-records-spf", "SPF",
+         RecordBlock block = BuildRecordBlock(content, "dns-records-spf", L("SPF"),
             host: domain.Name,
-            hostNote: "the domain itself (many DNS consoles write the zone apex as \"@\")",
+            hostNote: L("the domain itself (many DNS consoles write the zone apex as \"@\")"),
             value: suggested,
-            copyWarning: "This suggestion cannot know your other senders. If anything else sends mail as " + domain.Name
-                         + " - a newsletter service, a website contact form, a hosted mailbox provider - copying this record "
-                         + "as-is makes that mail fail SPF at every receiver that checks it. Add those senders to the record first.");
+            copyWarning: F("This suggestion cannot know your other senders. If anything else sends mail as {0} - a newsletter service, a website contact form, a hosted mailbox provider - copying this record as-is makes that mail fail SPF at every receiver that checks it. Add those senders to the record first.", domain.Name));
 
          block.Check.Click += async (s, e) => await CheckSpf(block, domain.Name, suggested);
 
@@ -442,32 +432,28 @@ namespace hMailServer.ControlPanel.Views
                if (spf.Count == 0)
                {
                   if (result.Records.Count > 0)
-                     block.SetResult(StatusLevel.Warning, "Not published",
-                        result.Records.Count + " TXT record(s) exist at " + domainName + ", but none begins \"v=spf1\", "
-                        + "so receivers see no SPF policy at all." + DescribeFound(result.Records));
+                     block.SetResult(StatusLevel.Warning, L("Not published"),
+                        F("{0} TXT record(s) exist at {1}, but none begins \"v=spf1\", so receivers see no SPF policy at all.", result.Records.Count, domainName) + DescribeFound(result.Records));
                   else
-                     block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(domainName));
+                     block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(domainName));
                }
                else if (spf.Count > 1)
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but duplicated",
-                     spf.Count + " records beginning \"v=spf1\" exist at " + domainName + ". RFC 7208 makes that a permanent "
-                     + "SPF error at every receiver - worse than no record. Merge them into one." + DescribeFound(spf));
+                  block.SetResult(StatusLevel.Warning, L("Published, but duplicated"),
+                     F("{0} records beginning \"v=spf1\" exist at {1}. RFC 7208 makes that a permanent SPF error at every receiver - worse than no record. Merge them into one.", spf.Count, domainName) + DescribeFound(spf));
                }
                else if (DnsTxtLookup.Matches(spf[0], suggested))
                {
-                  block.SetResult(StatusLevel.Good, "Published and correct",
-                     "The record at " + domainName + " matches the suggestion.");
+                  block.SetResult(StatusLevel.Good, L("Published and correct"),
+                     F("The record at {0} matches the suggestion.", domainName));
                }
                else
                {
                   // Never "wrong": this page cannot know the administrator's other
                   // senders, so a difference from the suggestion may be deliberate
                   // and better. Show what is published so they can judge.
-                  block.SetResult(StatusLevel.Information, "Published, differs from the suggestion",
-                     "An SPF record is live at " + domainName + " and it is not the suggested one. That may well be deliberate - "
-                     + "the suggestion cannot know your other senders. Published: " + spf[0]
-                     + " — just confirm everything that really sends mail as " + domainName + " is covered.");
+                  block.SetResult(StatusLevel.Information, L("Published, differs from the suggestion"),
+                     F("An SPF record is live at {0} and it is not the suggested one. That may well be deliberate - the suggestion cannot know your other senders. Published: {1} — just confirm everything that really sends mail as {0} is covered.", domainName, spf[0]));
                }
             });
          });
@@ -484,7 +470,7 @@ namespace hMailServer.ControlPanel.Views
 
       private Border DkimCard(DomainInfo domain)
       {
-         Border card = Card("DKIM — the public key receivers verify " + domain.Name + "'s signatures against", out StackPanel content);
+         Border card = Card(F("DKIM — the public key receivers verify {0}'s signatures against", domain.Name), out StackPanel content);
 
          bool configured = domain.DkimSelector.Length > 0 && domain.DkimKeyFile.Length > 0;
 
@@ -495,37 +481,33 @@ namespace hMailServer.ControlPanel.Views
                // Half-configured: one of the pair is set. Generating over the top
                // of it could clobber a key the administrator meant to keep, so
                // this page points at the editor that owns the pair instead.
-               content.Children.Add(Paragraph(
-                  "DKIM is half-configured: the " + (domain.DkimSelector.Length == 0 ? "selector" : "private key file")
-                  + " is missing, so there is no record to derive. Complete the pair on the domain's DKIM tab.",
+               content.Children.Add(Paragraph(domain.DkimSelector.Length == 0
+                  ? L("DKIM is half-configured: the selector is missing, so there is no record to derive. Complete the pair on the domain's DKIM tab.")
+                  : L("DKIM is half-configured: the private key file is missing, so there is no record to derive. Complete the pair on the domain's DKIM tab."),
                   Typography.Body));
-               content.Children.Add(PageLink("domains", "Open Domains…",
-                  "Open Domains, where the DKIM selector and key file are configured"));
+               content.Children.Add(PageLink("domains", L("Open Domains…"),
+                  L("Open Domains, where the DKIM selector and key file are configured")));
                return card;
             }
 
-            content.Children.Add(Paragraph(
-               "No DKIM key is configured for " + domain.Name + " yet. Generate one here: the private key is saved to a file "
-               + "of your choosing on this machine, the selector and key file are stored on the domain, and signing stays OFF "
-               + "until the DNS record below has been published and a check on this page has seen it - switching signing on "
-               + "before then would sign mail with a key the world cannot look up.",
+            content.Children.Add(Paragraph(F("No DKIM key is configured for {0} yet. Generate one here: the private key is saved to a file of your choosing on this machine, the selector and key file are stored on the domain, and signing stays OFF until the DNS record below has been published and a check on this page has seen it - switching signing on before then would sign mail with a key the world cannot look up.", domain.Name),
                Typography.Body));
 
             var selectorRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 4, 0, 8) };
             var selectorBox = new TextBox
             {
-               Text = "dkim",
+               Text = "dkim", // no-loc
                FontSize = Typography.Body,
                MinWidth = 180,
                Padding = new Thickness(6),
                VerticalAlignment = VerticalAlignment.Center
             };
-            System.Windows.Automation.AutomationProperties.SetName(selectorBox, "Selector name for the new DKIM key");
+            System.Windows.Automation.AutomationProperties.SetName(selectorBox, L("Selector name for the new DKIM key"));
             System.Windows.Automation.AutomationProperties.SetAutomationId(selectorBox, "dns-records-dkim-selector");
             selectorRow.Children.Add(selectorBox);
 
-            var generate = new Wpf.Ui.Controls.Button { Content = "_Generate key pair…", Margin = new Thickness(8, 0, 0, 0) };
-            System.Windows.Automation.AutomationProperties.SetName(generate, "Generate a DKIM key pair for " + domain.Name);
+            var generate = new Wpf.Ui.Controls.Button { Content = L("_Generate key pair…"), Margin = new Thickness(8, 0, 0, 0) };
+            System.Windows.Automation.AutomationProperties.SetName(generate, F("Generate a DKIM key pair for {0}", domain.Name));
             System.Windows.Automation.AutomationProperties.SetAutomationId(generate, "dns-records-dkim-generate");
             generate.Click += (s, e) => GenerateDkim(domain.Name, selectorBox.Text.Trim());
             selectorRow.Children.Add(generate);
@@ -544,29 +526,23 @@ namespace hMailServer.ControlPanel.Views
          // presence-only and says so, exactly like the rotation flow does.
          string expected = DeriveDkimRecord(domain.DkimKeyFile);
 
-         content.Children.Add(Paragraph(
-            "Derived from the domain's configured key: selector \"" + domain.DkimSelector + "\", private key file "
-            + domain.DkimKeyFile + ". Signing is currently "
-            + (domain.DkimEnabled ? "ON." : "OFF - it can be switched on below once the record is confirmed published.")
+         content.Children.Add(Paragraph(F("Derived from the domain's configured key: selector \"{0}\", private key file {1}. Signing is currently ", domain.DkimSelector, domain.DkimKeyFile)
+            + (domain.DkimEnabled ? L("ON.") : L("OFF - it can be switched on below once the record is confirmed published."))
             + (domain.DkimEnabled && expected == null
-               ? " The key file could not be read from this machine, so the record value cannot be shown here; the domain's DKIM tab showed it when the key was made."
+               ? L(" The key file could not be read from this machine, so the record value cannot be shown here; the domain's DKIM tab showed it when the key was made.")
                : ""),
             Typography.Caption));
 
-         RecordBlock block = BuildRecordBlock(content, "dns-records-dkim", "DKIM",
+         RecordBlock block = BuildRecordBlock(content, "dns-records-dkim", L("DKIM"),
             host: host,
             hostNote: null,
-            value: expected ?? "(The private key file could not be read from this machine, so the record value cannot be "
-                               + "derived here. Run this page on the server itself, or use the domain's DKIM tab.)",
+            value: expected ?? L("(The private key file could not be read from this machine, so the record value cannot be derived here. Run this page on the server itself, or use the domain's DKIM tab.)"),
             copyWarning: null,
             valueCopyable: expected != null);
 
          if (domain.DkimSecondarySelector.Length > 0)
          {
-            content.Children.Add(Paragraph(
-               "A key rotation is staged (selector \"" + domain.DkimSecondarySelector + "\"). The staged record and the "
-               + "promote step are managed from the domain's DKIM tab, which gates promotion on its own DNS check; it is "
-               + "deliberately not repeated here.",
+            content.Children.Add(Paragraph(F("A key rotation is staged (selector \"{0}\"). The staged record and the promote step are managed from the domain's DKIM tab, which gates promotion on its own DNS check; it is deliberately not repeated here.", domain.DkimSecondarySelector),
                Typography.Caption));
          }
 
@@ -578,15 +554,15 @@ namespace hMailServer.ControlPanel.Views
          {
             enable = new Wpf.Ui.Controls.Button
             {
-               Content = "_Enable DKIM signing",
+               Content = L("_Enable DKIM signing"),
                Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
                IsEnabled = false,
                Margin = new Thickness(0, 8, 0, 0),
-               ToolTip = "Enabled once \"Check\" has confirmed the published record carries this key's public key."
+               ToolTip = L("Enabled once \"Check\" has confirmed the published record carries this key's public key.")
             };
             ToolTipService.SetShowOnDisabled(enable, true);
             System.Windows.Automation.AutomationProperties.SetName(enable,
-               "Enable DKIM signing for " + domain.Name + "; unlocked once the DNS check has passed");
+               F("Enable DKIM signing for {0}; unlocked once the DNS check has passed", domain.Name));
             System.Windows.Automation.AutomationProperties.SetAutomationId(enable, "dns-records-dkim-enable");
             enable.Click += (s, e) => EnableDkimSigning(domain.Name);
             content.Children.Add(enable);
@@ -612,13 +588,11 @@ namespace hMailServer.ControlPanel.Views
                   switch (found.Status)
                   {
                      case DnsTxtLookup.LookupStatus.Found:
-                        block.SetResult(StatusLevel.Information, "Cannot tell",
-                           "A TXT record exists at " + host + ", but the private key file could not be read from this "
-                           + "machine, so whether it carries the RIGHT key cannot be verified from here. Run the check on "
-                           + "the server itself, or use the domain's DKIM tab.");
+                        block.SetResult(StatusLevel.Information, L("Cannot tell"),
+                           F("A TXT record exists at {0}, but the private key file could not be read from this machine, so whether it carries the RIGHT key cannot be verified from here. Run the check on the server itself, or use the domain's DKIM tab.", host));
                         break;
                      case DnsTxtLookup.LookupStatus.NoRecord:
-                        block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(host));
+                        block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(host));
                         break;
                      default:
                         SetLookupFailed(block, host, found.Error);
@@ -641,18 +615,16 @@ namespace hMailServer.ControlPanel.Views
                switch (result.Status)
                {
                   case DnsTxtLookup.MatchStatus.FoundAndMatches:
-                     block.SetResult(StatusLevel.Good, "Published and correct",
-                        "The record at " + host + " carries this key's public key."
-                        + (enableButton != null ? " It is safe to enable signing." : ""));
+                     block.SetResult(StatusLevel.Good, L("Published and correct"),
+                        F("The record at {0} carries this key's public key.", host)
+                        + (enableButton != null ? L(" It is safe to enable signing.") : ""));
                      break;
                   case DnsTxtLookup.MatchStatus.NoRecord:
-                     block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(host));
+                     block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(host));
                      break;
                   case DnsTxtLookup.MatchStatus.FoundButDifferent:
-                     block.SetResult(StatusLevel.Critical, "Published, but wrong key",
-                        "TXT record(s) exist at " + host + " but none carries this key's public key, so every signature made "
-                        + "with this key fails verification. Waiting will not fix this - correct the published value to match "
-                        + "the one above." + DescribeFound(result.Records));
+                     block.SetResult(StatusLevel.Critical, L("Published, but wrong key"),
+                        F("TXT record(s) exist at {0} but none carries this key's public key, so every signature made with this key fails verification. Waiting will not fix this - correct the published value to match the one above.", host) + DescribeFound(result.Records));
                      break;
                   default:
                      SetLookupFailed(block, host, result.Error);
@@ -671,12 +643,12 @@ namespace hMailServer.ControlPanel.Views
       private void GenerateDkim(string domainName, string selector)
       {
          if (selector.Length == 0)
-            selector = "dkim";
+            selector = "dkim"; // no-loc: the default selector name
 
          var save = new Microsoft.Win32.SaveFileDialog
          {
-            Title = "Save the DKIM private key",
-            Filter = "PEM key files (*.pem)|*.pem|All files (*.*)|*.*",
+            Title = L("Save the DKIM private key"),
+            Filter = L("PEM key files (*.pem)|*.pem|All files (*.*)|*.*"),
             FileName = selector + "._domainkey." + domainName + ".pem"
          };
 
@@ -712,7 +684,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not generate and store the DKIM key: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("Could not generate and store the DKIM key: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
             return;
          }
 
@@ -738,7 +710,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not enable DKIM signing: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("Could not enable DKIM signing: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
             return;
          }
 
@@ -757,7 +729,7 @@ namespace hMailServer.ControlPanel.Views
             string pem = File.ReadAllText(keyFile);
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pem);
-            return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()); // no-loc
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
@@ -769,38 +741,30 @@ namespace hMailServer.ControlPanel.Views
 
       private Border DmarcCard(DomainInfo domain)
       {
-         Border card = Card("DMARC — what receivers should do with mail that fails SPF and DKIM", out StackPanel content);
+         Border card = Card(L("DMARC — what receivers should do with mail that fails SPF and DKIM"), out StackPanel content);
 
          // rua= is only offered when the domain has a postmaster address to send
          // reports to; inventing a mailbox would produce a record that asks the
          // world to mail reports somewhere that does not exist.
          bool haveRua = domain.Postmaster.Contains("@");
          string suggested = haveRua
-            ? "v=DMARC1; p=none; rua=mailto:" + domain.Postmaster
-            : "v=DMARC1; p=none";
+            ? "v=DMARC1; p=none; rua=mailto:" + domain.Postmaster // no-loc
+            : "v=DMARC1; p=none"; // no-loc: a DNS record
 
-         content.Children.Add(Paragraph(
-            "p=none is the right starting point, not an oversight: it makes receivers check and report but deliver as "
-            + "normal. A stricter policy (quarantine or reject) tells every receiver to junk or refuse mail that fails "
-            + "alignment - and until reports show your own mail passing SPF or DKIM, the mail that fails will include "
-            + "yours. Tighten only after the reports say it is safe.",
+         content.Children.Add(Paragraph(L("p=none is the right starting point, not an oversight: it makes receivers check and report but deliver as normal. A stricter policy (quarantine or reject) tells every receiver to junk or refuse mail that fails alignment - and until reports show your own mail passing SPF or DKIM, the mail that fails will include yours. Tighten only after the reports say it is safe."),
             Typography.Caption));
 
          content.Children.Add(Paragraph(
             haveRua
-               ? "rua=mailto:" + domain.Postmaster + " sends you the aggregate reports; the address is the domain's "
-                 + "postmaster address as configured on the domain. Reports arrive from strangers, so the mailbox must exist and accept them."
-               : "No rua= is included because " + domain.Name + " has no postmaster address configured, and this page will "
-                 + "not invent a mailbox. Without rua= the policy still applies, but nobody sends you reports - add "
-                 + "\"; rua=mailto:<a mailbox you read>\" when you have one.",
+               ? F("rua=mailto:{0} sends you the aggregate reports; the address is the domain's postmaster address as configured on the domain. Reports arrive from strangers, so the mailbox must exist and accept them.", domain.Postmaster)
+               : F("No rua= is included because {0} has no postmaster address configured, and this page will not invent a mailbox. Without rua= the policy still applies, but nobody sends you reports - add \"; rua=mailto:<a mailbox you read>\" when you have one.", domain.Name),
             Typography.Caption));
 
-         RecordBlock block = BuildRecordBlock(content, "dns-records-dmarc", "DMARC",
+         RecordBlock block = BuildRecordBlock(content, "dns-records-dmarc", L("DMARC"),
             host: "_dmarc." + domain.Name,
             hostNote: null,
             value: suggested,
-            copyWarning: "Keep p=none until you know your own mail passes. Editing this to p=quarantine or p=reject before "
-                         + "then tells every receiver to junk or bounce your own legitimate mail.");
+            copyWarning: L("Keep p=none until you know your own mail passes. Editing this to p=quarantine or p=reject before then tells every receiver to junk or bounce your own legitimate mail."));
 
          block.Check.Click += async (s, e) => await CheckDmarc(block, domain.Name);
 
@@ -832,19 +796,17 @@ namespace hMailServer.ControlPanel.Views
                if (dmarc.Count == 0)
                {
                   if (result.Records.Count > 0)
-                     block.SetResult(StatusLevel.Warning, "Not published",
-                        result.Records.Count + " TXT record(s) exist at " + host + ", but none begins \"v=DMARC1\", so "
-                        + "receivers - and this server's own DMARC check - see no policy." + DescribeFound(result.Records));
+                     block.SetResult(StatusLevel.Warning, L("Not published"),
+                        F("{0} TXT record(s) exist at {1}, but none begins \"v=DMARC1\", so receivers - and this server's own DMARC check - see no policy.", result.Records.Count, host) + DescribeFound(result.Records));
                   else
-                     block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(host));
+                     block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(host));
                   return;
                }
 
                if (dmarc.Count > 1)
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but duplicated",
-                     dmarc.Count + " records beginning \"v=DMARC1\" exist at " + host + ". Receivers treat multiple DMARC "
-                     + "records as no policy at all - remove all but one." + DescribeFound(dmarc));
+                  block.SetResult(StatusLevel.Warning, L("Published, but duplicated"),
+                     F("{0} records beginning \"v=DMARC1\" exist at {1}. Receivers treat multiple DMARC records as no policy at all - remove all but one.", dmarc.Count, host) + DescribeFound(dmarc));
                   return;
                }
 
@@ -853,34 +815,29 @@ namespace hMailServer.ControlPanel.Views
 
                if (policy == null)
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but incomplete",
-                     "The record at " + host + " has no p= tag, so it declares no policy and receivers ignore it. "
-                     + "Published: " + record);
+                  block.SetResult(StatusLevel.Warning, L("Published, but incomplete"),
+                     F("The record at {0} has no p= tag, so it declares no policy and receivers ignore it. Published: {1}", host, record));
                }
                else if (policy.Equals("none", StringComparison.OrdinalIgnoreCase))
                {
-                  block.SetResult(StatusLevel.Good, "Published and correct",
-                     "A DMARC record with p=none is live at " + host + "."
+                  block.SetResult(StatusLevel.Good, L("Published and correct"),
+                     F("A DMARC record with p=none is live at {0}.", host)
                      + (ParseTag(record, "rua") == null
-                        ? " It has no rua= tag, so nobody sends you reports - fine, but you learn nothing; add one when you have a mailbox for it."
+                        ? L(" It has no rua= tag, so nobody sends you reports - fine, but you learn nothing; add one when you have a mailbox for it.")
                         : "")
-                     + " Published: " + record);
+                     + F(" Published: {0}", record));
                }
                else if (policy.Equals("quarantine", StringComparison.OrdinalIgnoreCase)
                      || policy.Equals("reject", StringComparison.OrdinalIgnoreCase))
                {
-                  block.SetResult(StatusLevel.Information, "Published, stricter than the starting point",
-                     "A DMARC record with p=" + policy.ToLowerInvariant() + " is live at " + host + " - stricter than the "
-                     + "p=none starting point. That is right if you already know your mail passes alignment; if you are "
-                     + "still setting SPF and DKIM up, mail that fails is being "
-                     + (policy.Equals("reject", StringComparison.OrdinalIgnoreCase) ? "rejected" : "quarantined")
-                     + " right now. Published: " + record);
+                  block.SetResult(StatusLevel.Information, L("Published, stricter than the starting point"),
+                     F("A DMARC record with p={0} is live at {1} - stricter than the p=none starting point. That is right if you already know your mail passes alignment; if you are still setting SPF and DKIM up, mail that fails is being {2} right now. Published: {3}",
+                        policy.ToLowerInvariant(), host, policy.Equals("reject", StringComparison.OrdinalIgnoreCase) ? L("rejected") : L("quarantined"), record));
                }
                else
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but different",
-                     "The record at " + host + " carries p=" + policy + ", which is not a policy receivers recognise "
-                     + "(none, quarantine, reject). Published: " + record);
+                  block.SetResult(StatusLevel.Warning, L("Published, but different"),
+                     F("The record at {0} carries p={1}, which is not a policy receivers recognise (none, quarantine, reject). Published: {2}", host, policy, record));
                }
             });
          });
@@ -890,41 +847,34 @@ namespace hMailServer.ControlPanel.Views
 
       private Border MtaStsCard(DomainInfo domain)
       {
-         Border card = Card("MTA-STS — require TLS from servers delivering to " + domain.Name, out StackPanel content);
+         Border card = Card(L("MTA-STS — require TLS from servers delivering to ") + domain.Name, out StackPanel content);
 
-         content.Children.Add(Paragraph(
-            "Two halves: a TXT record that tells senders a policy exists, and the policy itself, fetched from "
-            + "https://mta-sts." + domain.Name + "/.well-known/mta-sts.txt. This server serves that policy itself - there "
-            + "is no file to upload - when MtaStsHostingEnabled is on and an HTTPS web-services listener is running "
-            + "(RFC 8461 section 3.3 allows HTTPS only). The name mta-sts." + domain.Name + " also needs an A or CNAME "
-            + "record pointing at this server, and the listener's certificate must cover that name.",
+         content.Children.Add(Paragraph(F("Two halves: a TXT record that tells senders a policy exists, and the policy itself, fetched from https://mta-sts.{0}/.well-known/mta-sts.txt. This server serves that policy itself - there is no file to upload - when MtaStsHostingEnabled is on and an HTTPS web-services listener is running (RFC 8461 section 3.3 allows HTTPS only). The name mta-sts.{0} also needs an A or CNAME record pointing at this server, and the listener's certificate must cover that name.", domain.Name),
             Typography.Caption));
 
          // The id's only job is to CHANGE whenever the policy changes, so senders
          // refetch instead of trusting their cache. Any value is as correct as
          // this one; a timestamp just makes "newer" self-evident.
          string suggestedId = DateTime.UtcNow.ToString("yyyyMMddHHmm");
-         string suggested = "v=STSv1; id=" + suggestedId;
+         string suggested = "v=STSv1; id=" + suggestedId; // no-loc
 
-         RecordBlock block = BuildRecordBlock(content, "dns-records-mtasts", "MTA-STS",
+         RecordBlock block = BuildRecordBlock(content, "dns-records-mtasts", L("MTA-STS"),
             host: "_mta-sts." + domain.Name,
             hostNote: null,
             value: suggested,
             copyWarning: null);
 
-         content.Children.Add(Paragraph(
-            "The id (" + suggestedId + ", generated just now) is yours to choose - any value is correct. Its only job is "
-            + "to change whenever the policy changes, so caches refetch.",
+         content.Children.Add(Paragraph(F("The id ({0}, generated just now) is yours to choose - any value is correct. Its only job is to change whenever the policy changes, so caches refetch.", suggestedId),
             Typography.Caption));
 
          block.Check.Click += async (s, e) => await CheckMtaStsTxt(block, domain.Name);
 
          // ---- the policy the server will serve ----
-         content.Children.Add(Label("Policy file the server will serve (read-only; served by the server itself):"));
+         content.Children.Add(Label(L("Policy file the server will serve (read-only; served by the server itself):")));
 
          var policyBox = ReadOnlyBox(70);
          policyBox.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         System.Windows.Automation.AutomationProperties.SetName(policyBox, "MTA-STS policy file content the server will serve");
+         System.Windows.Automation.AutomationProperties.SetName(policyBox, L("MTA-STS policy file content the server will serve"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(policyBox, "dns-records-mtasts-policy");
          content.Children.Add(policyBox);
 
@@ -940,17 +890,17 @@ namespace hMailServer.ControlPanel.Views
          BuildMtaStsPolicyPreview(domain.Name, policyBox, policyNote);
 
          // ---- fetch what is actually served ----
-         var fetchButton = new Wpf.Ui.Controls.Button { Content = "Check _policy (HTTPS)", Margin = new Thickness(0, 4, 0, 0) };
+         var fetchButton = new Wpf.Ui.Controls.Button { Content = L("Check _policy (HTTPS)"), Margin = new Thickness(0, 4, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetName(fetchButton,
-            "Fetch the MTA-STS policy for " + domain.Name + " over HTTPS and show what is served");
+            F("Fetch the MTA-STS policy for {0} over HTTPS and show what is served", domain.Name));
          System.Windows.Automation.AutomationProperties.SetAutomationId(fetchButton, "dns-records-mtasts-fetch");
          content.Children.Add(fetchButton);
 
          var fetchMark = new Path { Width = 11, Height = 11, Stretch = System.Windows.Media.Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
          var fetchText = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
          content.Children.Add(ResultRow(fetchMark, fetchText));
-         SetResultOn(fetchMark, fetchText, StatusLevel.Normal, "Not checked",
-            "Press \"Check policy (HTTPS)\" to fetch https://mta-sts." + domain.Name + "/.well-known/mta-sts.txt from this machine.");
+         SetResultOn(fetchMark, fetchText, StatusLevel.Normal, L("Not checked"),
+            F("Press \"Check policy (HTTPS)\" to fetch https://mta-sts.{0}/.well-known/mta-sts.txt from this machine.", domain.Name));
 
          fetchButton.Click += async (s, e) => await FetchMtaStsPolicy(domain.Name, fetchButton, fetchMark, fetchText);
 
@@ -993,16 +943,15 @@ namespace hMailServer.ControlPanel.Views
          }
 
          string caveat = iniReadable
-            ? "Mode and max_age read from hMailServer.INI on this machine."
+            ? L("Mode and max_age read from hMailServer.INI on this machine.")
             : (local
-               ? "hMailServer.INI was not found on this machine, so mode and max_age shown are the shipped defaults."
-               : "Connected to a remote server: hMailServer.INI cannot be read from here, so mode and max_age shown are the shipped defaults.");
+               ? L("hMailServer.INI was not found on this machine, so mode and max_age shown are the shipped defaults.")
+               : L("Connected to a remote server: hMailServer.INI cannot be read from here, so mode and max_age shown are the shipped defaults."));
 
          if (iniReadable && !hosting)
-            caveat += " NOTE: MtaStsHostingEnabled=0, so the server will NOT serve this policy at all.";
+            caveat += L(" NOTE: MtaStsHostingEnabled=0, so the server will NOT serve this policy at all.");
          else if (iniReadable && httpsPort <= 0)
-            caveat += " NOTE: WebServicesHttpsPort=0, so no HTTPS listener runs and the policy cannot be served "
-                      + "(RFC 8461 allows HTTPS only). The TXT record would advertise a policy nothing serves.";
+            caveat += L(" NOTE: WebServicesHttpsPort=0, so no HTTPS listener runs and the policy cannot be served (RFC 8461 allows HTTPS only). The TXT record would advertise a policy nothing serves.");
 
          List<string> mxHosts = null;
          string mxNote;
@@ -1010,18 +959,17 @@ namespace hMailServer.ControlPanel.Views
          if (mxOverride.Length > 0)
          {
             mxHosts = mxOverride.Split(',').Select(s => s.Trim().ToLowerInvariant()).Where(s => s.Length > 0).ToList();
-            mxNote = "mx lines from the MtaStsPolicyMx override in hMailServer.INI.";
+            mxNote = L("mx lines from the MtaStsPolicyMx override in hMailServer.INI.");
          }
          else
          {
-            mxNote = "mx lines are derived from " + domainName + "'s live MX records at request time; the lookup below is "
-                     + "this machine's view of the same answer.";
+            mxNote = F("mx lines are derived from {0}'s live MX records at request time; the lookup below is this machine's view of the same answer.", domainName);
          }
 
          void Render(List<string> hosts, string extra)
          {
             var body = new StringBuilder();
-            body.Append("version: STSv1\r\n");
+            body.Append("version: STSv1\r\n"); // no-loc
             body.Append("mode: ").Append(mode).Append("\r\n");
             foreach (string mx in hosts)
                body.Append("mx: ").Append(mx).Append("\r\n");
@@ -1036,7 +984,7 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
 
-         Render(new List<string> { "(looking up " + domainName + "'s MX records…)" }, "");
+         Render(new List<string> { F("(looking up {0}'s MX records…)", domainName) }, "");
 
          Task.Run(() => QueryMxRecords(domainName)).ContinueWith(t =>
          {
@@ -1050,11 +998,11 @@ namespace hMailServer.ControlPanel.Views
                // The server's own fallback when a domain has no MX records:
                // GetPolicyMxHosts_ uses Configuration::GetHostName().
                Render(new List<string> { serverHostName_.ToLowerInvariant() },
-                  "No MX records were found from this machine, so the server would fall back to its own host name.");
+                  L("No MX records were found from this machine, so the server would fall back to its own host name."));
             }
             else
             {
-               Render(new List<string> { "(no MX records found, and the server host name is not set - the server would serve no policy)" }, "");
+               Render(new List<string> { L("(no MX records found, and the server host name is not set - the server would serve no policy)") }, "");
             }
          }, TaskScheduler.FromCurrentSynchronizationContext());
       }
@@ -1083,26 +1031,23 @@ namespace hMailServer.ControlPanel.Views
                if (sts.Count == 0)
                {
                   if (result.Records.Count > 0)
-                     block.SetResult(StatusLevel.Warning, "Not published",
-                        result.Records.Count + " TXT record(s) exist at " + host + ", but none begins \"v=STSv1\", so "
-                        + "senders see no policy." + DescribeFound(result.Records));
+                     block.SetResult(StatusLevel.Warning, L("Not published"),
+                        F("{0} TXT record(s) exist at {1}, but none begins \"v=STSv1\", so senders see no policy.", result.Records.Count, host) + DescribeFound(result.Records));
                   else
-                     block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(host));
+                     block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(host));
                   return;
                }
 
                string id = ParseTag(sts[0], "id");
                if (id == null)
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but incomplete",
-                     "The record at " + host + " has no id= tag, which RFC 8461 requires - senders may never notice "
-                     + "policy updates. Published: " + sts[0]);
+                  block.SetResult(StatusLevel.Warning, L("Published, but incomplete"),
+                     F("The record at {0} has no id= tag, which RFC 8461 requires - senders may never notice policy updates. Published: {1}", host, sts[0]));
                }
                else
                {
-                  block.SetResult(StatusLevel.Good, "Published and correct",
-                     "A v=STSv1 record is live at " + host + " with id " + id + ". The id being different from the "
-                     + "suggestion is fine - it is yours to choose; change it whenever the policy changes.");
+                  block.SetResult(StatusLevel.Good, L("Published and correct"),
+                     F("A v=STSv1 record is live at {0} with id {1}. The id being different from the suggestion is fine - it is yours to choose; change it whenever the policy changes.", host, id));
                }
             });
          });
@@ -1121,7 +1066,7 @@ namespace hMailServer.ControlPanel.Views
          string url = "https://mta-sts." + domainName + "/.well-known/mta-sts.txt";
 
          button.IsEnabled = false;
-         SetResultOn(mark, text, StatusLevel.Information, "Checking…", "Fetching " + url + "…");
+         SetResultOn(mark, text, StatusLevel.Information, L("Checking…"), F("Fetching {0}…", url));
 
          try
          {
@@ -1131,17 +1076,15 @@ namespace hMailServer.ControlPanel.Views
 
             if (code >= 300 && code < 400)
             {
-               SetResultOn(mark, text, StatusLevel.Warning, "Not served",
-                  url + " answered with a redirect (HTTP " + code + "). Sending servers must not follow redirects "
-                  + "(RFC 8461 section 3.3), so this counts as no policy.");
+               SetResultOn(mark, text, StatusLevel.Warning, L("Not served"),
+                  F("{0} answered with a redirect (HTTP {1}). Sending servers must not follow redirects (RFC 8461 section 3.3), so this counts as no policy.", url, code));
                return;
             }
 
             if (code != 200)
             {
-               SetResultOn(mark, text, StatusLevel.Warning, "Not served",
-                  url + " answered HTTP " + code + ". The server serves the policy only when MtaStsHostingEnabled is on, "
-                  + "the domain is hosted and active, and the request's Host header is mta-sts." + domainName + ".");
+               SetResultOn(mark, text, StatusLevel.Warning, L("Not served"),
+                  F("{0} answered HTTP {1}. The server serves the policy only when MtaStsHostingEnabled is on, the domain is hosted and active, and the request's Host header is mta-sts.{2}.", url, code, domainName));
                return;
             }
 
@@ -1150,37 +1093,30 @@ namespace hMailServer.ControlPanel.Views
 
             if (bodyText.TrimStart().StartsWith("version:", StringComparison.OrdinalIgnoreCase) && bodyText.Contains("STSv1"))
             {
-               SetResultOn(mark, text, StatusLevel.Good, "Served",
-                  "The policy is being served over HTTPS. From this machine that also proves mta-sts." + domainName
-                  + " resolves, the certificate validates for that name, and the listener answers - the internet's view can "
-                  + "still differ if a firewall treats this machine specially. Served content: " + snippet);
+               SetResultOn(mark, text, StatusLevel.Good, L("Served"),
+                  F("The policy is being served over HTTPS. From this machine that also proves mta-sts.{0} resolves, the certificate validates for that name, and the listener answers - the internet's view can still differ if a firewall treats this machine specially. Served content: {1}", domainName, snippet));
             }
             else
             {
-               SetResultOn(mark, text, StatusLevel.Warning, "Answered, but not with a policy",
-                  url + " answered HTTP 200, but the body is not an MTA-STS policy (it does not begin \"version: STSv1\"). "
-                  + "Something other than the MTA-STS host is answering that URL. Served: " + snippet);
+               SetResultOn(mark, text, StatusLevel.Warning, L("Answered, but not with a policy"),
+                  F("{0} answered HTTP 200, but the body is not an MTA-STS policy (it does not begin \"version: STSv1\"). Something other than the MTA-STS host is answering that URL. Served: {1}", url, snippet));
             }
          }
          catch (TaskCanceledException)
          {
-            SetResultOn(mark, text, StatusLevel.Warning, "Not served",
-               url + " did not answer within 10 seconds from this machine. Likely causes: no A/CNAME record for mta-sts."
-               + domainName + ", the HTTPS listener is not running (WebServicesHttpsPort), or a firewall in between. "
-               + "Checked from this machine only.");
+            SetResultOn(mark, text, StatusLevel.Warning, L("Not served"),
+               F("{0} did not answer within 10 seconds from this machine. Likely causes: no A/CNAME record for mta-sts.{1}, the HTTPS listener is not running (WebServicesHttpsPort), or a firewall in between. Checked from this machine only.", url, domainName));
          }
          catch (HttpRequestException ex)
          {
             string reason = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
-            SetResultOn(mark, text, StatusLevel.Warning, "Not served",
-               url + " could not be fetched from this machine: " + reason + " Likely causes: no A/CNAME record for mta-sts."
-               + domainName + ", the HTTPS listener is not running (WebServicesHttpsPort=0 is the shipped default), or a "
-               + "certificate that does not cover mta-sts." + domainName + ". Checked from this machine only.");
+            SetResultOn(mark, text, StatusLevel.Warning, L("Not served"),
+               F("{0} could not be fetched from this machine: {1} Likely causes: no A/CNAME record for mta-sts.{2}, the HTTPS listener is not running (WebServicesHttpsPort=0 is the shipped default), or a certificate that does not cover mta-sts.{2}. Checked from this machine only.", url, reason, domainName));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SetResultOn(mark, text, StatusLevel.Information, "Lookup failed",
-               "The fetch itself failed: " + ex.Message + " This says nothing about the policy.");
+            SetResultOn(mark, text, StatusLevel.Information, L("Lookup failed"),
+               F("The fetch itself failed: {0} This says nothing about the policy.", ex.Message));
          }
          finally
          {
@@ -1192,12 +1128,9 @@ namespace hMailServer.ControlPanel.Views
 
       private Border TlsRptCard(DomainInfo domain)
       {
-         Border card = Card("TLS-RPT — ask other servers to report TLS failures when delivering to " + domain.Name, out StackPanel content);
+         Border card = Card(L("TLS-RPT — ask other servers to report TLS failures when delivering to ") + domain.Name, out StackPanel content);
 
-         content.Children.Add(Paragraph(
-            "Publishing this record asks every server that delivers to " + domain.Name + " to e-mail you a daily report "
-            + "when TLS to you fails or is downgraded. The reports go to the rua= mailbox, which must exist and accept "
-            + "mail from strangers. This works regardless of any hMailServer setting - the senders do the reporting.",
+         content.Children.Add(Paragraph(F("Publishing this record asks every server that delivers to {0} to e-mail you a daily report when TLS to you fails or is downgraded. The reports go to the rua= mailbox, which must exist and accept mail from strangers. This works regardless of any hMailServer setting - the senders do the reporting.", domain.Name),
             Typography.Caption));
 
          bool havePostmaster = domain.Postmaster.Contains("@");
@@ -1205,7 +1138,7 @@ namespace hMailServer.ControlPanel.Views
          var addressRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 4) };
          addressRow.Children.Add(new TextBlock
          {
-            Text = "Report mailbox:",
+            Text = L("Report mailbox:"),
             FontSize = Typography.Label,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
@@ -1218,19 +1151,18 @@ namespace hMailServer.ControlPanel.Views
             Padding = new Thickness(6),
             VerticalAlignment = VerticalAlignment.Center
          };
-         System.Windows.Automation.AutomationProperties.SetName(addressBox, "Mailbox that receives TLS reports for " + domain.Name);
+         System.Windows.Automation.AutomationProperties.SetName(addressBox, F("Mailbox that receives TLS reports for {0}", domain.Name));
          System.Windows.Automation.AutomationProperties.SetAutomationId(addressBox, "dns-records-tlsrpt-address");
          addressRow.Children.Add(addressBox);
          content.Children.Add(addressRow);
 
          content.Children.Add(Paragraph(
             havePostmaster
-               ? "Pre-filled with the domain's postmaster address, as configured on the domain. Change it if reports should go elsewhere."
-               : domain.Name + " has no postmaster address configured, and this page will not invent a mailbox - enter the "
-                 + "address that should receive the reports. Until one is entered there is no record to copy.",
+               ? L("Pre-filled with the domain's postmaster address, as configured on the domain. Change it if reports should go elsewhere.")
+               : F("{0} has no postmaster address configured, and this page will not invent a mailbox - enter the address that should receive the reports. Until one is entered there is no record to copy.", domain.Name),
             Typography.Caption));
 
-         RecordBlock block = BuildRecordBlock(content, "dns-records-tlsrpt", "TLS-RPT",
+         RecordBlock block = BuildRecordBlock(content, "dns-records-tlsrpt", L("TLS-RPT"),
             host: "_smtp._tls." + domain.Name,
             hostNote: null,
             value: BuildTlsRptValue(addressBox.Text.Trim()),
@@ -1243,11 +1175,11 @@ namespace hMailServer.ControlPanel.Views
             bool usable = address.Contains("@");
             block.ValueBox.Text = BuildTlsRptValue(address);
             block.CopyValue.IsEnabled = usable;
-            block.CopyValue.ToolTip = usable ? null : "Enter a report mailbox first - a record without a real rua= mailbox asks for nothing.";
+            block.CopyValue.ToolTip = usable ? null : L("Enter a report mailbox first - a record without a real rua= mailbox asks for nothing.");
          };
          ToolTipService.SetShowOnDisabled(block.CopyValue, true);
          if (!addressBox.Text.Trim().Contains("@"))
-            block.CopyValue.ToolTip = "Enter a report mailbox first - a record without a real rua= mailbox asks for nothing.";
+            block.CopyValue.ToolTip = L("Enter a report mailbox first - a record without a real rua= mailbox asks for nothing.");
 
          // The other direction, read from the server's own code: TlsRptReporterTask
          // collects statistics hourly but discards each completed day unsent while
@@ -1260,21 +1192,17 @@ namespace hMailServer.ControlPanel.Views
             {
                string from = ini.Read("TlsRptFromAddress", "").Trim();
                sendingNote = from.Length > 0
-                  ? "Separately, this server SENDS such reports to other domains: TlsRptFromAddress is set to " + from + ", so its own reports go out."
-                  : "Separately, this server's own SENDING of such reports to other domains is inert: TlsRptFromAddress is "
-                    + "empty in hMailServer.INI (the default), so it collects statistics and discards every completed day "
-                    + "unsent. Set it on the Transport security page if you want to send reports too.";
+                  ? F("Separately, this server SENDS such reports to other domains: TlsRptFromAddress is set to {0}, so its own reports go out.", from)
+                  : L("Separately, this server's own SENDING of such reports to other domains is inert: TlsRptFromAddress is empty in hMailServer.INI (the default), so it collects statistics and discards every completed day unsent. Set it on the Transport security page if you want to send reports too.");
             }
             else
             {
-               sendingNote = "Separately, this server sends its own reports to other domains only when TlsRptFromAddress is set "
-                             + "in hMailServer.INI - which could not be found on this machine to check.";
+               sendingNote = L("Separately, this server sends its own reports to other domains only when TlsRptFromAddress is set in hMailServer.INI - which could not be found on this machine to check.");
             }
          }
          else
          {
-            sendingNote = "Separately, this server sends its own reports to other domains only when TlsRptFromAddress is set "
-                          + "in hMailServer.INI on the server - not readable from this machine.";
+            sendingNote = L("Separately, this server sends its own reports to other domains only when TlsRptFromAddress is set in hMailServer.INI on the server - not readable from this machine.");
          }
          content.Children.Add(Paragraph(sendingNote, Typography.Caption));
 
@@ -1286,7 +1214,7 @@ namespace hMailServer.ControlPanel.Views
       private static string BuildTlsRptValue(string address)
          => address.Contains("@")
             ? "v=TLSRPTv1; rua=mailto:" + address
-            : "v=TLSRPTv1; rua=mailto:<enter a report mailbox above>";
+            : L("v=TLSRPTv1; rua=mailto:<enter a report mailbox above>");
 
       private async Task CheckTlsRpt(RecordBlock block, string domainName, TextBox addressBox)
       {
@@ -1311,11 +1239,11 @@ namespace hMailServer.ControlPanel.Views
                if (rpt.Count == 0)
                {
                   if (result.Records.Count > 0)
-                     block.SetResult(StatusLevel.Warning, "Not published",
-                        result.Records.Count + " TXT record(s) exist at " + host + ", but none begins \"v=TLSRPTv1\"."
+                     block.SetResult(StatusLevel.Warning, L("Not published"),
+                        F("{0} TXT record(s) exist at {1}, but none begins \"v=TLSRPTv1\".", result.Records.Count, host)
                         + DescribeFound(result.Records));
                   else
-                     block.SetResult(StatusLevel.Warning, "Not published", NotFoundAdvice(host));
+                     block.SetResult(StatusLevel.Warning, L("Not published"), NotFoundAdvice(host));
                   return;
                }
 
@@ -1324,21 +1252,19 @@ namespace hMailServer.ControlPanel.Views
 
                if (rua == null || rua.Length == 0)
                {
-                  block.SetResult(StatusLevel.Warning, "Published, but incomplete",
-                     "The record at " + host + " has no rua= tag, so it asks for reports and gives senders nowhere to "
-                     + "send them. Published: " + record);
+                  block.SetResult(StatusLevel.Warning, L("Published, but incomplete"),
+                     F("The record at {0} has no rua= tag, so it asks for reports and gives senders nowhere to send them. Published: {1}", host, record));
                }
                else if (suggestedAddress.Contains("@")
                      && rua.IndexOf("mailto:" + suggestedAddress, StringComparison.OrdinalIgnoreCase) >= 0)
                {
-                  block.SetResult(StatusLevel.Good, "Published and correct",
-                     "A v=TLSRPTv1 record is live at " + host + " and its reports go to " + suggestedAddress + ".");
+                  block.SetResult(StatusLevel.Good, L("Published and correct"),
+                     F("A v=TLSRPTv1 record is live at {0} and its reports go to {1}.", host, suggestedAddress));
                }
                else
                {
-                  block.SetResult(StatusLevel.Information, "Published, differs from the suggestion",
-                     "A v=TLSRPTv1 record is live at " + host + " with rua=" + rua + " - a different report mailbox than "
-                     + "the one above, which is fine as long as it exists and is read. Published: " + record);
+                  block.SetResult(StatusLevel.Information, L("Published, differs from the suggestion"),
+                     F("A v=TLSRPTv1 record is live at {0} with rua={1} - a different report mailbox than the one above, which is fine as long as it exists and is read. Published: {2}", host, rua, record));
                }
             });
          });
@@ -1358,15 +1284,9 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private Border PtrCard()
       {
-         Border card = Card("Reverse DNS (PTR) and the HELO name — set by whoever owns your IP address", out StackPanel content);
+         Border card = Card(L("Reverse DNS (PTR) and the HELO name — set by whoever owns your IP address"), out StackPanel content);
 
-         content.Children.Add(Paragraph(
-            "Receivers look up the PTR record of the connecting IP address and compare it with the name the server "
-            + "announces in HELO/EHLO; this server judges incoming mail by the same standard when the PTR and HELO checks "
-            + "on Anti-spam settings are on. Unlike every other record on this page, the PTR is NOT published in "
-            + "your domain's zone: it lives in the reverse zone of the IP address, which belongs to whoever owns the "
-            + "address - usually your hosting provider or ISP. Ask them to set it; there is nothing to paste into your "
-            + "own DNS console.",
+         content.Children.Add(Paragraph(L("Receivers look up the PTR record of the connecting IP address and compare it with the name the server announces in HELO/EHLO; this server judges incoming mail by the same standard when the PTR and HELO checks on Anti-spam settings are on. Unlike every other record on this page, the PTR is NOT published in your domain's zone: it lives in the reverse zone of the IP address, which belongs to whoever owns the address - usually your hosting provider or ISP. Ask them to set it; there is nothing to paste into your own DNS console."),
             Typography.Caption));
 
          string heloName;
@@ -1374,42 +1294,37 @@ namespace hMailServer.ControlPanel.Views
 
          if (!serverHostNameKnown_)
          {
-            heloName = "(could not be read from the server)";
-            heloNote = "The server's host name could not be read, so the name it announces in HELO/EHLO is unknown from here.";
+            heloName = L("(could not be read from the server)");
+            heloNote = L("The server's host name could not be read, so the name it announces in HELO/EHLO is unknown from here.");
          }
          else if (serverHostName_.Length > 0)
          {
             heloName = serverHostName_;
-            heloNote = "This is Settings > Delivery of e-mail > Host name, the name the server announces in HELO/EHLO on "
-                       + "every outbound delivery (Utilities::ComputerName). Ask the IP's owner to make the PTR of your "
-                       + "public IP resolve to exactly this name, and publish an A record for this name pointing back at "
-                       + "the same IP - receivers check both directions.";
+            heloNote = L("This is Settings > Delivery of e-mail > Host name, the name the server announces in HELO/EHLO on every outbound delivery (Utilities::ComputerName). Ask the IP's owner to make the PTR of your public IP resolve to exactly this name, and publish an A record for this name pointing back at the same IP - receivers check both directions.");
          }
          else
          {
-            heloName = IsLocalServer() ? Environment.MachineName : "(the server's Windows computer name)";
-            heloNote = "The Host name on Delivery of e-mail is EMPTY, so the server falls back to its Windows computer name"
-                       + (IsLocalServer() ? " - shown above as this machine's name" : ", which cannot be read from this machine")
-                       + ". A bare computer name is not a public DNS name: receivers that compare HELO with DNS will "
-                       + "penalise it, and no PTR can agree with it. Set a real host name first.";
+            heloName = IsLocalServer() ? Environment.MachineName : L("(the server's Windows computer name)");
+            heloNote = F("The Host name on Delivery of e-mail is EMPTY, so the server falls back to its Windows computer name{0}. A bare computer name is not a public DNS name: receivers that compare HELO with DNS will penalise it, and no PTR can agree with it. Set a real host name first.",
+               IsLocalServer() ? L(" - shown above as this machine's name") : L(", which cannot be read from this machine"));
          }
 
-         content.Children.Add(Label("Host name this server announces (give this to the IP's owner for the PTR):"));
+         content.Children.Add(Label(L("Host name this server announces (give this to the IP's owner for the PTR):")));
          TextBox heloBox = ReadOnlyBox(0);
          heloBox.Text = heloName;
          heloBox.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         System.Windows.Automation.AutomationProperties.SetName(heloBox, "Host name this server announces in HELO");
+         System.Windows.Automation.AutomationProperties.SetName(heloBox, L("Host name this server announces in HELO"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(heloBox, "dns-records-ptr-helo");
          content.Children.Add(heloBox);
 
-         var copy = new Wpf.Ui.Controls.Button { Content = "Copy _host name", Margin = new Thickness(0, 0, 0, 6) };
-         System.Windows.Automation.AutomationProperties.SetName(copy, "Copy the HELO host name");
+         var copy = new Wpf.Ui.Controls.Button { Content = L("Copy _host name"), Margin = new Thickness(0, 0, 0, 6) };
+         System.Windows.Automation.AutomationProperties.SetName(copy, L("Copy the HELO host name"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(copy, "dns-records-ptr-copy");
          bool copyable = serverHostNameKnown_ && serverHostName_.Length > 0;
          copy.IsEnabled = copyable;
          if (!copyable)
          {
-            copy.ToolTip = "There is no configured host name to copy yet.";
+            copy.ToolTip = L("There is no configured host name to copy yet.");
             ToolTipService.SetShowOnDisabled(copy, true);
          }
          copy.Click += (s, e) => CopyToClipboard(serverHostName_);
@@ -1417,16 +1332,12 @@ namespace hMailServer.ControlPanel.Views
 
          content.Children.Add(Paragraph(heloNote, Typography.Caption));
 
-         content.Children.Add(Paragraph(
-            "Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel "
-            + "cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT "
-            + "records only. Test from outside instead: nslookup <your public IP> shows the PTR; it should name the host "
-            + "above.",
+         content.Children.Add(Paragraph(L("Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup <your public IP> shows the PTR; it should name the host above."),
             Typography.Caption));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal };
-         links.Children.Add(PageLink("delivery", "Host name setting…", "Open Delivery of e-mail, which owns the Host name"));
-         links.Children.Add(PageLink("antispam", "PTR / HELO checks…", "Open Anti-spam settings, which owns the inbound PTR and HELO checks"));
+         links.Children.Add(PageLink("delivery", L("Host name setting…"), L("Open Delivery of e-mail, which owns the Host name")));
+         links.Children.Add(PageLink("antispam", L("PTR / HELO checks…"), L("Open Anti-spam settings, which owns the inbound PTR and HELO checks")));
          content.Children.Add(links);
 
          return card;
@@ -1460,21 +1371,21 @@ namespace hMailServer.ControlPanel.Views
       {
          var block = new RecordBlock();
 
-         parent.Children.Add(Label("Record type: TXT.  Host/Name" + (hostNote != null ? " — " + hostNote : "") + ":"));
+         parent.Children.Add(Label(L("Record type: TXT.  Host/Name") + (hostNote != null ? " — " + hostNote : "") + ":"));
 
          block.HostBox = ReadOnlyBox(0);
          block.HostBox.Text = host;
          block.HostBox.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         System.Windows.Automation.AutomationProperties.SetName(block.HostBox, recordName + " record host name");
+         System.Windows.Automation.AutomationProperties.SetName(block.HostBox, F("{0} record host name", recordName));
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.HostBox, idPrefix + "-host");
          parent.Children.Add(block.HostBox);
 
-         parent.Children.Add(Label("TXT value:"));
+         parent.Children.Add(Label(L("TXT value:")));
 
          block.ValueBox = ReadOnlyBox(44);
          block.ValueBox.Text = value;
          block.ValueBox.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         System.Windows.Automation.AutomationProperties.SetName(block.ValueBox, recordName + " record value");
+         System.Windows.Automation.AutomationProperties.SetName(block.ValueBox, F("{0} record value", recordName));
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.ValueBox, idPrefix + "-value");
          parent.Children.Add(block.ValueBox);
 
@@ -1490,11 +1401,11 @@ namespace hMailServer.ControlPanel.Views
             row.Children.Add(mark);
 
             var text = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
-            var word = new Run("Before you copy — ") { FontWeight = FontWeights.SemiBold };
+            var word = new Run(L("Before you copy — ")) { FontWeight = FontWeights.SemiBold };
             word.SetResourceReference(TextElement.ForegroundProperty, warning.BrushKey);
             text.Inlines.Add(word);
             text.Inlines.Add(new Run(copyWarning));
-            System.Windows.Automation.AutomationProperties.SetName(text, "Warning before copying. " + copyWarning);
+            System.Windows.Automation.AutomationProperties.SetName(text, F("Warning before copying. {0}", copyWarning));
             Grid.SetColumn(text, 1);
             row.Children.Add(text);
 
@@ -1503,25 +1414,25 @@ namespace hMailServer.ControlPanel.Views
 
          var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
 
-         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy host" };   // per record: no access key, the rows are reached with the arrow keys
-         System.Windows.Automation.AutomationProperties.SetName(copyHost, "Copy the " + recordName + " record host name");
+         var copyHost = new Wpf.Ui.Controls.Button { Content = L("Copy host") };   // per record: no access key, the rows are reached with the arrow keys
+         System.Windows.Automation.AutomationProperties.SetName(copyHost, F("Copy the {0} record host name", recordName));
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, idPrefix + "-copy-host");
          copyHost.Click += (s, e) => CopyToClipboard(block.HostBox.Text);
          copyRow.Children.Add(copyHost);
 
-         block.CopyValue = new Wpf.Ui.Controls.Button { Content = "Copy value", Margin = new Thickness(8, 0, 0, 0), IsEnabled = valueCopyable };   // per record: no access key, the rows are reached with the arrow keys
-         System.Windows.Automation.AutomationProperties.SetName(block.CopyValue, "Copy the " + recordName + " record value");
+         block.CopyValue = new Wpf.Ui.Controls.Button { Content = L("Copy value"), Margin = new Thickness(8, 0, 0, 0), IsEnabled = valueCopyable };   // per record: no access key, the rows are reached with the arrow keys
+         System.Windows.Automation.AutomationProperties.SetName(block.CopyValue, F("Copy the {0} record value", recordName));
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.CopyValue, idPrefix + "-copy-value");
          if (!valueCopyable)
          {
-            block.CopyValue.ToolTip = "The value cannot be produced from this machine, so there is nothing correct to copy.";
+            block.CopyValue.ToolTip = L("The value cannot be produced from this machine, so there is nothing correct to copy.");
             ToolTipService.SetShowOnDisabled(block.CopyValue, true);
          }
          block.CopyValue.Click += (s, e) => { if (block.CopyValue.IsEnabled) CopyToClipboard(block.ValueBox.Text); };
          copyRow.Children.Add(block.CopyValue);
 
-         block.Check = new Wpf.Ui.Controls.Button { Content = "Check", Margin = new Thickness(8, 0, 0, 0) };   // per record: no access key, the rows are reached with the arrow keys
-         System.Windows.Automation.AutomationProperties.SetName(block.Check, "Check whether the " + recordName + " record is published in DNS");
+         block.Check = new Wpf.Ui.Controls.Button { Content = L("Check"), Margin = new Thickness(8, 0, 0, 0) };   // per record: no access key, the rows are reached with the arrow keys
+         System.Windows.Automation.AutomationProperties.SetName(block.Check, F("Check whether the {0} record is published in DNS", recordName));
          System.Windows.Automation.AutomationProperties.SetAutomationId(block.Check, idPrefix + "-check");
          copyRow.Children.Add(block.Check);
 
@@ -1531,7 +1442,7 @@ namespace hMailServer.ControlPanel.Views
          block.Result = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
          parent.Children.Add(ResultRow(block.Mark, block.Result));
 
-         block.SetResult(StatusLevel.Normal, "Not checked", "Press \"Check\" to look the record up through this machine's resolver.");
+         block.SetResult(StatusLevel.Normal, L("Not checked"), L("Press \"Check\" to look the record up through this machine's resolver."));
 
          return block;
       }
@@ -1578,7 +1489,7 @@ namespace hMailServer.ControlPanel.Views
             return;
 
          block.Check.IsEnabled = false;
-         block.SetResult(StatusLevel.Information, "Checking…", "Looking up " + host + "…");
+         block.SetResult(StatusLevel.Information, L("Checking…"), F("Looking up {0}…", host));
 
          try
          {
@@ -1593,16 +1504,15 @@ namespace hMailServer.ControlPanel.Views
 
       private static void SetLookupFailed(RecordBlock block, string host, string error)
       {
-         block.SetResult(StatusLevel.Information, "Lookup failed",
-            "The DNS lookup for " + host + " itself failed: " + error + " This says nothing about the record - this "
-            + "machine could not get an answer from its DNS server. Check the network and try again.");
+         block.SetResult(StatusLevel.Information, L("Lookup failed"),
+            F("The DNS lookup for {0} itself failed: {1} This says nothing about the record - this machine could not get an answer from its DNS server. Check the network and try again.", host, error));
       }
 
-      private const string PropagationAdvice =
-         "Publish it at your DNS provider - or, if you just did, wait for propagation (usually minutes, sometimes hours) and check again.";
+      private static string PropagationAdvice =>
+         L("Publish it at your DNS provider - or, if you just did, wait for propagation (usually minutes, sometimes hours) and check again.");
 
       private static string NotFoundAdvice(string host)
-         => "No TXT record was found at " + host + ". " + PropagationAdvice;
+         => F("No TXT record was found at {0}. ", host) + PropagationAdvice;
 
       /// <summary>Shows what IS published beside any mismatch verdict - the
       /// administrator cannot fix a difference they cannot see.</summary>

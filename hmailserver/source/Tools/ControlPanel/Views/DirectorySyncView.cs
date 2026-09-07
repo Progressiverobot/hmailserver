@@ -12,6 +12,7 @@ using hMailServer.ControlPanel.Services;
 
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -51,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class DirectorySyncView : UserControl, IPageLifecycle
    {
-      private const string IniSection = "LDAP";
+      private const string IniSection = "LDAP"; // no-loc
 
       private readonly IniFeatureStore store_ = new IniFeatureStore();
 
@@ -101,16 +102,13 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "Directory synchronisation" };
+         var title = new TextBlock { Text = L("Directory synchronisation") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Creates and updates mailboxes to match an LDAP directory. Only domains that have an Active "
-                   + "Directory domain name set take part, so this cannot provision into a hosted domain by "
-                   + "accident. Nothing here ever deletes an account or a message: the most it does is mark one "
-                   + "inactive, and only when you ask it to."
+            Text = L("Creates and updates mailboxes to match an LDAP directory. Only domains that have an Active Directory domain name set take part, so this cannot provision into a hosted domain by accident. Nothing here ever deletes an account or a message: the most it does is mark one inactive, and only when you ask it to.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -212,7 +210,7 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private Border BuildStateCard_()
       {
-         Border card = Card_("Can this server provision from the directory?", null, out StackPanel content);
+         Border card = Card_(L("Can this server provision from the directory?"), null, out StackPanel content);
 
          stateText_.FontSize = Typography.Body;
          stateText_.TextWrapping = TextWrapping.Wrap;
@@ -226,16 +224,12 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildSelectionCard_()
       {
-         Border card = Card_("Which directory entries become mailboxes",
-            "These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two "
-            + "seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is "
-            + "not Windows will not have sAMAccountName and needs the attribute names changed.",
+         Border card = Card_(L("Which directory entries become mailboxes"),
+            L("These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed."),
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Search _filter", filter_, "dirsync-filter",
-            "The LDAP filter that selects the people who should have a mailbox. The default takes enabled person "
-            + "objects that carry a mail address - which deliberately excludes disabled leavers, service accounts "
-            + "and computers, all of which a broader filter would provision mailboxes for.",
+         content.Children.Add(LabelledBox_(L("Search _filter"), filter_, "dirsync-filter",
+            L("The LDAP filter that selects the people who should have a mailbox. The default takes enabled person objects that carry a mail address - which deliberately excludes disabled leavers, service accounts and computers, all of which a broader filter would provision mailboxes for."),
             // The server's kDefaultSyncFilter, character for character, INCLUDING the
             // userAccountControl clause. That clause is the whole of what the caption
             // above promises, and an earlier version of this placeholder omitted it -
@@ -248,26 +242,20 @@ namespace hMailServer.ControlPanel.Views
             placeholder: "(&(objectClass=user)(objectCategory=person)(mail=*)"
                          + "(!(userAccountControl:1.2.840.113556.1.4.803:=2)))"));
 
-         content.Children.Add(LabelledBox_("Address attri_bute", mailAttribute_, "dirsync-mail-attribute",
-            "Which attribute holds the mailbox address. proxyAddresses is understood: its scheme prefix is removed "
-            + "and the primary SMTP: value is preferred over the lower-case aliases.",
+         content.Children.Add(LabelledBox_(L("Address attri_bute"), mailAttribute_, "dirsync-mail-attribute",
+            L("Which attribute holds the mailbox address. proxyAddresses is understood: its scheme prefix is removed and the primary SMTP: value is preferred over the lower-case aliases."),
             placeholder: "mail"));
 
-         content.Children.Add(LabelledBox_("_Logon name attribute", usernameAttribute_, "dirsync-username-attribute",
-            "Which attribute holds the name the person logs in with. This is what is stored against the account and "
-            + "what the directory is asked about at every logon afterwards, so guessing it from the address is not "
-            + "good enough - an entry that does not carry it is reported rather than provisioned.",
+         content.Children.Add(LabelledBox_(L("_Logon name attribute"), usernameAttribute_, "dirsync-username-attribute",
+            L("Which attribute holds the name the person logs in with. This is what is stored against the account and what the directory is asked about at every logon afterwards, so guessing it from the address is not good enough - an entry that does not carry it is reported rather than provisioned."),
             placeholder: "sAMAccountName"));
 
-         content.Children.Add(LabelledBox_("_Display name attribute", displayNameAttribute_, "dirsync-displayname-attribute",
-            "Split into first and last name, and only ever written to an account that has neither. A name typed here "
-            + "by an administrator is never overwritten by the directory.",
+         content.Children.Add(LabelledBox_(L("_Display name attribute"), displayNameAttribute_, "dirsync-displayname-attribute",
+            L("Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory."),
             placeholder: "displayName"));
 
-         content.Children.Add(LabelledBox_("_Maximum entries to read", maxUsers_, "dirsync-max-users",
-            "A ceiling on one pass, so a search base pointed one level too high cannot be answered by reading an "
-            + "entire forest. If it is hit, the run says so and disables nothing at all - beyond the limit, an entry "
-            + "that exists is indistinguishable from one that was deleted.",
+         content.Children.Add(LabelledBox_(L("_Maximum entries to read"), maxUsers_, "dirsync-max-users",
+            L("A ceiling on one pass, so a search base pointed one level too high cannot be answered by reading an entire forest. If it is hit, the run says so and disables nothing at all - beyond the limit, an entry that exists is indistinguishable from one that was deleted."),
             placeholder: "5000"));
 
          return card;
@@ -275,31 +263,27 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildRunCard_()
       {
-         Border card = Card_("Preview, then apply",
-            "Preview changes nothing and reports exactly what Apply would do - they share one decider in the "
-            + "server, so a preview cannot describe an action the apply would not take. Apply stays disabled until "
-            + "a preview has been run with the options as they stand.",
+         Border card = Card_(L("Preview, then apply"),
+            L("Preview changes nothing and reports exactly what Apply would do - they share one decider in the server, so a preview cannot describe an action the apply would not take. Apply stays disabled until a preview has been run with the options as they stand."),
             out StackPanel content);
 
          var domainPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
          domainPanel.Children.Add(new TextBlock
          {
-            Text = "Domain",
+            Text = L("Domain"),
             FontSize = Typography.Body,
             Margin = new Thickness(0, 0, 0, 4)
          });
          domainChoice_.MinWidth = 320;
          domainChoice_.MaxWidth = 620;
          domainChoice_.HorizontalAlignment = HorizontalAlignment.Left;
-         System.Windows.Automation.AutomationProperties.SetName(domainChoice_, "Which domain to synchronise");
+         System.Windows.Automation.AutomationProperties.SetName(domainChoice_, L("Which domain to synchronise"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(domainChoice_, "dirsync-domain");
          domainChoice_.SelectionChanged += (s, e) => InvalidatePreview_();
          domainPanel.Children.Add(domainChoice_);
          domainPanel.Children.Add(new TextBlock
          {
-            Text = "Only domains with an Active Directory domain name set are listed - that field is what links a "
-                   + "mail domain to a directory. Bringing one domain over at a time is the sane way to do this the "
-                   + "first time.",
+            Text = L("Only domains with an Active Directory domain name set are listed - that field is what links a mail domain to a directory. Bringing one domain over at a time is the sane way to do this the first time."),
             FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.65,
@@ -307,25 +291,21 @@ namespace hMailServer.ControlPanel.Views
          });
          content.Children.Add(domainPanel);
 
-         disableMissing_.Content = "Also mark accounts _inactive when their directory entry has gone";
+         disableMissing_.Content = L("Also mark accounts _inactive when their directory entry has gone");
          disableMissing_.FontSize = Typography.Body;
          disableMissing_.Margin = new Thickness(0, 0, 0, 4);
          System.Windows.Automation.AutomationProperties.SetName(disableMissing_,
-            "Also mark accounts inactive when their directory entry has gone");
+            L("Also mark accounts inactive when their directory entry has gone"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(disableMissing_, "dirsync-disable-missing");
          System.Windows.Automation.AutomationProperties.SetHelpText(disableMissing_,
-            "Off by default. An account that stops being visible is far more often a filter that changed than a "
-            + "person who left, and the two mistakes do not cost the same. No message is ever deleted and no "
-            + "account is removed - re-enabling one restores everything.");
+            L("Off by default. An account that stops being visible is far more often a filter that changed than a person who left, and the two mistakes do not cost the same. No message is ever deleted and no account is removed - re-enabling one restores everything."));
          disableMissing_.Checked += (s, e) => InvalidatePreview_();
          disableMissing_.Unchecked += (s, e) => InvalidatePreview_();
          content.Children.Add(disableMissing_);
 
          content.Children.Add(new TextBlock
          {
-            Text = "Off by default. An account that stops being visible in the directory is far more often a search "
-                   + "that changed than a person who left, and the two mistakes do not cost the same. Nothing is "
-                   + "disabled at all when the enumeration was cut short or came back empty.",
+            Text = L("Off by default. An account that stops being visible in the directory is far more often a search that changed than a person who left, and the two mistakes do not cost the same. Nothing is disabled at all when the enumeration was cut short or came back empty."),
             FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.65,
@@ -336,19 +316,19 @@ namespace hMailServer.ControlPanel.Views
 
          previewButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "_Preview",
+            Content = L("_Preview"),
             Margin = new Thickness(0, 0, 8, 0),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary
          };
          System.Windows.Automation.AutomationProperties.SetName(previewButton_,
-            "Show what a synchronisation would do, changing nothing");
+            L("Show what a synchronisation would do, changing nothing"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(previewButton_, "dirsync-preview");
          previewButton_.Click += async (s, e) => await RunAsync_(false);
          buttons.Children.Add(previewButton_);
 
-         applyButton_ = new Wpf.Ui.Controls.Button { Content = "_Apply", IsEnabled = false };
+         applyButton_ = new Wpf.Ui.Controls.Button { Content = L("_Apply"), IsEnabled = false };
          System.Windows.Automation.AutomationProperties.SetName(applyButton_,
-            "Create and update the accounts the preview listed");
+            L("Create and update the accounts the preview listed"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(applyButton_, "dirsync-apply");
          applyButton_.Click += async (s, e) => await ApplyAsync_();
          buttons.Children.Add(applyButton_);
@@ -377,16 +357,12 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildScheduleCard_()
       {
-         Border card = Card_("Unattended synchronisation",
-            "A schedule creates and updates accounts with nobody watching. It never disables one, whatever the "
-            + "checkbox above is set to - departures are left to a person who has read a preview. Switch this on "
-            + "only after a preview has told you what it is going to do.",
+         Border card = Card_(L("Unattended synchronisation"),
+            L("A schedule creates and updates accounts with nobody watching. It never disables one, whatever the checkbox above is set to - departures are left to a person who has read a preview. Switch this on only after a preview has told you what it is going to do."),
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Run _every (minutes)", scheduleMinutes_, "dirsync-schedule",
-            "0 switches the schedule off, which is the default and is what every existing installation stays at. "
-            + "Values between 1 and 14 are treated as 15, and anything over a week as a week. This one needs a "
-            + "service restart: the task is registered when the server starts.",
+         content.Children.Add(LabelledBox_(L("Run _every (minutes)"), scheduleMinutes_, "dirsync-schedule",
+            L("0 switches the schedule off, which is the default and is what every existing installation stays at. Values between 1 and 14 are treated as 15, and anything over a week as a week. This one needs a service restart: the task is registered when the server starts."),
             placeholder: "0"));
 
          return card;
@@ -406,18 +382,18 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload", Margin = new Thickness(0, 0, 8, 0) };
-         System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read these settings from hMailServer.INI");
+         var reload = new Wpf.Ui.Controls.Button { Content = L("_Reload"), Margin = new Thickness(0, 0, 8, 0) };
+         System.Windows.Automation.AutomationProperties.SetName(reload, L("Re-read these settings from hMailServer.INI"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "dirsync-reload");
          reload.Click += (s, e) => Load_();
          buttons.Children.Add(reload);
 
          saveButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "_Save changes",
+            Content = L("_Save changes"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary
          };
-         System.Windows.Automation.AutomationProperties.SetName(saveButton_, "Save these settings to hMailServer.INI");
+         System.Windows.Automation.AutomationProperties.SetName(saveButton_, L("Save these settings to hMailServer.INI"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(saveButton_, "dirsync-save");
          saveButton_.Click += (s, e) => Save_();
          buttons.Children.Add(saveButton_);
@@ -477,8 +453,7 @@ namespace hMailServer.ControlPanel.Views
 
             footerStatus_.Text = editable
                ? ""
-               : "hMailServer.INI cannot be reached from this computer, so these selections cannot be edited here. "
-                 + "Preview and Apply still work: they run inside the server.";
+               : L("hMailServer.INI cannot be reached from this computer, so these selections cannot be edited here. Preview and Apply still work: they run inside the server.");
          }
          finally
          {
@@ -506,8 +481,7 @@ namespace hMailServer.ControlPanel.Views
             // next compares the file's write time.
             ProfileApi.Flush(store_.IniPath);
 
-            footerStatus_.Text = "Saved. The server picks the selection up within two seconds; a change to the "
-                                 + "schedule needs a service restart.";
+            footerStatus_.Text = L("Saved. The server picks the selection up within two seconds; a change to the schedule needs a service restart.");
 
             // A saved change alters what a run would select, so a preview taken before
             // it no longer describes what Apply would do.
@@ -515,7 +489,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            footerStatus_.Text = "Could not save: " + ex.Message;
+            footerStatus_.Text = L("Could not save: ") + ex.Message;
          }
       }
 
@@ -534,7 +508,7 @@ namespace hMailServer.ControlPanel.Views
       private void LoadDomains_()
       {
          domainChoice_.Items.Clear();
-         domainChoice_.Items.Add("All linked domains");
+         domainChoice_.Items.Add(L("All linked domains"));
          domainsRead_ = false;
 
          dynamic domains = null;
@@ -608,19 +582,14 @@ namespace hMailServer.ControlPanel.Views
          // readable domains, which is not the same fact as having no linked ones.
          if (!store_.IsAvailable)
          {
-            stateText_.Text = "Cannot tell from here. hMailServer.INI is not reachable from this computer, so the "
-                              + "[LDAP] section cannot be read - and it is that section, not anything on this page, "
-                              + "which decides whether a run can happen. Press Preview: it runs inside the server "
-                              + "and will say exactly what is missing, if anything is.";
+            stateText_.Text = L("Cannot tell from here. hMailServer.INI is not reachable from this computer, so the [LDAP] section cannot be read - and it is that section, not anything on this page, which decides whether a run can happen. Press Preview: it runs inside the server and will say exactly what is missing, if anything is.");
             stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
             return;
          }
 
          if (!domainsRead_)
          {
-            stateText_.Text = "Cannot tell from here - the server's domain list could not be read, so which domains "
-                              + "are linked to a directory is unknown. That is a connection problem rather than a "
-                              + "configuration one.";
+            stateText_.Text = L("Cannot tell from here - the server's domain list could not be read, so which domains are linked to a directory is unknown. That is a connection problem rather than a configuration one.");
             stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
             return;
          }
@@ -631,25 +600,22 @@ namespace hMailServer.ControlPanel.Views
          var problems = new List<string>();
 
          if (!ldapOn)
-            problems.Add("directory access is switched off ([LDAP] Enabled=0 - the Directory authentication page turns it on)");
+            problems.Add(L("directory access is switched off ([LDAP] Enabled=0 - the Directory authentication page turns it on)"));
 
          if (searchBase.Length == 0)
-            problems.Add("no search base is set, so there is nowhere to enumerate from");
+            problems.Add(L("no search base is set, so there is nowhere to enumerate from"));
 
          if (linkedDomains == 0)
-            problems.Add("no domain on this server has an Active Directory domain name set, so no domain is eligible "
-                         + "(set it on the domain's own page)");
+            problems.Add(L("no domain on this server has an Active Directory domain name set, so no domain is eligible (set it on the domain's own page)"));
 
          if (problems.Count == 0)
          {
-            stateText_.Text = "Yes. " + linkedDomains + " domain(s) are linked to a directory and will take part. "
-                              + "Run a preview first: the shape of a directory is rarely what anyone expects, and the "
-                              + "skipped rows are where the surprises are.";
+            stateText_.Text = F("Yes. {0} domain(s) are linked to a directory and will take part. Run a preview first: the shape of a directory is rarely what anyone expects, and the skipped rows are where the surprises are.", linkedDomains);
             stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
             return;
          }
 
-         stateText_.Text = "Not yet - " + string.Join("; ", problems) + ".";
+         stateText_.Text = L("Not yet - ") + string.Join("; ", problems) + ".";
          stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
       }
 
@@ -699,7 +665,7 @@ namespace hMailServer.ControlPanel.Views
 
          previewButton_.IsEnabled = false;
          applyButton_.IsEnabled = false;
-         summaryText_.Text = apply ? "Applying..." : "Reading the directory...";
+         summaryText_.Text = apply ? "Applying..." : L("Reading the directory...");
          attentionText_.Text = "";
          rows_.Children.Clear();
 
@@ -731,7 +697,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            summaryText_.Text = "The run failed: " + ServerSession.DescribeComError(ex);
+            summaryText_.Text = L("The run failed: ") + ServerSession.DescribeComError(ex);
             previewedOptions_ = null;
          }
          finally
@@ -747,19 +713,17 @@ namespace hMailServer.ControlPanel.Views
          // the click and the handler.
          if (previewedOptions_ == null || previewedOptions_ != CurrentOptions_())
          {
-            summaryText_.Text = "Run a preview first: the options have changed since the last one, so it no longer "
-                                + "describes what this would do.";
+            summaryText_.Text = L("Run a preview first: the options have changed since the last one, so it no longer describes what this would do.");
             applyButton_.IsEnabled = false;
             return;
          }
 
          MessageBoxResult answer = MessageBox.Show(
-            "This creates and updates mailboxes on the server to match the directory"
-            + (disableMissing_.IsChecked is true
-               ? ", and marks accounts inactive when their directory entry has gone."
-               : ". No account will be disabled.")
-            + "\r\n\r\nNo message is deleted and no account is removed. Continue?",
-            "Apply directory synchronisation",
+            F("This creates and updates mailboxes on the server to match the directory{0}\r\n\r\nNo message is deleted and no account is removed. Continue?",
+               disableMissing_.IsChecked is true
+                  ? L(", and marks accounts inactive when their directory entry has gone.")
+                  : L(". No account will be disabled.")),
+            L("Apply directory synchronisation"),
             MessageBoxButton.OKCancel,
             MessageBoxImage.Warning,
             MessageBoxResult.Cancel);
@@ -779,8 +743,7 @@ namespace hMailServer.ControlPanel.Views
          // make it safer.
          if (previewedOptions_ != CurrentOptions_())
          {
-            summaryText_.Text = "Nothing was applied: the options changed while the confirmation was open, so the "
-                                + "preview no longer describes what this would do. Run the preview again.";
+            summaryText_.Text = L("Nothing was applied: the options changed while the confirmation was open, so the preview no longer describes what this would do. Run the preview again.");
             applyButton_.IsEnabled = false;
             previewedOptions_ = null;
             return;
@@ -833,11 +796,10 @@ namespace hMailServer.ControlPanel.Views
             // So the claim is made only when the list is empty, and the rows are drawn
             // either way.
             attentionText_.Text = report.Rows.Count == 0
-               ? (applied ? "Nothing was changed." : "Nothing was read.")
+               ? (applied ? L("Nothing was changed.") : L("Nothing was read."))
                : (applied
-                  ? "The run did not finish. The rows below say what had already been done before it stopped - "
-                    + "read them before running it again."
-                  : "The run did not finish. What was read before it stopped is below.");
+                  ? L("The run did not finish. The rows below say what had already been done before it stopped - read them before running it again.")
+                  : L("The run did not finish. What was read before it stopped is below."));
 
             RenderRows_(report);
             return;
@@ -861,16 +823,14 @@ namespace hMailServer.ControlPanel.Views
             // Apply_ counts individual refusals in `failed` and leaves the run itself
             // successful - so "applied" on its own tells an administrator very little.
             attentionText_.Text = failed == 0
-               ? done + " change(s) carried out, none failed."
-               : failed + " of " + (failed + done) + " change(s) could not be carried out and are listed first, "
-                 + "with the server's reason on each. The rest were applied.";
+               ? F("{0} change(s) carried out, none failed.", done)
+               : F("{0} of {1} change(s) could not be carried out and are listed first, with the server's reason on each. The rest were applied.", failed, failed + done);
          }
          else
          {
             attentionText_.Text = attention == 0
-               ? "Nothing here needs a decision: no mailbox is being skipped and none is being disabled."
-               : attention + " row(s) need reading before you apply - a skipped entry is a mailbox somebody expects "
-                 + "and will not get, and a disabled one is a mailbox being taken away.";
+               ? L("Nothing here needs a decision: no mailbox is being skipped and none is being disabled.")
+               : F("{0} row(s) need reading before you apply - a skipped entry is a mailbox somebody expects and will not get, and a disabled one is a mailbox being taken away.", attention);
          }
 
          RenderRows_(report);
@@ -896,7 +856,7 @@ namespace hMailServer.ControlPanel.Views
          // summarises, rather than trailing four hundred lines below them.
          rows_.Children.Add(new TextBlock
          {
-            Text = "Skipped, by reason",
+            Text = L("Skipped, by reason"),
             FontSize = Typography.Body,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 14, 0, 4)
@@ -928,7 +888,7 @@ namespace hMailServer.ControlPanel.Views
 
          var head = new TextBlock
          {
-            Text = (row.Address.Length == 0 ? "(no address)" : row.Address) + "  -  " + row.Action,
+            Text = (row.Address.Length == 0 ? L("(no address)") : row.Address) + "  -  " + row.Action,
             FontSize = Typography.Body,
             FontWeight = emphasise ? FontWeights.SemiBold : FontWeights.Normal,
             TextWrapping = TextWrapping.Wrap

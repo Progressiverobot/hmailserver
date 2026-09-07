@@ -17,6 +17,7 @@ using hMailServer.ControlPanel.Services;
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using Path = System.Windows.Shapes.Path;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -58,7 +59,7 @@ namespace hMailServer.ControlPanel.Views
       private const string DefaultUserSearchFilter =
          "(&(objectCategory=person)(objectClass=user)(sAMAccountName=%u))";
 
-      private const string IniSection = "LDAP";
+      private const string IniSection = "LDAP"; // no-loc
 
       private readonly IniFeatureStore store_ = new();
 
@@ -117,16 +118,13 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "Directory authentication (LDAP)" };
+         var title = new TextBlock { Text = L("Directory authentication (LDAP)") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Accounts marked as directory-linked log on with their domain password through an LDAP bind - "
-                   + "unlike Windows logon, this works from a host that is not joined to the domain, which is the "
-                   + "usual situation for a mail server in a DMZ. Edits the [LDAP] section of hMailServer.INI; the "
-                   + "server re-reads that section within two seconds of a save, so no service restart is needed."
+            Text = L("Accounts marked as directory-linked log on with their domain password through an LDAP bind - unlike Windows logon, this works from a host that is not joined to the domain, which is the usual situation for a mail server in a DMZ. Edits the [LDAP] section of hMailServer.INI; the server re-reads that section within two seconds of a save, so no service restart is needed.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -186,14 +184,14 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload", Margin = new Thickness(0, 0, 8, 0) };
-         System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read the LDAP settings from hMailServer.INI");
+         var reload = new Wpf.Ui.Controls.Button { Content = L("_Reload"), Margin = new Thickness(0, 0, 8, 0) };
+         System.Windows.Automation.AutomationProperties.SetName(reload, L("Re-read the LDAP settings from hMailServer.INI"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "ldap-reload");
          reload.Click += (s, e) => Load_();
          buttons.Children.Add(reload);
 
-         saveButton_ = new Wpf.Ui.Controls.Button { Content = "_Save changes", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
-         System.Windows.Automation.AutomationProperties.SetName(saveButton_, "Save the LDAP settings to hMailServer.INI");
+         saveButton_ = new Wpf.Ui.Controls.Button { Content = L("_Save changes"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         System.Windows.Automation.AutomationProperties.SetName(saveButton_, L("Save the LDAP settings to hMailServer.INI"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(saveButton_, "ldap-save");
          saveButton_.Click += (s, e) => Save_();
          buttons.Children.Add(saveButton_);
@@ -342,7 +340,7 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildStateCard_()
       {
-         Border card = Card_("Is this configuration complete?", null, out StackPanel content);
+         Border card = Card_(L("Is this configuration complete?"), null, out StackPanel content);
 
          var row = new Grid();
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -373,53 +371,41 @@ namespace hMailServer.ControlPanel.Views
          // LdapDirectoryAuthenticator, evaluated over what is in the editors right
          // now - so it answers "what will happen if I save this", not "what did I
          // save last time".
-         content.Children.Add(Caption_("Evaluated from the values in the editors on this page, saved or not. "
-            + "The server applies the same checks to what is actually saved in hMailServer.INI."));
+         content.Children.Add(Caption_(L("Evaluated from the values in the editors on this page, saved or not. The server applies the same checks to what is actually saved in hMailServer.INI.")));
 
          return card;
       }
 
       private Border BuildConnectionCard_()
       {
-         Border card = Card_("Directory server", null, out StackPanel content);
+         Border card = Card_(L("Directory server"), null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(enabled_,
-            "_Use LDAP directory authentication (Enabled)",
+            L("_Use LDAP directory authentication (Enabled)"),
             "ldap-enabled",
-            "Off by default, and inert when off: directory-linked accounts are then validated the old way, through "
-            + "Windows logon. When on, the same accounts - the ones with the Directory tab filled in - are validated "
-            + "by an LDAP bind against the server below instead. Non-directory accounts are never affected either way."));
+            L("Off by default, and inert when off: directory-linked accounts are then validated the old way, through Windows logon. When on, the same accounts - the ones with the Directory tab filled in - are validated by an LDAP bind against the server below instead. Non-directory accounts are never affected either way.")));
 
-         content.Children.Add(LabelledBox_("Directory server _host name (Server)", server_, "ldap-server",
-            "Required. The Active Directory domain controller or other LDAP server to bind against. For LDAPS the "
-            + "name must match the server's certificate, so use the DNS name, not an IP address.",
+         content.Children.Add(LabelledBox_(L("Directory server _host name (Server)"), server_, "ldap-server",
+            L("Required. The Active Directory domain controller or other LDAP server to bind against. For LDAPS the name must match the server's certificate, so use the DNS name, not an IP address."),
             placeholder: "dc01.example.local"));
 
-         content.Children.Add(LabelledBox_("_Port (Port)", port_, "ldap-port",
-            "Leave empty (or 0) for automatic: 636 when the connection security is LDAPS, 389 otherwise. The port is "
-            + "derived from the security setting so that choosing LDAPS and forgetting the port cannot attempt TLS "
-            + "against the cleartext port, which fails in a way that looks like a certificate problem.",
-            placeholder: "Automatic - 636 for LDAPS, 389 otherwise"));
+         content.Children.Add(LabelledBox_(L("_Port (Port)"), port_, "ldap-port",
+            L("Leave empty (or 0) for automatic: 636 when the connection security is LDAPS, 389 otherwise. The port is derived from the security setting so that choosing LDAPS and forgetting the port cannot attempt TLS against the cleartext port, which fails in a way that looks like a certificate problem."),
+            placeholder: L("Automatic - 636 for LDAPS, 389 otherwise")));
 
-         content.Children.Add(LabelledCombo_("_Connection security (Security)", security_, "ldap-security",
-            "LDAPS is the default. A number in the INI that is not one of these three is read as LDAPS, so a typo "
-            + "cannot silently weaken the transport - and whatever this is set to, a password is never sent over an "
-            + "unprotected connection unless that is explicitly allowed below.",
-            (2, "LDAPS - TLS from the first byte (default, port 636)"),
-            (1, "StartTLS - connect on 389, upgrade to TLS before anything is sent"),
-            (0, "Unprotected LDAP - cleartext (lab networks only)")));
+         content.Children.Add(LabelledCombo_(L("_Connection security (Security)"), security_, "ldap-security",
+            L("LDAPS is the default. A number in the INI that is not one of these three is read as LDAPS, so a typo cannot silently weaken the transport - and whatever this is set to, a password is never sent over an unprotected connection unless that is explicitly allowed below."),
+            (2, L("LDAPS - TLS from the first byte (default, port 636)")),
+            (1, L("StartTLS - connect on 389, upgrade to TLS before anything is sent")),
+            (0, L("Unprotected LDAP - cleartext (lab networks only)"))));
 
          content.Children.Add(LabelledCheck_(verifyCertificate_,
-            "_Verify the directory server's certificate (VerifyCertificate)",
+            L("_Verify the directory server's certificate (VerifyCertificate)"),
             "ldap-verify-certificate",
-            "On by default, and only an explicit 0 in the INI turns it off. Turned off, the encrypted connection no "
-            + "longer proves it reaches YOUR directory: anyone who can intercept it can present any certificate and "
-            + "collect every password sent over it. The server notes the disabling in its application log once per "
-            + "service start. Only meaningful for LDAPS and StartTLS."));
+            L("On by default, and only an explicit 0 in the INI turns it off. Turned off, the encrypted connection no longer proves it reaches YOUR directory: anyone who can intercept it can present any certificate and collect every password sent over it. The server notes the disabling in its application log once per service start. Only meaningful for LDAPS and StartTLS.")));
 
-         content.Children.Add(LabelledBox_("Time_out in seconds (TimeoutSeconds)", timeout_, "ldap-timeout",
-            "Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, "
-            + "because \"wait forever\" for an unreachable directory is how connection threads get exhausted.",
+         content.Children.Add(LabelledBox_(L("Time_out in seconds (TimeoutSeconds)"), timeout_, "ldap-timeout",
+            L("Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because \"wait forever\" for an unreachable directory is how connection threads get exhausted."),
             placeholder: "10"));
 
          return card;
@@ -427,74 +413,56 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildBindMethodCard_()
       {
-         Border card = Card_("How the password is proved",
-            "Two bind methods, and the difference matters more than it looks: one sends the password to the "
-            + "directory, the other never puts it on the wire at all.", out StackPanel content);
+         Border card = Card_(L("How the password is proved"),
+            L("Two bind methods, and the difference matters more than it looks: one sends the password to the directory, the other never puts it on the wire at all."), out StackPanel content);
 
-         content.Children.Add(LabelledCombo_("_Bind method (BindMethod)", bindMethod_, "ldap-bind-method",
-            "Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never "
-            + "transmits the password and signs the connection - it is the only method a default-configured modern "
-            + "domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and "
-            + "no service account, and it works from a host that is not domain-joined.",
-            (0, "Simple bind - the password is sent to the directory (use with TLS)"),
-            (1, "Negotiate (Kerberos/NTLM) - the password never crosses the network")));
+         content.Children.Add(LabelledCombo_(L("_Bind method (BindMethod)"), bindMethod_, "ldap-bind-method",
+            L("Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined."),
+            (0, L("Simple bind - the password is sent to the directory (use with TLS)")),
+            (1, L("Negotiate (Kerberos/NTLM) - the password never crosses the network"))));
 
          content.Children.Add(LabelledCheck_(allowUnprotected_,
-            "_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)",
+            L("_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)"),
             "ldap-allow-unprotected",
-            "Off by default. With unprotected LDAP and a simple bind, the server does NOT send the password and does "
-            + "NOT guess what you meant: it refuses the logon and reports the contradiction, once per minute. Turning "
-            + "this on sends passwords in the clear and should only ever happen on a network you control end to end."));
+            L("Off by default. With unprotected LDAP and a simple bind, the server does NOT send the password and does NOT guess what you meant: it refuses the logon and reports the contradiction, once per minute. Turning this on sends passwords in the clear and should only ever happen on a network you control end to end.")));
 
          return card;
       }
 
       private Border BuildLookupCard_()
       {
-         Border card = Card_("Finding the user's directory entry",
-            "A simple bind needs the user's distinguished name. There are two ways to get one - search for it, or "
-            + "compute it from a template - and Negotiate needs neither, because SSPI authenticates by user name and "
-            + "domain, which the account already carries.", out StackPanel content);
+         Border card = Card_(L("Finding the user's directory entry"),
+            L("A simple bind needs the user's distinguished name. There are two ways to get one - search for it, or compute it from a template - and Negotiate needs neither, because SSPI authenticates by user name and domain, which the account already carries."), out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Search bas_e (SearchBase)", searchBase_, "ldap-search-base",
-            "Where the search starts, e.g. DC=example,DC=local. Required in search mode - that is, when the bind "
-            + "method is Simple and no DN template is set.",
+         content.Children.Add(LabelledBox_(L("Search bas_e (SearchBase)"), searchBase_, "ldap-search-base",
+            L("Where the search starts, e.g. DC=example,DC=local. Required in search mode - that is, when the bind method is Simple and no DN template is set."),
             placeholder: "DC=example,DC=local"));
 
-         content.Children.Add(LabelledBox_("User search _filter (UserSearchFilter)", userSearchFilter_, "ldap-user-search-filter",
-            "Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is "
-            + "indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab "
-            + "stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; "
-            + "all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A "
-            + "filter that matches more than one entry authenticates nobody, by design.",
+         content.Children.Add(LabelledBox_(L("User search _filter (UserSearchFilter)"), userSearchFilter_, "ldap-user-search-filter",
+            L("Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design."),
             placeholder: DefaultUserSearchFilter));
 
-         content.Children.Add(LabelledBox_("User _DN template (UserDnTemplate)", userDnTemplate_, "ldap-user-dn-template",
-            "The other way to reach a DN: set this and the server skips the search - and with it the need for a "
-            + "SearchBase and a service account. A UPN works against Active Directory. Same %u, %d, %m placeholders, "
-            + "escaped for a distinguished name.",
-            placeholder: "%u@example.local   or   CN=%u,OU=Staff,DC=example,DC=local"));
+         content.Children.Add(LabelledBox_(L("User _DN template (UserDnTemplate)"), userDnTemplate_, "ldap-user-dn-template",
+            L("The other way to reach a DN: set this and the server skips the search - and with it the need for a SearchBase and a service account. A UPN works against Active Directory. Same %u, %d, %m placeholders, escaped for a distinguished name."),
+            placeholder: "%u@example.local   or   CN=%u,OU=Staff,DC=example,DC=local")); // no-loc
 
          return card;
       }
 
       private Border BuildServiceCredentialCard_()
       {
-         Border card = Card_("Service account (search mode only)",
-            "Active Directory refuses anonymous searches by default, so search mode normally needs a credential "
-            + "that may read the directory. Negotiate and DN-template configurations need none of this.",
+         Border card = Card_(L("Service account (search mode only)"),
+            L("Active Directory refuses anonymous searches by default, so search mode normally needs a credential that may read the directory. Negotiate and DN-template configurations need none of this."),
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("Service account user _name (ServiceUsername)", serviceUsername_, "ldap-service-username",
-            "Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\\name, or a "
-            + "full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, "
-            + "with a reported reason that names this setting.",
+         content.Children.Add(LabelledBox_(L("Service account user _name (ServiceUsername)"), serviceUsername_, "ldap-service-username",
+            L("Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting."),
             placeholder: "svc-mail@example.local"));
 
          var passwordPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
          passwordPanel.Children.Add(new TextBlock
          {
-            Text = "Service account password (ServicePassword)",
+            Text = L("Service account password (ServicePassword)"),
             FontSize = Typography.Body,
             Margin = new Thickness(0, 0, 0, 4)
          });
@@ -503,24 +471,20 @@ namespace hMailServer.ControlPanel.Views
          servicePassword_.MaxWidth = 520;
          servicePassword_.MinWidth = 320;
          servicePassword_.HorizontalAlignment = HorizontalAlignment.Left;
-         System.Windows.Automation.AutomationProperties.SetName(servicePassword_, "Service account password (ServicePassword)");
+         System.Windows.Automation.AutomationProperties.SetName(servicePassword_, L("Service account password (ServicePassword)"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(servicePassword_, "ldap-service-password");
          passwordPanel.Children.Add(servicePassword_);
 
-         const string passwordCaption =
-            "Write-only: a stored password is never shown here again - leave the box blank to keep it. It is stored "
-            + "as plain text in hMailServer.INI on the server, because the server has to present it to the directory "
-            + "verbatim and so cannot hash it; restrict file access to the INI accordingly. It only ever leaves the "
-            + "server over the transport configured above.";
+         string passwordCaption =
+            L("Write-only: a stored password is never shown here again - leave the box blank to keep it. It is stored as plain text in hMailServer.INI on the server, because the server has to present it to the directory verbatim and so cannot hash it; restrict file access to the INI accordingly. It only ever leaves the server over the transport configured above.");
          System.Windows.Automation.AutomationProperties.SetHelpText(servicePassword_, passwordCaption);
          passwordPanel.Children.Add(Caption_(passwordCaption));
          content.Children.Add(passwordPanel);
 
          content.Children.Add(LabelledCheck_(clearServicePassword_,
-            "Remove the stored service account pass_word when saving",
+            L("Remove the stored service account pass_word when saving"),
             "ldap-clear-service-password",
-            "The blank-keeps-it rule above means there would otherwise be no way to delete a stored password from "
-            + "this page - for instance after switching to Negotiate or a DN template, neither of which needs one."));
+            L("The blank-keeps-it rule above means there would otherwise be no way to delete a stored password from this page - for instance after switching to Negotiate or a DN template, neither of which needs one.")));
 
          // ServiceDomain is deliberately NOT an editor. LdapSettings.cpp reads the
          // key, and nothing anywhere consumes it: the service credential binds with
@@ -539,51 +503,36 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildFallbackCard_()
       {
-         Border card = Card_("If the directory cannot answer", null, out StackPanel content);
+         Border card = Card_(L("If the directory cannot answer"), null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(fallback_,
-            "Retr_y through Windows logon when the directory is unavailable (FallbackToWindowsLogon)",
+            L("Retr_y through Windows logon when the directory is unavailable (FallbackToWindowsLogon)"),
             "ldap-fallback",
-            "Off by default. When off, an unreachable directory refuses the logon and the server reports the real "
-            + "reason (throttled to once per minute per distinct problem) instead of retrying through Windows logon "
-            + "- which cannot succeed on a host that is not domain-joined, and whose failure would bury a precise "
-            + "diagnostic under an indistinguishable one. Turn on only on a domain-joined host that wants LDAP as "
-            + "its first choice. A password the directory REJECTED never falls back either way: retrying it would "
-            + "double every failed attempt and let one wrong password trigger a directory lockout policy."));
+            L("Off by default. When off, an unreachable directory refuses the logon and the server reports the real reason (throttled to once per minute per distinct problem) instead of retrying through Windows logon - which cannot succeed on a host that is not domain-joined, and whose failure would bury a precise diagnostic under an indistinguishable one. Turn on only on a domain-joined host that wants LDAP as its first choice. A password the directory REJECTED never falls back either way: retrying it would double every failed attempt and let one wrong password trigger a directory lockout policy.")));
 
          return card;
       }
 
       private Border BuildPrerequisitesCard_()
       {
-         Border card = Card_("What has to exist outside this server",
-            "hMailServer cannot create any of these for itself. Each one missing has its own failure shape, and the "
-            + "server reports which one it hit - see the error log.", out StackPanel content);
+         Border card = Card_(L("What has to exist outside this server"),
+            L("hMailServer cannot create any of these for itself. Each one missing has its own failure shape, and the server reports which one it hit - see the error log."), out StackPanel content);
 
          AddBullet_(content,
-            "A reachable directory server. The hMailServer machine must reach the host above on the effective port "
-            + "(636 for LDAPS, 389 otherwise) through any firewall in between. A DMZ host usually needs a rule added "
-            + "for exactly this.");
+            L("A reachable directory server. The hMailServer machine must reach the host above on the effective port (636 for LDAPS, 389 otherwise) through any firewall in between. A DMZ host usually needs a rule added for exactly this."));
 
          AddBullet_(content,
-            "For LDAPS or StartTLS: a certificate on the directory server that THIS machine trusts - issued by a CA "
-            + "in the Windows machine certificate store, with the host name above in it. A domain controller does "
-            + "not have one out of the box. The Negotiate bind method needs no certificate at all, because the "
-            + "password never crosses the network.");
+            L("For LDAPS or StartTLS: a certificate on the directory server that THIS machine trusts - issued by a CA in the Windows machine certificate store, with the host name above in it. A domain controller does not have one out of the box. The Negotiate bind method needs no certificate at all, because the password never crosses the network."));
 
          AddBullet_(content,
-            "For search mode: a service account allowed to read the directory. Any ordinary domain account can, by "
-            + "default; it needs no other rights.");
+            L("For search mode: a service account allowed to read the directory. Any ordinary domain account can, by default; it needs no other rights."));
 
          AddBullet_(content,
-            "Accounts marked as directory-linked. That half already lives in this GUI: open Domains, edit the "
-            + "account, and on its Directory tab tick the Active Directory option and fill in the AD user name - "
-            + "the sAMAccountName, which is what %u carries. Accounts without that mark keep their ordinary "
-            + "hMailServer password and never touch the directory.");
+            L("Accounts marked as directory-linked. That half already lives in this GUI: open Domains, edit the account, and on its Directory tab tick the Active Directory option and fill in the AD user name - the sAMAccountName, which is what %u carries. Accounts without that mark keep their ordinary hMailServer password and never touch the directory."));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
-         links.Children.Add(PageLink_("domains", "Open Domains...", "Open Domains, where an account's Directory tab links it to the directory"));
-         links.Children.Add(PageLink_("logs", "Open Live logs...", "Open Live logs, where LDAP infrastructure failures are reported"));
+         links.Children.Add(PageLink_("domains", L("Open Domains..."), L("Open Domains, where an account's Directory tab links it to the directory")));
+         links.Children.Add(PageLink_("logs", L("Open Live logs..."), L("Open Live logs, where LDAP infrastructure failures are reported")));
          content.Children.Add(links);
 
          return card;
@@ -607,29 +556,22 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildTestCard_()
       {
-         Border card = Card_("Test the connection",
-            "Runs the same steps the server runs, in the same order, using the values in the editors above as they "
-            + "stand: connect, protect the transport, bind the service credential, search for the user - and, only "
-            + "if a password is typed below, bind as that user to prove it. The password is used once and never "
-            + "stored, and the test refuses to run any configuration that would put a password on the network "
-            + "unprotected. One honest caveat: the test runs from this computer, so a firewall that treats this "
-            + "machine and the hMailServer service differently can make the two disagree.",
+         Border card = Card_(L("Test the connection"),
+            L("Runs the same steps the server runs, in the same order, using the values in the editors above as they stand: connect, protect the transport, bind the service credential, search for the user - and, only if a password is typed below, bind as that user to prove it. The password is used once and never stored, and the test refuses to run any configuration that would put a password on the network unprotected. One honest caveat: the test runs from this computer, so a firewall that treats this machine and the hMailServer service differently can make the two disagree."),
             out StackPanel content);
 
-         content.Children.Add(LabelledBox_("User name to _look up", testUsername_, "ldap-test-username",
-            "The Active Directory user name (sAMAccountName) - the same value the account's Directory tab holds. "
-            + "Optional: left empty, the test stops after the connection and service-credential stages.",
+         content.Children.Add(LabelledBox_(L("User name to _look up"), testUsername_, "ldap-test-username",
+            L("The Active Directory user name (sAMAccountName) - the same value the account's Directory tab holds. Optional: left empty, the test stops after the connection and service-credential stages."),
             placeholder: "jsmith"));
 
-         content.Children.Add(LabelledBox_("AD do_main of that user", testDomain_, "ldap-test-domain",
-            "Used for the %d placeholder and for a Negotiate bind (NTLM needs it on a host that is not "
-            + "domain-joined). The server takes this from the account's Directory tab; type the same value here.",
-            placeholder: "EXAMPLE"));
+         content.Children.Add(LabelledBox_(L("AD do_main of that user"), testDomain_, "ldap-test-domain",
+            L("Used for the %d placeholder and for a Negotiate bind (NTLM needs it on a host that is not domain-joined). The server takes this from the account's Directory tab; type the same value here."),
+            placeholder: "EXAMPLE")); // no-loc
 
          var passwordPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
          passwordPanel.Children.Add(new TextBlock
          {
-            Text = "Password (optional - only to test a real logon)",
+            Text = L("Password (optional - only to test a real logon)"),
             FontSize = Typography.Body,
             Margin = new Thickness(0, 0, 0, 4)
          });
@@ -637,17 +579,16 @@ namespace hMailServer.ControlPanel.Views
          testPassword_.MaxWidth = 520;
          testPassword_.MinWidth = 320;
          testPassword_.HorizontalAlignment = HorizontalAlignment.Left;
-         testPassword_.PlaceholderText = "Leave empty to test only the infrastructure";
-         System.Windows.Automation.AutomationProperties.SetName(testPassword_, "Password (optional - only to test a real logon)");
+         testPassword_.PlaceholderText = L("Leave empty to test only the infrastructure");
+         System.Windows.Automation.AutomationProperties.SetName(testPassword_, L("Password (optional - only to test a real logon)"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(testPassword_, "ldap-test-password");
          System.Windows.Automation.AutomationProperties.SetHelpText(testPassword_,
-            "Used once for a test bind and never stored. With no password the test still proves the connection, the "
-            + "transport, the service credential and the search.");
+            L("Used once for a test bind and never stored. With no password the test still proves the connection, the transport, the service credential and the search."));
          passwordPanel.Children.Add(testPassword_);
          content.Children.Add(passwordPanel);
 
-         testButton_ = new Wpf.Ui.Controls.Button { Content = "_Test connection" };
-         System.Windows.Automation.AutomationProperties.SetName(testButton_, "Test the directory connection with the values on this page");
+         testButton_ = new Wpf.Ui.Controls.Button { Content = L("_Test connection") };
+         System.Windows.Automation.AutomationProperties.SetName(testButton_, L("Test the directory connection with the values on this page"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(testButton_, "ldap-test-button");
          testButton_.Click += async (s, e) => await RunTest_();
          content.Children.Add(testButton_);
@@ -730,7 +671,7 @@ namespace hMailServer.ControlPanel.Views
       private void IniWrite_(string key, string value)
       {
          if (!store_.IsAvailable)
-            throw new InvalidOperationException("hMailServer.INI was not found on this machine.");
+            throw new InvalidOperationException(L("hMailServer.INI was not found on this machine."));
 
          if (!ProfileApi.WriteString(IniSection, key, value, store_.IniPath))
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error(),
@@ -744,13 +685,12 @@ namespace hMailServer.ControlPanel.Views
          if (!store_.IsAvailable)
          {
             saveButton_.IsEnabled = false;
-            footerStatus_.Text = "hMailServer.INI was not found on this machine. These settings can only be edited "
-                                 + "on the server itself; the connection test still works with the values typed here.";
+            footerStatus_.Text = L("hMailServer.INI was not found on this machine. These settings can only be edited on the server itself; the connection test still works with the values typed here.");
          }
          else
          {
             saveButton_.IsEnabled = true;
-            footerStatus_.Text = "Editing " + store_.IniPath + " - saved changes are live within two seconds; no service restart.";
+            footerStatus_.Text = F("Editing {0} - saved changes are live within two seconds; no service restart.", store_.IniPath);
          }
 
          enabled_.IsChecked = IniReadInt_("Enabled", 0) != 0;
@@ -778,8 +718,8 @@ namespace hMailServer.ControlPanel.Views
          storedServicePassword_ = IniRead_("ServicePassword", "").Length > 0;
          servicePassword_.Password = "";
          servicePassword_.PlaceholderText = storedServicePassword_
-            ? "A password is stored - leave blank to keep it"
-            : "Enter the service account password";
+            ? L("A password is stored - leave blank to keep it")
+            : L("Enter the service account password");
          clearServicePassword_.IsChecked = false;
 
          int timeoutSeconds = IniReadInt_("TimeoutSeconds", 10);
@@ -792,11 +732,8 @@ namespace hMailServer.ControlPanel.Views
          fallback_.IsChecked = IniReadInt_("FallbackToWindowsLogon", 0) != 0;
 
          string serviceDomain = IniRead_("ServiceDomain", "");
-         serviceDomainNote_.Text = "ServiceDomain "
-            + (serviceDomain.Length > 0 ? "is set to \"" + serviceDomain + "\" in the INI" : "is not set")
-            + ", and is shown here rather than offered for editing because the server reads the key and then never "
-            + "uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain "
-            + "in the user name instead (DOMAIN\\name or a UPN).";
+         serviceDomainNote_.Text = F("ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\\name or a UPN).",
+            serviceDomain.Length > 0 ? F("is set to \"{0}\" in the INI", serviceDomain) : L("is not set"));
 
          loading_ = false;
          RefreshState_();
@@ -804,24 +741,23 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save_()
       {
-         if (!NumericField.TryValidate(port_.Text, "Port", 0, 65535, out int port, out bool hasPort, out string portError))
+         if (!NumericField.TryValidate(port_.Text, L("Port"), 0, 65535, out int port, out bool hasPort, out string portError))
          {
-            MessageBox.Show(portError, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(portError, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
-         if (!NumericField.TryValidate(timeout_.Text, "Timeout in seconds", 1, 90, out int timeoutSeconds, out bool hasTimeout, out string timeoutError))
+         if (!NumericField.TryValidate(timeout_.Text, L("Timeout in seconds"), 1, 90, out int timeoutSeconds, out bool hasTimeout, out string timeoutError))
          {
-            MessageBox.Show(timeoutError, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(timeoutError, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
          string newServicePassword = servicePassword_.Password;
          if (newServicePassword.Length > 0 && clearServicePassword_.IsChecked is true)
          {
-            MessageBox.Show("A new service account password has been typed AND \"remove the stored password\" is "
-               + "ticked. Untick one of them - guessing which was meant is not this page's decision to make.",
-               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(L("A new service account password has been typed AND \"remove the stored password\" is ticked. Untick one of them - guessing which was meant is not this page's decision to make."),
+               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
@@ -852,7 +788,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save: " + ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(F("Could not save: {0}", ex.Message), L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Error);
             return;
          }
 
@@ -860,14 +796,13 @@ namespace hMailServer.ControlPanel.Views
          // server keys its cache on the INI's write time and re-reads within two
          // seconds, precisely so a broken directory configuration can be fixed
          // while the administrator is still looking at the screen.
-         footerStatus_.Text = "Saved " + DateTime.Now.ToLongTimeString()
-            + " - the server picks this up within two seconds. No service restart is needed.";
+         footerStatus_.Text = F("Saved {0} - the server picks this up within two seconds. No service restart is needed.", DateTime.Now.ToLongTimeString());
 
          storedServicePassword_ = IniRead_("ServicePassword", "").Length > 0;
          servicePassword_.Password = "";
          servicePassword_.PlaceholderText = storedServicePassword_
-            ? "A password is stored - leave blank to keep it"
-            : "Enter the service account password";
+            ? L("A password is stored - leave blank to keep it")
+            : L("Enter the service account password");
          clearServicePassword_.IsChecked = false;
 
          RefreshState_();
@@ -933,7 +868,7 @@ namespace hMailServer.ControlPanel.Views
             => UserSearchFilter.Length == 0 ? DefaultUserSearchFilter : UserSearchFilter;
 
          public string TransportName()
-            => Security == 2 ? "LDAPS" : Security == 1 ? "StartTLS" : "unprotected LDAP";
+            => Security == 2 ? L("LDAPS") : Security == 1 ? "StartTLS" : L("unprotected LDAP");
 
          public string Target()
             => Server + ":" + EffectivePort();
@@ -945,13 +880,13 @@ namespace hMailServer.ControlPanel.Views
             missing = "";
 
             if (Server.Length == 0)
-               missing = "Server";
+               missing = L("Server");
 
             if (UsesSearch() && SearchBase.Length == 0)
             {
                if (missing.Length > 0)
                   missing += ", ";
-               missing += "SearchBase (or UserDnTemplate, to bind directly without searching)";
+               missing += L("SearchBase (or UserDnTemplate, to bind directly without searching)");
             }
 
             return missing.Length == 0;
@@ -1011,64 +946,48 @@ namespace hMailServer.ControlPanel.Views
          if (!config.Enabled)
          {
             level = StatusLevel.Information;
-            headline = "Off. Directory-linked accounts are validated through Windows logon (LogonUser), which only "
-                       + "works when this host is joined to the domain - every failure there looks like a wrong password.";
+            headline = L("Off. Directory-linked accounts are validated through Windows logon (LogonUser), which only works when this host is joined to the domain - every failure there looks like a wrong password.");
             detail = complete
-               ? "The section below is filled in; ticking the switch above would activate it."
-               : "Before enabling, the section is also missing: " + missing + ".";
+               ? L("The section below is filled in; ticking the switch above would activate it.")
+               : F("Before enabling, the section is also missing: {0}.", missing);
          }
          else if (!complete)
          {
             level = StatusLevel.Warning;
-            headline = "Enabled but not configured: " + missing + " is not set.";
-            detail = "No LDAP authentication is attempted. Directory-linked accounts keep validating through Windows "
-                     + "logon, and the server reports this (error 5922) once per minute so it cannot fail silently.";
+            headline = F("Enabled but not configured: {0} is not set.", missing);
+            detail = L("No LDAP authentication is attempted. Directory-linked accounts keep validating through Windows logon, and the server reports this (error 5922) once per minute so it cannot fail silently.");
          }
          else if (!config.PasswordIsProtected() && !config.AllowUnprotectedPassword)
          {
             level = StatusLevel.Critical;
-            headline = "Every LDAP logon will be refused: unprotected LDAP with a simple bind would send passwords "
-                       + "in the clear, and AllowUnprotectedPassword is off.";
-            detail = "The server fails closed rather than guessing (error 5921): no password is sent and the logon "
-                     + "is refused. Fix it by choosing LDAPS or StartTLS, or the Negotiate bind method (which never "
-                     + "transmits the password) - or, on a network you control end to end, by explicitly allowing "
-                     + "the unprotected password.";
+            headline = L("Every LDAP logon will be refused: unprotected LDAP with a simple bind would send passwords in the clear, and AllowUnprotectedPassword is off.");
+            detail = L("The server fails closed rather than guessing (error 5921): no password is sent and the logon is refused. Fix it by choosing LDAPS or StartTLS, or the Negotiate bind method (which never transmits the password) - or, on a network you control end to end, by explicitly allowing the unprotected password.");
          }
          else if (config.UsesSearch() && config.ServiceUsername.Length == 0)
          {
             level = StatusLevel.Warning;
-            headline = "Complete, but the user search will run anonymously - Active Directory refuses anonymous "
-                       + "searches by default.";
-            detail = "Against " + config.Target() + " over " + config.TransportName() + ". Set ServiceUsername (and "
-                     + "its password), or switch to a UserDnTemplate or the Negotiate bind method, neither of which "
-                     + "searches at all.";
+            headline = L("Complete, but the user search will run anonymously - Active Directory refuses anonymous searches by default.");
+            detail = F("Against {0} over {1}. Set ServiceUsername (and its password), or switch to a UserDnTemplate or the Negotiate bind method, neither of which searches at all.", config.Target(), config.TransportName());
          }
          else
          {
             level = StatusLevel.Good;
             if (config.BindMethod == 1)
             {
-               headline = "Complete. Accounts authenticate with SSPI Negotiate (Kerberos, then NTLM) against "
-                          + config.Target() + " - the password never crosses the network, and no search, search "
-                          + "base or service account is needed.";
+               headline = F("Complete. Accounts authenticate with SSPI Negotiate (Kerberos, then NTLM) against {0} - the password never crosses the network, and no search, search base or service account is needed.", config.Target());
             }
             else if (config.UsesSearch())
             {
-               headline = "Complete. The server searches under " + config.SearchBase + " as "
-                          + config.ServiceUsername + ", then proves the user's password with a simple bind against "
-                          + config.Target() + " over " + config.TransportName() + ".";
+               headline = F("Complete. The server searches under {0} as {1}, then proves the user's password with a simple bind against {2} over {3}.", config.SearchBase, config.ServiceUsername, config.Target(), config.TransportName());
             }
             else
             {
-               headline = "Complete. The user's DN comes from the template, proved with a simple bind against "
-                          + config.Target() + " over " + config.TransportName() + " - no search and no service "
-                          + "account needed.";
+               headline = F("Complete. The user's DN comes from the template, proved with a simple bind against {0} over {1} - no search and no service account needed.", config.Target(), config.TransportName());
             }
 
             detail = config.VerifyCertificate || config.Security == 0
                ? ""
-               : "Note: certificate verification is turned off, so the encrypted connection does not prove which "
-                 + "directory it reaches. The server logs this once per start.";
+               : L("Note: certificate verification is turned off, so the encrypted connection does not prove which directory it reaches. The server logs this once per start.");
          }
 
          StatusPresentation presentation = StatusSemantics.For(level);
@@ -1114,13 +1033,13 @@ namespace hMailServer.ControlPanel.Views
 
          if (config.Server.Length == 0)
          {
-            ShowTestResult_(StatusLevel.Warning, "Type the directory server host name first.");
+            ShowTestResult_(StatusLevel.Warning, L("Type the directory server host name first."));
             return;
          }
 
          if (password.Length > 0 && username.Length == 0)
          {
-            ShowTestResult_(StatusLevel.Warning, "Type the user name the password belongs to.");
+            ShowTestResult_(StatusLevel.Warning, L("Type the user name the password belongs to."));
             return;
          }
 
@@ -1131,15 +1050,12 @@ namespace hMailServer.ControlPanel.Views
          if (!config.PasswordIsProtected() && !config.AllowUnprotectedPassword)
          {
             ShowTestResult_(StatusLevel.Critical,
-               "Not tested: this configuration would send a password over unprotected LDAP with a simple bind, and "
-               + "AllowUnprotectedPassword is off - so the server refuses every logon under it, and this test "
-               + "refuses to transmit anything for the same reason. Choose LDAPS or StartTLS, or the Negotiate bind "
-               + "method, or explicitly allow the unprotected password.");
+               L("Not tested: this configuration would send a password over unprotected LDAP with a simple bind, and AllowUnprotectedPassword is off - so the server refuses every logon under it, and this test refuses to transmit anything for the same reason. Choose LDAPS or StartTLS, or the Negotiate bind method, or explicitly allow the unprotected password."));
             return;
          }
 
          testButton_.IsEnabled = false;
-         ShowTestResult_(StatusLevel.Information, "Testing against " + config.Target() + " over " + config.TransportName() + "...");
+         ShowTestResult_(StatusLevel.Information, F("Testing against {0} over {1}...", config.Target(), config.TransportName()));
 
          try
          {
@@ -1150,7 +1066,7 @@ namespace hMailServer.ControlPanel.Views
          {
             // Mirror of the authenticator's outer barrier: an unexpected failure is
             // an infrastructure answer, never a crash of the page.
-            ShowTestResult_(StatusLevel.Critical, "The test itself failed unexpectedly: " + ex.Message);
+            ShowTestResult_(StatusLevel.Critical, F("The test itself failed unexpectedly: {0}", ex.Message));
          }
          finally
          {
@@ -1651,32 +1567,30 @@ namespace hMailServer.ControlPanel.Views
             switch (error)
             {
                case LDAP_SUCCESS:
-                  return "no error";
+                  return L("no error");
                case LDAP_STRONG_AUTH_REQUIRED:
-                  return "the directory refuses simple binds on an unprotected connection (strongAuthRequired). "
-                         + "Use LDAPS or StartTLS, or the Negotiate bind method, which satisfies the requirement "
-                         + "without TLS";
+                  return L("the directory refuses simple binds on an unprotected connection (strongAuthRequired). Use LDAPS or StartTLS, or the Negotiate bind method, which satisfies the requirement without TLS");
                case LDAP_SERVER_DOWN:
                case 91:   // LDAP_CONNECT_ERROR
-                  return "the directory server could not be contacted";
+                  return L("the directory server could not be contacted");
                case LDAP_TIMEOUT:
-                  return "the directory server did not answer within the configured timeout";
+                  return L("the directory server did not answer within the configured timeout");
                case LDAP_FILTER_ERROR:
-                  return "the configured UserSearchFilter is not a valid LDAP filter";
+                  return L("the configured UserSearchFilter is not a valid LDAP filter");
                case LDAP_INSUFFICIENT_RIGHTS:
-                  return "the service credential is not permitted to read the directory";
+                  return L("the service credential is not permitted to read the directory");
                case LDAP_INAPPROPRIATE_AUTH:
-                  return "the directory refused the configured bind method for this entry";
+                  return L("the directory refused the configured bind method for this entry");
                case LDAP_UNWILLING_TO_PERFORM:
-                  return "the directory refused to perform the operation";
+                  return L("the directory refused to perform the operation");
                case LDAP_INVALID_CREDENTIALS:
-                  return "the credentials were rejected";
+                  return L("the credentials were rejected");
                case LDAP_NO_SUCH_OBJECT:
-                  return "the entry does not exist (check SearchBase, or UserDnTemplate)";
+                  return L("the entry does not exist (check SearchBase, or UserDnTemplate)");
             }
 
             IntPtr text = ldap_err2stringW(error);
-            return text == IntPtr.Zero ? "an unrecognised LDAP error" : (Marshal.PtrToStringUni(text) ?? "an unrecognised LDAP error");
+            return text == IntPtr.Zero ? L("an unrecognised LDAP error") : (Marshal.PtrToStringUni(text) ?? L("an unrecognised LDAP error"));
          }
 
          /// <summary>LdapClient::DescribeActiveDirectorySubStatus, ported. The
@@ -1701,16 +1615,16 @@ namespace hMailServer.ControlPanel.Views
 
             switch (code)
             {
-               case "525": return "the user does not exist in the directory";
-               case "52e": return "the password is not correct";
-               case "530": return "logon is not permitted at this time of day";
-               case "531": return "logon from this computer is not permitted";
-               case "532": return "the password has expired";
-               case "533": return "the account is disabled";
-               case "568": return "too many context IDs (the directory is out of resources)";
-               case "701": return "the account has expired";
-               case "773": return "the password must be changed before the next logon";
-               case "775": return "the account is locked out";
+               case "525": return L("the user does not exist in the directory");
+               case "52e": return L("the password is not correct");
+               case "530": return L("logon is not permitted at this time of day");
+               case "531": return L("logon from this computer is not permitted");
+               case "532": return L("the password has expired");
+               case "533": return L("the account is disabled");
+               case "568": return L("too many context IDs (the directory is out of resources)");
+               case "701": return L("the account has expired");
+               case "773": return L("the password must be changed before the next logon");
+               case "775": return L("the account is locked out");
                default: return "";
             }
          }
@@ -1778,13 +1692,11 @@ namespace hMailServer.ControlPanel.Views
 
          private static LdapProbeResult Unavailable(Session session, Snapshot config, string stage)
          {
-            string text = "Infrastructure failure, unrelated to any password - every account authenticated against "
-               + "this directory would be unable to log in. Stage: " + stage + ". Directory: " + config.Target()
-               + " over " + config.TransportName() + ". Reason: " + DescribeError(session.LastError)
-               + " (LDAP error " + session.LastError + ").";
+            string text = F("Infrastructure failure, unrelated to any password - every account authenticated against this directory would be unable to log in. Stage: {0}. Directory: {1} over {2}. Reason: {3} (LDAP error {4}).",
+               stage, config.Target(), config.TransportName(), DescribeError(session.LastError), session.LastError);
 
             if (!string.IsNullOrEmpty(session.LastDiagnostic))
-               text += " The directory said: " + session.LastDiagnostic;
+               text += F(" The directory said: {0}", session.LastDiagnostic);
 
             return LdapProbeResult.Make(StatusLevel.Critical, text);
          }
@@ -1808,11 +1720,11 @@ namespace hMailServer.ControlPanel.Views
                using var search = new Session(config);
 
                if (search.Connect(config) != Outcome.Success)
-                  return Unavailable(search, config, "connecting in order to search for the user");
+                  return Unavailable(search, config, L("connecting in order to search for the user"));
 
-               proven.Append("Connected to " + config.Target() + " over " + config.TransportName() + ". ");
+               proven.Append(F("Connected to {0} over {1}. ", config.Target(), config.TransportName()));
                if (!config.VerifyCertificate && config.Security != 0)
-                  proven.Append("Certificate validation was DISABLED for this test, matching VerifyCertificate=0. ");
+                  proven.Append(L("Certificate validation was DISABLED for this test, matching VerifyCertificate=0. "));
 
                Outcome serviceBind = config.ServiceUsername.Length == 0
                   ? search.BindAnonymous()
@@ -1824,23 +1736,23 @@ namespace hMailServer.ControlPanel.Views
                   // a rejected user: the password that was refused belongs to the
                   // configuration. Same mapping as the server.
                   string stage = config.ServiceUsername.Length == 0
-                     ? "binding anonymously to search for the user (set ServiceUsername)"
-                     : "binding with the configured ServiceUsername";
+                     ? L("binding anonymously to search for the user (set ServiceUsername)")
+                     : L("binding with the configured ServiceUsername");
 
                   if (config.ServiceUsername.Length > 0 && config.ServicePassword.Length == 0)
-                     stage += " - no ServicePassword is stored or typed, and an empty password is refused before it is sent";
+                     stage += L(" - no ServicePassword is stored or typed, and an empty password is refused before it is sent");
 
                   return Unavailable(search, config, stage);
                }
 
                proven.Append(config.ServiceUsername.Length == 0
-                  ? "Anonymous directory read accepted. "
-                  : "Service credential accepted. ");
+                  ? L("Anonymous directory read accepted. ")
+                  : L("Service credential accepted. "));
 
                if (username.Length == 0)
                {
                   return LdapProbeResult.Make(StatusLevel.Good, proven
-                     + "Type a user name to also test the search and, with a password, a real logon.");
+                     + L("Type a user name to also test the search and, with a password, a real logon."));
                }
 
                string filter = ExpandTemplate(config.EffectiveFilter(), username, domain, address, forFilter: true);
@@ -1848,14 +1760,12 @@ namespace hMailServer.ControlPanel.Views
                string dn;
                int matchCount;
                if (search.Search(config.SearchBase, filter, out dn, out matchCount) != Outcome.Success)
-                  return Unavailable(search, config, "searching for the user (filter " + filter + ")");
+                  return Unavailable(search, config, F("searching for the user (filter {0})", filter));
 
                if (matchCount == 0)
                {
                   return LdapProbeResult.Make(StatusLevel.Warning, proven
-                     + "The search matched nothing (filter " + filter + " under " + config.SearchBase + "). As a "
-                     + "logon this is a refusal, not an outage - check the user name against the account's "
-                     + "Directory tab, and the filter and search base against the directory.");
+                     + F("The search matched nothing (filter {0} under {1}). As a logon this is a refusal, not an outage - check the user name against the account's Directory tab, and the filter and search base against the directory.", filter, config.SearchBase));
                }
 
                if (matchCount > 1)
@@ -1864,13 +1774,11 @@ namespace hMailServer.ControlPanel.Views
                   // nobody, because binding as one of them may prove somebody else's
                   // entry.
                   return LdapProbeResult.Make(StatusLevel.Critical, proven
-                     + "The search matched MORE than one directory entry (filter " + filter + ", base "
-                     + config.SearchBase + "). The server refuses to authenticate against an ambiguous match - "
-                     + "make UserSearchFilter or SearchBase select exactly one entry.");
+                     + F("The search matched MORE than one directory entry (filter {0}, base {1}). The server refuses to authenticate against an ambiguous match - make UserSearchFilter or SearchBase select exactly one entry.", filter, config.SearchBase));
                }
 
                userDn = dn;
-               proven.Append("The search found exactly one entry: " + userDn + ". ");
+               proven.Append(F("The search found exactly one entry: {0}. ", userDn));
 
                // The search connection is closed before any user bind, so the bind
                // that proves the password never shares a connection with the service
@@ -1881,29 +1789,29 @@ namespace hMailServer.ControlPanel.Views
             {
                if (config.UsesSearch())
                   return LdapProbeResult.Make(StatusLevel.Good, proven
-                     + "No password was typed, so no logon was tested - the infrastructure half all works.");
+                     + L("No password was typed, so no logon was tested - the infrastructure half all works."));
 
                // Negotiate or DN-template mode with nothing to prove: the useful
                // test left is the connection itself.
                using var probe = new Session(config);
                if (probe.Connect(config) != Outcome.Success)
-                  return Unavailable(probe, config, "connecting to the directory");
+                  return Unavailable(probe, config, L("connecting to the directory"));
 
                string extra = config.BindMethod == 1
-                  ? "Negotiate binds authenticate per user, so type a user name, domain and password to test one."
-                  : "Type a user name and password to test a real logon through the DN template.";
+                  ? L("Negotiate binds authenticate per user, so type a user name, domain and password to test one.")
+                  : L("Type a user name and password to test a real logon through the DN template.");
 
                return LdapProbeResult.Make(StatusLevel.Good,
-                  "Connected to " + config.Target() + " over " + config.TransportName() + ". "
+                  F("Connected to {0} over {1}. ", config.Target(), config.TransportName())
                   + (!config.VerifyCertificate && config.Security != 0
-                     ? "Certificate validation was DISABLED for this test, matching VerifyCertificate=0. " : "")
+                     ? L("Certificate validation was DISABLED for this test, matching VerifyCertificate=0. ") : "")
                   + extra);
             }
 
             using var user = new Session(config);
 
             if (user.Connect(config) != Outcome.Success)
-               return Unavailable(user, config, "connecting in order to authenticate the user");
+               return Unavailable(user, config, L("connecting in order to authenticate the user"));
 
             Outcome outcome;
             string boundAs;
@@ -1923,7 +1831,7 @@ namespace hMailServer.ControlPanel.Views
             if (outcome == Outcome.Success)
             {
                return LdapProbeResult.Make(StatusLevel.Good, proven
-                  + "The directory ACCEPTED the credentials: bound as " + boundAs + ". This account would log on.");
+                  + F("The directory ACCEPTED the credentials: bound as {0}. This account would log on.", boundAs));
             }
 
             if (outcome == Outcome.Rejected)
@@ -1938,12 +1846,10 @@ namespace hMailServer.ControlPanel.Views
                   reason = DescribeError(user.LastError);
 
                return LdapProbeResult.Make(StatusLevel.Information, proven
-                  + "The directory answered and REFUSED these credentials: " + reason + " (LDAP error "
-                  + user.LastError + "). The connection, transport and configuration are all working - this is a "
-                  + "credentials problem, which is exactly what a user typing a wrong password would see.");
+                  + F("The directory answered and REFUSED these credentials: {0} (LDAP error {1}). The connection, transport and configuration are all working - this is a credentials problem, which is exactly what a user typing a wrong password would see.", reason, user.LastError));
             }
 
-            return Unavailable(user, config, "binding as the user");
+            return Unavailable(user, config, L("binding as the user"));
          }
       }
    }
