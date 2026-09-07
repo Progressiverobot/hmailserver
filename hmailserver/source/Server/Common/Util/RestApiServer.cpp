@@ -276,6 +276,30 @@ namespace HM
       std::mutex refused_addresses_mutex;
       std::vector<RefusedAddress> refused_addresses;
 
+      // Browser sessions for the self-service page. One row per sign-in,
+      // holding the SHA-256 of the cookie's token and the account it stands
+      // for; the token itself lives only in the browser. Bounded in number
+      // and in time (see AuthenticateSession_), and dropped on Stop() - a
+      // restarted listener holds no sessions.
+      struct BrowserSession
+      {
+         BrowserSession() : account_id(0), created_at(0), last_seen_at(0) { }
+
+         AnsiString token_hash;
+         __int64 account_id;
+         ULONGLONG created_at;
+         ULONGLONG last_seen_at;
+      };
+
+      const char *SessionCookieName = "hmailsession";
+      const int SessionTokenBytes = 32;
+      const ULONGLONG SessionIdleMilliseconds = 30ULL * 60 * 1000;
+      const ULONGLONG SessionAbsoluteMilliseconds = 12ULL * 60 * 60 * 1000;
+      const size_t MaxBrowserSessions = 1000;
+
+      std::mutex browser_sessions_mutex;
+      std::vector<BrowserSession> browser_sessions;
+
       bool IsSameAddress(const RefusedAddress &entry, int family, unsigned __int64 high, unsigned __int64 low)
       {
          return entry.family == family && entry.address_high == high && entry.address_low == low;
@@ -662,6 +686,7 @@ namespace HM
       // is dropped rather than surviving into the next Start().
       ClearRefusedAddresses_();
       ClearRequestRates_();
+      ClearBrowserSessions_();
 
       // Deliberately no SSL_CTX_free: the boost context owns the SSL_CTX and frees it
       // in its own destructor. Released after the server has stopped, so no session
@@ -709,7 +734,12 @@ namespace HM
 
       AnsiString headerValue = GetAuthorizationHeader_(request);
       if (headerValue.IsEmpty())
+      {
+         // No password and no key: a browser session cookie is the one other
+         // credential, and it stands for an account and nothing more.
+         AuthenticateSession_(request, peer_address, caller);
          return caller;
+      }
 
       // Bearer is preferred when present. Basic is still accepted, unchanged,
       // because every existing script depends on it.
@@ -1225,6 +1255,17 @@ namespace HM
          // REST worker thread.
          Caller caller = Authenticate_(request, peer_address);
 
+         // Cross-site request forgery, closed twice over: the cookie is
+         // SameSite=Strict, so another site's request does not carry it, and
+         // a request that changes something must carry a header a browser
+         // never adds on its own - which another origin cannot add without a
+         // preflight this server never grants.
+         if (caller.via_session && method != "GET" && method != "HEAD" &&
+             GetHeader_(request, "x-requested-with") != "hMailServer")
+         {
+            return BuildResponse_(403, "{\"error\":\"a request that changes something must carry X-Requested-With: hMailServer when it is authenticated by a session cookie\"}");
+         }
+
          if (caller.result == AuthenticationFailed)
             return BuildUnauthorizedResponse_(caller.second_factor_required);
 
@@ -1383,6 +1424,12 @@ namespace HM
          case RouteMeVacation:
             return HandleMeVacation_(caller, GetRequestBody_(request));
 
+         case RouteSessionCreate:
+            return HandleSessionCreate_(caller);
+
+         case RouteSessionDelete:
+            return HandleSessionDelete_(caller);
+
          case RouteOpenApi:
             return HandleOpenApi_();
 
@@ -1458,6 +1505,18 @@ namespace HM
       if (path == "/api/v1/me/vacation" && method == "PUT")
       {
          route.kind = RouteMeVacation;
+         return;
+      }
+
+      if (path == "/api/v1/session" && method == "POST")
+      {
+         route.kind = RouteSessionCreate;
+         return;
+      }
+
+      if (path == "/api/v1/session" && method == "DELETE")
+      {
+         route.kind = RouteSessionDelete;
          return;
       }
 
@@ -1833,6 +1892,8 @@ namespace HM
       case RouteUpdateInstall:
       case RouteMePassword:
       case RouteMeVacation:
+      case RouteSessionCreate:
+      case RouteSessionDelete:
          return true;
 
       default:
@@ -4068,6 +4129,8 @@ namespace HM
       case RouteMe:
       case RouteMePassword:
       case RouteMeVacation:
+      case RouteSessionCreate:
+      case RouteSessionDelete:
          return true;
 
       default:
@@ -4192,6 +4255,11 @@ namespace HM
          return BuildResponse_(500, body);
       }
 
+      // Every other browser signed in to this account is signed out: a
+      // password is changed most urgently when somebody else may have it,
+      // and a session they already hold would outlive the change.
+      RevokeSessionsForAccount_(account->GetID(), caller.via_session ? caller.session_hash : AnsiString());
+
       LOG_APPLICATION("REST API: " + account->GetAddress() + " changed its own password from " + String(caller.peer.ToString()) + ".");
 
       return BuildResponse_(200, "{\"changed\":true}");
@@ -4263,6 +4331,211 @@ namespace HM
          JsonEscape_(AnsiString(expires ? expiresDate : String())).c_str());
 
       return BuildResponse_(200, json);
+   }
+
+   bool
+   RestApiServer::AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller)
+   {
+      // The cookie is the only credential a browser can hold without the page
+      // keeping the password in memory. Its value is a random token; only the
+      // token's SHA-256 is stored, so the table leaks nothing if it is read.
+      AnsiString cookies = GetHeader_(request, "cookie");
+      if (cookies.IsEmpty())
+         return false;
+
+      AnsiString token;
+      std::vector<AnsiString> parts = StringParser::SplitString(cookies, ";");
+      for (size_t i = 0; i < parts.size(); i++)
+      {
+         AnsiString part = parts[i];
+         part.Trim();
+
+         const AnsiString prefix = AnsiString(SessionCookieName) + "=";
+         if (part.GetLength() > prefix.GetLength() && part.Mid(0, prefix.GetLength()) == prefix)
+         {
+            token = part.Mid(prefix.GetLength());
+            break;
+         }
+      }
+
+      if (!IsLowerHex(token, SessionTokenBytes * 2))
+         return false;
+
+      AnsiString presentedHash = HashApiKeyToken(token);
+      if (presentedHash.IsEmpty())
+         return false;
+
+      __int64 accountId = 0;
+      {
+         std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+
+         const ULONGLONG now = GetTickCount64();
+
+         for (std::vector<BrowserSession>::iterator it = browser_sessions.begin(); it != browser_sessions.end(); ++it)
+         {
+            if (!ConstantTimeEquals(presentedHash, it->token_hash))
+               continue;
+
+            // Two ceilings, both absolute in their own way: the session ends
+            // when it has been idle for SessionIdleMilliseconds, and it ends
+            // SessionAbsoluteMilliseconds after it was created whatever the
+            // user is doing - a captured cookie stays useful for a bounded
+            // time, not for as long as the victim keeps clicking.
+            if (now - it->last_seen_at > SessionIdleMilliseconds || now - it->created_at > SessionAbsoluteMilliseconds)
+            {
+               browser_sessions.erase(it);
+               return false;
+            }
+
+            it->last_seen_at = now;
+            accountId = it->account_id;
+            break;
+         }
+      }
+
+      if (accountId == 0)
+         return false;
+
+      // Read fresh on every request rather than remembered from sign-in: an
+      // account that was deactivated or deleted after the session began is
+      // refused from the next request, and its session is dropped.
+      std::shared_ptr<Account> account = std::shared_ptr<Account>(new Account());
+      if (!PersistentAccount::ReadObject(account, accountId) || account->GetID() == 0 || !account->GetActive())
+      {
+         RevokeSessionsForAccount_(accountId, "");
+         return false;
+      }
+
+      caller.result = AuthenticatedAsAccount;
+      caller.read_only = false;
+      caller.identity = AnsiString("account:") + AnsiString(account->GetAddress());
+      caller.account = account;
+      caller.via_session = true;
+      caller.session_hash = presentedHash;
+
+      return true;
+   }
+
+   HttpResponse
+   RestApiServer::HandleSessionCreate_(const Caller &caller)
+   {
+      if (caller.via_session)
+         return BuildResponse_(403, "{\"error\":\"a session is started with the account's password, not with another session\"}");
+
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      unsigned char secret[SessionTokenBytes];
+      if (RAND_bytes(secret, sizeof(secret)) != 1)
+         return BuildResponse_(500, "{\"error\":\"no entropy for a session token\"}");
+
+      AnsiString token = BytesToLowerHex(secret, SessionTokenBytes);
+      AnsiString tokenHash = HashApiKeyToken(token);
+      if (tokenHash.IsEmpty())
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      {
+         std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+
+         const ULONGLONG now = GetTickCount64();
+
+         // Expired sessions go first, so the table holds what is live; then,
+         // if it is still full, the least recently used one goes. The cap is
+         // what stops a script from filling memory with sign-ins.
+         browser_sessions.erase(
+            std::remove_if(browser_sessions.begin(), browser_sessions.end(),
+               [now](const BrowserSession &session)
+               {
+                  return now - session.last_seen_at > SessionIdleMilliseconds || now - session.created_at > SessionAbsoluteMilliseconds;
+               }),
+            browser_sessions.end());
+
+         if (browser_sessions.size() >= MaxBrowserSessions)
+         {
+            size_t oldest = 0;
+            for (size_t i = 1; i < browser_sessions.size(); i++)
+            {
+               if (browser_sessions[i].last_seen_at < browser_sessions[oldest].last_seen_at)
+                  oldest = i;
+            }
+
+            browser_sessions.erase(browser_sessions.begin() + oldest);
+         }
+
+         BrowserSession session;
+         session.token_hash = tokenHash;
+         session.account_id = account->GetID();
+         session.created_at = now;
+         session.last_seen_at = now;
+
+         browser_sessions.push_back(session);
+      }
+
+      LOG_APPLICATION("REST API: " + account->GetAddress() + " started a browser session from " + String(caller.peer.ToString()) + ".");
+
+      // HttpOnly: the script never reads it, so a script that should not be
+      // there cannot either. SameSite=Strict: a request from another site does
+      // not carry it. Secure whenever the listener speaks TLS - which it does
+      // everywhere but loopback. Max-Age is the absolute ceiling; the idle
+      // ceiling is shorter and is the server's to enforce.
+      AnsiString cookie;
+      cookie.Format("Set-Cookie: %hs=%hs; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d%hs\r\n",
+         SessionCookieName, token.c_str(), (int) (SessionAbsoluteMilliseconds / 1000), use_tls_ ? "; Secure" : "");
+
+      AnsiString body;
+      body.Format("{\"address\":\"%hs\",\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
+         JsonEscape_(AnsiString(account->GetAddress())).c_str(),
+         (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
+
+      return BuildResponse_(201, body, cookie);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSessionDelete_(const Caller &caller)
+   {
+      if (!caller.via_session)
+         return BuildResponse_(400, "{\"error\":\"there is no session to end: this request carried a password, not a session cookie\"}");
+
+      {
+         std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+
+         browser_sessions.erase(
+            std::remove_if(browser_sessions.begin(), browser_sessions.end(),
+               [&caller](const BrowserSession &session)
+               {
+                  return ConstantTimeEquals(session.token_hash, caller.session_hash);
+               }),
+            browser_sessions.end());
+      }
+
+      AnsiString cookie;
+      cookie.Format("Set-Cookie: %hs=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0%hs\r\n",
+         SessionCookieName, use_tls_ ? "; Secure" : "");
+
+      return BuildResponse_(200, "{\"ended\":true}", cookie);
+   }
+
+   void
+   RestApiServer::RevokeSessionsForAccount_(__int64 accountId, const AnsiString &keepTokenHash)
+   {
+      std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+
+      browser_sessions.erase(
+         std::remove_if(browser_sessions.begin(), browser_sessions.end(),
+            [accountId, &keepTokenHash](const BrowserSession &session)
+            {
+               return session.account_id == accountId &&
+                      (keepTokenHash.IsEmpty() || !ConstantTimeEquals(session.token_hash, keepTokenHash));
+            }),
+         browser_sessions.end());
+   }
+
+   void
+   RestApiServer::ClearBrowserSessions_()
+   {
+      std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+      browser_sessions.clear();
    }
 
    namespace
@@ -4346,17 +4619,16 @@ namespace HM
       const char *PortalScript =
          "(function () {\n"
          "  'use strict';\n"
-         "  var credentials = null;\n"
          "  var el = function (id) { return document.getElementById(id); };\n"
          "  var say = function (id, text, ok) { var s = el(id); s.textContent = text || ''; s.className = 'status' + (text ? (ok ? ' ok' : ' error') : ''); };\n"
-         "  var headers = function (extra) {\n"
-         "    var h = { 'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(credentials.address + ':' + credentials.password))) };\n"
-         "    if (extra) { for (var k in extra) { if (extra[k]) { h[k] = extra[k]; } } }\n"
-         "    return h;\n"
-         "  };\n"
+         "  // The password is sent exactly once, to start the session; from then on\n"
+         "  // the browser's cookie is the credential and nothing is kept in memory.\n"
          "  var call = function (method, path, body, extra) {\n"
-         "    var options = { method: method, headers: headers(extra), cache: 'no-store' };\n"
-         "    if (body !== undefined) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }\n"
+         "    var h = {};\n"
+         "    if (extra) { for (var k in extra) { if (extra[k]) { h[k] = extra[k]; } } }\n"
+         "    if (method !== 'GET') { h['X-Requested-With'] = 'hMailServer'; }\n"
+         "    var options = { method: method, headers: h, cache: 'no-store', credentials: 'same-origin' };\n"
+         "    if (body !== undefined) { h['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }\n"
          "    return fetch(path, options).then(function (response) {\n"
          "      return response.text().then(function (text) {\n"
          "        var data = null;\n"
@@ -4367,7 +4639,7 @@ namespace HM
          "  };\n"
          "  var describe = function (result, fallback) {\n"
          "    if (result.data && result.data.error) { return result.data.error; }\n"
-         "    if (result.status === 401) { return 'The address or password is not right.'; }\n"
+         "    if (result.status === 401) { return 'The address or password is not right, or the session has ended.'; }\n"
          "    if (result.status === 429) { return 'Too many attempts; wait a minute and try again.'; }\n"
          "    return fallback + ' (' + result.status + ')';\n"
          "  };\n"
@@ -4376,6 +4648,11 @@ namespace HM
          "    if (bytes >= 1048576) { return (bytes / 1048576).toFixed(1) + ' MB'; }\n"
          "    if (bytes >= 1024) { return (bytes / 1024).toFixed(0) + ' KB'; }\n"
          "    return bytes + ' bytes';\n"
+         "  };\n"
+         "  var showSignIn = function () {\n"
+         "    el('account').hidden = true;\n"
+         "    el('signin').hidden = false;\n"
+         "    el('address').focus();\n"
          "  };\n"
          "  var render = function (me) {\n"
          "    el('who').textContent = me.address;\n"
@@ -4398,30 +4675,30 @@ namespace HM
          "    el('signin').hidden = true;\n"
          "    el('account').hidden = false;\n"
          "  };\n"
-         "  var load = function () {\n"
+         "  var load = function (quiet) {\n"
          "    return call('GET', '/api/v1/me').then(function (result) {\n"
          "      if (result.status === 200 && result.data) { render(result.data); return true; }\n"
-         "      say('signin-status', describe(result, 'Could not sign in'), false);\n"
-         "      credentials = null;\n"
+         "      if (!quiet) { say('signin-status', describe(result, 'Could not sign in'), false); }\n"
+         "      showSignIn();\n"
          "      return false;\n"
          "    });\n"
          "  };\n"
          "  el('signin-form').addEventListener('submit', function (event) {\n"
          "    event.preventDefault();\n"
          "    say('signin-status', '', true);\n"
-         "    credentials = { address: el('address').value.trim(), password: el('password').value };\n"
+         "    var address = el('address').value.trim(), password = el('password').value;\n"
          "    el('password').value = '';\n"
-         "    load();\n"
+         "    var basic = 'Basic ' + btoa(unescape(encodeURIComponent(address + ':' + password)));\n"
+         "    call('POST', '/api/v1/session', undefined, { 'Authorization': basic }).then(function (result) {\n"
+         "      if (result.status === 201) { load(false); return; }\n"
+         "      say('signin-status', describe(result, 'Could not sign in'), false);\n"
+         "    });\n"
          "  });\n"
          "  el('signout').addEventListener('click', function () {\n"
-         "    credentials = null;\n"
-         "    el('account').hidden = true;\n"
-         "    el('signin').hidden = false;\n"
-         "    el('address').focus();\n"
+         "    call('DELETE', '/api/v1/session').then(function () { showSignIn(); });\n"
          "  });\n"
          "  el('vacation-form').addEventListener('submit', function (event) {\n"
          "    event.preventDefault();\n"
-         "    if (!credentials) { return; }\n"
          "    var body = {\n"
          "      enabled: el('vacation-enabled').checked,\n"
          "      subject: el('vacation-subject').value,\n"
@@ -4435,22 +4712,22 @@ namespace HM
          "  });\n"
          "  el('password-form').addEventListener('submit', function (event) {\n"
          "    event.preventDefault();\n"
-         "    if (!credentials) { return; }\n"
          "    var current = el('current').value, fresh = el('new').value, confirm = el('confirm').value;\n"
          "    if (fresh !== confirm) { say('password-status', 'The two new passwords differ.', false); return; }\n"
          "    call('POST', '/api/v1/me/password', { current: current, 'new': fresh }, { 'X-hMailServer-OTP': el('otp').value.trim() }).then(function (result) {\n"
          "      if (result.status === 200) {\n"
-         "        credentials.password = fresh;\n"
          "        el('current').value = ''; el('new').value = ''; el('confirm').value = ''; el('otp').value = '';\n"
-         "        say('password-status', 'Password changed.', true);\n"
-         "        load();\n"
+         "        say('password-status', 'Password changed. Other browsers signed in to this account have been signed out.', true);\n"
+         "        load(true);\n"
          "        return;\n"
          "      }\n"
          "      if (result.otp === 'required') { el('otp-row').hidden = false; say('password-status', 'Enter the code from your authenticator app.', false); return; }\n"
          "      say('password-status', describe(result, 'Could not change the password'), false);\n"
          "    });\n"
          "  });\n"
-         "  el('address').focus();\n"
+         "  // A session from an earlier visit is still good until it has been idle\n"
+         "  // too long: try it first, and only ask for the password when it is not.\n"
+         "  load(true);\n"
          "})();\n";
 
       // The page and its script share these. No inline script or style
@@ -4501,6 +4778,7 @@ namespace HM
          "\"/api/v1/me\":{\"get\":{\"summary\":\"The signed-in account's own state\",\"description\":\"HTTP Basic with the account's address and password - the same credential and the same checks as an IMAP logon, including a per-name lockout and the auto-ban. Refused for the administrator password and for API keys.\",\"responses\":{\"200\":{\"description\":\"address, domain, active, quota (limit_mb, used_bytes), vacation (enabled, active, subject, message, expires, expires_date), password_changed, second_factor, directory_linked\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"The administrator password or an API key was presented\"}}}},"
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
          "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
+         "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account\",\"description\":\"HTTP Basic with the account's address and password, once. Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates the /api/v1/me endpoints without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions.\",\"responses\":{\"201\":{\"description\":\"address, idle_seconds, lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"A session cookie, the administrator password or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
