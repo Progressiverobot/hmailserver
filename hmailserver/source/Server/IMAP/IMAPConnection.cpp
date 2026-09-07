@@ -781,6 +781,8 @@ namespace HM
          return IMAP_GETMETADATA;
       else if (sCommand == _T("SETMETADATA"))
          return IMAP_SETMETADATA;
+      else if (sCommand == _T("COMPRESS"))
+         return IMAP_COMPRESS;
 
       return IMAP_UNKNOWN;
    }

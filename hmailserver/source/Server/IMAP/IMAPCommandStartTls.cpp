@@ -28,6 +28,10 @@ namespace HM
    IMAPResult
    IMAPCommandStartTls::ExecuteCommand(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument)
    {
+      // RFC 4978 section 3: TLS is not started under compression.
+      if (pConnection->IsCompressed())
+         return IMAPResult(IMAPResult::ResultBad, "STARTTLS is not available once COMPRESS is active");
+
       if (pConnection->GetConnectionSecurity() == CSSTARTTLSOptional ||
          pConnection->GetConnectionSecurity() == CSSTARTTLSRequired)
       {

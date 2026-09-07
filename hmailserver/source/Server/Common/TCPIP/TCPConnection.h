@@ -20,6 +20,9 @@
 
 using boost::asio::ip::tcp;
 
+#include "DeflateStreams.h"
+#include <memory>
+
 typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket&> ssl_socket;
 
 namespace HM
@@ -59,6 +62,14 @@ namespace HM
       // already buffered beyond the requested count are left in the receive buffer for
       // the following read. The connection must be in binary receive mode.
       void EnqueueReadExact(size_t numBytes);
+
+      // RFC 4978 COMPRESS=DEFLATE and its like. lastPlainResponse is written as it
+      // is, and from the write after it everything this connection sends is raw
+      // DEFLATE; everything the peer sends from now on is inflated before the
+      // protocol sees it. Once per connection; false when compression is already
+      // on or zlib could not be set up. Nothing above the connection changes.
+      bool EnableCompression(const AnsiString &lastPlainResponse);
+      bool IsCompressed() const { return compression_read_enabled_; }
 
       // Throws away anything already received and not yet parsed.
       //
@@ -268,6 +279,14 @@ namespace HM
       void Shutdown(boost::asio::socket_base::shutdown_type);
       
       void AsyncWrite(std::shared_ptr<ByteBuffer> buffer);
+
+      // The compressed read path: raw bytes into compressed_buffer_, inflated into
+      // receive_buffer_, until what the pending read asked for - a delimiter, an
+      // exact count, or anything at all - is there, and then AsyncReadCompleted
+      // as if the socket had delivered it plain.
+      void StartCompressedRead_();
+      void AsyncCompressedReadCompleted(const boost::system::error_code& error, size_t bytes_transferred);
+      bool CompressedReadSatisfied_(size_t &available);
       void AsyncRead(const AnsiString &delimitor);
       void AsyncHandshake();
       void AsyncDelay(int seconds);
@@ -328,6 +347,19 @@ namespace HM
       int session_ceiling_seconds_;
       bool session_ceiling_armed_;
       boost::asio::streambuf receive_buffer_;
+      // COMPRESS=DEFLATE (EnableCompression): the zlib state, the raw bytes not yet
+      // inflated, what the pending compressed read is waiting for, and the deflated
+      // copy of the write in flight, which async_write must be able to read until
+      // it completes.
+      std::unique_ptr<DeflateStreams> deflate_streams_;
+      bool compression_read_enabled_ = false;
+      bool compression_write_enabled_ = false;
+      boost::asio::streambuf compressed_buffer_;
+      AnsiString compressed_read_delimiter_;
+      std::shared_ptr<ByteBuffer> compressed_write_buffer_;
+      // Set when the write that announces compression is dispatched; the deflater
+      // is turned on when that write completes, so the announcement goes out plain.
+      bool enable_write_compression_on_completion_ = false;
       boost::asio::ssl::context& context_;
 
       IOOperationQueue operation_queue_;

@@ -40,12 +40,18 @@ namespace HM
       AnsiString GetString() {return string_; }
       int GetDelaySeconds() const {return delay_seconds_; }
 
+      // A write after which everything this connection sends is deflated: the
+      // response that announces compression, which must itself go out plain.
+      void SetEnablesCompression(bool enables) { enables_compression_ = enables; }
+      bool GetEnablesCompression() const { return enables_compression_; }
+
    private:
 
       OperationType type_;
       AnsiString string_;
       std::shared_ptr<ByteBuffer> buffer_;
       int delay_seconds_ = 0;
+      bool enables_compression_ = false;
 
    };
 }
