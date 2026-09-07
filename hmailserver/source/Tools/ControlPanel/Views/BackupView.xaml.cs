@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -43,11 +44,9 @@ namespace hMailServer.ControlPanel.Views
          else
          {
             CheckMessagesDbOnly.IsEnabled = false;
-            MessagesDbOnlyNote.Text = "hMailServer.ini was not found on this machine, so BackupMessagesDBOnly " +
-                                      "can only be changed on the server itself.";
+            MessagesDbOnlyNote.Text = L("hMailServer.ini was not found on this machine, so BackupMessagesDBOnly can only be changed on the server itself.");
             CheckVerifyRestore.IsEnabled = false;
-            VerifyRestoreNote.Text = "hMailServer.ini was not found on this machine, so BackupVerifyRestore " +
-                                     "can only be changed on the server itself.";
+            VerifyRestoreNote.Text = L("hMailServer.ini was not found on this machine, so BackupVerifyRestore can only be changed on the server itself.");
 
             // An editor that cannot read the value back must not write it either -
             // it would misreport its own state on the next visit.
@@ -70,7 +69,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = "Could not read the backup settings: " + ex.Message;
+            SubtitleText.Text = F("Could not read the backup settings: {0}", ex.Message);
          }
 
          RefreshScheduleStatus();
@@ -104,7 +103,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the backup settings: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the backup settings: {0}", ex.Message), L("Control Panel"));
             return false;
          }
       }
@@ -118,7 +117,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void BrowseBackupFile_Click(object sender, RoutedEventArgs e)
       {
-         string file = PathPicker.PickFile(BackupFileBox.Text, "Backup files (*.xml)|*.xml|All files (*.*)|*.*");
+         string file = PathPicker.PickFile(BackupFileBox.Text, L("Backup files (*.xml)|*.xml|All files (*.*)|*.*"));
          if (file != null)
             BackupFileBox.Text = file;
       }
@@ -130,9 +129,9 @@ namespace hMailServer.ControlPanel.Views
             // The COM properties are live immediately; the INI one is read when
             // the service starts, so don't claim both took effect.
             SubtitleText.Text = iniStore_.IsAvailable
-               ? "Backup settings saved - the message-metadata-only switch applies after a service restart."
-               : "Backup settings saved.";
-            Services.Toast.Success("Backup settings saved.");
+               ? L("Backup settings saved - the message-metadata-only switch applies after a service restart.")
+               : L("Backup settings saved.");
+            Services.Toast.Success(L("Backup settings saved."));
 
             // The destination may have changed, and the destination is where the
             // "last backup" state is read from.
@@ -150,12 +149,11 @@ namespace hMailServer.ControlPanel.Views
             dynamic manager = ServerSession.Current.Application.BackupManager;
             manager.StartBackup();
             ServerSession.Release(manager);
-            SubtitleText.Text = "Backup started " + DateTime.Now.ToLongTimeString() +
-                                " - runs in the background on the server.";
+            SubtitleText.Text = F("Backup started {0} - runs in the background on the server.", DateTime.Now.ToLongTimeString());
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not start the backup: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not start the backup: {0}", ex.Message), L("Control Panel"));
          }
       }
 
@@ -164,13 +162,13 @@ namespace hMailServer.ControlPanel.Views
          string backupFile = BackupFileBox.Text.Trim();
          if (backupFile.Length == 0)
          {
-            MessageBox.Show("Enter the path of the backup XML file on the server.", "Control Panel");
+            MessageBox.Show(L("Enter the path of the backup XML file on the server."), L("Control Panel"));
             return;
          }
 
          if (MessageBox.Show(
-             "Restoring replaces current data for the selected categories with the backup contents.\n\nContinue?",
-             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+             L("Restoring replaces current data for the selected categories with the backup contents.\n\nContinue?"),
+             L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          try
@@ -183,11 +181,11 @@ namespace hMailServer.ControlPanel.Views
             backup.StartRestore();
             ServerSession.Release(backup);
             ServerSession.Release(manager);
-            SubtitleText.Text = "Restore started - runs in the background on the server.";
+            SubtitleText.Text = L("Restore started - runs in the background on the server.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not start the restore: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not start the restore: {0}", ex.Message), L("Control Panel"));
          }
       }
 
@@ -204,17 +202,16 @@ namespace hMailServer.ControlPanel.Views
             // The server is deliberately strict (BackupScheduleTask::ParseTimeOfDay
             // refuses anything it would have to guess at), so refuse here too
             // rather than store a value the service will reject at start-up.
-            MessageBox.Show("'" + time + "' is not a 24-hour HH:MM time. The server accepts values like 02:00 " +
-                            "or 23:45 and refuses anything else rather than guess. Leave the box empty for no " +
-                            "daily backup.", "Control Panel");
+            MessageBox.Show(F("'{0}' is not a 24-hour HH:MM time. The server accepts values like 02:00 or 23:45 and refuses anything else rather than guess. Leave the box empty for no daily backup.", time),
+               L("Control Panel"));
             return;
          }
 
-         if (!TryReadCount(IntervalBox, "Backup interval in minutes", out int intervalMinutes))
+         if (!TryReadCount(IntervalBox, L("Backup interval in minutes"), out int intervalMinutes))
             return;
-         if (!TryReadCount(KeepCountBox, "Archives to keep", out int keepCount))
+         if (!TryReadCount(KeepCountBox, L("Archives to keep"), out int keepCount))
             return;
-         if (!TryReadCount(MaxAgeBox, "Delete archives older than this many days", out int maxAgeDays))
+         if (!TryReadCount(MaxAgeBox, L("Delete archives older than this many days"), out int maxAgeDays))
             return;
 
          try
@@ -226,7 +223,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not write to hMailServer.ini: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not write to hMailServer.ini: {0}", ex.Message), L("Control Panel"));
             return;
          }
 
@@ -236,9 +233,8 @@ namespace hMailServer.ControlPanel.Views
          KeepCountBox.Text = keepCount.ToString(CultureInfo.InvariantCulture);
          MaxAgeBox.Text = maxAgeDays.ToString(CultureInfo.InvariantCulture);
 
-         SubtitleText.Text = "Backup schedule saved - the service reads these settings when it starts, " +
-                             "so they apply after a service restart.";
-         Services.Toast.Success("Backup schedule saved.");
+         SubtitleText.Text = L("Backup schedule saved - the service reads these settings when it starts, so they apply after a service restart.");
+         Services.Toast.Success(L("Backup schedule saved."));
          RefreshScheduleStatus();
       }
 
@@ -251,7 +247,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!NumericField.TryValidate(box.Text, label, 0, int.MaxValue, out value, out bool hasValue, out string error))
          {
-            MessageBox.Show(error, "Control Panel");
+            MessageBox.Show(error, L("Control Panel"));
             return false;
          }
 
@@ -280,9 +276,7 @@ namespace hMailServer.ControlPanel.Views
          if (!iniStore_.IsAvailable)
          {
             scheduleLevel = StatusLevel.Warning;
-            scheduleText = "Cannot tell whether a schedule is configured: hMailServer.ini was not found on " +
-                           "this machine. Check ScheduledBackupTime and ScheduledBackupIntervalMinutes on the " +
-                           "server itself.";
+            scheduleText = L("Cannot tell whether a schedule is configured: hMailServer.ini was not found on this machine. Check ScheduledBackupTime and ScheduledBackupIntervalMinutes on the server itself.");
          }
          else
          {
@@ -297,36 +291,31 @@ namespace hMailServer.ControlPanel.Views
                scheduleConfigured = true;
                expectedMinutes = 24 * 60;
                scheduleLevel = StatusLevel.Good;
-               scheduleText = string.Format(CultureInfo.InvariantCulture,
-                  "A schedule is configured: daily at {0:00}:{1:00}, server local time.", hour, minute);
+               scheduleText = F("A schedule is configured: daily at {0:00}:{1:00}, server local time.", hour, minute);
             }
             else if (time.Length > 0 && intervalMinutes > 0)
             {
                scheduleConfigured = true;
                expectedMinutes = intervalMinutes;
                scheduleLevel = StatusLevel.Warning;
-               scheduleText = "ScheduledBackupTime '" + time + "' is not a valid 24-hour HH:MM time, so the " +
-                              "server falls back to the interval: one backup every " + intervalMinutes +
-                              " minute(s).";
+               scheduleText = F("ScheduledBackupTime '{0}' is not a valid 24-hour HH:MM time, so the server falls back to the interval: one backup every {1} minute(s).", time, intervalMinutes);
             }
             else if (time.Length > 0)
             {
                scheduleLevel = StatusLevel.Critical;
-               scheduleText = "ScheduledBackupTime '" + time + "' is not a valid 24-hour HH:MM time and no " +
-                              "interval is set, so no scheduled backup will ever run.";
+               scheduleText = F("ScheduledBackupTime '{0}' is not a valid 24-hour HH:MM time and no interval is set, so no scheduled backup will ever run.", time);
             }
             else if (intervalMinutes > 0)
             {
                scheduleConfigured = true;
                expectedMinutes = intervalMinutes;
                scheduleLevel = StatusLevel.Good;
-               scheduleText = "A schedule is configured: one backup every " + intervalMinutes + " minute(s).";
+               scheduleText = F("A schedule is configured: one backup every {0} minute(s).", intervalMinutes);
             }
             else
             {
                scheduleLevel = StatusLevel.Warning;
-               scheduleText = "No schedule is configured, so no backup will ever run on its own. Backups " +
-                              "happen only when someone clicks Start backup now.";
+               scheduleText = L("No schedule is configured, so no backup will ever run on its own. Backups happen only when someone clicks Start backup now.");
             }
          }
 
@@ -340,14 +329,14 @@ namespace hMailServer.ControlPanel.Views
          if (destination == null)
          {
             lastLevel = StatusLevel.Warning;
-            lastText = "Cannot tell when the last backup ran: the backup settings could not be read from the server.";
+            lastText = L("Cannot tell when the last backup ran: the backup settings could not be read from the server.");
          }
          else if (destination.Length == 0)
          {
             lastLevel = StatusLevel.Warning;
             lastText = scheduleConfigured
-               ? "No destination folder is configured, so the schedule above will skip every run until one is set."
-               : "No destination folder is configured, so a backup has nowhere to go.";
+               ? L("No destination folder is configured, so the schedule above will skip every run until one is set.")
+               : L("No destination folder is configured, so a backup has nowhere to go.");
          }
          else
          {
@@ -377,24 +366,20 @@ namespace hMailServer.ControlPanel.Views
             if (!destinationReadable)
             {
                lastLevel = scheduleConfigured ? StatusLevel.Warning : StatusLevel.Information;
-               lastText = "Cannot tell when the last backup ran: " + destination +
-                          " could not be read from this machine. Check the folder on the server, or in the " +
-                          "backup log on the Logs page.";
+               lastText = F("Cannot tell when the last backup ran: {0} could not be read from this machine. Check the folder on the server, or in the backup log on the Logs page.", destination);
             }
             else if (newestName == null)
             {
                lastLevel = scheduleConfigured ? StatusLevel.Critical : StatusLevel.Warning;
-               lastText = "No backup has ever completed into " + destination +
-                          " - there is no HMBackup archive there." +
+               lastText = F("No backup has ever completed into {0} - there is no HMBackup archive there.", destination) +
                           (scheduleConfigured
-                             ? " If the schedule was only just set up, re-check after its first run was due; " +
-                               "otherwise the backup log on the Logs page says why runs are being skipped."
+                             ? L(" If the schedule was only just set up, re-check after its first run was due; otherwise the backup log on the Logs page says why runs are being skipped.")
                              : "");
             }
             else
             {
                TimeSpan age = DateTime.Now - newestTime;
-               string described = "Last backup: " + DescribeAge(age) + " (" + newestName + ").";
+               string described = F("Last backup: {0} ({1}).", DescribeAge(age), newestName);
 
                // 2.0 rather than 2, so the doubling happens in floating point. As an
                // int multiply this overflows for any expectedMinutes above
@@ -406,8 +391,7 @@ namespace hMailServer.ControlPanel.Views
                if (scheduleConfigured && expectedMinutes > 0 && age.TotalMinutes > expectedMinutes * 2.0)
                {
                   lastLevel = StatusLevel.Critical;
-                  lastText = described + " That is older than the schedule allows, so runs are failing or " +
-                             "being skipped - the backup log on the Logs page says why.";
+                  lastText = described + L(" That is older than the schedule allows, so runs are failing or being skipped - the backup log on the Logs page says why.");
                }
                else if (scheduleConfigured)
                {
@@ -417,7 +401,7 @@ namespace hMailServer.ControlPanel.Views
                else
                {
                   lastLevel = StatusLevel.Information;
-                  lastText = described + " With no schedule configured, nothing will take the next one.";
+                  lastText = described + L(" With no schedule configured, nothing will take the next one.");
                }
             }
          }
@@ -567,21 +551,21 @@ namespace hMailServer.ControlPanel.Views
             age = TimeSpan.Zero;
 
          if (age.TotalMinutes < 1)
-            return "less than a minute ago";
+            return L("less than a minute ago");
 
          if (age.TotalHours < 1)
          {
             int minutes = (int)age.TotalMinutes;
-            return minutes == 1 ? "1 minute ago" : minutes + " minutes ago";
+            return minutes == 1 ? L("1 minute ago") : F("{0} minutes ago", minutes);
          }
 
          if (age.TotalDays < 2)
          {
             int hours = (int)age.TotalHours;
-            return hours == 1 ? "1 hour ago" : hours + " hours ago";
+            return hours == 1 ? L("1 hour ago") : F("{0} hours ago", hours);
          }
 
-         return (int)age.TotalDays + " days ago";
+         return F("{0} days ago", (int)age.TotalDays);
       }
    }
 

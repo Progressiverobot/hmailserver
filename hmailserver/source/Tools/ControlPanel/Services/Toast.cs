@@ -4,6 +4,7 @@
 using System;
 using Wpf.Ui;
 using Wpf.Ui.Controls;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -25,8 +26,8 @@ namespace hMailServer.ControlPanel.Services
          ready_ = true;
       }
 
-      public static void Success(string message, string title = "Saved")
-         => Show(title, message, ControlAppearance.Success);
+      public static void Success(string message, string title = null)
+         => Show(title ?? L("Saved"), message, ControlAppearance.Success);
 
       public static void Info(string message, string title = "")
          => Show(title, message, ControlAppearance.Info);

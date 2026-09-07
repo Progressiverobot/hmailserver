@@ -1,0 +1,1959 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+     SPDX-License-Identifier: AGPL-3.0-or-later -->
+<root>
+  <!-- Svenska: the Swedish catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Swedish and checked by build/check-mnemonics.py. -->
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name=" (published {0})" xml:space="preserve">
+    <value> (publicerad {0})</value>
+  </data>
+  <data name=" (route #{0})" xml:space="preserve">
+    <value> (rutt nr {0})</value>
+  </data>
+  <data name=" (subject '{0}')" xml:space="preserve">
+    <value> (ämne '{0}')</value>
+  </data>
+  <data name=" If the schedule was only just set up, re-check after its first run was due; otherwise the backup log on the Logs page says why runs are being skipped." xml:space="preserve">
+    <value> Om schemat nyss lades upp, kontrollera igen när den första körningen skulle ha gjorts; annars säger säkerhetskopieringsloggen på sidan Loggar varför körningar hoppas över.</value>
+  </data>
+  <data name=" That is older than the schedule allows, so runs are failing or being skipped - the backup log on the Logs page says why." xml:space="preserve">
+    <value> Det är äldre än schemat tillåter, så körningar misslyckas eller hoppas över - säkerhetskopieringsloggen på sidan Loggar säger varför.</value>
+  </data>
+  <data name=" With no schedule configured, nothing will take the next one." xml:space="preserve">
+    <value> Utan något schema kommer ingen att ta nästa.</value>
+  </data>
+  <data name="'{0}' is not a 24-hour HH:MM time. The server accepts values like 02:00 or 23:45 and refuses anything else rather than guess. Leave the box empty for no daily backup." xml:space="preserve">
+    <value>'{0}' är inte en tid i 24-timmarsformat HH:MM. Servern godtar värden som 02:00 eller 23:45 och avvisar allt annat hellre än att gissa. Lämna rutan tom för ingen daglig säkerhetskopiering.</value>
+  </data>
+  <data name="(the log file could not be written)" xml:space="preserve">
+    <value>(loggfilen kunde inte skrivas)</value>
+  </data>
+  <data name=", checked {0}" xml:space="preserve">
+    <value>, kontrollerad {0}</value>
+  </data>
+  <data name=". Connections to them are refused. The usual causes are another program already holding the port, a bind address that does not exist on this machine, or - on a TLS port - a certificate the server could not load; the server records which, once, in the error log at start-up." xml:space="preserve">
+    <value>. Anslutningar till dem avvisas. De vanliga orsakerna är ett annat program som redan håller porten, en bindningsadress som inte finns på den här datorn, eller - på en TLS-port - ett certifikat som servern inte kunde läsa in; servern skriver vilket, en gång, i felloggen vid start.</value>
+  </data>
+  <data name="0 means archives are never deleted. Retention runs on the server after every backup into this folder - scheduled or started by hand with Start backup now - and only once the new archive has been written and verified readable, so a failed backup never deletes anything. The newest archive is never deleted, the age limit always leaves the two newest alone, and only this server's own HMBackup archives are counted - other files in the folder are never touched." xml:space="preserve">
+    <value>0 betyder att arkiv aldrig tas bort. Gallringen körs på servern efter varje säkerhetskopiering till den här mappen - schemalagd eller startad för hand med Starta säkerhetskopiering nu - och först när det nya arkivet har skrivits och verifierats läsbart, så en misslyckad säkerhetskopiering tar aldrig bort något. Det nyaste arkivet tas aldrig bort, åldersgränsen lämnar alltid de två nyaste i fred, och bara den här serverns egna HMBackup-arkiv räknas - andra filer i mappen rörs aldrig.</value>
+  </data>
+  <data name="1 DNS record is still being checked in the background; this summary will update." xml:space="preserve">
+    <value>1 DNS-post kontrolleras fortfarande i bakgrunden; den här sammanfattningen uppdateras.</value>
+  </data>
+  <data name="1 hour ago" xml:space="preserve">
+    <value>1 timme sedan</value>
+  </data>
+  <data name="1 item cannot be checked from here" xml:space="preserve">
+    <value>1 punkt kan inte kontrolleras härifrån</value>
+  </data>
+  <data name="1 item cannot be checked from here." xml:space="preserve">
+    <value>1 punkt kan inte kontrolleras härifrån.</value>
+  </data>
+  <data name="1 minute ago" xml:space="preserve">
+    <value>1 minut sedan</value>
+  </data>
+  <data name="1 thing needs attention" xml:space="preserve">
+    <value>1 sak behöver åtgärdas</value>
+  </data>
+  <data name="24 hours" xml:space="preserve">
+    <value>24 timmar</value>
+  </data>
+  <data name="30 days" xml:space="preserve">
+    <value>30 dagar</value>
+  </data>
+  <data name="7 days" xml:space="preserve">
+    <value>7 dagar</value>
+  </data>
+  <data name="; Install update applies it" xml:space="preserve">
+    <value>; Installera uppdatering tar den i bruk</value>
+  </data>
+  <data name="A passphrase is already stored for '{0}'. Saving replaces it - the old one cannot be recovered from here. Replace it?" xml:space="preserve">
+    <value>En lösenfras är redan sparad för '{0}'. Att spara ersätter den - den gamla kan inte återfås härifrån. Ersätt den?</value>
+  </data>
+  <data name="A passphrase is stored for this certificate. It is never displayed here - saving a new one replaces it. Whether it is the RIGHT passphrase is only proven when the server loads the key: after the next restart, check the application error log." xml:space="preserve">
+    <value>En lösenfras är sparad för det här certifikatet. Den visas aldrig här - att spara en ny ersätter den. Om det är RÄTT lösenfras bevisas först när servern läser in nyckeln: kontrollera programmets fellogg efter nästa omstart.</value>
+  </data>
+  <data name="A passphrase is stored, but the key file is not encrypted, so it is never used. Harmless - it simply does nothing." xml:space="preserve">
+    <value>En lösenfras är sparad, men nyckelfilen är inte krypterad, så den används aldrig. Ofarligt - den gör helt enkelt ingenting.</value>
+  </data>
+  <data name="A schedule is configured: daily at {0:00}:{1:00}, server local time." xml:space="preserve">
+    <value>Ett schema är konfigurerat: dagligen kl. {0:00}:{1:00}, serverns lokala tid.</value>
+  </data>
+  <data name="A schedule is configured: one backup every {0} minute(s)." xml:space="preserve">
+    <value>Ett schema är konfigurerat: en säkerhetskopiering var {0}:e minut.</value>
+  </data>
+  <data name="API &amp; monitoring" xml:space="preserve">
+    <value>API &amp; övervakning</value>
+  </data>
+  <data name="About" xml:space="preserve">
+    <value>Om</value>
+  </data>
+  <data name="Access &amp; abuse protection" xml:space="preserve">
+    <value>Åtkomst &amp; missbruksskydd</value>
+  </data>
+  <data name="Access control: which addresses may connect and what they are allowed to do. Higher priority wins." xml:space="preserve">
+    <value>Åtkomstkontroll: vilka adresser som får ansluta och vad de får göra. Högre prioritet vinner.</value>
+  </data>
+  <data name="Accounts &amp; domains" xml:space="preserve">
+    <value>Konton &amp; domäner</value>
+  </data>
+  <data name="Action needed: {0}. Opens {1}." xml:space="preserve">
+    <value>Åtgärd krävs: {0}. Öppnar {1}.</value>
+  </data>
+  <data name="Add _criterion…" xml:space="preserve">
+    <value>Lägg till _kriterium…</value>
+  </data>
+  <data name="Add a_lias" xml:space="preserve">
+    <value>Lägg till _alias</value>
+  </data>
+  <data name="Add ac_tion…" xml:space="preserve">
+    <value>Lägg till åt_gärd…</value>
+  </data>
+  <data name="Add alias" xml:space="preserve">
+    <value>Lägg till alias</value>
+  </data>
+  <data name="Add certificate" xml:space="preserve">
+    <value>Lägg till certifikat</value>
+  </data>
+  <data name="Add distribution list" xml:space="preserve">
+    <value>Lägg till distributionslista</value>
+  </data>
+  <data name="Add domains, accounts, aliases, distribution lists, DKIM signing and external (POP3) collection." xml:space="preserve">
+    <value>Lägg till domäner, konton, alias, distributionslistor, DKIM-signering och extern (POP3) hämtning.</value>
+  </data>
+  <data name="Add li_st" xml:space="preserve">
+    <value>Lägg till li_sta</value>
+  </data>
+  <data name="Add port" xml:space="preserve">
+    <value>Lägg till port</value>
+  </data>
+  <data name="Add range" xml:space="preserve">
+    <value>Lägg till intervall</value>
+  </data>
+  <data name="Add route" xml:space="preserve">
+    <value>Lägg till rutt</value>
+  </data>
+  <data name="Add the certificate" xml:space="preserve">
+    <value>Lägg till certifikatet</value>
+  </data>
+  <data name="Address" xml:space="preserve">
+    <value>Adress</value>
+  </data>
+  <data name="Address and password are required." xml:space="preserve">
+    <value>Adress och lösenord krävs.</value>
+  </data>
+  <data name="Administrative access" xml:space="preserve">
+    <value>Administrativ åtkomst</value>
+  </data>
+  <data name="Administrator" xml:space="preserve">
+    <value>Administratör</value>
+  </data>
+  <data name="Advanced" xml:space="preserve">
+    <value>Avancerat</value>
+  </data>
+  <data name="Aliases" xml:space="preserve">
+    <value>Alias</value>
+  </data>
+  <data name="Allow _IMAP" xml:space="preserve">
+    <value>Tillåt _IMAP</value>
+  </data>
+  <data name="Allow _POP3" xml:space="preserve">
+    <value>Tillåt _POP3</value>
+  </data>
+  <data name="Allow _SMTP" xml:space="preserve">
+    <value>Tillåt _SMTP</value>
+  </data>
+  <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
+    <value>Ett oväntat fel inträffade:
+
+{0}
+
+Alla detaljer skrevs till:
+{1}
+
+Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</value>
+  </data>
+  <data name="Anti-spam settings" xml:space="preserve">
+    <value>Skräppostinställningar</value>
+  </data>
+  <data name="Anti-virus settings" xml:space="preserve">
+    <value>Antivirusinställningar</value>
+  </data>
+  <data name="Archives to kee_p (0 = keep all)" xml:space="preserve">
+    <value>Arkiv att beh_ålla (0 = behåll alla)</value>
+  </data>
+  <data name="Archives to keep" xml:space="preserve">
+    <value>Arkiv att behålla</value>
+  </data>
+  <data name="Archives to keep (0 = keep all)" xml:space="preserve">
+    <value>Arkiv att behålla (0 = behåll alla)</value>
+  </data>
+  <data name="Archiving, mirroring, the default domain, disk-space limits, and the switch that turns the event-scripting engine on." xml:space="preserve">
+    <value>Arkivering, spegling, standarddomänen, diskutrymmesgränser och strömbrytaren som slår på skriptmotorn för händelser.</value>
+  </data>
+  <data name="At most one backup per calendar day, taken at the first check at or after this time (the server's local time). If an interval is also set below, the daily time wins." xml:space="preserve">
+    <value>Högst en säkerhetskopiering per kalenderdag, tagen vid den första kontrollen vid eller efter den här tiden (serverns lokala tid). Om ett intervall också anges nedan vinner den dagliga tiden.</value>
+  </data>
+  <data name="Auth" xml:space="preserve">
+    <value>Aut.</value>
+  </data>
+  <data name="Authenticate accounts against Active Directory or any LDAP directory, so users sign in with their domain password." xml:space="preserve">
+    <value>Autentisera konton mot Active Directory eller valfri LDAP-katalog, så att användarna loggar in med sitt domänlösenord.</value>
+  </data>
+  <data name="Authentication" xml:space="preserve">
+    <value>Autentisering</value>
+  </data>
+  <data name="Auto-ban" xml:space="preserve">
+    <value>Automatisk spärr</value>
+  </data>
+  <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
+    <value>Säkerhetskopiera _domäner (konton, alias, listor)</value>
+  </data>
+  <data name="Back up _messages" xml:space="preserve">
+    <value>Säkerhetskopiera _meddelanden</value>
+  </data>
+  <data name="Back up _settings" xml:space="preserve">
+    <value>Säkerhetskopiera _inställningar</value>
+  </data>
+  <data name="Back up domains, messages and settings to a folder; restore from a previous backup." xml:space="preserve">
+    <value>Säkerhetskopiera domäner, meddelanden och inställningar till en mapp; återställ från en tidigare säkerhetskopia.</value>
+  </data>
+  <data name="Back up or restore the configuration, the domains and the messages." xml:space="preserve">
+    <value>Säkerhetskopiera eller återställ konfigurationen, domänerna och meddelandena.</value>
+  </data>
+  <data name="Back_up file (HMBackup*.xml on the server)" xml:space="preserve">
+    <value>Säkerhetskopierings_fil (HMBackup*.xml på servern)</value>
+  </data>
+  <data name="Backlog" xml:space="preserve">
+    <value>Eftersläpning</value>
+  </data>
+  <data name="Backup" xml:space="preserve">
+    <value>Säkerhetskopiering</value>
+  </data>
+  <data name="Backup &amp; restore" xml:space="preserve">
+    <value>Säkerhetskopiering &amp; återställning</value>
+  </data>
+  <data name="Backup files (*.xml)|*.xml|All files (*.*)|*.*" xml:space="preserve">
+    <value>Säkerhetskopior (*.xml)|*.xml|Alla filer (*.*)|*.*</value>
+  </data>
+  <data name="Backup interva_l in minutes (0 = off)" xml:space="preserve">
+    <value>Interv_all i minuter (0 = av)</value>
+  </data>
+  <data name="Backup interval in minutes" xml:space="preserve">
+    <value>Intervall i minuter</value>
+  </data>
+  <data name="Backup interval in minutes (0 = off)" xml:space="preserve">
+    <value>Intervall i minuter (0 = av)</value>
+  </data>
+  <data name="Backup schedule saved - the service reads these settings when it starts, so they apply after a service restart." xml:space="preserve">
+    <value>Schemat för säkerhetskopiering sparat - tjänsten läser de här inställningarna när den startar, så de gäller efter en omstart av tjänsten.</value>
+  </data>
+  <data name="Backup schedule saved." xml:space="preserve">
+    <value>Schemat för säkerhetskopiering sparat.</value>
+  </data>
+  <data name="Backup settings saved - the message-metadata-only switch applies after a service restart." xml:space="preserve">
+    <value>Inställningarna för säkerhetskopiering sparade - valet bara meddelandemetadata gäller efter en omstart av tjänsten.</value>
+  </data>
+  <data name="Backup settings saved." xml:space="preserve">
+    <value>Inställningarna för säkerhetskopiering sparade.</value>
+  </data>
+  <data name="Backup started {0} - runs in the background on the server." xml:space="preserve">
+    <value>Säkerhetskopieringen startade {0} - körs i bakgrunden på servern.</value>
+  </data>
+  <data name="Bind address (0.0.0.0)" xml:space="preserve">
+    <value>Bindningsadress (0.0.0.0)</value>
+  </data>
+  <data name="Bind to address" xml:space="preserve">
+    <value>Bind till adress</value>
+  </data>
+  <data name="Block lists checked against the IP address that is connecting." xml:space="preserve">
+    <value>Spärrlistor som kontrolleras mot IP-adressen som ansluter.</value>
+  </data>
+  <data name="Block lists checked against the links found inside a message body." xml:space="preserve">
+    <value>Spärrlistor som kontrolleras mot länkarna i meddelandetexten.</value>
+  </data>
+  <data name="Blocked attachments" xml:space="preserve">
+    <value>Blockerade bilagor</value>
+  </data>
+  <data name="Blocked senders" xml:space="preserve">
+    <value>Blockerade avsändare</value>
+  </data>
+  <data name="Body" xml:space="preserve">
+    <value>Meddelandetext</value>
+  </data>
+  <data name="Browse for a file" xml:space="preserve">
+    <value>Bläddra efter en fil</value>
+  </data>
+  <data name="Browse for a folder" xml:space="preserve">
+    <value>Bläddra efter en mapp</value>
+  </data>
+  <data name="Browse for the certificate file" xml:space="preserve">
+    <value>Bläddra efter certifikatfilen</value>
+  </data>
+  <data name="Browse for the private key file" xml:space="preserve">
+    <value>Bläddra efter den privata nyckelfilen</value>
+  </data>
+  <data name="Built-in (SQL Server Compact)" xml:space="preserve">
+    <value>Inbyggd (SQL Server Compact)</value>
+  </data>
+  <data name="CC" xml:space="preserve">
+    <value>Kopia</value>
+  </data>
+  <data name="Cancel" xml:space="preserve">
+    <value>Avbryt</value>
+  </data>
+  <data name="Cannot tell when the last backup ran: the backup settings could not be read from the server." xml:space="preserve">
+    <value>Kan inte avgöra när den senaste säkerhetskopieringen kördes: inställningarna för säkerhetskopiering kunde inte läsas från servern.</value>
+  </data>
+  <data name="Cannot tell when the last backup ran: {0} could not be read from this machine. Check the folder on the server, or in the backup log on the Logs page." xml:space="preserve">
+    <value>Kan inte avgöra när den senaste säkerhetskopieringen kördes: {0} kunde inte läsas från den här datorn. Kontrollera mappen på servern, eller säkerhetskopieringsloggen på sidan Loggar.</value>
+  </data>
+  <data name="Cannot tell whether a schedule is configured: hMailServer.ini was not found on this machine. Check ScheduledBackupTime and ScheduledBackupIntervalMinutes on the server itself." xml:space="preserve">
+    <value>Kan inte avgöra om ett schema är konfigurerat: hMailServer.ini hittades inte på den här datorn. Kontrollera ScheduledBackupTime och ScheduledBackupIntervalMinutes på själva servern.</value>
+  </data>
+  <data name="Certificate" xml:space="preserve">
+    <value>Certifikat</value>
+  </data>
+  <data name="Certificate file" xml:space="preserve">
+    <value>Certifikatfil</value>
+  </data>
+  <data name="Certificate file (PEM)" xml:space="preserve">
+    <value>Certifikatfil (PEM)</value>
+  </data>
+  <data name="Certificate file for the new certificate" xml:space="preserve">
+    <value>Certifikatfil för det nya certifikatet</value>
+  </data>
+  <data name="Certificates (ACME)" xml:space="preserve">
+    <value>Certifikat (ACME)</value>
+  </data>
+  <data name="Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let's Encrypt certificates appear here automatically." xml:space="preserve">
+    <value>Certifikat som kan användas för TLS-portar, med vad den här datorn kan verifiera om vart och ett: filerna, utgångsdatumet och om nyckeln hör till certifikatet. Med ACME aktiverat visas Let's Encrypt-certifikat här automatiskt.</value>
+  </data>
+  <data name="Change the language" xml:space="preserve">
+    <value>Byt språk</value>
+  </data>
+  <data name="Check for _updates" xml:space="preserve">
+    <value>_Sök efter uppdateringar</value>
+  </data>
+  <data name="Checking what this server still needs done outside it…" xml:space="preserve">
+    <value>Kontrollerar vad den här servern fortfarande behöver få gjort utanför sig själv…</value>
+  </data>
+  <data name="ClamAV and external scanners, and what to do with a message that is found to be infected." xml:space="preserve">
+    <value>ClamAV och externa skannrar, och vad som ska göras med ett meddelande som visar sig vara infekterat.</value>
+  </data>
+  <data name="Connect to server" xml:space="preserve">
+    <value>Anslut till server</value>
+  </data>
+  <data name="Connected to another host, so whether these ports are being listened on cannot be read from here - open the Control Panel on the server itself to see it." xml:space="preserve">
+    <value>Ansluten till en annan värd, så om de här portarna lyssnas på kan inte läsas härifrån - öppna Kontrollpanelen på själva servern för att se det.</value>
+  </data>
+  <data name="Connected to {0} as {1}" xml:space="preserve">
+    <value>Ansluten till {0} som {1}</value>
+  </data>
+  <data name="Connecting…" xml:space="preserve">
+    <value>Ansluter…</value>
+  </data>
+  <data name="Connection failed." xml:space="preserve">
+    <value>Anslutningen misslyckades.</value>
+  </data>
+  <data name="Connection restored" xml:space="preserve">
+    <value>Anslutningen återupprättad</value>
+  </data>
+  <data name="Connection to the server lost." xml:space="preserve">
+    <value>Anslutningen till servern bröts.</value>
+  </data>
+  <data name="Connections &amp; protocols" xml:space="preserve">
+    <value>Anslutningar &amp; protokoll</value>
+  </data>
+  <data name="Contacting {0}…" xml:space="preserve">
+    <value>Kontaktar {0}…</value>
+  </data>
+  <data name="Control Panel" xml:space="preserve">
+    <value>Kontrollpanel</value>
+  </data>
+  <data name="Could not add the certificate: {0}" xml:space="preserve">
+    <value>Kunde inte lägga till certifikatet: {0}</value>
+  </data>
+  <data name="Could not add the port: {0}" xml:space="preserve">
+    <value>Kunde inte lägga till porten: {0}</value>
+  </data>
+  <data name="Could not add the range: {0}" xml:space="preserve">
+    <value>Kunde inte lägga till intervallet: {0}</value>
+  </data>
+  <data name="Could not add the route: {0}" xml:space="preserve">
+    <value>Kunde inte lägga till rutten: {0}</value>
+  </data>
+  <data name="Could not change the match mode: {0}" xml:space="preserve">
+    <value>Kunde inte ändra matchningsläget: {0}</value>
+  </data>
+  <data name="Could not create the account: {0}" xml:space="preserve">
+    <value>Kunde inte skapa kontot: {0}</value>
+  </data>
+  <data name="Could not create the alias: {0}" xml:space="preserve">
+    <value>Kunde inte skapa aliaset: {0}</value>
+  </data>
+  <data name="Could not create the domain: {0}" xml:space="preserve">
+    <value>Kunde inte skapa domänen: {0}</value>
+  </data>
+  <data name="Could not create the list: {0}" xml:space="preserve">
+    <value>Kunde inte skapa listan: {0}</value>
+  </data>
+  <data name="Could not create the rule: {0}" xml:space="preserve">
+    <value>Kunde inte skapa regeln: {0}</value>
+  </data>
+  <data name="Could not delete the account: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort kontot: {0}</value>
+  </data>
+  <data name="Could not delete the alias: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort aliaset: {0}</value>
+  </data>
+  <data name="Could not delete the certificate: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort certifikatet: {0}</value>
+  </data>
+  <data name="Could not delete the domain: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort domänen: {0}</value>
+  </data>
+  <data name="Could not delete the list: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort listan: {0}</value>
+  </data>
+  <data name="Could not delete the port: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort porten: {0}</value>
+  </data>
+  <data name="Could not delete the range: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort intervallet: {0}</value>
+  </data>
+  <data name="Could not delete the route: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort rutten: {0}</value>
+  </data>
+  <data name="Could not evaluate all warnings: {0}" xml:space="preserve">
+    <value>Kunde inte utvärdera alla varningar: {0}</value>
+  </data>
+  <data name="Could not load the history: {0}" xml:space="preserve">
+    <value>Kunde inte läsa in historiken: {0}</value>
+  </data>
+  <data name="Could not load this page: {0}" xml:space="preserve">
+    <value>Kunde inte läsa in den här sidan: {0}</value>
+  </data>
+  <data name="Could not move the action: {0}" xml:space="preserve">
+    <value>Kunde inte flytta åtgärden: {0}</value>
+  </data>
+  <data name="Could not read the backup settings: {0}" xml:space="preserve">
+    <value>Kunde inte läsa inställningarna för säkerhetskopiering: {0}</value>
+  </data>
+  <data name="Could not read the queue: {0}" xml:space="preserve">
+    <value>Kunde inte läsa kön: {0}</value>
+  </data>
+  <data name="Could not remove the action: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort åtgärden: {0}</value>
+  </data>
+  <data name="Could not remove the criterion: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort kriteriet: {0}</value>
+  </data>
+  <data name="Could not remove the message: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort meddelandet: {0}</value>
+  </data>
+  <data name="Could not remove the passphrase: {0}" xml:space="preserve">
+    <value>Kunde inte ta bort lösenfrasen: {0}</value>
+  </data>
+  <data name="Could not retrigger delivery: {0}" xml:space="preserve">
+    <value>Kunde inte starta om leveransen: {0}</value>
+  </data>
+  <data name="Could not save the backup settings: {0}" xml:space="preserve">
+    <value>Kunde inte spara inställningarna för säkerhetskopiering: {0}</value>
+  </data>
+  <data name="Could not save the passphrase: {0}" xml:space="preserve">
+    <value>Kunde inte spara lösenfrasen: {0}</value>
+  </data>
+  <data name="Could not save the permissions: {0}" xml:space="preserve">
+    <value>Kunde inte spara behörigheterna: {0}</value>
+  </data>
+  <data name="Could not start the backup: {0}" xml:space="preserve">
+    <value>Kunde inte starta säkerhetskopieringen: {0}</value>
+  </data>
+  <data name="Could not start the restore: {0}" xml:space="preserve">
+    <value>Kunde inte starta återställningen: {0}</value>
+  </data>
+  <data name="Could not write to hMailServer.ini: {0}" xml:space="preserve">
+    <value>Kunde inte skriva till hMailServer.ini: {0}</value>
+  </data>
+  <data name="Couldn't load aliases: " xml:space="preserve">
+    <value>Kunde inte läsa in alias: </value>
+  </data>
+  <data name="Couldn't load distribution lists: " xml:space="preserve">
+    <value>Kunde inte läsa in distributionslistor: </value>
+  </data>
+  <data name="Create and update mailboxes to match an LDAP directory - preview first, then apply." xml:space="preserve">
+    <value>Skapa och uppdatera brevlådor så att de matchar en LDAP-katalog - förhandsgranska först, tillämpa sedan.</value>
+  </data>
+  <data name="Create copy" xml:space="preserve">
+    <value>Skapa kopia</value>
+  </data>
+  <data name="Created" xml:space="preserve">
+    <value>Skapad</value>
+  </data>
+  <data name="Critical" xml:space="preserve">
+    <value>Kritisk</value>
+  </data>
+  <data name="DANE, MTA-STS, ARC and TLS reporting - proving to other servers that TLS is required." xml:space="preserve">
+    <value>DANE, MTA-STS, ARC och TLS-rapportering - visar för andra servrar att TLS krävs.</value>
+  </data>
+  <data name="DNS blacklists" xml:space="preserve">
+    <value>DNS-svartlistor</value>
+  </data>
+  <data name="DNS records" xml:space="preserve">
+    <value>DNS-poster</value>
+  </data>
+  <data name="DNS resolver" xml:space="preserve">
+    <value>DNS-uppslagning</value>
+  </data>
+  <data name="Daily backup t_ime (24-hour HH:MM, empty = off)" xml:space="preserve">
+    <value>Daglig säkerhetskopiering k_l. (24-timmars HH:MM, tomt = av)</value>
+  </data>
+  <data name="Daily backup time (24-hour HH:MM, empty = off)" xml:space="preserve">
+    <value>Daglig säkerhetskopiering kl. (24-timmars HH:MM, tomt = av)</value>
+  </data>
+  <data name="Dashboard" xml:space="preserve">
+    <value>Översikt</value>
+  </data>
+  <data name="Database" xml:space="preserve">
+    <value>Databas</value>
+  </data>
+  <data name="Database host" xml:space="preserve">
+    <value>Databasvärd</value>
+  </data>
+  <data name="Database name" xml:space="preserve">
+    <value>Databasnamn</value>
+  </data>
+  <data name="Database schema version" xml:space="preserve">
+    <value>Databasschemats version</value>
+  </data>
+  <data name="Database type" xml:space="preserve">
+    <value>Databastyp</value>
+  </data>
+  <data name="De_lete rule" xml:space="preserve">
+    <value>_Ta bort regel</value>
+  </data>
+  <data name="Delete" xml:space="preserve">
+    <value>Ta bort</value>
+  </data>
+  <data name="Delete IP range '{0}'?" xml:space="preserve">
+    <value>Ta bort IP-intervallet '{0}'?</value>
+  </data>
+  <data name="Delete alias" xml:space="preserve">
+    <value>Ta bort alias</value>
+  </data>
+  <data name="Delete archives older tha_n this many days (0 = keep all)" xml:space="preserve">
+    <value>Ta bort arkiv _äldre än så här många dagar (0 = behåll alla)</value>
+  </data>
+  <data name="Delete archives older than this many days" xml:space="preserve">
+    <value>Ta bort arkiv äldre än så här många dagar</value>
+  </data>
+  <data name="Delete archives older than this many days (0 = keep all)" xml:space="preserve">
+    <value>Ta bort arkiv äldre än så här många dagar (0 = behåll alla)</value>
+  </data>
+  <data name="Delete certificate '{0}'?" xml:space="preserve">
+    <value>Ta bort certifikatet '{0}'?</value>
+  </data>
+  <data name="Delete distribution list" xml:space="preserve">
+    <value>Ta bort distributionslista</value>
+  </data>
+  <data name="Delete domain" xml:space="preserve">
+    <value>Ta bort domän</value>
+  </data>
+  <data name="Delete e-mail" xml:space="preserve">
+    <value>Ta bort e-post</value>
+  </data>
+  <data name="Delete rule '{0}'?" xml:space="preserve">
+    <value>Ta bort regeln '{0}'?</value>
+  </data>
+  <data name="Delete selected ra_nge" xml:space="preserve">
+    <value>Ta bort valt inter_vall</value>
+  </data>
+  <data name="Delete the alias {0}?" xml:space="preserve">
+    <value>Ta bort aliaset {0}?</value>
+  </data>
+  <data name="Delete the distribution list {0}?" xml:space="preserve">
+    <value>Ta bort distributionslistan {0}?</value>
+  </data>
+  <data name="Delete the domain {0}?&#10;&#10;This permanently removes {1}, every message stored in them, and all of the domain's aliases and distribution lists. There is no undo." xml:space="preserve">
+    <value>Ta bort domänen {0}?
+
+Det tar permanent bort {1}, varje meddelande som lagras i dem, och alla domänens alias och distributionslistor. Det går inte att ångra.</value>
+  </data>
+  <data name="Delete the route for '{0}'?" xml:space="preserve">
+    <value>Ta bort rutten för '{0}'?</value>
+  </data>
+  <data name="Delete the selected certificate" xml:space="preserve">
+    <value>Ta bort det valda certifikatet</value>
+  </data>
+  <data name="Delete the {0} port {1} binding?" xml:space="preserve">
+    <value>Ta bort bindningen för {0}-port {1}?</value>
+  </data>
+  <data name="Delete {0}?" xml:space="preserve">
+    <value>Ta bort {0}?</value>
+  </data>
+  <data name="Deliver _local → local" xml:space="preserve">
+    <value>Leverera l_okalt → lokalt</value>
+  </data>
+  <data name="Deliver local → _remote" xml:space="preserve">
+    <value>Leverera lokalt → _fjärr</value>
+  </data>
+  <data name="Deliver mail for named domains to a chosen server instead of looking up its MX record." xml:space="preserve">
+    <value>Leverera post för namngivna domäner till en vald server i stället för att slå upp dess MX-post.</value>
+  </data>
+  <data name="Deliver mail for specific domains through a designated SMTP host instead of MX lookup." xml:space="preserve">
+    <value>Leverera post för vissa domäner genom en utsedd SMTP-värd i stället för MX-uppslagning.</value>
+  </data>
+  <data name="Deliver remote → remote (rela_y)" xml:space="preserve">
+    <value>Leverera fjärr → fjärr (_relä)</value>
+  </data>
+  <data name="Delivery attempts" xml:space="preserve">
+    <value>Leveransförsök</value>
+  </data>
+  <data name="Delivery of e-mail" xml:space="preserve">
+    <value>Leverans av e-post</value>
+  </data>
+  <data name="Delivery queue" xml:space="preserve">
+    <value>Leveranskö</value>
+  </data>
+  <data name="Delivery retriggered for message {0}." xml:space="preserve">
+    <value>Leveransen startades om för meddelande {0}.</value>
+  </data>
+  <data name="Destination _folder (on the server)" xml:space="preserve">
+    <value>Målmapp (på se_rvern)</value>
+  </data>
+  <data name="Diagnosing stalled mail" xml:space="preserve">
+    <value>Diagnos av post som fastnat</value>
+  </data>
+  <data name="Diagnostics" xml:space="preserve">
+    <value>Diagnostik</value>
+  </data>
+  <data name="Directory authentication (LDAP)" xml:space="preserve">
+    <value>Katalogautentisering (LDAP)</value>
+  </data>
+  <data name="Directory synchronisation" xml:space="preserve">
+    <value>Katalogsynkronisering</value>
+  </data>
+  <data name="Distribution lists" xml:space="preserve">
+    <value>Distributionslistor</value>
+  </data>
+  <data name="Domain" xml:space="preserve">
+    <value>Domän</value>
+  </data>
+  <data name="Domain (e.g. partner.com)" xml:space="preserve">
+    <value>Domän (t.ex. partner.com)</value>
+  </data>
+  <data name="Domain and target host are required." xml:space="preserve">
+    <value>Domän och målvärd krävs.</value>
+  </data>
+  <data name="Domains" xml:space="preserve">
+    <value>Domäner</value>
+  </data>
+  <data name="Domains &amp; accounts" xml:space="preserve">
+    <value>Domäner &amp; konton</value>
+  </data>
+  <data name="Dow_n" xml:space="preserve">
+    <value>N_er</value>
+  </data>
+  <data name="E-mail every account on the server at once - for maintenance announcements." xml:space="preserve">
+    <value>Skicka e-post till varje konto på servern på en gång - för underhållsmeddelanden.</value>
+  </data>
+  <data name="Ed_it action…" xml:space="preserve">
+    <value>Red_igera åtgärd…</value>
+  </data>
+  <data name="Edit" xml:space="preserve">
+    <value>Redigera</value>
+  </data>
+  <data name="Edit the event-handler script the server runs on delivery, logon and error events. The engine itself is switched on under Advanced." xml:space="preserve">
+    <value>Redigera händelseskriptet som servern kör vid leverans-, inloggnings- och felhändelser. Själva motorn slås på under Avancerat.</value>
+  </data>
+  <data name="Ena_ble / disable" xml:space="preserve">
+    <value>_Aktivera / inaktivera</value>
+  </data>
+  <data name="Enabled" xml:space="preserve">
+    <value>Aktiverad</value>
+  </data>
+  <data name="Encrypted key, no passphrase" xml:space="preserve">
+    <value>Krypterad nyckel, ingen lösenfras</value>
+  </data>
+  <data name="Enter a name for the new rule." xml:space="preserve">
+    <value>Ange ett namn för den nya regeln.</value>
+  </data>
+  <data name="Enter a valid domain name." xml:space="preserve">
+    <value>Ange ett giltigt domännamn.</value>
+  </data>
+  <data name="Enter a valid port number." xml:space="preserve">
+    <value>Ange ett giltigt portnummer.</value>
+  </data>
+  <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
+    <value>Ange sökvägen till säkerhetskopians XML-fil på servern.</value>
+  </data>
+  <data name="Envelope senders refused outright or scored - one address, or a whole domain with its subdomains." xml:space="preserve">
+    <value>Kuvertavsändare som avvisas direkt eller poängsätts - en adress, eller en hel domän med dess underdomäner.</value>
+  </data>
+  <data name="Event scripts" xml:space="preserve">
+    <value>Händelseskript</value>
+  </data>
+  <data name="Every spam check in the order the server runs them, what each adds to the score, and what that score then does to the message." xml:space="preserve">
+    <value>Varje skräppostkontroll i den ordning servern kör dem, vad var och en lägger till poängen, och vad den poängen sedan gör med meddelandet.</value>
+  </data>
+  <data name="Everything that decides whether a message is wanted." xml:space="preserve">
+    <value>Allt som avgör om ett meddelande är önskat.</value>
+  </data>
+  <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
+    <value>Allt den här servern behöver få gjort utanför sig själv - DNS-poster, nyckel- och CA-filer, betrodda listor - och läget för var och en.</value>
+  </data>
+  <data name="External setup" xml:space="preserve">
+    <value>Extern konfiguration</value>
+  </data>
+  <data name="Fetches the newer release's installer and verifies it against its Sigstore bundle before keeping it. The Control Panel waits while it does; an installer is tens of megabytes." xml:space="preserve">
+    <value>Hämtar den nyare versionens installationsprogram och verifierar det mot dess Sigstore-paket innan det behålls. Kontrollpanelen väntar under tiden; ett installationsprogram är tiotals megabyte.</value>
+  </data>
+  <data name="File-name patterns stripped from incoming messages regardless of what a scanner says." xml:space="preserve">
+    <value>Filnamnsmönster som tas bort från inkommande meddelanden oavsett vad en skanner säger.</value>
+  </data>
+  <data name="Forward e-mail" xml:space="preserve">
+    <value>Vidarebefordra e-post</value>
+  </data>
+  <data name="Found by search" xml:space="preserve">
+    <value>Hittad via sökning</value>
+  </data>
+  <data name="From" xml:space="preserve">
+    <value>Från</value>
+  </data>
+  <data name="Generate a strong password (copied to clipboard)" xml:space="preserve">
+    <value>Generera ett starkt lösenord (kopieras till urklipp)</value>
+  </data>
+  <data name="Generated password copied to clipboard — reveal it with the eye icon." xml:space="preserve">
+    <value>Genererat lösenord kopierat till urklipp — visa det med ögonikonen.</value>
+  </data>
+  <data name="Global rules" xml:space="preserve">
+    <value>Globala regler</value>
+  </data>
+  <data name="Go to the related page {0}" xml:space="preserve">
+    <value>Gå till den relaterade sidan {0}</value>
+  </data>
+  <data name="Greylisting white list" xml:space="preserve">
+    <value>Vitlista för gråstlistning</value>
+  </data>
+  <data name="Groups" xml:space="preserve">
+    <value>Grupper</value>
+  </data>
+  <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
+    <value>Lämnar över det verifierade installationsprogrammet till uppdateringshjälpen. Tjänsten stoppas och startas; om den inte kommer tillbaka installeras den tidigare versionen om. Resultatet rapporteras här när tjänsten är tillbaka.</value>
+  </data>
+  <data name="High" xml:space="preserve">
+    <value>Hög</value>
+  </data>
+  <data name="Host" xml:space="preserve">
+    <value>Värd</value>
+  </data>
+  <data name="Housekeeping, tuning, and the settings that still have no better home." xml:space="preserve">
+    <value>Underhåll, finjustering och de inställningar som ännu inte har något bättre hem.</value>
+  </data>
+  <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
+    <value>Hur konton bevisar vilka de är: lösenordshashning, OAuth2 / XOAUTH2 och krävda mekanismer.</value>
+  </data>
+  <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
+    <value>Hur post kommer in, vart den tar vägen sedan, och vad som händer med den på vägen.</value>
+  </data>
+  <data name="IF" xml:space="preserve">
+    <value>OM</value>
+  </data>
+  <data name="IMAP sessions" xml:space="preserve">
+    <value>IMAP-sessioner</value>
+  </data>
+  <data name="IP addresses exempt from the greylisting delay, for senders that will not retry." xml:space="preserve">
+    <value>IP-adresser undantagna från gråstlistningens fördröjning, för avsändare som inte försöker igen.</value>
+  </data>
+  <data name="IP range '{0}' allows external-to-external delivery without authentication (open relay risk)." xml:space="preserve">
+    <value>IP-intervallet '{0}' tillåter leverans från extern till extern utan autentisering (risk för öppet relä).</value>
+  </data>
+  <data name="IP ranges" xml:space="preserve">
+    <value>IP-intervall</value>
+  </data>
+  <data name="In queue" xml:space="preserve">
+    <value>I kö</value>
+  </data>
+  <data name="In queue, {0}" xml:space="preserve">
+    <value>I kö, {0}</value>
+  </data>
+  <data name="In queue, {0}. {1}: backlog." xml:space="preserve">
+    <value>I kö, {0}. {1}: eftersläpning.</value>
+  </data>
+  <data name="Incoming relays" xml:space="preserve">
+    <value>Inkommande reläer</value>
+  </data>
+  <data name="Info" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="Install the update now?&#10;&#10;The verified installer is handed to the update helper: the service stops, the new version is installed, and the service starts again. If it does not come back, the previous version is reinstalled. This Control Panel loses its connection while that happens; reconnect afterwards to see the outcome here." xml:space="preserve">
+    <value>Installera uppdateringen nu?
+
+Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen: tjänsten stoppas, den nya versionen installeras och tjänsten startas igen. Om den inte kommer tillbaka installeras den tidigare versionen om. Den här Kontrollpanelen tappar sin anslutning under tiden; anslut igen efteråt för att se resultatet här.</value>
+  </data>
+  <data name="Installing {0}: the service will stop and start" xml:space="preserve">
+    <value>Installerar {0}: tjänsten kommer att stoppas och startas</value>
+  </data>
+  <data name="Is mail flowing, and if it is not, where has it stopped?" xml:space="preserve">
+    <value>Flödar posten, och om inte, var har den stannat?</value>
+  </data>
+  <data name="Is transport security correct, and will it still be correct next month?" xml:space="preserve">
+    <value>Är transportsäkerheten korrekt, och kommer den fortfarande att vara det nästa månad?</value>
+  </data>
+  <data name="Issue and renew certificates automatically from Let's Encrypt or another ACME authority." xml:space="preserve">
+    <value>Utfärda och förnya certifikat automatiskt från Let's Encrypt eller en annan ACME-utfärdare.</value>
+  </data>
+  <data name="Keeping several generations of messages needs compression: without 'Compress destination files (zip)' every backup writes its message files into the same DataBackup folder, overwriting the previous run's, so retention can only keep generations of the small settings-and-domains archives." xml:space="preserve">
+    <value>Att behålla flera generationer av meddelanden kräver komprimering: utan 'Komprimera målfilerna (zip)' skriver varje säkerhetskopiering sina meddelandefiler till samma DataBackup-mapp och skriver över den förra körningens, så gallringen kan bara behålla generationer av de små arkiven med inställningar och domäner.</value>
+  </data>
+  <data name="Key matches certificate" xml:space="preserve">
+    <value>Nyckeln matchar certifikatet</value>
+  </data>
+  <data name="Key passphrase (only for an encrypted key)" xml:space="preserve">
+    <value>Nyckelns lösenfras (bara för en krypterad nyckel)</value>
+  </data>
+  <data name="Language" xml:space="preserve">
+    <value>Språk</value>
+  </data>
+  <data name="Last backup: {0} ({1})." xml:space="preserve">
+    <value>Senaste säkerhetskopiering: {0} ({1}).</value>
+  </data>
+  <data name="Last update: {0}. " xml:space="preserve">
+    <value>Senaste uppdatering: {0}. </value>
+  </data>
+  <data name="Listening" xml:space="preserve">
+    <value>Lyssnar</value>
+  </data>
+  <data name="Live" xml:space="preserve">
+    <value>Direkt</value>
+  </data>
+  <data name="Live counters and charts for processed mail, spam, viruses and sessions." xml:space="preserve">
+    <value>Direkträknare och diagram för behandlad post, skräppost, virus och sessioner.</value>
+  </data>
+  <data name="Live logs" xml:space="preserve">
+    <value>Direktloggar</value>
+  </data>
+  <data name="Live server statistics - last update {0}" xml:space="preserve">
+    <value>Serverstatistik i realtid - senast uppdaterad {0}</value>
+  </data>
+  <data name="Live server statistics, refreshed every 2 seconds." xml:space="preserve">
+    <value>Serverstatistik i realtid, uppdateras varannan sekund.</value>
+  </data>
+  <data name="Localhost is currently banned in the IP ranges." xml:space="preserve">
+    <value>Localhost är för närvarande spärrad i IP-intervallen.</value>
+  </data>
+  <data name="Location" xml:space="preserve">
+    <value>Plats</value>
+  </data>
+  <data name="Lock out an address that keeps failing to log on - and let one back in that should not have been locked out." xml:space="preserve">
+    <value>Stäng ute en adress som gång på gång misslyckas med att logga in - och släpp in en igen som inte borde ha stängts ute.</value>
+  </data>
+  <data name="Log folder not found on this machine (live logs need a local server)." xml:space="preserve">
+    <value>Loggmappen hittades inte på den här datorn (direktloggar kräver en lokal server).</value>
+  </data>
+  <data name="Logging" xml:space="preserve">
+    <value>Loggning</value>
+  </data>
+  <data name="Look up where e-mail for a domain is delivered, to check DNS before blaming the server." xml:space="preserve">
+    <value>Slå upp vart e-post för en domän levereras, för att kontrollera DNS innan servern får skulden.</value>
+  </data>
+  <data name="Lower IP" xml:space="preserve">
+    <value>Nedre IP</value>
+  </data>
+  <data name="Lower IP (e.g. 10.0.0.0)" xml:space="preserve">
+    <value>Nedre IP (t.ex. 10.0.0.0)</value>
+  </data>
+  <data name="MX query" xml:space="preserve">
+    <value>MX-uppslagning</value>
+  </data>
+  <data name="Mail flow &amp; delivery" xml:space="preserve">
+    <value>Postflöde &amp; leverans</value>
+  </data>
+  <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
+    <value>Post från en tom avsändaradress nekas. Många servrar skickar studsmeddelanden från &lt;&gt;, vilka kommer att avvisas.</value>
+  </data>
+  <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
+    <value>Posten rör sig inte och inget har kraschat: vilken halva som har fastnat, loggraderna som pekar ut orsaken, och inställningen som begränsar varje steg.</value>
+  </data>
+  <data name="Main navigation" xml:space="preserve">
+    <value>Huvudnavigering</value>
+  </data>
+  <data name="Maintenance" xml:space="preserve">
+    <value>Underhåll</value>
+  </data>
+  <data name="Manage the domains hosted by this server and their mailboxes." xml:space="preserve">
+    <value>Hantera domänerna som den här servern hyser och deras brevlådor.</value>
+  </data>
+  <data name="Match ALL criteria (AND)" xml:space="preserve">
+    <value>Matcha ALLA kriterier (OCH)</value>
+  </data>
+  <data name="Match ANY criterion (OR)" xml:space="preserve">
+    <value>Matcha NÅGOT kriterium (ELLER)</value>
+  </data>
+  <data name="Medium" xml:space="preserve">
+    <value>Medel</value>
+  </data>
+  <data name="Members" xml:space="preserve">
+    <value>Medlemmar</value>
+  </data>
+  <data name="Message metadata _only — do not copy the message files" xml:space="preserve">
+    <value>_Bara meddelandemetadata — kopiera inte meddelandefilerna</value>
+  </data>
+  <data name="Message size" xml:space="preserve">
+    <value>Meddelandestorlek</value>
+  </data>
+  <data name="Message trace" xml:space="preserve">
+    <value>Meddelandespårning</value>
+  </data>
+  <data name="Message {0} removed." xml:space="preserve">
+    <value>Meddelande {0} borttaget.</value>
+  </data>
+  <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
+    <value>Meddelanden som hålls för granskning i stället för att avvisas, och de två saker du kan göra med vart och ett: släppa det till mottagaren, eller ta bort det.</value>
+  </data>
+  <data name="Messages processed" xml:space="preserve">
+    <value>Behandlade meddelanden</value>
+  </data>
+  <data name="Messages still waiting to be delivered, why each is waiting, and when it will be retried." xml:space="preserve">
+    <value>Meddelanden som fortfarande väntar på leverans, varför vart och ett väntar, och när nästa försök görs.</value>
+  </data>
+  <data name="Messages waiting for delivery." xml:space="preserve">
+    <value>Meddelanden som väntar på leverans.</value>
+  </data>
+  <data name="Monitoring &amp; troubleshooting" xml:space="preserve">
+    <value>Övervakning &amp; felsökning</value>
+  </data>
+  <data name="More than {0} messages are waiting to be delivered." xml:space="preserve">
+    <value>Fler än {0} meddelanden väntar på leverans.</value>
+  </data>
+  <data name="Move _down" xml:space="preserve">
+    <value>Flytta _ned</value>
+  </data>
+  <data name="Move _up" xml:space="preserve">
+    <value>Flytta _upp</value>
+  </data>
+  <data name="Move to IMAP folder" xml:space="preserve">
+    <value>Flytta till IMAP-mapp</value>
+  </data>
+  <data name="Name" xml:space="preserve">
+    <value>Namn</value>
+  </data>
+  <data name="Name for the new certificate" xml:space="preserve">
+    <value>Namn på det nya certifikatet</value>
+  </data>
+  <data name="Name, certificate file and private key file are required." xml:space="preserve">
+    <value>Namn, certifikatfil och privat nyckelfil krävs.</value>
+  </data>
+  <data name="Name, lower IP and upper IP are required." xml:space="preserve">
+    <value>Namn, nedre IP och övre IP krävs.</value>
+  </data>
+  <data name="New passphrase" xml:space="preserve">
+    <value>Ny lösenfras</value>
+  </data>
+  <data name="New private key passphrase for the selected certificate" xml:space="preserve">
+    <value>Ny lösenfras för det valda certifikatets privata nyckel</value>
+  </data>
+  <data name="New rule name" xml:space="preserve">
+    <value>Namn på ny regel</value>
+  </data>
+  <data name="Next try" xml:space="preserve">
+    <value>Nästa försök</value>
+  </data>
+  <data name="No" xml:space="preserve">
+    <value>Nej</value>
+  </data>
+  <data name="No IP ranges defined yet." xml:space="preserve">
+    <value>Inga IP-intervall är definierade ännu.</value>
+  </data>
+  <data name="No active sessions" xml:space="preserve">
+    <value>Inga aktiva sessioner</value>
+  </data>
+  <data name="No aliases for this domain." xml:space="preserve">
+    <value>Inga alias för den här domänen.</value>
+  </data>
+  <data name="No backup has ever completed into {0} - there is no HMBackup archive there." xml:space="preserve">
+    <value>Ingen säkerhetskopiering har någonsin slutförts till {0} - det finns inget HMBackup-arkiv där.</value>
+  </data>
+  <data name="No certificates available yet." xml:space="preserve">
+    <value>Inga certifikat tillgängliga ännu.</value>
+  </data>
+  <data name="No configuration warnings." xml:space="preserve">
+    <value>Inga konfigurationsvarningar.</value>
+  </data>
+  <data name="No delivery activity yet" xml:space="preserve">
+    <value>Ingen leveransaktivitet ännu</value>
+  </data>
+  <data name="No destination folder is configured, so a backup has nowhere to go." xml:space="preserve">
+    <value>Ingen målmapp är konfigurerad, så en säkerhetskopia har ingenstans att ta vägen.</value>
+  </data>
+  <data name="No destination folder is configured, so the schedule above will skip every run until one is set." xml:space="preserve">
+    <value>Ingen målmapp är konfigurerad, så schemat ovan hoppar över varje körning tills en anges.</value>
+  </data>
+  <data name="No distribution lists for this domain." xml:space="preserve">
+    <value>Inga distributionslistor för den här domänen.</value>
+  </data>
+  <data name="No log files in {0} yet. Enable logging in the server settings." xml:space="preserve">
+    <value>Inga loggfiler i {0} ännu. Aktivera loggning i serverinställningarna.</value>
+  </data>
+  <data name="No passphrase needed" xml:space="preserve">
+    <value>Ingen lösenfras behövs</value>
+  </data>
+  <data name="No passphrase stored" xml:space="preserve">
+    <value>Ingen lösenfras sparad</value>
+  </data>
+  <data name="No ports configured." xml:space="preserve">
+    <value>Inga portar konfigurerade.</value>
+  </data>
+  <data name="No public host name is configured in the SMTP settings." xml:space="preserve">
+    <value>Inget publikt värdnamn är konfigurerat i SMTP-inställningarna.</value>
+  </data>
+  <data name="No routes defined yet." xml:space="preserve">
+    <value>Inga rutter definierade ännu.</value>
+  </data>
+  <data name="No rules defined yet - create one below." xml:space="preserve">
+    <value>Inga regler definierade ännu - skapa en nedan.</value>
+  </data>
+  <data name="No samples in this range yet" xml:space="preserve">
+    <value>Inga mätvärden i det här intervallet ännu</value>
+  </data>
+  <data name="No samples in this range yet: the server records one a minute and keeps {0} days." xml:space="preserve">
+    <value>Inga mätvärden i det här intervallet ännu: servern sparar ett i minuten och behåller {0} dagar.</value>
+  </data>
+  <data name="No schedule is configured, so no backup will ever run on its own. Backups happen only when someone clicks Start backup now." xml:space="preserve">
+    <value>Inget schema är konfigurerat, så ingen säkerhetskopiering körs någonsin av sig själv. Säkerhetskopior tas bara när någon klickar på Starta säkerhetskopiering nu.</value>
+  </data>
+  <data name="None" xml:space="preserve">
+    <value>Ingen</value>
+  </data>
+  <data name="Not checked" xml:space="preserve">
+    <value>Inte kontrollerad</value>
+  </data>
+  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
+    <value>Inte kontrollerad ännu (Sök efter uppdateringar, eller UpdateCheckEnabled=1 i hMailServer.INI för en daglig kontroll)</value>
+  </data>
+  <data name="Nothing needs action, but " xml:space="preserve">
+    <value>Inget behöver åtgärdas, men </value>
+  </data>
+  <data name="Nothing needs attention - all {0} external setup checks are done or not needed." xml:space="preserve">
+    <value>Inget behöver åtgärdas - alla {0} kontroller av extern konfiguration är klara eller behövs inte.</value>
+  </data>
+  <data name="OK" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="One configured port is not being listened on: " xml:space="preserve">
+    <value>En konfigurerad port lyssnas inte på: </value>
+  </data>
+  <data name="One point per {0}, from the {1}-day history the server keeps. Throughput is the change in the processed-messages total per minute." xml:space="preserve">
+    <value>En punkt per {0}, från den {1}-dagarshistorik servern behåller. Genomströmning är förändringen i totalen behandlade meddelanden per minut.</value>
+  </data>
+  <data name="Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before." xml:space="preserve">
+    <value>Behövs bara när nyckelfilen är krypterad: med en krypterad nyckel och ingen lösenfras läses nyckeln inte in (serverfel 6170) och ingen TLS-port som använder det här certifikatet startar - inkommande post på de portarna stannar. Lösenfrasen är en hemlighet: den lagras skyddad på servern och visas aldrig här igen, och att spara en ny ersätter vad som än var sparat tidigare.</value>
+  </data>
+  <data name="Open External setup, the full checklist of what this server needs done outside it" xml:space="preserve">
+    <value>Öppna Extern konfiguration, hela checklistan över vad den här servern behöver få gjort utanför sig själv</value>
+  </data>
+  <data name="Open {0}, which owns the settings for: {1}" xml:space="preserve">
+    <value>Öppna {0}, som äger inställningarna för: {1}</value>
+  </data>
+  <data name="PEM files (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|All files (*.*)|*.*" xml:space="preserve">
+    <value>PEM-filer (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|Alla filer (*.*)|*.*</value>
+  </data>
+  <data name="POP3 sessions" xml:space="preserve">
+    <value>POP3-sessioner</value>
+  </data>
+  <data name="Page content" xml:space="preserve">
+    <value>Sidinnehåll</value>
+  </data>
+  <data name="Passphrase" xml:space="preserve">
+    <value>Lösenfras</value>
+  </data>
+  <data name="Passphrase state unknown" xml:space="preserve">
+    <value>Lösenfrasens läge okänt</value>
+  </data>
+  <data name="Passphrase stored" xml:space="preserve">
+    <value>Lösenfras sparad</value>
+  </data>
+  <data name="Passphrase stored, key not encrypted" xml:space="preserve">
+    <value>Lösenfras sparad, nyckeln inte krypterad</value>
+  </data>
+  <data name="Password" xml:space="preserve">
+    <value>Lösenord</value>
+  </data>
+  <data name="Pause the mail server?&#10;&#10;No new connections will be accepted and no mail will be delivered until it is resumed. The Windows service keeps running, so this Control Panel stays connected." xml:space="preserve">
+    <value>Pausa e-postservern?
+
+Inga nya anslutningar tas emot och ingen post levereras förrän den återupptas. Windows-tjänsten fortsätter köra, så den här Kontrollpanelen förblir ansluten.</value>
+  </data>
+  <data name="Per-protocol limits and behaviour for SMTP, POP3 and IMAP." xml:space="preserve">
+    <value>Gränser och beteende per protokoll för SMTP, POP3 och IMAP.</value>
+  </data>
+  <data name="Performance" xml:space="preserve">
+    <value>Prestanda</value>
+  </data>
+  <data name="Permissions (select a range)" xml:space="preserve">
+    <value>Behörigheter (välj ett intervall)</value>
+  </data>
+  <data name="Permissions - {0}" xml:space="preserve">
+    <value>Behörigheter - {0}</value>
+  </data>
+  <data name="Permissions - {0} (saved)" xml:space="preserve">
+    <value>Behörigheter - {0} (sparade)</value>
+  </data>
+  <data name="Port" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="Pr_operties…" xml:space="preserve">
+    <value>_Egenskaper…</value>
+  </data>
+  <data name="Priority" xml:space="preserve">
+    <value>Prioritet</value>
+  </data>
+  <data name="Private _key passphrase" xml:space="preserve">
+    <value>Lösenfras för privat _nyckel</value>
+  </data>
+  <data name="Private key" xml:space="preserve">
+    <value>Privat nyckel</value>
+  </data>
+  <data name="Private key file" xml:space="preserve">
+    <value>Privat nyckelfil</value>
+  </data>
+  <data name="Private key file (PEM)" xml:space="preserve">
+    <value>Privat nyckelfil (PEM)</value>
+  </data>
+  <data name="Private key file for the new certificate" xml:space="preserve">
+    <value>Privat nyckelfil för det nya certifikatet</value>
+  </data>
+  <data name="Private key passphrase for the certificate being added" xml:space="preserve">
+    <value>Lösenfras för den privata nyckeln till certifikatet som läggs till</value>
+  </data>
+  <data name="Processed messages" xml:space="preserve">
+    <value>Behandlade meddelanden</value>
+  </data>
+  <data name="Properties" xml:space="preserve">
+    <value>Egenskaper</value>
+  </data>
+  <data name="Protocol" xml:space="preserve">
+    <value>Protokoll</value>
+  </data>
+  <data name="Protocols" xml:space="preserve">
+    <value>Protokoll</value>
+  </data>
+  <data name="Public folders" xml:space="preserve">
+    <value>Publika mappar</value>
+  </data>
+  <data name="Quarantine" xml:space="preserve">
+    <value>Karantän</value>
+  </data>
+  <data name="REST API keys" xml:space="preserve">
+    <value>REST API-nycklar</value>
+  </data>
+  <data name="Re-chec_k status" xml:space="preserve">
+    <value>Kontrollera status i_gen</value>
+  </data>
+  <data name="Re-read the schedule from hMailServer.ini and look at the destination folder again" xml:space="preserve">
+    <value>Läs om schemat från hMailServer.ini och titta på målmappen igen</value>
+  </data>
+  <data name="Re_fresh" xml:space="preserve">
+    <value>Uppdate_ra</value>
+  </data>
+  <data name="Re_move action" xml:space="preserve">
+    <value>Ta b_ort åtgärd</value>
+  </data>
+  <data name="Reads the project's release feed now and says whether a newer release exists. Nothing is downloaded or installed by this." xml:space="preserve">
+    <value>Läser projektets versionsflöde nu och säger om en nyare version finns. Inget hämtas eller installeras av detta.</value>
+  </data>
+  <data name="Recipient list" xml:space="preserve">
+    <value>Mottagarlista</value>
+  </data>
+  <data name="Recipients" xml:space="preserve">
+    <value>Mottagare</value>
+  </data>
+  <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
+    <value>Återansluten till {0} efter att tjänsten startade om.</value>
+  </data>
+  <data name="Related:" xml:space="preserve">
+    <value>Relaterat:</value>
+  </data>
+  <data name="Relaying to an upstream server, retry intervals, bounce handling and what happens to local mail." xml:space="preserve">
+    <value>Relä till en uppströmsserver, intervall mellan försök, hantering av studsmeddelanden och vad som händer med lokal post.</value>
+  </data>
+  <data name="Remove message {0} from the queue?" xml:space="preserve">
+    <value>Ta bort meddelande {0} från kön?</value>
+  </data>
+  <data name="Remove the stored passphrase for '{0}'? If the key file is encrypted, the key will stop loading at the next restart (server error 6170) and the TLS ports using this certificate will not start." xml:space="preserve">
+    <value>Ta bort den sparade lösenfrasen för '{0}'? Om nyckelfilen är krypterad slutar nyckeln läsas in vid nästa omstart (serverfel 6170) och TLS-portarna som använder det här certifikatet startar inte.</value>
+  </data>
+  <data name="Remove the stored private key passphrase from the selected certificate" xml:space="preserve">
+    <value>Ta bort den sparade lösenfrasen för den privata nyckeln från det valda certifikatet</value>
+  </data>
+  <data name="Replace ALL IP ranges with the defaults?&#10;&#10;Every custom range - including any auto-ban entries - will be removed and replaced with 'My computer' (127.0.0.1) and 'Internet' (everything else). This changes who may connect and relay, immediately." xml:space="preserve">
+    <value>Ersätt ALLA IP-intervall med standardvärdena?
+
+Varje eget intervall - inklusive eventuella automatiska spärrar - tas bort och ersätts med 'Min dator' (127.0.0.1) och 'Internet' (allt annat). Det ändrar omedelbart vem som får ansluta och reläa.</value>
+  </data>
+  <data name="Replace ALL configured ports with the defaults?&#10;&#10;SMTP 25 and 587, POP3 110, IMAP 143 - without connection security. TLS ports and custom bindings will be removed. The change takes effect when the server is restarted." xml:space="preserve">
+    <value>Ersätt ALLA konfigurerade portar med standardvärdena?
+
+SMTP 25 och 587, POP3 110, IMAP 143 - utan anslutningssäkerhet. TLS-portar och egna bindningar tas bort. Ändringen träder i kraft när servern startas om.</value>
+  </data>
+  <data name="Replaces every port with the standard set: SMTP 25 and 587, POP3 110, IMAP 143, all without connection security." xml:space="preserve">
+    <value>Ersätter varje port med standarduppsättningen: SMTP 25 och 587, POP3 110, IMAP 143, alla utan anslutningssäkerhet.</value>
+  </data>
+  <data name="Replaces every range with the standard two: 'My computer' (127.0.0.1) and 'Internet' (everything else)." xml:space="preserve">
+    <value>Ersätter varje intervall med de två standardintervallen: 'Min dator' (127.0.0.1) och 'Internet' (allt annat).</value>
+  </data>
+  <data name="Reply" xml:space="preserve">
+    <value>Svara</value>
+  </data>
+  <data name="Require _TLS for auth" xml:space="preserve">
+    <value>Kräv _TLS för autentisering</value>
+  </data>
+  <data name="Res_tore settings" xml:space="preserve">
+    <value>Å_terställ inställningar</value>
+  </data>
+  <data name="Restore" xml:space="preserve">
+    <value>Återställning</value>
+  </data>
+  <data name="Restore de_faults" xml:space="preserve">
+    <value>Återställ standar_d</value>
+  </data>
+  <data name="Restore dom_ains" xml:space="preserve">
+    <value>Återställ d_omäner</value>
+  </data>
+  <data name="Restore messa_ges" xml:space="preserve">
+    <value>Återställ m_eddelanden</value>
+  </data>
+  <data name="Restore started - runs in the background on the server." xml:space="preserve">
+    <value>Återställningen startade - körs i bakgrunden på servern.</value>
+  </data>
+  <data name="Restoring replaces current data for the selected categories with the backup contents.&#10;&#10;Continue?" xml:space="preserve">
+    <value>Återställning ersätter nuvarande data för de valda kategorierna med säkerhetskopians innehåll.
+
+Fortsätt?</value>
+  </data>
+  <data name="Retention" xml:space="preserve">
+    <value>Gallring</value>
+  </data>
+  <data name="Retries" xml:space="preserve">
+    <value>Försök</value>
+  </data>
+  <data name="Routes" xml:space="preserve">
+    <value>Rutter</value>
+  </data>
+  <data name="Rule operation failed: {0}" xml:space="preserve">
+    <value>Regeloperationen misslyckades: {0}</value>
+  </data>
+  <data name="Rules" xml:space="preserve">
+    <value>Regler</value>
+  </data>
+  <data name="Run script function" xml:space="preserve">
+    <value>Kör skriptfunktion</value>
+  </data>
+  <data name="Run the built-in connectivity and configuration checks, and read the last message-store consistency scan." xml:space="preserve">
+    <value>Kör de inbyggda anslutnings- och konfigurationskontrollerna, och läs den senaste konsistenskontrollen av meddelandelagret.</value>
+  </data>
+  <data name="Running" xml:space="preserve">
+    <value>Körs</value>
+  </data>
+  <data name="SMTP sessions" xml:space="preserve">
+    <value>SMTP-sessioner</value>
+  </data>
+  <data name="SSL certificates" xml:space="preserve">
+    <value>SSL-certifikat</value>
+  </data>
+  <data name="SSL/TLS" xml:space="preserve">
+    <value>SSL/TLS</value>
+  </data>
+  <data name="STARTTLS (optional)" xml:space="preserve">
+    <value>STARTTLS (valfritt)</value>
+  </data>
+  <data name="STARTTLS (required)" xml:space="preserve">
+    <value>STARTTLS (krävs)</value>
+  </data>
+  <data name="SURBL servers" xml:space="preserve">
+    <value>SURBL-servrar</value>
+  </data>
+  <data name="Sa_ve permissions" xml:space="preserve">
+    <value>Spara _behörigheter</value>
+  </data>
+  <data name="Save _passphrase" xml:space="preserve">
+    <value>Spara lösen_fras</value>
+  </data>
+  <data name="Save s_ettings" xml:space="preserve">
+    <value>S_para inställningar</value>
+  </data>
+  <data name="Save sc_hedule" xml:space="preserve">
+    <value>Spara sc_hema</value>
+  </data>
+  <data name="Save the private key passphrase for the selected certificate" xml:space="preserve">
+    <value>Spara lösenfrasen för det valda certifikatets privata nyckel</value>
+  </data>
+  <data name="Saved" xml:space="preserve">
+    <value>Sparat</value>
+  </data>
+  <data name="Scheduled backups" xml:space="preserve">
+    <value>Schemalagda säkerhetskopieringar</value>
+  </data>
+  <data name="ScheduledBackupTime '{0}' is not a valid 24-hour HH:MM time and no interval is set, so no scheduled backup will ever run." xml:space="preserve">
+    <value>ScheduledBackupTime '{0}' är inte en giltig tid i 24-timmarsformat HH:MM och inget intervall är angivet, så ingen schemalagd säkerhetskopiering körs någonsin.</value>
+  </data>
+  <data name="ScheduledBackupTime '{0}' is not a valid 24-hour HH:MM time, so the server falls back to the interval: one backup every {1} minute(s)." xml:space="preserve">
+    <value>ScheduledBackupTime '{0}' är inte en giltig tid i 24-timmarsformat HH:MM, så servern faller tillbaka på intervallet: en säkerhetskopiering var {1}:e minut.</value>
+  </data>
+  <data name="Schema" xml:space="preserve">
+    <value>Schema</value>
+  </data>
+  <data name="Scoped, expiring credentials for the REST API, so automation does not have to carry the administrator password." xml:space="preserve">
+    <value>Avgränsade, tidsbegränsade inloggningsuppgifter för REST API:et, så att automation inte behöver bära på administratörslösenordet.</value>
+  </data>
+  <data name="Scores and thresholds, SPF, DKIM and DMARC checks, greylisting, and SpamAssassin." xml:space="preserve">
+    <value>Poäng och trösklar, SPF-, DKIM- och DMARC-kontroller, gråstlistning och SpamAssassin.</value>
+  </data>
+  <data name="Search" xml:space="preserve">
+    <value>Sök</value>
+  </data>
+  <data name="Search IP ranges" xml:space="preserve">
+    <value>Sök IP-intervall</value>
+  </data>
+  <data name="Search IP ranges..." xml:space="preserve">
+    <value>Sök IP-intervall...</value>
+  </data>
+  <data name="Search accounts" xml:space="preserve">
+    <value>Sök konton</value>
+  </data>
+  <data name="Search accounts..." xml:space="preserve">
+    <value>Sök konton...</value>
+  </data>
+  <data name="Search certificates" xml:space="preserve">
+    <value>Sök certifikat</value>
+  </data>
+  <data name="Search certificates..." xml:space="preserve">
+    <value>Sök certifikat...</value>
+  </data>
+  <data name="Search domains" xml:space="preserve">
+    <value>Sök domäner</value>
+  </data>
+  <data name="Search domains..." xml:space="preserve">
+    <value>Sök domäner...</value>
+  </data>
+  <data name="Search pages, settings and tasks (Ctrl+K)" xml:space="preserve">
+    <value>Sök sidor, inställningar och uppgifter (Ctrl+K)</value>
+  </data>
+  <data name="Search pages, settings and tasks. Keyboard shortcut Control K." xml:space="preserve">
+    <value>Sök sidor, inställningar och uppgifter. Kortkommando Control K.</value>
+  </data>
+  <data name="Search ports" xml:space="preserve">
+    <value>Sök portar</value>
+  </data>
+  <data name="Search ports..." xml:space="preserve">
+    <value>Sök portar...</value>
+  </data>
+  <data name="Search queue..." xml:space="preserve">
+    <value>Sök i kön...</value>
+  </data>
+  <data name="Search routes" xml:space="preserve">
+    <value>Sök rutter</value>
+  </data>
+  <data name="Search routes..." xml:space="preserve">
+    <value>Sök rutter...</value>
+  </data>
+  <data name="Search rules" xml:space="preserve">
+    <value>Sök regler</value>
+  </data>
+  <data name="Search rules..." xml:space="preserve">
+    <value>Sök regler...</value>
+  </data>
+  <data name="Search the delivery queue" xml:space="preserve">
+    <value>Sök i leveranskön</value>
+  </data>
+  <data name="Security" xml:space="preserve">
+    <value>Säkerhet</value>
+  </data>
+  <data name="Security groups, so shared-folder permissions can be granted to several accounts at once." xml:space="preserve">
+    <value>Säkerhetsgrupper, så att behörigheter till delade mappar kan ges till flera konton på en gång.</value>
+  </data>
+  <data name="Select a domain" xml:space="preserve">
+    <value>Välj en domän</value>
+  </data>
+  <data name="Select a domain to see its aliases." xml:space="preserve">
+    <value>Välj en domän för att se dess alias.</value>
+  </data>
+  <data name="Select a domain to see its distribution lists." xml:space="preserve">
+    <value>Välj en domän för att se dess distributionslistor.</value>
+  </data>
+  <data name="Select a message first." xml:space="preserve">
+    <value>Välj ett meddelande först.</value>
+  </data>
+  <data name="Select a port first." xml:space="preserve">
+    <value>Välj en port först.</value>
+  </data>
+  <data name="Select a range first." xml:space="preserve">
+    <value>Välj ett intervall först.</value>
+  </data>
+  <data name="Select a route first." xml:space="preserve">
+    <value>Välj en rutt först.</value>
+  </data>
+  <data name="Select a rule first." xml:space="preserve">
+    <value>Välj en regel först.</value>
+  </data>
+  <data name="Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories." xml:space="preserve">
+    <value>Välj XML-filen som skapades av en tidigare säkerhetskopiering (i målmappen). Innehållet ersätter nuvarande data för de valda kategorierna.</value>
+  </data>
+  <data name="Send using route" xml:space="preserve">
+    <value>Skicka via rutt</value>
+  </data>
+  <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
+    <value>Avsändare och IP-intervall som helt kringgår skräppostskyddet.</value>
+  </data>
+  <data name="Server" xml:space="preserve">
+    <value>Server</value>
+  </data>
+  <data name="Server (localhost)" xml:space="preserve">
+    <value>Server (localhost)</value>
+  </data>
+  <data name="Server limits &amp; expert settings" xml:space="preserve">
+    <value>Servergränser &amp; expertinställningar</value>
+  </data>
+  <data name="Server messages" xml:space="preserve">
+    <value>Servermeddelanden</value>
+  </data>
+  <data name="Server sendout" xml:space="preserve">
+    <value>Serverutskick</value>
+  </data>
+  <data name="Server status" xml:space="preserve">
+    <value>Serverstatus</value>
+  </data>
+  <data name="Server unavailable" xml:space="preserve">
+    <value>Servern är inte tillgänglig</value>
+  </data>
+  <data name="Server, database and health overview." xml:space="preserve">
+    <value>Översikt över server, databas och hälsa.</value>
+  </data>
+  <data name="Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature." xml:space="preserve">
+    <value>Serverövergripande tak, hållbarhet och missbrukskontroller som inte hör till något enskilt protokoll eller någon enskild funktion.</value>
+  </data>
+  <data name="Server-wide message rules, evaluated top to bottom." xml:space="preserve">
+    <value>Serverövergripande meddelanderegler, utvärderade uppifrån och ned.</value>
+  </data>
+  <data name="Server-wide rules that inspect messages as they arrive and act on them." xml:space="preserve">
+    <value>Serverövergripande regler som granskar meddelanden när de kommer in och agerar på dem.</value>
+  </data>
+  <data name="Set header value" xml:space="preserve">
+    <value>Sätt rubrikvärde</value>
+  </data>
+  <data name="Set up two-factor authentication…" xml:space="preserve">
+    <value>Konfigurera tvåfaktorsautentisering…</value>
+  </data>
+  <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
+    <value>Delade IMAP-mappar, och vilka konton eller grupper som får läsa och skriva i var och en.</value>
+  </data>
+  <data name="Show" xml:space="preserve">
+    <value>Visa</value>
+  </data>
+  <data name="Show the Control Panel in {0}? It restarts to change language." xml:space="preserve">
+    <value>Visa Kontrollpanelen på {0}? Den startar om för att byta språk.</value>
+  </data>
+  <data name="Show the group {0} in the navigation" xml:space="preserve">
+    <value>Visa gruppen {0} i navigeringen</value>
+  </data>
+  <data name="Show {0}" xml:space="preserve">
+    <value>Visa {0}</value>
+  </data>
+  <data name="Show {0} in the navigation" xml:space="preserve">
+    <value>Visa {0} i navigeringen</value>
+  </data>
+  <data name="Sign in with the hMailServer administrator credential." xml:space="preserve">
+    <value>Logga in med hMailServers administratörsuppgifter.</value>
+  </data>
+  <data name="Sign-in cancelled." xml:space="preserve">
+    <value>Inloggningen avbröts.</value>
+  </data>
+  <data name="Signing in…" xml:space="preserve">
+    <value>Loggar in…</value>
+  </data>
+  <data name="Spam &amp; virus filtering" xml:space="preserve">
+    <value>Skräppost- &amp; virusfiltrering</value>
+  </data>
+  <data name="Spam blocked" xml:space="preserve">
+    <value>Skräppost blockerad</value>
+  </data>
+  <data name="Spam filtering overview" xml:space="preserve">
+    <value>Översikt över skräppostfiltrering</value>
+  </data>
+  <data name="Spam removed" xml:space="preserve">
+    <value>Skräppost borttagen</value>
+  </data>
+  <data name="Start _backup now" xml:space="preserve">
+    <value>Starta säkerhetskopiering _nu</value>
+  </data>
+  <data name="Start _restore" xml:space="preserve">
+    <value>_Starta återställning</value>
+  </data>
+  <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
+    <value>Börja här: hoppa direkt till en vanlig uppgift, eller tryck Ctrl+K och beskriv vad du vill göra.</value>
+  </data>
+  <data name="Started" xml:space="preserve">
+    <value>Startad</value>
+  </data>
+  <data name="Starting" xml:space="preserve">
+    <value>Startar</value>
+  </data>
+  <data name="State" xml:space="preserve">
+    <value>Läge</value>
+  </data>
+  <data name="Statistics" xml:space="preserve">
+    <value>Statistik</value>
+  </data>
+  <data name="Stop rule processing" xml:space="preserve">
+    <value>Stoppa regelbehandling</value>
+  </data>
+  <data name="Stopped" xml:space="preserve">
+    <value>Stoppad</value>
+  </data>
+  <data name="Stopping" xml:space="preserve">
+    <value>Stoppar</value>
+  </data>
+  <data name="Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed." xml:space="preserve">
+    <value>Stoppar e-postserverns motor medan Windows-tjänsten fortsätter köra: inga nya anslutningar tas emot och inget levereras förrän den återupptas.</value>
+  </data>
+  <data name="Stored in hMailServer.ini as ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays. The service reads them when it starts, so changes here apply after a service restart." xml:space="preserve">
+    <value>Lagras i hMailServer.ini som ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount och ScheduledBackupMaxAgeDays. Tjänsten läser dem när den startar, så ändringar här gäller efter en omstart av tjänsten.</value>
+  </data>
+  <data name="Stream the server log as it is written - the fastest way to see what happened to one message." xml:space="preserve">
+    <value>Strömma serverloggen medan den skrivs - det snabbaste sättet att se vad som hände med ett meddelande.</value>
+  </data>
+  <data name="Streaming the server log in real time." xml:space="preserve">
+    <value>Strömmar serverloggen i realtid.</value>
+  </data>
+  <data name="Streaming {0}" xml:space="preserve">
+    <value>Strömmar {0}</value>
+  </data>
+  <data name="Subject" xml:space="preserve">
+    <value>Ämne</value>
+  </data>
+  <data name="Switch to the dark theme" xml:space="preserve">
+    <value>Byt till det mörka temat</value>
+  </data>
+  <data name="Switch to the light theme" xml:space="preserve">
+    <value>Byt till det ljusa temat</value>
+  </data>
+  <data name="TCP/IP ports" xml:space="preserve">
+    <value>TCP/IP-portar</value>
+  </data>
+  <data name="THEN" xml:space="preserve">
+    <value>DÅ</value>
+  </data>
+  <data name="TLS &amp; certificates" xml:space="preserve">
+    <value>TLS &amp; certifikat</value>
+  </data>
+  <data name="Target SMTP host" xml:space="preserve">
+    <value>SMTP-målvärd</value>
+  </data>
+  <data name="Target host" xml:space="preserve">
+    <value>Målvärd</value>
+  </data>
+  <data name="The REST API, Prometheus metrics and health endpoints an outside monitoring system reads." xml:space="preserve">
+    <value>REST API:et, Prometheus-mätvärdena och hälsoslutpunkterna som ett externt övervakningssystem läser.</value>
+  </data>
+  <data name="The addresses and ports each protocol listens on, and the connection security used on each." xml:space="preserve">
+    <value>Adresserna och portarna varje protokoll lyssnar på, och anslutningssäkerheten som används på var och en.</value>
+  </data>
+  <data name="The built-in HTTP listener: Autodiscover, autoconfig, the MTA-STS policy and ACME challenges." xml:space="preserve">
+    <value>Den inbyggda HTTP-lyssnaren: Autodiscover, autoconfig, MTA-STS-policyn och ACME-utmaningar.</value>
+  </data>
+  <data name="The certificates this server presents, which port uses which, and when each expires." xml:space="preserve">
+    <value>Certifikaten den här servern presenterar, vilken port som använder vilket, och när vart och ett går ut.</value>
+  </data>
+  <data name="The delivery queue is empty." xml:space="preserve">
+    <value>Leveranskön är tom.</value>
+  </data>
+  <data name="The exact SPF, DKIM, DMARC, MTA-STS and TLS-RPT records each domain should publish, with a check for whether each one is live." xml:space="preserve">
+    <value>Exakt de SPF-, DKIM-, DMARC-, MTA-STS- och TLS-RPT-poster varje domän bör publicera, med en kontroll av om var och en är i drift.</value>
+  </data>
+  <data name="The external setup could not be checked - not connected to the server." xml:space="preserve">
+    <value>Den externa konfigurationen kunde inte kontrolleras - inte ansluten till servern.</value>
+  </data>
+  <data name="The external setup could not be checked - {0}" xml:space="preserve">
+    <value>Den externa konfigurationen kunde inte kontrolleras - {0}</value>
+  </data>
+  <data name="The greeting, bounce and error texts the server sends back to clients." xml:space="preserve">
+    <value>Hälsnings-, studs- och feltexterna som servern skickar tillbaka till klienter.</value>
+  </data>
+  <data name="The key file is encrypted and no passphrase is stored, so the key will not load (server error 6170) and every TLS port using this certificate will not start - inbound mail on those ports stops. Enter the passphrase below, or replace the file with an unencrypted key." xml:space="preserve">
+    <value>Nyckelfilen är krypterad och ingen lösenfras är sparad, så nyckeln läses inte in (serverfel 6170) och ingen TLS-port som använder det här certifikatet startar - inkommande post på de portarna stannar. Ange lösenfrasen nedan, eller ersätt filen med en okrypterad nyckel.</value>
+  </data>
+  <data name="The key file is not encrypted, so no passphrase is needed and none is stored." xml:space="preserve">
+    <value>Nyckelfilen är inte krypterad, så ingen lösenfras behövs och ingen är sparad.</value>
+  </data>
+  <data name="The language could not be saved: {0}" xml:space="preserve">
+    <value>Språket kunde inte sparas: {0}</value>
+  </data>
+  <data name="The last update step failed: {0}" xml:space="preserve">
+    <value>Det senaste uppdateringssteget misslyckades: {0}</value>
+  </data>
+  <data name="The people and the domains this server carries mail for." xml:space="preserve">
+    <value>Människorna och domänerna som den här servern hanterar post för.</value>
+  </data>
+  <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
+    <value>Portarna varje protokoll lyssnar på, deras bindningsadress och anslutningssäkerhet. Tjänsten måste startas om efter ändringar. Kolumnen Lyssnar läses från den här datorns öppna portar, inte från konfigurationen, så den visar vad som faktiskt händer snarare än vad som begärdes.</value>
+  </data>
+  <data name="The private key file is encrypted (passphrase-protected) and no passphrase was entered. The certificate will be added, but its key will not load (server error 6170) and the TLS ports using it will not start until the passphrase is saved.&#10;&#10;Add it anyway?" xml:space="preserve">
+    <value>Den privata nyckelfilen är krypterad (skyddad med lösenfras) och ingen lösenfras angavs. Certifikatet läggs till, men dess nyckel läses inte in (serverfel 6170) och TLS-portarna som använder det startar inte förrän lösenfrasen har sparats.
+
+Lägg till det ändå?</value>
+  </data>
+  <data name="The server administration password, and who is allowed to use these tools at all." xml:space="preserve">
+    <value>Serverns administrationslösenord, och vem som över huvud taget får använda de här verktygen.</value>
+  </data>
+  <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
+    <value>Servern sparar ingen historik: MetricsHistoryDays är 0 i hMailServer.ini. Sätt det till antalet dagar att behålla och starta om tjänsten.</value>
+  </data>
+  <data name="The server state could not be changed: {0}" xml:space="preserve">
+    <value>Serverns läge kunde inte ändras: {0}</value>
+  </data>
+  <data name="The update step could not be run: {0}" xml:space="preserve">
+    <value>Uppdateringssteget kunde inte köras: {0}</value>
+  </data>
+  <data name="The verification code is incorrect." xml:space="preserve">
+    <value>Verifieringskoden är felaktig.</value>
+  </data>
+  <data name="There is a total of {0} auto-ban IP range(s)." xml:space="preserve">
+    <value>Det finns totalt {0} automatiskt spärrade IP-intervall.</value>
+  </data>
+  <data name="This entry was not checked." xml:space="preserve">
+    <value>Den här posten kontrollerades inte.</value>
+  </data>
+  <data name="This is the latest release" xml:space="preserve">
+    <value>Det här är den senaste versionen</value>
+  </data>
+  <data name="This key file is encrypted (passphrase-protected). Enter its passphrase in the box below before adding, or the key will not load (server error 6170) and the TLS ports using this certificate will not start." xml:space="preserve">
+    <value>Den här nyckelfilen är krypterad (skyddad med lösenfras). Ange dess lösenfras i rutan nedan innan du lägger till, annars läses nyckeln inte in (serverfel 6170) och TLS-portarna som använder det här certifikatet startar inte.</value>
+  </data>
+  <data name="Thread counts, database connections and caching - what to change when the server is slow." xml:space="preserve">
+    <value>Antal trådar, databasanslutningar och cachning - vad som ska ändras när servern är långsam.</value>
+  </data>
+  <data name="To" xml:space="preserve">
+    <value>Till</value>
+  </data>
+  <data name="Transport encryption overview" xml:space="preserve">
+    <value>Översikt över transportkryptering</value>
+  </data>
+  <data name="Transport security" xml:space="preserve">
+    <value>Transportsäkerhet</value>
+  </data>
+  <data name="Tries" xml:space="preserve">
+    <value>Försök</value>
+  </data>
+  <data name="Two-factor authentication" xml:space="preserve">
+    <value>Tvåfaktorsautentisering</value>
+  </data>
+  <data name="Type" xml:space="preserve">
+    <value>Typ</value>
+  </data>
+  <data name="Type the new passphrase first. To remove the stored one, use &quot;Remove stored passphrase&quot;." xml:space="preserve">
+    <value>Skriv den nya lösenfrasen först. Använd "Ta bort sparad lösenfras" för att ta bort den sparade.</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Okänd</value>
+  </data>
+  <data name="Update" xml:space="preserve">
+    <value>Uppdatering</value>
+  </data>
+  <data name="Upper IP" xml:space="preserve">
+    <value>Övre IP</value>
+  </data>
+  <data name="Upper IP (e.g. 10.0.0.255)" xml:space="preserve">
+    <value>Övre IP (t.ex. 10.0.0.255)</value>
+  </data>
+  <data name="Upstream gateways whose IP address must not be treated as the connecting client in spam checks." xml:space="preserve">
+    <value>Uppströms-gateways vars IP-adress inte får behandlas som den anslutande klienten i skräppostkontroller.</value>
+  </data>
+  <data name="Uptime" xml:space="preserve">
+    <value>Drifttid</value>
+  </data>
+  <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
+    <value>Används när ingen daglig tid är angiven. Intervallet mäts mot det nyaste arkivet i målmappen, så det överlever omstarter av tjänsten; om målmappen inte innehåller någon säkerhetskopia alls tas den första ungefär en minut efter att tjänsten startat.</value>
+  </data>
+  <data name="User name" xml:space="preserve">
+    <value>Användarnamn</value>
+  </data>
+  <data name="Version" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="Version, build, licence and where to get support." xml:space="preserve">
+    <value>Version, bygge, licens och var man får support.</value>
+  </data>
+  <data name="Virus scanning overview" xml:space="preserve">
+    <value>Översikt över virusskanning</value>
+  </data>
+  <data name="Viruses removed" xml:space="preserve">
+    <value>Virus borttagna</value>
+  </data>
+  <data name="Warnings" xml:space="preserve">
+    <value>Varningar</value>
+  </data>
+  <data name="Web services &amp; autoconfiguration" xml:space="preserve">
+    <value>Webbtjänster &amp; automatisk konfiguration</value>
+  </data>
+  <data name="Welcome" xml:space="preserve">
+    <value>Välkommen</value>
+  </data>
+  <data name="What every listener protects, which certificate it presents and when that expires, and what can still be negotiated." xml:space="preserve">
+    <value>Vad varje lyssnare skyddar, vilket certifikat den presenterar och när det går ut, och vad som fortfarande kan förhandlas.</value>
+  </data>
+  <data name="What happened to a particular message - searchable by sender or recipient, instead of grepping logs." xml:space="preserve">
+    <value>Vad som hände med ett visst meddelande - sökbart på avsändare eller mottagare, i stället för att leta i loggar.</value>
+  </data>
+  <data name="Whether a passphrase is stored could not be read - reading it requires the server-administrator account. Saving a new one from here still works." xml:space="preserve">
+    <value>Om en lösenfras är sparad kunde inte läsas - det kräver serveradministratörskontot. Att spara en ny härifrån fungerar ändå.</value>
+  </data>
+  <data name="Whether the key file needs one cannot be checked from here. If it is encrypted, it will not load without a passphrase (server error 6170) and the TLS ports using this certificate will not start." xml:space="preserve">
+    <value>Om nyckelfilen behöver en kan inte kontrolleras härifrån. Om den är krypterad läses den inte in utan lösenfras (serverfel 6170) och TLS-portarna som använder det här certifikatet startar inte.</value>
+  </data>
+  <data name="Which TLS versions and ciphers this server will negotiate, and whether it verifies the certificate of the server it delivers to." xml:space="preserve">
+    <value>Vilka TLS-versioner och chiffer den här servern förhandlar, och om den verifierar certifikatet hos servern den levererar till.</value>
+  </data>
+  <data name="Which addresses may connect, which may relay without authenticating, and which must authenticate first." xml:space="preserve">
+    <value>Vilka adresser som får ansluta, vilka som får reläa utan att autentisera, och vilka som måste autentisera först.</value>
+  </data>
+  <data name="Which log files the server writes, how much detail they carry, and how long they are kept." xml:space="preserve">
+    <value>Vilka loggfiler servern skriver, hur detaljerade de är, och hur länge de behålls.</value>
+  </data>
+  <data name="Which name servers the server asks, and whether answers are DNSSEC validated." xml:space="preserve">
+    <value>Vilka namnservrar servern frågar, och om svaren DNSSEC-valideras.</value>
+  </data>
+  <data name="Which scanners can actually run, what size of message is scanned, and what happens to one that is found to be infected." xml:space="preserve">
+    <value>Vilka skannrar som faktiskt kan köras, hur stora meddelanden som skannas, och vad som händer med ett som visar sig vara infekterat.</value>
+  </data>
+  <data name="Which services are running, who is connected right now, and how long the server has been up." xml:space="preserve">
+    <value>Vilka tjänster som körs, vem som är ansluten just nu, och hur länge servern har varit uppe.</value>
+  </data>
+  <data name="Which services listen, on what, and how clients reach them." xml:space="preserve">
+    <value>Vilka tjänster som lyssnar, på vad, och hur klienter når dem.</value>
+  </data>
+  <data name="White list" xml:space="preserve">
+    <value>Vitlista</value>
+  </data>
+  <data name="Who may connect, who may authenticate, and what happens when someone keeps trying." xml:space="preserve">
+    <value>Vem som får ansluta, vem som får autentisera, och vad som händer när någon fortsätter försöka.</value>
+  </data>
+  <data name="Windows display language" xml:space="preserve">
+    <value>Windows visningsspråk</value>
+  </data>
+  <data name="Yes" xml:space="preserve">
+    <value>Ja</value>
+  </data>
+  <data name="You arrived here from the search palette" xml:space="preserve">
+    <value>Du kom hit från sökpaletten</value>
+  </data>
+  <data name="_Add" xml:space="preserve">
+    <value>_Lägg till</value>
+  </data>
+  <data name="_Add domain" xml:space="preserve">
+    <value>Lägg till _domän</value>
+  </data>
+  <data name="_Add rule" xml:space="preserve">
+    <value>_Lägg till regel</value>
+  </data>
+  <data name="_Clear" xml:space="preserve">
+    <value>Re_nsa</value>
+  </data>
+  <data name="_Compress destination files (zip)" xml:space="preserve">
+    <value>_Komprimera målfilerna (zip)</value>
+  </data>
+  <data name="_Connect" xml:space="preserve">
+    <value>_Anslut</value>
+  </data>
+  <data name="_Create account" xml:space="preserve">
+    <value>Skapa _konto</value>
+  </data>
+  <data name="_Delete selected" xml:space="preserve">
+    <value>_Ta bort valda</value>
+  </data>
+  <data name="_Deliver now" xml:space="preserve">
+    <value>_Leverera nu</value>
+  </data>
+  <data name="_Deliver remote → local" xml:space="preserve">
+    <value>Leverera fjärr → lo_kalt</value>
+  </data>
+  <data name="_Download update" xml:space="preserve">
+    <value>_Hämta uppdatering</value>
+  </data>
+  <data name="_Edit criterion…" xml:space="preserve">
+    <value>_Redigera kriterium…</value>
+  </data>
+  <data name="_External setup…" xml:space="preserve">
+    <value>_Extern konfiguration…</value>
+  </data>
+  <data name="_Generate" xml:space="preserve">
+    <value>_Generera</value>
+  </data>
+  <data name="_Install update" xml:space="preserve">
+    <value>_Installera uppdatering</value>
+  </data>
+  <data name="_Language" xml:space="preserve">
+    <value>_Språk</value>
+  </data>
+  <data name="_Pause" xml:space="preserve">
+    <value>_Pausa</value>
+  </data>
+  <data name="_Properties" xml:space="preserve">
+    <value>Egenska_per</value>
+  </data>
+  <data name="_Refresh" xml:space="preserve">
+    <value>Upp_datera</value>
+  </data>
+  <data name="_Reload" xml:space="preserve">
+    <value>Ladda _om</value>
+  </data>
+  <data name="_Remove" xml:space="preserve">
+    <value>Ta _bort</value>
+  </data>
+  <data name="_Remove criterion" xml:space="preserve">
+    <value>Ta _bort kriterium</value>
+  </data>
+  <data name="_Remove stored passphrase" xml:space="preserve">
+    <value>Ta bort sparad lösenfra_s</value>
+  </data>
+  <data name="_Restore defaults" xml:space="preserve">
+    <value>Återställ standa_rd</value>
+  </data>
+  <data name="_Resume" xml:space="preserve">
+    <value>_Återuppta</value>
+  </data>
+  <data name="_Save changes" xml:space="preserve">
+    <value>_Spara ändringar</value>
+  </data>
+  <data name="_Verify each backup by extracting its message store and reconciling it against the rows" xml:space="preserve">
+    <value>_Verifiera varje säkerhetskopia genom att packa upp dess meddelandelager och stämma av det mot raderna</value>
+  </data>
+  <data name="_View source" xml:space="preserve">
+    <value>_Visa källa</value>
+  </data>
+  <data name="contains" xml:space="preserve">
+    <value>innehåller</value>
+  </data>
+  <data name="does not contain" xml:space="preserve">
+    <value>innehåller inte</value>
+  </data>
+  <data name="does not equal" xml:space="preserve">
+    <value>är inte lika med</value>
+  </data>
+  <data name="equals" xml:space="preserve">
+    <value>är lika med</value>
+  </data>
+  <data name="hMailServer Control Panel" xml:space="preserve">
+    <value>hMailServer Kontrollpanel</value>
+  </data>
+  <data name="hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart." xml:space="preserve">
+    <value>Inställningen BackupMessagesDBOnly i hMailServer.ini. Säkerhetskopian registrerar då vilka meddelanden som finns men inte deras innehåll, och en återställning förväntar sig att filerna fortfarande finns i datamappen. Gäller säkerhetskopiering och återställning, efter en omstart av tjänsten.</value>
+  </data>
+  <data name="hMailServer.ini setting BackupVerifyRestore, on by default. After the archive is written its message store is extracted to the temp folder through the same code a restore uses, held to exactly the files the backup staged, and every message row is checked for its file; the result is in the backup log. The store exists twice while it runs, so turn it off for a store the temp volume cannot hold. Applies after a service restart." xml:space="preserve">
+    <value>Inställningen BackupVerifyRestore i hMailServer.ini, på som standard. När arkivet har skrivits packas dess meddelandelager upp till temp-mappen med samma kod som en återställning använder, hålls till exakt de filer säkerhetskopian samlade, och varje meddelanderad kontrolleras mot sin fil; resultatet finns i säkerhetskopieringsloggen. Lagret finns två gånger medan det körs, så stäng av det för ett lager som temp-volymen inte rymmer. Gäller efter en omstart av tjänsten.</value>
+  </data>
+  <data name="hMailServer.ini was not found on this machine, so BackupMessagesDBOnly can only be changed on the server itself." xml:space="preserve">
+    <value>hMailServer.ini hittades inte på den här datorn, så BackupMessagesDBOnly kan bara ändras på själva servern.</value>
+  </data>
+  <data name="hMailServer.ini was not found on this machine, so BackupVerifyRestore can only be changed on the server itself." xml:space="preserve">
+    <value>hMailServer.ini hittades inte på den här datorn, så BackupVerifyRestore kan bara ändras på själva servern.</value>
+  </data>
+  <data name="header '{0}'" xml:space="preserve">
+    <value>rubriken '{0}'</value>
+  </data>
+  <data name="hour" xml:space="preserve">
+    <value>timme</value>
+  </data>
+  <data name="inactive" xml:space="preserve">
+    <value>inaktiv</value>
+  </data>
+  <data name="is greater than" xml:space="preserve">
+    <value>är större än</value>
+  </data>
+  <data name="is less than" xml:space="preserve">
+    <value>är mindre än</value>
+  </data>
+  <data name="its 1 account" xml:space="preserve">
+    <value>dess 1 konto</value>
+  </data>
+  <data name="its {0} accounts" xml:space="preserve">
+    <value>dess {0} konton</value>
+  </data>
+  <data name="less than a minute ago" xml:space="preserve">
+    <value>för mindre än en minut sedan</value>
+  </data>
+  <data name="matches regex" xml:space="preserve">
+    <value>matchar reguljärt uttryck</value>
+  </data>
+  <data name="matches wildcard" xml:space="preserve">
+    <value>matchar jokertecken</value>
+  </data>
+  <data name="minute" xml:space="preserve">
+    <value>minut</value>
+  </data>
+  <data name="ten minutes" xml:space="preserve">
+    <value>tio minuter</value>
+  </data>
+  <data name="the certificate no longer exists - reload the page." xml:space="preserve">
+    <value>certifikatet finns inte längre - ladda om sidan.</value>
+  </data>
+  <data name="{0} (inactive)" xml:space="preserve">
+    <value>{0} (inaktiv)</value>
+  </data>
+  <data name="{0} - accounts" xml:space="preserve">
+    <value>{0} - konton</value>
+  </data>
+  <data name="{0} DNS records are still being checked in the background; this summary will update." xml:space="preserve">
+    <value>{0} DNS-poster kontrolleras fortfarande i bakgrunden; den här sammanfattningen uppdateras.</value>
+  </data>
+  <data name="{0} configured ports are not being listened on: " xml:space="preserve">
+    <value>{0} konfigurerade portar lyssnas inte på: </value>
+  </data>
+  <data name="{0} days ago" xml:space="preserve">
+    <value>{0} dagar sedan</value>
+  </data>
+  <data name="{0} hours ago" xml:space="preserve">
+    <value>{0} timmar sedan</value>
+  </data>
+  <data name="{0} is available" xml:space="preserve">
+    <value>{0} finns tillgänglig</value>
+  </data>
+  <data name="{0} is downloaded and verified" xml:space="preserve">
+    <value>{0} är hämtad och verifierad</value>
+  </data>
+  <data name="{0} items cannot be checked from here" xml:space="preserve">
+    <value>{0} punkter kan inte kontrolleras härifrån</value>
+  </data>
+  <data name="{0} items cannot be checked from here." xml:space="preserve">
+    <value>{0} punkter kan inte kontrolleras härifrån.</value>
+  </data>
+  <data name="{0} message(s) waiting for delivery." xml:space="preserve">
+    <value>{0} meddelande(n) väntar på leverans.</value>
+  </data>
+  <data name="{0} minutes ago" xml:space="preserve">
+    <value>{0} minuter sedan</value>
+  </data>
+  <data name="{0} rule(s), evaluated top to bottom." xml:space="preserve">
+    <value>{0} regel/regler, utvärderade uppifrån och ned.</value>
+  </data>
+  <data name="{0} the mail server engine" xml:space="preserve">
+    <value>{0} e-postserverns motor</value>
+  </data>
+  <data name="{0} things need attention" xml:space="preserve">
+    <value>{0} saker behöver åtgärdas</value>
+  </data>
+  <data name="{0} value(s) could not be read from the server, so this summary may be incomplete." xml:space="preserve">
+    <value>{0} värde(n) kunde inte läsas från servern, så den här sammanfattningen kan vara ofullständig.</value>
+  </data>
+</root>

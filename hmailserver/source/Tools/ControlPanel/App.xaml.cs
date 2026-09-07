@@ -8,6 +8,7 @@ using System.Windows;
 using System.Windows.Threading;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel
 {
@@ -16,6 +17,11 @@ namespace hMailServer.ControlPanel
       protected override void OnStartup(StartupEventArgs e)
       {
          base.OnStartup(e);
+
+         // The language first: every caption from here on is looked up in the
+         // culture this puts in force, and the first window is created when this
+         // method returns.
+         LanguageChoice.Apply();
 
          DispatcherUnhandledException += OnDispatcherUnhandledException;
          AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
@@ -29,15 +35,14 @@ namespace hMailServer.ControlPanel
       {
          string logPath = LogException(args.Exception);
 
-         string message =
-            "An unexpected error occurred:\n\n" + args.Exception.Message +
-            "\n\nThe full details were written to:\n" + logPath +
-            "\n\nRestart the Control Panel now? Choose No to try to keep working.";
+         string message = F(
+            "An unexpected error occurred:\n\n{0}\n\nThe full details were written to:\n{1}\n\nRestart the Control Panel now? Choose No to try to keep working.",
+            args.Exception.Message, logPath);
 
          // Keep the app alive so the user decides; never silently swallow.
          args.Handled = true;
 
-         if (MessageBox.Show(message, "hMailServer Control Panel",
+         if (MessageBox.Show(message, L("hMailServer Control Panel"),
                 MessageBoxButton.YesNo, MessageBoxImage.Error) == MessageBoxResult.Yes)
          {
             Restart();
@@ -71,16 +76,16 @@ namespace hMailServer.ControlPanel
 
             string path = Path.Join(dir, "control-panel-errors.log");
             File.AppendAllText(path,
-               string.Format("[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}{2}", DateTime.Now, ex, Environment.NewLine));
+               string.Format("[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}{2}", DateTime.Now, ex, Environment.NewLine)); // no-loc
             return path;
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            return "(the log file could not be written)";
+            return L("(the log file could not be written)");
          }
       }
 
-      private void Restart()
+      internal void Restart()
       {
          try
          {

@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.IPRangesView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid Margin="26,20">
@@ -15,12 +16,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="IP ranges" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Access control: which addresses may connect and what they are allowed to do. Higher priority wins."
+            <TextBlock Text="{loc:L 'IP ranges'}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{loc:L 'Access control: which addresses may connect and what they are allowed to do. Higher priority wins.'}"
                        Style="{StaticResource PageSubtitle}" />
-            <ui:TextBox x:Name="SearchBox" PlaceholderText="Search IP ranges..." Width="300"
+            <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search IP ranges...'}" Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                        AutomationProperties.Name="Search IP ranges">
+                        AutomationProperties.Name="{loc:L 'Search IP ranges'}">
                 <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
             </ui:TextBox>
         </StackPanel>
@@ -33,10 +34,10 @@
                       SelectionMode="Single" SelectionChanged="RangeGrid_SelectionChanged"
                       MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*" />
-                    <DataGridTextColumn Header="Lower IP" Binding="{Binding LowerIP}" Width="150" />
-                    <DataGridTextColumn Header="Upper IP" Binding="{Binding UpperIP}" Width="150" />
-                    <DataGridTextColumn Header="Priority" Binding="{Binding Priority}" Width="80" />
+                    <DataGridTextColumn Header="{loc:L 'Name'}" Binding="{Binding Name}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Lower IP'}" Binding="{Binding LowerIP}" Width="150" />
+                    <DataGridTextColumn Header="{loc:L 'Upper IP'}" Binding="{Binding UpperIP}" Width="150" />
+                    <DataGridTextColumn Header="{loc:L 'Priority'}" Binding="{Binding Priority}" Width="80" />
                     <DataGridTextColumn Header="SMTP" Binding="{Binding Smtp}" Width="70" />
                     <DataGridTextColumn Header="IMAP" Binding="{Binding Imap}" Width="70" />
                     <DataGridTextColumn Header="POP3" Binding="{Binding Pop3}" Width="70" />
@@ -51,31 +52,31 @@
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock x:Name="PermHeader" Text="Permissions (select a range)" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock x:Name="PermHeader" Text="{loc:L 'Permissions (select a range)'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <UniformGrid Columns="4" Margin="0,0,0,12">
-                    <CheckBox x:Name="PermSmtp" Content="Allow _SMTP" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermImap" Content="Allow _IMAP" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermPop3" Content="Allow _POP3" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermTlsAuth" Content="Require _TLS for auth" FontSize="14" Margin="0,0,12,8" />
-                    <CheckBox x:Name="PermLL" Content="Deliver _local → local" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermLR" Content="Deliver local → _remote" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRL" Content="_Deliver remote → local" FontSize="14" Margin="0,0,12,0" />
-                    <CheckBox x:Name="PermRR" Content="Deliver remote → remote (rela_y)" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermSmtp" Content="{loc:L 'Allow _SMTP'}" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermImap" Content="{loc:L 'Allow _IMAP'}" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermPop3" Content="{loc:L 'Allow _POP3'}" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermTlsAuth" Content="{loc:L 'Require _TLS for auth'}" FontSize="14" Margin="0,0,12,8" />
+                    <CheckBox x:Name="PermLL" Content="{loc:L 'Deliver _local → local'}" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermLR" Content="{loc:L 'Deliver local → _remote'}" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRL" Content="{loc:L '_Deliver remote → local'}" FontSize="14" Margin="0,0,12,0" />
+                    <CheckBox x:Name="PermRR" Content="{loc:L 'Deliver remote → remote (rela_y)'}" FontSize="14" Margin="0,0,12,0" />
                 </UniformGrid>
                 <StackPanel Orientation="Horizontal">
-                    <ui:Button x:Name="SavePermsButton" Content="Sa_ve permissions" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
-                    <ui:Button Content="Pr_operties…" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Content="Delete selected ra_nge" Appearance="Secondary"
+                    <ui:Button x:Name="SavePermsButton" Content="{loc:L 'Sa_ve permissions'}" Appearance="Primary" Click="SavePerms_Click" IsEnabled="False" Margin="0,0,8,0" />
+                    <ui:Button Content="{loc:L 'Pr_operties…'}" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Content="{loc:L 'Delete selected ra_nge'}" Appearance="Secondary"
                                Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" Margin="0,0,8,0" />
-                    <ui:Button Content="Restore de_faults" Click="RestoreDefaults_Click"
-                               ToolTip="Replaces every range with the standard two: 'My computer' (127.0.0.1) and 'Internet' (everything else)." />
+                    <ui:Button Content="{loc:L 'Restore de_faults'}" Click="RestoreDefaults_Click"
+                               ToolTip="{loc:L 'Replaces every range with the standard two: \'My computer\' (127.0.0.1) and \'Internet\' (everything else).'}" />
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add range" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="{loc:L 'Add range'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />
@@ -84,11 +85,11 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="NewName" PlaceholderText="Name" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewLower" Grid.Column="1" PlaceholderText="Lower IP (e.g. 10.0.0.0)" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewUpper" Grid.Column="2" PlaceholderText="Upper IP (e.g. 10.0.0.255)" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewPriority" Grid.Column="3" PlaceholderText="Priority" Text="15" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="4" Content="_Add" Appearance="Primary" Click="Add_Click" />
+                    <ui:TextBox x:Name="NewName" PlaceholderText="{loc:L 'Name'}" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewLower" Grid.Column="1" PlaceholderText="{loc:L 'Lower IP (e.g. 10.0.0.0)'}" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewUpper" Grid.Column="2" PlaceholderText="{loc:L 'Upper IP (e.g. 10.0.0.255)'}" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewPriority" Grid.Column="3" PlaceholderText="{loc:L 'Priority'}" Text="15" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="4" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" />
                 </Grid>
             </StackPanel>
         </Border>

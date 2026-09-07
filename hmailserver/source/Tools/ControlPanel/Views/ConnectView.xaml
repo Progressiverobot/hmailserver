@@ -4,6 +4,8 @@
     x:Class="hMailServer.ControlPanel.Views.ConnectView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:local="clr-namespace:hMailServer.ControlPanel.Views"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid>
@@ -16,19 +18,19 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <TextBlock Text="Connect to server" FontSize="20" FontWeight="SemiBold"
+                <TextBlock Text="{loc:L 'Connect to server'}" FontSize="20" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                <TextBlock Text="Sign in with the hMailServer administrator credential."
+                <TextBlock Text="{loc:L 'Sign in with the hMailServer administrator credential.'}"
                            FontSize="12" Margin="0,4,0,22"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
 
-                <ui:TextBox x:Name="HostBox" PlaceholderText="Server (localhost)" Margin="0,0,0,10" Text="localhost">
+                <ui:TextBox x:Name="HostBox" PlaceholderText="{loc:L 'Server (localhost)'}" Margin="0,0,0,10" Text="localhost">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Server24" /></ui:TextBox.Icon>
                 </ui:TextBox>
-                <ui:TextBox x:Name="UserBox" PlaceholderText="User name" Margin="0,0,0,10" Text="Administrator">
+                <ui:TextBox x:Name="UserBox" PlaceholderText="{loc:L 'User name'}" Margin="0,0,0,10" Text="{loc:L 'Administrator'}">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Person24" /></ui:TextBox.Icon>
                 </ui:TextBox>
-                <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="Password" Margin="0,0,0,18">
+                <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="{loc:L 'Password'}" Margin="0,0,0,18">
                     <ui:PasswordBox.Icon><ui:SymbolIcon Symbol="Key24" /></ui:PasswordBox.Icon>
                 </ui:PasswordBox>
 
@@ -37,12 +39,12 @@
                      that jumps as soon as you click it reads as instability, which
                      is the opposite of what a progress indicator is for. -->
                 <Grid Height="38">
-                    <ui:Button x:Name="ConnectButton" Content="_Connect" Appearance="Primary"
+                    <ui:Button x:Name="ConnectButton" Content="{loc:L '_Connect'}" Appearance="Primary"
                                HorizontalAlignment="Stretch" Height="38" Click="Connect_Click" />
                     <StackPanel x:Name="BusyPanel" Orientation="Horizontal" Visibility="Collapsed"
                                 HorizontalAlignment="Center" VerticalAlignment="Center">
                         <ui:ProgressRing IsIndeterminate="True" Width="20" Height="20" />
-                        <TextBlock x:Name="BusyText" Text="Connecting…" FontSize="13" Margin="10,0,0,0"
+                        <TextBlock x:Name="BusyText" Text="{loc:L 'Connecting…'}" FontSize="13" Margin="10,0,0,0"
                                    VerticalAlignment="Center"
                                    Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
@@ -51,8 +53,24 @@
                 <TextBlock x:Name="ErrorText" AutomationProperties.LiveSetting="Assertive" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
                            TextWrapping="Wrap" Visibility="Collapsed" />
 
-                <ui:HyperlinkButton Content="Set up two-factor authentication…" Click="Totp_Click"
+                <ui:HyperlinkButton Content="{loc:L 'Set up two-factor authentication…'}" Click="Totp_Click"
                                     HorizontalAlignment="Left" Margin="0,12,0,0" FontSize="12" />
+
+                <!-- The language, before sign-in, because the person who needs it
+                     is the one who cannot read the rest of this card. A change
+                     restarts the Control Panel (LanguageChoice says why). -->
+                <Grid Margin="0,14,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{loc:L '_Language'}" local:Mnemonic.Target="{Binding ElementName=LanguageBox}"
+                               FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <ComboBox x:Name="LanguageBox" Grid.Column="1" FontSize="12" HorizontalAlignment="Left" MinWidth="180"
+                              AutomationProperties.Name="{loc:L 'Language'}"
+                              SelectionChanged="Language_SelectionChanged" DropDownClosed="Language_DropDownClosed" />
+                </Grid>
             </StackPanel>
         </Border>
     </Grid>

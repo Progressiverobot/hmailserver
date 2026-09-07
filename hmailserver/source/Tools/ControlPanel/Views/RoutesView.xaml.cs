@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -48,7 +49,7 @@ namespace hMailServer.ControlPanel.Views
                   TargetHost = (string)route.TargetSMTPHost,
                   TargetPort = (int)route.TargetSMTPPort,
                   Retries = (int)route.NumberOfTries,
-                  Auth = (bool)route.RelayerRequiresAuth ? "Yes" : "No"
+                  Auth = (bool)route.RelayerRequiresAuth ? L("Yes") : L("No")
                });
                ServerSession.Release(route);
             }
@@ -60,7 +61,7 @@ namespace hMailServer.ControlPanel.Views
 
          RouteGrid.ItemsSource = rows;
          ListSearch.Apply(RouteGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, null, "No routes defined yet.");
+         StatusText.Show(EmptyStatus, rows.Count, null, L("No routes defined yet."));
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)
@@ -73,7 +74,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (domain.Length == 0 || host.Length == 0)
          {
-            MessageBox.Show("Domain and target host are required.", "Control Panel");
+            MessageBox.Show(L("Domain and target host are required."), L("Control Panel"));
             return;
          }
 
@@ -94,7 +95,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the route: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the route: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -110,7 +111,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (RouteGrid.SelectedItem is not RouteRow row)
          {
-            MessageBox.Show("Select a route first.", "Control Panel");
+            MessageBox.Show(L("Select a route first."), L("Control Panel"));
             return;
          }
 
@@ -123,7 +124,7 @@ namespace hMailServer.ControlPanel.Views
          if (RouteGrid.SelectedItem is not RouteRow row)
             return;
 
-         if (MessageBox.Show("Delete the route for '" + row.DomainName + "'?", "Control Panel",
+         if (MessageBox.Show(F("Delete the route for '{0}'?", row.DomainName), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -145,7 +146,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the route: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the route: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

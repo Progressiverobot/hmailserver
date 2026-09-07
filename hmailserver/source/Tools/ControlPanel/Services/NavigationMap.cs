@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -344,27 +345,27 @@ namespace hMailServer.ControlPanel.Services
       {
          return new List<NavNode>
          {
-            Page("welcome", "Welcome",
-               "Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do.",
+            Page("welcome", N("Welcome"),
+               N("Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do."),
                aliases: "Home|Start|Getting started|Quick actions|First steps",
                seeAlso: "dashboard"),
 
-            Page("dashboard", "Dashboard",
-               "Live counters and charts for processed mail, spam, viruses and sessions.",
+            Page("dashboard", N("Dashboard"),
+               N("Live counters and charts for processed mail, spam, viruses and sessions."),
                aliases: "Overview|Charts|Graphs|Statistics|Counters|Throughput",
                seeAlso: "status|queue"),
 
-            Group("Pulse24", "Monitoring & troubleshooting",
-               "Is mail flowing, and if it is not, where has it stopped?",
+            Group("Pulse24", N("Monitoring & troubleshooting"),
+               N("Is mail flowing, and if it is not, where has it stopped?"),
                "Status|Health|Troubleshooting|Problems|Something is wrong|Observability",
 
-               Page("status", "Server status",
-                  "Which services are running, who is connected right now, and how long the server has been up.",
+               Page("status", N("Server status"),
+                  N("Which services are running, who is connected right now, and how long the server has been up."),
                   aliases: "Sessions|Connections|Uptime|Running|Service state|Live sessions",
                   seeAlso: "queue|dashboard|logs"),
 
-               Page("queue", "Delivery queue",
-                  "Messages still waiting to be delivered, why each is waiting, and when it will be retried.",
+               Page("queue", N("Delivery queue"),
+                  N("Messages still waiting to be delivered, why each is waiting, and when it will be retried."),
                   aliases: "Spool|Stuck mail|Pending mail|Outbound queue|Retry|Not delivered|Backlog",
                   seeAlso: "logs|delivery|status|stalledmail"),
 
@@ -372,31 +373,31 @@ namespace hMailServer.ControlPanel.Services
                // as a page with a button beside each step. The queue shows that a
                // message is waiting; this is what to do when the reason is not on
                // the queue page - which is the case the guide was written for.
-               Page("stalledmail", "Diagnosing stalled mail",
-                  "Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage.",
+               Page("stalledmail", N("Diagnosing stalled mail"),
+                  N("Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage."),
                   aliases: "Stalled mail|Slow mail|Mail is stalled|Timed out while sending end of data|Accepted but never delivered|Hung|Wedged|Stall diagnosis|Diagnosing slow mail",
                   seeAlso: "queue|logs|diagnostics"),
 
                // Next to the queue on purpose: the two answer the same question at
                // different moments. The queue says where a message is now; the trace
                // says what happened to one that has already gone.
-               Page("messagetrace", "Message trace",
-                  "What happened to a particular message - searchable by sender or recipient, instead of grepping logs.",
+               Page("messagetrace", N("Message trace"),
+                  N("What happened to a particular message - searchable by sender or recipient, instead of grepping logs."),
                   aliases: "Message trace|Delivery history|Where did my email go|Did it arrive|Track a message|Was it delivered|Message log|Audit|What happened to|Trace",
                   seeAlso: "queue|logs|quarantine"),
 
-               Page("logs", "Live logs",
-                  "Stream the server log as it is written - the fastest way to see what happened to one message.",
+               Page("logs", N("Live logs"),
+                  N("Stream the server log as it is written - the fastest way to see what happened to one message."),
                   aliases: "Log viewer|Tail|Trace|Debug|SMTP conversation|Error log|Awstats",
                   seeAlso: "logging|queue|diagnostics"),
 
-               Page("diagnostics", "Diagnostics",
-                  "Run the built-in connectivity and configuration checks, and read the last message-store consistency scan.",
+               Page("diagnostics", N("Diagnostics"),
+                  N("Run the built-in connectivity and configuration checks, and read the last message-store consistency scan."),
                   aliases: "Self test|Health check|Port 25 test|Connectivity|Message store consistency|Missing files",
                   seeAlso: "mxquery|logs|queue"),
 
-               Page("mxquery", "MX query",
-                  "Look up where e-mail for a domain is delivered, to check DNS before blaming the server.",
+               Page("mxquery", N("MX query"),
+                  N("Look up where e-mail for a domain is delivered, to check DNS before blaming the server."),
                   aliases: "MX-query|MX lookup|DNS lookup|nslookup|Mail exchanger|Where does mail go",
                   seeAlso: "routes|dns|diagnostics"),
 
@@ -405,26 +406,26 @@ namespace hMailServer.ControlPanel.Services
                // This page is the one place that says which of those are still
                // outstanding, so it lives with the other "is it actually working"
                // pages rather than beside any one feature's settings.
-               Page("externalsetup", "External setup",
-                  "Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one.",
+               Page("externalsetup", N("External setup"),
+                  N("Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one."),
                   aliases: "External prerequisites|Prerequisites|Setup checklist|Checklist|Outside the server|What still needs doing|Publish a DNS record|TXT record|Inert features|Action needed",
                   seeAlso: "security|diagnostics|domains"),
 
                // Sits beside External setup on purpose: that page says WHICH
                // external steps are outstanding, this one produces the exact
                // DNS records those steps need and checks each one.
-               Page("dnsrecords", "DNS records",
-                  "The exact SPF, DKIM, DMARC, MTA-STS and TLS-RPT records each domain should publish, with a check for whether each one is live.",
+               Page("dnsrecords", N("DNS records"),
+                  N("The exact SPF, DKIM, DMARC, MTA-STS and TLS-RPT records each domain should publish, with a check for whether each one is live."),
                   aliases: "SPF record|DKIM record|DMARC record|MTA-STS record|TLS-RPT record|TXT records|Reverse DNS|PTR record|What DNS records do I need|Publish DNS records|DNS checklist|Sender authentication",
                   seeAlso: "externalsetup|domains|security"),
 
-               Page("logging", "Logging",
-                  "Which log files the server writes, how much detail they carry, and how long they are kept.",
+               Page("logging", N("Logging"),
+                  N("Which log files the server writes, how much detail they carry, and how long they are kept."),
                   aliases: "Log level|Log files|Log folder|Retention|Delete old logs|Verbosity|Debug logging",
                   seeAlso: "logs|performance"),
 
-               Page("api", "API & monitoring",
-                  "The REST API, Prometheus metrics and health endpoints an outside monitoring system reads.",
+               Page("api", N("API & monitoring"),
+                  N("The REST API, Prometheus metrics and health endpoints an outside monitoring system reads."),
                   aliases: "REST|Prometheus|Grafana|Metrics|Health endpoint|Nagios|Zabbix|Webhooks|Automation",
                   seeAlso: "apikeys|logging|status|webservices"),
 
@@ -432,66 +433,66 @@ namespace hMailServer.ControlPanel.Services
                // list of objects with their own lifecycle, and the page has to be
                // usable while the REST listener is switched off - which is the
                // state every installation is in when it first comes here.
-               Page("apikeys", "REST API keys",
-                  "Scoped, expiring credentials for the REST API, so automation does not have to carry the administrator password.",
+               Page("apikeys", N("REST API keys"),
+                  N("Scoped, expiring credentials for the REST API, so automation does not have to carry the administrator password."),
                   aliases: "API key|Bearer token|Access token|Credential|Service account for the API|Revoke a key|hmapi|Automation credential|Read-only key",
                   seeAlso: "api|adminaccess")),
 
-            Group("Globe24", "Accounts & domains",
-               "The people and the domains this server carries mail for.",
+            Group("Globe24", N("Accounts & domains"),
+               N("The people and the domains this server carries mail for."),
                "Users|Mailboxes|People|Addresses|Tenants",
 
-               Page("domains", "Domains",
-                  "Add domains, accounts, aliases, distribution lists, DKIM signing and external (POP3) collection.",
+               Page("domains", N("Domains"),
+                  N("Add domains, accounts, aliases, distribution lists, DKIM signing and external (POP3) collection."),
                   aliases: "Accounts|Users|Mailboxes|Add a user|Aliases|Distribution lists|Mailing list|Quota|Size limit|DKIM|External accounts|Domain aliases|Signatures|Forwarding",
                   seeAlso: "publicfolders|groups|rules"),
 
-               Page("publicfolders", "Public folders",
-                  "Shared IMAP folders, and which accounts or groups may read and write each one.",
+               Page("publicfolders", N("Public folders"),
+                  N("Shared IMAP folders, and which accounts or groups may read and write each one."),
                   aliases: "Shared folders|Shared mailbox|IMAP ACL|Permissions|Team folder|Shared calendar",
                   seeAlso: "groups|domains"),
 
-               Page("groups", "Groups",
-                  "Security groups, so shared-folder permissions can be granted to several accounts at once.",
+               Page("groups", N("Groups"),
+                  N("Security groups, so shared-folder permissions can be granted to several accounts at once."),
                   aliases: "Security groups|Roles|Membership|Permission groups",
                   seeAlso: "publicfolders|domains")),
 
-            Group("MailArrowForward20", "Mail flow & delivery",
-               "How mail gets in, where it goes next, and what happens to it on the way.",
+            Group("MailArrowForward20", N("Mail flow & delivery"),
+               N("How mail gets in, where it goes next, and what happens to it on the way."),
                "Delivery|Routing|Transport|SMTP|Relay|Mail flow",
 
-               Page("delivery", "Delivery of e-mail",
-                  "Relaying to an upstream server, retry intervals, bounce handling and what happens to local mail.",
+               Page("delivery", N("Delivery of e-mail"),
+                  N("Relaying to an upstream server, retry intervals, bounce handling and what happens to local mail."),
                   aliases: "SMTP relayer|Smarthost|Send through my ISP|Retries|Bounce|Non-delivery report|Host name|Max message size|Deliver local to local",
                   seeAlso: "routes|queue|ipranges"),
 
-               Page("routes", "Routes",
-                  "Deliver mail for named domains to a chosen server instead of looking up its MX record.",
+               Page("routes", N("Routes"),
+                  N("Deliver mail for named domains to a chosen server instead of looking up its MX record."),
                   aliases: "Static route|Transport map|Send domain to server|Internal relay|Hybrid|Split delivery",
                   seeAlso: "delivery|mxquery"),
 
-               Page("relays", "Incoming relays",
-                  "Upstream gateways whose IP address must not be treated as the connecting client in spam checks.",
+               Page("relays", N("Incoming relays"),
+                  N("Upstream gateways whose IP address must not be treated as the connecting client in spam checks."),
                   aliases: "Trusted relay|Upstream gateway|Front-end filter|Load balancer|Proxy|Received header",
                   seeAlso: "ipranges|antispam"),
 
-               Page("rules", "Rules",
-                  "Server-wide rules that inspect messages as they arrive and act on them.",
+               Page("rules", N("Rules"),
+                  N("Server-wide rules that inspect messages as they arrive and act on them."),
                   aliases: "Global rules|Filters|Conditions and actions|Sieve|Auto-reply|Move to folder|Tag subject",
                   seeAlso: "domains|scripts"),
 
-               Page("servermessages", "Server messages",
-                  "The greeting, bounce and error texts the server sends back to clients.",
+               Page("servermessages", N("Server messages"),
+                  N("The greeting, bounce and error texts the server sends back to clients."),
                   aliases: "Banner|Greeting|Bounce text|Error text|Templates|Wording|Localise messages",
                   seeAlso: "delivery|protocols"),
 
-               Page("sendout", "Server sendout",
-                  "E-mail every account on the server at once - for maintenance announcements.",
+               Page("sendout", N("Server sendout"),
+                  N("E-mail every account on the server at once - for maintenance announcements."),
                   aliases: "Announcement|Mail all users|Broadcast|Notify everyone|Maintenance notice",
                   seeAlso: "domains")),
 
-            Group("ShieldCheckmark24", "Spam & virus filtering",
-               "Everything that decides whether a message is wanted.",
+            Group("ShieldCheckmark24", N("Spam & virus filtering"),
+               N("Everything that decides whether a message is wanted."),
                "Anti-spam|Antispam|Anti-virus|Antivirus|Filtering|Junk|Malware|Content filtering",
 
                // The group had five spam pages and no answer to the question an
@@ -506,8 +507,8 @@ namespace hMailServer.ControlPanel.Services
                // every row links to the page that owns the setting, which is also
                // what keeps this page from becoming a second place to change the
                // same value.
-               Page("spamoverview", "Spam filtering overview",
-                  "Every spam check in the order the server runs them, what each adds to the score, and what that score then does to the message.",
+               Page("spamoverview", N("Spam filtering overview"),
+                  N("Every spam check in the order the server runs them, what each adds to the score, and what that score then does to the message."),
                   aliases: "Spam overview|Anti-spam overview|Spam pipeline|Spam summary|What is my spam configuration|Spam checks|Order of spam checks|Spam thresholds|Spam verdict|Why was this marked as spam",
                   seeAlso: "antispam|spamwhitelist|logs"),
 
@@ -515,13 +516,13 @@ namespace hMailServer.ControlPanel.Services
                // diagnostics heading: the reason somebody opens this page is almost
                // always that a threshold on the anti-spam page just caught something
                // it should not have.
-               Page("quarantine", "Quarantine",
-                  "Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it.",
+               Page("quarantine", N("Quarantine"),
+                  N("Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it."),
                   aliases: "Quarantine|Held messages|Release a message|False positive|Review spam|Quarantined mail|Where did my email go|Blocked message|Recover a message|Spam review queue",
                   seeAlso: "antispam|spamoverview|spamwhitelist"),
 
-               Page("antispam", "Anti-spam settings",
-                  "Scores and thresholds, SPF, DKIM and DMARC checks, greylisting, and SpamAssassin.",
+               Page("antispam", N("Anti-spam settings"),
+                  N("Scores and thresholds, SPF, DKIM and DMARC checks, greylisting, and SpamAssassin."),
                   aliases: "Spam filter|Stop spam|Score|Threshold|SPF|DKIM|DMARC|ARC|Greylisting|SpamAssassin|Junk mail|PTR|HELO check|Subject prefix",
                   seeAlso: "spamoverview|dnsbl|surbl|spamwhitelist|greylistwhitelist"),
 
@@ -529,28 +530,28 @@ namespace hMailServer.ControlPanel.Services
                // is the one page that says what the change just made on this page
                // does to a message, and only three signposts fit beside the
                // breadcrumb.
-               Page("surbl", "SURBL servers",
-                  "Block lists checked against the links found inside a message body.",
+               Page("surbl", N("SURBL servers"),
+                  N("Block lists checked against the links found inside a message body."),
                   aliases: "SURBL|URI block list|Link blacklist|Body URL check|Spamhaus DBL",
                   seeAlso: "spamoverview|antispam|dnsbl"),
 
-               Page("dnsbl", "DNS blacklists",
-                  "Block lists checked against the IP address that is connecting.",
+               Page("dnsbl", N("DNS blacklists"),
+                  N("Block lists checked against the IP address that is connecting."),
                   aliases: "DNSBL|DNS blacklists (DNSBL)|RBL|Blackhole list|Spamhaus|Barracuda|Block an IP by reputation",
                   seeAlso: "spamoverview|antispam|surbl|ipranges"),
 
-               Page("spamwhitelist", "White list",
-                  "Senders and IP ranges that bypass spam protection entirely.",
+               Page("spamwhitelist", N("White list"),
+                  N("Senders and IP ranges that bypass spam protection entirely."),
                   aliases: "Anti-spam white list|Allow list|Safe senders|False positive|Let a sender through|Exempt from spam filter",
                   seeAlso: "spamoverview|antispam|greylistwhitelist"),
 
-               Page("blockedsenders", "Blocked senders",
-                  "Envelope senders refused outright or scored - one address, or a whole domain with its subdomains.",
+               Page("blockedsenders", N("Blocked senders"),
+                  N("Envelope senders refused outright or scored - one address, or a whole domain with its subdomains."),
                   aliases: "Blacklist|Block list|Deny list|Block a sender|Banned senders|Refuse mail from",
                   seeAlso: "spamwhitelist|antispam|spamoverview"),
 
-               Page("greylistwhitelist", "Greylisting white list",
-                  "IP addresses exempt from the greylisting delay, for senders that will not retry.",
+               Page("greylistwhitelist", N("Greylisting white list"),
+                  N("IP addresses exempt from the greylisting delay, for senders that will not retry."),
                   aliases: "Greylist exemption|Greylisting delay|Slow mail|First message delayed|Retry delay",
                   seeAlso: "spamoverview|antispam|spamwhitelist"),
 
@@ -561,56 +562,56 @@ namespace hMailServer.ControlPanel.Services
                // and VirusScanner::ScanFile_ treats "every scanner errored" as
                // NoVirusFound - so the mail is delivered as though it had been
                // examined. Nothing in an editor for those settings can say that.
-               Page("virusoverview", "Virus scanning overview",
-                  "Which scanners can actually run, what size of message is scanned, and what happens to one that is found to be infected.",
+               Page("virusoverview", N("Virus scanning overview"),
+                  N("Which scanners can actually run, what size of message is scanned, and what happens to one that is found to be infected."),
                   aliases: "Anti-virus overview|Antivirus overview|Virus overview|Virus summary|What is my virus configuration|Is virus scanning working|Am I scanning for viruses|Scanner not working|ClamAV not scanning|Unscanned mail",
                   seeAlso: "antivirus|blockedattachments|logs"),
 
-               Page("antivirus", "Anti-virus settings",
-                  "ClamAV and external scanners, and what to do with a message that is found to be infected.",
+               Page("antivirus", N("Anti-virus settings"),
+                  N("ClamAV and external scanners, and what to do with a message that is found to be infected."),
                   aliases: "Virus scanner|ClamAV|Malware|Infected mail|Scan attachments|External scanner",
                   seeAlso: "virusoverview|blockedattachments"),
 
-               Page("blockedattachments", "Blocked attachments",
-                  "File-name patterns stripped from incoming messages regardless of what a scanner says.",
+               Page("blockedattachments", N("Blocked attachments"),
+                  N("File-name patterns stripped from incoming messages regardless of what a scanner says."),
                   aliases: "Attachment blocking|Block exe|File extensions|Strip attachments|Dangerous files|Zip",
                   seeAlso: "virusoverview|antivirus")),
 
-            Group("PlugConnected24", "Connections & protocols",
-               "Which services listen, on what, and how clients reach them.",
+            Group("PlugConnected24", N("Connections & protocols"),
+               N("Which services listen, on what, and how clients reach them."),
                "Network|Ports|Listeners|Protocols|Bindings|Client access",
 
-               Page("protocols", "Protocols",
-                  "Per-protocol limits and behaviour for SMTP, POP3 and IMAP.",
+               Page("protocols", N("Protocols"),
+                  N("Per-protocol limits and behaviour for SMTP, POP3 and IMAP."),
                   aliases: "SMTP|POP3|IMAP|Timeouts|Max connections|Message size limit|Authentication required|Welcome banner",
                   seeAlso: "ports|delivery|authentication"),
 
-               Page("ports", "TCP/IP ports",
-                  "The addresses and ports each protocol listens on, and the connection security used on each.",
+               Page("ports", N("TCP/IP ports"),
+                  N("The addresses and ports each protocol listens on, and the connection security used on each."),
                   aliases: "Listeners|Bindings|Port 25|Port 465|Port 587|Submission|Port 993|Port 995|STARTTLS|Implicit TLS|Interface|Bind address|Open a port",
                   seeAlso: "certs|tls|protocols"),
 
-               Page("webservices", "Web services & autoconfiguration",
-                  "The built-in HTTP listener: Autodiscover, autoconfig, the MTA-STS policy and ACME challenges.",
+               Page("webservices", N("Web services & autoconfiguration"),
+                  N("The built-in HTTP listener: Autodiscover, autoconfig, the MTA-STS policy and ACME challenges."),
                   aliases: "HTTP|Autodiscover|Autoconfig|Outlook setup|Thunderbird setup|Mobile setup|MTA-STS policy|Well-known|Web server",
                   seeAlso: "acme|security|api"),
 
-               Page("dns", "DNS resolver",
-                  "Which name servers the server asks, and whether answers are DNSSEC validated.",
+               Page("dns", N("DNS resolver"),
+                  N("Which name servers the server asks, and whether answers are DNSSEC validated."),
                   aliases: "Name servers|Resolver|DNSSEC|Lookup failures|DNS cache|EDNS",
                   seeAlso: "security|antispam|mxquery")),
 
-            Group("LockClosed24", "TLS & certificates",
-               "Is transport security correct, and will it still be correct next month?",
+            Group("LockClosed24", N("TLS & certificates"),
+               N("Is transport security correct, and will it still be correct next month?"),
                "TLS|SSL|Certificates|Encryption|MTA-STS|DANE|Transport security",
 
-               Page("certs", "SSL certificates",
-                  "The certificates this server presents, which port uses which, and when each expires.",
+               Page("certs", N("SSL certificates"),
+                  N("The certificates this server presents, which port uses which, and when each expires."),
                   aliases: "Certificate|SSL certificate|TLS certificate|PFX|PEM|Expiry|Renew|Install a certificate|Chain|Private key",
                   seeAlso: "acme|ports|security"),
 
-               Page("acme", "Certificates (ACME)",
-                  "Issue and renew certificates automatically from Let's Encrypt or another ACME authority.",
+               Page("acme", N("Certificates (ACME)"),
+                  N("Issue and renew certificates automatically from Let's Encrypt or another ACME authority."),
                   aliases: "ACME|Let's Encrypt|Letsencrypt|Automatic renewal|http-01|Certbot|Free certificate",
                   seeAlso: "certs|webservices|ports"),
 
@@ -631,13 +632,13 @@ namespace hMailServer.ControlPanel.Services
                //
                // Read-only, like the spam and virus overviews, and for the same
                // reason: it must not become a fifth place to change the same value.
-               Page("tlsoverview", "Transport encryption overview",
-                  "What every listener protects, which certificate it presents and when that expires, and what can still be negotiated.",
+               Page("tlsoverview", N("Transport encryption overview"),
+                  N("What every listener protects, which certificate it presents and when that expires, and what can still be negotiated."),
                   aliases: "TLS overview|SSL overview|Encryption overview|Is my mail encrypted|Plaintext password|Passwords in the clear|Unencrypted port|Certificate expiry|Certificate expiring|What TLS am I using|STARTTLS not required",
                   seeAlso: "tls|certs|ports"),
 
-               Page("tls", "SSL/TLS",
-                  "Which TLS versions and ciphers this server will negotiate, and whether it verifies the certificate of the server it delivers to.",
+               Page("tls", N("SSL/TLS"),
+                  N("Which TLS versions and ciphers this server will negotiate, and whether it verifies the certificate of the server it delivers to."),
                   aliases: "Auto-ban & SSL/TLS|TLS versions|TLS 1.0|TLS 1.1|TLS 1.2|TLS 1.3|Ciphers|Cipher list|Cipher suites|OpenSSL cipher string|Disable old TLS|Weak ciphers|ChaCha20|Verify remote certificate",
                   // autoban stays in this list. This page and Auto-ban are the two
                   // halves of the old "Auto-ban & SSL/TLS", and PageSplitTests holds
@@ -645,25 +646,25 @@ namespace hMailServer.ControlPanel.Services
                   // title and landed on the wrong half can get to the right one.
                   seeAlso: "tlsoverview|certs|ports|security|autoban"),
 
-               Page("security", "Transport security",
-                  "DANE, MTA-STS, ARC and TLS reporting - proving to other servers that TLS is required.",
+               Page("security", N("Transport security"),
+                  N("DANE, MTA-STS, ARC and TLS reporting - proving to other servers that TLS is required."),
                   aliases: "DANE|TLSA|MTA-STS|TLS-RPT|TLS reporting|ARC|Downgrade|Opportunistic TLS|Enforce TLS",
                   seeAlso: "certs|dns|webservices")),
 
-            Group("ShieldKeyhole24", "Access & abuse protection",
-               "Who may connect, who may authenticate, and what happens when someone keeps trying.",
+            Group("ShieldKeyhole24", N("Access & abuse protection"),
+               N("Who may connect, who may authenticate, and what happens when someone keeps trying."),
                "Security|Access control|Authentication|Abuse|Brute force|Who can connect",
 
-               Page("authentication", "Authentication",
-                  "How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms.",
+               Page("authentication", N("Authentication"),
+                  N("How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms."),
                   aliases: "Password hashing|bcrypt|Argon2|OAuth2|XOAUTH2|Modern authentication|Microsoft 365|Google|SASL|CRAM-MD5|APOP|Two-factor|Pepper",
                   seeAlso: "adminaccess|autoban|ipranges|protocols"),
 
                // Directory authentication is how accounts prove who they are, so it
                // belongs beside Authentication - not filed under "advanced INI" because
                // that happens to be where its settings are stored.
-               Page("ldap", "Directory authentication (LDAP)",
-                  "Authenticate accounts against Active Directory or any LDAP directory, so users sign in with their domain password.",
+               Page("ldap", N("Directory authentication (LDAP)"),
+                  N("Authenticate accounts against Active Directory or any LDAP directory, so users sign in with their domain password."),
                   aliases: "LDAP|Active Directory|AD|Directory|Domain password|Bind|LDAPS|StartTLS|Single sign-on|Domain accounts|DC",
                   seeAlso: "authentication|adminaccess|domains|directorysync"),
 
@@ -673,13 +674,13 @@ namespace hMailServer.ControlPanel.Services
                // have a mailbox at all. Somebody arriving to bulk-create accounts from
                // the directory is not looking for a bind method, and somebody debugging
                // a logon does not want a provisioning run one click away.
-               Page("directorysync", "Directory synchronisation",
-                  "Create and update mailboxes to match an LDAP directory - preview first, then apply.",
+               Page("directorysync", N("Directory synchronisation"),
+                  N("Create and update mailboxes to match an LDAP directory - preview first, then apply."),
                   aliases: "Directory sync|Provisioning|Provision accounts|Account source|Bulk create accounts|Import users|Sync users|LDAP sync|AD sync|Create accounts from Active Directory|Onboarding|Leavers",
                   seeAlso: "ldap|domains"),
 
-               Page("adminaccess", "Administrative access",
-                  "The server administration password, and who is allowed to use these tools at all.",
+               Page("adminaccess", N("Administrative access"),
+                  N("The server administration password, and who is allowed to use these tools at all."),
                   aliases: "Admin password|Administrator password|Change the admin password|Remote administration|COM API access",
                   seeAlso: "authentication"),
 
@@ -690,8 +691,8 @@ namespace hMailServer.ControlPanel.Services
                // whichever they wanted, half the page was noise. Splitting it also
                // lets each half sit in the group where its subject lives - this one
                // beside IP ranges, which is where the ban it creates ends up.
-               Page("autoban", "Auto-ban",
-                  "Lock out an address that keeps failing to log on - and let one back in that should not have been locked out.",
+               Page("autoban", N("Auto-ban"),
+                  N("Lock out an address that keeps failing to log on - and let one back in that should not have been locked out."),
                   aliases: "Auto-ban & SSL/TLS|Autoban|Brute force|Bruteforce|Lockout|Locked out|Failed logons|Failed logins|Password guessing|Dictionary attack|Fail2ban|Hammering|Temporary ban|Logon failure list",
                   // "tls" is here, and "autoban" is on the SSL/TLS page, so a
                   // reader who followed an old note about the combined page and
@@ -701,22 +702,22 @@ namespace hMailServer.ControlPanel.Services
                   // one, because this is the half the documented path resolves to.
                   seeAlso: "ipranges|authentication|tls|logs"),
 
-               Page("ipranges", "IP ranges",
-                  "Which addresses may connect, which may relay without authenticating, and which must authenticate first.",
+               Page("ipranges", N("IP ranges"),
+                  N("Which addresses may connect, which may relay without authenticating, and which must authenticate first."),
                   aliases: "IP range|Firewall|Block an IP|Allow an IP|Open relay|Relay permissions|Require authentication|Let a device send mail|Printer|Scanner|LAN|Localhost|My IP",
                   seeAlso: "authentication|autoban|relays|delivery")),
 
-            Group("Wrench24", "Maintenance",
-               "Housekeeping, tuning, and the settings that still have no better home.",
+            Group("Wrench24", N("Maintenance"),
+               N("Housekeeping, tuning, and the settings that still have no better home."),
                "Housekeeping|Backup|Tuning|Advanced|Scripting|INI",
 
-               Page("backup", "Backup & restore",
-                  "Back up or restore the configuration, the domains and the messages.",
+               Page("backup", N("Backup & restore"),
+                  N("Back up or restore the configuration, the domains and the messages."),
                   aliases: "Backup|Restore|Export|Import|Disaster recovery|Copy to another server|Migrate",
                   seeAlso: "hardening|domains"),
 
-               Page("performance", "Performance",
-                  "Thread counts, database connections and caching - what to change when the server is slow.",
+               Page("performance", N("Performance"),
+                  N("Thread counts, database connections and caching - what to change when the server is slow."),
                   aliases: "Threads|Workers|Database connections|Cache|Slow server|Tuning|Concurrency|Memory",
                   seeAlso: "hardening|logging"),
 
@@ -726,13 +727,13 @@ namespace hMailServer.ControlPanel.Services
                // concepts, one of them a catch-all - so this one is now what the page
                // calls itself, and its description says where the switch is. The old
                // title stays as an alias; the key is unchanged, so links still arrive.
-               Page("advanced", "Advanced",
-                  "Archiving, mirroring, the default domain, disk-space limits, and the switch that turns the event-scripting engine on.",
+               Page("advanced", N("Advanced"),
+                  N("Archiving, mirroring, the default domain, disk-space limits, and the switch that turns the event-scripting engine on."),
                   aliases: "Advanced & scripting|Archive|Archiving|Mirror|Default domain|Scripting engine|Enable scripting|VBScript|JScript|IPv6 preference",
                   seeAlso: "scripts|hardening"),
 
-               Page("scripts", "Event scripts",
-                  "Edit the event-handler script the server runs on delivery, logon and error events. The engine itself is switched on under Advanced.",
+               Page("scripts", N("Event scripts"),
+                  N("Edit the event-handler script the server runs on delivery, logon and error events. The engine itself is switched on under Advanced."),
                   aliases: "EventHandlers|Scripts|OnDeliverMessage|OnClientLogon|OnAcceptMessage|VBScript|Run code on mail",
                   seeAlso: "advanced|rules"),
 
@@ -742,14 +743,14 @@ namespace hMailServer.ControlPanel.Services
                // is left really is server-wide, and the title now says so. Both old
                // titles stay as aliases, and the key is unchanged, so every link,
                // bookmark and remembered path still arrives here.
-               Page("hardening", "Server limits & expert settings",
-                  "Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature.",
+               Page("hardening", N("Server limits & expert settings"),
+                  N("Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature."),
                   aliases: "Advanced INI settings|Advanced hardening|INI settings|hMailServer.INI|Registry|Undocumented|Expert settings|Everything else|" +
                            "Timeouts|Queue bounds|Sending limits|Rate limit|Throttle|fsync|Durability|DPAPI|Received headers|mailer-daemon",
                   seeAlso: "advanced|performance|backup")),
 
-            Page("about", "About",
-               "Version, build, licence and where to get support.",
+            Page("about", N("About"),
+               N("Version, build, licence and where to get support."),
                aliases: "Version|Build|Licence|License|Support|Credits|Copyright")
          };
       }

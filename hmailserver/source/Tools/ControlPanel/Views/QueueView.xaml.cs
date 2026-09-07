@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using System.Linq;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -41,7 +42,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = "Select a message first.";
+            SubtitleText.Text = L("Select a message first.");
             return;
          }
 
@@ -52,7 +53,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = "Select a message first.";
+            SubtitleText.Text = L("Select a message first.");
             return;
          }
 
@@ -64,12 +65,12 @@ namespace hMailServer.ControlPanel.Views
             queue.ResetDeliveryTime(Convert.ToInt64(row.Id));
             queue.StartDelivery();
             ServerSession.Release(queue);
-            SubtitleText.Text = "Delivery retriggered for message " + row.Id + ".";
+            SubtitleText.Text = F("Delivery retriggered for message {0}.", row.Id);
             Reload();
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = "Could not retrigger delivery: " + ex.Message;
+            SubtitleText.Text = F("Could not retrigger delivery: {0}", ex.Message);
          }
       }
 
@@ -77,11 +78,11 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = "Select a message first.";
+            SubtitleText.Text = L("Select a message first.");
             return;
          }
 
-         if (MessageBox.Show("Remove message " + row.Id + " from the queue?", "Control Panel",
+         if (MessageBox.Show(F("Remove message {0} from the queue?", row.Id), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -90,12 +91,12 @@ namespace hMailServer.ControlPanel.Views
             dynamic queue = ServerSession.Current.Application.GlobalObjects.DeliveryQueue;
             queue.Remove(Convert.ToInt64(row.Id));
             ServerSession.Release(queue);
-            SubtitleText.Text = "Message " + row.Id + " removed.";
+            SubtitleText.Text = F("Message {0} removed.", row.Id);
             Reload();
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = "Could not remove the message: " + ex.Message;
+            SubtitleText.Text = F("Could not remove the message: {0}", ex.Message);
          }
       }
 
@@ -127,12 +128,12 @@ namespace hMailServer.ControlPanel.Views
             QueueGrid.ItemsSource = rows;
             ListSearch.Apply(QueueGrid, SearchBox.Text);
             SubtitleText.Text = rows.Count == 0
-               ? "The delivery queue is empty."
-               : rows.Count + " message(s) waiting for delivery.";
+               ? L("The delivery queue is empty.")
+               : F("{0} message(s) waiting for delivery.", rows.Count);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = "Could not read the queue: " + ex.Message;
+            SubtitleText.Text = F("Could not read the queue: {0}", ex.Message);
          }
       }
 

@@ -4,6 +4,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -29,7 +30,7 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public static class Dialogs
    {
-      private const string DefaultCaption = "hMailServer Control Panel";
+      private static string DefaultCaption => L("hMailServer Control Panel");
 
       public static MessageBoxResult Show(string messageBoxText)
       {
@@ -179,26 +180,26 @@ namespace hMailServer.ControlPanel.Views
          switch (button)
          {
             case MessageBoxButton.OKCancel:
-               AddButton("OK", MessageBoxResult.OK, primary: true, isCancel: false);
-               AddButton("Cancel", MessageBoxResult.Cancel, primary: false, isCancel: true);
+               AddButton(L("OK"), MessageBoxResult.OK, primary: true, isCancel: false);
+               AddButton(L("Cancel"), MessageBoxResult.Cancel, primary: false, isCancel: true);
                break;
 
             case MessageBoxButton.YesNo:
-               AddButton("Yes", MessageBoxResult.Yes, primary: true, isCancel: false);
+               AddButton(L("Yes"), MessageBoxResult.Yes, primary: true, isCancel: false);
                // Esc answering "No" preserves the old semantics: closing the
                // Win32 YesNo box without choosing was impossible, and every
                // caller treats anything-but-Yes as "do nothing".
-               AddButton("No", MessageBoxResult.No, primary: false, isCancel: true);
+               AddButton(L("No"), MessageBoxResult.No, primary: false, isCancel: true);
                break;
 
             case MessageBoxButton.YesNoCancel:
-               AddButton("Yes", MessageBoxResult.Yes, primary: true, isCancel: false);
-               AddButton("No", MessageBoxResult.No, primary: false, isCancel: false);
-               AddButton("Cancel", MessageBoxResult.Cancel, primary: false, isCancel: true);
+               AddButton(L("Yes"), MessageBoxResult.Yes, primary: true, isCancel: false);
+               AddButton(L("No"), MessageBoxResult.No, primary: false, isCancel: false);
+               AddButton(L("Cancel"), MessageBoxResult.Cancel, primary: false, isCancel: true);
                break;
 
             default:
-               AddButton("OK", MessageBoxResult.OK, primary: true, isCancel: true);
+               AddButton(L("OK"), MessageBoxResult.OK, primary: true, isCancel: true);
                break;
          }
 

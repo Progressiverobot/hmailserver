@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -31,7 +32,7 @@ namespace hMailServer.ControlPanel.Views
          public FrameworkElement ListeningMark { get; set; }
       }
 
-      private static readonly string[] SecurityNames = { "None", "SSL/TLS", "STARTTLS (optional)", "STARTTLS (required)" };
+      private static readonly string[] SecurityNames = { L("None"), L("SSL/TLS"), L("STARTTLS (optional)"), L("STARTTLS (required)") };
 
       public TcpIpPortsView()
       {
@@ -106,7 +107,7 @@ namespace hMailServer.ControlPanel.Views
 
          PortGrid.ItemsSource = rows;
          ListSearch.Apply(PortGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, null, "No ports configured.");
+         StatusText.Show(EmptyStatus, rows.Count, null, L("No ports configured."));
 
          ShowListenerSummary(rows, local);
       }
@@ -147,8 +148,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!local)
          {
-            ListenerSummary.Text = "Connected to another host, so whether these ports are being listened on cannot "
-                                   + "be read from here - open the Control Panel on the server itself to see it.";
+            ListenerSummary.Text = L("Connected to another host, so whether these ports are being listened on cannot be read from here - open the Control Panel on the server itself to see it.");
             ListenerSummary.Visibility = Visibility.Visible;
             return;
          }
@@ -166,11 +166,9 @@ namespace hMailServer.ControlPanel.Views
             names.Add(row.Protocol + " " + row.Address + ":" + row.Port);
 
          ListenerSummary.Text =
-            (down.Count == 1 ? "One configured port is not being listened on: " : down.Count + " configured ports are not being listened on: ")
+            (down.Count == 1 ? L("One configured port is not being listened on: ") : F("{0} configured ports are not being listened on: ", down.Count))
             + string.Join(", ", names)
-            + ". Connections to them are refused. The usual causes are another program already holding the port, a "
-            + "bind address that does not exist on this machine, or - on a TLS port - a certificate the server could "
-            + "not load; the server records which, once, in the error log at start-up.";
+            + L(". Connections to them are refused. The usual causes are another program already holding the port, a bind address that does not exist on this machine, or - on a TLS port - a certificate the server could not load; the server records which, once, in the error log at start-up.");
          ListenerSummary.Visibility = Visibility.Visible;
       }
 
@@ -240,7 +238,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (PortGrid.SelectedItem is not PortRow row)
          {
-            MessageBox.Show("Select a port first.", "Control Panel");
+            MessageBox.Show(L("Select a port first."), L("Control Panel"));
             return;
          }
 
@@ -252,7 +250,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!int.TryParse(NewPort.Text.Trim(), out int portNumber) || portNumber <= 0 || portNumber > 65535)
          {
-            MessageBox.Show("Enter a valid port number.", "Control Panel");
+            MessageBox.Show(L("Enter a valid port number."), L("Control Panel"));
             return;
          }
 
@@ -276,7 +274,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the port: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the port: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -299,10 +297,8 @@ namespace hMailServer.ControlPanel.Views
       private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
       {
          if (MessageBox.Show(
-                "Replace ALL configured ports with the defaults?\n\nSMTP 25 and 587, POP3 110, IMAP 143 - " +
-                "without connection security. TLS ports and custom bindings will be removed. The change takes " +
-                "effect when the server is restarted.",
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                L("Replace ALL configured ports with the defaults?\n\nSMTP 25 and 587, POP3 110, IMAP 143 - without connection security. TLS ports and custom bindings will be removed. The change takes effect when the server is restarted."),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          dynamic ports = ServerSession.Current.Application.Settings.TCPIPPorts;
@@ -312,7 +308,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Error);
          }
          finally
          {
@@ -327,7 +323,7 @@ namespace hMailServer.ControlPanel.Views
          if (PortGrid.SelectedItem is not PortRow row)
             return;
 
-         if (MessageBox.Show("Delete the " + row.Protocol + " port " + row.Port + " binding?", "Control Panel",
+         if (MessageBox.Show(F("Delete the {0} port {1} binding?", row.Protocol, row.Port), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -351,7 +347,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the port: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the port: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

@@ -4,12 +4,13 @@
     x:Class="hMailServer.ControlPanel.Views.DashboardView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
         <StackPanel>
-            <TextBlock Text="Dashboard" Style="{StaticResource PageTitle}" />
-            <TextBlock x:Name="SubtitleText" Text="Live server statistics, refreshed every 2 seconds."
+            <TextBlock Text="{loc:L 'Dashboard'}" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="SubtitleText" Text="{loc:L 'Live server statistics, refreshed every 2 seconds.'}"
                        Style="{StaticResource PageSubtitle}" />
 
             <!-- "Needs attention" summary. The dashboard is the page an
@@ -39,12 +40,12 @@
                                    Visibility="Collapsed" />
                         <TextBlock x:Name="AttentionSummary" Grid.Column="2" FontSize="14"
                                    FontWeight="SemiBold" TextWrapping="Wrap"
-                                   Text="Checking what this server still needs done outside it…" />
-                        <ui:Button x:Name="OpenExternalSetupButton" Grid.Column="3" Content="_External setup…"
+                                   Text="{loc:L 'Checking what this server still needs done outside it…'}" />
+                        <ui:Button x:Name="OpenExternalSetupButton" Grid.Column="3" Content="{loc:L '_External setup…'}"
                                    Appearance="Transparent" FontSize="12" Padding="8,3,8,3"
                                    VerticalAlignment="Top" Cursor="Hand" Click="OpenExternalSetup_Click"
-                                   ToolTip="Open External setup, the full checklist of what this server needs done outside it"
-                                   AutomationProperties.Name="Open External setup, the full checklist of what this server needs done outside it"
+                                   ToolTip="{loc:L 'Open External setup, the full checklist of what this server needs done outside it'}"
+                                   AutomationProperties.Name="{loc:L 'Open External setup, the full checklist of what this server needs done outside it'}"
                                    AutomationProperties.AutomationId="dashboard-open-external-setup" />
                     </Grid>
                     <StackPanel x:Name="AttentionItems" Margin="19,2,0,0" />
@@ -68,7 +69,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiUptime" Text="—" Style="{StaticResource KpiValue}" FontSize="20" />
-                        <TextBlock Grid.Row="1" Text="Uptime" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="{loc:L 'Uptime'}" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -78,7 +79,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiProcessed" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="Messages processed" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="{loc:L 'Messages processed'}" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -110,7 +111,7 @@
                                            VerticalAlignment="Center" />
                             </StackPanel>
                         </StackPanel>
-                        <TextBlock Grid.Row="1" Text="In queue" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="{loc:L 'In queue'}" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96" Margin="0,0,12,0">
@@ -120,7 +121,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiSpam" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="Spam blocked" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="{loc:L 'Spam blocked'}" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
                 <Border Style="{StaticResource Card}" MinHeight="96">
@@ -130,7 +131,7 @@
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
                         <TextBlock x:Name="KpiViruses" Text="0" Style="{StaticResource KpiValue}" />
-                        <TextBlock Grid.Row="1" Text="Viruses removed" Style="{StaticResource KpiLabel}" />
+                        <TextBlock Grid.Row="1" Text="{loc:L 'Viruses removed'}" Style="{StaticResource KpiLabel}" />
                     </Grid>
                 </Border>
             </UniformGrid>

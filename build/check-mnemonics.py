@@ -27,6 +27,11 @@ What is checked
     method's keys.
   * Exempt: Cancel, OK and Close (Escape and Enter are their keys, by platform
     convention), the "…" browse buttons, and captions that come from data.
+  * A caption may be wrapped for translation - L("_Save changes") in code,
+    {loc:L '_Save changes'} in XAML - and is read through the wrapper. Every
+    language catalogue (Resources/Strings.<culture>.resx) is then checked the
+    same way: each translated caption carries its own key, chosen for that
+    language, and no two that share a scope share one.
 
 Usage: python3 build/check-mnemonics.py [--list]
 Exit status 0 when every caption is covered and every scope is collision-free.
@@ -100,8 +105,14 @@ def xaml_captions(path):
     for m in re.finditer(r'<(?:ui:)?(?:Button|CheckBox|RadioButton|ToggleButton)\b[^>]*?\bContent="([^"]*)"', src, re.S):
         if templated(m.start()):
             continue
-        out.append(Caption(path, line_of(src, m.start()), os.path.basename(path), m.group(1)))
+        out.append(Caption(path, line_of(src, m.start()), os.path.basename(path), unwrap_xaml(m.group(1))))
     return out
+
+
+def unwrap_xaml(value):
+    """The English text inside {loc:L '...'}, or the value itself when it is not wrapped."""
+    m = re.fullmatch(r"\{loc:L\s+'((?:[^'\\]|\\.)*)'\s*\}", value)
+    return re.sub(r"\\(.)", r"\1", m.group(1)) if m else value
 
 
 def body_ranges(src, header):
@@ -137,7 +148,7 @@ def body_ranges(src, header):
 
 METHOD = r"^\s+(?:public|private|protected|internal)[^\n;=]*?\b(\w+)\s*\([^;{]*?\)\s*(?:where[^{]*)?\n\s*\{"
 CLASS = r"^\s*(?:public|private|protected|internal|static|sealed|partial|abstract|\s)*class\s+(\w+)[^\n{]*\n\s*\{"
-LITERAL = r"\"((?:[^\"\\]|\\.)*)\""
+LITERAL = r"(?:L\()?\"((?:[^\"\\]|\\.)*)\"\)?"
 
 
 def cs_captions(path):
@@ -205,6 +216,51 @@ def cs_captions(path):
     return out
 
 
+def language_problems(captions):
+    """Every translated caption must carry a key, and no two in one scope may share
+    one - the rule above, applied to each catalogue in Resources with the captions
+    mapped through it. A caption the catalogue does not translate is shown in
+    English, so it keeps the English key and takes part in the English check only."""
+    import xml.etree.ElementTree as ET
+    resources = os.path.join(ROOT, "Resources")
+    if not os.path.isdir(resources):
+        return []
+    problems = []
+    for name in sorted(os.listdir(resources)):
+        m = re.fullmatch(r"Strings\.([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*)\.resx", name)
+        if not m:
+            continue
+        tag = m.group(1)
+        catalogue = {}
+        for data in ET.parse(os.path.join(resources, name)).getroot().findall("data"):
+            value = data.find("value")
+            if value is not None and value.text:
+                catalogue[data.get("name")] = value.text
+        by_scope = {}
+        for c in captions:
+            raw = catalogue.get(c.raw)
+            if raw is None or c.text in EXEMPT:
+                continue
+            translated = Caption(c.file, c.line, c.scope, raw, c.class_name)
+            rel = os.path.relpath(c.file, ROOT)
+            if c.key is not None and translated.key is None:
+                problems.append(f"{rel}:{c.line}: [{tag}] no mnemonic in \"{raw}\" (translation of \"{c.raw}\")")
+            if translated.key:
+                by_scope.setdefault((c.file, c.scope), []).append(translated)
+        for (file, scope), items in by_scope.items():
+            ctor = by_scope.get((file, items[0].class_name), []) if items[0].class_name and items[0].class_name != scope else []
+            seen = {}
+            rel = os.path.relpath(file, ROOT)
+            for c in items + ctor:
+                if c.key in seen:
+                    other = seen[c.key]
+                    if c in items:
+                        problems.append(f"{rel}:{c.line}: [{tag}] Alt+{c.key} in \"{c.raw}\" collides with \"{other.raw}\" (line {other.line}, scope {scope})")
+                else:
+                    seen[c.key] = c
+    return problems
+
+
 def main():
     listing = "--list" in sys.argv
     if hasattr(sys.stdout, "reconfigure"):
@@ -243,6 +299,7 @@ def main():
                         problems.append(f"{rel}:{c.line}: Alt+{c.key} in \"{c.raw}\" collides with \"{other.raw}\" (line {other.line}, scope {scope})")
                 else:
                     seen[c.key] = c
+    problems += language_problems(all_captions)
     if listing:
         for c in all_captions:
             print(f"{os.path.relpath(c.file, ROOT)}:{c.line}: [{c.scope}] {'Alt+' + c.key if c.key else '   -'}  {c.text}")
