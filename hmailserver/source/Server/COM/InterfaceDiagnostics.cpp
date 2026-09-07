@@ -8,6 +8,7 @@
 #include "InterfaceDiagnostics.h"
 #include "InterfaceDiagnosticResults.h"
 #include "../Common/TCPIP/DnssecResolver.h"
+#include "../Common/Util/AcmeClient.h"
 
 
 // InterfaceDiagnostics
@@ -216,6 +217,28 @@ STDMETHODIMP InterfaceDiagnostics::DnssecChainStatus(BSTR sName, BSTR sType, lon
       default:                                    *pVal = 2; break;
       }
 
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceDiagnostics::AcmeRenewalTime(double notBefore, double notAfter, double *pVal)
+{
+   try
+   {
+      if (!authentication_)
+         return GetAccessDenied();
+
+      if (!authentication_->GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      // The renewal arithmetic alone, for the tests that pin the lifetimes the
+      // industry is moving to: the ACME suggested-renewal window is the CA's
+      // opinion and is exercised where the CA is faked.
+      *pVal = (double) HM::AcmeClient::GetRenewalTime((time_t) notBefore, (time_t) notAfter);
       return S_OK;
    }
    catch (...)

@@ -409,6 +409,7 @@
     <Compile Include="Shared\FakeDnsServer.cs" />
     <Compile Include="Shared\DnssecSigner.cs" />
     <Compile Include="Security\DnssecDenialOfExistence.cs" />
+    <Compile Include="Security\AcmeRenewalTiming.cs" />
     <Compile Include="Shared\SuiteDns.cs" />
     <Compile Include="SMTP\OutboundPipelining.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />
