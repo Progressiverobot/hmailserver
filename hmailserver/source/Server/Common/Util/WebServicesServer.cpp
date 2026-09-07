@@ -717,6 +717,17 @@ namespace HM
       // been checked for CR and LF - see IsUsableRedirectTarget.
       response.extra_headers = extra_headers;
 
+      // Not cacheable unless the handler said otherwise. The default is the
+      // right answer for most of what this listener serves: an MTA-STS policy
+      // (RFC 8461 section 3.3 forbids HTTP caching of it outright), an ACME
+      // challenge that belongs to one order, an Apple profile with credentials
+      // in it, an autodiscover answer to a POST, and every refusal. The
+      // handlers whose answers change rarely and are fetched by many clients -
+      // security.txt, the Thunderbird autoconfig XML and the RFC 6764 redirects
+      // - carry their own Cache-Control.
+      if (extra_headers.Find("Cache-Control:") < 0)
+         response.extra_headers += "Cache-Control: no-store\r\n";
+
       return response;
    }
 
@@ -724,8 +735,12 @@ namespace HM
    WebServicesServer::BuildRedirectResponse_(const AnsiString &location)
    {
       // 301 rather than 302: RFC 6764 section 6 wants the client to remember
-      // the answer, so it stops asking the mail server about calendars.
+      // the answer, so it stops asking the mail server about calendars. A day
+      // of cache life says the same thing to any cache in between; the target
+      // is read from hMailServer.ini once a minute, so a change reaches new
+      // clients within that and everyone within the day.
       AnsiString headers = "Location: " + location + "\r\n";
+      headers += "Cache-Control: public, max-age=86400\r\n";
 
       return BuildResponse_(301, "text/plain", "moved permanently: " + location, headers);
    }
@@ -1059,7 +1074,10 @@ namespace HM
       body += AnsiString("Policy: ") + SecurityTxtPolicyUrl + "\r\n";
       body += "Preferred-Languages: en\r\n";
 
-      return BuildResponse_(200, "text/plain; charset=utf-8", body);
+      // Cacheable for an hour: the file names a contact and a policy that
+      // change rarely, its own Expires is months away, and scanners fetch it
+      // from many places.
+      return BuildResponse_(200, "text/plain; charset=utf-8", body, "Cache-Control: public, max-age=3600\r\n");
    }
 
    bool
@@ -1359,7 +1377,11 @@ namespace HM
       xml += "  </emailProvider>\r\n";
       xml += "</clientConfig>\r\n";
 
-      return BuildResponse_(200, "text/xml", xml);
+      // Cacheable for an hour: the same answer goes to every client of the
+      // domain, and a changed port or host name reaches new setups within
+      // the hour - a client that has already set itself up keeps what it
+      // was told in any case.
+      return BuildResponse_(200, "text/xml", xml, "Cache-Control: public, max-age=3600\r\n");
    }
 
    HttpResponse
