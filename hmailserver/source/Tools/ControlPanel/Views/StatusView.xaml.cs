@@ -142,6 +142,17 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(VersionValue, "Version", "-"); }
 
+         // The update check's verdict, kept by the server; the row says what the
+         // scheduled check (UpdateCheckEnabled) or an on-demand one last found.
+         try
+         {
+            dynamic status = app.Status;
+            SetValue_(UpdateValue, "Update", UpdateText_((int)status.UpdateState, (string)status.AvailableVersion,
+               (string)status.AvailableVersionPublished, (string)status.UpdateLastChecked, (string)status.UpdateLastError));
+            ServerSession.Release(status);
+         }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(UpdateValue, "Update", "-"); }
+
          try
          {
             int state = (int)app.ServerState;
@@ -215,6 +226,21 @@ namespace hMailServer.ControlPanel.Views
       /// what the dashboard's KPI row already does, and doing the same here means
       /// the two pages sound alike.
       /// </summary>
+      // One line for the status card, from Status.UpdateState and its companions.
+      internal static string UpdateText_(int state, string version, string published, string checkedAt, string error)
+      {
+         string when = string.IsNullOrEmpty(published) ? "" : " (published " + published + ")";
+         switch (state)
+         {
+            case 1: return "This is the latest release" + (string.IsNullOrEmpty(checkedAt) ? "" : ", checked " + checkedAt);
+            case 2: return version + " is available" + when;
+            case 3: return version + " is downloaded and verified" + when;
+            case 4: return "Installing " + version;
+            case 5: return "The last check failed: " + error;
+            default: return "Not checked yet (UpdateCheckEnabled in hMailServer.INI turns the daily check on)";
+         }
+      }
+
       private static void SetValue_(TextBlock value, string label, string text)
       {
          value.Text = text;

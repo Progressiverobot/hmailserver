@@ -20,7 +20,7 @@ Contents
 * [Capabilities](#capabilities) — what the server does
 * [Technology](#technology) — what it is built on
 * [Administration](#administration) — the Control Panel and the APIs
-* [Installing](#installing) — supported platforms and unattended install
+* [Installing](#installing) — supported platforms, unattended install and the update check
 * [Building hMailServer](#building-hmailserver)
 * [Configuration reference](#configuration-reference)
 * [Operator documentation](#operator-documentation) — the runbooks
@@ -90,6 +90,7 @@ Operations and observability
 * **Metric history**: one sample per metric per minute kept in the database (`MetricsHistoryDays`, a week by default), read back averaged per minute, ten minutes or hour by the Control Panel dashboard's 24 h / 7 d / 30 d views, by `GET /api/v1/metrics/history?metric=…&range=24h|7d|30d` and by `Utilities.GetMetricHistory` over COM.
 * **OpenTelemetry** export over OTLP/HTTP for all three signals - traces (`/v1/traces`), metrics (`/v1/metrics`) and logs (`/v1/logs`) - each with its own endpoint setting and each off until it is set. The exported metrics are the same counters the Prometheus `/metrics` endpoint serves, under the same names, rather than a second tally. Inbound W3C `traceparent` is honoured on HTTP and on SMTP (where it travels as a message header), and emitted onward, so a message keeps one trace across hops. Plus message-to-session correlation IDs.
 * Optional **JSON-structured logs**, log retention, per-service log files, and a slow-query log with every SQL string literal redacted.
+* An **update check** (`UpdateCheckEnabled=1`, off until you opt in): once a day the server reads the project's release feed and says in the application log, the Control Panel, `Status.UpdateState` and `GET /api/v1/update` when a newer release exists - the version, the date and the page. It sends nothing but the request, and it downloads and installs nothing; that is the rest of the roadmap's live-update row.
 * Per-stage timing of message acceptance, so a slow scanner, DNS lookup or event script is identified by name in the log rather than appearing as an unexplained pause. Acceptance is also bounded: if it runs past its deadline the sender gets a temporary `451` and retries, instead of waiting for a reply that never comes. Every wait that can hold a pooled thread - scanners, DNS, event scripts, external processes, outbound sessions - has a ceiling, and the work queue reports which task is holding each thread when they are all busy. See [diagnosing slow or stalled mail](hmailserver/docs/DiagnosingStalledMail.md).
 * Backup and restore, a read-only **message-store consistency check** with a recovery report, configurable message-store fsync, graceful-shutdown drain, and a documented active/passive HA runbook.
 
@@ -166,6 +167,27 @@ Two things to know, because they are limitations rather than choices:
 The installer checks both that the database tool launched *and* its exit code, so a failed or cancelled database create/upgrade cannot report a successful install — the service would otherwise come up against a missing or outdated schema. Treat a non-zero installer exit code as a failed install and read the log.
 
 Do not run the installer on a machine you are also using to build the server: it takes over the service path, the COM `LocalServer32` registration and the 32-bit `InstallLocation` registry value, which is exactly the state a development checkout needs to control.
+
+Update check
+------------
+
+The server can tell you when a newer release exists. With `UpdateCheckEnabled=1`
+in `hMailServer.INI` it reads the project's release feed once at startup and then
+every `UpdateCheckHours` (a day), compares the newest release the channel accepts
+with its own version, and says what it found in the application log, in the
+Control Panel, in `Status.UpdateState` / `Status.AvailableVersion` over COM and in
+`GET /api/v1/update` over the REST API: the version, when it was published and the
+release page. `UpdateChannel=prerelease` includes pre-releases; the default,
+`stable`, does not. `Status.CheckForUpdate` and `POST /api/v1/update/check` run a
+check on demand whether or not the scheduled one is on.
+
+It is off until you opt in, because a server must not call out to anyone until its
+administrator says it may; when it is on, the request is a plain `GET` of the
+GitHub Releases API with nothing but the `User-Agent` the server always sends - no
+identifier, no configuration, no counts. `UpdateFeedUrl` points it at a mirror on a
+network without Internet access. It downloads and installs nothing: verifying the
+installer against the release's Sigstore bundle and applying it are the next parts
+of the roadmap's live-update row.
 
 Building hMailServer
 ====================
@@ -383,6 +405,14 @@ Administration and monitoring:
    RestApiBindAddress=127.0.0.1  ; TLS is required unless bound to 127.0.0.1
    RestApiCertificateFile=       ; PEM; falls back to the ACME certificate
    RestApiPrivateKeyFile=
+   UpdateCheckEnabled=0          ; read the project's release feed once at startup and every UpdateCheckHours
+                                 ; and say in the application log, the Control Panel, Status.UpdateState and
+                                 ; GET /api/v1/update when a newer release exists. Nothing is downloaded or
+                                 ; installed by it. Off until you opt in; Status.CheckForUpdate and
+                                 ; POST /api/v1/update/check run a check on demand regardless
+   UpdateChannel=stable          ; prerelease to be told about pre-releases as well
+   UpdateCheckHours=24
+   UpdateFeedUrl=                ; a feed other than the GitHub Releases API (a mirror; the tests' fake)
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
                                  ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read
@@ -551,7 +581,7 @@ Administration and monitoring:
 
    The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 only when `StateRunning` and the database has answered a real round trip within the last 20 seconds, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database, uptime). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, the start time (`hmailserver_start_time_seconds`), database connectivity (`hmailserver_database_connected`, proved by a round trip, plus pool gauges), the SMTP delivery-queue depth and oldest-message age, certificate expiry, work-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and per-command and per-query latency histograms (`hmailserver_command_processing_seconds`, `hmailserver_db_query_seconds`).
 
-   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
+   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/update` (GET, the update check's verdict: state, the newer release's version, date, page and installer asset) and `/api/v1/update/check` (POST, read the release feed now), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
 
 Secret protection and least-privilege:
 

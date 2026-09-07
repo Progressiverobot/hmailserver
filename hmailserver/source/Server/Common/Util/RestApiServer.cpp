@@ -14,6 +14,7 @@
 #include "Totp.h"
 #include "AccountLogon.h"
 #include "AcmeClient.h"
+#include "UpdateChecker.h"
 #include "WebServicesServer.h"
 #include "../AntiSpam/QuarantineStore.h"
 #include "../BO/Aliases.h"
@@ -1624,6 +1625,10 @@ namespace HM
             return HandleSrv_(caller.domains);
          case RouteMetricsHistory:
             return HandleMetricsHistory_(route.query);
+         case RouteUpdateGet:
+            return HandleUpdateGet_();
+         case RouteUpdateCheck:
+            return HandleUpdateCheck_();
 
          case RouteQuarantineList:
             return HandleListQuarantine_();
@@ -1839,6 +1844,18 @@ namespace HM
       if (method == "GET" && path == "/api/v1/metrics/history")
       {
          route.kind = RouteMetricsHistory;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/update")
+      {
+         route.kind = RouteUpdateGet;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/update/check")
+      {
+         route.kind = RouteUpdateCheck;
          return;
       }
 
@@ -2073,6 +2090,9 @@ namespace HM
       case RouteBackupStart:
       case RouteArchiveHold:
       case RouteArchiveRelease:
+      // An update check changes the recorded verdict and makes the server call
+      // out, neither of which a read-only credential should be able to cause.
+      case RouteUpdateCheck:
          return true;
 
       default:
@@ -2163,9 +2183,12 @@ namespace HM
       case RouteBackupStart:
       case RouteBackupStatus:
       case RouteSettingsGet:
-         // IP ranges, certificates, global rules, the logs, the backup and the
-         // server settings are all server-wide: none of them belongs to a domain,
-         // and the logs in particular carry every domain's traffic.
+      case RouteUpdateGet:
+      case RouteUpdateCheck:
+         // IP ranges, certificates, global rules, the logs, the backup, the
+         // server settings and the update check are all server-wide: none of
+         // them belongs to a domain, and the logs in particular carry every
+         // domain's traffic.
          refusalReason = "this api key is restricted to named domains, and that resource is server-wide";
          return AuthorizationForbidden;
       default:
@@ -4288,6 +4311,8 @@ namespace HM
          "\"/api/v1/domains/{domain}/aliases\":{\"get\":{\"summary\":\"List aliases in a domain\",\"responses\":{\"200\":{\"description\":\"Array of aliases\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/tlsa\":{\"get\":{\"summary\":\"Recommended DANE TLSA records for the configured certificates\",\"responses\":{\"200\":{\"description\":\"Array of TLSA records\"}}}},"
          "\"/api/v1/srv\":{\"get\":{\"summary\":\"Recommended client-discovery SRV records (RFC 6186/8314 and Outlook autodiscover) for the enabled listeners\",\"description\":\"One record set per active domain; a domain-restricted key sees only its own domains. Only services that are enabled and not loopback-bound are advertised.\",\"responses\":{\"200\":{\"description\":\"Array of SRV records\"}}}},"
+         "\"/api/v1/update\":{\"get\":{\"summary\":\"The update check\'s verdict\",\"description\":\"state: 0 not checked since the service started, 1 up to date, 2 a newer release is available, 3 its installer is downloaded and verified, 4 installing, 5 the last check failed (lastError). availableVersion, releaseName, publishedAt, releaseUrl and installer describe the newer release when there is one. Nothing is fetched by this route; the scheduled check (UpdateCheckEnabled) or POST /api/v1/update/check does that.\",\"responses\":{\"200\":{\"description\":\"The verdict\"}}}},"
+         "\"/api/v1/update/check\":{\"post\":{\"summary\":\"Read the release feed now\",\"description\":\"Runs the update check on this request, whether or not the scheduled check is on, and returns the verdict as GET /api/v1/update does. Refused for read-only keys.\",\"responses\":{\"200\":{\"description\":\"The verdict after the check; state 5 with lastError when the feed could not be read\"}}}},"
          "\"/api/v1/metrics/history\":{\"get\":{\"summary\":\"The history of one metric\",\"description\":\"Query parameters: metric (a name from the exporter without the hmailserver_ prefix, e.g. sessions_smtp or processed_messages_total) and range (24h, 7d or 30d - samples averaged per minute, per ten minutes or per hour). Counters are totals; a rate is the difference between two samples. Empty when MetricsHistoryDays is 0.\",\"responses\":{\"200\":{\"description\":\"The samples\"},\"400\":{\"description\":\"Unknown metric or range\"}}}},"
          "\"/api/v1/apikeys\":{"
          "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
@@ -4775,6 +4800,23 @@ namespace HM
       }
 
       return result;
+   }
+
+   AnsiString
+   RestApiServer::HandleUpdateGet_()
+   {
+      return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
+   }
+
+   AnsiString
+   RestApiServer::HandleUpdateCheck_()
+   {
+      // The check's own outcome is in the verdict it returns (state 5 and
+      // lastError when the feed could not be read), so the response is 200
+      // either way: the request - run a check - was carried out.
+      String error;
+      UpdateChecker::CheckNow(error);
+      return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
    }
 
    AnsiString

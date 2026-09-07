@@ -8,6 +8,7 @@
 #include "InterfaceStatus.h"
 
 #include "../Common/Util/ServerStatus.h"
+#include "../Common/Util/UpdateChecker.h"
 
 InterfaceStatus::InterfaceStatus() :
    status_(nullptr),
@@ -144,6 +145,132 @@ InterfaceStatus::get_ThreadID(long* pVal)
          return GetAccessDenied();
 
       *pVal = status_->GetThreadID();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+// The update check. The verdict lives in UpdateChecker, process-wide, so the
+// Control Panel and the REST API read the same one; these are its view over COM.
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateState(long *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = (long) HM::UpdateChecker::Current().state;
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_AvailableVersion(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().available_version.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_AvailableVersionPublished(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().published_at.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_AvailableVersionUrl(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().release_url.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateLastChecked(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().last_checked.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateLastError(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().last_error.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::CheckForUpdate(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      // On the caller's thread, so that when this returns the properties are the
+      // answer. A feed that cannot be read is false with UpdateLastError set, not
+      // a COM error: the caller asked a question and this is the answer to it.
+      HM::String error;
+      *pVal = HM::UpdateChecker::CheckNow(error) ? VARIANT_TRUE : VARIANT_FALSE;
       return S_OK;
    }
    catch (...)

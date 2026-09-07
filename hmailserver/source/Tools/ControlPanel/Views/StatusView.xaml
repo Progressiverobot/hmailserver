@@ -52,6 +52,7 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Version" Style="{StaticResource StatusLabel}" />
                                 <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionValue" Style="{StaticResource StatusValue}" />
@@ -61,6 +62,8 @@
                                 <TextBlock Grid.Row="2" Grid.Column="1" x:Name="StartedValue" Style="{StaticResource StatusValue}" />
                                 <TextBlock Grid.Row="3" Grid.Column="0" Text="Uptime" Style="{StaticResource StatusLabel}" />
                                 <TextBlock Grid.Row="3" Grid.Column="1" x:Name="UptimeValue" Style="{StaticResource StatusValue}" />
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Update" Style="{StaticResource StatusLabel}" />
+                                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="UpdateValue" Style="{StaticResource StatusValue}" TextWrapping="Wrap" />
                             </Grid>
                         </StackPanel>
                     </Border>
