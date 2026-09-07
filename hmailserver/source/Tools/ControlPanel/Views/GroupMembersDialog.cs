@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -46,7 +47,7 @@ namespace hMailServer.ControlPanel.Views
          groupName_ = groupName ?? "";
 
          Owner = owner;
-         Title = "Members - " + groupName_;
+         Title = L("Members - ") + groupName_;
          Width = 520;
          SizeToContent = SizeToContent.Height;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -67,9 +68,7 @@ namespace hMailServer.ControlPanel.Views
 
          var blurb = new TextBlock
          {
-            Text = "A group exists so that several accounts can be given the same rights at once - "
-                   + "grant the group access to a public folder under Public folders, and every account "
-                   + "listed here gets that access. An empty group grants nothing to anyone.",
+            Text = L("A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone."),
             FontSize = Typography.Label,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
@@ -77,7 +76,7 @@ namespace hMailServer.ControlPanel.Views
          blurb.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
          panel.Children.Add(blurb);
 
-         System.Windows.Automation.AutomationProperties.SetName(list_, "Accounts in the group " + groupName_);
+         System.Windows.Automation.AutomationProperties.SetName(list_, F("Accounts in the group {0}", groupName_));
          System.Windows.Automation.AutomationProperties.SetAutomationId(list_, "group-members-list");
          panel.Children.Add(list_);
 
@@ -91,32 +90,32 @@ namespace hMailServer.ControlPanel.Views
 
          var add = new Wpf.Ui.Controls.Button
          {
-            Content = "_Add account…",
+            Content = L("_Add account…"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 110
          };
-         System.Windows.Automation.AutomationProperties.SetName(add, "Add an account to this group");
+         System.Windows.Automation.AutomationProperties.SetName(add, L("Add an account to this group"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(add, "group-members-add");
          add.Click += (s, e) => AddMember();
          buttons.Children.Add(add);
 
          var remove = new Wpf.Ui.Controls.Button
          {
-            Content = "_Remove",
+            Content = L("_Remove"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 90
          };
-         System.Windows.Automation.AutomationProperties.SetName(remove, "Remove the selected account from this group");
+         System.Windows.Automation.AutomationProperties.SetName(remove, L("Remove the selected account from this group"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(remove, "group-members-remove");
          remove.Click += (s, e) => RemoveSelected();
          buttons.Children.Add(remove);
 
          // IsCancel only, and deliberately not the default button: Enter with a row
          // selected must not re-open the add prompt.
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", MinWidth = 80, IsCancel = true };
-         System.Windows.Automation.AutomationProperties.SetName(close, "Close the group members window");
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 80, IsCancel = true };
+         System.Windows.Automation.AutomationProperties.SetName(close, L("Close the group members window"));
          close.Click += (s, e) => Close();
          buttons.Children.Add(close);
 
@@ -168,19 +167,19 @@ namespace hMailServer.ControlPanel.Views
                }
 
                if (string.IsNullOrWhiteSpace(label))
-                  label = "(account " + (int)member.AccountID + " no longer exists)";
+                  label = F("(account {0} no longer exists)", (int)member.AccountID);
 
                memberIds_.Add(memberId);
                list_.Items.Add(label);
             }
 
             status_.Text = count == 0
-               ? "This group has no accounts in it, so any permission granted to it currently applies to nobody."
-               : count + (count == 1 ? " account is a member." : " accounts are members.");
+               ? L("This group has no accounts in it, so any permission granted to it currently applies to nobody.")
+               : (count == 1 ? L("1 account is a member.") : F("{0} accounts are members.", count));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "The group members could not be read: " + ServerSession.DescribeComError(ex);
+            status_.Text = L("The group members could not be read: ") + ServerSession.DescribeComError(ex);
          }
       }
 
@@ -246,7 +245,7 @@ namespace hMailServer.ControlPanel.Views
 
             if (candidates.Count == 0)
             {
-               MessageBox.Show("There are no accounts on this server to add.", "Control Panel");
+               MessageBox.Show(L("There are no accounts on this server to add."), L("Control Panel"));
                return;
             }
 
@@ -269,7 +268,7 @@ namespace hMailServer.ControlPanel.Views
             {
                if ((int)members[i].AccountID == accountId)
                {
-                  MessageBox.Show(address + " is already a member of this group.", "Control Panel");
+                  MessageBox.Show(F("{0} is already a member of this group.", address), L("Control Panel"));
                   return;
                }
             }
@@ -284,7 +283,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("The account could not be added to the group: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("The account could not be added to the group: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
          }
       }
 
@@ -296,9 +295,8 @@ namespace hMailServer.ControlPanel.Views
 
          string label = (string)list_.Items[index];
 
-         if (MessageBox.Show("Remove " + label + " from " + groupName_ + "?\r\n\r\n"
-                             + "Any access this group has been granted stops applying to that account.",
-                             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+         if (MessageBox.Show(F("Remove {0} from {1}?\r\n\r\nAny access this group has been granted stops applying to that account.", label, groupName_),
+                             L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
          {
             return;
          }
@@ -311,7 +309,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("The account could not be removed from the group: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("The account could not be removed from the group: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
          }
       }
    }
@@ -329,7 +327,7 @@ namespace hMailServer.ControlPanel.Views
          var dlg = new FluentDialogWindow
          {
             Owner = owner,
-            Title = "Add account to group",
+            Title = L("Add account to group"),
             Width = 420,
             SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize,
@@ -341,7 +339,7 @@ namespace hMailServer.ControlPanel.Views
 
          var label = new TextBlock
          {
-            Text = "Account to add",
+            Text = L("Account to add"),
             FontSize = Typography.Label,
             Margin = new Thickness(0, 0, 0, 6)
          };
@@ -352,7 +350,7 @@ namespace hMailServer.ControlPanel.Views
          foreach (string address in addresses)
             combo.Items.Add(address);
          combo.SelectedIndex = 0;
-         System.Windows.Automation.AutomationProperties.SetName(combo, "Account to add to the group");
+         System.Windows.Automation.AutomationProperties.SetName(combo, L("Account to add to the group"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(combo, "group-members-pick");
          panel.Children.Add(combo);
 
@@ -362,7 +360,7 @@ namespace hMailServer.ControlPanel.Views
 
          var ok = new Wpf.Ui.Controls.Button
          {
-            Content = "_Add",
+            Content = L("_Add"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 80,
@@ -371,7 +369,7 @@ namespace hMailServer.ControlPanel.Views
          ok.Click += (s, e) => { result = combo.SelectedItem as string; dlg.DialogResult = true; dlg.Close(); };
          buttons.Children.Add(ok);
 
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => dlg.Close();
          buttons.Children.Add(cancel);
 

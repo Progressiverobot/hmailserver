@@ -5,6 +5,7 @@ using System.Windows;
 using hMailServer.ControlPanel.Services;
 using System.Windows.Controls;
 using System.Windows.Input;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -27,7 +28,7 @@ namespace hMailServer.ControlPanel.Views
       public TotpPromptDialog(Window owner)
       {
          Owner = owner;
-         Title = "Two-factor authentication";
+         Title = L("Two-factor authentication");
          Width = 400;
          Height = 230;
          ResizeMode = ResizeMode.NoResize;
@@ -37,7 +38,7 @@ namespace hMailServer.ControlPanel.Views
          var panel = new StackPanel { Margin = new Thickness(20) };
          var info = new TextBlock
          {
-            Text = "Enter the 6-digit code from your authenticator app:",
+            Text = L("Enter the 6-digit code from your authenticator app:"),
             FontSize = Typography.Body,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
@@ -49,7 +50,7 @@ namespace hMailServer.ControlPanel.Views
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
          var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          ok.Click += (s, e) => { DialogResult = true; Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => { DialogResult = false; Close(); };
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);

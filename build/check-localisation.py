@@ -88,6 +88,27 @@ LOCALISED = {
    "Views/StatusView.xaml.cs",
    "Views/TcpIpPortsView.xaml",
    "Views/TcpIpPortsView.xaml.cs",
+   "Views/DomainDialog.cs",
+   "Views/AccountDialog.cs",
+   "Views/CollectionSpecs.cs",
+   "Views/FolderPermissionsDialog.cs",
+   "Views/TcpIpPortDialog.cs",
+   "Views/RouteDialog.cs",
+   "Views/IPRangeDialog.cs",
+   "Views/GroupMembersDialog.cs",
+   "Views/RuleActionDialog.cs",
+   "Views/DistributionListDialog.cs",
+   "Views/RuleCriteriaDialog.cs",
+   "Views/AppPasswordsPanel.cs",
+   "Views/RecipientsDialog.cs",
+   "Views/ActiveDirectoryPickerDialog.cs",
+   "Views/TotpSetupDialog.cs",
+   "Views/AdministratorTwoFactorDialog.cs",
+   "Views/CollectionEditorView.cs",
+   "Views/AccountTwoFactorPanel.cs",
+   "Views/MessageViewerDialog.cs",
+   "Views/TotpPromptDialog.cs",
+   "Views/FieldDialog.cs",
 }
 
 # Literal texts that are the same in every language and are not captions to
@@ -251,7 +272,7 @@ NON_UI_CALL = re.compile(
    r"|GetValue|SetValue|ReadFrom|WriteTo|ReadValue|LiveBool_|LiveText_|LiveInt_|SecretConfigured_|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
    r"|Split|Replace|IndexOf|TryParse|TryParseExact|ParseExact|GetFiles|Path\.Join|Path\.Combine|nameof|Debug\.Fail"
    r"|Debug\.Assert|LogException|RunUpdateAction_|NavigateTo|Slug|GetString|Equals|Compare|Regex|Match|\w+Exception)\s*\(")
-NON_UI_CONTEXT = re.compile(r"(?:\bcase\s|==|!=|\bis\s|\[|\bTag\s*=|\bKey\s*=|\bPath\s*=|\bconst\s)\s*$")
+NON_UI_CONTEXT = re.compile(r"(?:\bcase\s|==|!=|\bis\s|\[|\bTag\s*=|\bKey\s*=|\bPath\s*=|\bProp\s*=|\bconst\s)\s*$")
 # named arguments whose value is a search term list or an icon name, not a caption
 NON_UI_ARGUMENT = re.compile(r"\b(?:aliases|seeAlso|icon):")
 
@@ -361,6 +382,15 @@ def main():
 
    texts = marked_texts()
    wanted = sorted(texts)
+   # MSBuild's resource compiler treats names case-insensitively (MSB3568), so
+   # two marked texts that differ only in case would be one resource
+   folded = {}
+   for t in wanted:
+      folded.setdefault(t.lower(), []).append(t)
+   for group in folded.values():
+      if len(group) > 1:
+         problems.append("these marked texts differ only in case and the resource compiler treats them as one; reword one: "
+                         + ", ".join(repr(t) + " (" + texts[t][0] + ")" for t in group))
    os.makedirs(RESOURCES, exist_ok=True)
 
    if write:

@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -29,7 +30,7 @@ namespace hMailServer.ControlPanel.Views
          criteriaId_ = criteriaId;
          rulesProvider_ = rulesProvider ?? (() => ServerSession.Current.Application.Rules);
          Owner = owner;
-         Title = criteriaId == 0 ? "Add criterion" : "Edit criterion";
+         Title = criteriaId == 0 ? L("Add criterion") : L("Edit criterion");
          Width = 480;
          Height = 380;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -43,41 +44,41 @@ namespace hMailServer.ControlPanel.Views
          // Upper-case deliberately, sentence-case sweep notwithstanding: "IF" is
          // the rule grammar's keyword, not prose. RulesView's editor panes carry
          // the same IF/THEN pair, and this dialog edits one clause of it.
-         var header = new TextBlock { Text = "IF", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = L("IF"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("_Field", field_));
-         field_.Items.Add(Combo("From", 1));
-         field_.Items.Add(Combo("To", 2));
-         field_.Items.Add(Combo("CC", 3));
-         field_.Items.Add(Combo("Subject", 4));
-         field_.Items.Add(Combo("Body", 5));
-         field_.Items.Add(Combo("Message size", 6));
-         field_.Items.Add(Combo("Recipient list", 7));
-         field_.Items.Add(Combo("Delivery attempts", 8));
-         field_.Items.Add(Combo("Custom header\u2026", 0));
+         body.Children.Add(Label(L("_Field"), field_));
+         field_.Items.Add(Combo(L("From"), 1));
+         field_.Items.Add(Combo(L("To"), 2));
+         field_.Items.Add(Combo(L("CC"), 3));
+         field_.Items.Add(Combo(L("Subject"), 4));
+         field_.Items.Add(Combo(L("Body"), 5));
+         field_.Items.Add(Combo(L("Message size"), 6));
+         field_.Items.Add(Combo(L("Recipient list"), 7));
+         field_.Items.Add(Combo(L("Delivery attempts"), 8));
+         field_.Items.Add(Combo(L("Custom header\u2026"), 0));
          field_.SelectionChanged += (s, e) => UpdateVisibility();
          body.Children.Add(field_);
 
-         headerPanel_.Children.Add(Label("_Header name (e.g. X-Spam-Status)", header_));
+         headerPanel_.Children.Add(Label(L("_Header name (e.g. X-Spam-Status)"), header_));
          headerPanel_.Children.Add(Input(header_));
          body.Children.Add(headerPanel_);
 
-         body.Children.Add(Label("_Match type", match_));
-         match_.Items.Add(Combo("equals", 1));
-         match_.Items.Add(Combo("contains", 2));
-         match_.Items.Add(Combo("is less than", 3));
-         match_.Items.Add(Combo("is greater than", 4));
-         match_.Items.Add(Combo("matches regex", 5));
-         match_.Items.Add(Combo("does not contain", 6));
-         match_.Items.Add(Combo("does not equal", 7));
-         match_.Items.Add(Combo("matches wildcard", 8));
+         body.Children.Add(Label(L("_Match type"), match_));
+         match_.Items.Add(Combo(L("equals"), 1));
+         match_.Items.Add(Combo(L("contains"), 2));
+         match_.Items.Add(Combo(L("is less than"), 3));
+         match_.Items.Add(Combo(L("is greater than"), 4));
+         match_.Items.Add(Combo(L("matches regex"), 5));
+         match_.Items.Add(Combo(L("does not contain"), 6));
+         match_.Items.Add(Combo(L("does not equal"), 7));
+         match_.Items.Add(Combo(L("matches wildcard"), 8));
          body.Children.Add(match_);
 
-         body.Children.Add(Label("_Value", value_));
+         body.Children.Add(Label(L("_Value"), value_));
          body.Children.Add(Input(value_));
 
          var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -86,9 +87,9 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -142,7 +143,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the criterion: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the criterion: {0}", ex.Message), L("Control Panel"));
             Close();
             return;
          }
@@ -193,7 +194,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the criterion: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the criterion: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

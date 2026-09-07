@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using hMailServer.ControlPanel.Services;
 using static hMailServer.ControlPanel.Views.CollectionEditorView;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -29,105 +30,101 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private static readonly (int Value, string Label)[] ServerTypeOptions =
       {
-         (0, "POP3 - download and (unless kept for N days) delete"),
-         (1, "IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0")
+         (0, L("POP3 - download and (unless kept for N days) delete")),
+         (1, L("IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0"))
       };
 
       private static readonly (int Value, string Label)[] ConnectionSecurityOptions =
       {
-         (0, "None - no encryption (port 110)"),
-         (1, "SSL/TLS - encrypted from the first byte (port 995)"),
-         (2, "STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)"),
-         (3, "STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)")
+         (0, L("None - no encryption (port 110)")),
+         (1, L("SSL/TLS - encrypted from the first byte (port 995)")),
+         (2, L("STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)")),
+         (3, L("STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)"))
       };
 
       public static CollectionEditorView SurblServers() => new(new CollectionSpec
       {
-         Title = "SURBL servers",
-         Subtitle = "Spam URI Realtime Block Lists. Messages whose body links resolve on these hosts gain spam score.",
-         ItemNoun = "SURBL server",
+         Title = L("SURBL servers"),
+         Subtitle = L("Spam URI Realtime Block Lists. Messages whose body links resolve on these hosts gain spam score."),
+         ItemNoun = L("SURBL server"),
          GetCollection = () => AntiSpam.SURBLServers,
          Fields =
          {
-            new FieldSpec { Prop = "Active", Label = "Active", Kind = FieldKind.Bool, GridWidth = 70 },
-            new FieldSpec { Prop = "DNSHost", Label = "DNS host" },
-            new FieldSpec { Prop = "RejectMessage", Label = "Reject message" },
-            new FieldSpec { Prop = "Score", Label = "Score", Kind = FieldKind.Number, GridWidth = 80, Default = 5 }
+            new FieldSpec { Prop = "Active", Label = L("Active"), Kind = FieldKind.Bool, GridWidth = 70 },
+            new FieldSpec { Prop = "DNSHost", Label = L("DNS host") },
+            new FieldSpec { Prop = "RejectMessage", Label = L("Reject message") },
+            new FieldSpec { Prop = "Score", Label = L("Score"), Kind = FieldKind.Number, GridWidth = 80, Default = 5 }
          }
       });
 
       public static CollectionEditorView DnsBlackLists() => new(new CollectionSpec
       {
-         Title = "DNS blacklists (DNSBL)",
-         Subtitle = "Real-time blackhole lists checked against the connecting IP address.",
-         ItemNoun = "blacklist",
+         Title = L("DNS blacklists (DNSBL)"),
+         Subtitle = L("Real-time blackhole lists checked against the connecting IP address."),
+         ItemNoun = L("blacklist"),
          GetCollection = () => AntiSpam.DNSBlackLists,
          Fields =
          {
-            new FieldSpec { Prop = "Active", Label = "Active", Kind = FieldKind.Bool, GridWidth = 70 },
-            new FieldSpec { Prop = "DNSHost", Label = "DNS host" },
-            new FieldSpec { Prop = "ExpectedResult", Label = "Expected result", GridWidth = 130 },
-            new FieldSpec { Prop = "RejectMessage", Label = "Reject message" },
-            new FieldSpec { Prop = "Score", Label = "Score", Kind = FieldKind.Number, GridWidth = 80, Default = 5 }
+            new FieldSpec { Prop = "Active", Label = L("Active"), Kind = FieldKind.Bool, GridWidth = 70 },
+            new FieldSpec { Prop = "DNSHost", Label = L("DNS host") },
+            new FieldSpec { Prop = "ExpectedResult", Label = L("Expected result"), GridWidth = 130 },
+            new FieldSpec { Prop = "RejectMessage", Label = L("Reject message") },
+            new FieldSpec { Prop = "Score", Label = L("Score"), Kind = FieldKind.Number, GridWidth = 80, Default = 5 }
          }
       });
 
       public static CollectionEditorView SpamWhiteList() => new(new CollectionSpec
       {
-         Title = "Anti-spam white list",
-         Subtitle = "Senders or IP ranges that bypass spam protection entirely.",
-         ItemNoun = "white-list entry",
+         Title = L("Anti-spam white list"),
+         Subtitle = L("Senders or IP ranges that bypass spam protection entirely."),
+         ItemNoun = L("white-list entry"),
          GetCollection = () => AntiSpam.WhiteListAddresses,
          Fields =
          {
-            new FieldSpec { Prop = "LowerIPAddress", Label = "Lower IP", GridWidth = 150 },
-            new FieldSpec { Prop = "UpperIPAddress", Label = "Upper IP", GridWidth = 150 },
-            new FieldSpec { Prop = "EmailAddress", Label = "E-mail address" },
-            new FieldSpec { Prop = "Description", Label = "Description" }
+            new FieldSpec { Prop = "LowerIPAddress", Label = L("Lower IP"), GridWidth = 150 },
+            new FieldSpec { Prop = "UpperIPAddress", Label = L("Upper IP"), GridWidth = 150 },
+            new FieldSpec { Prop = "EmailAddress", Label = L("E-mail address") },
+            new FieldSpec { Prop = "Description", Label = L("Description") }
          }
       });
 
       public static CollectionEditorView BlockedSenders() => new(new CollectionSpec
       {
-         Title = "Blocked senders",
-         Subtitle = "Envelope senders refused outright, or scored. An entry with an @ is one exact address; " +
-                    "without one it is a whole domain including its subdomains. The default score of 100 " +
-                    "crosses the delete threshold and refuses the message during the SMTP conversation. " +
-                    "This matches the address the sender CLAIMS, so it stops a correspondent who keeps using " +
-                    "one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses.",
-         ItemNoun = "blocked sender",
+         Title = L("Blocked senders"),
+         Subtitle = L("Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses."),
+         ItemNoun = L("blocked sender"),
          GetCollection = () => AntiSpam.BlockedSenders,
          Fields =
          {
-            new FieldSpec { Prop = "Address", Label = "Address or domain", GridWidth = 260 },
-            new FieldSpec { Prop = "Score", Label = "Score", GridWidth = 80, Default = "100" },
-            new FieldSpec { Prop = "Description", Label = "Description" }
+            new FieldSpec { Prop = "Address", Label = L("Address or domain"), GridWidth = 260 },
+            new FieldSpec { Prop = "Score", Label = L("Score"), GridWidth = 80, Default = "100" },
+            new FieldSpec { Prop = "Description", Label = L("Description") }
          }
       });
 
       public static CollectionEditorView GreyListWhiteList() => new(new CollectionSpec
       {
-         Title = "Greylisting white list",
-         Subtitle = "IP addresses exempt from greylisting delays.",
-         ItemNoun = "address",
+         Title = L("Greylisting white list"),
+         Subtitle = L("IP addresses exempt from greylisting delays."),
+         ItemNoun = L("IP address"),
          GetCollection = () => AntiSpam.GreyListingWhiteAddresses,
          Fields =
          {
-            new FieldSpec { Prop = "IPAddress", Label = "IP address", GridWidth = 200 },
-            new FieldSpec { Prop = "Description", Label = "Description" }
+            new FieldSpec { Prop = "IPAddress", Label = L("IP address"), GridWidth = 200 },
+            new FieldSpec { Prop = "Description", Label = L("Description") }
          }
       });
 
       public static CollectionEditorView BlockedAttachments() => new(new CollectionSpec
       {
-         Title = "Blocked attachments",
-         Subtitle = "File-name wildcards that are stripped from incoming messages (requires attachment blocking on the Anti-virus page).",
-         ItemNoun = "rule",
+         Title = L("Blocked attachments"),
+         Subtitle = L("File-name wildcards that are stripped from incoming messages (requires attachment blocking on the Anti-virus page)."),
+         ItemNoun = L("rule"),
          GetCollection = () => Settings.AntiVirus.BlockedAttachments,
          Fields =
          {
-            new FieldSpec { Prop = "Wildcard", Label = "Wildcard", GridWidth = 220, Default = "*.exe" },
-            new FieldSpec { Prop = "Description", Label = "Description" }
+            new FieldSpec { Prop = "Wildcard", Label = L("Wildcard"), GridWidth = 220, Default = "*.exe" },
+            new FieldSpec { Prop = "Description", Label = L("Description") }
          }
       });
 
@@ -140,30 +137,28 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       public static UserControl Groups() => new GroupsPageView(new CollectionSpec
       {
-         Title = "Groups",
-         Subtitle = "Security groups used to grant shared-folder (IMAP ACL) permissions to several accounts at once. " +
-                    "A group's permissions cover exactly the accounts on its member list - select a group and choose " +
-                    "Members to edit that list.",
-         ItemNoun = "group",
+         Title = L("Groups"),
+         Subtitle = L("Security groups used to grant shared-folder (IMAP ACL) permissions to several accounts at once. A group's permissions cover exactly the accounts on its member list - select a group and choose Members to edit that list."),
+         ItemNoun = L("security group"),
          GetCollection = () => Settings.Groups,
          Fields =
          {
-            new FieldSpec { Prop = "Name", Label = "Group name" }
+            new FieldSpec { Prop = "Name", Label = L("Group name") }
          }
       });
 
       public static CollectionEditorView ServerMessages() => new(new CollectionSpec
       {
-         Title = "Server messages",
-         Subtitle = "The text templates the server returns to clients (greetings, bounce and error messages). These are a fixed set you can edit.",
-         ItemNoun = "message",
+         Title = L("Server messages"),
+         Subtitle = L("The text templates the server returns to clients (greetings, bounce and error messages). These are a fixed set you can edit."),
+         ItemNoun = L("message"),
          CanAdd = false,
          CanDelete = false,
          GetCollection = () => Settings.ServerMessages,
          Fields =
          {
-            new FieldSpec { Prop = "Name", Label = "Name", GridWidth = 260 },
-            new FieldSpec { Prop = "Text", Label = "Text", Kind = FieldKind.Multiline }
+            new FieldSpec { Prop = "Name", Label = L("Name"), GridWidth = 260 },
+            new FieldSpec { Prop = "Text", Label = L("Text"), Kind = FieldKind.Multiline }
          }
       });
 
@@ -190,9 +185,9 @@ namespace hMailServer.ControlPanel.Views
       /// <summary>Domain-name aliases for one domain (embedded in the Domain editor).</summary>
       public static CollectionEditorView DomainAliases(string domainName) => new(new CollectionSpec
       {
-         Title = "Domain aliases",
-         Subtitle = "Alternative domain names treated as this domain. Mail sent to user@alias is delivered to user@" + domainName + ".",
-         ItemNoun = "alias",
+         Title = L("Domain aliases"),
+         Subtitle = F("Alternative domain names treated as this domain. Mail sent to user@alias is delivered to user@{0}.", domainName),
+         ItemNoun = L("alias"),
          GetCollection = () =>
          {
             dynamic domain = OpenDomain(domainName);
@@ -202,17 +197,16 @@ namespace hMailServer.ControlPanel.Views
          },
          Fields =
          {
-            new FieldSpec { Prop = "AliasName", Label = "Alias domain name (e.g. example.net)", Default = "" }
+            new FieldSpec { Prop = "AliasName", Label = L("Alias domain name (e.g. example.net)"), Default = "" }
          }
       }, embedded: true);
 
       /// <summary>External POP3 download (fetch) accounts for one account.</summary>
       public static CollectionEditorView FetchAccounts(string domainName, string address) => new(new CollectionSpec
       {
-         Title = "External accounts",
-         Subtitle = "POP3 or IMAP mailboxes hMailServer collects mail from on behalf of this account. "
-                    + "Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143.",
-         ItemNoun = "external account",
+         Title = L("External accounts"),
+         Subtitle = L("POP3 or IMAP mailboxes hMailServer collects mail from on behalf of this account. Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143."),
+         ItemNoun = L("external account"),
          GetCollection = () =>
          {
             dynamic account = OpenAccount(domainName, address);
@@ -222,15 +216,15 @@ namespace hMailServer.ControlPanel.Views
          },
          Fields =
          {
-            new FieldSpec { Prop = "Enabled", Label = "Enabled", Kind = FieldKind.Bool, GridWidth = 70, Default = true },
-            new FieldSpec { Prop = "Name", Label = "Name", GridWidth = 150, Default = "" },
-            new FieldSpec { Prop = "ServerType", Label = "Server type", Kind = FieldKind.Combo, Options = ServerTypeOptions, GridWidth = 90, Default = 0 },
-            new FieldSpec { Prop = "ServerAddress", Label = "Server", Default = "" },
-            new FieldSpec { Prop = "Port", Label = "Port", Kind = FieldKind.Number, GridWidth = 70, Default = 110 },
-            new FieldSpec { Prop = "Username", Label = "User name", ShowInGrid = false, Default = "" },
-            new FieldSpec { Prop = "Password", Label = "Password", Kind = FieldKind.Password, ShowInGrid = false, Default = "" },
-            new FieldSpec { Prop = "MinutesBetweenFetch", Label = "Minutes between downloads", Kind = FieldKind.Number, ShowInGrid = false, Default = 15 },
-            new FieldSpec { Prop = "DaysToKeepMessages", Label = "Days to keep on server (0 = delete after download)", Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
+            new FieldSpec { Prop = "Enabled", Label = L("Enabled"), Kind = FieldKind.Bool, GridWidth = 70, Default = true },
+            new FieldSpec { Prop = "Name", Label = L("Name"), GridWidth = 150, Default = "" },
+            new FieldSpec { Prop = "ServerType", Label = L("Server type"), Kind = FieldKind.Combo, Options = ServerTypeOptions, GridWidth = 90, Default = 0 },
+            new FieldSpec { Prop = "ServerAddress", Label = L("Server"), Default = "" },
+            new FieldSpec { Prop = "Port", Label = L("Port"), Kind = FieldKind.Number, GridWidth = 70, Default = 110 },
+            new FieldSpec { Prop = "Username", Label = L("User name"), ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "Password", Label = L("Password"), Kind = FieldKind.Password, ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "MinutesBetweenFetch", Label = L("Minutes between downloads"), Kind = FieldKind.Number, ShowInGrid = false, Default = 15 },
+            new FieldSpec { Prop = "DaysToKeepMessages", Label = L("Days to keep on server (0 = delete after download)"), Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
             // Was a "Use SSL/TLS" checkbox, which could not express STARTTLS at
             // all. The COM property behind that checkbox is UseSSL, and its
             // getter is ConnectionSecurity == CSSSL while its setter writes
@@ -247,26 +241,26 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec
             {
                Prop = "ConnectionSecurity",
-               Label = "Connection security",
+               Label = L("Connection security"),
                Kind = FieldKind.Combo,
                Options = ConnectionSecurityOptions,
                GridWidth = 150,
                Default = 0
             },
-            new FieldSpec { Prop = "UseAntiSpam", Label = "Run anti-spam on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
-            new FieldSpec { Prop = "UseAntiVirus", Label = "Run anti-virus on downloaded mail", Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            new FieldSpec { Prop = "UseAntiSpam", Label = L("Run anti-spam on downloaded mail"), Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            new FieldSpec { Prop = "UseAntiVirus", Label = L("Run anti-virus on downloaded mail"), Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
             // IMAP accounts only; the server ignores it for POP3. A migration rather than a
             // collection: every folder, verbatim, flags and dates kept, nothing delivered.
-            new FieldSpec { Prop = "MirrorFolders", Label = "Mirror every folder (IMAP only: a migration, verbatim, with flags and dates)", Kind = FieldKind.Bool, ShowInGrid = false, Default = false }
+            new FieldSpec { Prop = "MirrorFolders", Label = L("Mirror every folder (IMAP only: a migration, verbatim, with flags and dates)"), Kind = FieldKind.Bool, ShowInGrid = false, Default = false }
          }
       }, embedded: true);
 
       /// <summary>Account-level rules (enable/disable and delete; criteria/actions are not edited here).</summary>
       public static CollectionEditorView AccountRules(string domainName, string address) => new(new CollectionSpec
       {
-         Title = "Rules",
-         Subtitle = "Per-account rules. You can add, rename, enable/disable and delete rules here; matching criteria and actions are managed on the server.",
-         ItemNoun = "rule",
+         Title = L("Rules"),
+         Subtitle = L("Per-account rules. You can add, rename, enable/disable and delete rules here; matching criteria and actions are managed on the server."),
+         ItemNoun = L("rule"),
          GetCollection = () =>
          {
             dynamic account = OpenAccount(domainName, address);
@@ -276,8 +270,8 @@ namespace hMailServer.ControlPanel.Views
          },
          Fields =
          {
-            new FieldSpec { Prop = "Active", Label = "Active", Kind = FieldKind.Bool, GridWidth = 70, Default = true },
-            new FieldSpec { Prop = "Name", Label = "Rule name", Default = "" }
+            new FieldSpec { Prop = "Active", Label = L("Active"), Kind = FieldKind.Bool, GridWidth = 70, Default = true },
+            new FieldSpec { Prop = "Name", Label = L("Rule name"), Default = "" }
          }
       }, embedded: true);
    }
@@ -294,8 +288,8 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public sealed class GroupsPageView : UserControl, IPageLifecycle
    {
-      private const string HintNoSelection =
-         "Select a group to edit which accounts are members of it.";
+      private static string HintNoSelection =>
+         L("Select a group to edit which accounts are members of it.");
 
       private readonly CollectionEditorView editor_;
       private readonly Wpf.Ui.Controls.Button membersButton_;
@@ -332,11 +326,11 @@ namespace hMailServer.ControlPanel.Views
 
          membersButton_ = new Wpf.Ui.Controls.Button
          {
-            Content = "_Members…",
+            Content = L("_Members…"),
             MinWidth = 110,
             IsEnabled = false
          };
-         AutomationProperties.SetName(membersButton_, "Edit the members of the selected group");
+         AutomationProperties.SetName(membersButton_, L("Edit the members of the selected group"));
          membersButton_.Click += (_, _) => OpenMembers();
          membersRow.Children.Add(membersButton_);
 
@@ -369,9 +363,9 @@ namespace hMailServer.ControlPanel.Views
          if (grid.SelectedItem is Row row && row.Id > 0)
          {
             selectedGroupId_ = row.Id;
-            selectedGroupName_ = row.Display("Name");
+            selectedGroupName_ = row.Display("Name"); // no-loc
             membersButton_.IsEnabled = true;
-            membersHint_.Text = "Open the member list of '" + selectedGroupName_ + "'.";
+            membersHint_.Text = L("Open the member list of '") + selectedGroupName_ + "'.";
          }
          else
          {

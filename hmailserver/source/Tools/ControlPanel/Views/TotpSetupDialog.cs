@@ -9,6 +9,7 @@ using System.Windows.Media.Imaging;
 using QRCoder;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -62,7 +63,7 @@ namespace hMailServer.ControlPanel.Views
       public TotpSetupDialog(Window owner)
       {
          Owner = owner;
-         Title = "Two-factor authentication setup";
+         Title = L("Two-factor authentication setup");
          Width = 560;
          Height = 610;
          MinWidth = 520;
@@ -74,7 +75,7 @@ namespace hMailServer.ControlPanel.Views
 
          var header = new TextBlock
          {
-            Text = "Two-factor authentication",
+            Text = L("Two-factor authentication"),
             FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 12)
@@ -88,7 +89,7 @@ namespace hMailServer.ControlPanel.Views
          BuildEnrolPanel();
          panel.Children.Add(enrolPanel_);
 
-         panel.Children.Add(Label("Verification code from your authenticator app"));
+         panel.Children.Add(Label(L("Verification code from your authenticator app")));
          code_.Margin = new Thickness(0, 0, 0, 4);
          panel.Children.Add(code_);
 
@@ -100,7 +101,7 @@ namespace hMailServer.ControlPanel.Views
          };
          action_.Click += (s, e) => Apply();
          action_.Margin = new Thickness(0, 0, 8, 0);
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), IsCancel = true };
          close.Click += (s, e) => Close();
          buttons.Children.Add(action_);
          buttons.Children.Add(close);
@@ -130,22 +131,22 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(qrCard);
 
          var right = new StackPanel { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-         right.Children.Add(StepText("1.  Scan this QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy, 1Password…)."));
-         right.Children.Add(StepText("2.  Or enter the setup key shown below by hand."));
+         right.Children.Add(StepText(L("1.  Scan this QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy, 1Password…).")));
+         right.Children.Add(StepText(L("2.  Or enter the setup key shown below by hand.")));
          Grid.SetColumn(right, 1);
          grid.Children.Add(right);
 
          enrolPanel_.Children.Add(grid);
 
          // Full-width key row so the grouped base32 key is never clipped.
-         enrolPanel_.Children.Add(Label("Setup key (for manual entry)"));
+         enrolPanel_.Children.Add(Label(L("Setup key (for manual entry)")));
          var keyRow = new Grid();
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          secret_.HorizontalAlignment = HorizontalAlignment.Stretch;
          Grid.SetColumn(secret_, 0);
          keyRow.Children.Add(secret_);
-         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secret_.Text)) Clipboard.SetText(secret_.Text.Replace(" ", "")); }
@@ -160,19 +161,19 @@ namespace hMailServer.ControlPanel.Views
       {
          if (TotpManager.IsConfigured())
          {
-            status_.Text = "Two-factor authentication is currently enabled. Enter a valid code to turn it off.";
+            status_.Text = L("Two-factor authentication is currently enabled. Enter a valid code to turn it off.");
             enrolPanel_.Visibility = Visibility.Collapsed;
-            action_.Content = "_Disable two-factor authentication";
+            action_.Content = L("_Disable two-factor authentication");
             pendingSecret_ = null;
          }
          else
          {
-            status_.Text = "Two-factor authentication is currently disabled. Add it to your authenticator app, then confirm with a code.";
+            status_.Text = L("Two-factor authentication is currently disabled. Add it to your authenticator app, then confirm with a code.");
             pendingSecret_ = Totp.GenerateSecret();
             secret_.Text = FormatSecret(pendingSecret_);
-            ShowQr(Totp.BuildOtpAuthUri("hMailServer Control Panel", pendingSecret_));
+            ShowQr(Totp.BuildOtpAuthUri("hMailServer Control Panel", pendingSecret_)); // no-loc: the issuer name inside the otpauth URI
             enrolPanel_.Visibility = Visibility.Visible;
-            action_.Content = "_Enable two-factor authentication";
+            action_.Content = L("_Enable two-factor authentication");
          }
 
          code_.Text = "";
@@ -215,30 +216,30 @@ namespace hMailServer.ControlPanel.Views
             {
                if (!Totp.VerifyCode(TotpManager.ReadSecret(), entered))
                {
-                  MessageBox.Show("The verification code is incorrect.", Title);
+                  MessageBox.Show(L("The verification code is incorrect."), Title);
                   return;
                }
 
                TotpManager.RemoveSecret();
-               MessageBox.Show("Two-factor authentication has been disabled.", Title);
+               MessageBox.Show(L("Two-factor authentication has been disabled."), Title);
             }
             else
             {
                if (!Totp.VerifyCode(pendingSecret_, entered))
                {
-                  MessageBox.Show("The verification code is incorrect. Make sure your authenticator app is set up with the new key.", Title);
+                  MessageBox.Show(L("The verification code is incorrect. Make sure your authenticator app is set up with the new key."), Title);
                   return;
                }
 
                TotpManager.SaveSecret(pendingSecret_);
-               MessageBox.Show("Two-factor authentication has been enabled. The next connection will require a verification code.", Title);
+               MessageBox.Show(L("Two-factor authentication has been enabled. The next connection will require a verification code."), Title);
             }
 
             RefreshState();
          }
          catch (UnauthorizedAccessException)
          {
-            MessageBox.Show("Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again.", Title);
+            MessageBox.Show(L("Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again."), Title);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

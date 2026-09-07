@@ -6,6 +6,7 @@ using hMailServer.ControlPanel.Services;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -18,7 +19,7 @@ namespace hMailServer.ControlPanel.Views
       public MessageViewerDialog(Window owner, string filePath)
       {
          Owner = owner;
-         Title = "Message source";
+         Title = L("Message source");
          Width = 760;
          Height = 620;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -30,7 +31,7 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = "Message source", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 10) };
+         var header = new TextBlock { Text = L("Message source"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 10) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
@@ -73,12 +74,12 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(contentBorder);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(0, 0, 8, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(0, 0, 8, 0) };
          copy.Click += (s, e) =>
          {
             try { Clipboard.SetText(content.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          };
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, IsCancel = true };
          close.Click += (s, e) => Close();
          buttons.Children.Add(copy);
          buttons.Children.Add(close);
@@ -91,7 +92,7 @@ namespace hMailServer.ControlPanel.Views
       private static string ReadMessage(string filePath)
       {
          if (string.IsNullOrWhiteSpace(filePath))
-            return "No file is associated with this message.";
+            return L("No file is associated with this message.");
 
          try
          {
@@ -99,19 +100,19 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (FileNotFoundException)
          {
-            return "The file\r\n   " + filePath + "\r\ncould not be loaded. The message has probably been delivered and is no longer in the queue.";
+            return F("The file\r\n   {0}\r\ncould not be loaded. The message has probably been delivered and is no longer in the queue.", filePath);
          }
          catch (DirectoryNotFoundException)
          {
-            return "The file\r\n   " + filePath + "\r\ncould not be loaded. The message has probably been delivered and is no longer in the queue.";
+            return F("The file\r\n   {0}\r\ncould not be loaded. The message has probably been delivered and is no longer in the queue.", filePath);
          }
          catch (UnauthorizedAccessException)
          {
-            return "Access to the message file was denied:\r\n   " + filePath + "\r\n\r\nThe Control Panel can only read message files when it runs on the same machine as the server, with sufficient permissions.";
+            return F("Access to the message file was denied:\r\n   {0}\r\n\r\nThe Control Panel can only read message files when it runs on the same machine as the server, with sufficient permissions.", filePath);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            return "Could not read the message file:\r\n   " + filePath + "\r\n\r\n" + ex.Message;
+            return F("Could not read the message file:\r\n   {0}\r\n\r\n{1}", filePath, ex.Message);
          }
       }
    }

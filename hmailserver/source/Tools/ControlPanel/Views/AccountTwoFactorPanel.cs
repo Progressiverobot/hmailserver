@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using QRCoder;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -53,8 +54,8 @@ namespace hMailServer.ControlPanel.Views
          enrolCard_ = new Border { Padding = new Thickness(12), Margin = new Thickness(0, 12, 0, 0), Visibility = Visibility.Collapsed };
          enrolCard_.SetResourceReference(StyleProperty, "Card");
 
-         enrol_ = MakeButton("_Enrol a second factor", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Enrol());
-         disable_ = MakeButton("_Remove", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Disable());
+         enrol_ = MakeButton(L("_Enrol a second factor"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Enrol());
+         disable_ = MakeButton(L("_Remove"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Disable());
 
          Build();
       }
@@ -63,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (string.IsNullOrEmpty(address_))
          {
-            status_.Text = "Save the account and reopen it - a second factor belongs to an account that exists.";
+            status_.Text = L("Save the account and reopen it - a second factor belongs to an account that exists.");
             enrol_.IsEnabled = false;
             disable_.IsEnabled = false;
             return;
@@ -77,11 +78,8 @@ namespace hMailServer.ControlPanel.Views
                bool enabled = (bool)account.TOTPEnabled;
 
                status_.Text = enabled
-                  ? "A second factor is enrolled. This account's own password no longer signs in to mail "
-                    + "clients - only its app passwords do. Removing the second factor restores it."
-                  : "No second factor. Enrolling one stops this account's password working in mail clients "
-                    + "immediately, because IMAP, POP3 and SMTP have nowhere to enter a code - set up an app "
-                    + "password on the App passwords tab first, or the mailbox will go quiet.";
+                  ? L("A second factor is enrolled. This account's own password no longer signs in to mail clients - only its app passwords do. Removing the second factor restores it.")
+                  : L("No second factor. Enrolling one stops this account's password working in mail clients immediately, because IMAP, POP3 and SMTP have nowhere to enter a code - set up an app password on the App passwords tab first, or the mailbox will go quiet.");
 
                enrol_.IsEnabled = true;
                disable_.IsEnabled = enabled;
@@ -197,9 +195,7 @@ namespace hMailServer.ControlPanel.Views
 
          var hint = new TextBlock
          {
-            Text = "A code from an authenticator app, required alongside this account's password. "
-                 + "It applies where a code can actually be entered - the Control Panel and the API. Mail "
-                 + "clients cannot present one, so once this is on they must use an app password instead.",
+            Text = L("A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead."),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
          };
@@ -216,7 +212,7 @@ namespace hMailServer.ControlPanel.Views
          var enrolContent = new StackPanel();
          enrolContent.Children.Add(new TextBlock
          {
-            Text = "Scan this now - it is not stored and cannot be shown again",
+            Text = L("Scan this now - it is not stored and cannot be shown again"),
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 8),
             TextWrapping = TextWrapping.Wrap
@@ -224,7 +220,7 @@ namespace hMailServer.ControlPanel.Views
          enrolContent.Children.Add(qr_);
          enrolContent.Children.Add(new TextBlock
          {
-            Text = "Or enter this key by hand:",
+            Text = L("Or enter this key by hand:"),
             Margin = new Thickness(0, 10, 0, 4)
          });
          enrolContent.Children.Add(secret_);

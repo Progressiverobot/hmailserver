@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -19,7 +20,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
 
       // General
-      private readonly CheckBox active_ = new() { Content = "Domain _enabled", FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = L("Domain _enabled"), FontSize = Typography.Body };
       private readonly TextBox name_ = NewInput();
       private readonly TextBox postmaster_ = NewInput();
       private readonly TextBox adDomain_ = NewInput();
@@ -37,21 +38,21 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox maxMessageSize_ = NewInput();
       private readonly TextBox maxAccountSize_ = NewInput();
       private readonly TextBox retentionDays_ = NewInput();
-      private readonly CheckBox maxAccountsOn_ = new() { Content = "_Limit number of accounts", FontSize = Typography.Body };
+      private readonly CheckBox maxAccountsOn_ = new() { Content = L("_Limit number of accounts"), FontSize = Typography.Body };
       private readonly TextBox maxAccounts_ = NewInput();
-      private readonly CheckBox maxAliasesOn_ = new() { Content = "Limit number of al_iases", FontSize = Typography.Body };
+      private readonly CheckBox maxAliasesOn_ = new() { Content = L("Limit number of al_iases"), FontSize = Typography.Body };
       private readonly TextBox maxAliases_ = NewInput();
-      private readonly CheckBox maxDistsOn_ = new() { Content = "Limit _number of distribution lists", FontSize = Typography.Body };
+      private readonly CheckBox maxDistsOn_ = new() { Content = L("Limit _number of distribution lists"), FontSize = Typography.Body };
       private readonly TextBox maxDists_ = NewInput();
-      private readonly CheckBox plusAddressingOn_ = new() { Content = "_Enable plus addressing", FontSize = Typography.Body };
+      private readonly CheckBox plusAddressingOn_ = new() { Content = L("_Enable plus addressing"), FontSize = Typography.Body };
       private readonly TextBox plusChar_ = NewInput();
-      private readonly CheckBox greylisting_ = new() { Content = "Enable _greylisting for this domain", FontSize = Typography.Body };
+      private readonly CheckBox greylisting_ = new() { Content = L("Enable _greylisting for this domain"), FontSize = Typography.Body };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = "_Add signature to outgoing messages", FontSize = Typography.Body };
+      private readonly CheckBox signatureOn_ = new() { Content = L("_Add signature to outgoing messages"), FontSize = Typography.Body };
       private readonly ComboBox signatureMethod_ = new();
-      private readonly CheckBox signReplies_ = new() { Content = "Add signature to _replies", FontSize = Typography.Body };
-      private readonly CheckBox signLocal_ = new() { Content = "Add signature to _local e-mail", FontSize = Typography.Body };
+      private readonly CheckBox signReplies_ = new() { Content = L("Add signature to _replies"), FontSize = Typography.Body };
+      private readonly CheckBox signLocal_ = new() { Content = L("Add signature to _local e-mail"), FontSize = Typography.Body };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
@@ -59,27 +60,27 @@ namespace hMailServer.ControlPanel.Views
       // Domain-wide out-of-office. The server sends this only for accounts that
       // have no vacation message of their own; the override below additionally
       // replaces an account's personal text for senders outside this server.
-      private readonly CheckBox oooOn_ = new() { Content = "Send a _domain-wide out-of-office reply", FontSize = Typography.Body };
+      private readonly CheckBox oooOn_ = new() { Content = L("Send a _domain-wide out-of-office reply"), FontSize = Typography.Body };
       private readonly TextBox oooSubject_ = NewInput();
       private readonly TextBox oooMessage_ = NewMemo();
       private readonly TextBox oooInternalSubject_ = NewInput();
       private readonly TextBox oooInternalMessage_ = NewMemo();
       private readonly CheckBox oooExternalOverride_ = new()
       {
-         Content = "_Outside senders always get the domain's text, even when the account has its own",
+         Content = L("_Outside senders always get the domain's text, even when the account has its own"),
          FontSize = Typography.Body
       };
 
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
-      private readonly CheckBox relayAuthOn_ = new() { Content = "The relay requires _authentication", FontSize = Typography.Body };
+      private readonly CheckBox relayAuthOn_ = new() { Content = L("The relay requires _authentication"), FontSize = Typography.Body };
       private readonly TextBox relayUser_ = NewInput();
       private readonly PasswordBox relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
       private readonly ComboBox relaySecurity_ = new();
 
       // DKIM
-      private readonly CheckBox dkimOn_ = new() { Content = "_Enable DKIM signing", FontSize = Typography.Body };
-      private readonly CheckBox dkimAliases_ = new() { Content = "Sign aliases _too", FontSize = Typography.Body };
+      private readonly CheckBox dkimOn_ = new() { Content = L("_Enable DKIM signing"), FontSize = Typography.Body };
+      private readonly CheckBox dkimAliases_ = new() { Content = L("Sign aliases _too"), FontSize = Typography.Body };
       private readonly TextBox dkimSelector_ = NewInput();
       private readonly TextBox dkimKeyFile_ = NewInput();
       private readonly ComboBox dkimHeaderCanon_ = new();
@@ -128,7 +129,7 @@ namespace hMailServer.ControlPanel.Views
          domainName_ = domainName;
 
          Owner = owner;
-         Title = "Domain - " + domainName;
+         Title = L("Domain - ") + domainName;
          Width = 640;
          Height = 680;
          MinWidth = 560;
@@ -153,20 +154,20 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
-         tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
-         tabs.Items.Add(new TabItem { Header = "Names", Content = BuildNames() });
-         tabs.Items.Add(new TabItem { Header = "Limits", Content = BuildLimits() });
-         tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
-         tabs.Items.Add(new TabItem { Header = "Relay", Content = BuildRelay() });
-         tabs.Items.Add(new TabItem { Header = "Out of office", Content = BuildOutOfOffice() });
-         tabs.Items.Add(new TabItem { Header = "DKIM", Content = BuildDkim() });
+         tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
+         tabs.Items.Add(new TabItem { Header = L("Names"), Content = BuildNames() });
+         tabs.Items.Add(new TabItem { Header = L("Limits"), Content = BuildLimits() });
+         tabs.Items.Add(new TabItem { Header = L("Signature"), Content = BuildSignature() });
+         tabs.Items.Add(new TabItem { Header = L("Relay"), Content = BuildRelay() });
+         tabs.Items.Add(new TabItem { Header = L("Out of office"), Content = BuildOutOfOffice() });
+         tabs.Items.Add(new TabItem { Header = L("DKIM"), Content = BuildDkim() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -188,15 +189,15 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(active_);
-         panel.Children.Add(Label("_Domain name (changing it renames the domain and moves every account, alias and list with it)", name_));
+         panel.Children.Add(Label(L("_Domain name (changing it renames the domain and moves every account, alias and list with it)"), name_));
          panel.Children.Add(Input(name_));
-         panel.Children.Add(Label("_Postmaster address (mail to unknown recipients is redirected here)", postmaster_));
+         panel.Children.Add(Label(L("_Postmaster address (mail to unknown recipients is redirected here)"), postmaster_));
          panel.Children.Add(Input(postmaster_));
-         panel.Children.Add(Label("Active Directory domain (for AD-synchronised domains; optional)"));
+         panel.Children.Add(Label(L("Active Directory domain (for AD-synchronised domains; optional)")));
          var adRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
          adDomain_.MinWidth = 320;
          adRow.Children.Add(adDomain_);
-         var adBrowse = new Wpf.Ui.Controls.Button { Content = "_Browse…", Margin = new Thickness(8, 0, 0, 0) };
+         var adBrowse = new Wpf.Ui.Controls.Button { Content = L("_Browse…"), Margin = new Thickness(8, 0, 0, 0) };
          adBrowse.Click += BrowseAdDomain;
          adRow.Children.Add(adBrowse);
          panel.Children.Add(adRow);
@@ -214,7 +215,7 @@ namespace hMailServer.ControlPanel.Views
 
          var save = new Microsoft.Win32.SaveFileDialog
          {
-            Title = "Save the DKIM private key",
+            Title = L("Save the DKIM private key"),
             Filter = "PEM key files (*.pem)|*.pem|All files (*.*)|*.*",
             FileName = selector + "._domainkey." + domainName_ + ".pem"
          };
@@ -240,14 +241,14 @@ namespace hMailServer.ControlPanel.Views
             dkimKeyFile_.Text = save.FileName;
             dkimOn_.IsChecked = true;
             dkimDnsValue_ = result.DnsTxtValue;
-            dkimDns_.Text = "Host/Name:  " + result.DnsHost + Environment.NewLine +
-                            "Type:       TXT" + Environment.NewLine +
-                            "Value:      " + result.DnsTxtValue;
+            dkimDns_.Text = F("Host/Name:  {0}", result.DnsHost) + Environment.NewLine +
+                            L("Type:       TXT") + Environment.NewLine +
+                            F("Value:      {0}", result.DnsTxtValue);
             dkimDnsPanel_.Visibility = Visibility.Visible;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not generate the DKIM key: {0}", ex.Message), L("Control Panel"));
          }
       }
 
@@ -255,14 +256,14 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!ActiveDirectoryService.IsAvailable(out string reason))
          {
-            MessageBox.Show("Active Directory is not available on this machine: " + reason, "Control Panel");
+            MessageBox.Show(F("Active Directory is not available on this machine: {0}", reason), L("Control Panel"));
             return;
          }
 
          System.Collections.Generic.List<string> domains = ActiveDirectoryService.ListDomains();
          if (domains == null || domains.Count == 0)
          {
-            MessageBox.Show("No Active Directory domains were found.", "Control Panel");
+            MessageBox.Show(L("No Active Directory domains were found."), L("Control Panel"));
             return;
          }
 
@@ -287,13 +288,13 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildLimits()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label("Maximum _domain size (MB, 0 = unlimited)", maxSize_));
+         panel.Children.Add(Label(L("Maximum _domain size (MB, 0 = unlimited)"), maxSize_));
          panel.Children.Add(Input(maxSize_));
-         panel.Children.Add(Label("Maximum _message size (KB, 0 = unlimited)", maxMessageSize_));
+         panel.Children.Add(Label(L("Maximum _message size (KB, 0 = unlimited)"), maxMessageSize_));
          panel.Children.Add(Input(maxMessageSize_));
-         panel.Children.Add(Label("Maximum size for _accounts created in this domain (MB, 0 = unlimited)", maxAccountSize_));
+         panel.Children.Add(Label(L("Maximum size for _accounts created in this domain (MB, 0 = unlimited)"), maxAccountSize_));
          panel.Children.Add(Input(maxAccountSize_));
-         panel.Children.Add(Label("Delete messages in this domain's mailboxes _older than (days; 0 = no policy, an account's own value overrides it)", retentionDays_));
+         panel.Children.Add(Label(L("Delete messages in this domain's mailboxes _older than (days; 0 = no policy, an account's own value overrides it)"), retentionDays_));
          panel.Children.Add(Input(retentionDays_));
          panel.Children.Add(Separator());
          panel.Children.Add(maxAccountsOn_);
@@ -304,7 +305,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Input(maxDists_));
          panel.Children.Add(Separator());
          panel.Children.Add(plusAddressingOn_);
-         panel.Children.Add(Label("_Plus addressing character", plusChar_));
+         panel.Children.Add(Label(L("_Plus addressing character"), plusChar_));
          panel.Children.Add(Input(plusChar_));
          panel.Children.Add(greylisting_);
          return Scroll(panel);
@@ -312,53 +313,47 @@ namespace hMailServer.ControlPanel.Views
 
       private ScrollViewer BuildSignature()
       {
-         signatureMethod_.Items.Add(Combo("Use only if account has no signature", 1));
-         signatureMethod_.Items.Add(Combo("Overwrite account signature", 2));
-         signatureMethod_.Items.Add(Combo("Append to account signature", 3));
+         signatureMethod_.Items.Add(Combo(L("Use only if account has no signature"), 1));
+         signatureMethod_.Items.Add(Combo(L("Overwrite account signature"), 2));
+         signatureMethod_.Items.Add(Combo(L("Append to account signature"), 3));
          StyleCombo(signatureMethod_);
 
          var panel = TabPanel();
          panel.Children.Add(signatureOn_);
-         panel.Children.Add(Label("Signature _method", signatureMethod_));
+         panel.Children.Add(Label(L("Signature _method"), signatureMethod_));
          panel.Children.Add(signatureMethod_);
          panel.Children.Add(signReplies_);
          panel.Children.Add(signLocal_);
-         panel.Children.Add(Label("_Plain-text signature", signaturePlain_));
+         panel.Children.Add(Label(L("_Plain-text signature"), signaturePlain_));
          panel.Children.Add(signaturePlain_);
-         panel.Children.Add(Label("_HTML signature", signatureHtml_));
+         panel.Children.Add(Label(L("_HTML signature"), signatureHtml_));
          panel.Children.Add(signatureHtml_);
          return Scroll(panel);
       }
 
       private ScrollViewer BuildRelay()
       {
-         relaySecurity_.Items.Add(Combo("None", 0));
-         relaySecurity_.Items.Add(Combo("SSL/TLS", 1));
-         relaySecurity_.Items.Add(Combo("STARTTLS (optional)", 2));
-         relaySecurity_.Items.Add(Combo("STARTTLS (required)", 3));
+         relaySecurity_.Items.Add(Combo(L("None"), 0));
+         relaySecurity_.Items.Add(Combo(L("SSL/TLS"), 1));
+         relaySecurity_.Items.Add(Combo(L("STARTTLS (optional)"), 2));
+         relaySecurity_.Items.Add(Combo(L("STARTTLS (required)"), 3));
          StyleCombo(relaySecurity_);
 
          var panel = TabPanel();
-         panel.Children.Add(Label(
-            "Where mail FROM this domain leaves through. This is a different question from a route, " +
-            "which decides where mail addressed TO a domain is sent - it is for a server hosting several " +
-            "independent domains where each has its own delivery provider."));
-         panel.Children.Add(Label(
-            "Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, " +
-            "exactly as it did before this setting existed. A route still wins over both, because a route " +
-            "is a statement about the destination."));
+         panel.Children.Add(Label(L("Where mail FROM this domain leaves through. This is a different question from a route, which decides where mail addressed TO a domain is sent - it is for a server hosting several independent domains where each has its own delivery provider.")));
+         panel.Children.Add(Label(L("Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination.")));
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("_Relay host (empty = use the server-wide relayer)", relayHost_));
+         panel.Children.Add(Label(L("_Relay host (empty = use the server-wide relayer)"), relayHost_));
          panel.Children.Add(Input(relayHost_));
-         panel.Children.Add(Label("_Port (0 = 25)", relayPort_));
+         panel.Children.Add(Label(L("_Port (0 = 25)"), relayPort_));
          panel.Children.Add(Input(relayPort_));
-         panel.Children.Add(Label("_Connection security", relaySecurity_));
+         panel.Children.Add(Label(L("_Connection security"), relaySecurity_));
          panel.Children.Add(relaySecurity_);
          panel.Children.Add(Separator());
          panel.Children.Add(relayAuthOn_);
-         panel.Children.Add(Label("_User name", relayUser_));
+         panel.Children.Add(Label(L("_User name"), relayUser_));
          panel.Children.Add(Input(relayUser_));
-         panel.Children.Add(Label("Pass_word (leave blank to keep the stored one)", relayPassword_));
+         panel.Children.Add(Label(L("Pass_word (leave blank to keep the stored one)"), relayPassword_));
          panel.Children.Add(relayPassword_);
          return Scroll(panel);
       }
@@ -366,62 +361,50 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildOutOfOffice()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label(
-            "A reply for the whole domain - a closed office, a decommissioned department. It answers only " +
-            "for accounts that have NO vacation message of their own: an account's own message always wins, " +
-            "and at most one reply answers any message."));
-         panel.Children.Add(Label(
-            "The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, " +
-            "mailing lists or other auto-replies, one reply per sender, and the reply itself is " +
-            "marked Auto-Submitted so two servers cannot loop."));
+         panel.Children.Add(Label(L("A reply for the whole domain - a closed office, a decommissioned department. It answers only for accounts that have NO vacation message of their own: an account's own message always wins, and at most one reply answers any message.")));
+         panel.Children.Add(Label(L("The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, mailing lists or other auto-replies, one reply per sender, and the reply itself is marked Auto-Submitted so two servers cannot loop.")));
          panel.Children.Add(Separator());
          panel.Children.Add(oooOn_);
-         panel.Children.Add(Label("Su_bject", oooSubject_));
+         panel.Children.Add(Label(L("Su_bject"), oooSubject_));
          panel.Children.Add(Input(oooSubject_));
-         panel.Children.Add(Label("_Message", oooMessage_));
+         panel.Children.Add(Label(L("_Message"), oooMessage_));
          panel.Children.Add(oooMessage_);
          panel.Children.Add(Separator());
-         panel.Children.Add(Label(
-            "Optional different text for local senders - colleagues can be told more than strangers. " +
-            "Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is " +
-            "forgeable: treat it as a courtesy, never as a place for anything confidential."));
-         panel.Children.Add(Label("Subject for _local senders (empty = same as above)", oooInternalSubject_));
+         panel.Children.Add(Label(L("Optional different text for local senders - colleagues can be told more than strangers. Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is forgeable: treat it as a courtesy, never as a place for anything confidential.")));
+         panel.Children.Add(Label(L("Subject for _local senders (empty = same as above)"), oooInternalSubject_));
          panel.Children.Add(Input(oooInternalSubject_));
-         panel.Children.Add(Label("Message for local s_enders (empty = same as above)", oooInternalMessage_));
+         panel.Children.Add(Label(L("Message for local s_enders (empty = same as above)"), oooInternalMessage_));
          panel.Children.Add(oooInternalMessage_);
          panel.Children.Add(Separator());
          panel.Children.Add(oooExternalOverride_);
-         panel.Children.Add(Label(
-            "With this on, an account's own vacation message still answers colleagues, but outside senders " +
-            "get the domain's generic text instead - so personal detail in a vacation message stays inside " +
-            "the organisation."));
+         panel.Children.Add(Label(L("With this on, an account's own vacation message still answers colleagues, but outside senders get the domain's generic text instead - so personal detail in a vacation message stays inside the organisation.")));
          return Scroll(panel);
       }
 
       private ScrollViewer BuildDkim()
       {
-         dkimHeaderCanon_.Items.Add(Combo("Simple", 1));
-         dkimHeaderCanon_.Items.Add(Combo("Relaxed", 2));
+         dkimHeaderCanon_.Items.Add(Combo(L("Simple"), 1));
+         dkimHeaderCanon_.Items.Add(Combo(L("Relaxed"), 2));
          StyleCombo(dkimHeaderCanon_);
-         dkimBodyCanon_.Items.Add(Combo("Simple", 1));
-         dkimBodyCanon_.Items.Add(Combo("Relaxed", 2));
+         dkimBodyCanon_.Items.Add(Combo(L("Simple"), 1));
+         dkimBodyCanon_.Items.Add(Combo(L("Relaxed"), 2));
          StyleCombo(dkimBodyCanon_);
-         dkimAlgorithm_.Items.Add(Combo("SHA1", 1));
-         dkimAlgorithm_.Items.Add(Combo("SHA256", 2));
+         dkimAlgorithm_.Items.Add(Combo(L("SHA1"), 1));
+         dkimAlgorithm_.Items.Add(Combo(L("SHA256"), 2));
          StyleCombo(dkimAlgorithm_);
 
          var panel = TabPanel();
          panel.Children.Add(dkimOn_);
          panel.Children.Add(dkimAliases_);
-         panel.Children.Add(Label("Se_lector", dkimSelector_));
+         panel.Children.Add(Label(L("Se_lector"), dkimSelector_));
          panel.Children.Add(Input(dkimSelector_));
-         panel.Children.Add(Label("Private key file"));
+         panel.Children.Add(Label(L("Private key file")));
          var dkimKeyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
          Input(dkimKeyFile_);
          dkimKeyFile_.MinWidth = 320;
          dkimKeyFile_.Margin = new Thickness(0);
          dkimKeyRow.Children.Add(dkimKeyFile_);
-         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = "B_rowse…", Margin = new Thickness(8, 0, 0, 0) };
+         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(dkimBrowse, "DkimKeyBrowse");
          dkimBrowse.Click += (s, e) =>
          {
@@ -434,7 +417,7 @@ namespace hMailServer.ControlPanel.Views
 
          var dkimGen = new Wpf.Ui.Controls.Button
          {
-            Content = "_Generate key pair\u2026",
+            Content = L("_Generate key pair\u2026"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
             Margin = new Thickness(0, 0, 0, 8)
          };
@@ -443,10 +426,10 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(dkimGen);
 
          dkimDnsPanel_ = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 8) };
-         dkimDnsPanel_.Children.Add(Label("Publish this DNS TXT record at your DNS provider, then enable DKIM:"));
+         dkimDnsPanel_.Children.Add(Label(L("Publish this DNS TXT record at your DNS provider, then enable DKIM:")));
          dkimDns_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          dkimDnsPanel_.Children.Add(dkimDns_);
-         var dkimCopy = new Wpf.Ui.Controls.Button { Content = "_Copy DNS value", Margin = new Thickness(0, 0, 0, 0) };
+         var dkimCopy = new Wpf.Ui.Controls.Button { Content = L("_Copy DNS value"), Margin = new Thickness(0, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
          dkimCopy.Click += (s, e) =>
          {
@@ -455,11 +438,11 @@ namespace hMailServer.ControlPanel.Views
          dkimDnsPanel_.Children.Add(dkimCopy);
          panel.Children.Add(dkimDnsPanel_);
 
-         panel.Children.Add(Label("_Header canonicalization", dkimHeaderCanon_));
+         panel.Children.Add(Label(L("_Header canonicalization"), dkimHeaderCanon_));
          panel.Children.Add(dkimHeaderCanon_);
-         panel.Children.Add(Label("_Body canonicalization", dkimBodyCanon_));
+         panel.Children.Add(Label(L("_Body canonicalization"), dkimBodyCanon_));
          panel.Children.Add(dkimBodyCanon_);
-         panel.Children.Add(Label("Signing _algorithm", dkimAlgorithm_));
+         panel.Children.Add(Label(L("Signing _algorithm"), dkimAlgorithm_));
          panel.Children.Add(dkimAlgorithm_);
 
          panel.Children.Add(Separator());
@@ -481,7 +464,7 @@ namespace hMailServer.ControlPanel.Views
 
          var title = new TextBlock
          {
-            Text = "Key rotation",
+            Text = L("Key rotation"),
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 2)
@@ -489,9 +472,7 @@ namespace hMailServer.ControlPanel.Views
          title.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          section.Children.Add(title);
 
-         var intro = Label("Replace the DKIM key without a gap in verification: stage a new key next to " +
-                           "the current one, publish its DNS record, wait for the record to propagate, " +
-                           "check it, and only then promote it.");
+         var intro = Label(L("Replace the DKIM key without a gap in verification: stage a new key next to the current one, publish its DNS record, wait for the record to propagate, check it, and only then promote it."));
          intro.TextWrapping = TextWrapping.Wrap;
          section.Children.Add(intro);
 
@@ -506,14 +487,14 @@ namespace hMailServer.ControlPanel.Views
 
          // Step 2 while nothing is staged: choose a selector name and stage a key.
          rotStartPanel_ = new StackPanel();
-         rotStartPanel_.Children.Add(Label("2. Stage a new key pair under a new selector name:"));
+         rotStartPanel_.Children.Add(Label(L("2. Stage a new key pair under a new selector name:")));
          var startRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
          Input(rotSelector_);
          rotSelector_.MinWidth = 200;
          rotSelector_.Margin = new Thickness(0);
          System.Windows.Automation.AutomationProperties.SetAutomationId(rotSelector_, "DkimRotationSelector");
          startRow.Children.Add(rotSelector_);
-         var start = new Wpf.Ui.Controls.Button { Content = "Generate and stage _key…", Margin = new Thickness(8, 0, 0, 0) };
+         var start = new Wpf.Ui.Controls.Button { Content = L("Generate and stage _key…"), Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(start, "DkimRotationStart");
          start.Click += (s, e) => StartRotation();
          startRow.Children.Add(start);
@@ -527,26 +508,26 @@ namespace hMailServer.ControlPanel.Views
          rotStagedInfo_.TextWrapping = TextWrapping.Wrap;
          rotStagedPanel_.Children.Add(rotStagedInfo_);
 
-         rotStagedPanel_.Children.Add(Label("3. Publish this DNS TXT record at your DNS provider. Host/Name:"));
+         rotStagedPanel_.Children.Add(Label(L("3. Publish this DNS TXT record at your DNS provider. Host/Name:")));
          rotDnsHost_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          rotStagedPanel_.Children.Add(rotDnsHost_);
-         rotStagedPanel_.Children.Add(Label("TXT value:"));
+         rotStagedPanel_.Children.Add(Label(L("TXT value:")));
          rotDnsValue_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          rotStagedPanel_.Children.Add(rotDnsValue_);
 
          var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-         var copyHost = new Wpf.Ui.Controls.Button { Content = "Copy h_ost" };
+         var copyHost = new Wpf.Ui.Controls.Button { Content = L("Copy h_ost") };
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, "DkimRotationCopyHost");
          copyHost.Click += (s, e) => CopyToClipboard(rotDnsHost_.Text);
          copyRow.Children.Add(copyHost);
-         var copyValue = new Wpf.Ui.Controls.Button { Content = "Copy _value", Margin = new Thickness(8, 0, 0, 0) };
+         var copyValue = new Wpf.Ui.Controls.Button { Content = L("Copy _value"), Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(copyValue, "DkimRotationCopyValue");
          copyValue.Click += (s, e) => CopyToClipboard(rotExpectedTxt_);
          copyRow.Children.Add(copyValue);
          rotStagedPanel_.Children.Add(copyRow);
 
-         rotStagedPanel_.Children.Add(Label("4. Check that the record is visible in DNS:"));
-         rotCheck_ = new Wpf.Ui.Controls.Button { Content = "Check D_NS" };
+         rotStagedPanel_.Children.Add(Label(L("4. Check that the record is visible in DNS:")));
+         rotCheck_ = new Wpf.Ui.Controls.Button { Content = L("Check D_NS") };
          System.Windows.Automation.AutomationProperties.SetAutomationId(rotCheck_, "DkimRotationCheck");
          rotCheck_.Click += async (s, e) => await CheckRotationDns();
          rotStagedPanel_.Children.Add(rotCheck_);
@@ -559,7 +540,7 @@ namespace hMailServer.ControlPanel.Views
          };
          rotStagedPanel_.Children.Add(rotStatus_);
 
-         rotStagedPanel_.Children.Add(Label("5. Promote the staged key to become the signing key:"));
+         rotStagedPanel_.Children.Add(Label(L("5. Promote the staged key to become the signing key:")));
          var promoteRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
 
          // Promote stays locked until a "Check DNS" in this session has seen the
@@ -572,17 +553,17 @@ namespace hMailServer.ControlPanel.Views
          // propagation completes.
          rotPromote_ = new Wpf.Ui.Controls.Button
          {
-            Content = "_Promote…",
+            Content = L("_Promote…"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             IsEnabled = false,
-            ToolTip = "Enabled once \"Check DNS\" has confirmed the published record matches the staged key."
+            ToolTip = L("Enabled once \"Check DNS\" has confirmed the published record matches the staged key.")
          };
          ToolTipService.SetShowOnDisabled(rotPromote_, true);
          System.Windows.Automation.AutomationProperties.SetAutomationId(rotPromote_, "DkimRotationPromote");
          rotPromote_.Click += (s, e) => PromoteRotation();
          promoteRow.Children.Add(rotPromote_);
 
-         var cancelRotation = new Wpf.Ui.Controls.Button { Content = "Cancel rotat_ion…", Margin = new Thickness(8, 0, 0, 0) };
+         var cancelRotation = new Wpf.Ui.Controls.Button { Content = L("Cancel rotat_ion…"), Margin = new Thickness(8, 0, 0, 0) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(cancelRotation, "DkimRotationCancel");
          cancelRotation.Click += (s, e) => CancelRotation();
          promoteRow.Children.Add(cancelRotation);
@@ -599,7 +580,7 @@ namespace hMailServer.ControlPanel.Views
          string selector = rotSelector_.Text.Trim();
          if (selector.Length == 0)
          {
-            MessageBox.Show("Enter a selector name for the new key first.", "Control Panel");
+            MessageBox.Show(L("Enter a selector name for the new key first."), L("Control Panel"));
             return;
          }
 
@@ -610,14 +591,13 @@ namespace hMailServer.ControlPanel.Views
          // a staged rotation exists to prevent.
          if (string.Equals(selector, dkimSelector_.Text.Trim(), StringComparison.OrdinalIgnoreCase))
          {
-            MessageBox.Show("The new selector must be different from the current selector (\"" + selector + "\"). " +
-                            "A rotation runs both keys side by side under different DNS names.", "Control Panel");
+            MessageBox.Show(F("The new selector must be different from the current selector (\"{0}\"). A rotation runs both keys side by side under different DNS names.", selector), L("Control Panel"));
             return;
          }
 
          var save = new Microsoft.Win32.SaveFileDialog
          {
-            Title = "Save the new DKIM private key",
+            Title = L("Save the new DKIM private key"),
             Filter = "PEM key files (*.pem)|*.pem|All files (*.*)|*.*",
             FileName = selector + "._domainkey." + domainName_ + ".pem"
          };
@@ -645,7 +625,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not generate the DKIM key: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not generate the DKIM key: {0}", ex.Message), L("Control Panel"));
             return;
          }
 
@@ -660,8 +640,8 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not stage the rotation on the server: " + ServerSession.DescribeComError(ex),
-               "Control Panel");
+            MessageBox.Show(F("Could not stage the rotation on the server: {0}", ServerSession.DescribeComError(ex)),
+               L("Control Panel"));
             return;
          }
          finally
@@ -674,17 +654,15 @@ namespace hMailServer.ControlPanel.Views
          rotExpectedTxt_ = generated.DnsTxtValue;
          rotCheckPassed_ = false;
          UpdateRotationUi();
-         SetRotationStatus("Not checked yet. Publish the record, allow time for propagation, then press \"Check DNS\".",
+         SetRotationStatus(L("Not checked yet. Publish the record, allow time for propagation, then press \"Check DNS\"."),
             ThemeTokens.Info);
       }
 
-      private const string RotationNotFoundText =
-         "The record was not found yet. New DNS records usually appear within minutes but can take hours to " +
-         "propagate - publish the record above if you have not already, then check again later.";
+      private static string RotationNotFoundText =>
+         L("The record was not found yet. New DNS records usually appear within minutes but can take hours to propagate - publish the record above if you have not already, then check again later.");
 
       private static string RotationLookupFailedText(string error) =>
-         "The DNS lookup itself failed: " + error + " This says nothing about the record - this machine could not " +
-         "get an answer from its DNS server. Check the network and try again.";
+         F("The DNS lookup itself failed: {0} This says nothing about the record - this machine could not get an answer from its DNS server. Check the network and try again.", error);
 
       private async Task CheckRotationDns()
       {
@@ -693,8 +671,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (rotStagedSelector_.Length == 0)
          {
-            SetRotationStatus("The staged pair has no selector, so there is no DNS name to check. Cancel the rotation " +
-               "and start again.", ThemeTokens.Danger);
+            SetRotationStatus(L("The staged pair has no selector, so there is no DNS name to check. Cancel the rotation and start again."), ThemeTokens.Danger);
             return;
          }
 
@@ -703,7 +680,7 @@ namespace hMailServer.ControlPanel.Views
 
          rotChecking_ = true;
          rotCheck_.IsEnabled = false;
-         SetRotationStatus("Checking " + host + "…", ThemeTokens.Info);
+         SetRotationStatus(F("Checking {0}…", host), ThemeTokens.Info);
 
          try
          {
@@ -727,7 +704,7 @@ namespace hMailServer.ControlPanel.Views
             switch (result.Status)
             {
                case DnsTxtLookup.MatchStatus.FoundAndMatches:
-                  SetRotationStatus("The published record matches the staged key. It is safe to promote.",
+                  SetRotationStatus(L("The published record matches the staged key. It is safe to promote."),
                      ThemeTokens.Success);
                   break;
 
@@ -736,9 +713,7 @@ namespace hMailServer.ControlPanel.Views
                   break;
 
                case DnsTxtLookup.MatchStatus.FoundButDifferent:
-                  SetRotationStatus("A TXT record exists at " + host + ", but it does not match the staged key. " +
-                     "Waiting will not fix this: correct the published record so it matches the value above, then " +
-                     "check again." + DescribeFoundRecords(result.Records), ThemeTokens.Danger);
+                  SetRotationStatus(F("A TXT record exists at {0}, but it does not match the staged key. Waiting will not fix this: correct the published record so it matches the value above, then check again.", host) + DescribeFoundRecords(result.Records), ThemeTokens.Danger);
                   break;
 
                default:
@@ -768,9 +743,7 @@ namespace hMailServer.ControlPanel.Views
          switch (found.Status)
          {
             case DnsTxtLookup.LookupStatus.Found:
-               SetRotationStatus("A TXT record exists, but the staged private key file (" + rotStagedKeyFile_ + ") " +
-                  "could not be read from this machine, so the record cannot be compared against the key. Run this " +
-                  "check on the server itself, or cancel the rotation and start it again from here.",
+               SetRotationStatus(F("A TXT record exists, but the staged private key file ({0}) could not be read from this machine, so the record cannot be compared against the key. Run this check on the server itself, or cancel the rotation and start it again from here.", rotStagedKeyFile_),
                   ThemeTokens.Warning);
                break;
 
@@ -790,12 +763,8 @@ namespace hMailServer.ControlPanel.Views
          string oldHost = oldSelector.Length > 0 ? oldSelector + "._domainkey." + domainName_ : "(none)";
 
          if (MessageBox.Show(
-             "Promote the staged selector \"" + rotStagedSelector_ + "\"?\n\n" +
-             "From the next message on, mail from " + domainName_ + " is signed with the new key, and the old " +
-             "selector is cleared from the configuration.\n\n" +
-             "Leave the OLD DNS record (" + oldHost + ") published for at least a few days. Mail signed with the old " +
-             "key may still be in transit, and receivers can only verify it for as long as that record exists.",
-             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+             F("Promote the staged selector \"{0}\"?\n\nFrom the next message on, mail from {1} is signed with the new key, and the old selector is cleared from the configuration.\n\nLeave the OLD DNS record ({2}) published for at least a few days. Mail signed with the old key may still be in transit, and receivers can only verify it for as long as that record exists.", rotStagedSelector_, domainName_, oldHost),
+             L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          dynamic domains = ServerSession.Current.Application.Domains;
@@ -826,13 +795,11 @@ namespace hMailServer.ControlPanel.Views
             rotCheckPassed_ = false;
             UpdateRotationUi();
 
-            MessageBox.Show("The rotation is complete: mail is now signed with selector \"" + newSelector + "\".\n\n" +
-               "Keep the old DNS record (" + oldHost + ") for a few more days while mail signed with the old key is " +
-               "still in transit, then remove it.", "Control Panel");
+            MessageBox.Show(F("The rotation is complete: mail is now signed with selector \"{0}\".\n\nKeep the old DNS record ({1}) for a few more days while mail signed with the old key is still in transit, then remove it.", newSelector, oldHost), L("Control Panel"));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not promote the staged key: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("Could not promote the staged key: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
          }
          finally
          {
@@ -843,10 +810,8 @@ namespace hMailServer.ControlPanel.Views
       private void CancelRotation()
       {
          if (MessageBox.Show(
-             "Cancel this rotation?\n\nThe staged selector \"" + rotStagedSelector_ + "\" is removed from the server " +
-             "configuration; signing continues with the current key, untouched. The generated key file stays on disk, " +
-             "and the DNS record for the staged selector - if you already published it - can simply be deleted.",
-             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+             F("Cancel this rotation?\n\nThe staged selector \"{0}\" is removed from the server configuration; signing continues with the current key, untouched. The generated key file stays on disk, and the DNS record for the staged selector - if you already published it - can simply be deleted.", rotStagedSelector_),
+             L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          dynamic domains = ServerSession.Current.Application.Domains;
@@ -860,7 +825,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not cancel the rotation: " + ServerSession.DescribeComError(ex), "Control Panel");
+            MessageBox.Show(F("Could not cancel the rotation: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
             return;
          }
          finally
@@ -902,11 +867,9 @@ namespace hMailServer.ControlPanel.Views
          UpdateRotationUi();
 
          if (selector.Length == 0 || keyFile.Length == 0)
-            SetRotationStatus("The staged rotation is incomplete (the selector or the key file is missing), so the " +
-               "server will refuse to promote it. Cancel the rotation and start again.", ThemeTokens.Danger);
+            SetRotationStatus(L("The staged rotation is incomplete (the selector or the key file is missing), so the server will refuse to promote it. Cancel the rotation and start again."), ThemeTokens.Danger);
          else
-            SetRotationStatus("A rotation is already staged. If the DNS record is published, press \"Check DNS\"; " +
-               "promoting unlocks once the check passes in this session.", ThemeTokens.Info);
+            SetRotationStatus(L("A rotation is already staged. If the DNS record is published, press \"Check DNS\"; promoting unlocks once the check passes in this session."), ThemeTokens.Info);
       }
 
       /// <summary>
@@ -925,7 +888,7 @@ namespace hMailServer.ControlPanel.Views
             using var rsa = System.Security.Cryptography.RSA.Create();
             rsa.ImportFromPem(pem);
             // The same record format DkimKeyGenerator emits when a key is first made.
-            return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            return "v=DKIM1; k=rsa; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()); // no-loc
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
@@ -938,9 +901,9 @@ namespace hMailServer.ControlPanel.Views
          string current = dkimSelector_.Text.Trim();
          string currentFile = dkimKeyFile_.Text.Trim();
          rotCurrent_.Text = current.Length > 0
-            ? "1. Currently signing with selector \"" + current + "\"" +
-              (currentFile.Length > 0 ? " (key file: " + currentFile + ")." : ".")
-            : "1. No signing selector is configured yet.";
+            ? F("1. Currently signing with selector \"{0}\"", current) +
+              (currentFile.Length > 0 ? F(" (key file: {0}).", currentFile) : ".")
+            : L("1. No signing selector is configured yet.");
 
          bool staged = rotStagedSelector_.Length > 0 || rotStagedKeyFile_.Length > 0;
          rotStartPanel_.Visibility = staged ? Visibility.Collapsed : Visibility.Visible;
@@ -961,14 +924,11 @@ namespace hMailServer.ControlPanel.Views
             return;
          }
 
-         rotStagedInfo_.Text = "2. A rotation is staged: selector \"" + rotStagedSelector_ + "\", key file " +
-            rotStagedKeyFile_ + ".";
+         rotStagedInfo_.Text = F("2. A rotation is staged: selector \"{0}\", key file {1}.", rotStagedSelector_, rotStagedKeyFile_);
          rotDnsHost_.Text = rotStagedSelector_.Length > 0
             ? rotStagedSelector_ + "._domainkey." + domainName_
-            : "(the staged pair has no selector)";
-         rotDnsValue_.Text = rotExpectedTxt_ ?? "(The staged private key file could not be read from this machine, " +
-            "so the record value cannot be shown here. It was shown when the rotation was started; if it is lost, " +
-            "cancel the rotation and start again.)";
+            : L("(the staged pair has no selector)");
+         rotDnsValue_.Text = rotExpectedTxt_ ?? L("(The staged private key file could not be read from this machine, so the record value cannot be shown here. It was shown when the rotation was started; if it is lost, cancel the rotation and start again.)");
          rotPromote_.IsEnabled = rotCheckPassed_;
       }
 
@@ -1070,7 +1030,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the domain: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the domain: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -1081,14 +1041,14 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         if (!NumericField.TryValidate(maxSize_.Text, "Maximum domain size (MB)", 0, int.MaxValue, out int msV, out bool hasMs, out string error)
-          || !NumericField.TryValidate(maxMessageSize_.Text, "Maximum message size (KB)", 0, int.MaxValue, out int mmsV, out bool hasMms, out error)
-          || !NumericField.TryValidate(maxAccountSize_.Text, "Maximum account size (MB)", 0, int.MaxValue, out int masV, out bool hasMas, out error)
-          || !NumericField.TryValidate(retentionDays_.Text, "Delete messages older than (days)", 0, int.MaxValue, out int retentionV, out bool hasRetention, out error)
-          || !NumericField.TryValidate(maxAccounts_.Text, "Maximum number of accounts", 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
-          || !NumericField.TryValidate(maxAliases_.Text, "Maximum number of aliases", 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
-          || !NumericField.TryValidate(maxDists_.Text, "Maximum number of distribution lists", 0, int.MaxValue, out int mndV, out bool hasMnd, out error)
-          || !NumericField.TryValidate(relayPort_.Text, "Relay port", 0, 65535, out int relayPortValue, out bool hasRelayPort, out error))
+         if (!NumericField.TryValidate(maxSize_.Text, L("Maximum domain size (MB)"), 0, int.MaxValue, out int msV, out bool hasMs, out string error)
+          || !NumericField.TryValidate(maxMessageSize_.Text, L("Maximum message size (KB)"), 0, int.MaxValue, out int mmsV, out bool hasMms, out error)
+          || !NumericField.TryValidate(maxAccountSize_.Text, L("Maximum account size (MB)"), 0, int.MaxValue, out int masV, out bool hasMas, out error)
+          || !NumericField.TryValidate(retentionDays_.Text, L("Delete messages older than (days)"), 0, int.MaxValue, out int retentionV, out bool hasRetention, out error)
+          || !NumericField.TryValidate(maxAccounts_.Text, L("Maximum number of accounts"), 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
+          || !NumericField.TryValidate(maxAliases_.Text, L("Maximum number of aliases"), 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
+          || !NumericField.TryValidate(maxDists_.Text, L("Maximum number of distribution lists"), 0, int.MaxValue, out int mndV, out bool hasMnd, out error)
+          || !NumericField.TryValidate(relayPort_.Text, L("Relay port"), 0, 65535, out int relayPortValue, out bool hasRelayPort, out error))
          {
             status_.Text = error;
             return;
@@ -1098,7 +1058,7 @@ namespace hMailServer.ControlPanel.Views
          string newName = name_.Text.Trim();
          if (newName.Length == 0 || !newName.Contains('.'))
          {
-            status_.Text = "Enter a valid domain name.";
+            status_.Text = L("Enter a valid domain name.");
             return;
          }
 
@@ -1110,11 +1070,8 @@ namespace hMailServer.ControlPanel.Views
          bool renaming = !string.Equals(newName, domainName_, StringComparison.OrdinalIgnoreCase);
          if (renaming &&
              MessageBox.Show(
-                "Rename " + domainName_ + " to " + newName + "?\n\nEvery account, alias and distribution " +
-                "list moves to the new name, and forwards or memberships in other domains that point at " +
-                domainName_ + " addresses are updated to match. Mail sent to the old name will no longer " +
-                "be accepted.",
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                F("Rename {0} to {1}?\n\nEvery account, alias and distribution list moves to the new name, and forwards or memberships in other domains that point at {0} addresses are updated to match. Mail sent to the old name will no longer be accepted.", domainName_, newName),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
          dynamic domains = ServerSession.Current.Application.Domains;
@@ -1185,7 +1142,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the domain: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the domain: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
