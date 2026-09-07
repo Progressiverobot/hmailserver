@@ -160,6 +160,8 @@ namespace HM
          RouteMe,
          RouteMePassword,
          RouteMeVacation,
+         RouteSessionCreate,
+         RouteSessionDelete,
          RouteOpenApi
       };
 
@@ -218,6 +220,12 @@ namespace HM
          // Where the request came from, for the handlers that count a
          // failure against it.
          IPAddress peer;
+
+         // True when the credential was a browser session cookie rather than
+         // a password: such a request must carry the X-Requested-With header
+         // to change anything, and may end the session it came with.
+         bool via_session = false;
+         AnsiString session_hash;
       };
 
       enum AuthorizationResult
@@ -252,6 +260,11 @@ namespace HM
       static HttpResponse HandleMePassword_(const Caller &caller, const AnsiString &request);
       static HttpResponse HandleMeVacation_(const Caller &caller, const AnsiString &requestBody);
       static HttpResponse HandlePortalPage_();
+      static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
+      HttpResponse HandleSessionCreate_(const Caller &caller);
+      HttpResponse HandleSessionDelete_(const Caller &caller);
+      static void RevokeSessionsForAccount_(__int64 accountId, const AnsiString &keepTokenHash);
+      static void ClearBrowserSessions_();
       static HttpResponse HandlePortalScript_();
       static bool IsDomainAllowed_(const std::vector<String> &domains, const String &domainName);
 

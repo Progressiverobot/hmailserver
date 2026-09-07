@@ -239,7 +239,127 @@ namespace RegressionTests.API
          StringAssert.Contains("/api/v1/me", script.Body);
       }
 
+      [Test]
+      [Description("POST /api/v1/session turns the password into a cookie that authenticates the account's endpoints on its own")]
+      public void ASessionCookieAuthenticatesWithoutThePassword()
+      {
+         Response started = Raw("POST", "/api/v1/session", UserHeader(UserPassword), null);
+         Assert.AreEqual(201, started.Status, started.Body);
+         StringAssert.Contains("\"address\":\"" + Address + "\"", started.Body);
+
+         string setCookie = started.Header("Set-Cookie");
+         StringAssert.StartsWith("hmailsession=", setCookie);
+         StringAssert.Contains("HttpOnly", setCookie);
+         StringAssert.Contains("SameSite=Strict", setCookie);
+         StringAssert.Contains("Path=/", setCookie);
+         Assert.IsFalse(setCookie.Contains("Secure"), "Over the plain loopback listener the cookie must not be marked Secure, or the browser would never send it.");
+
+         string cookie = CookieOf(setCookie);
+         Assert.AreEqual(64, cookie.Length, "A 32-byte token in hex.");
+
+         Response me = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(200, me.Status, me.Body);
+         StringAssert.Contains("\"address\":\"" + Address + "\"", me.Body);
+
+         // The cookie is a credential for the account's own endpoints only.
+         Response status = Raw("GET", "/api/v1/status", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, status.Status, status.Body);
+
+         // A session cannot start another session: that takes the password.
+         Response again = Raw("POST", "/api/v1/session", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, again.Status, again.Body);
+      }
+
+      [Test]
+      [Description("A request that changes something on a session must carry the X-Requested-With header")]
+      public void AChangeOnASessionNeedsTheHeader()
+      {
+         string cookie = SignIn();
+
+         Response bare = Raw("PUT", "/api/v1/me/vacation", null,
+            "{\"enabled\":true,\"subject\":\"s\",\"message\":\"m\"}",
+            "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, bare.Status, bare.Body);
+         StringAssert.Contains("X-Requested-With", bare.Body);
+
+         Account untouched = _domain.Accounts.ItemByAddress[Address];
+         Assert.IsFalse(untouched.VacationMessageIsOn, "The refused request must have changed nothing.");
+
+         Response withHeader = Raw("PUT", "/api/v1/me/vacation", null,
+            "{\"enabled\":true,\"subject\":\"s\",\"message\":\"m\"}",
+            "Cookie: hmailsession=" + cookie + "\r\nX-Requested-With: hMailServer\r\n");
+         Assert.AreEqual(200, withHeader.Status, withHeader.Body);
+
+         Account changed = _domain.Accounts.ItemByAddress[Address];
+         Assert.IsTrue(changed.VacationMessageIsOn);
+
+         // A password never needed the header: it is not something a browser
+         // sends on its own.
+         (int status, string body) reset = Http("PUT", "/api/v1/me/vacation", UserHeader(UserPassword),
+            "{\"enabled\":false,\"subject\":\"\",\"message\":\"\"}");
+         Assert.AreEqual(200, reset.status, reset.body);
+      }
+
+      [Test]
+      [Description("DELETE /api/v1/session ends the session, and a garbage or ended cookie is refused")]
+      public void SigningOutEndsTheSession()
+      {
+         string cookie = SignIn();
+
+         Response ended = Raw("DELETE", "/api/v1/session", null, null,
+            "Cookie: hmailsession=" + cookie + "\r\nX-Requested-With: hMailServer\r\n");
+         Assert.AreEqual(200, ended.Status, ended.Body);
+         StringAssert.Contains("Max-Age=0", ended.Header("Set-Cookie"));
+
+         Response afterwards = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(401, afterwards.Status, afterwards.Body);
+
+         Response garbage = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=deadbeef; other=1\r\n");
+         Assert.AreEqual(401, garbage.Status, garbage.Body);
+
+         Response noSession = Raw("DELETE", "/api/v1/session", UserHeader(UserPassword), null);
+         Assert.AreEqual(400, noSession.Status, noSession.Body);
+      }
+
+      [Test]
+      [Description("A password change ends the account's other sessions and keeps the one that made it")]
+      public void APasswordChangeEndsOtherSessions()
+      {
+         const string newPassword = "Rotated-Passw0rd!";
+
+         string mine = SignIn();
+         string theirs = SignIn();
+
+         Response changed = Raw("POST", "/api/v1/me/password", null,
+            "{\"current\":\"" + UserPassword + "\",\"new\":\"" + newPassword + "\"}",
+            "Cookie: hmailsession=" + mine + "\r\nX-Requested-With: hMailServer\r\n");
+         Assert.AreEqual(200, changed.Status, changed.Body);
+
+         Response theirsAfter = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + theirs + "\r\n");
+         Assert.AreEqual(401, theirsAfter.Status, "The other session must have been ended. " + theirsAfter.Body);
+
+         Response mineAfter = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + mine + "\r\n");
+         Assert.AreEqual(200, mineAfter.Status, "The session that changed the password stays. " + mineAfter.Body);
+
+         (int status, string body) newAccepted = Http("GET", "/api/v1/me", UserHeader(newPassword));
+         Assert.AreEqual(200, newAccepted.status, newAccepted.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
+
+      private string SignIn()
+      {
+         Response started = Raw("POST", "/api/v1/session", UserHeader(UserPassword), null);
+         Assert.AreEqual(201, started.Status, started.Body);
+         return CookieOf(started.Header("Set-Cookie"));
+      }
+
+      private static string CookieOf(string setCookie)
+      {
+         int start = setCookie.IndexOf('=') + 1;
+         int end = setCookie.IndexOf(';', start);
+         return end > start ? setCookie.Substring(start, end - start) : setCookie.Substring(start);
+      }
 
       private static string AdminHeader()
       {
@@ -276,7 +396,7 @@ namespace RegressionTests.API
          return (response.Status, response.Body);
       }
 
-      private static Response Raw(string method, string path, string authorization, string requestBody)
+      private static Response Raw(string method, string path, string authorization, string requestBody, string extraHeaders = null)
       {
          using (var client = new TcpClient())
          {
@@ -307,6 +427,8 @@ namespace RegressionTests.API
                headers.Append("Host: 127.0.0.1\r\n");
                if (authorization != null)
                   headers.Append("Authorization: " + authorization + "\r\n");
+               if (extraHeaders != null)
+                  headers.Append(extraHeaders);
 
                byte[] bodyBytes = requestBody == null ? new byte[0] : Encoding.UTF8.GetBytes(requestBody);
                if (requestBody != null)
