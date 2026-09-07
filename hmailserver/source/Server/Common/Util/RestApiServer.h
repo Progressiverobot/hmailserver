@@ -59,8 +59,10 @@
 
 #pragma once
 
-#include <thread>
+#include <memory>
 #include <vector>
+
+#include "HttpServer.h"
 
 namespace HM
 {
@@ -216,11 +218,8 @@ namespace HM
          AuthorizationForbidden = 2
       };
 
-      void Run_();
-      void HandleClient_(SOCKET client_socket, const IPAddress &peer_address);
-
       // Request processing. Returns the full HTTP response.
-      AnsiString ProcessRequest_(const AnsiString &request, const IPAddress &peer_address);
+      HttpResponse ProcessRequest_(const AnsiString &request, const IPAddress &peer_address);
 
       static void ParseRoute_(const AnsiString &method, const AnsiString &path, Route &route);
 
@@ -251,9 +250,9 @@ namespace HM
 
       static AnsiString GetAuthorizationHeader_(const AnsiString &request);
       static AnsiString GetHeader_(const AnsiString &request, const AnsiString &lowerCaseName);
-      static AnsiString BuildUnauthorizedResponse_(bool secondFactorRequired);
-      static AnsiString BuildForbiddenResponse_(const AnsiString &reason);
-      static AnsiString BuildTooManyRequestsResponse_();
+      static HttpResponse BuildUnauthorizedResponse_(bool secondFactorRequired);
+      static HttpResponse BuildForbiddenResponse_(const AnsiString &reason);
+      static HttpResponse BuildTooManyRequestsResponse_();
 
       // Per-credential request budget. Returns false when this request is over
       // it; firstRefusal is set only for the request that crosses the line, so
@@ -282,67 +281,67 @@ namespace HM
       static bool IsExpired_(const String &expires);
       static bool IsSourceAllowed_(const String &allowed_from, const IPAddress &peer_address);
 
-      static AnsiString HandleListApiKeys_();
-      static AnsiString HandleCreateApiKey_(const AnsiString &requestBody);
-      static AnsiString HandleRevokeApiKey_(const AnsiString &id);
+      static HttpResponse HandleListApiKeys_();
+      static HttpResponse HandleCreateApiKey_(const AnsiString &requestBody);
+      static HttpResponse HandleRevokeApiKey_(const AnsiString &id);
 
       // extraHeaders, when it is not empty, must be complete header lines each
       // ending in CRLF. Only the 429 uses it (Retry-After).
-      static AnsiString BuildResponse_(int statusCode, const AnsiString &body, const AnsiString &extraHeaders = "");
-      static AnsiString HandleWebAdminPage_();
-      static AnsiString HandleStatus_();
+      static HttpResponse BuildResponse_(int statusCode, const AnsiString &body, const AnsiString &extraHeaders = "");
+      static HttpResponse HandleWebAdminPage_();
+      static HttpResponse HandleStatus_();
 
       // allowedDomains empty means every domain; otherwise the listing is
       // filtered to those, so a key issued for one customer is not handed the
       // names of all the others.
-      static AnsiString HandleListDomains_(const std::vector<String> &allowedDomains);
-      static AnsiString HandleListAccounts_(const String &domainName);
-      static AnsiString HandleCreateAccount_(const String &domainName, const AnsiString &requestBody);
-      static AnsiString HandleDeleteAccount_(const String &address);
-      static AnsiString HandleListQueue_();
-      static AnsiString HandleQueueRetry_(__int64 messageId);
-      static AnsiString HandleQueueDelete_(__int64 messageId);
-      static AnsiString HandleTlsa_();
+      static HttpResponse HandleListDomains_(const std::vector<String> &allowedDomains);
+      static HttpResponse HandleListAccounts_(const String &domainName);
+      static HttpResponse HandleCreateAccount_(const String &domainName, const AnsiString &requestBody);
+      static HttpResponse HandleDeleteAccount_(const String &address);
+      static HttpResponse HandleListQueue_();
+      static HttpResponse HandleQueueRetry_(__int64 messageId);
+      static HttpResponse HandleQueueDelete_(__int64 messageId);
+      static HttpResponse HandleTlsa_();
 
       // Ready-to-publish client-discovery SRV records (RFC 6186 / RFC 8314,
       // plus the Outlook _autodiscover convention), derived from the ports
       // that are actually configured and enabled. allowedDomains filters the
       // per-domain records exactly as HandleListDomains_ filters the domain
       // listing, and for the same reason.
-      static AnsiString HandleSrv_(const std::vector<String> &allowedDomains);
-      static AnsiString HandleMetricsHistory_(const AnsiString &query);
+      static HttpResponse HandleSrv_(const std::vector<String> &allowedDomains);
+      static HttpResponse HandleMetricsHistory_(const AnsiString &query);
       // The update check's verdict, and a check run now. Both server-wide.
-      static AnsiString HandleUpdateGet_();
-      static AnsiString HandleUpdateCheck_();
-      static AnsiString HandleUpdateDownload_();
-      static AnsiString HandleUpdateInstall_();
+      static HttpResponse HandleUpdateGet_();
+      static HttpResponse HandleUpdateCheck_();
+      static HttpResponse HandleUpdateDownload_();
+      static HttpResponse HandleUpdateInstall_();
       static AnsiString QueryParameter_(const AnsiString &query, const AnsiString &name);
 
-      AnsiString HandleListQuarantine_();
-      AnsiString HandleQuarantineRelease_(__int64 id);
-      AnsiString HandleQuarantineDelete_(__int64 id);
-      AnsiString HandleListAliases_(const String &domainName);
-      AnsiString HandleListIpRanges_();
-      AnsiString HandleCreateIpRange_(const AnsiString &requestBody);
-      AnsiString HandleDeleteIpRange_(__int64 rangeId);
-      AnsiString HandleListLists_(const String &domainName);
-      AnsiString HandleCreateList_(const String &domainName, const AnsiString &requestBody);
-      AnsiString HandleDeleteList_(const String &address);
-      AnsiString HandleListCertificates_();
-      AnsiString HandleDkim_(const String &domainName);
-      AnsiString HandleListRules_();
-      AnsiString HandleListLogs_();
-      AnsiString HandleLogTail_(const AnsiString &name, const AnsiString &query);
-      AnsiString HandleBackupStart_();
-      AnsiString HandleBackupStatus_();
-      AnsiString HandleSettings_();
-      AnsiString HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
-      AnsiString HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);
-      AnsiString HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold);
+      HttpResponse HandleListQuarantine_();
+      HttpResponse HandleQuarantineRelease_(__int64 id);
+      HttpResponse HandleQuarantineDelete_(__int64 id);
+      HttpResponse HandleListAliases_(const String &domainName);
+      HttpResponse HandleListIpRanges_();
+      HttpResponse HandleCreateIpRange_(const AnsiString &requestBody);
+      HttpResponse HandleDeleteIpRange_(__int64 rangeId);
+      HttpResponse HandleListLists_(const String &domainName);
+      HttpResponse HandleCreateList_(const String &domainName, const AnsiString &requestBody);
+      HttpResponse HandleDeleteList_(const String &address);
+      HttpResponse HandleListCertificates_();
+      HttpResponse HandleDkim_(const String &domainName);
+      HttpResponse HandleListRules_();
+      HttpResponse HandleListLogs_();
+      HttpResponse HandleLogTail_(const AnsiString &name, const AnsiString &query);
+      HttpResponse HandleBackupStart_();
+      HttpResponse HandleBackupStatus_();
+      HttpResponse HandleSettings_();
+      HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
+      HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);
+      HttpResponse HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold);
       static bool GetJsonBoolValue_(const AnsiString &json, const AnsiString &key, bool defaultValue);
       static std::vector<AnsiString> GetJsonStringArray_(const AnsiString &json, const AnsiString &key);
       static bool IsSafeLogName_(const AnsiString &name);
-      AnsiString HandleOpenApi_();
+      HttpResponse HandleOpenApi_();
 
       // True if the id names a message that is really in the delivery queue.
       static bool QueueMessageExists_(__int64 messageId);
@@ -351,8 +350,7 @@ namespace HM
       static AnsiString GetJsonStringValue_(const AnsiString &json, const AnsiString &key);
       static AnsiString JsonEscape_(const AnsiString &value);
 
-      SOCKET listen_socket_;
-      std::thread worker_;
+      std::shared_ptr<HttpServer> server_;
       bool running_;
       bool use_tls_;
       String certificate_file_;

@@ -561,6 +561,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\AcmeClient.cpp" />
     <ClCompile Include="..\Common\Util\MetricsServer.cpp" />
     <ClCompile Include="..\Common\Util\OtelTracer.cpp" />
+    <ClCompile Include="..\Common\Util\HttpServer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiServer.cpp" />
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
     <ClCompile Include="..\Common\AntiSpam\QuarantineStore.cpp" />
@@ -1258,6 +1259,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\AcmeClient.h" />
     <ClInclude Include="..\Common\Util\MetricsServer.h" />
     <ClInclude Include="..\Common\Util\OtelTracer.h" />
+    <ClInclude Include="..\Common\Util\HttpServer.h" />
     <ClInclude Include="..\Common\Util\RestApiServer.h" />
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
     <ClInclude Include="..\Common\AntiSpam\QuarantineStore.h" />

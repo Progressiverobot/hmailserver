@@ -309,6 +309,7 @@
     <Compile Include="Infrastructure\DatabaseFailureHandling.cs" />
     <Compile Include="Infrastructure\DiskSpaceGuard.cs" />
     <Compile Include="Infrastructure\ListenerIpv6.cs" />
+    <Compile Include="Infrastructure\HttpFoundation.cs" />
     <Compile Include="Infrastructure\TraceContext.cs" />
     <Compile Include="Infrastructure\WindowsEventLog.cs" />
     <Compile Include="Infrastructure\PrivacyTools.cs" />

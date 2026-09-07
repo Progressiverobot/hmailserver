@@ -8,6 +8,7 @@
 #include "StdAfx.h"
 
 #include "WebServicesServer.h"
+#include "HttpServer.h"
 #include "AcmeClient.h"
 #include "FileUtilities.h"
 #include "OtelTracer.h"
@@ -39,8 +40,13 @@ namespace HM
 {
    namespace
    {
-      const int MaxRequestSize = 64 * 1024;
-      const DWORD SocketTimeoutMilliseconds = 10000;
+      // The ceilings HttpServer enforces for these listeners. Every one is
+      // absolute - see HttpServer.cpp for why an idle timeout is not enough.
+      const size_t MaxRequestSize = 64 * 1024;
+      const unsigned RequestSeconds = 15;
+      const unsigned ConnectionSeconds = 120;
+      const unsigned MaxConnections = 128;
+      const unsigned WorkerThreads = 4;
       const int MxCacheSeconds = 3600;
 
       // How far ahead the mandatory RFC 9116 Expires field is set. Derived
@@ -60,11 +66,10 @@ namespace HM
       // could make the listener touch the file once per request.
       const int DavRedirectCacheSeconds = 60;
 
-      SSL_CTX *tls_context = nullptr;
-
-      // Owns the context tls_context points into; the boost object frees the SSL_CTX
-      // in its destructor, so it has to outlive every session made from it and
-      // nothing here may call SSL_CTX_free. Same arrangement as RestApiServer.
+      // The TLS context the HTTPS listener hands to HttpServer; the boost object
+      // frees the SSL_CTX in its destructor, so it has to outlive every session
+      // made from it and nothing here may call SSL_CTX_free. Same arrangement as
+      // RestApiServer.
       std::shared_ptr<boost::asio::ssl::context> tls_context_owner;
 
       // The configuration ReportUnreachableFeatures last reported on, empty
@@ -221,131 +226,9 @@ namespace HM
          return atCount == 1 && atPosition > 0 && atPosition < value.GetLength() - 1;
       }
 
-      // Reads an HTTP request (headers + body according to Content-Length)
-      // using the supplied read function.
-      template <typename ReadFunction>
-      bool ReadHttpRequest(ReadFunction readSome, AnsiString &request)
-      {
-         std::string data;
-         char buffer[4096];
-
-         size_t headerEnd = std::string::npos;
-
-         while (data.size() < MaxRequestSize)
-         {
-            int bytesRead = readSome(buffer, sizeof(buffer));
-            if (bytesRead <= 0)
-               break;
-
-            data.append(buffer, bytesRead);
-
-            headerEnd = data.find("\r\n\r\n");
-            if (headerEnd != std::string::npos)
-            {
-               // Determine expected body length.
-               size_t contentLength = 0;
-
-               std::string headers = data.substr(0, headerEnd);
-               std::transform(headers.begin(), headers.end(), headers.begin(), ::tolower);
-
-               size_t lengthPosition = headers.find("content-length:");
-               if (lengthPosition != std::string::npos)
-                  contentLength = atoi(headers.c_str() + lengthPosition + 15);
-
-               if (contentLength > MaxRequestSize)
-                  return false;
-
-               if (data.size() >= headerEnd + 4 + contentLength)
-                  break;
-            }
-         }
-
-         if (headerEnd == std::string::npos)
-            return false;
-
-         request = data.c_str();
-         return true;
-      }
-
-      // Parses a bind address that is an IPv4 or IPv6 literal into a sockaddr
-      // ready for bind(), choosing the family by the presence of a colon - the
-      // same test IPAddress::TryParse uses, and one no IPv4 literal can pass.
-      // False when the address is neither. A scoped link-local literal
-      // ("fe80::1%3") is not accepted, because inet_pton does not parse scope
-      // ids; it fails here and is reported as an invalid bind address.
-      bool ParseBindAddress(const AnsiString &narrowBindAddress, int port,
-                            sockaddr_storage &address, int &addressLength)
-      {
-         if (narrowBindAddress.Find(":") >= 0)
-         {
-            sockaddr_in6 address6 = {};
-            address6.sin6_family = AF_INET6;
-            address6.sin6_port = htons(static_cast<unsigned short>(port));
-
-            if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &address6.sin6_addr) != 1)
-               return false;
-
-            memcpy(&address, &address6, sizeof(address6));
-            addressLength = static_cast<int>(sizeof(address6));
-            return true;
-         }
-
-         sockaddr_in address4 = {};
-         address4.sin_family = AF_INET;
-         address4.sin_port = htons(static_cast<unsigned short>(port));
-
-         if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address4.sin_addr) != 1)
-            return false;
-
-         memcpy(&address, &address4, sizeof(address4));
-         addressLength = static_cast<int>(sizeof(address4));
-         return true;
-      }
-
-      // Windows creates AF_INET6 sockets with IPV6_V6ONLY on, so a listener
-      // bound to :: would accept IPv6 clients only - and MTA-STS fetchers,
-      // autoconfig clients and ACME validators still overwhelmingly arrive
-      // over IPv4. This listener has exactly one bind-address setting (unlike
-      // the mail protocols, which take one port row per address), so :: is the
-      // only way to serve both families and is therefore made dual-stack. A
-      // specific IPv6 address is left alone: it can only ever accept IPv6.
-      // Returns false only when the option was needed and could not be set, so
-      // the caller can say IPv4 will not be served rather than leave it to be
-      // discovered.
-      bool TryEnableDualStack(SOCKET listenSocket, const sockaddr_storage &address)
-      {
-         if (address.ss_family != AF_INET6)
-            return true;
-
-         const sockaddr_in6 *address6 = reinterpret_cast<const sockaddr_in6*>(&address);
-
-         if (!IN6_IS_ADDR_UNSPECIFIED(&address6->sin6_addr))
-            return true;
-
-         DWORD v6Only = 0;
-
-         return setsockopt(listenSocket, IPPROTO_IPV6, IPV6_V6ONLY,
-            reinterpret_cast<const char*>(&v6Only), sizeof(v6Only)) != SOCKET_ERROR;
-      }
-
-      // "host:port" for log lines, with an IPv6 literal in brackets -
-      // "[::1]:8080" - because "::1:8080" reads as a different IPv6 address.
-      String FormatEndpoint(const String &bind_address, int port)
-      {
-         String result;
-
-         if (bind_address.Find(_T(":")) >= 0)
-            result.Format(_T("[%s]:%d"), bind_address.c_str(), port);
-         else
-            result.Format(_T("%s:%d"), bind_address.c_str(), port);
-
-         return result;
-      }
    }
 
    WebServicesServer::WebServicesServer() :
-      http_socket_(INVALID_SOCKET),
-      https_socket_(INVALID_SOCKET),
       running_(false),
       tls_available_(false)
    {
@@ -531,45 +414,6 @@ namespace HM
    }
 
    bool
-   WebServicesServer::StartListener_(const String &bind_address, int port, SOCKET &listen_socket)
-   {
-      AnsiString narrowBindAddress = bind_address == _T("localhost") ? AnsiString("127.0.0.1") : AnsiString(bind_address);
-
-      sockaddr_storage address = {};
-      int addressLength = 0;
-
-      if (!ParseBindAddress(narrowBindAddress, port, address, addressLength))
-      {
-         LOG_APPLICATION("WebServices: Invalid bind address: " + bind_address);
-         return false;
-      }
-
-      listen_socket = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
-      if (listen_socket == INVALID_SOCKET)
-         return false;
-
-      BOOL reuseAddress = TRUE;
-      setsockopt(listen_socket, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
-
-      if (!TryEnableDualStack(listen_socket, address))
-         LOG_APPLICATION("WebServices: IPV6_V6ONLY could not be cleared for the :: bind, so this listener will accept IPv6 connections only. Bind 0.0.0.0 instead if IPv4 is what is needed.");
-
-      if (bind(listen_socket, reinterpret_cast<const sockaddr*>(&address), addressLength) == SOCKET_ERROR ||
-          listen(listen_socket, 5) == SOCKET_ERROR)
-      {
-         String message;
-         message.Format(_T("WebServices: Failed to bind to %s. Is the port in use?"), FormatEndpoint(bind_address, port).c_str());
-         LOG_APPLICATION(message);
-
-         closesocket(listen_socket);
-         listen_socket = INVALID_SOCKET;
-         return false;
-      }
-
-      return true;
-   }
-
-   bool
    WebServicesServer::Start(const String &bind_address, int http_port, int https_port,
                             const String &certificate_file, const String &private_key_file)
    {
@@ -650,13 +494,12 @@ namespace HM
                if (SslContextInitializer::InitServer(*context, certificate, bind_address, https_port))
                {
                   tls_context_owner = context;
-                  tls_context = context->native_handle();
 
                   // Kept from the previous implementation and applied after
                   // InitServer, so it can only tighten: the shared option mask follows
                   // the [Settings] protocol toggles, which may permit TLS 1.0 for a
                   // legacy mail client, and an HTTPS listener should not inherit that.
-                  SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
+                  SSL_CTX_set_min_proto_version(context->native_handle(), TLS1_2_VERSION);
 
                   tls_available_ = true;
                }
@@ -677,47 +520,55 @@ namespace HM
          }
       }
 
-      bool anyListener = false;
+      HttpLimits limits;
+      limits.max_request_bytes = MaxRequestSize;
+      limits.request_seconds = RequestSeconds;
+      limits.connection_seconds = ConnectionSeconds;
+      limits.max_connections = MaxConnections;
+      limits.worker_threads = WorkerThreads;
 
-      if (http_port > 0 && StartListener_(bind_address, http_port, http_socket_))
-      {
-         anyListener = true;
-      }
+      std::shared_ptr<HttpServer> server(new HttpServer("WebServices", limits,
+         [](const HttpRequest &request)
+         {
+            return ProcessRequest_(request.raw, request.over_tls);
+         },
+         HttpServer::AcceptFilter(),
+         [](int status, const AnsiString &message)
+         {
+            return BuildResponse_(status, "text/plain", message);
+         }));
 
-      if (tls_available_ && StartListener_(bind_address, https_port, https_socket_))
-      {
-         anyListener = true;
-      }
+      bool httpListening = http_port > 0 &&
+         server->Listen(bind_address, http_port, std::shared_ptr<boost::asio::ssl::context>());
 
-      if (!anyListener)
+      bool httpsListening = tls_available_ &&
+         server->Listen(bind_address, https_port, tls_context_owner);
+
+      if (!httpListening && !httpsListening)
       {
          // No SSL_CTX_free: the boost context owns it. See tls_context_owner.
-         tls_context = nullptr;
          tls_context_owner.reset();
          tls_available_ = false;
 
          return false;
       }
 
+      server_ = server;
       running_ = true;
 
-      if (http_socket_ != INVALID_SOCKET)
-      {
+      if (httpListening)
          http_listen_port = http_port;
-         http_worker_ = std::thread(&WebServicesServer::Run_, this, http_socket_, false);
-      }
 
-      if (https_socket_ != INVALID_SOCKET)
-      {
+      if (httpsListening)
          https_listen_port = https_port;
-         https_worker_ = std::thread(&WebServicesServer::Run_, this, https_socket_, true);
-      }
+
+      server_->Start();
 
       String message;
       message.Format(_T("WebServices: Listening on %s (http port %d, https port %d)."),
          bind_address.c_str(),
-         http_socket_ != INVALID_SOCKET ? http_port : 0,
-         https_socket_ != INVALID_SOCKET ? https_port : 0);
+         httpListening ? http_port : 0,
+         httpsListening ? https_port : 0);
       LOG_APPLICATION(message);
 
       return true;
@@ -733,114 +584,20 @@ namespace HM
       http_listen_port = 0;
       https_listen_port = 0;
 
-      if (http_socket_ != INVALID_SOCKET)
+      if (server_)
       {
-         closesocket(http_socket_);
-         http_socket_ = INVALID_SOCKET;
+         server_->Stop();
+         server_.reset();
       }
 
-      if (https_socket_ != INVALID_SOCKET)
-      {
-         closesocket(https_socket_);
-         https_socket_ = INVALID_SOCKET;
-      }
-
-      if (http_worker_.joinable())
-         http_worker_.join();
-
-      if (https_worker_.joinable())
-         https_worker_.join();
-
-      // No SSL_CTX_free: the boost context owns it. Released after both joins above,
-      // so no session is still using it.
-      tls_context = nullptr;
+      // No SSL_CTX_free: the boost context owns it. Released after the server has
+      // stopped, so no session is still using it.
       tls_context_owner.reset();
 
       tls_available_ = false;
    }
 
-   void
-   WebServicesServer::Run_(SOCKET listen_socket, bool use_tls)
-   {
-      for (;;)
-      {
-         SOCKET clientSocket = accept(listen_socket, nullptr, nullptr);
-
-         if (clientSocket == INVALID_SOCKET)
-         {
-            if (!running_)
-               return;
-
-            continue;
-         }
-
-         try
-         {
-            HandleClient_(clientSocket, use_tls);
-         }
-         catch (...)
-         {
-            closesocket(clientSocket);
-         }
-      }
-   }
-
-   void
-   WebServicesServer::HandleClient_(SOCKET client_socket, bool use_tls)
-   {
-      DWORD timeout = SocketTimeoutMilliseconds;
-      setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-      setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
-
-      if (use_tls)
-      {
-         SSL *tlsSession = SSL_new(tls_context);
-         if (tlsSession == nullptr)
-         {
-            closesocket(client_socket);
-            return;
-         }
-
-         SSL_set_fd(tlsSession, static_cast<int>(client_socket));
-
-         if (SSL_accept(tlsSession) == 1)
-         {
-            AnsiString request;
-
-            bool requestOk = ReadHttpRequest(
-               [&](char *buffer, int size) { return SSL_read(tlsSession, buffer, size); },
-               request);
-
-            AnsiString response = requestOk
-               ? ProcessRequest_(request, true)
-               : BuildResponse_(400, "text/plain", "malformed request");
-
-            SSL_write(tlsSession, response.c_str(), response.GetLength());
-            SSL_shutdown(tlsSession);
-         }
-
-         SSL_free(tlsSession);
-         closesocket(client_socket);
-         return;
-      }
-
-      AnsiString request;
-
-      bool requestOk = ReadHttpRequest(
-         [&](char *buffer, int size) { return recv(client_socket, buffer, size, 0); },
-         request);
-
-      AnsiString response = requestOk
-         ? ProcessRequest_(request, false)
-         : BuildResponse_(400, "text/plain", "malformed request");
-
-      send(client_socket, response.c_str(), response.GetLength(), 0);
-
-      shutdown(client_socket, SD_SEND);
-      closesocket(client_socket);
-   }
-
-   AnsiString
+   HttpResponse
    WebServicesServer::ProcessRequest_(const AnsiString &request, bool over_tls)
    {
       int lineEnd = request.Find("\r\n");
@@ -945,36 +702,25 @@ namespace HM
       }
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::BuildResponse_(int status_code, const AnsiString &content_type, const AnsiString &body,
                                      const AnsiString &extra_headers)
    {
-      AnsiString statusText;
-      switch (status_code)
-      {
-      case 200: statusText = "OK"; break;
-      case 301: statusText = "Moved Permanently"; break;
-      case 400: statusText = "Bad Request"; break;
-      case 403: statusText = "Forbidden"; break;
-      case 404: statusText = "Not Found"; break;
-      default:  statusText = "Internal Server Error"; status_code = 500; break;
-      }
-
-      AnsiString response;
-      response.Format("HTTP/1.0 %d %hs\r\nContent-Type: %hs\r\nContent-Length: %d\r\n",
-         status_code, statusText.c_str(), content_type.c_str(), body.GetLength());
+      // The status line, the framing headers and the connection header are the
+      // server's; a status it does not know becomes a 500 there, deliberately.
+      HttpResponse response;
+      response.status = status_code;
+      response.content_type = content_type;
+      response.body = body;
 
       // extra_headers is only ever built here from values that have already
       // been checked for CR and LF - see IsUsableRedirectTarget.
-      response += extra_headers;
-
-      response += "Connection: close\r\n\r\n";
-      response += body;
+      response.extra_headers = extra_headers;
 
       return response;
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::BuildRedirectResponse_(const AnsiString &location)
    {
       // 301 rather than 302: RFC 6764 section 6 wants the client to remember
@@ -1040,7 +786,7 @@ namespace HM
       return value == "https";
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::RefusePlainHttpProfile_(const AnsiString &host, const AnsiString &path, const AnsiString &query)
    {
       int httpsPort = IniFileSettings::Instance()->GetWebServicesHttpsPort();
@@ -1081,7 +827,7 @@ namespace HM
       return request.Mid(bodyStart + 4);
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleAcmeChallenge_(const AnsiString &path)
    {
       AnsiString token = path;
@@ -1176,7 +922,7 @@ namespace HM
       return !mx_hosts.empty();
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleMtaStsPolicy_(const AnsiString &host)
    {
       // The policy host must be mta-sts.<domain> (RFC 8461 section 3.3).
@@ -1279,7 +1025,7 @@ namespace HM
       return false;
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleSecurityTxt_(const AnsiString &host)
    {
       AnsiString contact;
@@ -1399,7 +1145,7 @@ namespace HM
       return true;
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleWellKnownDavRedirect_(bool calendar)
    {
       AnsiString target;
@@ -1571,7 +1317,7 @@ namespace HM
       return domain;
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleAutoconfig_(const AnsiString &host, const AnsiString &query)
    {
       AnsiString clientHost;
@@ -1616,7 +1362,7 @@ namespace HM
       return BuildResponse_(200, "text/xml", xml);
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleAutodiscover_(const AnsiString &body)
    {
       AnsiString clientHost;
@@ -1729,7 +1475,7 @@ namespace HM
       return result;
    }
 
-   AnsiString
+   HttpResponse
    WebServicesServer::HandleAppleProfile_(const AnsiString &host, const AnsiString &query)
    {
       AnsiString clientHost;

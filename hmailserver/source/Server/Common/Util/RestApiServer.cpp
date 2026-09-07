@@ -6,6 +6,7 @@
 #include "StdAfx.h"
 
 #include "RestApiServer.h"
+#include "HttpServer.h"
 #include "../Application/MetricsHistoryTask.h"
 #include "ServerStatus.h"
 #include "OtelTracer.h"
@@ -91,11 +92,13 @@ namespace HM
       // size below is between like types. /W3 /WX would otherwise turn one of
       // them into a signed/unsigned build failure the first time it is written
       // without a constant on the signed side.
+      // The ceilings HttpServer enforces for this listener. Every one is
+      // absolute - see HttpServer.cpp for why an idle timeout is not enough.
       const size_t MaxRequestSize = 64 * 1024;
-      const DWORD SocketTimeoutMilliseconds = 10000;
-
-      // Total time allowed to read one request, across all reads.
-      const ULONGLONG RequestReadTimeoutMilliseconds = 30000;
+      const unsigned RequestSeconds = 30;
+      const unsigned ConnectionSeconds = 300;
+      const unsigned MaxConnections = 64;
+      const unsigned WorkerThreads = 4;
 
       // hm_messages.messagetype for a message held for ETRN. There is no
       // Message::State enumerator for it, but GET /api/v1/queue lists it
@@ -103,14 +106,10 @@ namespace HM
       // delete endpoints have to accept it too.
       const int EtrnHeldMessageType = 3;
 
-      SSL_CTX *tls_context = nullptr;
-
-      // Owns the context that tls_context points into. This listener speaks to
-      // OpenSSL directly - blocking sockets and SSL_new - but its configuration now
-      // comes from SslContextInitializer, which takes a boost::asio::ssl::context.
-      // The boost object owns the underlying SSL_CTX and frees it in its destructor,
-      // so it has to outlive every SSL session made from it, and Stop() must not
-      // call SSL_CTX_free.
+      // The TLS context the HTTPS listener hands to HttpServer. Its configuration
+      // comes from SslContextInitializer; the boost object owns the underlying
+      // SSL_CTX and frees it in its destructor, so it has to outlive every session
+      // made from it, and Stop() releases it only after the server has stopped.
       std::shared_ptr<boost::asio::ssl::context> tls_context_owner;
 
       // API key store layout. One section per key; the section suffix is the
@@ -477,224 +476,9 @@ namespace HM
          return id > 0;
       }
 
-      // Why an enum and not a bool: an oversized request and a malformed one
-      // are different answers (413 and 400), and a caller that cannot tell them
-      // apart is the reason the oversize case used to be answered by silently
-      // truncating the body. See the totalExpected check below.
-      enum RequestReadResult
-      {
-         RequestReadOk = 0,
-         RequestReadMalformed = 1,
-         RequestReadTooLarge = 2
-      };
-
-      // Reads an HTTP request (headers + body according to Content-Length)
-      // using the supplied read function.
-      template <typename ReadFunction>
-      RequestReadResult ReadHttpRequest(ReadFunction readSome, AnsiString &request)
-      {
-         std::string data;
-         char buffer[4096];
-
-         size_t headerEnd = std::string::npos;
-
-         // Absolute wall-clock ceiling for reading one request. The per-socket
-         // SO_RCVTIMEO only bounds a single read; without a total deadline a
-         // client that dribbles a byte at a time just under that timeout can
-         // occupy the (single) REST worker thread indefinitely and also stall
-         // shutdown, since Stop() waits for the handler to return.
-         const ULONGLONG deadline = GetTickCount64() + RequestReadTimeoutMilliseconds;
-
-         for (;;)
-         {
-            if (GetTickCount64() >= deadline)
-               return RequestReadMalformed;
-
-            int bytesRead = readSome(buffer, sizeof(buffer));
-            if (bytesRead <= 0)
-               break;
-
-            data.append(buffer, bytesRead);
-
-            headerEnd = data.find("\r\n\r\n");
-
-            if (headerEnd == std::string::npos)
-            {
-               // Header block still not terminated. Bounded here rather than by
-               // the loop condition, so that "the headers alone are bigger than
-               // the cap" is an oversized request rather than one that is
-               // quietly treated as having no body.
-               if (data.size() >= MaxRequestSize)
-                  return RequestReadTooLarge;
-
-               continue;
-            }
-
-            // Determine expected body length.
-            size_t contentLength = 0;
-
-            std::string headersLower = data.substr(0, headerEnd);
-            for (size_t i = 0; i < headersLower.size(); i++)
-               headersLower[i] = (char) tolower((unsigned char) headersLower[i]);
-
-            size_t lengthPosition = headersLower.find("content-length:");
-            if (lengthPosition != std::string::npos)
-               contentLength = strtoul(headersLower.c_str() + lengthPosition + 15, nullptr, 10);
-
-            // Headers, terminator and body against the one cap.
-            //
-            // The bug this replaces: the cap was the loop condition and only
-            // the declared body length was measured against it, so a request
-            // whose headers and body *together* exceeded 64 KB left the loop
-            // with the body cut short and was then processed as if it were
-            // complete.
-            //
-            // A truncated JSON body is not a syntax error to GetJsonStringValue_,
-            // which looks each field up independently: whichever fields survived
-            // the cut are honoured and the rest read as absent. So a
-            // POST /api/v1/apikeys whose label came first created a key from a
-            // request that was never fully received, and a create-account body
-            // could lose its password the same way. One answer now, 413,
-            // whichever half is oversized.
-            size_t totalExpected = headerEnd + 4 + contentLength;
-
-            if (contentLength > MaxRequestSize || totalExpected > MaxRequestSize)
-               return RequestReadTooLarge;
-
-            if (data.size() >= totalExpected)
-               break;
-         }
-
-         if (headerEnd == std::string::npos)
-            return RequestReadMalformed;
-
-         // A NUL anywhere in the request refuses it.
-         //
-         // There is no legitimate NUL in an HTTP request line, a header block or
-         // a JSON body, and `request = data.c_str()` - what this replaces -
-         // truncated the request at the first one. So a client could cut its own
-         // request short at a byte of its choosing and still have the remains
-         // processed, and every length the reader had just checked described a
-         // different string from the one the parser saw.
-         if (data.find('\0') != std::string::npos)
-            return RequestReadMalformed;
-
-         request.assign(data.c_str(), data.size());
-         return RequestReadOk;
-      }
-
-      // Parses a bind address that is an IPv4 or IPv6 literal into a sockaddr
-      // ready for bind(), choosing the family by the presence of a colon - the
-      // same test IPAddress::TryParse uses, and one no IPv4 literal can pass.
-      // False when the address is neither. A scoped link-local literal
-      // ("fe80::1%3") is not accepted, because inet_pton does not parse scope
-      // ids; it fails here and is reported as an invalid bind address.
-      bool ParseBindAddress(const AnsiString &narrowBindAddress, int port,
-                            sockaddr_storage &address, int &addressLength)
-      {
-         if (narrowBindAddress.Find(":") >= 0)
-         {
-            sockaddr_in6 address6 = {};
-            address6.sin6_family = AF_INET6;
-            address6.sin6_port = htons(static_cast<unsigned short>(port));
-
-            if (inet_pton(AF_INET6, narrowBindAddress.c_str(), &address6.sin6_addr) != 1)
-               return false;
-
-            memcpy(&address, &address6, sizeof(address6));
-            addressLength = static_cast<int>(sizeof(address6));
-            return true;
-         }
-
-         sockaddr_in address4 = {};
-         address4.sin_family = AF_INET;
-         address4.sin_port = htons(static_cast<unsigned short>(port));
-
-         if (inet_pton(AF_INET, narrowBindAddress.c_str(), &address4.sin_addr) != 1)
-            return false;
-
-         memcpy(&address, &address4, sizeof(address4));
-         addressLength = static_cast<int>(sizeof(address4));
-         return true;
-      }
-
-      // Windows creates AF_INET6 sockets with IPV6_V6ONLY on, so a listener
-      // bound to :: would accept IPv6 clients only - and an operator who binds
-      // "any" and then finds IPv4 clients refused would have nothing to go on.
-      // This listener has exactly one bind-address setting (unlike the mail
-      // protocols, which take one port row per address), so :: is the only way
-      // to serve both families and is therefore made dual-stack. A specific
-      // IPv6 address is left alone: it can only ever accept IPv6, and the
-      // option would be dead weight. Returns false only when the option was
-      // needed and could not be set, so the caller can say IPv4 will not be
-      // served rather than leave it to be discovered.
-      bool TryEnableDualStack(SOCKET listenSocket, const sockaddr_storage &address)
-      {
-         if (address.ss_family != AF_INET6)
-            return true;
-
-         const sockaddr_in6 *address6 = reinterpret_cast<const sockaddr_in6*>(&address);
-
-         if (!IN6_IS_ADDR_UNSPECIFIED(&address6->sin6_addr))
-            return true;
-
-         DWORD v6Only = 0;
-
-         return setsockopt(listenSocket, IPPROTO_IPV6, IPV6_V6ONLY,
-            reinterpret_cast<const char*>(&v6Only), sizeof(v6Only)) != SOCKET_ERROR;
-      }
-
-      // Renders an accepted peer's address as text. On the dual-stack listener
-      // an IPv4 client arrives as an IPv4-mapped IPv6 address (::ffff:a.b.c.d),
-      // which is unmapped to its IPv4 form here - not cosmetics: every consumer
-      // of the result matches on address family. The auto-ban exclusion
-      // compares against "127.0.0.1", an AllowedFrom restriction written as an
-      // IPv4 address, range or CIDR refuses any IPv6 peer outright, and the
-      // security ranges the auto-ban creates are IPv4 ranges. A v4 client
-      // dressed as v6 would silently match none of them - including the
-      // loopback exclusion, so the server could auto-ban its own loopback.
-      bool FormatPeerAddress(const sockaddr_storage &peer, char *buffer, size_t bufferSize)
-      {
-         if (peer.ss_family == AF_INET)
-         {
-            const sockaddr_in *peer4 = reinterpret_cast<const sockaddr_in*>(&peer);
-            return inet_ntop(AF_INET, &peer4->sin_addr, buffer, bufferSize) != nullptr;
-         }
-
-         if (peer.ss_family == AF_INET6)
-         {
-            const sockaddr_in6 *peer6 = reinterpret_cast<const sockaddr_in6*>(&peer);
-
-            if (IN6_IS_ADDR_V4MAPPED(&peer6->sin6_addr))
-            {
-               in_addr mapped = {};
-               memcpy(&mapped, peer6->sin6_addr.s6_addr + 12, sizeof(mapped));
-               return inet_ntop(AF_INET, &mapped, buffer, bufferSize) != nullptr;
-            }
-
-            return inet_ntop(AF_INET6, &peer6->sin6_addr, buffer, bufferSize) != nullptr;
-         }
-
-         return false;
-      }
-
-      // "host:port" for log lines, with an IPv6 literal in brackets -
-      // "[::1]:8080" - because "::1:8080" reads as a different IPv6 address.
-      String FormatEndpoint(const String &bind_address, int port)
-      {
-         String result;
-
-         if (bind_address.Find(_T(":")) >= 0)
-            result.Format(_T("[%s]:%d"), bind_address.c_str(), port);
-         else
-            result.Format(_T("%s:%d"), bind_address.c_str(), port);
-
-         return result;
-      }
    }
 
    RestApiServer::RestApiServer() :
-      listen_socket_(INVALID_SOCKET),
       running_(false),
       use_tls_(false)
    {
@@ -781,7 +565,6 @@ namespace HM
             }
 
             tls_context_owner = context;
-            tls_context = context->native_handle();
 
             // The one thing that is deliberately *not* taken from the shared
             // configuration. This listener enforced a TLS 1.2 floor before, and the
@@ -790,7 +573,7 @@ namespace HM
             // client. That argument does not extend to an HTTP API - there is no
             // 2008-era REST client to keep working - so the floor stays, applied after
             // InitServer so it can only tighten what the shared configuration allows.
-            SSL_CTX_set_min_proto_version(tls_context, TLS1_2_VERSION);
+            SSL_CTX_set_min_proto_version(context->native_handle(), TLS1_2_VERSION);
          }
          catch (...)
          {
@@ -801,44 +584,57 @@ namespace HM
          }
       }
 
-      AnsiString narrowBindAddress = bind_address == _T("localhost") ? AnsiString("127.0.0.1") : AnsiString(bind_address);
+      HttpLimits limits;
+      limits.max_request_bytes = MaxRequestSize;
+      limits.request_seconds = RequestSeconds;
+      limits.connection_seconds = ConnectionSeconds;
+      limits.max_connections = MaxConnections;
+      limits.worker_threads = WorkerThreads;
 
-      sockaddr_storage address = {};
-      int addressLength = 0;
+      std::shared_ptr<HttpServer> server(new HttpServer("RestApi", limits,
+         [this](const HttpRequest &request)
+         {
+            return ProcessRequest_(request.raw, request.peer);
+         },
+         [](const IPAddress &peer)
+         {
+            // An address that has already tripped the auto-ban is refused here:
+            // before the request is read, before the TLS handshake, and - the
+            // point of the exercise - before anything touches the database. A
+            // refused connection is closed without a response, exactly as a
+            // security range refuses an SMTP connection before its banner.
+            if (IsRefusedAddress_(peer))
+            {
+               LOG_DEBUG("RestApiServer: Refused a connection from " + String(peer.ToString()) +
+                  ", which has recently failed authentication repeatedly.");
+               return false;
+            }
 
-      if (!ParseBindAddress(narrowBindAddress, port, address, addressLength))
+            return true;
+         },
+         [](int status, const AnsiString &message)
+         {
+            // The server's own refusals - malformed, oversized, chunked, a
+            // handler that threw - in the API's JSON shape. Says nothing about
+            // the cap: an administrator hitting it reads the documentation, a
+            // stranger measuring it learns nothing useful.
+            AnsiString body;
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(message).c_str());
+            return BuildResponse_(status, body);
+         }));
+
+      if (!server->Listen(bind_address, port, use_tls_ ? tls_context_owner : std::shared_ptr<boost::asio::ssl::context>()))
       {
-         LOG_APPLICATION("RestApi: Invalid bind address: " + bind_address);
+         tls_context_owner.reset();
          return false;
       }
 
-      listen_socket_ = socket(address.ss_family, SOCK_STREAM, IPPROTO_TCP);
-      if (listen_socket_ == INVALID_SOCKET)
-         return false;
-
-      BOOL reuseAddress = TRUE;
-      setsockopt(listen_socket_, SOL_SOCKET, SO_REUSEADDR, (const char*) &reuseAddress, sizeof(reuseAddress));
-
-      if (!TryEnableDualStack(listen_socket_, address))
-         LOG_APPLICATION("RestApi: IPV6_V6ONLY could not be cleared for the :: bind, so this listener will accept IPv6 connections only. Bind 0.0.0.0 instead if IPv4 is what is needed.");
-
-      if (bind(listen_socket_, reinterpret_cast<const sockaddr*>(&address), addressLength) == SOCKET_ERROR ||
-          listen(listen_socket_, 5) == SOCKET_ERROR)
-      {
-         String message;
-         message.Format(_T("RestApi: Failed to bind to %s."), FormatEndpoint(bind_address, port).c_str());
-         LOG_APPLICATION(message);
-
-         closesocket(listen_socket_);
-         listen_socket_ = INVALID_SOCKET;
-         return false;
-      }
-
+      server_ = server;
       running_ = true;
-      worker_ = std::thread(&RestApiServer::Run_, this);
+      server_->Start();
 
       String message;
-      message.Format(_T("RestApi: Listening on %s (%s)."), FormatEndpoint(bind_address, port).c_str(), use_tls_ ? _T("https") : _T("http, loopback only"));
+      message.Format(_T("RestApi: Listening on %s (%s)."), HttpServer::FormatEndpoint(bind_address, port).c_str(), use_tls_ ? _T("https") : _T("http, loopback only"));
       LOG_APPLICATION(message);
 
       return true;
@@ -852,159 +648,22 @@ namespace HM
 
       running_ = false;
 
-      if (listen_socket_ != INVALID_SOCKET)
+      if (server_)
       {
-         closesocket(listen_socket_);
-         listen_socket_ = INVALID_SOCKET;
+         server_->Stop();
+         server_.reset();
       }
 
-      if (worker_.joinable())
-         worker_.join();
-
-      // After the join, so there is no reader left to race with. A stopped
+      // After the stop, so there is no request left to race with. A stopped
       // listener holds no refusals and no request counts: whatever was in force
       // is dropped rather than surviving into the next Start().
       ClearRefusedAddresses_();
       ClearRequestRates_();
 
       // Deliberately no SSL_CTX_free: the boost context owns the SSL_CTX and frees it
-      // in its own destructor, so freeing it here as well would be a double free the
-      // next time the listener is stopped. Released after the join above, so no
-      // session is still using it.
-      tls_context = nullptr;
+      // in its own destructor. Released after the server has stopped, so no session
+      // is still using it.
       tls_context_owner.reset();
-   }
-
-   void
-   RestApiServer::Run_()
-   {
-      for (;;)
-      {
-         // The peer address is captured here rather than discarded: an
-         // authentication failure has to be attributable to an IP for the
-         // auto-ban machinery, and an API key may be restricted to a source
-         // address or range. sockaddr_storage, because the listener may be an
-         // AF_INET or an AF_INET6 socket and this has to hold either family's
-         // address.
-         sockaddr_storage peer = {};
-         int peerLength = sizeof(peer);
-
-         SOCKET clientSocket = accept(listen_socket_, reinterpret_cast<sockaddr*>(&peer), &peerLength);
-
-         if (clientSocket == INVALID_SOCKET)
-         {
-            if (!running_)
-               return;
-
-            continue;
-         }
-
-         // Everything from here on is inside the try. This is the top frame of
-         // the worker thread, so anything that escapes it is std::terminate - a
-         // dead server - and leaks clientSocket on the way out. Constructing an
-         // IPAddress and parsing it can only realistically fail by bad_alloc,
-         // but the cost of being certain is one level of indentation.
-         try
-         {
-            IPAddress peerAddress;
-
-            char peerText[INET6_ADDRSTRLEN] = {};
-            if (FormatPeerAddress(peer, peerText, sizeof(peerText)))
-            {
-               // A parse failure leaves peerAddress as the default 0.0.0.0,
-               // which is refused by every non-empty source restriction and is
-               // never auto-banned. Failing closed is the right direction here.
-               peerAddress.TryParse(AnsiString(peerText), false);
-            }
-
-            // An address that has already tripped the auto-ban is refused here:
-            // before the request is read, before the TLS handshake, and - the
-            // point of the exercise - before anything touches the database. A
-            // refused connection is closed without a response, exactly as a
-            // security range refuses an SMTP connection before its banner.
-            if (IsRefusedAddress_(peerAddress))
-            {
-               LOG_DEBUG("RestApiServer: Refused a connection from " + String(peerAddress.ToString()) +
-                  ", which has recently failed authentication repeatedly.");
-
-               closesocket(clientSocket);
-               continue;
-            }
-
-            HandleClient_(clientSocket, peerAddress);
-         }
-         catch (...)
-         {
-            closesocket(clientSocket);
-         }
-      }
-   }
-
-   void
-   RestApiServer::HandleClient_(SOCKET client_socket, const IPAddress &peer_address)
-   {
-      DWORD timeout = SocketTimeoutMilliseconds;
-      setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-      setsockopt(client_socket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
-
-      // One place that turns a read outcome into a response, shared by the TLS
-      // and plaintext paths below, so the two cannot answer the same condition
-      // differently.
-      auto answer = [&](RequestReadResult readResult, const AnsiString &httpRequest) -> AnsiString
-      {
-         if (readResult == RequestReadOk)
-            return ProcessRequest_(httpRequest, peer_address);
-
-         // Says nothing about the cap. An administrator hitting this reads the
-         // documentation; a stranger measuring it learns nothing useful.
-         if (readResult == RequestReadTooLarge)
-            return BuildResponse_(413, "{\"error\":\"request too large\"}");
-
-         return BuildResponse_(400, "{\"error\":\"malformed request\"}");
-      };
-
-      if (use_tls_)
-      {
-         SSL *tlsSession = SSL_new(tls_context);
-         if (tlsSession == nullptr)
-         {
-            closesocket(client_socket);
-            return;
-         }
-
-         SSL_set_fd(tlsSession, static_cast<int>(client_socket));
-
-         if (SSL_accept(tlsSession) == 1)
-         {
-            AnsiString request;
-
-            RequestReadResult readResult = ReadHttpRequest(
-               [&](char *buffer, int size) { return SSL_read(tlsSession, buffer, size); },
-               request);
-
-            AnsiString response = answer(readResult, request);
-
-            SSL_write(tlsSession, response.c_str(), response.GetLength());
-            SSL_shutdown(tlsSession);
-         }
-
-         SSL_free(tlsSession);
-         closesocket(client_socket);
-         return;
-      }
-
-      AnsiString request;
-
-      RequestReadResult readResult = ReadHttpRequest(
-         [&](char *buffer, int size) { return recv(client_socket, buffer, size, 0); },
-         request);
-
-      AnsiString response = answer(readResult, request);
-
-      send(client_socket, response.c_str(), response.GetLength(), 0);
-
-      shutdown(client_socket, SD_SEND);
-      closesocket(client_socket);
    }
 
    AnsiString
@@ -1481,7 +1140,7 @@ namespace HM
       }
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::ProcessRequest_(const AnsiString &request, const IPAddress &peer_address)
    {
       // Parse the request line.
@@ -2262,39 +1921,22 @@ namespace HM
       return AuthorizationAllowed;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::BuildResponse_(int statusCode, const AnsiString &body, const AnsiString &extraHeaders)
    {
-      // Any status not named here becomes a 500, deliberately - a wrong number
-      // in a response line is worse than an honest server error. Which is also
-      // why 403, 413 and 429 had to be added below the moment anything started
-      // using them: BuildResponse_(429, ...) against the previous list answered
-      // "500 Internal Server Error" while carrying a rate-limit body.
-      AnsiString statusText;
-      switch (statusCode)
-      {
-      case 200: statusText = "OK"; break;
-      case 201: statusText = "Created"; break;
-      case 202: statusText = "Accepted"; break;
-      case 400: statusText = "Bad Request"; break;
-      case 403: statusText = "Forbidden"; break;
-      case 404: statusText = "Not Found"; break;
-      case 409: statusText = "Conflict"; break;
-      case 413: statusText = "Payload Too Large"; break;
-      case 429: statusText = "Too Many Requests"; break;
-      case 503: statusText = "Service Unavailable"; break;
-      default:  statusText = "Internal Server Error"; statusCode = 500; break;
-      }
-
-      AnsiString response;
-      response.Format("HTTP/1.0 %d %hs\r\nContent-Type: application/json\r\nContent-Length: %d\r\n%hsConnection: close\r\n\r\n",
-         statusCode, statusText.c_str(), body.GetLength(), extraHeaders.c_str());
-      response += body;
+      // The status line, the framing headers and the connection header are the
+      // server's; a status it does not know becomes a 500 there, deliberately -
+      // a wrong number in a response line is worse than an honest server error.
+      HttpResponse response;
+      response.status = statusCode;
+      response.content_type = "application/json";
+      response.body = body;
+      response.extra_headers = extraHeaders;
 
       return response;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::BuildUnauthorizedResponse_(bool secondFactorRequired)
    {
       // One response for every possible authentication problem: no credential,
@@ -2316,20 +1958,14 @@ namespace HM
          ? "{\"error\":\"authentication failed\",\"second_factor\":\"required\"}"
          : "{\"error\":\"authentication failed\"}";
 
-      AnsiString response;
-      response += "HTTP/1.0 401 Unauthorized\r\n";
-      response += "WWW-Authenticate: Basic realm=\"hMailServer\"\r\n";
+      AnsiString headers = "WWW-Authenticate: Basic realm=\"hMailServer\"\r\n";
       if (secondFactorRequired)
-         response += "X-hMailServer-OTP: required\r\n";
-      response += "Content-Type: application/json\r\n";
-      response.AppendFormat("Content-Length: %d\r\n", body.GetLength());
-      response += "Connection: close\r\n\r\n";
-      response += body;
+         headers += "X-hMailServer-OTP: required\r\n";
 
-      return response;
+      return BuildResponse_(401, body, headers);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::BuildForbiddenResponse_(const AnsiString &reason)
    {
       // 403 and not 401, and it says why.
@@ -2349,7 +1985,7 @@ namespace HM
       return BuildResponse_(403, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::BuildTooManyRequestsResponse_()
    {
       // Retry-After is the whole window. The window is fixed rather than
@@ -2629,7 +2265,7 @@ namespace HM
       return peer_address.WithinRange(lower, upper);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListApiKeys_()
    {
       // Metadata only. The hash is not returned: it is not a usable credential,
@@ -2670,7 +2306,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleCreateApiKey_(const AnsiString &requestBody)
    {
       AnsiString label = GetJsonStringValue_(requestBody, "label");
@@ -2915,7 +2551,7 @@ namespace HM
       return BuildResponse_(201, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleRevokeApiKey_(const AnsiString &id)
    {
       // Only ids of the shape we hand out, so that nothing here can be talked
@@ -2959,7 +2595,7 @@ namespace HM
       return BuildResponse_(200, "{\"revoked\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleWebAdminPage_()
    {
       String pagePath = FileUtilities::Combine(
@@ -2978,15 +2614,14 @@ namespace HM
                 "The REST API is available under /api/v1/.</p></body></html>";
       }
 
-      AnsiString response;
-      response.Format("HTTP/1.0 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: %d\r\nConnection: close\r\n\r\n",
-         body.GetLength());
-      response += body;
+      HttpResponse response;
+      response.content_type = "text/html; charset=utf-8";
+      response.body = body;
 
       return response;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleStatus_()
    {
       ServerStatus *status = ServerStatus::Instance();
@@ -3008,7 +2643,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListDomains_(const std::vector<String> &allowedDomains)
    {
       Domains domains;
@@ -3053,7 +2688,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListAccounts_(const String &domainName)
    {
       Domains domains;
@@ -3095,7 +2730,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleCreateAccount_(const String &domainName, const AnsiString &requestBody)
    {
       AnsiString address = GetJsonStringValue_(requestBody, "address");
@@ -3215,7 +2850,7 @@ namespace HM
       return BuildResponse_(201, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleDeleteAccount_(const String &address)
    {
       std::shared_ptr<Account> account = std::shared_ptr<Account>(new Account());
@@ -3231,7 +2866,7 @@ namespace HM
       return BuildResponse_(200, "{\"deleted\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListQueue_()
    {
       // Reuses the same query that backs the COM Status.UndeliveredMessages
@@ -3302,7 +2937,7 @@ namespace HM
              messageType == EtrnHeldMessageType;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleQueueRetry_(__int64 messageId)
    {
       if (!QueueMessageExists_(messageId))
@@ -3316,7 +2951,7 @@ namespace HM
       return BuildResponse_(200, "{\"retried\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleQueueDelete_(__int64 messageId)
    {
       if (!QueueMessageExists_(messageId))
@@ -3329,7 +2964,7 @@ namespace HM
       return BuildResponse_(200, "{\"deleted\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListQuarantine_()
    {
       // The same store call the administration surface uses, bounded the same
@@ -3364,7 +2999,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleQuarantineRelease_(__int64 id)
    {
       // Existence checked first, so an unknown id is a 404 rather than a 500
@@ -3385,7 +3020,7 @@ namespace HM
       return BuildResponse_(200, "{\"released\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleQuarantineDelete_(__int64 id)
    {
       QuarantinedMessage message;
@@ -3398,7 +3033,7 @@ namespace HM
       return BuildResponse_(200, "{\"deleted\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListAliases_(const String &domainName)
    {
       Domains domains;
@@ -3447,7 +3082,7 @@ namespace HM
    // every string goes through JsonEscape_, and nothing here is reachable
    // except through the dispatch in ProcessRequest_ after Authorize_.
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListIpRanges_()
    {
       SecurityRanges ranges;
@@ -3502,7 +3137,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleCreateIpRange_(const AnsiString &requestBody)
    {
       AnsiString name = GetJsonStringValue_(requestBody, "name");
@@ -3581,7 +3216,7 @@ namespace HM
       return BuildResponse_(201, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleDeleteIpRange_(__int64 rangeId)
    {
       SecurityRanges ranges;
@@ -3598,7 +3233,7 @@ namespace HM
       return BuildResponse_(200, "{\"deleted\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListLists_(const String &domainName)
    {
       Domains domains;
@@ -3652,7 +3287,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleCreateList_(const String &domainName, const AnsiString &requestBody)
    {
       AnsiString address = GetJsonStringValue_(requestBody, "address");
@@ -3709,7 +3344,7 @@ namespace HM
       return BuildResponse_(201, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleDeleteList_(const String &address)
    {
       String domainName = StringParser::ExtractDomain(address);
@@ -3732,7 +3367,7 @@ namespace HM
       return BuildResponse_(200, "{\"deleted\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListCertificates_()
    {
       std::shared_ptr<SSLCertificates> certificates = Configuration::Instance()->GetSSLCertificates();
@@ -3764,7 +3399,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleDkim_(const String &domainName)
    {
       Domains domains;
@@ -3836,7 +3471,7 @@ namespace HM
       }
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListRules_()
    {
       // The global rules, from the cache the delivery path itself reads, so the
@@ -3951,7 +3586,7 @@ namespace HM
       return true;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleListLogs_()
    {
       String directory = IniFileSettings::Instance()->GetLogDirectory();
@@ -3981,7 +3616,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleLogTail_(const AnsiString &name, const AnsiString &query)
    {
       if (!IsSafeLogName_(name))
@@ -4080,7 +3715,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleBackupStart_()
    {
       std::shared_ptr<BackupManager> manager = Application::Instance()->GetBackupManager();
@@ -4099,7 +3734,7 @@ namespace HM
       return BuildResponse_(202, "{\"started\":true}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleBackupStatus_()
    {
       std::shared_ptr<BackupManager> manager = Application::Instance()->GetBackupManager();
@@ -4142,7 +3777,7 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleSettings_()
    {
       // A snapshot of the settings an operator asks about first, and nothing
@@ -4249,7 +3884,7 @@ namespace HM
    // rows in them; the Inbound copies belong to no domain and are the
    // administrator's alone.
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query)
    {
       PersistentArchiveIndex::Criteria criteria;
@@ -4279,7 +3914,7 @@ namespace HM
       return BuildResponse_(200, PersistentArchiveIndex::ToJson(entries));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId)
    {
       PersistentArchiveIndex::Entry entry;
@@ -4290,7 +3925,7 @@ namespace HM
       return BuildResponse_(200, PersistentArchiveIndex::ToJson(entry));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold)
    {
       PersistentArchiveIndex::Entry entry;
@@ -4305,7 +3940,7 @@ namespace HM
       return BuildResponse_(200, hold ? "{\"hold\":true}" : "{\"hold\":false}");
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleOpenApi_()
    {
       // The description lives here, beside the router it describes, so a route
@@ -4376,7 +4011,7 @@ namespace HM
       return BuildResponse_(200, AnsiString(openApiJson));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleTlsa_()
    {
       // Recommended DANE TLSA records (3 1 1: DANE-EE, SPKI, SHA-256) for
@@ -4480,7 +4115,7 @@ namespace HM
       return "";
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleMetricsHistory_(const AnsiString &query)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
@@ -4528,7 +4163,7 @@ namespace HM
       return BuildResponse_(200, MetricsHistoryTask::QueryAsJson(String(metric), minutesBack, bucketMinutes));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleSrv_(const std::vector<String> &allowedDomains)
    {
       // Ready-to-publish client-discovery SRV records: RFC 6186 for
@@ -4827,13 +4462,13 @@ namespace HM
       return result;
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleUpdateGet_()
    {
       return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleUpdateInstall_()
    {
       String error;
@@ -4842,7 +4477,7 @@ namespace HM
       return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleUpdateDownload_()
    {
       String error;
@@ -4850,7 +4485,7 @@ namespace HM
       return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
    }
 
-   AnsiString
+   HttpResponse
    RestApiServer::HandleUpdateCheck_()
    {
       // The check's own outcome is in the verdict it returns (state 5 and
