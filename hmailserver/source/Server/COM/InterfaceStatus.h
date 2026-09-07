@@ -62,6 +62,8 @@ public:
    STDMETHOD(DownloadUpdate)(/*[out, retval]*/ VARIANT_BOOL *pVal);
    STDMETHOD(get_UpdateInstallerPath)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(get_UpdateSignerIdentity)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(InstallUpdate)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(get_UpdateApplyOutcome)(/*[out, retval]*/ BSTR *pVal);
 
 private:
 

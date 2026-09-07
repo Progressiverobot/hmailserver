@@ -498,6 +498,9 @@ namespace HM
       update_signing_issuer_ = ReadIniSettingString_("Settings", "UpdateSigningIssuer", "");
       update_source_repository_ = ReadIniSettingString_("Settings", "UpdateSourceRepository", "");
       update_require_authenticode_ = ReadIniSettingInteger_("Settings", "UpdateRequireAuthenticode", 0) == 1;
+      update_service_wait_seconds_ = ReadIniSettingInteger_("Settings", "UpdateServiceWaitSeconds", 180);
+      if (update_service_wait_seconds_ < 5)
+         update_service_wait_seconds_ = 5;
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
       log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);

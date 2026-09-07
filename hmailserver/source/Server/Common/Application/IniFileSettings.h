@@ -575,6 +575,9 @@ namespace HM
       String GetUpdateSigningIssuer() const { return update_signing_issuer_; }
       String GetUpdateSourceRepository() const { return update_source_repository_; }
       bool GetUpdateRequireAuthenticode() const { return update_require_authenticode_; }
+      // How long the update helper gives the service to come back after the installer
+      // has run before it rolls back.
+      int GetUpdateServiceWaitSeconds() const { return update_service_wait_seconds_; }
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
@@ -1126,6 +1129,7 @@ namespace HM
       String update_signing_issuer_;
       String update_source_repository_;
       bool update_require_authenticode_ = false;
+      int update_service_wait_seconds_ = 180;
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;

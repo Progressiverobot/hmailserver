@@ -41,6 +41,8 @@ hmailserver/source/Server/hMailServer.Minidump/Release/*
 
 hmailserver/test/RegressionTests/TestResult.xml
 hmailserver/source/Server/hMailServer.Minidump/x64/*
+hmailserver/source/Server/hMailServer.Updater/Release/*
+hmailserver/source/Server/hMailServer.Updater/x64/*
 /hmailserver/installation/Output/*
 /hmailserver/test/packages/*
 /hmailserver/test/RegressionTests/packages/*

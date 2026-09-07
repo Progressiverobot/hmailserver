@@ -246,6 +246,79 @@ namespace HM
       snapshot_.last_error = reason;
    }
 
+   void
+   UpdateChecker::RecordInstalling()
+   {
+      boost::lock_guard<boost::mutex> guard(mutex_);
+      snapshot_.state = StateInstalling;
+      snapshot_.last_error.Empty();
+   }
+
+   void
+   UpdateChecker::RecordApplyOutcome(const String &status, const String &version, const String &detail)
+   {
+      boost::lock_guard<boost::mutex> guard(mutex_);
+      snapshot_.apply_status = status;
+      snapshot_.apply_version = version;
+      snapshot_.apply_detail = detail;
+      // An outcome means the helper has finished: whatever the state said before
+      // the restart, the service is running now, and the next check decides.
+      if (snapshot_.state == StateInstalling)
+         snapshot_.state = StateNotChecked;
+   }
+
+   AnsiString
+   UpdateChecker::ReleaseByTagUrl(const String &version)
+   {
+      std::string configured = std::string(AnsiString(IniFileSettings::Instance()->GetUpdateFeedUrl()).c_str());
+      std::string tag = "/tags/v" + std::string(AnsiString(version).c_str());
+      if (configured.empty())
+         return AnsiString(("https://api.github.com/repos/Progressiverobot/hmailserver/releases" + tag).c_str());
+      size_t releases = configured.find("/releases");
+      if (releases == std::string::npos)
+         return AnsiString((configured + tag).c_str());
+      return AnsiString((configured.substr(0, releases + 9) + tag).c_str());
+   }
+
+   bool
+   UpdateChecker::FetchReleaseByTag(const String &version, ReleaseAssets &assets, String &error)
+   {
+      assets = ReleaseAssets();
+
+      std::vector<AnsiString> headers;
+      headers.push_back("X-GitHub-Api-Version: 2022-11-28");
+
+      HttpsClient::Response response;
+      String requestError;
+      AnsiString url = ReleaseByTagUrl(version);
+      if (!HttpsClient::Request("GET", url, headers, "", "", response, requestError, 20, MAX_FEED_BYTES))
+      {
+         error = Formatter::Format(_T("the release feed could not be read for {0}: {1}"), version, requestError);
+         return false;
+      }
+      if (response.status_code != 200)
+      {
+         error = Formatter::Format(_T("the release feed answered HTTP {0} for release {1}"), response.status_code, version);
+         return false;
+      }
+
+      JsonValue document;
+      std::string parseError;
+      Release release;
+      if (!JsonValue::Parse(std::string(response.body), document, parseError) || !ReadRelease_(document, release))
+      {
+         error = Formatter::Format(_T("the feed's entry for release {0} is not a release"), version);
+         return false;
+      }
+
+      assets.version = release.version;
+      assets.installer_url = release.installer_url;
+      assets.installer_size = release.installer_size;
+      assets.installer_digest = release.installer_digest;
+      assets.bundle_url = release.bundle_url;
+      return true;
+   }
+
    String
    UpdateChecker::FormatUnixTime(__int64 seconds)
    {
@@ -442,6 +515,11 @@ namespace HM
       body += ",\"signer\":" + Quote_(String(snapshot.signer_identity));
       body += ",\"logTime\":" + Quote_(FormatUnixTime(snapshot.integrated_time));
       body += ",\"verifiedAt\":" + Quote_(snapshot.verified_at);
+      body += "}";
+      body += ",\"apply\":{";
+      body += "\"status\":" + Quote_(snapshot.apply_status);
+      body += ",\"version\":" + Quote_(snapshot.apply_version);
+      body += ",\"detail\":" + Quote_(snapshot.apply_detail);
       body += "}";
       body += ",\"lastChecked\":" + Quote_(snapshot.last_checked);
       body += ",\"lastError\":" + Quote_(snapshot.last_error);

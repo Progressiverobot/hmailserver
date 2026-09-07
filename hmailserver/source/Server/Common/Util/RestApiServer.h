@@ -122,6 +122,7 @@ namespace HM
          RouteUpdateGet,
          RouteUpdateCheck,
          RouteUpdateDownload,
+         RouteUpdateInstall,
          RouteQuarantineList,
          RouteQuarantineRelease,
          RouteQuarantineDelete,
@@ -314,6 +315,7 @@ namespace HM
       static AnsiString HandleUpdateGet_();
       static AnsiString HandleUpdateCheck_();
       static AnsiString HandleUpdateDownload_();
+      static AnsiString HandleUpdateInstall_();
       static AnsiString QueryParameter_(const AnsiString &query, const AnsiString &name);
 
       AnsiString HandleListQuarantine_();

@@ -150,6 +150,7 @@ The installer is Inno Setup, so it takes the standard switches, plus one of its 
 | `/LOG="<path>"` | Write an install log. Use it; it is the only record of what happened |
 | `/DIR="<path>"` | Installation directory |
 | `/COMPONENTS="server,admintools,controlpanel"` | Which components to install. `server` is the service itself; `admintools` registers the COM type library so scripts can administer a *remote* instance; `controlpanel` installs the admin GUI. The Control Panel does not need `admintools` — it binds late through IDispatch |
+| `/upgradetoken=<hex>` | **Custom to this installer.** The single-use token the server issues when it applies a live update; forwarded to the database upgrade as its credential in place of the administrator password. Not for people to type: see *Update check* below |
 | `/useinternaldbms=true\|false` | **Custom to this installer.** `true` (the default) uses the bundled SQL Server Compact database. Set `false` when pointing at an existing MySQL, MariaDB, PostgreSQL or MS SQL server |
 
 Example:
@@ -194,13 +195,29 @@ under its own key. A file that fails any of that is deleted and the reason is in
 `Status.UpdateLastError` and the log. `UpdateRequireAuthenticode=1` adds a Windows
 Authenticode check on top. Nothing is run: applying the installer is the next part.
 
+**Applying it.** `Status.InstallUpdate` or `POST /api/v1/update/install` verifies
+the downloaded installer once more, fetches and verifies the running version's
+installer as a rollback image (where the feed still offers it), issues a
+single-use token for the database upgrade, and hands the installer to
+`hMailServer.Updater.exe`, copied out of `Bin` into `Data\Updates` because the
+installer replaces `Bin`. The helper runs the installer silently, waits for the
+service to come back, and if it does not, reinstalls the previous version; either
+way it writes one line the service reports in its log and `Status.UpdateApplyOutcome`
+the next time it starts. The token replaces the administrator password the silent
+upgrade would otherwise need: it is 32 random bytes in a file only the machine's
+administrators can read, good for one hour and one use, accepted by
+`Application.Authenticate` as `token:<hex>` exactly once. A rollback reinstalls the
+previous binaries; it cannot take the database back, so when the new version had
+already moved the schema and then failed to start, the previous version will
+refuse the newer schema and the outcome says so. Take a backup before an update
+that moves the schema; the notes of every release say whether it does.
+
 It is off until you opt in, because a server must not call out to anyone until its
 administrator says it may; when it is on, the request is a plain `GET` of the
 GitHub Releases API with nothing but the `User-Agent` the server always sends - no
 identifier, no configuration, no counts. `UpdateFeedUrl` points it at a mirror on a
-network without Internet access. It installs nothing: applying the verified
-installer, with a rollback if the service does not come back, is the next part of
-the roadmap's live-update row.
+network without Internet access. Nothing is applied until you ask: an unattended
+window for applying is the last part of the roadmap's live-update row.
 
 Building hMailServer
 ====================
@@ -433,6 +450,8 @@ Administration and monitoring:
                                  ; sign-release workflow); UpdateSigningIssuer= the OIDC issuer (empty = GitHub's);
                                  ; UpdateSourceRepository= the repository it must record (empty = this one, - = any)
    UpdateRequireAuthenticode=0   ; 1: the installer must also carry an Authenticode signature Windows trusts
+   UpdateServiceWaitSeconds=180  ; how long the update helper gives the service to come back after the
+                                 ; installer has run before it reinstalls the previous version
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
                                  ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read
@@ -601,7 +620,7 @@ Administration and monitoring:
 
    The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 only when `StateRunning` and the database has answered a real round trip within the last 20 seconds, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database, uptime). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, the start time (`hmailserver_start_time_seconds`), database connectivity (`hmailserver_database_connected`, proved by a round trip, plus pool gauges), the SMTP delivery-queue depth and oldest-message age, certificate expiry, work-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and per-command and per-query latency histograms (`hmailserver_command_processing_seconds`, `hmailserver_db_query_seconds`).
 
-   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/update` (GET, the update check's verdict: state, the newer release's version, date, page and installer asset) and `/api/v1/update/check` (POST, read the release feed now), `/api/v1/update/download` (POST, fetch and verify the newer release's installer), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
+   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/update` (GET, the update check's verdict: state, the newer release's version, date, page and installer asset) and `/api/v1/update/check` (POST, read the release feed now), `/api/v1/update/download` (POST, fetch and verify the newer release's installer), `/api/v1/update/install` (POST, apply it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
 
 Secret protection and least-privilege:
 

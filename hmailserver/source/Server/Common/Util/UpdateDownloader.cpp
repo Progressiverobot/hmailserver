@@ -101,6 +101,71 @@ namespace HM
    }
 
    bool
+   UpdateDownloader::FetchVerified(const String &installerUrl, const String &bundleUrl, const String &installerPath, __int64 expectedSize,
+                                   const String &expectedDigest, const SigstoreTrust &trust, SigstoreVerdict &verdict, String &why)
+   {
+      String bundlePath = installerPath + _T(".cosign.bundle");
+      String partialPath = installerPath + _T(".partial");
+      bool ok = false;
+      int status = 0;
+
+      // The bundle first: it is small, and without it the installer is not worth
+      // the bandwidth.
+      if (!HttpsClient::Download(AnsiString(bundleUrl), bundlePath, MAX_BUNDLE_BYTES, status, why))
+         why = Formatter::Format(_T("The Sigstore bundle could not be fetched: {0}"), why);
+      else if (!HttpsClient::Download(AnsiString(installerUrl), partialPath, MAX_INSTALLER_BYTES, status, why))
+         why = Formatter::Format(_T("The installer could not be fetched: {0}"), why);
+      else
+      {
+         unsigned __int64 size = 0;
+         FileUtilities::FileSize64(partialPath, size);
+         if (expectedSize > 0 && (__int64) size != expectedSize)
+            why = Formatter::Format(_T("The feed says the installer is {0} bytes; the download is {1}."), expectedSize, (__int64) size);
+         else
+         {
+            // The feed's digest is a cheap consistency check, not the proof; the
+            // proof is the bundle. A disagreement between the two means one of them
+            // is not what it claims, and that is enough to stop.
+            std::vector<unsigned char> digest;
+            String hashError;
+            if (!SigstoreVerifier::Sha256File(partialPath, digest, hashError))
+               why = hashError;
+            else
+            {
+               AnsiString stated = AnsiString(expectedDigest);
+               stated.MakeLower();
+               if (stated.StartsWith("sha256:") && std::string(stated.c_str() + 7) != SigstoreVerifier::Hex(digest))
+                  why = Formatter::Format(_T("The feed says the installer's SHA-256 is {0}; the download's is {1}."),
+                     String(stated.c_str() + 7), String(SigstoreVerifier::Hex(digest).c_str()));
+               else
+               {
+                  AnsiString bundleJson = AnsiString(Unicode::ToANSI(FileUtilities::ReadCompleteTextFile(bundlePath)));
+                  if (!SigstoreVerifier::VerifyFile(partialPath, bundleJson, trust, verdict))
+                     why = Formatter::Format(_T("The installer did not verify against its Sigstore bundle: {0}"), verdict.error);
+                  else if (IniFileSettings::Instance()->GetUpdateRequireAuthenticode() && !AuthenticodeTrusted(partialPath, why))
+                     why = Formatter::Format(_T("The installer's Authenticode signature was refused: {0}."), why);
+                  else
+                  {
+                     Remove_(installerPath);
+                     if (!FileUtilities::Move(partialPath, installerPath))
+                        why = Formatter::Format(_T("{0} could not be moved into place."), partialPath);
+                     else
+                        ok = true;
+                  }
+               }
+            }
+         }
+      }
+
+      if (!ok)
+      {
+         Remove_(partialPath);
+         Remove_(bundlePath);
+      }
+      return ok;
+   }
+
+   bool
    UpdateDownloader::DownloadAndVerify(String &error)
    {
       error.Empty();
@@ -134,10 +199,6 @@ namespace HM
          return false;
       }
 
-      String installerPath = directory + _T("\\") + snapshot.installer_name;
-      String bundlePath = installerPath + _T(".cosign.bundle");
-      String partialPath = installerPath + _T(".partial");
-
       SigstoreTrust trust;
       String trustError;
       if (!SigstoreVerifier::ConfiguredTrust(trust, trustError))
@@ -148,63 +209,11 @@ namespace HM
          return false;
       }
 
-      String why;
-      bool ok = false;
+      String installerPath = directory + _T("\\") + snapshot.installer_name;
       SigstoreVerdict verdict;
-      int status = 0;
-
-      // The bundle first: it is small, and without it the installer is not worth
-      // the bandwidth.
-      if (!HttpsClient::Download(AnsiString(snapshot.bundle_url), bundlePath, MAX_BUNDLE_BYTES, status, why))
-         why = Formatter::Format(_T("The Sigstore bundle could not be fetched: {0}"), why);
-      else if (!HttpsClient::Download(AnsiString(snapshot.installer_url), partialPath, MAX_INSTALLER_BYTES, status, why))
-         why = Formatter::Format(_T("The installer could not be fetched: {0}"), why);
-      else
+      String why;
+      if (!FetchVerified(snapshot.installer_url, snapshot.bundle_url, installerPath, snapshot.installer_size, snapshot.installer_digest, trust, verdict, why))
       {
-         unsigned __int64 size = 0;
-         FileUtilities::FileSize64(partialPath, size);
-         if (snapshot.installer_size > 0 && (__int64) size != snapshot.installer_size)
-            why = Formatter::Format(_T("The feed says the installer is {0} bytes; the download is {1}."), snapshot.installer_size, (__int64) size);
-         else
-         {
-            // The feed's digest is a cheap consistency check, not the proof; the
-            // proof is the bundle. A disagreement between the two means one of them
-            // is not what it claims, and that is enough to stop.
-            std::vector<unsigned char> digest;
-            String hashError;
-            if (!SigstoreVerifier::Sha256File(partialPath, digest, hashError))
-               why = hashError;
-            else
-            {
-               AnsiString stated = AnsiString(snapshot.installer_digest);
-               stated.MakeLower();
-               if (stated.StartsWith("sha256:") && std::string(stated.c_str() + 7) != SigstoreVerifier::Hex(digest))
-                  why = Formatter::Format(_T("The feed says the installer's SHA-256 is {0}; the download's is {1}."),
-                     String(stated.c_str() + 7), String(SigstoreVerifier::Hex(digest).c_str()));
-               else
-               {
-                  AnsiString bundleJson = AnsiString(Unicode::ToANSI(FileUtilities::ReadCompleteTextFile(bundlePath)));
-                  if (!SigstoreVerifier::VerifyFile(partialPath, bundleJson, trust, verdict))
-                     why = Formatter::Format(_T("The installer did not verify against its Sigstore bundle: {0}"), verdict.error);
-                  else if (IniFileSettings::Instance()->GetUpdateRequireAuthenticode() && !AuthenticodeTrusted(partialPath, why))
-                     why = Formatter::Format(_T("The installer's Authenticode signature was refused: {0}."), why);
-                  else
-                  {
-                     Remove_(installerPath);
-                     if (!FileUtilities::Move(partialPath, installerPath))
-                        why = Formatter::Format(_T("{0} could not be moved into place."), partialPath);
-                     else
-                        ok = true;
-                  }
-               }
-            }
-         }
-      }
-
-      if (!ok)
-      {
-         Remove_(partialPath);
-         Remove_(bundlePath);
          UpdateChecker::RecordFailure(why);
          LOG_APPLICATION(Formatter::Format(_T("Update download failed for hMailServer {0}: {1}"), snapshot.available_version, why));
          error = why;

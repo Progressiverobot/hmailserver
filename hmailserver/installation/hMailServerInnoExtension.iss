@@ -3,6 +3,7 @@
 var
   g_pageAccessKey: TInputQueryWizardPage;
   g_szAdminPassword: String;
+  g_szUpgradeToken: String;
   
   g_pageDBType: TWizardPage;
   g_bUseInternal : Boolean;
@@ -647,6 +648,10 @@ begin
 	// because it arrived on the command line. When none is given the key is left
 	// out of the ini entirely - see HasAdministratorPassword.
 	g_szAdminPassword := ExpandConstant('{param:adminpassword|}');
+	// The live update's helper passes the single-use token the server issued for the
+	// database upgrade; it is forwarded to the database tool as its credential and
+	// is not a password: it is never written to the ini.
+	g_szUpgradeToken := ExpandConstant('{param:upgradetoken|}');
 
 	if (Length(g_szAdminPassword) > 0) and (Length(g_szAdminPassword) < 5) then
 	begin
@@ -941,7 +946,9 @@ begin
          // Authenticator fails instead of prompting under /silent, so the worst case is a
          // reported exit code rather than a wait with no end.
          if (Length(g_szAdminPassword) > 0) then
-            szParameters := szParameters + ' password:' + g_szAdminPassword;
+            szParameters := szParameters + ' password:' + g_szAdminPassword
+         else if (Length(g_szUpgradeToken) > 0) then
+            szParameters := szParameters + ' password:token:' + g_szUpgradeToken;
 
          // Skipped when the built-in database engine could not be installed: the
          // tools cannot possibly succeed without it, and a second, vaguer error

@@ -6,6 +6,7 @@
 #include "stdafx.h"
 
 #include ".\COMAuthentication.h"
+#include "..\Common\Util\UpdateApplyToken.h"
 #include "..\Common\BO\Account.h"
 #include "..\Common\Util\PasswordValidator.h"
 #include "..\Common\Util\Totp.h"
@@ -96,6 +97,17 @@ namespace HM
    void
    COMAuthentication::AuthenticateAdministrator_(const String &sPassword, const String &sCode, bool codePresented)
    {
+      // The update helper's database upgrade: the single-use token the server
+      // issued for it (UpdateApplyToken), in place of a password nobody typed. It
+      // stands in for the second factor as well, being the server's own proof of
+      // its own action.
+      if (sPassword.StartsWith(_T("token:")))
+      {
+         if (HM::UpdateApplyToken::Redeem(sPassword))
+            account_ = std::shared_ptr<Account>(new Account("Administrator", Account::ServerAdmin));
+         return;
+      }
+
       String sPasswordCorrect = HM::IniFileSettings::Instance()->GetAdministratorPassword();
 
       if (sPasswordCorrect.IsEmpty())

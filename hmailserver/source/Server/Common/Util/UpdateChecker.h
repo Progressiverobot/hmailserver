@@ -54,6 +54,9 @@ namespace HM
          AnsiString signer_identity;   // the workflow identity the bundle's certificate names
          __int64 integrated_time;      // when the transparency log recorded the signature, Unix seconds
          String verified_at;           // local time the installer was verified
+         String apply_status;          // the helper's last outcome: ok, failed, rolled-back, rollback-failed, no-rollback
+         String apply_version;         // the version that outcome was about
+         String apply_detail;          // what the helper said
          String last_checked;          // local time; empty until a check has completed
          String last_error;            // empty unless the last check failed
       };
@@ -84,6 +87,28 @@ namespace HM
       // A failure of a check or a download: the state becomes StateFailed and
       // last_error says why; what an earlier check learned is kept.
       static void RecordFailure(const String &reason);
+
+      // The installer has been handed to the helper.
+      static void RecordInstalling();
+      // The helper's outcome, read at startup by UpdateInstaller::ReportLastOutcome.
+      static void RecordApplyOutcome(const String &status, const String &version, const String &detail);
+
+      // One release's installer and bundle, as a rollback image needs them.
+      struct ReleaseAssets
+      {
+         ReleaseAssets() : installer_size(0) {}
+
+         String version;
+         String installer_url;
+         __int64 installer_size;
+         String installer_digest;
+         String bundle_url;
+      };
+
+      // The release the feed publishes under tag v<version>: releases/tags/v<version>
+      // beside the feed's own path, so a mirror or the tests' fake serves it too.
+      static AnsiString ReleaseByTagUrl(const String &version);
+      static bool FetchReleaseByTag(const String &version, ReleaseAssets &assets, String &error);
 
       // Unix seconds as ISO 8601 UTC.
       static String FormatUnixTime(__int64 seconds);
