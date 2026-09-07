@@ -486,6 +486,12 @@ namespace HM
       dane_enabled_ = ReadIniSettingInteger_("Settings", "DaneEnforcementEnabled", 1) == 1;
       dnssec_validation_enabled_ = ReadIniSettingInteger_("Settings", "DnssecValidationEnabled", 1) == 1;
       dnssec_trust_anchors_ = ReadIniSettingString_("Settings", "DnssecTrustAnchors", "");
+      update_check_enabled_ = ReadIniSettingInteger_("Settings", "UpdateCheckEnabled", 0) == 1;
+      update_channel_ = ReadIniSettingString_("Settings", "UpdateChannel", "stable");
+      update_feed_url_ = ReadIniSettingString_("Settings", "UpdateFeedUrl", "");
+      update_check_hours_ = ReadIniSettingInteger_("Settings", "UpdateCheckHours", 24);
+      if (update_check_hours_ < 1)
+         update_check_hours_ = 1;
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
       log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);

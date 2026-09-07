@@ -537,6 +537,13 @@ interface IInterfaceStatus : IDispatch {
    [propget, id(5), helpstring("Gets the number of detected spam messages")] HRESULT RemovedSpamMessages([out, retval] long *pVal);
    [propget, id(6), helpstring("Gets the current number of sessions")] HRESULT SessionCount([in] eSessionType iType, [out, retval] long *pVal);
    [propget, id(7), helpstring("Gets the current thread number")] HRESULT ThreadID([out, retval] long *pVal);
+   [propget, id(8), helpstring("The update check's verdict: 0 no check has completed since the service started, 1 this is the latest release, 2 a newer release is available (see AvailableVersion), 3 its installer is downloaded and verified, 4 it is being installed, 5 the last check failed (see UpdateLastError).")] HRESULT UpdateState([out, retval] long *pVal);
+   [propget, id(9), helpstring("The newer release's version, when UpdateState says there is one; otherwise empty.")] HRESULT AvailableVersion([out, retval] BSTR *pVal);
+   [propget, id(10), helpstring("When the newer release was published, as the feed gives it (ISO 8601, UTC).")] HRESULT AvailableVersionPublished([out, retval] BSTR *pVal);
+   [propget, id(11), helpstring("The newer release's page.")] HRESULT AvailableVersionUrl([out, retval] BSTR *pVal);
+   [propget, id(12), helpstring("When the release feed was last read, local time; empty until it has been.")] HRESULT UpdateLastChecked([out, retval] BSTR *pVal);
+   [propget, id(13), helpstring("Why the last check failed; empty when it did not.")] HRESULT UpdateLastError([out, retval] BSTR *pVal);
+   [id(14), helpstring("Reads the release feed now, whether or not the scheduled check (UpdateCheckEnabled) is on, and returns whether it could be read. The properties above then say what it said.")] HRESULT CheckForUpdate([out, retval] VARIANT_BOOL *pVal);
 };
 
 [

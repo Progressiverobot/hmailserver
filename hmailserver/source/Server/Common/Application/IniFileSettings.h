@@ -561,6 +561,12 @@ namespace HM
       bool GetDaneEnabled() const { return dane_enabled_; }
       bool GetDnssecValidationEnabled() const { return dnssec_validation_enabled_; }
       String GetDnssecTrustAnchors() const { return dnssec_trust_anchors_; }
+      // The update check: off until an administrator opts in, the GitHub Releases API
+      // unless UpdateFeedUrl says otherwise, stable unless UpdateChannel=prerelease.
+      bool GetUpdateCheckEnabled() const { return update_check_enabled_; }
+      String GetUpdateChannel() const { return update_channel_; }
+      String GetUpdateFeedUrl() const { return update_feed_url_; }
+      int GetUpdateCheckHours() const { return update_check_hours_; }
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
@@ -1102,6 +1108,10 @@ namespace HM
       bool dane_enabled_ = true;
       bool dnssec_validation_enabled_ = true;
       String dnssec_trust_anchors_;
+      bool update_check_enabled_ = false;
+      String update_channel_;
+      String update_feed_url_;
+      int update_check_hours_ = 24;
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;

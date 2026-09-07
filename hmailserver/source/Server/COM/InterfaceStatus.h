@@ -52,6 +52,13 @@ public:
    STDMETHOD(get_RemovedSpamMessages)(/*[out, retval]*/ long *pVal);
    STDMETHOD(get_SessionCount)(eSessionType iType, long *pVal);
    STDMETHOD(get_ThreadID)(/*[out, retval]*/ long* pVal);
+   STDMETHOD(get_UpdateState)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(get_AvailableVersion)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(get_AvailableVersionPublished)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(get_AvailableVersionUrl)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(get_UpdateLastChecked)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(get_UpdateLastError)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(CheckForUpdate)(/*[out, retval]*/ VARIANT_BOOL *pVal);
 
 private:
 
