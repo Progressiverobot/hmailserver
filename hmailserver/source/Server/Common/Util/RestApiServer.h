@@ -173,6 +173,7 @@ namespace HM
          RouteMeMessageFlags,
          RouteMeMessageMove,
          RouteMeMessageDelete,
+         RouteMeMessageSend,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -288,7 +289,9 @@ namespace HM
       static HttpResponse HandleMeMessageMove_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
       static HttpResponse HandleMeMessageDelete_(const Caller &caller, __int64 messageId, const AnsiString &query);
       static std::shared_ptr<Message> FindOwnMessage_(std::shared_ptr<const Account> account, __int64 messageId, std::shared_ptr<IMAPFolder> &folder);
-      static std::shared_ptr<IMAPFolder> FindTrashFolder_(std::shared_ptr<const Account> account);
+      static std::shared_ptr<IMAPFolder> FindDesignatedFolder_(std::shared_ptr<const Account> account, int designation);
+      static HttpResponse HandleMeMessageSend_(const Caller &caller, const AnsiString &requestBody);
+      static String JsonUtf8Value_(const AnsiString &json, const AnsiString &key);
       static bool DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);

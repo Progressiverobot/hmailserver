@@ -34,6 +34,10 @@
 #include "../../IMAP/IMAPFolderContainer.h"
 #include "../../IMAP/IMAPSpecialUse.h"
 #include "../../IMAP/MessagesContainer.h"
+#include "../../SMTP/RecipientParser.h"
+#include "../BO/MessageRecipients.h"
+#include "../BO/MessageRecipient.h"
+#include "Unicode.h"
 #include "../Application/FolderManager.h"
 #include "../BO/ACLPermission.h"
 #include "../Tracking/ChangeNotification.h"
@@ -1468,6 +1472,9 @@ namespace HM
          case RouteMeMessageDelete:
             return HandleMeMessageDelete_(caller, route.message_id, route.query);
 
+         case RouteMeMessageSend:
+            return HandleMeMessageSend_(caller, GetRequestBody_(request));
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1587,6 +1594,12 @@ namespace HM
                route.kind = RouteMeFolderMessages;
          }
 
+         return;
+      }
+
+      if (path == "/api/v1/me/messages" && method == "POST")
+      {
+         route.kind = RouteMeMessageSend;
          return;
       }
 
@@ -2021,6 +2034,7 @@ namespace HM
       case RouteMeMessageFlags:
       case RouteMeMessageMove:
       case RouteMeMessageDelete:
+      case RouteMeMessageSend:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4267,6 +4281,7 @@ namespace HM
       case RouteMeMessageFlags:
       case RouteMeMessageMove:
       case RouteMeMessageDelete:
+      case RouteMeMessageSend:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -5132,10 +5147,11 @@ namespace HM
       return messages->GetItemByDBID(messageId);
    }
 
-   // The account's folder designated \Trash, if it has one: a CREATE USE
-   // designation, or the name a client gave it.
+   // The account's folder carrying a special-use designation - \Trash,
+   // \Sent - if it has one: a CREATE USE designation, or the name a client
+   // gave it.
    std::shared_ptr<IMAPFolder>
-   RestApiServer::FindTrashFolder_(std::shared_ptr<const Account> account)
+   RestApiServer::FindDesignatedFolder_(std::shared_ptr<const Account> account, int designation)
    {
       std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
       if (!folders)
@@ -5146,12 +5162,12 @@ namespace HM
 
       for (std::map<__int64, int>::const_iterator it = designations.begin(); it != designations.end(); ++it)
       {
-         if ((it->second & IMAPSpecialUse::DesignationTrash) == 0)
+         if ((it->second & designation) == 0)
             continue;
 
-         std::shared_ptr<IMAPFolder> trash = folders->GetItemByDBIDRecursive(it->first);
-         if (trash)
-            return trash;
+         std::shared_ptr<IMAPFolder> folder = folders->GetItemByDBIDRecursive(it->first);
+         if (folder)
+            return folder;
       }
 
       return std::shared_ptr<IMAPFolder>();
@@ -5321,7 +5337,7 @@ namespace HM
       // does - and final otherwise, or when the caller says permanent.
       if (!permanent)
       {
-         std::shared_ptr<IMAPFolder> trash = FindTrashFolder_(account);
+         std::shared_ptr<IMAPFolder> trash = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationTrash);
          if (trash && trash->GetID() != folder->GetID())
          {
             if (!ACLManager::CheckPermission(account->GetID(), trash, ACLPermission::PermissionInsert))
@@ -5344,6 +5360,242 @@ namespace HM
          return BuildResponse_(500, "{\"error\":\"the message could not be deleted\"}");
 
       return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   // A JSON body is UTF-8; the server's strings are wide.
+   String
+   RestApiServer::JsonUtf8Value_(const AnsiString &json, const AnsiString &key)
+   {
+      String value;
+      Unicode::MultiByteToWide(GetJsonStringValue_(json, key), value);
+      return value;
+   }
+
+   namespace
+   {
+      // "a@x, Name <b@y>; c@z" -> the three addresses, and the entries as
+      // written for the header. A list is split on commas and semicolons; an
+      // entry keeps its display name for the header and gives its address to
+      // the envelope.
+      void SplitAddressList(const String &list, std::vector<String> &addresses, std::vector<String> &entries)
+      {
+         std::vector<String> parts = StringParser::SplitString(list, _T(","));
+         std::vector<String> all;
+         for (size_t i = 0; i < parts.size(); i++)
+         {
+            std::vector<String> inner = StringParser::SplitString(parts[i], _T(";"));
+            all.insert(all.end(), inner.begin(), inner.end());
+         }
+
+         for (size_t i = 0; i < all.size(); i++)
+         {
+            String entry = all[i];
+            entry.TrimLeft();
+            entry.TrimRight();
+            if (entry.IsEmpty())
+               continue;
+
+            // "Name <address>" gives its address to the envelope and keeps the
+            // whole entry for the header.
+            String address = entry;
+            int open = entry.Find(_T("<"));
+            int close = entry.ReverseFind(_T(">"));
+            if (open >= 0 && close > open)
+               address = entry.Mid(open + 1, close - open - 1);
+            address.TrimLeft();
+            address.TrimRight();
+            if (address.IsEmpty())
+               address = entry;
+
+            addresses.push_back(address);
+            entries.push_back(entry);
+         }
+      }
+
+      String JoinEntries(const std::vector<String> &entries)
+      {
+         String joined;
+         for (size_t i = 0; i < entries.size(); i++)
+         {
+            if (i > 0)
+               joined += _T(", ");
+            joined += entries[i];
+         }
+         return joined;
+      }
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessageSend_(const Caller &caller, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      const String from = account->GetAddress();
+
+      std::vector<String> toAddresses, toEntries, ccAddresses, ccEntries, bccAddresses, bccEntries;
+      SplitAddressList(JsonUtf8Value_(requestBody, "to"), toAddresses, toEntries);
+      SplitAddressList(JsonUtf8Value_(requestBody, "cc"), ccAddresses, ccEntries);
+      SplitAddressList(JsonUtf8Value_(requestBody, "bcc"), bccAddresses, bccEntries);
+
+      std::vector<String> recipients;
+      recipients.insert(recipients.end(), toAddresses.begin(), toAddresses.end());
+      recipients.insert(recipients.end(), ccAddresses.begin(), ccAddresses.end());
+      recipients.insert(recipients.end(), bccAddresses.begin(), bccAddresses.end());
+
+      if (recipients.empty())
+         return BuildResponse_(400, "{\"error\":\"at least one recipient is required, in to, cc or bcc\"}");
+
+      std::shared_ptr<SMTPConfiguration> smtpConfiguration = Configuration::Instance()->GetSMTPConfiguration();
+
+      int maxRecipients = smtpConfiguration->GetMaxSMTPRecipientsInBatch();
+      if (maxRecipients > 0 && (int) recipients.size() > maxRecipients)
+      {
+         AnsiString json;
+         json.Format("{\"error\":\"too many recipients; the server allows %d\"}", maxRecipients);
+         return BuildResponse_(400, json);
+      }
+
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+      message->SetFromAddress(from);
+
+      // Every address is put through the two questions RCPT TO asks, as an
+      // authenticated sender: may this sender deliver there, and what does
+      // the address resolve to - so aliases, distribution lists, routes and
+      // the relay rules apply unchanged, and a refused address is named.
+      RecipientParser parser;
+      for (size_t i = 0; i < recipients.size(); i++)
+      {
+         const String &address = recipients[i];
+
+         if (!StringParser::IsValidEmailAddress(address))
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": not an e-mail address\"}");
+
+         String reason;
+         bool treatSecurityAsLocal = false;
+         RecipientParser::DeliveryPossibility possibility =
+            parser.CheckDeliveryPossibility(true, from, address, reason, treatSecurityAsLocal, 0, true);
+
+         if (possibility != RecipientParser::DP_Possible)
+         {
+            if (reason.IsEmpty())
+            {
+               if (possibility == RecipientParser::DP_RecipientUnknown)
+                  reason = _T("unknown recipient");
+               else if (possibility == RecipientParser::DP_MailboxFull)
+                  reason = _T("the mailbox is full");
+               else
+                  reason = _T("delivery is not permitted");
+            }
+
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": " + JsonEscape_(AnsiString(reason)) + "\"}");
+         }
+
+         bool recipientOK = false;
+         parser.CreateMessageRecipientList(address, message->GetRecipients(), recipientOK);
+         if (!recipientOK)
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": unknown recipient\"}");
+      }
+
+      if (message->GetRecipients()->GetCount() == 0)
+         return BuildResponse_(400, "{\"error\":\"no address resolved to a recipient\"}");
+
+      // The message: the account's name and address, the lists as written,
+      // a Date and a Message-ID, the text as UTF-8. Bcc goes to the envelope
+      // and nowhere else.
+      String fromHeader = from;
+      String name = account->GetPersonFirstName();
+      String lastName = account->GetPersonLastName();
+      if (!lastName.IsEmpty())
+      {
+         if (!name.IsEmpty())
+            name += _T(" ");
+         name += lastName;
+      }
+      if (!name.IsEmpty())
+      {
+         fromHeader = _T("\"");
+         fromHeader += name;
+         fromHeader += _T("\" <");
+         fromHeader += from;
+         fromHeader += _T(">");
+      }
+
+      const String fileName = PersistentMessage::GetFileName(message);
+
+      MessageData messageData;
+      messageData.LoadFromMessage(fileName, message);
+      messageData.SetCharset(_T("utf-8"));
+      messageData.SetFrom(fromHeader);
+      messageData.SetTo(JoinEntries(toEntries));
+      if (!ccEntries.empty())
+         messageData.SetCC(JoinEntries(ccEntries));
+      messageData.SetSubject(JsonUtf8Value_(requestBody, "subject"));
+      messageData.SetBody(JsonUtf8Value_(requestBody, "text"));
+      messageData.SetSentTime(Time::GetCurrentMimeDate());
+      messageData.GenerateMessageID();
+
+      if (!messageData.Write(fileName))
+         return BuildResponse_(500, "{\"error\":\"the message could not be written\"}");
+
+      message->SetSize((int) FileUtilities::FileSize(fileName));
+
+      int maxKB = smtpConfiguration->GetMaxMessageSize();
+      if (maxKB > 0 && (__int64) message->GetSize() > (__int64) maxKB * 1024)
+      {
+         FileUtilities::DeleteFile(fileName);
+         return BuildResponse_(413, "{\"error\":\"the message is larger than the server allows\"}");
+      }
+
+      message->SetState(Message::Delivering);
+
+      if (!PersistentMessage::SaveObject(message))
+      {
+         FileUtilities::DeleteFile(fileName);
+         return BuildResponse_(500, "{\"error\":\"the message could not be queued\"}");
+      }
+
+      // A copy for the folder designated \Sent, marked read, before the queue
+      // takes the file - when the account has such a folder and its quota
+      // allows. Without one the message is sent and not kept, as over SMTP.
+      __int64 sentId = 0;
+      std::shared_ptr<IMAPFolder> sent = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationSent);
+      if (sent)
+      {
+         __int64 maxBytes = (__int64) account->GetAccountMaxSize() * 1024 * 1024;
+         __int64 used = AccountSizeCache::Instance()->GetSize(account->GetID());
+         bool fits = maxBytes <= 0 || used + message->GetSize() <= maxBytes;
+
+         if (fits && ACLManager::CheckPermission(account->GetID(), sent, ACLPermission::PermissionInsert))
+         {
+            std::shared_ptr<Message> copy = PersistentMessage::CopyToIMAPFolder(message, sent);
+            if (copy)
+            {
+               copy->SetFlagSeen(true);
+
+               if (PersistentMessage::SaveObject(copy))
+               {
+                  sentId = copy->GetID();
+                  sent->GetMessages()->Refresh(false);
+
+                  std::shared_ptr<ChangeNotification> notification =
+                     std::shared_ptr<ChangeNotification>(new ChangeNotification(account->GetID(), sent->GetID(), ChangeNotification::NotificationMessageAdded));
+                  Application::Instance()->GetNotificationServer()->SendNotification(notification);
+               }
+               else
+               {
+                  FileUtilities::DeleteFile(PersistentMessage::GetFileName(account, copy));
+               }
+            }
+         }
+      }
+
+      Application::Instance()->SubmitPendingEmail();
+
+      AnsiString json;
+      json.Format("{\"queued\":true,\"recipients\":%d,\"sent_id\":%I64d}", message->GetRecipients()->GetCount(), sentId);
+      return BuildResponse_(201, json);
    }
 
    namespace
@@ -5431,6 +5683,17 @@ namespace HM
          "<div id=\"message-attachments\" class=\"held-detail\"></div>\n"
          "</div>\n"
          "<div id=\"mail-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</section>\n"
+         "<section id=\"compose-section\">\n"
+         "<h2>New message</h2>\n"
+         "<form id=\"compose-form\">\n"
+         "<label for=\"compose-to\">To</label><input id=\"compose-to\" type=\"text\" required>\n"
+         "<label for=\"compose-cc\">Cc</label><input id=\"compose-cc\" type=\"text\">\n"
+         "<label for=\"compose-subject\">Subject</label><input id=\"compose-subject\" type=\"text\" maxlength=\"500\">\n"
+         "<label for=\"compose-text\">Message</label><textarea id=\"compose-text\"></textarea>\n"
+         "<button type=\"submit\">Send</button>\n"
+         "<div id=\"compose-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
          "</section>\n"
          "<section id=\"password-section\">\n"
          "<h2>Change password</h2>\n"
@@ -5717,6 +5980,20 @@ namespace HM
          "      say('password-status', describe(result, 'Could not change the password'), false);\n"
          "    });\n"
          "  });\n"
+         "  el('compose-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    say('compose-status', '', true);\n"
+         "    var body = { to: el('compose-to').value, cc: el('compose-cc').value, subject: el('compose-subject').value, text: el('compose-text').value };\n"
+         "    call('POST', '/api/v1/me/messages', body).then(function (result) {\n"
+         "      if (result.status === 201) {\n"
+         "        el('compose-to').value = ''; el('compose-cc').value = ''; el('compose-subject').value = ''; el('compose-text').value = '';\n"
+         "        say('compose-status', 'Sent.', true);\n"
+         "        loadFolders();\n"
+         "        return;\n"
+         "      }\n"
+         "      say('compose-status', describe(result, 'Could not send'), false);\n"
+         "    });\n"
+         "  });\n"
          "  // A session from an earlier visit is still good until it has been idle\n"
          "  // too long: try it first, and only ask for the password when it is not.\n"
          "  load(true);\n"
@@ -5776,6 +6053,7 @@ namespace HM
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"}}}},"
          "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200) and before_uid (only messages with a lower UID - the way to page back). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text. Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
