@@ -61,6 +61,7 @@
 
 #include <memory>
 #include <vector>
+#include <map>
 
 #include "HttpServer.h"
 
@@ -68,6 +69,8 @@ namespace HM
 {
    class IPAddress;
    class Account;
+   class IMAPFolder;
+   class IMAPFolders;
 
    class RestApiServer
    {
@@ -163,6 +166,9 @@ namespace HM
          RouteMeQuarantineList,
          RouteMeQuarantineRelease,
          RouteMeQuarantineDelete,
+         RouteMeFolders,
+         RouteMeFolderMessages,
+         RouteMeMessage,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -170,13 +176,14 @@ namespace HM
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
          __int64 message_id;
          __int64 range_id;        // an IP range id, for the routes that name one
          __int64 archive_id;      // an archive index row id, for the routes that name one
+         __int64 folder_id;       // an IMAP folder id, for the account's own mailbox routes
          AnsiString query;        // the part after "?", for the routes that take one
       };
 
@@ -266,6 +273,13 @@ namespace HM
       static HttpResponse HandleMeQuarantineList_(const Caller &caller);
       static HttpResponse HandleMeQuarantineRelease_(const Caller &caller, __int64 id);
       static HttpResponse HandleMeQuarantineDelete_(const Caller &caller, __int64 id);
+      static HttpResponse HandleMeFolders_(const Caller &caller);
+      static HttpResponse HandleMeFolderMessages_(const Caller &caller, __int64 folderId, const AnsiString &query);
+      static HttpResponse HandleMeMessage_(const Caller &caller, __int64 messageId);
+      static std::shared_ptr<IMAPFolder> FindOwnReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId);
+      static void AppendFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders,
+                                    const String &parentPath, const std::map<__int64, int> &designations,
+                                    const String &delimiter, AnsiString &json, int depth);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);
       HttpResponse HandleSessionDelete_(const Caller &caller);

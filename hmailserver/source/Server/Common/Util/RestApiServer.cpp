@@ -23,6 +23,16 @@
 #include "UpdateInstaller.h"
 #include "WebServicesServer.h"
 #include "../AntiSpam/QuarantineStore.h"
+#include "../BO/IMAPFolders.h"
+#include "../BO/IMAPFolder.h"
+#include "../BO/Messages.h"
+#include "../BO/MessageData.h"
+#include "../BO/Attachments.h"
+#include "../BO/Attachment.h"
+#include "../Mime/Mime.h"
+#include "../Application/ACLManager.h"
+#include "../../IMAP/IMAPFolderContainer.h"
+#include "../../IMAP/IMAPSpecialUse.h"
 #include "../BO/Aliases.h"
 #include "../BO/Alias.h"
 #include "../BO/SecurityRanges.h"
@@ -1433,6 +1443,15 @@ namespace HM
          case RouteMeQuarantineDelete:
             return HandleMeQuarantineDelete_(caller, route.message_id);
 
+         case RouteMeFolders:
+            return HandleMeFolders_(caller);
+
+         case RouteMeFolderMessages:
+            return HandleMeFolderMessages_(caller, route.folder_id, route.query);
+
+         case RouteMeMessage:
+            return HandleMeMessage_(caller, route.message_id);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1527,6 +1546,42 @@ namespace HM
 
          if (method == "DELETE" && ParseQueueId(rest, route.message_id))
             route.kind = RouteMeQuarantineDelete;
+
+         return;
+      }
+
+      // The account's own mailbox, read-only: the folder tree, one folder's
+      // messages, one message.
+      if (path == "/api/v1/me/folders" && method == "GET")
+      {
+         route.kind = RouteMeFolders;
+         return;
+      }
+
+      const AnsiString meFoldersPath = "/api/v1/me/folders/";
+
+      if (path.StartsWith(meFoldersPath))
+      {
+         AnsiString rest = path.Mid(meFoldersPath.GetLength());
+
+         if (method == "GET" && rest.EndsWith("/messages"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/messages").GetLength());
+            if (ParseQueueId(idText, route.folder_id))
+               route.kind = RouteMeFolderMessages;
+         }
+
+         return;
+      }
+
+      const AnsiString meMessagesPath = "/api/v1/me/messages/";
+
+      if (path.StartsWith(meMessagesPath))
+      {
+         AnsiString rest = path.Mid(meMessagesPath.GetLength());
+
+         if (method == "GET" && ParseQueueId(rest, route.message_id))
+            route.kind = RouteMeMessage;
 
          return;
       }
@@ -4169,6 +4224,9 @@ namespace HM
       case RouteMeQuarantineList:
       case RouteMeQuarantineRelease:
       case RouteMeQuarantineDelete:
+      case RouteMeFolders:
+      case RouteMeFolderMessages:
+      case RouteMeMessage:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4666,6 +4724,314 @@ namespace HM
 
    namespace
    {
+      // A message is read whole into memory for GET /api/v1/me/messages/{id};
+      // this is the ceiling. Streaming is the HTTP foundation's declared debt,
+      // and until it is paid a larger message is described and not read.
+      const int MaxMessageBodyBytes = 1024 * 1024;
+
+      // How many messages one listing returns at most: the newest, and the
+      // caller pages further back with before_uid.
+      const int MaxMessagesPerPage = 200;
+
+      // The listing decodes Subject, From and Date from the head of each
+      // message's file - what IMAP FETCH ENVELOPE does - rather than parsing
+      // the MIME tree, so a folder of thousands stays cheap.
+      void DescribeHeader(const String &fileName, AnsiString &subject, AnsiString &from, AnsiString &date)
+      {
+         AnsiString header = PersistentMessage::LoadHeader(fileName, false);
+         if (header.IsEmpty())
+            return;
+
+         MimeHeader mimeHeader;
+         mimeHeader.Load(header.c_str(), header.GetLength(), true);
+
+         subject = AnsiString(mimeHeader.GetUnicodeFieldValue("Subject"));
+         from = AnsiString(mimeHeader.GetUnicodeFieldValue("From"));
+
+         const char *rawDate = mimeHeader.GetRawFieldValue("Date");
+         date = rawDate ? rawDate : "";
+      }
+
+      AnsiString FlagsJson(std::shared_ptr<Message> message)
+      {
+         AnsiString flags;
+         flags.Format("{\"seen\":%hs,\"flagged\":%hs,\"answered\":%hs,\"draft\":%hs,\"deleted\":%hs}",
+            message->GetFlagSeen() ? "true" : "false",
+            message->GetFlagFlagged() ? "true" : "false",
+            message->GetFlagAnswered() ? "true" : "false",
+            message->GetFlagDraft() ? "true" : "false",
+            message->GetFlagDeleted() ? "true" : "false");
+         return flags;
+      }
+   }
+
+   // The folder the id names, if it is in the signed-in account's own tree
+   // and the account may read it. Ownership is what the id is checked
+   // against first; the ACL is asked afterwards, through the one choke point
+   // every IMAP folder decision goes through, so a folder the owner has
+   // shared away from themselves - rare, but expressible - is refused too.
+   std::shared_ptr<IMAPFolder>
+   RestApiServer::FindOwnReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId)
+   {
+      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+      if (!folders)
+         return std::shared_ptr<IMAPFolder>();
+
+      std::shared_ptr<IMAPFolder> folder = folders->GetItemByDBIDRecursive(folderId);
+      if (!folder || folder->GetAccountID() != account->GetID())
+         return std::shared_ptr<IMAPFolder>();
+
+      bool readAccess = false;
+      bool writeAccess = false;
+      ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
+
+      if (!readAccess)
+         return std::shared_ptr<IMAPFolder>();
+
+      return folder;
+   }
+
+   void
+   RestApiServer::AppendFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders,
+                                    const String &parentPath, const std::map<__int64, int> &designations,
+                                    const String &delimiter, AnsiString &json, int depth)
+   {
+      // Depth-first, the way IMAP LIST walks the same tree. A tree deeper
+      // than this is not one an IMAP client made, and it is not walked.
+      if (!folders || depth > 32)
+         return;
+
+      int written = 0;
+      for (int i = 0; i < folders->GetCount(); i++)
+      {
+         std::shared_ptr<IMAPFolder> folder = folders->GetItem(i);
+         if (!folder)
+            continue;
+
+         // A folder the ACL keeps from the account is left out with its
+         // subtree, exactly as LIST leaves it out.
+         bool readAccess = false;
+         bool writeAccess = false;
+         ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
+         if (!readAccess)
+            continue;
+
+         String path = parentPath.IsEmpty() ? folder->GetFolderName() : parentPath + delimiter + folder->GetFolderName();
+
+         std::shared_ptr<Messages> messages = folder->GetMessages();
+         long messageCount = messages ? messages->GetCount() : 0;
+         long seen = messages ? messages->GetNoOfSeen() : 0;
+
+         std::map<__int64, int>::const_iterator designation = designations.find(folder->GetID());
+         String specialUse = designation != designations.end() ? IMAPSpecialUse::FormatDesignations(designation->second) : String();
+
+         if (written > 0)
+            json += ",";
+
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
+            folder->GetID(),
+            JsonEscape_(AnsiString(folder->GetFolderName())).c_str(),
+            JsonEscape_(AnsiString(path)).c_str(),
+            folder->GetParentFolderID(),
+            JsonEscape_(AnsiString(specialUse)).c_str(),
+            folder->GetIsSubscribed() ? "true" : "false",
+            writeAccess ? "true" : "false",
+            messageCount,
+            messageCount - seen,
+            folder->GetCreationTime().ToInt());
+         json += entry;
+
+         AppendFolderJson_(account, folder->GetSubFolders(), path, designations, delimiter, json, depth + 1);
+
+         json += "]}";
+         written++;
+      }
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeFolders_(const Caller &caller)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+
+      std::map<__int64, int> designations;
+      if (folders)
+         IMAPSpecialUse::Resolve(folders, designations);
+
+      String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
+      AnsiString json;
+      json.Format("{\"delimiter\":\"%hs\",\"folders\":[", JsonEscape_(AnsiString(delimiter)).c_str());
+      AppendFolderJson_(account, folders, String(), designations, delimiter, json, 0);
+      json += "]}";
+
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeFolderMessages_(const Caller &caller, __int64 folderId, const AnsiString &query)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder = FindOwnReadableFolder_(account, folderId);
+      if (!folder)
+         return BuildResponse_(404, "{\"error\":\"folder not found\"}");
+
+      int limit = MaxMessagesPerPage;
+      AnsiString limitText = QueryParameter_(query, "limit");
+      if (!limitText.IsEmpty())
+      {
+         limit = atoi(limitText.c_str());
+         if (limit < 1 || limit > MaxMessagesPerPage)
+            limit = MaxMessagesPerPage;
+      }
+
+      unsigned int beforeUid = 0;
+      AnsiString beforeText = QueryParameter_(query, "before_uid");
+      if (!beforeText.IsEmpty())
+         beforeUid = (unsigned int) strtoul(beforeText.c_str(), nullptr, 10);
+
+      // A snapshot, walked newest UID first: the collection is shared with
+      // every IMAP session on the mailbox, and a copy is what lets this read
+      // files without holding its lock.
+      std::shared_ptr<Messages> messages = folder->GetMessages();
+      std::vector<std::shared_ptr<Message>> snapshot = messages ? messages->GetCopy() : std::vector<std::shared_ptr<Message>>();
+
+      int total = 0;
+      for (std::vector<std::shared_ptr<Message>>::const_iterator it = snapshot.begin(); it != snapshot.end(); ++it)
+      {
+         if (*it && !(*it)->GetFlagDeleted())
+            total++;
+      }
+
+      AnsiString json;
+      json.Format("{\"folder_id\":%I64d,\"total\":%d,\"messages\":[", folder->GetID(), total);
+
+      int written = 0;
+      for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend() && written < limit; ++it)
+      {
+         std::shared_ptr<Message> message = *it;
+         if (!message || message->GetFlagDeleted())
+            continue;
+
+         if (beforeUid > 0 && message->GetUID() >= beforeUid)
+            continue;
+
+         AnsiString subject, from, date;
+         DescribeHeader(PersistentMessage::GetFileName(account, message), subject, from, date);
+
+         if (written > 0)
+            json += ",";
+
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs}",
+            message->GetID(),
+            message->GetUID(),
+            message->GetSize(),
+            JsonEscape_(AnsiString(message->GetCreateTime())).c_str(),
+            JsonEscape_(subject).c_str(),
+            JsonEscape_(from).c_str(),
+            JsonEscape_(date).c_str(),
+            FlagsJson(message).c_str());
+         json += entry;
+         written++;
+      }
+
+      json += "]}";
+
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessage_(const Caller &caller, __int64 messageId)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // The row first, then the folder it is in, which is what decides
+      // whether this account may read it. Another account's message, or one
+      // in a folder the ACL keeps from this account, is "not found": the id
+      // space is shared, and a refusal that differed would say it exists.
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+      if (!PersistentMessage::ReadObject(message, messageId) || message->GetID() == 0 ||
+          message->GetAccountID() != account->GetID())
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      std::shared_ptr<IMAPFolder> folder = FindOwnReadableFolder_(account, message->GetFolderID());
+      if (!folder)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      String fileName = PersistentMessage::GetFileName(account, message);
+      if (!FileUtilities::Exists(fileName))
+         return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
+
+      AnsiString subject, from, date;
+      DescribeHeader(fileName, subject, from, date);
+
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"uid\":%u,\"folder_id\":%I64d,\"size\":%d,\"received\":\"%hs\",\"flags\":%hs,\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",",
+         message->GetID(),
+         message->GetUID(),
+         message->GetFolderID(),
+         message->GetSize(),
+         JsonEscape_(AnsiString(message->GetCreateTime())).c_str(),
+         FlagsJson(message).c_str(),
+         JsonEscape_(subject).c_str(),
+         JsonEscape_(from).c_str(),
+         JsonEscape_(date).c_str());
+
+      if (message->GetSize() > MaxMessageBodyBytes)
+      {
+         json += "\"truncated\":true,\"to\":\"\",\"cc\":\"\",\"text\":\"\",\"html\":\"\",\"attachments\":[]}";
+         return BuildResponse_(200, json);
+      }
+
+      MessageData messageData;
+      if (!messageData.LoadFromMessage(account, message))
+         return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
+
+      AnsiString attachments = "[";
+      std::shared_ptr<Attachments> attachmentList = messageData.GetAttachments();
+      if (attachmentList)
+      {
+         for (size_t i = 0; i < attachmentList->GetCount(); i++)
+         {
+            std::shared_ptr<Attachment> attachment = attachmentList->GetItem((unsigned int) i);
+            if (!attachment)
+               continue;
+
+            if (i > 0)
+               attachments += ",";
+
+            AnsiString entry;
+            entry.Format("{\"index\":%d,\"name\":\"%hs\",\"size\":%d}",
+               (int) i, JsonEscape_(AnsiString(attachment->GetFileName())).c_str(), attachment->GetSize());
+            attachments += entry;
+         }
+      }
+      attachments += "]";
+
+      AnsiString tail;
+      tail.Format("\"truncated\":false,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"attachments\":%hs}",
+         JsonEscape_(AnsiString(messageData.GetTo())).c_str(),
+         JsonEscape_(AnsiString(messageData.GetCC())).c_str(),
+         JsonEscape_(AnsiString(messageData.GetBody())).c_str(),
+         JsonEscape_(AnsiString(messageData.GetHTMLBody())).c_str(),
+         attachments.c_str());
+      json += tail;
+
+      return BuildResponse_(200, json);
+   }
+
+   namespace
+   {
       // The self-service page. Static: nothing in it comes from the server's
       // data, so nothing is escaped into it - every value the user sees is
       // fetched by the script as JSON and written into the page as text. The
@@ -4691,6 +5057,9 @@ namespace HM
          ".status{margin-top:.5rem;font-size:.9rem;min-height:1.2rem}.status.error{color:#b42318}.status.ok{color:#067647}\n"
          ".meter{height:.5rem;background:#e4e6ea;border-radius:.25rem;overflow:hidden;margin:.4rem 0}.meter div{height:100%;background:#2f81f7}\n"
          ".held{border-top:1px solid #e4e6ea;padding:.6rem 0}.held-subject{font-weight:600}.held-detail{font-size:.85rem;color:#4b5563;margin:.2rem 0 .4rem}.held button{margin:0 .5rem 0 0}\n"
+         "select{width:100%;box-sizing:border-box;padding:.45rem;border:1px solid #b9bec7;border-radius:.3rem;font:inherit;background:#fff}\n"
+         ".msg{border-top:1px solid #e4e6ea;padding:.5rem 0;cursor:pointer}.msg.unseen .msg-subject{font-weight:600}.msg-detail{font-size:.85rem;color:#4b5563}\n"
+         "pre{white-space:pre-wrap;word-break:break-word;font:inherit;background:#f4f5f7;padding:.75rem;border-radius:.3rem;max-height:30rem;overflow:auto}\n"
          "[hidden]{display:none!important}\n"
          "</style>\n"
          "</head>\n"
@@ -4731,6 +5100,19 @@ namespace HM
          "<p id=\"quarantine-note\"></p>\n"
          "<div id=\"quarantine-list\"></div>\n"
          "<div id=\"quarantine-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</section>\n"
+         "<section id=\"mail-section\">\n"
+         "<h2>Mail</h2>\n"
+         "<label for=\"folder\">Folder</label><select id=\"folder\"></select>\n"
+         "<div id=\"message-list\"></div>\n"
+         "<div id=\"message-view\" hidden>\n"
+         "<button id=\"message-back\" class=\"secondary\" type=\"button\">Back to the list</button>\n"
+         "<div id=\"message-subject\" class=\"held-subject\"></div>\n"
+         "<div id=\"message-meta\" class=\"held-detail\"></div>\n"
+         "<pre id=\"message-text\"></pre>\n"
+         "<div id=\"message-attachments\" class=\"held-detail\"></div>\n"
+         "</div>\n"
+         "<div id=\"mail-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</section>\n"
          "<section id=\"password-section\">\n"
          "<h2>Change password</h2>\n"
@@ -4827,6 +5209,79 @@ namespace HM
          "      if (result.status === 200 && result.data) { renderQuarantine(result.data); }\n"
          "    });\n"
          "  };\n"
+         "  // The mailbox, read-only: the folder tree, the newest messages of\n"
+         "  // the chosen folder, and one message's text. Nothing here writes.\n"
+         "  var flatten = function (list, into) {\n"
+         "    list.forEach(function (f) { into.push(f); flatten(f.subfolders || [], into); });\n"
+         "    return into;\n"
+         "  };\n"
+         "  var renderMessage = function (m) {\n"
+         "    el('message-list').hidden = true;\n"
+         "    el('message-view').hidden = false;\n"
+         "    el('message-subject').textContent = m.subject || '(no subject)';\n"
+         "    el('message-meta').textContent = 'From ' + (m.from || '?') + (m.to ? ' to ' + m.to : '') + (m.cc ? ', cc ' + m.cc : '') + ' - ' + (m.date || m.received);\n"
+         "    var text = m.text || '';\n"
+         "    if (!text && m.html) {\n"
+         "      // An HTML-only message is read as a document and only its text is\n"
+         "      // shown: nothing in it runs, loads or renders.\n"
+         "      text = new DOMParser().parseFromString(m.html, 'text/html').body.textContent || '';\n"
+         "    }\n"
+         "    if (m.truncated) { text = 'This message is too large to show here; open it in your mail program.'; }\n"
+         "    el('message-text').textContent = text || '(no text)';\n"
+         "    var names = (m.attachments || []).map(function (a) { return a.name + ' (' + format(a.size) + ')'; });\n"
+         "    el('message-attachments').textContent = names.length ? 'Attachments: ' + names.join(', ') : '';\n"
+         "  };\n"
+         "  var openMessage = function (id) {\n"
+         "    say('mail-status', '', true);\n"
+         "    call('GET', '/api/v1/me/messages/' + id).then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderMessage(result.data); return; }\n"
+         "      say('mail-status', describe(result, 'Could not open the message'), false);\n"
+         "    });\n"
+         "  };\n"
+         "  var renderMessages = function (page) {\n"
+         "    var list = el('message-list');\n"
+         "    while (list.firstChild) { list.removeChild(list.firstChild); }\n"
+         "    list.hidden = false;\n"
+         "    el('message-view').hidden = true;\n"
+         "    if (!page.messages.length) { list.appendChild(node('div', 'This folder is empty.', 'msg-detail')); return; }\n"
+         "    page.messages.forEach(function (m) {\n"
+         "      var row = node('div', undefined, m.flags.seen ? 'msg' : 'msg unseen');\n"
+         "      row.appendChild(node('div', m.subject || '(no subject)', 'msg-subject'));\n"
+         "      row.appendChild(node('div', (m.from || '?') + ' - ' + (m.date || m.received) + ' - ' + format(m.size), 'msg-detail'));\n"
+         "      row.addEventListener('click', function () { openMessage(m.id); });\n"
+         "      list.appendChild(row);\n"
+         "    });\n"
+         "    if (page.total > page.messages.length) { list.appendChild(node('div', 'The newest ' + page.messages.length + ' of ' + page.total + ' are shown.', 'msg-detail')); }\n"
+         "  };\n"
+         "  var loadMessages = function () {\n"
+         "    var id = el('folder').value;\n"
+         "    if (!id) { renderMessages({ total: 0, messages: [] }); return; }\n"
+         "    call('GET', '/api/v1/me/folders/' + id + '/messages').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderMessages(result.data); return; }\n"
+         "      say('mail-status', describe(result, 'Could not read the folder'), false);\n"
+         "    });\n"
+         "  };\n"
+         "  var renderFolders = function (tree) {\n"
+         "    var select = el('folder');\n"
+         "    var chosen = select.value;\n"
+         "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
+         "    var folders = flatten(tree.folders, []);\n"
+         "    folders.forEach(function (f) {\n"
+         "      var option = node('option', f.path + (f.unseen ? ' (' + f.unseen + ')' : ''));\n"
+         "      option.value = f.id;\n"
+         "      select.appendChild(option);\n"
+         "    });\n"
+         "    var inbox = folders.filter(function (f) { return f.path.toUpperCase() === 'INBOX'; })[0];\n"
+         "    select.value = chosen || (inbox ? inbox.id : (folders.length ? folders[0].id : ''));\n"
+         "    loadMessages();\n"
+         "  };\n"
+         "  var loadFolders = function () {\n"
+         "    return call('GET', '/api/v1/me/folders').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderFolders(result.data); }\n"
+         "    });\n"
+         "  };\n"
+         "  el('folder').addEventListener('change', loadMessages);\n"
+         "  el('message-back').addEventListener('click', function () { el('message-view').hidden = true; el('message-list').hidden = false; });\n"
          "  var render = function (me) {\n"
          "    el('who').textContent = me.address;\n"
          "    var used = me.quota.used_bytes, limit = me.quota.limit_mb * 1048576;\n"
@@ -4850,7 +5305,7 @@ namespace HM
          "  };\n"
          "  var load = function (quiet) {\n"
          "    return call('GET', '/api/v1/me').then(function (result) {\n"
-         "      if (result.status === 200 && result.data) { render(result.data); loadQuarantine(); return true; }\n"
+         "      if (result.status === 200 && result.data) { render(result.data); loadQuarantine(); loadFolders(); return true; }\n"
          "      if (!quiet) { say('signin-status', describe(result, 'Could not sign in'), false); }\n"
          "      showSignIn();\n"
          "      return false;\n"
@@ -4955,6 +5410,9 @@ namespace HM
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
+         "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"}}}},"
+         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200) and before_uid (only messages with a lower UID - the way to page back). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
