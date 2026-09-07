@@ -8,6 +8,7 @@
 #include "JsonDocument.h"
 #include "Time.h"
 #include "Unicode.h"
+#include "FileUtilities.h"
 #include "../Application/IniFileSettings.h"
 #include "../Application/Version.h"
 
@@ -203,6 +204,18 @@ namespace HM
 
       {
          boost::lock_guard<boost::mutex> guard(mutex_);
+         // A verified installer of the same version survives the re-check that
+         // found it still current; a different version, or a file that has gone,
+         // starts again from available.
+         if (snapshot.state == StateAvailable && snapshot_.state == StateDownloaded &&
+             snapshot_.available_version == snapshot.available_version && FileUtilities::Exists(snapshot_.installer_path))
+         {
+            snapshot.state = StateDownloaded;
+            snapshot.installer_path = snapshot_.installer_path;
+            snapshot.signer_identity = snapshot_.signer_identity;
+            snapshot.integrated_time = snapshot_.integrated_time;
+            snapshot.verified_at = snapshot_.verified_at;
+         }
          snapshot_ = snapshot;
       }
 
@@ -210,18 +223,51 @@ namespace HM
       return true;
    }
 
+   void
+   UpdateChecker::RecordDownloaded(const String &path, const AnsiString &identity, __int64 integratedTime)
+   {
+      boost::lock_guard<boost::mutex> guard(mutex_);
+      snapshot_.state = StateDownloaded;
+      snapshot_.installer_path = path;
+      snapshot_.signer_identity = identity;
+      snapshot_.integrated_time = integratedTime;
+      snapshot_.verified_at = Time::GetCurrentDateTime();
+      snapshot_.last_error.Empty();
+   }
+
+   void
+   UpdateChecker::RecordFailure(const String &reason)
+   {
+      boost::lock_guard<boost::mutex> guard(mutex_);
+      // The failure replaces the verdict but not what the last successful check
+      // learned: a release that was available before the feed went quiet is still
+      // available, and the Control Panel can keep saying so beside the error.
+      snapshot_.state = StateFailed;
+      snapshot_.last_error = reason;
+   }
+
+   String
+   UpdateChecker::FormatUnixTime(__int64 seconds)
+   {
+      if (seconds <= 0)
+         return _T("");
+      time_t value = (time_t) seconds;
+      struct tm parts;
+      if (gmtime_s(&parts, &value) != 0)
+         return _T("");
+      String text;
+      text.Format(_T("%04d-%02d-%02dT%02d:%02d:%02dZ"), parts.tm_year + 1900, parts.tm_mon + 1, parts.tm_mday, parts.tm_hour, parts.tm_min, parts.tm_sec);
+      return text;
+   }
+
    bool
    UpdateChecker::Fail_(const String &reason, String &error)
    {
       error = reason;
+      RecordFailure(reason);
 
       {
          boost::lock_guard<boost::mutex> guard(mutex_);
-         // The failure replaces the verdict but not what the last successful check
-         // learned: a release that was available before the feed went quiet is still
-         // available, and the Control Panel can keep saying so beside the error.
-         snapshot_.state = StateFailed;
-         snapshot_.last_error = reason;
          snapshot_.last_checked = Time::GetCurrentDateTime();
       }
 
@@ -390,6 +436,12 @@ namespace HM
       body += ",\"size\":" + size;
       body += ",\"digest\":" + Quote_(snapshot.installer_digest);
       body += ",\"bundleUrl\":" + Quote_(snapshot.bundle_url);
+      body += "}";
+      body += ",\"downloaded\":{";
+      body += "\"path\":" + Quote_(snapshot.installer_path);
+      body += ",\"signer\":" + Quote_(String(snapshot.signer_identity));
+      body += ",\"logTime\":" + Quote_(FormatUnixTime(snapshot.integrated_time));
+      body += ",\"verifiedAt\":" + Quote_(snapshot.verified_at);
       body += "}";
       body += ",\"lastChecked\":" + Quote_(snapshot.last_checked);
       body += ",\"lastError\":" + Quote_(snapshot.last_error);

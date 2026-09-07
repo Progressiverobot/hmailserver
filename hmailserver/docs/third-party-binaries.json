@@ -410,8 +410,8 @@
     },
     {
       "path": "hmailserver/source/Tools/Interop/Interop.hMailServer.dll",
-      "sha256": "405d59981808a5c718d47738e086d4d24c6f3cce0c0589d372dcee4d3c8f620d",
-      "size": 194560,
+      "sha256": "8925f427e348f7e1bdfa4abc54f13a1e21153994d30a38487724aeb86fa7c211",
+      "size": 195072,
       "component": "Interop.hMailServer (tlbimp wrapper for this project COM API)",
       "version": "1.0.0.0",
       "publisher": "this repository",

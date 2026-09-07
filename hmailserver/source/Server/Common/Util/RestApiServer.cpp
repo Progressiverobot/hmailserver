@@ -15,6 +15,7 @@
 #include "AccountLogon.h"
 #include "AcmeClient.h"
 #include "UpdateChecker.h"
+#include "UpdateDownloader.h"
 #include "WebServicesServer.h"
 #include "../AntiSpam/QuarantineStore.h"
 #include "../BO/Aliases.h"
@@ -1629,6 +1630,8 @@ namespace HM
             return HandleUpdateGet_();
          case RouteUpdateCheck:
             return HandleUpdateCheck_();
+         case RouteUpdateDownload:
+            return HandleUpdateDownload_();
 
          case RouteQuarantineList:
             return HandleListQuarantine_();
@@ -1856,6 +1859,12 @@ namespace HM
       if (method == "POST" && path == "/api/v1/update/check")
       {
          route.kind = RouteUpdateCheck;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/update/download")
+      {
+         route.kind = RouteUpdateDownload;
          return;
       }
 
@@ -2091,8 +2100,10 @@ namespace HM
       case RouteArchiveHold:
       case RouteArchiveRelease:
       // An update check changes the recorded verdict and makes the server call
-      // out, neither of which a read-only credential should be able to cause.
+      // out, neither of which a read-only credential should be able to cause;
+      // a download writes a file the next part will run.
       case RouteUpdateCheck:
+      case RouteUpdateDownload:
          return true;
 
       default:
@@ -2185,6 +2196,7 @@ namespace HM
       case RouteSettingsGet:
       case RouteUpdateGet:
       case RouteUpdateCheck:
+      case RouteUpdateDownload:
          // IP ranges, certificates, global rules, the logs, the backup, the
          // server settings and the update check are all server-wide: none of
          // them belongs to a domain, and the logs in particular carry every
@@ -4313,6 +4325,7 @@ namespace HM
          "\"/api/v1/srv\":{\"get\":{\"summary\":\"Recommended client-discovery SRV records (RFC 6186/8314 and Outlook autodiscover) for the enabled listeners\",\"description\":\"One record set per active domain; a domain-restricted key sees only its own domains. Only services that are enabled and not loopback-bound are advertised.\",\"responses\":{\"200\":{\"description\":\"Array of SRV records\"}}}},"
          "\"/api/v1/update\":{\"get\":{\"summary\":\"The update check\'s verdict\",\"description\":\"state: 0 not checked since the service started, 1 up to date, 2 a newer release is available, 3 its installer is downloaded and verified, 4 installing, 5 the last check failed (lastError). availableVersion, releaseName, publishedAt, releaseUrl and installer describe the newer release when there is one. Nothing is fetched by this route; the scheduled check (UpdateCheckEnabled) or POST /api/v1/update/check does that.\",\"responses\":{\"200\":{\"description\":\"The verdict\"}}}},"
          "\"/api/v1/update/check\":{\"post\":{\"summary\":\"Read the release feed now\",\"description\":\"Runs the update check on this request, whether or not the scheduled check is on, and returns the verdict as GET /api/v1/update does. Refused for read-only keys.\",\"responses\":{\"200\":{\"description\":\"The verdict after the check; state 5 with lastError when the feed could not be read\"}}}},"
+         "\"/api/v1/update/download\":{\"post\":{\"summary\":\"Download and verify the newer release\'s installer\",\"description\":\"Fetches the installer the last check found and its Sigstore bundle into the data directory\'s Updates folder and verifies the installer against the bundle: digest, certificate chain at the time the transparency log recorded the signature, the release workflow\'s identity, the signature, and the log\'s own signature. A file that fails is deleted. Nothing is run. Returns the verdict as GET /api/v1/update does; state 3 when the installer is in place and verified, 5 with lastError when it is not. Refused for read-only keys.\",\"responses\":{\"200\":{\"description\":\"The verdict after the download\"}}}},"
          "\"/api/v1/metrics/history\":{\"get\":{\"summary\":\"The history of one metric\",\"description\":\"Query parameters: metric (a name from the exporter without the hmailserver_ prefix, e.g. sessions_smtp or processed_messages_total) and range (24h, 7d or 30d - samples averaged per minute, per ten minutes or per hour). Counters are totals; a rate is the difference between two samples. Empty when MetricsHistoryDays is 0.\",\"responses\":{\"200\":{\"description\":\"The samples\"},\"400\":{\"description\":\"Unknown metric or range\"}}}},"
          "\"/api/v1/apikeys\":{"
          "\"get\":{\"summary\":\"List API keys\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Array of keys, never the clear-text tokens\"}}},"
@@ -4805,6 +4818,14 @@ namespace HM
    AnsiString
    RestApiServer::HandleUpdateGet_()
    {
+      return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
+   }
+
+   AnsiString
+   RestApiServer::HandleUpdateDownload_()
+   {
+      String error;
+      UpdateDownloader::DownloadAndVerify(error);
       return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
    }
 

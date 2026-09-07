@@ -38,7 +38,7 @@ namespace HM
 
       struct Snapshot
       {
-         Snapshot() : state(StateNotChecked), installer_size(0) {}
+         Snapshot() : state(StateNotChecked), installer_size(0), integrated_time(0) {}
 
          State state;
          String available_version;     // "6.2.28"; empty unless a newer release is known
@@ -50,6 +50,10 @@ namespace HM
          __int64 installer_size;
          String installer_digest;      // "sha256:<hex>" as the feed states it; a hint, not the proof
          String bundle_url;            // the installer's Sigstore bundle
+         String installer_path;        // where the verified installer is, from StateDownloaded on
+         AnsiString signer_identity;   // the workflow identity the bundle's certificate names
+         __int64 integrated_time;      // when the transparency log recorded the signature, Unix seconds
+         String verified_at;           // local time the installer was verified
          String last_checked;          // local time; empty until a check has completed
          String last_error;            // empty unless the last check failed
       };
@@ -74,6 +78,15 @@ namespace HM
       static int CompareVersions(const String &left, const String &right);
 
       static const char *StateName(State state);
+
+      // The download's outcome, recorded by UpdateDownloader.
+      static void RecordDownloaded(const String &path, const AnsiString &identity, __int64 integratedTime);
+      // A failure of a check or a download: the state becomes StateFailed and
+      // last_error says why; what an earlier check learned is kept.
+      static void RecordFailure(const String &reason);
+
+      // Unix seconds as ISO 8601 UTC.
+      static String FormatUnixTime(__int64 seconds);
 
       // The snapshot as the JSON document the REST route returns.
       static AnsiString ToJson(const Snapshot &snapshot);

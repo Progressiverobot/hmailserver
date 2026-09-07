@@ -8,6 +8,8 @@
 
 #include "../TCPIP/CertificateVerifier.h"
 #include "../TCPIP/SslContextInitializer.h"
+#include "FileUtilities.h"
+#include <fstream>
 
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
@@ -289,5 +291,256 @@ namespace HM
          error = Formatter::Format(_T("The request to {0} failed: {1}"), String(host), String(e.what()));
          return false;
       }
+   }
+
+   namespace
+   {
+      // Reads one response from stream: the status line and headers into header_block,
+      // then the body to sink, up to max_bytes. too_large is set when the body went
+      // past max_bytes; the read stops there.
+      template <typename Stream>
+      bool ReadResponseToSink_(Stream &stream, std::string &header_block, std::ofstream *sink, size_t max_bytes, size_t &body_bytes, bool &too_large)
+      {
+         char buffer[16384];
+         std::string pending;
+         bool headersDone = false;
+         boost::system::error_code errorCode;
+         body_bytes = 0;
+         too_large = false;
+
+         for (;;)
+         {
+            const size_t bytesRead = stream.read_some(boost::asio::buffer(buffer, sizeof(buffer)), errorCode);
+            if (bytesRead > 0)
+            {
+               if (!headersDone)
+               {
+                  pending.append(buffer, bytesRead);
+                  const size_t headerEnd = pending.find("\r\n\r\n");
+                  if (headerEnd != std::string::npos)
+                  {
+                     header_block = pending.substr(0, headerEnd);
+                     headersDone = true;
+                     const std::string first = pending.substr(headerEnd + 4);
+                     body_bytes += first.size();
+                     if (body_bytes > max_bytes)
+                     {
+                        too_large = true;
+                        return true;
+                     }
+                     if (sink && !first.empty())
+                        sink->write(first.data(), (std::streamsize) first.size());
+                     pending.clear();
+                  }
+                  else if (pending.size() > 64 * 1024)
+                     return false;   // headers that never end are not a response
+               }
+               else
+               {
+                  body_bytes += bytesRead;
+                  if (body_bytes > max_bytes)
+                  {
+                     too_large = true;
+                     return true;
+                  }
+                  if (sink)
+                     sink->write(buffer, (std::streamsize) bytesRead);
+               }
+            }
+            if (errorCode)
+               break;
+         }
+
+         return headersDone;
+      }
+
+      // The value of one header in a header block, case-insensitively; empty when absent.
+      std::string HeaderValue_(const std::string &header_block, const std::string &name)
+      {
+         size_t position = 0;
+         while (position < header_block.size())
+         {
+            size_t end = header_block.find("\r\n", position);
+            if (end == std::string::npos)
+               end = header_block.size();
+            std::string line = header_block.substr(position, end - position);
+            position = end + 2;
+
+            size_t colon = line.find(':');
+            if (colon == std::string::npos || colon != name.size())
+               continue;
+            if (_strnicmp(line.c_str(), name.c_str(), name.size()) != 0)
+               continue;
+            std::string value = line.substr(colon + 1);
+            size_t start = value.find_first_not_of(" \t");
+            size_t stop = value.find_last_not_of(" \t\r");
+            return start == std::string::npos ? std::string() : value.substr(start, stop - start + 1);
+         }
+         return std::string();
+      }
+   }
+
+   bool
+   HttpsClient::Download(const AnsiString &url, const String &path, size_t max_bytes, int &status_code, String &error, int timeout_seconds)
+   {
+      status_code = 0;
+      AnsiString current = url;
+
+      for (int hop = 0; hop < 6; hop++)
+      {
+         bool https = false;
+         AnsiString host, port, requestPath;
+         if (!ParseUrl(current, https, host, port, requestPath))
+         {
+            error = Formatter::Format(_T("{0} is not an http or https URL with a host."), String(current));
+            return false;
+         }
+         if (!https && !IsLoopbackHost(host))
+         {
+            error = Formatter::Format(_T("{0}: plain http is only accepted to a loopback address; use https."), String(current));
+            return false;
+         }
+
+         AnsiString request;
+         request.append("GET ");
+         request.append(requestPath);
+         request.append(" HTTP/1.0\r\nHost: ");
+         request.append(host);
+         request.append("\r\nUser-Agent: hMailServer\r\nAccept: */*\r\nConnection: close\r\n\r\n");
+
+         std::string headerBlock;
+         size_t bodyBytes = 0;
+         bool tooLarge = false;
+         bool responded = false;
+
+         // The file is opened once the status is known to be 200, so a redirect or
+         // an error leaves nothing behind; a body that turns out too large is
+         // removed below.
+         std::ofstream sink;
+         try
+         {
+            boost::asio::io_context ioContext;
+            boost::asio::ip::tcp::resolver resolver(ioContext);
+            boost::asio::ip::tcp::resolver::results_type endpoints =
+               resolver.resolve(std::string(host.c_str()), std::string(port.c_str()));
+
+            // The headers are read first with no sink; the body's first bytes are
+            // held by the reader until the sink exists. To keep the reader simple the
+            // status is decided from the header block it hands back, and the sink
+            // is opened before the body is streamed - which means the reader must
+            // be told the sink up front. So: open the file now, and delete it unless
+            // the response was a 200 written in full.
+            sink.open(path.c_str(), std::ios::binary | std::ios::trunc);
+            if (!sink)
+            {
+               error = Formatter::Format(_T("{0} could not be created."), path);
+               return false;
+            }
+
+            if (https)
+            {
+               boost::asio::ssl::context sslContext(boost::asio::ssl::context::tls_client);
+               sslContext.set_options(HM_TLS_CONTEXT_FLOOR);
+               sslContext.set_default_verify_paths();
+               SslContextInitializer::InitClient(sslContext, false);
+
+               boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
+               boost::asio::connect(stream.next_layer(), endpoints);
+               SetSocketTimeouts_(stream.next_layer(), timeout_seconds);
+               stream.set_verify_mode(boost::asio::ssl::verify_peer);
+               stream.set_verify_callback(CertificateVerifier(0, CSSSL, String(host)));
+               if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
+               {
+                  error = _T("Could not set the TLS server name.");
+                  sink.close();
+                  FileUtilities::DeleteFile(path);
+                  return false;
+               }
+               stream.handshake(boost::asio::ssl::stream_base::client);
+               boost::asio::write(stream, boost::asio::buffer(request.c_str(), request.GetLength()));
+               responded = ReadResponseToSink_(stream, headerBlock, &sink, max_bytes, bodyBytes, tooLarge);
+            }
+            else
+            {
+               boost::asio::ip::tcp::socket socket(ioContext);
+               boost::asio::connect(socket, endpoints);
+               SetSocketTimeouts_(socket, timeout_seconds);
+               boost::asio::write(socket, boost::asio::buffer(request.c_str(), request.GetLength()));
+               responded = ReadResponseToSink_(socket, headerBlock, &sink, max_bytes, bodyBytes, tooLarge);
+            }
+         }
+         catch (const std::exception &e)
+         {
+            sink.close();
+            FileUtilities::DeleteFile(path);
+            error = Formatter::Format(_T("The request to {0} failed: {1}"), String(host), String(e.what()));
+            return false;
+         }
+
+         sink.close();
+
+         if (!responded)
+         {
+            FileUtilities::DeleteFile(path);
+            error = Formatter::Format(_T("{0} sent no HTTP response."), String(host));
+            return false;
+         }
+
+         const size_t firstLineEnd = headerBlock.find("\r\n");
+         const std::string statusLine = headerBlock.substr(0, firstLineEnd);
+         const size_t space = statusLine.find(' ');
+         if (statusLine.compare(0, 5, "HTTP/") != 0 || space == std::string::npos)
+         {
+            FileUtilities::DeleteFile(path);
+            error = _T("The response did not start with an HTTP status line.");
+            return false;
+         }
+         status_code = atoi(statusLine.c_str() + space + 1);
+
+         if (status_code == 301 || status_code == 302 || status_code == 303 || status_code == 307 || status_code == 308)
+         {
+            FileUtilities::DeleteFile(path);
+            std::string location = HeaderValue_(headerBlock, "Location");
+            if (location.empty())
+            {
+               error = Formatter::Format(_T("{0} redirected without saying where."), String(host));
+               return false;
+            }
+            if (location[0] == '/')
+            {
+               // Relative to the host: same scheme, host and port.
+               std::string origin = https ? "https://" : "http://";
+               origin += host.c_str();
+               if (port != (https ? "443" : "80"))
+               {
+                  origin += ":";
+                  origin += port.c_str();
+               }
+               location = origin + location;
+            }
+            current = location.c_str();
+            continue;
+         }
+
+         if (status_code != 200)
+         {
+            FileUtilities::DeleteFile(path);
+            error = Formatter::Format(_T("{0} answered HTTP {1}."), String(host), status_code);
+            return false;
+         }
+
+         if (tooLarge)
+         {
+            FileUtilities::DeleteFile(path);
+            error = Formatter::Format(_T("The response from {0} exceeded the size limit."), String(host));
+            return false;
+         }
+
+         return true;
+      }
+
+      FileUtilities::DeleteFile(path);
+      error = Formatter::Format(_T("{0} redirected too many times."), String(url));
+      return false;
    }
 }
