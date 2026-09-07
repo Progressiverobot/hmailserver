@@ -67,6 +67,19 @@ namespace HM
       return attachment_->GetContentLength();
    }
 
+   bool
+   Attachment::GetContent(AnsiString &decoded) const
+   {
+      return attachment_->GetDecodedContent(decoded);
+   }
+
+   AnsiString
+   Attachment::GetContentType() const
+   {
+      const char *contentType = attachment_->GetContentType();
+      return contentType ? contentType : "";
+   }
+
    void
    Attachment::Delete()
    {

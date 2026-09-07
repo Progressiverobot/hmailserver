@@ -1475,6 +1475,9 @@ namespace HM
          case RouteMeMessageSend:
             return HandleMeMessageSend_(caller, GetRequestBody_(request));
 
+         case RouteMeMessageAttachment:
+            return HandleMeMessageAttachment_(caller, route.message_id, route.attachment_index);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1614,6 +1617,23 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/flags").GetLength());
             if (ParseQueueId(idText, route.message_id))
                route.kind = RouteMeMessageFlags;
+            return;
+         }
+
+         int attachmentsAt = rest.Find("/attachments/");
+         if (method == "GET" && attachmentsAt > 0)
+         {
+            AnsiString idText = rest.Mid(0, attachmentsAt);
+            AnsiString indexText = rest.Mid(attachmentsAt + AnsiString("/attachments/").GetLength());
+            // The index starts at zero, which no queue id does.
+            bool digits = !indexText.IsEmpty() && indexText.GetLength() <= 5;
+            for (int k = 0; digits && k < indexText.GetLength(); k++)
+               digits = indexText[k] >= '0' && indexText[k] <= '9';
+            if (ParseQueueId(idText, route.message_id) && digits)
+            {
+               route.attachment_index = atoi(indexText.c_str());
+               route.kind = RouteMeMessageAttachment;
+            }
             return;
          }
 
@@ -4282,6 +4302,7 @@ namespace HM
       case RouteMeMessageMove:
       case RouteMeMessageDelete:
       case RouteMeMessageSend:
+      case RouteMeMessageAttachment:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4784,6 +4805,26 @@ namespace HM
       // and until it is paid a larger message is described and not read.
       const int MaxMessageBodyBytes = 1024 * 1024;
 
+      // Up to this size a message is still parsed - for its attachment
+      // list, and for one attachment at a time on the download route.
+      const int MaxMessageParseBytes = 32 * 1024 * 1024;
+
+      // The size a user expects: the bytes the file has, not the base64
+      // that carries them. Decoding is a pass over the part, so only a
+      // message small enough to read whole pays it; above that the encoded
+      // length stands in.
+      int AttachmentSize(std::shared_ptr<Attachment> attachment, bool decode)
+      {
+         if (decode)
+         {
+            AnsiString decoded;
+            if (attachment->GetContent(decoded))
+               return decoded.GetLength();
+         }
+
+         return attachment->GetSize();
+      }
+
       // How many messages one listing returns at most: the newest, and the
       // caller pages further back with before_uid.
       const int MaxMessagesPerPage = 200;
@@ -5042,11 +5083,16 @@ namespace HM
          JsonEscape_(from).c_str(),
          JsonEscape_(date).c_str());
 
-      if (message->GetSize() > MaxMessageBodyBytes)
+      if (message->GetSize() > MaxMessageParseBytes)
       {
          json += "\"truncated\":true,\"to\":\"\",\"cc\":\"\",\"text\":\"\",\"html\":\"\",\"attachments\":[]}";
          return BuildResponse_(200, json);
       }
+
+      // Between the two ceilings the message is parsed for its attachment
+      // list, which the download route serves one at a time, and its text
+      // is left out.
+      bool bodyTooLarge = message->GetSize() > MaxMessageBodyBytes;
 
       MessageData messageData;
       if (!messageData.LoadFromMessage(account, message))
@@ -5067,18 +5113,22 @@ namespace HM
 
             AnsiString entry;
             entry.Format("{\"index\":%d,\"name\":\"%hs\",\"size\":%d}",
-               (int) i, JsonEscape_(AnsiString(attachment->GetFileName())).c_str(), attachment->GetSize());
+               (int) i, JsonEscape_(AnsiString(attachment->GetFileName())).c_str(), AttachmentSize(attachment, message->GetSize() <= MaxMessageBodyBytes));
             attachments += entry;
          }
       }
       attachments += "]";
 
       AnsiString tail;
-      tail.Format("\"truncated\":false,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"attachments\":%hs}",
+      AnsiString text = bodyTooLarge ? AnsiString() : JsonEscape_(AnsiString(messageData.GetBody()));
+      AnsiString html = bodyTooLarge ? AnsiString() : JsonEscape_(AnsiString(messageData.GetHTMLBody()));
+
+      tail.Format("\"truncated\":%hs,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"attachments\":%hs}",
+         bodyTooLarge ? "true" : "false",
          JsonEscape_(AnsiString(messageData.GetTo())).c_str(),
          JsonEscape_(AnsiString(messageData.GetCC())).c_str(),
-         JsonEscape_(AnsiString(messageData.GetBody())).c_str(),
-         JsonEscape_(AnsiString(messageData.GetHTMLBody())).c_str(),
+         text.c_str(),
+         html.c_str(),
          attachments.c_str());
       json += tail;
 
@@ -5600,6 +5650,129 @@ namespace HM
 
    namespace
    {
+      // RFC 8187: the bytes of a UTF-8 name that are not attr-char, percent-encoded.
+      AnsiString PercentEncodeUtf8(const String &value)
+      {
+         AnsiString utf8;
+         Unicode::WideToMultiByte(value, utf8);
+
+         static const char *hex = "0123456789ABCDEF";
+         AnsiString encoded;
+         for (int i = 0; i < utf8.GetLength(); i++)
+         {
+            unsigned char c = (unsigned char) utf8.c_str()[i];
+            bool plain = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') ||
+                         c == '-' || c == '.' || c == '_' || c == '~';
+            if (plain)
+            {
+               encoded += (char) c;
+               continue;
+            }
+
+            encoded += '%';
+            encoded += hex[c >> 4];
+            encoded += hex[c & 15];
+         }
+         return encoded;
+      }
+
+      // The name as a quoted-string an old client can read: ASCII only, and
+      // nothing that would end the string or the header.
+      AnsiString AsciiFileName(const String &value)
+      {
+         AnsiString ascii;
+         for (int i = 0; i < value.GetLength(); i++)
+         {
+            wchar_t c = value.c_str()[i];
+            bool safe = c >= 0x20 && c < 0x7F && c != '"' && c != '\\';
+            ascii += safe ? (char) c : '_';
+         }
+         if (ascii.IsEmpty())
+            ascii = "attachment";
+         return ascii;
+      }
+
+      // A media type that a browser would run or render is not served under
+      // it: with the session cookie attached, an attachment that rendered as
+      // a page on this origin could act as the page. Everything else keeps
+      // its type; the disposition, nosniff and the sandbox policy hold too.
+      AnsiString SafeMediaType(const AnsiString &declared)
+      {
+         // The field value carries its parameters (name=, charset=); the
+         // media type is what precedes the first semicolon.
+         AnsiString type = declared;
+         int semicolon = type.Find(";");
+         if (semicolon >= 0)
+            type = type.Mid(0, semicolon);
+         type.ToLower();
+         type.TrimLeft();
+         type.TrimRight();
+
+         if (type.IsEmpty() || type.Find("\r") >= 0 || type.Find("\n") >= 0 || type.Find("/") < 0)
+            return "application/octet-stream";
+
+         if (type == "text/html" || type == "application/xhtml+xml" || type == "image/svg+xml" ||
+             type == "text/xml" || type == "application/xml" || type.EndsWith("+xml") ||
+             type == "text/javascript" || type == "application/javascript")
+            return "application/octet-stream";
+
+         return type;
+      }
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessageAttachment_(const Caller &caller, __int64 messageId, int index)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> message = FindOwnMessage_(account, messageId, folder);
+      if (!message)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      if (message->GetSize() > MaxMessageParseBytes)
+         return BuildResponse_(413, "{\"error\":\"the message is too large to read here\"}");
+
+      String fileName = PersistentMessage::GetFileName(account, message);
+      if (!FileUtilities::Exists(fileName))
+         return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
+
+      MessageData messageData;
+      if (!messageData.LoadFromMessage(account, message))
+         return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
+
+      std::shared_ptr<Attachments> attachments = messageData.GetAttachments();
+      if (!attachments || index < 0 || index >= (int) attachments->GetCount())
+         return BuildResponse_(404, "{\"error\":\"attachment not found\"}");
+
+      std::shared_ptr<Attachment> attachment = attachments->GetItem((unsigned int) index);
+      if (!attachment)
+         return BuildResponse_(404, "{\"error\":\"attachment not found\"}");
+
+      AnsiString bytes;
+      if (!attachment->GetContent(bytes))
+         return BuildResponse_(500, "{\"error\":\"the attachment could not be decoded\"}");
+
+      String name = attachment->GetFileName();
+      if (name.IsEmpty())
+         name = _T("attachment");
+
+      HttpResponse response;
+      response.status = 200;
+      response.content_type = SafeMediaType(attachment->GetContentType());
+      response.body = bytes;
+      response.extra_headers =
+         "Content-Disposition: attachment; filename=\"" + AsciiFileName(name) + "\"; filename*=UTF-8''" + PercentEncodeUtf8(name) + "\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Content-Security-Policy: sandbox\r\n"
+         "Cache-Control: no-store\r\n";
+      return response;
+   }
+
+   namespace
+   {
       // The self-service page. Static: nothing in it comes from the server's
       // data, so nothing is escaped into it - every value the user sees is
       // fetched by the script as JSON and written into the page as text. The
@@ -5807,10 +5980,20 @@ namespace HM
          "      // shown: nothing in it runs, loads or renders.\n"
          "      text = new DOMParser().parseFromString(m.html, 'text/html').body.textContent || '';\n"
          "    }\n"
-         "    if (m.truncated) { text = 'This message is too large to show here; open it in your mail program.'; }\n"
+         "    if (m.truncated) { text = 'This message is too large to show here; open it in your mail program.' + ((m.attachments || []).length ? ' Its attachments can be downloaded below.' : ''); }\n"
          "    el('message-text').textContent = text || '(no text)';\n"
-         "    var names = (m.attachments || []).map(function (a) { return a.name + ' (' + format(a.size) + ')'; });\n"
-         "    el('message-attachments').textContent = names.length ? 'Attachments: ' + names.join(', ') : '';\n"
+         "    var attachments = el('message-attachments');\n"
+         "    while (attachments.firstChild) { attachments.removeChild(attachments.firstChild); }\n"
+         "    if ((m.attachments || []).length) {\n"
+         "      attachments.appendChild(node('span', 'Attachments: '));\n"
+         "      m.attachments.forEach(function (a, i) {\n"
+         "        var link = node('a', a.name + ' (' + format(a.size) + ')');\n"
+         "        link.href = '/api/v1/me/messages/' + m.id + '/attachments/' + a.index;\n"
+         "        link.setAttribute('download', a.name);\n"
+         "        if (i > 0) { attachments.appendChild(node('span', ', ')); }\n"
+         "        attachments.appendChild(link);\n"
+         "      });\n"
+         "    }\n"
          "    current = m;\n"
          "    renderActions();\n"
          "  };\n"
@@ -6057,6 +6240,7 @@ namespace HM
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
+         "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under its own media type, except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"

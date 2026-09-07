@@ -482,6 +482,8 @@ namespace HM
       bool IsAttachment() const;
       bool ReadFromFile(const String &pszFilename);
       bool WriteToFile(const String  &sFilename);
+      // The content with its transfer encoding removed, in memory.
+      bool GetDecodedContent(AnsiString &decoded);
 
       // operations for 'multipart' media
       bool IsMultiPart() const;

@@ -21,6 +21,8 @@ namespace HM
       int GetSize();
       void Delete();
       void SaveAs(const String &sSaveTo) const;
+      bool GetContent(AnsiString &decoded) const;
+      AnsiString GetContentType() const;
       
    private:
       

@@ -1508,6 +1508,17 @@ namespace HM
    // the scanner open that file by name. A failed write there means the scanner is
    // handed a file that is missing or empty, finds nothing in it, and the message is
    // delivered as clean.
+   bool MimeBody::GetDecodedContent(AnsiString &decoded)
+   {
+      std::unique_ptr<MimeCodeBase> pCoder(MimeEnvironment::CreateCoder(GetTransferEncoding()));
+      if (!pCoder)
+         return false;
+
+      pCoder->SetInput(text_, text_.GetLength(), false);
+      pCoder->GetOutput(decoded);
+      return true;
+   }
+
    bool MimeBody::WriteToFile(const String &sFilename)
    {
       // First de-code the content.
