@@ -33,6 +33,13 @@
 #include "../Application/ACLManager.h"
 #include "../../IMAP/IMAPFolderContainer.h"
 #include "../../IMAP/IMAPSpecialUse.h"
+#include "../../IMAP/MessagesContainer.h"
+#include "../Application/FolderManager.h"
+#include "../BO/ACLPermission.h"
+#include "../Tracking/ChangeNotification.h"
+#include "../Tracking/NotificationServer.h"
+#include "MessageUtilities.h"
+#include "../Application/Application.h"
 #include "../BO/Aliases.h"
 #include "../BO/Alias.h"
 #include "../BO/SecurityRanges.h"
@@ -1452,6 +1459,15 @@ namespace HM
          case RouteMeMessage:
             return HandleMeMessage_(caller, route.message_id);
 
+         case RouteMeMessageFlags:
+            return HandleMeMessageFlags_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeMessageMove:
+            return HandleMeMessageMove_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeMessageDelete:
+            return HandleMeMessageDelete_(caller, route.message_id, route.query);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1580,8 +1596,26 @@ namespace HM
       {
          AnsiString rest = path.Mid(meMessagesPath.GetLength());
 
+         if (method == "PUT" && rest.EndsWith("/flags"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/flags").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageFlags;
+            return;
+         }
+
+         if (method == "POST" && rest.EndsWith("/move"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/move").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageMove;
+            return;
+         }
+
          if (method == "GET" && ParseQueueId(rest, route.message_id))
             route.kind = RouteMeMessage;
+         else if (method == "DELETE" && ParseQueueId(rest, route.message_id))
+            route.kind = RouteMeMessageDelete;
 
          return;
       }
@@ -1984,6 +2018,9 @@ namespace HM
       case RouteMeVacation:
       case RouteMeQuarantineRelease:
       case RouteMeQuarantineDelete:
+      case RouteMeMessageFlags:
+      case RouteMeMessageMove:
+      case RouteMeMessageDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4227,6 +4264,9 @@ namespace HM
       case RouteMeFolders:
       case RouteMeFolderMessages:
       case RouteMeMessage:
+      case RouteMeMessageFlags:
+      case RouteMeMessageMove:
+      case RouteMeMessageDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -5032,6 +5072,282 @@ namespace HM
 
    namespace
    {
+      // A bare number in a JSON body - folder_id - with or without quotes.
+      bool JsonNumber(const AnsiString &json, const AnsiString &key, __int64 &value)
+      {
+         AnsiString needle = "\"" + key + "\"";
+         int keyPosition = json.Find(needle);
+         if (keyPosition < 0)
+            return false;
+
+         int colon = json.Find(":", keyPosition + needle.GetLength());
+         if (colon < 0)
+            return false;
+
+         int i = colon + 1;
+         while (i < json.GetLength() && (json[i] == ' ' || json[i] == '\t' || json[i] == '\r' || json[i] == '\n' || json[i] == '\"'))
+            i++;
+
+         int start = i;
+         while (i < json.GetLength() && json[i] >= '0' && json[i] <= '9')
+            i++;
+
+         if (i == start)
+            return false;
+
+         value = _atoi64(json.Mid(start, i - start).c_str());
+         return true;
+      }
+
+      // Every IMAP session on the folder is told, the way STORE, MOVE and
+      // EXPUNGE tell them: by message id, which each turns into its own
+      // sequence numbers.
+      void NotifyFolder(std::shared_ptr<const Account> account, __int64 folderId, ChangeNotification::NotificationType type, const std::vector<__int64> &messageIds)
+      {
+         std::shared_ptr<ChangeNotification> notification =
+            std::shared_ptr<ChangeNotification>(new ChangeNotification(account->GetID(), folderId, type, messageIds));
+
+         Application::Instance()->GetNotificationServer()->SendNotification(notification);
+      }
+   }
+
+   // The message the id names, if it is the signed-in account's and sits in
+   // a folder the account may read - and the live object every IMAP session
+   // on the mailbox shares, since what is changed here must be what they see.
+   std::shared_ptr<Message>
+   RestApiServer::FindOwnMessage_(std::shared_ptr<const Account> account, __int64 messageId, std::shared_ptr<IMAPFolder> &folder)
+   {
+      std::shared_ptr<Message> row = std::shared_ptr<Message>(new Message());
+      if (!PersistentMessage::ReadObject(row, messageId) || row->GetID() == 0 || row->GetAccountID() != account->GetID())
+         return std::shared_ptr<Message>();
+
+      folder = FindOwnReadableFolder_(account, row->GetFolderID());
+      if (!folder)
+         return std::shared_ptr<Message>();
+
+      std::shared_ptr<Messages> messages = folder->GetMessages();
+      if (!messages)
+         return std::shared_ptr<Message>();
+
+      return messages->GetItemByDBID(messageId);
+   }
+
+   // The account's folder designated \Trash, if it has one: a CREATE USE
+   // designation, or the name a client gave it.
+   std::shared_ptr<IMAPFolder>
+   RestApiServer::FindTrashFolder_(std::shared_ptr<const Account> account)
+   {
+      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+      if (!folders)
+         return std::shared_ptr<IMAPFolder>();
+
+      std::map<__int64, int> designations;
+      IMAPSpecialUse::Resolve(folders, designations);
+
+      for (std::map<__int64, int>::const_iterator it = designations.begin(); it != designations.end(); ++it)
+      {
+         if ((it->second & IMAPSpecialUse::DesignationTrash) == 0)
+            continue;
+
+         std::shared_ptr<IMAPFolder> trash = folders->GetItemByDBIDRecursive(it->first);
+         if (trash)
+            return trash;
+      }
+
+      return std::shared_ptr<IMAPFolder>();
+   }
+
+   // What EXPUNGE does for one message: the row and the file go, the
+   // folder's shared collection drops it, and every session is told.
+   bool
+   RestApiServer::DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder)
+   {
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(account->GetID(), folder->GetID());
+      if (!messages)
+         return false;
+
+      std::set<__int64> ids;
+      ids.insert(message->GetID());
+
+      std::vector<__int64> deleted = messages->DeleteMessagesById(ids);
+      if (deleted.empty())
+         return false;
+
+      NotifyFolder(account, folder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted);
+      return true;
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessageFlags_(const Caller &caller, __int64 messageId, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> message = FindOwnMessage_(account, messageId, folder);
+      if (!message)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      // Only the flags the body names change; the rest stay as they are, so
+      // two clients touching different flags do not undo each other.
+      static const char *names[] = { "seen", "flagged", "answered", "draft", "deleted" };
+      bool named[5] = { false, false, false, false, false };
+      bool values[5] = { false, false, false, false, false };
+      int mentioned = 0;
+
+      for (int i = 0; i < 5; i++)
+      {
+         AnsiString needle = AnsiString("\"") + names[i] + "\"";
+         if (requestBody.Find(needle) < 0)
+            continue;
+
+         named[i] = true;
+         values[i] = GetJsonBoolValue_(requestBody, names[i], false);
+         mentioned++;
+      }
+
+      if (mentioned == 0)
+         return BuildResponse_(400, "{\"error\":\"no flag named: seen, flagged, answered, draft or deleted\"}");
+
+      // The rights STORE asks for. RFC 4314 makes \Seen, \Deleted and the
+      // other flags three separate permissions, and they are asked for
+      // separately here too.
+      if (named[0] && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteSeen))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change the seen flag\"}");
+
+      if (named[4] && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteDeleted))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change the deleted flag\"}");
+
+      if ((named[1] || named[2] || named[3]) && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteOthers))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change flags\"}");
+
+      if (named[0])
+         message->SetFlagSeen(values[0]);
+      if (named[1])
+         message->SetFlagFlagged(values[1]);
+      if (named[2])
+         message->SetFlagAnswered(values[2]);
+      if (named[3])
+         message->SetFlagDraft(values[3]);
+      if (named[4])
+         message->SetFlagDeleted(values[4]);
+
+      // The path STORE takes: the flags are written with the folder's next
+      // mod-sequence, so CONDSTORE and QRESYNC clients see the change.
+      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) account->GetID(), (int) folder->GetID(), message->GetID(), message->GetFlags()))
+         return BuildResponse_(500, "{\"error\":\"the flags could not be stored\"}");
+
+      std::vector<__int64> changed;
+      changed.push_back(message->GetID());
+      NotifyFolder(account, folder->GetID(), ChangeNotification::NotificationMessageFlagsChanged, changed);
+
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"folder_id\":%I64d,\"flags\":%hs}", message->GetID(), folder->GetID(), FlagsJson(message).c_str());
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessageMove_(const Caller &caller, __int64 messageId, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> source;
+      std::shared_ptr<Message> message = FindOwnMessage_(account, messageId, source);
+      if (!message)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      __int64 folderId = 0;
+      if (!JsonNumber(requestBody, "folder_id", folderId))
+         return BuildResponse_(400, "{\"error\":\"folder_id is required\"}");
+
+      // The destination goes through the same test as any folder id: the
+      // account's own tree, readable. Another account's folder is 404.
+      std::shared_ptr<IMAPFolder> destination = FindOwnReadableFolder_(account, folderId);
+      if (!destination)
+         return BuildResponse_(404, "{\"error\":\"folder not found\"}");
+
+      if (destination->GetID() == source->GetID())
+         return BuildResponse_(400, "{\"error\":\"the message is already in that folder\"}");
+
+      // The rights MOVE asks for: insert there, mark deleted and expunge here.
+      if (!ACLManager::CheckPermission(account->GetID(), destination, ACLPermission::PermissionInsert))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to add messages\"}");
+
+      if (!ACLManager::CheckPermission(account->GetID(), source, ACLPermission::PermissionWriteDeleted) ||
+          !ACLManager::CheckPermission(account->GetID(), source, ACLPermission::PermissionExpunge))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to remove messages\"}");
+
+      // Copy, then expunge: the shape MOVE has, so the moved message is a
+      // new row with a new UID in the destination and every session on
+      // either folder is told. A copy that could not be followed by the
+      // expunge is reported as exactly that, and the copy is left.
+      __int64 newMessageId = 0;
+      if (!MessageUtilities::CopyToIMAPFolder(message, (int) destination->GetID(), newMessageId))
+         return BuildResponse_(500, "{\"error\":\"the message could not be copied to the folder\"}");
+
+      if (!DeleteOwnMessage_(account, message, source))
+         return BuildResponse_(500, "{\"error\":\"the message was copied to the folder but the original could not be removed\"}");
+
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"folder_id\":%I64d}", newMessageId, destination->GetID());
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeMessageDelete_(const Caller &caller, __int64 messageId, const AnsiString &query)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> message = FindOwnMessage_(account, messageId, folder);
+      if (!message)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      // The rights EXPUNGE asks for, since that is what this is.
+      if (!ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteDeleted) ||
+          !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionExpunge))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to delete messages\"}");
+
+      AnsiString permanentText = QueryParameter_(query, "permanent");
+      bool permanent = permanentText == "1" || permanentText == "true";
+
+      // Deleting is moving to the folder designated \Trash when the account
+      // has one and the message is not in it already - what a mail client
+      // does - and final otherwise, or when the caller says permanent.
+      if (!permanent)
+      {
+         std::shared_ptr<IMAPFolder> trash = FindTrashFolder_(account);
+         if (trash && trash->GetID() != folder->GetID())
+         {
+            if (!ACLManager::CheckPermission(account->GetID(), trash, ACLPermission::PermissionInsert))
+               return BuildResponse_(403, "{\"error\":\"the trash folder does not allow this account to add messages\"}");
+
+            __int64 newMessageId = 0;
+            if (!MessageUtilities::CopyToIMAPFolder(message, (int) trash->GetID(), newMessageId))
+               return BuildResponse_(500, "{\"error\":\"the message could not be copied to the trash folder\"}");
+
+            if (!DeleteOwnMessage_(account, message, folder))
+               return BuildResponse_(500, "{\"error\":\"the message was copied to the trash folder but the original could not be removed\"}");
+
+            AnsiString json;
+            json.Format("{\"deleted\":false,\"moved_to\":%I64d,\"id\":%I64d}", trash->GetID(), newMessageId);
+            return BuildResponse_(200, json);
+         }
+      }
+
+      if (!DeleteOwnMessage_(account, message, folder))
+         return BuildResponse_(500, "{\"error\":\"the message could not be deleted\"}");
+
+      return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   namespace
+   {
       // The self-service page. Static: nothing in it comes from the server's
       // data, so nothing is escaped into it - every value the user sees is
       // fetched by the script as JSON and written into the page as text. The
@@ -5060,6 +5376,7 @@ namespace HM
          "select{width:100%;box-sizing:border-box;padding:.45rem;border:1px solid #b9bec7;border-radius:.3rem;font:inherit;background:#fff}\n"
          ".msg{border-top:1px solid #e4e6ea;padding:.5rem 0;cursor:pointer}.msg.unseen .msg-subject{font-weight:600}.msg-detail{font-size:.85rem;color:#4b5563}\n"
          "pre{white-space:pre-wrap;word-break:break-word;font:inherit;background:#f4f5f7;padding:.75rem;border-radius:.3rem;max-height:30rem;overflow:auto}\n"
+         "#message-actions{margin:.5rem 0}#message-actions button{margin:0 .5rem .5rem 0}#message-actions select{width:auto;display:inline-block;margin-right:.5rem}\n"
          "[hidden]{display:none!important}\n"
          "</style>\n"
          "</head>\n"
@@ -5109,6 +5426,7 @@ namespace HM
          "<button id=\"message-back\" class=\"secondary\" type=\"button\">Back to the list</button>\n"
          "<div id=\"message-subject\" class=\"held-subject\"></div>\n"
          "<div id=\"message-meta\" class=\"held-detail\"></div>\n"
+         "<div id=\"message-actions\"><button id=\"message-unread\" class=\"secondary\" type=\"button\">Mark as unread</button><button id=\"message-flag\" class=\"secondary\" type=\"button\">Flag</button><button id=\"message-delete\" class=\"secondary\" type=\"button\">Delete</button><select id=\"message-move\" aria-label=\"Move to\"></select><button id=\"message-move-go\" class=\"secondary\" type=\"button\">Move</button></div>\n"
          "<pre id=\"message-text\"></pre>\n"
          "<div id=\"message-attachments\" class=\"held-detail\"></div>\n"
          "</div>\n"
@@ -5230,19 +5548,19 @@ namespace HM
          "    el('message-text').textContent = text || '(no text)';\n"
          "    var names = (m.attachments || []).map(function (a) { return a.name + ' (' + format(a.size) + ')'; });\n"
          "    el('message-attachments').textContent = names.length ? 'Attachments: ' + names.join(', ') : '';\n"
+         "    current = m;\n"
+         "    renderActions();\n"
          "  };\n"
          "  var openMessage = function (id) {\n"
          "    say('mail-status', '', true);\n"
          "    call('GET', '/api/v1/me/messages/' + id).then(function (result) {\n"
-         "      if (result.status === 200 && result.data) { renderMessage(result.data); return; }\n"
+         "      if (result.status === 200 && result.data) { renderMessage(result.data); if (!result.data.flags.seen) { setFlags({ seen: true }, true); } return; }\n"
          "      say('mail-status', describe(result, 'Could not open the message'), false);\n"
          "    });\n"
          "  };\n"
          "  var renderMessages = function (page) {\n"
          "    var list = el('message-list');\n"
          "    while (list.firstChild) { list.removeChild(list.firstChild); }\n"
-         "    list.hidden = false;\n"
-         "    el('message-view').hidden = true;\n"
          "    if (!page.messages.length) { list.appendChild(node('div', 'This folder is empty.', 'msg-detail')); return; }\n"
          "    page.messages.forEach(function (m) {\n"
          "      var row = node('div', undefined, m.flags.seen ? 'msg' : 'msg unseen');\n"
@@ -5266,6 +5584,7 @@ namespace HM
          "    var chosen = select.value;\n"
          "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
          "    var folders = flatten(tree.folders, []);\n"
+         "    allFolders = folders;\n"
          "    folders.forEach(function (f) {\n"
          "      var option = node('option', f.path + (f.unseen ? ' (' + f.unseen + ')' : ''));\n"
          "      option.value = f.id;\n"
@@ -5280,8 +5599,53 @@ namespace HM
          "      if (result.status === 200 && result.data) { renderFolders(result.data); }\n"
          "    });\n"
          "  };\n"
-         "  el('folder').addEventListener('change', loadMessages);\n"
+         "  el('folder').addEventListener('change', function () { showList(); loadMessages(); });\n"
          "  el('message-back').addEventListener('click', function () { el('message-view').hidden = true; el('message-list').hidden = false; });\n"
+         "  // Acting on the open message: read or unread, flag, move, delete.\n"
+         "  // Each is one call, and the folder counts are re-read afterwards.\n"
+         "  var current = null;\n"
+         "  var allFolders = [];\n"
+         "  var showList = function () { el('message-view').hidden = true; el('message-list').hidden = false; };\n"
+         "  var renderActions = function () {\n"
+         "    if (!current) { return; }\n"
+         "    el('message-unread').textContent = current.flags.seen ? 'Mark as unread' : 'Mark as read';\n"
+         "    el('message-flag').textContent = current.flags.flagged ? 'Remove flag' : 'Flag';\n"
+         "    var select = el('message-move');\n"
+         "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
+         "    allFolders.forEach(function (f) {\n"
+         "      if (f.id === current.folder_id || !f.writable) { return; }\n"
+         "      var option = node('option', f.path); option.value = f.id; select.appendChild(option);\n"
+         "    });\n"
+         "  };\n"
+         "  var setFlags = function (flags, quiet) {\n"
+         "    if (!current) { return; }\n"
+         "    var id = current.id;\n"
+         "    return call('PUT', '/api/v1/me/messages/' + id + '/flags', flags).then(function (result) {\n"
+         "      if (result.status === 200 && result.data) {\n"
+         "        if (current && current.id === id) { current.flags = result.data.flags; renderActions(); }\n"
+         "        loadFolders();\n"
+         "        return;\n"
+         "      }\n"
+         "      if (!quiet) { say('mail-status', describe(result, 'Could not change the flags'), false); }\n"
+         "    });\n"
+         "  };\n"
+         "  el('message-unread').addEventListener('click', function () { if (current) { setFlags({ seen: !current.flags.seen }, false); } });\n"
+         "  el('message-flag').addEventListener('click', function () { if (current) { setFlags({ flagged: !current.flags.flagged }, false); } });\n"
+         "  el('message-delete').addEventListener('click', function () {\n"
+         "    if (!current) { return; }\n"
+         "    call('DELETE', '/api/v1/me/messages/' + current.id).then(function (result) {\n"
+         "      if (result.status === 200) { say('mail-status', result.data && result.data.deleted ? 'Deleted.' : 'Moved to the trash folder.', true); current = null; showList(); loadFolders(); return; }\n"
+         "      say('mail-status', describe(result, 'Could not delete'), false);\n"
+         "    });\n"
+         "  });\n"
+         "  el('message-move-go').addEventListener('click', function () {\n"
+         "    var target = el('message-move').value;\n"
+         "    if (!current || !target) { return; }\n"
+         "    call('POST', '/api/v1/me/messages/' + current.id + '/move', { folder_id: Number(target) }).then(function (result) {\n"
+         "      if (result.status === 200) { say('mail-status', 'Moved.', true); current = null; showList(); loadFolders(); return; }\n"
+         "      say('mail-status', describe(result, 'Could not move'), false);\n"
+         "    });\n"
+         "  });\n"
          "  var render = function (me) {\n"
          "    el('who').textContent = me.address;\n"
          "    var used = me.quota.used_bytes, limit = me.quota.limit_mb * 1048576;\n"
@@ -5412,7 +5776,9 @@ namespace HM
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"}}}},"
          "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200) and before_uid (only messages with a lower UID - the way to page back). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
-         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
