@@ -9,6 +9,7 @@ using System.Threading;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
+using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 
 namespace RegressionTests.API
@@ -905,6 +906,118 @@ namespace RegressionTests.API
          Assert.AreEqual(0, imap.GetMessageCount("INBOX"));
          Assert.AreEqual(0, imap.GetMessageCount("Trash"));
          imap.Disconnect();
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/messages sends as the account to local recipients, and keeps a read copy in the Sent folder")]
+      public void AMessageIsSentToLocalRecipientsAndKeptInSent()
+      {
+         string other = OtherAccount();
+         string third = "third@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, third, UserPassword);
+
+         _account.PersonFirstName = "Self";
+         _account.PersonLastName = "Service";
+         _account.Save();
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"cc\":\"" + third + "\",\"subject\":\"Hello there\",\"text\":\"Body text here.\"}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         StringAssert.Contains("\"recipients\":2", sent.body);
+         long sentId = long.Parse(Between(sent.body, "\"sent_id\":", "}"));
+         Assert.Greater(sentId, 0, "A copy is kept in the Sent folder: " + sent.body);
+
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+         Pop3ClientSimulator.AssertMessageCount(third, UserPassword, 1);
+
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("Body text here.", received);
+         StringAssert.Contains("Subject: Hello there", received);
+         StringAssert.Contains("From: \"Self Service\" <" + Address + ">", received);
+         StringAssert.Contains("To: " + other, received);
+         StringAssert.Contains("CC: " + third, received);
+         StringAssert.Contains("Message-ID:", received);
+         StringAssert.Contains("Date:", received);
+
+         imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.AreEqual(1, imap.GetMessageCount("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":1,\"unseen\":0", FolderEntry(tree.body, "Sent"));
+
+         (int status, string body) copy = Http("GET", "/api/v1/me/messages/" + sentId, UserHeader(UserPassword));
+         Assert.AreEqual(200, copy.status, "Body: " + copy.body);
+         StringAssert.Contains("Body text here.", copy.body);
+         StringAssert.Contains("\"seen\":true", copy.body);
+      }
+
+      [Test]
+      [Description("A submission names the address it refuses, needs a recipient, and is the account's alone")]
+      public void ASubmissionNamesWhatItRefuses()
+      {
+         (int status, string body) nobody = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"subject\":\"Hello\",\"text\":\"Nobody is here.\"}");
+         Assert.AreEqual(400, nobody.status, "Body: " + nobody.body);
+
+         string unknown = "nobody@" + _domain.Name;
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + unknown + "\",\"subject\":\"Hello\",\"text\":\"Nobody is here.\"}");
+         Assert.AreEqual(400, refused.status, "Body: " + refused.body);
+         StringAssert.Contains(unknown, refused.body);
+
+         (int status, string body) malformed = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"not an address\",\"text\":\"x\"}");
+         Assert.AreEqual(400, malformed.status, "Body: " + malformed.body);
+
+         (int status, string body) admin = Http("POST", "/api/v1/me/messages", AdminHeader(),
+            "{\"to\":\"" + Address + "\",\"text\":\"x\"}");
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+
+         string cookie = SignIn();
+         Response bare = Raw("POST", "/api/v1/me/messages", null,
+            "{\"to\":\"" + Address + "\",\"text\":\"x\"}",
+            "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, bare.Status, "A send on a session needs the header. " + bare.Body);
+
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 0);
+      }
+
+      [Test]
+      [Description("A submission to an external address goes out through the delivery queue like any other")]
+      public void AMessageIsRelayedToAnExternalRecipient()
+      {
+         var deliveryResults = new System.Collections.Generic.Dictionary<string, int>();
+         deliveryResults["test@dummy-example.com"] = 250;
+
+         int smtpServerPort = TestSetup.GetNextFreePort();
+         using (var server = new SmtpServerSimulator(1, smtpServerPort))
+         {
+            server.AddRecipientResult(deliveryResults);
+            server.StartListen();
+
+            TestSetup.AddRoutePointingAtLocalhost(1, smtpServerPort, false);
+
+            (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+               "{\"to\":\"Dummy <test@dummy-example.com>\",\"subject\":\"Outward\",\"text\":\"Going out.\"}");
+            Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+            StringAssert.Contains("\"recipients\":1", sent.body);
+
+            server.WaitForCompletion();
+
+            StringAssert.Contains("Going out.", server.MessageData);
+            StringAssert.Contains("To: Dummy <test@dummy-example.com>", server.MessageData);
+            StringAssert.Contains("Subject: Outward", server.MessageData);
+            StringAssert.Contains("<" + Address + ">", server.MailFromCommand);
+         }
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
       }
 
       // ------------------------------------------------------------ helpers ---
