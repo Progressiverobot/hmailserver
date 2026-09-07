@@ -1424,6 +1424,15 @@ namespace HM
          case RouteMeVacation:
             return HandleMeVacation_(caller, GetRequestBody_(request));
 
+         case RouteMeQuarantineList:
+            return HandleMeQuarantineList_(caller);
+
+         case RouteMeQuarantineRelease:
+            return HandleMeQuarantineRelease_(caller, route.message_id);
+
+         case RouteMeQuarantineDelete:
+            return HandleMeQuarantineDelete_(caller, route.message_id);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1493,6 +1502,32 @@ namespace HM
       if (path == "/api/v1/me" && method == "GET")
       {
          route.kind = RouteMe;
+         return;
+      }
+
+      const AnsiString meQuarantinePath = "/api/v1/me/quarantine";
+
+      if (path == meQuarantinePath && method == "GET")
+      {
+         route.kind = RouteMeQuarantineList;
+         return;
+      }
+
+      if (path.StartsWith(meQuarantinePath + "/"))
+      {
+         AnsiString rest = path.Mid(meQuarantinePath.GetLength() + 1);
+
+         if (method == "POST" && rest.EndsWith("/release"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/release").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeQuarantineRelease;
+            return;
+         }
+
+         if (method == "DELETE" && ParseQueueId(rest, route.message_id))
+            route.kind = RouteMeQuarantineDelete;
+
          return;
       }
 
@@ -1892,6 +1927,8 @@ namespace HM
       case RouteUpdateInstall:
       case RouteMePassword:
       case RouteMeVacation:
+      case RouteMeQuarantineRelease:
+      case RouteMeQuarantineDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4129,6 +4166,9 @@ namespace HM
       case RouteMe:
       case RouteMePassword:
       case RouteMeVacation:
+      case RouteMeQuarantineList:
+      case RouteMeQuarantineRelease:
+      case RouteMeQuarantineDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4538,6 +4578,92 @@ namespace HM
       browser_sessions.clear();
    }
 
+   HttpResponse
+   RestApiServer::HandleMeQuarantineList_(const Caller &caller)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // The whole table, filtered here to the rows this address is a recipient
+      // of; nothing about anyone else's mail is computed into the answer, not
+      // even a count. The recipients field is left out for the same reason:
+      // the user learns that a message was held for them, not for whom else.
+      const std::vector<QuarantinedMessage> messages = QuarantineStore::List(1000);
+
+      AnsiString body;
+      body.Format("{\"enabled\":%hs,\"messages\":[", QuarantineStore::GetEnabled() ? "true" : "false");
+
+      int count = 0;
+      for (const QuarantinedMessage &message : messages)
+      {
+         if (!QuarantineStore::IsRecipient(message, account->GetAddress()))
+            continue;
+
+         if (count > 0)
+            body += ",";
+
+         AnsiString entry;
+         entry.Format("{\"id\":%I64d,\"sender\":\"%hs\",\"subject\":\"%hs\",\"reason\":\"%hs\",\"score\":%d,\"size\":%d,\"created\":\"%hs\"}",
+            message.id,
+            JsonEscape_(AnsiString(message.sender)).c_str(),
+            JsonEscape_(AnsiString(message.subject)).c_str(),
+            JsonEscape_(AnsiString(message.reason)).c_str(),
+            message.score,
+            message.size,
+            JsonEscape_(AnsiString(message.created)).c_str());
+
+         body += entry;
+         count++;
+      }
+
+      body += "]}";
+
+      return BuildResponse_(200, body);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeQuarantineRelease_(const Caller &caller, __int64 id)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // A message this address was not sent is "not found", not "forbidden":
+      // the id space is shared, and a refusal that differed would confirm that
+      // somebody else's message exists.
+      QuarantinedMessage message;
+      if (!QuarantineStore::GetById(id, message) || !QuarantineStore::IsRecipient(message, account->GetAddress()))
+         return BuildResponse_(404, "{\"error\":\"quarantined message not found\"}");
+
+      String error;
+      if (!QuarantineStore::ReleaseTo(id, account->GetAddress(), error))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         return BuildResponse_(500, body);
+      }
+
+      return BuildResponse_(200, "{\"released\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeQuarantineDelete_(const Caller &caller, __int64 id)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      QuarantinedMessage message;
+      if (!QuarantineStore::GetById(id, message) || !QuarantineStore::IsRecipient(message, account->GetAddress()))
+         return BuildResponse_(404, "{\"error\":\"quarantined message not found\"}");
+
+      if (!QuarantineStore::DiscardFor(id, account->GetAddress()))
+         return BuildResponse_(500, "{\"error\":\"the quarantined message could not be discarded\"}");
+
+      return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
    namespace
    {
       // The self-service page. Static: nothing in it comes from the server's
@@ -4564,6 +4690,7 @@ namespace HM
          "button.secondary{background:#e4e6ea;color:#1c1e21}\n"
          ".status{margin-top:.5rem;font-size:.9rem;min-height:1.2rem}.status.error{color:#b42318}.status.ok{color:#067647}\n"
          ".meter{height:.5rem;background:#e4e6ea;border-radius:.25rem;overflow:hidden;margin:.4rem 0}.meter div{height:100%;background:#2f81f7}\n"
+         ".held{border-top:1px solid #e4e6ea;padding:.6rem 0}.held-subject{font-weight:600}.held-detail{font-size:.85rem;color:#4b5563;margin:.2rem 0 .4rem}.held button{margin:0 .5rem 0 0}\n"
          "[hidden]{display:none!important}\n"
          "</style>\n"
          "</head>\n"
@@ -4598,6 +4725,12 @@ namespace HM
          "<button type=\"submit\">Save</button>\n"
          "<div id=\"vacation-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</form>\n"
+         "</section>\n"
+         "<section id=\"quarantine-section\">\n"
+         "<h2>Held as suspected spam</h2>\n"
+         "<p id=\"quarantine-note\"></p>\n"
+         "<div id=\"quarantine-list\"></div>\n"
+         "<div id=\"quarantine-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</section>\n"
          "<section id=\"password-section\">\n"
          "<h2>Change password</h2>\n"
@@ -4654,6 +4787,46 @@ namespace HM
          "    el('signin').hidden = false;\n"
          "    el('address').focus();\n"
          "  };\n"
+         "  // Every value from the server is written as text, never as markup.\n"
+         "  var node = function (tag, text, className) {\n"
+         "    var n = document.createElement(tag);\n"
+         "    if (text !== undefined) { n.textContent = text; }\n"
+         "    if (className) { n.className = className; }\n"
+         "    return n;\n"
+         "  };\n"
+         "  var renderQuarantine = function (held) {\n"
+         "    var list = el('quarantine-list');\n"
+         "    while (list.firstChild) { list.removeChild(list.firstChild); }\n"
+         "    if (!held.enabled) { el('quarantine-note').textContent = 'The server does not hold suspected spam for review; it refuses it.'; return; }\n"
+         "    if (!held.messages.length) { el('quarantine-note').textContent = 'Nothing is being held for you.'; return; }\n"
+         "    el('quarantine-note').textContent = held.messages.length + ' message' + (held.messages.length === 1 ? '' : 's') + ' held as suspected spam. Releasing one delivers it to you; deleting one is final.';\n"
+         "    held.messages.forEach(function (m) {\n"
+         "      var row = node('div', undefined, 'held');\n"
+         "      row.appendChild(node('div', m.subject || '(no subject)', 'held-subject'));\n"
+         "      row.appendChild(node('div', 'From ' + m.sender + ' - ' + m.created + ' - ' + m.reason + ' (score ' + m.score + ')', 'held-detail'));\n"
+         "      var release = node('button', 'Release to my inbox'); release.type = 'button';\n"
+         "      var discard = node('button', 'Delete', 'secondary'); discard.type = 'button';\n"
+         "      release.addEventListener('click', function () {\n"
+         "        call('POST', '/api/v1/me/quarantine/' + m.id + '/release').then(function (result) {\n"
+         "          say('quarantine-status', result.status === 200 ? 'Released. It will arrive in your inbox shortly.' : describe(result, 'Could not release'), result.status === 200);\n"
+         "          loadQuarantine();\n"
+         "        });\n"
+         "      });\n"
+         "      discard.addEventListener('click', function () {\n"
+         "        call('DELETE', '/api/v1/me/quarantine/' + m.id).then(function (result) {\n"
+         "          say('quarantine-status', result.status === 200 ? 'Deleted.' : describe(result, 'Could not delete'), result.status === 200);\n"
+         "          loadQuarantine();\n"
+         "        });\n"
+         "      });\n"
+         "      row.appendChild(release); row.appendChild(discard);\n"
+         "      list.appendChild(row);\n"
+         "    });\n"
+         "  };\n"
+         "  var loadQuarantine = function () {\n"
+         "    return call('GET', '/api/v1/me/quarantine').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderQuarantine(result.data); }\n"
+         "    });\n"
+         "  };\n"
          "  var render = function (me) {\n"
          "    el('who').textContent = me.address;\n"
          "    var used = me.quota.used_bytes, limit = me.quota.limit_mb * 1048576;\n"
@@ -4677,7 +4850,7 @@ namespace HM
          "  };\n"
          "  var load = function (quiet) {\n"
          "    return call('GET', '/api/v1/me').then(function (result) {\n"
-         "      if (result.status === 200 && result.data) { render(result.data); return true; }\n"
+         "      if (result.status === 200 && result.data) { render(result.data); loadQuarantine(); return true; }\n"
          "      if (!quiet) { say('signin-status', describe(result, 'Could not sign in'), false); }\n"
          "      showSignIn();\n"
          "      return false;\n"
@@ -4779,6 +4952,9 @@ namespace HM
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
          "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
          "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account\",\"description\":\"HTTP Basic with the account's address and password, once. Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates the /api/v1/me endpoints without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions.\",\"responses\":{\"201\":{\"description\":\"address, idle_seconds, lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"A session cookie, the administrator password or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
+         "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
+         "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
+         "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
