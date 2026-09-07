@@ -20,6 +20,7 @@ using Typography = hMailServer.ControlPanel.Services.Typography;
 using hMailServer.ControlPanel.Services;
 using System.Linq;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -230,7 +231,7 @@ namespace hMailServer.ControlPanel.Views
          public readonly string Default = "";
          public string Placeholder = "";
          public bool PickFolder;
-         public string FileFilter = "All files (*.*)|*.*";
+         public string FileFilter = L("All files (*.*)|*.*");
          private Wpf.Ui.Controls.TextBox box_;
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
@@ -264,15 +265,16 @@ namespace hMailServer.ControlPanel.Views
                MinWidth = 40,
                Margin = new Thickness(8, 0, 0, 0),
                VerticalAlignment = VerticalAlignment.Bottom,
-               ToolTip = PickFolder ? "Browse for a folder" : "Browse for a file"
+               ToolTip = PickFolder ? L("Browse for a folder") : L("Browse for a file")
             };
-            SetAid(browse, Key + "Browse");
+            SetAid(browse, Key + "Browse"); // no-loc
             // The content is a single ellipsis, so without this the certificate and
             // private-key browse buttons on the REST API card are announced as two
             // identical "\u2026" and there is no way to tell which one is which.
             System.Windows.Automation.AutomationProperties.SetName(browse,
-               (PickFolder ? "Browse for a folder for " : "Browse for a file for ")
-               + (AccessibleName ?? Label ?? "this setting"));
+               PickFolder
+                  ? F("Browse for a folder for {0}", AccessibleName ?? Label ?? L("this setting"))
+                  : F("Browse for a file for {0}", AccessibleName ?? Label ?? L("this setting")));
             browse.Click += (s, e) =>
             {
                string picked = PickFolder
@@ -366,7 +368,7 @@ namespace hMailServer.ControlPanel.Views
          /// the server does with the value, and two members of that name would have
          /// been one silently shadowing the other.
          /// </summary>
-         public string Hint = "";
+         public string Hint = L("");
 
          /// <summary>
          /// Adds a "Generate" button that fills the box with a strong random value
@@ -400,8 +402,8 @@ namespace hMailServer.ControlPanel.Views
 
             hasStored_ = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
             string placeholder = hasStored_
-               ? "A secret is configured — leave blank to keep it"
-               : (string.IsNullOrEmpty(Hint) ? "Enter a secret" : Hint);
+               ? L("A secret is configured — leave blank to keep it")
+               : (string.IsNullOrEmpty(Hint) ? L("Enter a secret") : Hint);
 
             box_ = new Wpf.Ui.Controls.PasswordBox
             {
@@ -430,16 +432,16 @@ namespace hMailServer.ControlPanel.Views
 
                var generate = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
                {
-                  Content = "Generate",
+                  Content = L("Generate"),
                   Margin = new Thickness(8, 0, 0, 0),
                   VerticalAlignment = VerticalAlignment.Bottom,
-                  ToolTip = "Fill in a strong random secret"
+                  ToolTip = L("Fill in a strong random secret")
                };
-               SetAid(generate, Key + "Generate");
+               SetAid(generate, Key + "Generate"); // no-loc
                // The visible content is the same word on every secret that offers
                // it, so the accessible name says which secret this one fills.
                System.Windows.Automation.AutomationProperties.SetName(generate,
-                  "Generate a random value for " + (AccessibleName ?? Label ?? "this secret"));
+                  F("Generate a random value for {0}", AccessibleName ?? Label ?? L("this secret")));
                generate.Click += (s, e) => box_.Password = PasswordGenerator.Generate(32);
                Grid.SetColumn(generate, 1);
                row.Children.Add(generate);
@@ -688,16 +690,16 @@ namespace hMailServer.ControlPanel.Views
 
             var button = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
             {
-               Content = "Open…",
+               Content = L("Open…"),
                Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
                FontSize = Typography.Caption,
                Padding = new Thickness(8, 3, 8, 3),
                Margin = new Thickness(10, 0, 0, 0),
                VerticalAlignment = VerticalAlignment.Center,
                Cursor = System.Windows.Input.Cursors.Hand,
-               ToolTip = "Open " + destination
+               ToolTip = F("Open {0}", destination)
             };
-            System.Windows.Automation.AutomationProperties.SetName(button, "Open " + destination + ", which now has " + Label);
+            System.Windows.Automation.AutomationProperties.SetName(button, F("Open {0}, which now has {1}", destination, Label));
             SetAid(button, "elsewhere-" + page_);
             button.Click += (s, e) => (Application.Current?.MainWindow as MainWindow)?.NavigateTo(page_);
             row.Children.Add(button);
@@ -829,8 +831,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Information,
-               Text = "The Control Panel is connected to another host, so the account ITS service runs as cannot be read "
-                      + "from here. Open the Control Panel on the server itself to see it."
+               Text = L("The Control Panel is connected to another host, so the account ITS service runs as cannot be read from here. Open the Control Panel on the server itself to see it.")
             };
          }
 
@@ -843,18 +844,14 @@ namespace hMailServer.ControlPanel.Views
             {
                Level = StatusLevel.Information,
                Text = service.Error != null
-                  ? "The Service Control Manager could not be queried, so the account the service runs as is unknown: "
-                    + service.Error
-                  : "Windows does not report an hMailServer service on this machine, so there is nothing for this "
-                    + "setting to apply to yet. It is read when the service is registered."
+                  ? F("The Service Control Manager could not be queried, so the account the service runs as is unknown: {0}", service.Error)
+                  : L("Windows does not report an hMailServer service on this machine, so there is nothing for this setting to apply to yet. It is read when the service is registered.")
             };
          }
 
          string running = WindowsServiceInfo.DescribeAccount(service.StartName);
-         string register = "\"" + WindowsServiceInfo.ExecutableFrom(service.PathName) + "\" /Register";
-         string howToApply = "To apply it, open an elevated Command Prompt and run:  " + register
-                             + "   - then restart the hMailServer service. Registering an already-registered service "
-                             + "reconfigures it in place; it does not create a second one and it does not touch your mail.";
+         string register = "\"" + WindowsServiceInfo.ExecutableFrom(service.PathName) + "\" /Register"; // no-loc
+         string howToApply = F("To apply it, open an elevated Command Prompt and run:  {0}   - then restart the hMailServer service. Registering an already-registered service reconfigures it in place; it does not create a second one and it does not touch your mail.", register);
 
          if (configured.Length == 0)
          {
@@ -875,13 +872,8 @@ namespace hMailServer.ControlPanel.Views
             {
                Level = localSystem ? StatusLevel.Information : StatusLevel.Good,
                Text = localSystem
-                  ? "The service is running as " + running + ". That is the default and it works, but every part of "
-                    + "hMailServer that faces the network runs with it. Naming an account above - NT SERVICE\\hMailServer "
-                    + "needs no password - and then re-registering the service is what changes it."
-                  : "The service is running as " + service.StartName + ", which is not LocalSystem, so it is already "
-                    + "contained. Nothing is requested above, and on an already-registered service an empty value "
-                    + "means \"leave the account as it is\" - so re-registering would not move it back to LocalSystem. "
-                    + "To do that, set the box to LocalSystem explicitly."
+                  ? F("The service is running as {0}. That is the default and it works, but every part of hMailServer that faces the network runs with it. Naming an account above - NT SERVICE\\hMailServer needs no password - and then re-registering the service is what changes it.", running)
+                  : F("The service is running as {0}, which is not LocalSystem, so it is already contained. Nothing is requested above, and on an already-registered service an empty value means \"leave the account as it is\" - so re-registering would not move it back to LocalSystem. To do that, set the box to LocalSystem explicitly.", service.StartName)
             };
          }
 
@@ -890,17 +882,14 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Good,
-               Text = "The service is running as " + service.StartName + ", which is the account requested above. "
-                      + "Nothing further is needed."
+               Text = F("The service is running as {0}, which is the account requested above. Nothing further is needed.", service.StartName)
             };
          }
 
          return new WarningState
          {
             Level = StatusLevel.Warning,
-            Text = "Not applied yet. The service is running as " + running + ", while this page asks for "
-                   + configured + ". This setting is read only when the service is registered, so saving it here "
-                   + "changes nothing on its own - not even after a restart. " + howToApply
+            Text = F("Not applied yet. The service is running as {0}, while this page asks for {1}. This setting is read only when the service is registered, so saving it here changes nothing on its own - not even after a restart. ", running, configured) + howToApply
          };
       }
 
@@ -960,8 +949,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Information,
-               Text = "The issued certificate is a file on the server's disk, and the Control Panel is connected to "
-                      + "another host, so its expiry cannot be read from here."
+               Text = L("The issued certificate is a file on the server's disk, and the Control Panel is connected to another host, so its expiry cannot be read from here.")
             };
          }
 
@@ -972,8 +960,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Information,
-               Text = "Where the issued certificate would be written could not be determined, because neither the "
-                      + "output folder above nor [Directories] DataFolder in hMailServer.INI could be read."
+               Text = L("Where the issued certificate would be written could not be determined, because neither the output folder above nor [Directories] DataFolder in hMailServer.INI could be read.")
             };
          }
 
@@ -982,10 +969,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "ACME is switched on but no certificate has been issued yet - fullchain.pem and privkey.pem "
-                      + "are not both in " + folder + ". Issue happens on the server's own schedule, so this is "
-                      + "normal for a few minutes after enabling it; if it persists, the CA could not reach this "
-                      + "server, and the External setup page checks exactly that."
+               Text = F("ACME is switched on but no certificate has been issued yet - fullchain.pem and privkey.pem are not both in {0}. Issue happens on the server's own schedule, so this is normal for a few minutes after enabling it; if it persists, the CA could not reach this server, and the External setup page checks exactly that.", folder)
             };
          }
 
@@ -1009,23 +993,20 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Information,
-               Text = "A certificate has been issued into " + folder + ", but its expiry could not be read: "
-                      + (health.CertificateFile?.Detail ?? "the file could not be parsed as a certificate.")
+               Text = F("A certificate has been issued into {0}, but its expiry could not be read: {1}", folder,
+                  health.CertificateFile?.Detail ?? L("the file could not be parsed as a certificate."))
             };
          }
 
          int days = health.DaysRemaining.Value;
-         string expires = health.ExpiresOn.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture);
+         string expires = health.ExpiresOn.Value.ToString("d MMMM yyyy", System.Globalization.CultureInfo.CurrentCulture); // no-loc
 
          if (days < 0)
          {
             return new WarningState
             {
                Level = StatusLevel.Critical,
-               Text = "The issued certificate EXPIRED on " + expires + ", " + (-days) + " days ago, and renewal has "
-                      + "not replaced it. Clients are refusing this server's TLS. Check the error log for the last "
-                      + "renewal attempt: the usual cause is that the CA can no longer reach this server on the "
-                      + "http-01 challenge port."
+               Text = F("The issued certificate EXPIRED on {0}, {1} days ago, and renewal has not replaced it. Clients are refusing this server's TLS. Check the error log for the last renewal attempt: the usual cause is that the CA can no longer reach this server on the http-01 challenge port.", expires, -days)
             };
          }
 
@@ -1034,17 +1015,14 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "The issued certificate expires on " + expires + ", in " + days + " days. The renewal task "
-                      + "runs inside this window, so this is only a problem if the number stops falling - if it does, "
-                      + "renewal is failing and the error log says why."
+               Text = F("The issued certificate expires on {0}, in {1} days. The renewal task runs inside this window, so this is only a problem if the number stops falling - if it does, renewal is failing and the error log says why.", expires, days)
             };
          }
 
          return new WarningState
          {
             Level = StatusLevel.Good,
-            Text = "A certificate is issued and valid until " + expires + ", " + days + " days from now. Renewal "
-                   + "starts automatically inside the last " + CertificateInspector.ExpiryWarningDays + " days."
+            Text = F("A certificate is issued and valid until {0}, {1} days from now. Renewal starts automatically inside the last {2} days.", expires, days, CertificateInspector.ExpiryWarningDays)
          };
       }
 
@@ -1088,9 +1066,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Information,
-               Text = "Whether STARTTLS will be offered could not be determined: the TCP/IP ports and certificates "
-                      + "could not be read. This listener borrows its certificate from a TLS-capable IMAP, POP3 or "
-                      + "SMTP port and has none of its own."
+               Text = L("Whether STARTTLS will be offered could not be determined: the TCP/IP ports and certificates could not be read. This listener borrows its certificate from a TLS-capable IMAP, POP3 or SMTP port and has none of its own.")
             };
          }
 
@@ -1107,28 +1083,18 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Good,
-               Text = "STARTTLS is expected to be offered, using the certificate '" + certificate + "' borrowed from "
-                      + "a TLS-capable mailbox port - this listener has no certificate setting of its own, by design: "
-                      + "the client editing Sieve filters is the client reading the mailbox, so the certificate it "
-                      + "already trusts is the right one to present. Whether the files actually load is decided when "
-                      + "the service starts; if they do not, the listener runs in plain text and says so in the "
-                      + "application log, and the SSL certificates page checks the files themselves."
+               Text = F("STARTTLS is expected to be offered, using the certificate '{0}' borrowed from a TLS-capable mailbox port - this listener has no certificate setting of its own, by design: the client editing Sieve filters is the client reading the mailbox, so the certificate it already trusts is the right one to present. Whether the files actually load is decided when the service starts; if they do not, the listener runs in plain text and says so in the application log, and the SSL certificates page checks the files themselves.", certificate)
             };
          }
 
-         string missing = "No TLS-capable IMAP, POP3 or SMTP port has a certificate assigned, so this listener will "
-                          + "offer plain text only - ManageSieve authenticates with the mailbox password, which would "
-                          + "then cross the network in the clear. ";
+         string missing = L("No TLS-capable IMAP, POP3 or SMTP port has a certificate assigned, so this listener will offer plain text only - ManageSieve authenticates with the mailbox password, which would then cross the network in the clear. ");
 
          return new WarningState
          {
             Level = loopbackOnly ? StatusLevel.Information : StatusLevel.Warning,
             Text = loopbackOnly
-               ? missing + "It is bound to " + bind + ", which keeps it on this machine - that is the supported way "
-                 + "to run it without TLS. Assign a certificate to a mailbox port to offer STARTTLS."
-               : missing + "It is bound to " + bind + ", so those passwords cross the network. Either assign a "
-                 + "certificate to a TLS-capable mailbox port on the TCP/IP ports page, bind this listener to "
-                 + "127.0.0.1, or put it behind a TLS terminator."
+               ? missing + F("It is bound to {0}, which keeps it on this machine - that is the supported way to run it without TLS. Assign a certificate to a mailbox port to offer STARTTLS.", bind)
+               : missing + F("It is bound to {0}, so those passwords cross the network. Either assign a certificate to a TLS-capable mailbox port on the TCP/IP ports page, bind this listener to 127.0.0.1, or put it behind a TLS terminator.", bind)
          };
       }
 
@@ -1309,16 +1275,14 @@ namespace hMailServer.ControlPanel.Views
          // algorithm names rather than letting a mismatch surface as a signature
          // failure. Either being allowed makes the file mandatory.
          if ((allowsRs256 || allowsEs256) && LiveText_("OAuth2PublicKeyFile", "").Trim().Length == 0)
-            blocking.Add("the issuer's public key file, which RS256 and ES256 tokens are verified against");
+            blocking.Add(L("the issuer's public key file, which RS256 and ES256 tokens are verified against"));
 
          if (allowsHs256 && !SecretConfigured_("OAuth2HmacSecret"))
-            blocking.Add("the shared HMAC secret, which HS256 tokens are verified against");
+            blocking.Add(L("the shared HMAC secret, which HS256 tokens are verified against"));
 
          if (!allowsRs256 && !allowsHs256 && !allowsEs256)
          {
-            blocking.Add("any algorithm this server can verify - it implements RS256, ES256 and HS256 only, and \""
-                         + algorithmSetting + "\" names none of them, so every token is refused whatever key "
-                         + "material is installed");
+            blocking.Add(F("any algorithm this server can verify - it implements RS256, ES256 and HS256 only, and \"{0}\" names none of them, so every token is refused whatever key material is installed", algorithmSetting));
          }
 
          if (blocking.Count > 0)
@@ -1326,11 +1290,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "OAuth2 is switched on but no client can log on with a token, because it is missing "
-                      + string.Join("; ", blocking)
-                      + ". Signature verification cannot run at all, so every token is rejected and the log records "
-                      + "only a failed logon - which reads as \"the password is wrong\" rather than as a "
-                      + "configuration gap."
+               Text = F("OAuth2 is switched on but no client can log on with a token, because it is missing {0}. Signature verification cannot run at all, so every token is rejected and the log records only a failed logon - which reads as \"the password is wrong\" rather than as a configuration gap.", string.Join("; ", blocking))
             };
          }
 
@@ -1343,14 +1303,7 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "Tokens signed with " + string.Join(" or ", unusable) + " are refused: this server implements "
-                      + "RS256 and HS256 only. " + (unusable.Contains("ES256")
-                         ? "ES256 in particular is rejected by name - JWS carries an ECDSA signature as a raw R||S "
-                           + "pair and OpenSSL expects DER, so it never verified and the server refuses it rather "
-                           + "than reporting a signature failure. "
-                         : "")
-                      + "Remove what the server cannot verify from the list, so a client offering it is refused for "
-                      + "a reason the log makes plain rather than appearing to be allowed."
+               Text = F("Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed.", string.Join(L(" or "), unusable))
             };
          }
 
@@ -1362,21 +1315,16 @@ namespace hMailServer.ControlPanel.Views
          if (noIssuer || noAudience)
          {
             string unchecked_ = noIssuer && noAudience
-               ? "neither the issuer (iss) nor the audience (aud) is checked"
-               : noIssuer ? "the issuer (iss) is not checked" : "the audience (aud) is not checked";
+               ? L("neither the issuer (iss) nor the audience (aud) is checked")
+               : noIssuer ? L("the issuer (iss) is not checked") : L("the audience (aud) is not checked");
 
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "Tokens are accepted, but " + unchecked_ + ": the server applies each of those only when you "
-                      + "have set it, and blank is the default. That is wider than it looks. Any token your identity "
-                      + "provider signs with this key is accepted - including one it issued to a different "
-                      + "application entirely, which is enough to log in as whichever mailbox that token names. "
-                      + "Set both to the exact values your provider puts in its tokens."
+               Text = F("Tokens are accepted, but {0}: the server applies each of those only when you have set it, and blank is the default. That is wider than it looks. Any token your identity provider signs with this key is accepted - including one it issued to a different application entirely, which is enough to log in as whichever mailbox that token names. Set both to the exact values your provider puts in its tokens.", unchecked_)
                       + (LiveBool_("OAuth2RequireTLS", true)
                          ? ""
-                         : " Tokens are also accepted over unencrypted connections, so a recorded one can be "
-                           + "replayed until it expires.")
+                         : L(" Tokens are also accepted over unencrypted connections, so a recorded one can be replayed until it expires."))
             };
          }
 
@@ -1385,20 +1333,14 @@ namespace hMailServer.ControlPanel.Views
             return new WarningState
             {
                Level = StatusLevel.Warning,
-               Text = "The configuration is complete, but tokens are accepted over connections that are not "
-                      + "encrypted. A bearer token is a credential in plain text: anyone who records the connection "
-                      + "can replay it until it expires. Turn TLS back on unless something in front of this server "
-                      + "is already terminating it."
+               Text = L("The configuration is complete, but tokens are accepted over connections that are not encrypted. A bearer token is a credential in plain text: anyone who records the connection can replay it until it expires. Turn TLS back on unless something in front of this server is already terminating it.")
             };
          }
 
          return new WarningState
          {
             Level = StatusLevel.Good,
-            Text = "Key material is present for the algorithms allowed, and both the issuer and the audience are "
-                   + "checked, so a token has to have been minted by your provider for this server specifically. "
-                   + "The mailbox it names still has to exist as a local account - a valid token for an address "
-                   + "this server does not host is refused."
+            Text = L("Key material is present for the algorithms allowed, and both the issuer and the audience are checked, so a token has to have been minted by your provider for this server specifically. The mailbox it names still has to exist as a local account - a valid token for an address this server does not host is refused.")
          };
       }
 
@@ -1468,46 +1410,41 @@ namespace hMailServer.ControlPanel.Views
          switch (section_)
          {
             case Section.Security:
-               TitleText.Text = "Transport security";
-               SubtitleText.Text = "Outbound mail authentication and encryption policies (hMailServer.INI). " +
-                                   "Changes take effect after a service restart.";
+               TitleText.Text = L("Transport security");
+               SubtitleText.Text = L("Outbound mail authentication and encryption policies (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
-                  Title = "DANE & DNSSEC",
-                  Blurb = "Validates recipient TLSA records with in-process DNSSEC and blocks delivery over forged chains (RFC 7672).",
+                  Title = L("DANE & DNSSEC"),
+                  Blurb = L("Validates recipient TLSA records with in-process DNSSEC and blocks delivery over forged chains (RFC 7672)."),
                   Settings =
                   {
-                     new BoolSetting { Key = "DaneEnforcementEnabled", Default = true, Label = "Honor recipient DANE/TLSA records when sending" },
-                     new BoolSetting { Key = "DnssecValidationEnabled", Default = true, Label = "Validate DNSSEC for DANE and SPF/DKIM/DMARC lookups" },
-                     new TextSetting { Key = "DnssecTrustAnchors", Label = "Trust anchor override (tag alg digesttype hex; ...)", Placeholder = "Leave empty for the built-in root anchors" }
+                     new BoolSetting { Key = "DaneEnforcementEnabled", Default = true, Label = L("Honor recipient DANE/TLSA records when sending") },
+                     new BoolSetting { Key = "DnssecValidationEnabled", Default = true, Label = L("Validate DNSSEC for DANE and SPF/DKIM/DMARC lookups") },
+                     new TextSetting { Key = "DnssecTrustAnchors", Label = L("Trust anchor override (tag alg digesttype hex; ...)"), Placeholder = L("Leave empty for the built-in root anchors") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "MTA-STS",
-                  Blurb = "Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). " +
-                          "To publish a policy for your own domains, see the Web services & autoconfiguration page.",
+                  Title = L("MTA-STS"),
+                  Blurb = L("Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). To publish a policy for your own domains, see the Web services & autoconfiguration page."),
                   Settings =
                   {
-                     new BoolSetting { Key = "MtaStsEnabled", Default = true, Label = "Honor recipient MTA-STS policies when sending" }
+                     new BoolSetting { Key = "MtaStsEnabled", Default = true, Label = L("Honor recipient MTA-STS policies when sending") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "ARC sealing",
+                  Title = L("ARC sealing"),
                   // The prerequisite sentence is stated rather than checked here:
                   // whether a hosted domain has a DKIM selector and key file lives
                   // in the database, behind the COM API, and this page works from
                   // hMailServer.INI alone - it must keep telling the truth when no
                   // COM session exists. The External setup page holds the live
                   // check and walks the actual domains.
-                  Blurb = "Adds ARC seals to forwarded mail so downstream servers can trust original authentication results (RFC 8617). " +
-                          "Sealing borrows the forwarding domain's DKIM selector and private key, so it needs at least one hosted " +
-                          "domain with DKIM signing configured - without that the switch reads enabled and seals nothing, with only " +
-                          "a debug log line to say so. The External setup page checks your domains for this.",
+                  Blurb = L("Adds ARC seals to forwarded mail so downstream servers can trust original authentication results (RFC 8617). Sealing borrows the forwarding domain's DKIM selector and private key, so it needs at least one hosted domain with DKIM signing configured - without that the switch reads enabled and seals nothing, with only a debug log line to say so. The External setup page checks your domains for this."),
                   Settings =
                   {
-                     new BoolSetting { Key = "ArcSealingEnabled", Default = false, Label = "Seal forwarded messages with the domain's DKIM key" }
+                     new BoolSetting { Key = "ArcSealingEnabled", Default = false, Label = L("Seal forwarded messages with the domain's DKIM key") }
                   }
                });
                cards_.Add(new CardDef
@@ -1523,27 +1460,19 @@ namespace hMailServer.ControlPanel.Views
                   // change nothing - the exact defect this page's blurbs exist to
                   // prevent - so until a real accessor exists, the card only tells
                   // the truth about where the switch is and what it needs.
-                  Title = "ARC inbound filtering",
+                  Title = L("ARC inbound filtering"),
                   // These two are database settings rather than ini values, so they are not
                   // editable on this page - which is for hMailServer.INI. They ARE editable,
                   // on the Anti-spam page, and this card points there. It used to say they
                   // could not be edited at all, which stopped being true the moment the COM
                   // properties landed; a card that describes a limitation the product no
                   // longer has is the same defect as one that claims a feature it lacks.
-                  Blurb = "The counterpart to ARC sealing: on inbound mail, a valid ARC chain from a trusted sealer can " +
-                          "offset the DMARC failure score for a message whose DMARC pass was destroyed by forwarding " +
-                          "(RFC 8617). It is configured on the Anti-spam page, under sender authentication, because it " +
-                          "is stored with the other anti-spam settings rather than in hMailServer.INI. With the " +
-                          "trusted-sealer list empty the feature does nothing at all, by design: anyone can fabricate " +
-                          "an entire ARC chain and seal it with keys published in their own DNS, and it will validate " +
-                          "perfectly, so a passing chain proves nothing unless you already trust the sealer. The list " +
-                          "is not an option of the feature - it is the feature. The offset never exceeds the DMARC " +
-                          "failure score, and applies only while DMARC scoring is enabled on the Anti-spam page."
+                  Blurb = L("The counterpart to ARC sealing: on inbound mail, a valid ARC chain from a trusted sealer can offset the DMARC failure score for a message whose DMARC pass was destroyed by forwarding (RFC 8617). It is configured on the Anti-spam page, under sender authentication, because it is stored with the other anti-spam settings rather than in hMailServer.INI. With the trusted-sealer list empty the feature does nothing at all, by design: anyone can fabricate an entire ARC chain and seal it with keys published in their own DNS, and it will validate perfectly, so a passing chain proves nothing unless you already trust the sealer. The list is not an option of the feature - it is the feature. The offset never exceeds the DMARC failure score, and applies only while DMARC scoring is enabled on the Anti-spam page.")
                });
                cards_.Add(new CardDef
                {
-                  Title = "DKIM signature timestamps",
-                  Blurb = "When a DKIM signature was made, and when it stops being one a verifier should honour (RFC 6376 3.5).",
+                  Title = L("DKIM signature timestamps"),
+                  Blurb = L("When a DKIM signature was made, and when it stops being one a verifier should honour (RFC 6376 3.5)."),
                   Settings =
                   {
                      new TextSetting
@@ -1551,30 +1480,23 @@ namespace hMailServer.ControlPanel.Views
                         Key = "DKIMSignatureValiditySeconds",
                         Default = "0",
                         Placeholder = "604800",
-                        Label = "Validity window in seconds for signatures we produce (0 = no expiry)",
-                        Blurb = "0 emits no expiry at all, which is the safe default: an expiry is a promise about mail " +
-                                "already in flight, and a window shorter than the delay a retry, a greylist or a mailing " +
-                                "list adds costs the message its DKIM pass and its DMARC alignment at the far end. " +
-                                "604800 is a week, the usual choice for a sender who wants one. A signing timestamp is " +
-                                "always sent regardless of this value."
+                        Label = L("Validity window in seconds for signatures we produce (0 = no expiry)"),
+                        Blurb = L("0 emits no expiry at all, which is the safe default: an expiry is a promise about mail already in flight, and a window shorter than the delay a retry, a greylist or a mailing list adds costs the message its DKIM pass and its DMARC alignment at the far end. 604800 is a week, the usual choice for a sender who wants one. A signing timestamp is always sent regardless of this value.")
                      },
                      new BoolSetting
                      {
                         Key = "DKIMEnforceSignatureExpiry",
                         Default = true,
-                        Label = "Refuse signatures on incoming mail whose expiry has passed",
-                        Blurb = "The expiry sits inside the bytes the signature covers, so it is the sending domain's own " +
-                                "instruction rather than something a third party can add. Turning this off means a " +
-                                "captured signed message can be replayed indefinitely."
+                        Label = L("Refuse signatures on incoming mail whose expiry has passed"),
+                        Blurb = L("The expiry sits inside the bytes the signature covers, so it is the sending domain's own instruction rather than something a third party can add. Turning this off means a captured signed message can be replayed indefinitely.")
                      },
                      new TextSetting
                      {
                         Key = "DKIMExpiryClockSkewSeconds",
                         Default = "300",
                         Placeholder = "300",
-                        Label = "Clock-drift tolerance in seconds when checking an expiry",
-                        Blurb = "Allows for this server's clock differing from the signer's. Without it, a clock running " +
-                                "a few minutes fast turns other people's valid mail into DKIM failures."
+                        Label = L("Clock-drift tolerance in seconds when checking an expiry"),
+                        Blurb = L("Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures.")
                      }
                   }
                });
@@ -1583,22 +1505,16 @@ namespace hMailServer.ControlPanel.Views
                   // Defaults verified against IniFileSettings.cpp (empty = off) and
                   // DKIM::InitializeOversigning_ for the length cap, the invalid-name
                   // handling and the automatic From.
-                  Title = "DKIM oversigning",
-                  Blurb = "Oversigning (RFC 6376 5.4) lists a header field name in the signature's h= tag once more often " +
-                          "than the field occurs, which makes ADDING another one - a second From:, an injected Subject: - " +
-                          "break the signature. Off by default: oversigning a field that a mailing list or forwarder " +
-                          "legitimately adds costs those messages their DKIM pass.",
+                  Title = L("DKIM oversigning"),
+                  Blurb = L("Oversigning (RFC 6376 5.4) lists a header field name in the signature's h= tag once more often than the field occurs, which makes ADDING another one - a second From:, an injected Subject: - break the signature. Off by default: oversigning a field that a mailing list or forwarder legitimately adds costs those messages their DKIM pass."),
                   Settings =
                   {
                      new TextSetting
                      {
                         Key = "DkimOversignHeaders",
-                        Label = "Header fields to oversign in outbound DKIM signatures (comma separated, empty = off)",
-                        Placeholder = "From, Subject, Reply-To",
-                        Blurb = "From is included automatically whenever this list is non-empty - a prepended second From: " +
-                                "is the attack oversigning exists for. Names must be printable ASCII without a colon; an " +
-                                "invalid name is dropped with an error log entry, and a value longer than 256 characters " +
-                                "is ignored entirely, also with an error entry, because h= has to fit on one unfolded line."
+                        Label = L("Header fields to oversign in outbound DKIM signatures (comma separated, empty = off)"),
+                        Placeholder = "From, Subject, Reply-To", // no-loc
+                        Blurb = L("From is included automatically whenever this list is non-empty - a prepended second From: is the attack oversigning exists for. Names must be printable ASCII without a colon; an invalid name is dropped with an error log entry, and a value longer than 256 characters is ignored entirely, also with an error entry, because h= has to fit on one unfolded line.")
                      }
                   }
                });
@@ -1607,59 +1523,45 @@ namespace hMailServer.ControlPanel.Views
                   // No mention of SMTP AUTH verdicts here on purpose: the server's
                   // results carrier has an auth= slot, but nothing feeds it yet, so
                   // advertising it would be a capability claim with nothing behind it.
-                  Title = "Authentication results on inbound mail",
-                  Blurb = "Records the verdicts this server itself reached about each inbound message - SPF, DKIM and " +
-                          "DMARC - as trace headers on the delivered message, for downstream filters and diagnostics " +
-                          "(RFC 8601, RFC 7208).",
+                  Title = L("Authentication results on inbound mail"),
+                  Blurb = L("Records the verdicts this server itself reached about each inbound message - SPF, DKIM and DMARC - as trace headers on the delivered message, for downstream filters and diagnostics (RFC 8601, RFC 7208)."),
                   Settings =
                   {
                      new BoolSetting
                      {
                         Key = "AuthenticationResultsEnabled",
                         Default = false,
-                        Label = "Write an Authentication-Results header on inbound mail",
-                        Blurb = "Each accepted inbound message gets one Authentication-Results header (RFC 8601) carrying " +
-                                "the SPF, DKIM and DMARC verdicts this server reached about it. Only checks that actually " +
-                                "ran are reported - which checks run is configured on the Anti-spam page - and a message " +
-                                "on which no check ran gets no header. An arriving message that already carries an " +
-                                "Authentication-Results header claiming this server's own identity has that header " +
-                                "removed first, so a sender cannot have a verdict written in this server's name believed " +
-                                "downstream (RFC 8601 section 5)."
+                        Label = L("Write an Authentication-Results header on inbound mail"),
+                        Blurb = L("Each accepted inbound message gets one Authentication-Results header (RFC 8601) carrying the SPF, DKIM and DMARC verdicts this server reached about it. Only checks that actually ran are reported - which checks run is configured on the Anti-spam page - and a message on which no check ran gets no header. An arriving message that already carries an Authentication-Results header claiming this server's own identity has that header removed first, so a sender cannot have a verdict written in this server's name believed downstream (RFC 8601 section 5).")
                      },
                      new BoolSetting
                      {
                         Key = "ReceivedSpfHeaderEnabled",
                         Default = false,
-                        Label = "Write a Received-SPF header on inbound mail",
-                        Blurb = "Records the SPF verdict for each accepted inbound message as a Received-SPF header " +
-                                "(RFC 7208 section 9.1). The header is only written when the SPF check actually ran, " +
-                                "so 'Check SPF' must be enabled on the Anti-spam page for it to appear."
+                        Label = L("Write a Received-SPF header on inbound mail"),
+                        Blurb = L("Records the SPF verdict for each accepted inbound message as a Received-SPF header (RFC 7208 section 9.1). The header is only written when the SPF check actually ran, so 'Check SPF' must be enabled on the Anti-spam page for it to appear.")
                      },
                      new TextSetting
                      {
                         Key = "AuthenticationResultsIdentity",
-                        Label = "Identity the results are written under (empty = this computer's name)",
+                        Label = L("Identity the results are written under (empty = this computer's name)"),
                         Placeholder = "mail.yourdomain.com",
-                        Blurb = "The authserv-id: the first token of every Authentication-Results header this server " +
-                                "writes, always lower-cased, and the name a downstream filter checks before trusting " +
-                                "the verdicts. The same name decides which arriving Authentication-Results headers are " +
-                                "treated as forged: one claiming this identity is removed, while one naming any other " +
-                                "identity is left completely untouched."
+                        Blurb = L("The authserv-id: the first token of every Authentication-Results header this server writes, always lower-cased, and the name a downstream filter checks before trusting the verdicts. The same name decides which arriving Authentication-Results headers are treated as forged: one claiming this identity is removed, while one naming any other identity is left completely untouched.")
                      }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "TLS reporting (TLS-RPT)",
-                  Blurb = "Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460).",
+                  Title = L("TLS reporting (TLS-RPT)"),
+                  Blurb = L("Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)."),
                   Settings =
                   {
                      // Named "TLS report..." rather than "Report..." since DMARC
                      // reporting joined this page: two identically-labelled fields
                      // on one page are ambiguous to anyone who cannot see which
                      // card they are in, and AccessibleNamesTests fails on it.
-                     new TextSetting { Key = "TlsRptFromAddress", Label = "TLS report sender address (empty = disabled)", Placeholder = "tlsrpt@yourdomain.com" },
-                     new TextSetting { Key = "TlsRptOrganizationName", Default = "hMailServer", Label = "Organization name in TLS reports" }
+                     new TextSetting { Key = "TlsRptFromAddress", Label = L("TLS report sender address (empty = disabled)"), Placeholder = "tlsrpt@yourdomain.com" },
+                     new TextSetting { Key = "TlsRptOrganizationName", Default = "hMailServer", Label = L("Organization name in TLS reports") }
                   }
                });
                // The same shape as TLS reporting above and deliberately beside it:
@@ -1669,15 +1571,12 @@ namespace hMailServer.ControlPanel.Views
                // likely to want the other.
                cards_.Add(new CardDef
                {
-                  Title = "DMARC aggregate reporting (rua)",
-                  Blurb = "Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record " +
-                          "(RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an " +
-                          "address outside the policy domain when that address's own DNS says it wants them, so a " +
-                          "domain cannot use its DMARC record to aim this server's reports at somebody else.",
+                  Title = L("DMARC aggregate reporting (rua)"),
+                  Blurb = L("Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else."),
                   Settings =
                   {
-                     new TextSetting { Key = "DmarcRptFromAddress", Label = "DMARC report sender address (empty = disabled)", Placeholder = "dmarc@yourdomain.com" },
-                     new TextSetting { Key = "DmarcRptOrganizationName", Default = "hMailServer", Label = "Organization name in DMARC reports" }
+                     new TextSetting { Key = "DmarcRptFromAddress", Label = L("DMARC report sender address (empty = disabled)"), Placeholder = "dmarc@yourdomain.com" },
+                     new TextSetting { Key = "DmarcRptOrganizationName", Default = "hMailServer", Label = L("Organization name in DMARC reports") }
                   }
                });
                // Moved here from the catch-all INI page. This is the same subject as
@@ -1688,31 +1587,21 @@ namespace hMailServer.ControlPanel.Views
                // SRS silently replaces it and neither one can be judged alone.
                cards_.Add(new CardDef
                {
-                  Title = "Forwarded mail & bounce protection (SRS / BATV)",
-                  Blurb = "Forwarding a message keeps the original envelope sender, so the next hop checks SPF for a " +
-                          "domain that never authorised this server and the message fails. These are the two answers. " +
-                          "SRS rewrites the envelope sender into one this server can vouch for and can undo on the way " +
-                          "back, so bounces still reach the original sender; BATV tags the envelope sender of outbound " +
-                          "mail so a forged bounce - one for a message this server never sent - can be told apart from " +
-                          "a real one. Both use a server-wide secret and do nothing at all until one is set. " +
-                          "Changes take effect after a service restart.",
+                  Title = L("Forwarded mail & bounce protection (SRS / BATV)"),
+                  Blurb = L("Forwarding a message keeps the original envelope sender, so the next hop checks SPF for a domain that never authorised this server and the message fails. These are the two answers. SRS rewrites the envelope sender into one this server can vouch for and can undo on the way back, so bounces still reach the original sender; BATV tags the envelope sender of outbound mail so a forged bounce - one for a message this server never sent - can be told apart from a real one. Both use a server-wide secret and do nothing at all until one is set. Changes take effect after a service restart."),
                   Settings =
                   {
                      new BoolSetting
                      {
                         Key = "RewriteEnvelopeFromWhenForwarding",
                         Default = false,
-                        Label = "Rewrite the envelope sender when forwarding (the simple fallback, no secret needed)",
-                        Blurb = "Replaces the envelope sender with the forwarding account's own address. That makes SPF " +
-                                "pass at the next hop, at the cost of the original sender's address: a bounce comes back " +
-                                "to the forwarding mailbox instead of to whoever wrote the message. SRS below does the " +
-                                "same job without losing the return path, and while SRS is enabled this setting is not " +
-                                "consulted at all."
+                        Label = L("Rewrite the envelope sender when forwarding (the simple fallback, no secret needed)"),
+                        Blurb = L("Replaces the envelope sender with the forwarding account's own address. That makes SPF pass at the next hop, at the cost of the original sender's address: a bounce comes back to the forwarding mailbox instead of to whoever wrote the message. SRS below does the same job without losing the return path, and while SRS is enabled this setting is not consulted at all.")
                      },
-                     new BoolSetting { Key = "SRSEnabled", Default = false, Label = "Enable Sender Rewriting Scheme (SRS) on forwarded mail" },
-                     new SecretSetting { Key = "SRSSecret", OfferGenerate = true, Label = "SRS signing secret", Hint = "A random server-wide secret" },
-                     new BoolSetting { Key = "BATVEnabled", Default = false, Label = "Tag outbound envelope senders with BATV and validate returning bounces" },
-                     new SecretSetting { Key = "BATVSecret", OfferGenerate = true, Label = "BATV signing secret", Hint = "A random server-wide secret" }
+                     new BoolSetting { Key = "SRSEnabled", Default = false, Label = L("Enable Sender Rewriting Scheme (SRS) on forwarded mail") },
+                     new SecretSetting { Key = "SRSSecret", OfferGenerate = true, Label = L("SRS signing secret"), Hint = L("A random server-wide secret") },
+                     new BoolSetting { Key = "BATVEnabled", Default = false, Label = L("Tag outbound envelope senders with BATV and validate returning bounces") },
+                     new SecretSetting { Key = "BATVSecret", OfferGenerate = true, Label = L("BATV signing secret"), Hint = L("A random server-wide secret") }
                   },
                   Warnings =
                   {
@@ -1730,9 +1619,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "SRS is switched on but no secret is set, so no envelope sender is rewritten - and " +
-                                     "while SRS is on, the plain rewrite fallback at the top of this card is skipped as " +
-                                     "well. This is strictly worse than switching SRS off. Generate or enter a secret."
+                              Text = L("SRS is switched on but no secret is set, so no envelope sender is rewritten - and while SRS is on, the plain rewrite fallback at the top of this card is skipped as well. This is strictly worse than switching SRS off. Generate or enter a secret.")
                            };
                         }
                      },
@@ -1746,9 +1633,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "BATV is switched on but no secret is set, so outbound senders are not tagged and " +
-                                     "returning bounces are not validated - the switch reads enabled while it does " +
-                                     "nothing. Generate or enter a secret."
+                              Text = L("BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret.")
                            };
                         }
                      }
@@ -1757,23 +1642,21 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Automation:
-               TitleText.Text = "Automatic certificates (ACME)";
-               SubtitleText.Text = "Built-in Let's Encrypt integration: certificates are issued, renewed, " +
-                                   "assigned to TLS ports and hot-reloaded automatically.";
+               TitleText.Text = L("Automatic certificates (ACME)");
+               SubtitleText.Text = L("Built-in Let's Encrypt integration: certificates are issued, renewed, assigned to TLS ports and hot-reloaded automatically.");
                cards_.Add(new CardDef
                {
-                  Title = "ACME (Let's Encrypt)",
-                  Blurb = "Issued certificates are stored in Data\\ACME and assigned to TLS ports without a restart. " +
-                          "Key reuse keeps published DANE TLSA records valid across renewals.",
+                  Title = L("ACME (Let's Encrypt)"),
+                  Blurb = L("Issued certificates are stored in Data\\ACME and assigned to TLS ports without a restart. Key reuse keeps published DANE TLSA records valid across renewals."),
                   Settings =
                   {
-                     new BoolSetting { Key = "AcmeEnabled", Default = false, Label = "Issue and renew certificates automatically" },
-                     new TextSetting { Key = "AcmeContactEmail", Label = "Contact e-mail (CA expiry notices)", Placeholder = "admin@yourdomain.com" },
-                     new TextSetting { Key = "AcmeDomains", Label = "Host names for the certificate (comma separated)", Placeholder = "mail.yourdomain.com, mta-sts.yourdomain.com" },
-                     new TextSetting { Key = "AcmeDirectoryUrl", Default = "https://acme-v02.api.letsencrypt.org/directory", Label = "ACME directory URL" },
-                     new TextSetting { Key = "AcmeHttpPort", Default = "80", Label = "Port for http-01 challenges" },
-                     new PathSetting { Key = "AcmeCertificateDirectory", PickFolder = true, Label = "Certificate output folder (empty = Data\\ACME)", Placeholder = "Falls back to Data\\ACME" },
-                     new BoolSetting { Key = "AcmeReuseKey", Default = true, Label = "Reuse the private key across renewals (keeps DANE TLSA records valid)" }
+                     new BoolSetting { Key = "AcmeEnabled", Default = false, Label = L("Issue and renew certificates automatically") },
+                     new TextSetting { Key = "AcmeContactEmail", Label = L("Contact e-mail (CA expiry notices)"), Placeholder = "admin@yourdomain.com" },
+                     new TextSetting { Key = "AcmeDomains", Label = L("Host names for the certificate (comma separated)"), Placeholder = "mail.yourdomain.com, mta-sts.yourdomain.com" }, // no-loc
+                     new TextSetting { Key = "AcmeDirectoryUrl", Default = "https://acme-v02.api.letsencrypt.org/directory", Label = L("ACME directory URL") },
+                     new TextSetting { Key = "AcmeHttpPort", Default = "80", Label = L("Port for http-01 challenges") },
+                     new PathSetting { Key = "AcmeCertificateDirectory", PickFolder = true, Label = L("Certificate output folder (empty = Data\\ACME)"), Placeholder = L("Falls back to Data\\ACME") },
+                     new BoolSetting { Key = "AcmeReuseKey", Default = true, Label = L("Reuse the private key across renewals (keeps DANE TLSA records valid)") }
                   },
                   Warnings =
                   {
@@ -1792,31 +1675,24 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Integration:
-               TitleText.Text = "API & monitoring";
-               SubtitleText.Text = "REST administration API, Prometheus metrics and remote script management. " +
-                                   "The public web services listener (autoconfiguration, MTA-STS hosting) is on the " +
-                                   "Web services & autoconfiguration page; OAuth2 token authentication is on the " +
-                                   "Authentication page.";
+               TitleText.Text = L("API & monitoring");
+               SubtitleText.Text = L("REST administration API, Prometheus metrics and remote script management. The public web services listener (autoconfiguration, MTA-STS hosting) is on the Web services & autoconfiguration page; OAuth2 token authentication is on the Authentication page.");
                cards_.Add(new CardDef
                {
-                  Title = "REST administration API + Web Control Deck",
-                  Blurb = "JSON API under /api/v1 plus the browser-based Control Deck at the listener root. " +
-                          "Authenticated with the administrator password, or with a scoped API key - a key can be " +
-                          "read-only, limited to named domains and source addresses, given an expiry and revoked on " +
-                          "its own, none of which the administrator password can. Keys are managed on the REST API " +
-                          "keys page. TLS is required unless the listener is bound to 127.0.0.1.",
+                  Title = L("REST administration API + Web Control Deck"),
+                  Blurb = L("JSON API under /api/v1 plus the browser-based Control Deck at the listener root. Authenticated with the administrator password, or with a scoped API key - a key can be read-only, limited to named domains and source addresses, given an expiry and revoked on its own, none of which the administrator password can. Keys are managed on the REST API keys page. TLS is required unless the listener is bound to 127.0.0.1."),
                   Settings =
                   {
-                     new ElsewhereSetting("apikeys", "Creating and revoking API keys"),
-                     new TextSetting { Key = "RestApiPort", Default = "0", Label = "Port (0 = disabled)", Placeholder = "8045" },
-                     new TextSetting { Key = "RestApiBindAddress", Default = "127.0.0.1", Label = "Bind address" },
-                     new PathSetting { Key = "RestApiCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
-                     new PathSetting { Key = "RestApiPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" }
+                     new ElsewhereSetting("apikeys", L("Creating and revoking API keys")),
+                     new TextSetting { Key = "RestApiPort", Default = "0", Label = L("Port (0 = disabled)"), Placeholder = "8045" },
+                     new TextSetting { Key = "RestApiBindAddress", Default = "127.0.0.1", Label = L("Bind address") },
+                     new PathSetting { Key = "RestApiCertificateFile", FileFilter = L("PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*"), Label = L("TLS certificate file (PEM, optional)"), Placeholder = L("Falls back to the ACME certificate") },
+                     new PathSetting { Key = "RestApiPrivateKeyFile", FileFilter = L("PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*"), Label = L("TLS private key file (PEM, optional)") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Monitoring",
+                  Title = L("Monitoring"),
                   // This blurb has been wrong in BOTH directions. It once advertised
                   // an OpenTelemetry metrics export that did not exist - an
                   // administrator pointed a collector here, got nothing, and no error
@@ -1826,34 +1702,24 @@ namespace hMailServer.ControlPanel.Views
                   // overclaim's wording must not come back verbatim, and the claim on
                   // each Otel*Endpoint setting is pinned separately. Keep this blurb
                   // in step with what Application::StartServers actually starts.
-                  Blurb = "Prometheus metrics (/metrics), OpenTelemetry export of traces, metrics and logs "
-                          + "(one endpoint per signal, each off until set), a slow-query log, and "
-                          + "JSON-structured log output for log aggregators (on the Logging page).",
+                  Blurb = L("Prometheus metrics (/metrics), OpenTelemetry export of traces, metrics and logs (one endpoint per signal, each off until set), a slow-query log, and JSON-structured log output for log aggregators (on the Logging page)."),
                   Settings =
                   {
-                     new TextSetting { Key = "MetricsServerPort", Default = "0", Label = "Metrics port (0 = disabled)", Placeholder = "9090" },
+                     new TextSetting { Key = "MetricsServerPort", Default = "0", Label = L("Metrics port (0 = disabled)"), Placeholder = "9090" },
                      new TextSetting
                      {
                         Key = "MetricsHistoryDays",
                         Default = "7",
-                        Label = "Keep metric history for (days; 0 = do not record)",
+                        Label = L("Keep metric history for (days; 0 = do not record)"),
                         Placeholder = "7",
-                        Blurb = "Once a minute the server writes one row per metric - sessions, messages processed, delivered, " +
-                                "deferred and bounced, spam and viruses, authentication and TLS outcomes, missing message files - " +
-                                "to hm_metricsamples, and keeps them this many days. It is what the dashboard's 24 hours, 7 days " +
-                                "and 30 days views and GET /api/v1/metrics/history read. A week of minute-resolution history is " +
-                                "about a hundred and forty thousand small rows. 0 turns the sampler off. Applies after a service " +
-                                "restart."
+                        Blurb = L("Once a minute the server writes one row per metric - sessions, messages processed, delivered, deferred and bounced, spam and viruses, authentication and TLS outcomes, missing message files - to hm_metricsamples, and keeps them this many days. It is what the dashboard's 24 hours, 7 days and 30 days views and GET /api/v1/metrics/history read. A week of minute-resolution history is about a hundred and forty thousand small rows. 0 turns the sampler off. Applies after a service restart.")
                      },
                      new TextSetting
                      {
                         Key = "MetricsServerBindAddress",
                         Default = "127.0.0.1",
-                        Label = "Metrics bind address",
-                        Blurb = "An IPv4 address, and the credential gate: anywhere in 127.0.0.0/8 the endpoints are open " +
-                                "to this machine without authentication, exactly as before. On any other address /metrics " +
-                                "answers 503 until a credential below is set - the exposition includes queue depth, " +
-                                "session counts and version numbers, so it must not be network-readable unauthenticated."
+                        Label = L("Metrics bind address"),
+                        Blurb = L("An IPv4 address, and the credential gate: anywhere in 127.0.0.0/8 the endpoints are open to this machine without authentication, exactly as before. On any other address /metrics answers 503 until a credential below is set - the exposition includes queue depth, session counts and version numbers, so it must not be network-readable unauthenticated.")
                      },
                      // Access control and TLS for the exposition. All five default to
                      // empty (verified in IniFileSettings.cpp), which on a loopback
@@ -1862,80 +1728,71 @@ namespace hMailServer.ControlPanel.Views
                      {
                         Key = "MetricsServerAuthToken",
                         OfferGenerate = true,
-                        Label = "Bearer token for /metrics (empty = none)",
-                        Hint = "A random token Prometheus will present on every scrape",
-                        Blurb = "Presented as \"Authorization: Bearer ...\" - in Prometheus, the scrape config's " +
-                                "bearer_token. Leading and trailing spaces are trimmed. The health probes /livez, /readyz " +
-                                "and /healthz never require it, so load balancers keep working."
+                        Label = L("Bearer token for /metrics (empty = none)"),
+                        Hint = L("A random token Prometheus will present on every scrape"),
+                        Blurb = L("Presented as \"Authorization: Bearer ...\" - in Prometheus, the scrape config's bearer_token. Leading and trailing spaces are trimmed. The health probes /livez, /readyz and /healthz never require it, so load balancers keep working.")
                      },
                      new TextSetting
                      {
                         Key = "MetricsServerAuthUsername",
-                        Label = "HTTP Basic user name for /metrics (empty = Basic off)",
+                        Label = L("HTTP Basic user name for /metrics (empty = Basic off)"),
                         Placeholder = "metrics",
-                        Blurb = "The alternative to the bearer token, for scrapers that only speak HTTP Basic. The user " +
-                                "name and the password must BOTH be set: with only one of them the server logs a warning " +
-                                "at startup and behaves as if neither were set."
+                        Blurb = L("The alternative to the bearer token, for scrapers that only speak HTTP Basic. The user name and the password must BOTH be set: with only one of them the server logs a warning at startup and behaves as if neither were set.")
                      },
                      new SecretSetting
                      {
                         Key = "MetricsServerAuthPassword",
                         OfferGenerate = true,
-                        Label = "HTTP Basic password for /metrics",
-                        Hint = "Only used together with the user name above",
-                        Blurb = "The user name is trimmed of surrounding spaces; the password deliberately is not, " +
-                                "because whitespace is legitimate inside a password."
+                        Label = L("HTTP Basic password for /metrics"),
+                        Hint = L("Only used together with the user name above"),
+                        Blurb = L("The user name is trimmed of surrounding spaces; the password deliberately is not, because whitespace is legitimate inside a password.")
                      },
                      new PathSetting
                      {
                         Key = "MetricsServerCertificateFile",
-                        FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*",
-                        Label = "TLS certificate file for the metrics listener (PEM)",
-                        Placeholder = "Leave both empty for plain HTTP"
+                        FileFilter = L("PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*"),
+                        Label = L("TLS certificate file for the metrics listener (PEM)"),
+                        Placeholder = L("Leave both empty for plain HTTP")
                      },
                      new PathSetting
                      {
                         Key = "MetricsServerPrivateKeyFile",
-                        FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*",
-                        Label = "TLS private key file for the metrics listener (PEM)",
-                        Blurb = "Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT " +
-                                "enabled and the server logs it. Unlike the REST API listener there is no fall-back to " +
-                                "the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable " +
-                                "file, a key that does not match), the health probes stay on plain HTTP and /metrics " +
-                                "answers 503 rather than serving the exposition in the clear."
+                        FileFilter = L("PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*"),
+                        Label = L("TLS private key file for the metrics listener (PEM)"),
+                        Blurb = L("Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear.")
                      },
                      // JsonLogging moved to the Logging page, with the other log settings.
                      new TextSetting
                      {
                         Key = "OtelEndpoint",
-                        Label = "OpenTelemetry OTLP endpoint for traces (empty = disabled)",
+                        Label = L("OpenTelemetry OTLP endpoint for traces (empty = disabled)"),
                         Placeholder = "http://localhost:4318",
-                        Blurb = SettingClaims.NoteFor("OtelEndpoint")
+                        Blurb = L(SettingClaims.NoteFor("OtelEndpoint"))
                      },
                      new TextSetting
                      {
                         Key = "OtelMetricsEndpoint",
-                        Label = "OpenTelemetry OTLP endpoint for metrics (empty = disabled)",
+                        Label = L("OpenTelemetry OTLP endpoint for metrics (empty = disabled)"),
                         Placeholder = "http://localhost:4318",
-                        Blurb = SettingClaims.NoteFor("OtelMetricsEndpoint")
+                        Blurb = L(SettingClaims.NoteFor("OtelMetricsEndpoint"))
                      },
                      new TextSetting
                      {
                         Key = "OtelLogsEndpoint",
-                        Label = "OpenTelemetry OTLP endpoint for logs (empty = disabled)",
+                        Label = L("OpenTelemetry OTLP endpoint for logs (empty = disabled)"),
                         Placeholder = "http://localhost:4318",
-                        Blurb = SettingClaims.NoteFor("OtelLogsEndpoint")
+                        Blurb = L(SettingClaims.NoteFor("OtelLogsEndpoint"))
                      },
                      new TextSetting
                      {
                         Key = "OtelMetricsInterval",
                         Default = "60",
-                        Label = "Seconds between metric pushes",
+                        Label = L("Seconds between metric pushes"),
                         Placeholder = "60",
-                        Blurb = "Clamped to 5-3600 by the exporter. Only used when the metrics endpoint above is set."
+                        Blurb = L("Clamped to 5-3600 by the exporter. Only used when the metrics endpoint above is set.")
                      },
-                     new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = "OpenTelemetry service name" },
-                     new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = "Log database queries slower than N ms (0 = off)", Placeholder = "250" }
+                     new TextSetting { Key = "OtelServiceName", Default = "hmailserver", Label = L("OpenTelemetry service name") },
+                     new TextSetting { Key = "SlowQueryLogMilliseconds", Default = "0", Label = L("Log database queries slower than N ms (0 = off)"), Placeholder = "250" }
                   },
                   Warnings =
                   {
@@ -1956,8 +1813,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "The metrics bind address is not a plain IPv4 address (host names and IPv6 are not " +
-                                     "accepted here), so the metrics listener will not start at all."
+                              Text = L("The metrics bind address is not a plain IPv4 address (host names and IPv6 are not accepted here), so the metrics listener will not start at all.")
                            };
                         }
                      },
@@ -1982,9 +1838,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "The bind address is not a loopback address and no credential is set, so /metrics " +
-                                     "answers 503 (Service Unavailable) to every scrape. Set a bearer token, or both " +
-                                     "HTTP Basic fields, or bind to 127.0.0.1. The health probes keep answering either way."
+                              Text = L("The bind address is not a loopback address and no credential is set, so /metrics answers 503 (Service Unavailable) to every scrape. Set a bearer token, or both HTTP Basic fields, or bind to 127.0.0.1. The health probes keep answering either way.")
                            };
                         }
                      },
@@ -2004,10 +1858,8 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "HTTP Basic needs both the user name and the password. Only " +
-                                     (userSet ? "the user name" : "the password") +
-                                     " is set, so Basic authentication is NOT enabled - the server logs this and behaves " +
-                                     "as if neither were set."
+                              Text = F("HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set.",
+                                 userSet ? L("the user name") : L("the password"))
                            };
                         }
                      },
@@ -2027,9 +1879,8 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "TLS for the metrics listener needs both the certificate and the private key. Only " +
-                                     (certSet ? "the certificate" : "the private key") +
-                                     " is set, so TLS is NOT enabled and scrapes stay plain HTTP."
+                              Text = F("TLS for the metrics listener needs both the certificate and the private key. Only {0} is set, so TLS is NOT enabled and scrapes stay plain HTTP.",
+                                 certSet ? L("the certificate") : L("the private key"))
                            };
                         }
                      },
@@ -2059,10 +1910,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Warning,
-                              Text = "A credential is set but the listener has no TLS, so the credential crosses the " +
-                                     "network in clear text on every scrape and can be replayed by anyone on the path. " +
-                                     "Set the certificate and key files, or bind to 127.0.0.1. The server still starts - " +
-                                     "it logs this same warning."
+                              Text = L("A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning.")
                            };
                         }
                      }
@@ -2074,42 +1922,34 @@ namespace hMailServer.ControlPanel.Views
                   // the Logger, so it fires independently of the log mask - which is
                   // the whole case for shipping it on. A healthy server writes zero
                   // events, and a per-id throttle (5 per 10 minutes) answers floods.
-                  Title = "Windows Event Log",
-                  Blurb = "Writes the conditions an operator alerts on - database unavailable, a listener that " +
-                          "would not start, a crash, a failed backup, the disk floor - to the Windows Application " +
-                          "log, where Event Viewer, monitoring agents and SIEM collectors can see them. Stable " +
-                          "event ids (the table lives in WindowsEventLog.h); a healthy server writes nothing at " +
-                          "all. Protocol traffic and routine logging never go here - a mail server that logs " +
-                          "every session to the Application log gets itself uninstalled.",
+                  Title = L("Windows Event Log"),
+                  Blurb = L("Writes the conditions an operator alerts on - database unavailable, a listener that would not start, a crash, a failed backup, the disk floor - to the Windows Application log, where Event Viewer, monitoring agents and SIEM collectors can see them. Stable event ids (the table lives in WindowsEventLog.h); a healthy server writes nothing at all. Protocol traffic and routine logging never go here - a mail server that logs every session to the Application log gets itself uninstalled."),
                   Settings =
                   {
-                     new BoolSetting { Key = "WindowsEventLogEnabled", Default = true, Label = "Write operational events to the Windows Application log" },
+                     new BoolSetting { Key = "WindowsEventLogEnabled", Default = true, Label = L("Write operational events to the Windows Application log") },
                      new ChoiceSetting
                      {
                         Key = "WindowsEventLogLevel",
                         Default = 2,
-                        Label = "Minimum severity that becomes an event",
+                        Label = L("Minimum severity that becomes an event"),
                         Options = new[]
                         {
-                           (1, "Critical only"),
-                           (2, "Critical and High (default - a healthy server writes nothing)"),
-                           (3, "Critical, High and Medium"),
-                           (4, "Everything ErrorManager reports")
+                           (1, L("Critical only")),
+                           (2, L("Critical and High (default - a healthy server writes nothing)")),
+                           (3, L("Critical, High and Medium")),
+                           (4, L("Everything ErrorManager reports"))
                         }
                      }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "ManageSieve (RFC 5804)",
-                  Blurb = "Lets mail clients upload and manage per-account Sieve filter scripts over TCP. " +
-                          "Authentication is SASL PLAIN against the account database, so the mailbox password crosses " +
-                          "this connection. STARTTLS is offered only when a TLS-capable mailbox port has a certificate " +
-                          "to borrow - the status below says whether it will be.",
+                  Title = L("ManageSieve (RFC 5804)"),
+                  Blurb = L("Lets mail clients upload and manage per-account Sieve filter scripts over TCP. Authentication is SASL PLAIN against the account database, so the mailbox password crosses this connection. STARTTLS is offered only when a TLS-capable mailbox port has a certificate to borrow - the status below says whether it will be."),
                   Settings =
                   {
-                     new TextSetting { Key = "ManageSieveServerPort", Default = "0", Label = "ManageSieve port (0 = disabled)", Placeholder = "4190" },
-                     new TextSetting { Key = "ManageSieveServerBindAddress", Default = "127.0.0.1", Label = "ManageSieve bind address" }
+                     new TextSetting { Key = "ManageSieveServerPort", Default = "0", Label = L("ManageSieve port (0 = disabled)"), Placeholder = "4190" },
+                     new TextSetting { Key = "ManageSieveServerBindAddress", Default = "127.0.0.1", Label = L("ManageSieve bind address") }
                   },
                   Warnings =
                   {
@@ -2127,13 +1967,13 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Operability",
+                  Title = L("Operability"),
                   // Log retention lives on the Logging page, next to the other
                   // logging settings, so there is exactly one editor per key.
-                  Blurb = "Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)",
+                  Blurb = L("Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)"),
                   Settings =
                   {
-                     new TextSetting { Key = "ShutdownDrainSeconds", Default = "0", Label = "On stop, wait up to N seconds for active sessions to finish (0 = stop immediately)", Placeholder = "30" }
+                     new TextSetting { Key = "ShutdownDrainSeconds", Default = "0", Label = L("On stop, wait up to N seconds for active sessions to finish (0 = stop immediately)"), Placeholder = "30" }
                   }
                });
                break;
@@ -2146,34 +1986,28 @@ namespace hMailServer.ControlPanel.Views
             // nav key stays "hardening" and the old titles stay as search aliases,
             // so every existing link and bookmark still lands here.
             case Section.Hardening:
-               TitleText.Text = "Server limits & expert settings";
-               SubtitleText.Text = "Server-wide ceilings, durability and abuse controls that belong to no single " +
-                                   "protocol or feature. The defaults are safe; change these only with a specific " +
-                                   "reason. Stored in hMailServer.INI, and unless a card says otherwise, changes " +
-                                   "take effect after a service restart.";
+               TitleText.Text = L("Server limits & expert settings");
+               SubtitleText.Text = L("Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature. The defaults are safe; change these only with a specific reason. Stored in hMailServer.INI, and unless a card says otherwise, changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
-                  Title = "Timeouts and queue bounds",
-                  Blurb = "Server-wide ceilings that keep one slow operation from holding a resource forever. The defaults " +
-                          "are deliberate; each one is here because there is a diagnosable situation in which it is the " +
-                          "right thing to change. Note that 0 does not mean the same thing for all of them - each label says.",
+                  Title = L("Timeouts and queue bounds"),
+                  Blurb = L("Server-wide ceilings that keep one slow operation from holding a resource forever. The defaults are deliberate; each one is here because there is a diagnosable situation in which it is the right thing to change. Note that 0 does not mean the same thing for all of them - each label says."),
                   Settings =
                   {
                      new TextSetting
                      {
                         Key = "FinalizationTimeout",
                         Default = "240",
-                        Label = "Message finalization deadline (seconds; 0 = no deadline)",
-                        Blurb = "How long the server will go on finalizing an accepted message before answering 451 and " +
-                                "asking the sender to retry, rather than holding the connection open indefinitely."
+                        Label = L("Message finalization deadline (seconds; 0 = no deadline)"),
+                        Blurb = L("How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely.")
                      },
-                     new TextSetting { Key = "DNSQueryTimeout", Default = "10", Label = "DNS query timeout (seconds; 0 = no bound)" },
-                     new TextSetting { Key = "ClientSessionCeiling", Default = "1800", Label = "Absolute lifetime of one client session (seconds)" },
-                     new TextSetting { Key = "DBConnectionAcquireTimeout", Default = "60", Label = "Wait for a free database connection (seconds)" },
-                     new TextSetting { Key = "ScriptTimeout", Default = "60", Label = "Event script execution timeout (seconds)" },
-                     new TextSetting { Key = "ExternalProcessTimeout", Default = "300", Label = "External process timeout, e.g. a command-line virus scanner (seconds)" },
-                     new TextSetting { Key = "AsyncQueueStallThreshold", Default = "120", Label = "Report the async work queue as stalled after (seconds)" },
-                     new TextSetting { Key = "AsyncQueueReservedThreads", Default = "2", Label = "Threads reserved so the async queue cannot be starved" }
+                     new TextSetting { Key = "DNSQueryTimeout", Default = "10", Label = L("DNS query timeout (seconds; 0 = no bound)") },
+                     new TextSetting { Key = "ClientSessionCeiling", Default = "1800", Label = L("Absolute lifetime of one client session (seconds)") },
+                     new TextSetting { Key = "DBConnectionAcquireTimeout", Default = "60", Label = L("Wait for a free database connection (seconds)") },
+                     new TextSetting { Key = "ScriptTimeout", Default = "60", Label = L("Event script execution timeout (seconds)") },
+                     new TextSetting { Key = "ExternalProcessTimeout", Default = "300", Label = L("External process timeout, e.g. a command-line virus scanner (seconds)") },
+                     new TextSetting { Key = "AsyncQueueStallThreshold", Default = "120", Label = L("Report the async work queue as stalled after (seconds)") },
+                     new TextSetting { Key = "AsyncQueueReservedThreads", Default = "2", Label = L("Threads reserved so the async queue cannot be starved") }
                   }
                });
                // Scanner timeouts moved to the scanner they configure: SpamAssassin
@@ -2188,52 +2022,38 @@ namespace hMailServer.ControlPanel.Views
                   // every trust decision is made against the real TCP peer, never
                   // against an address a header supplied, so chained proxies cannot
                   // bootstrap trust.
-                  Title = "Front-end proxies (PROXY protocol and XCLIENT)",
-                  Blurb = "Put a load balancer, a TLS terminator or a Postfix relay in front of the SMTP listener and " +
-                          "every connection appears to come from IT - which silently breaks DNSBL checks, SPF, " +
-                          "greylisting, auto-ban and the IP range rules all at once, while everything still reports " +
-                          "success. These let a named upstream pass on the real client address. Both are off by " +
-                          "default and trust nobody until an address is listed, because a peer that can rewrite its " +
-                          "own source address has defeated every IP-based control on this server. " +
-                          "The upstream has to be configured to send it or nothing here changes: HAProxy needs " +
-                          "send-proxy or send-proxy-v2 on its server line, and a Postfix relay needs XCLIENT " +
-                          "enabled towards this host. hMailServer cannot check that from here - and note that " +
-                          "once an address is listed as a PROXY protocol proxy the header becomes REQUIRED from " +
-                          "it, so a proxy that does not send one will have its connections dropped.",
+                  Title = L("Front-end proxies (PROXY protocol and XCLIENT)"),
+                  Blurb = L("Put a load balancer, a TLS terminator or a Postfix relay in front of the SMTP listener and every connection appears to come from IT - which silently breaks DNSBL checks, SPF, greylisting, auto-ban and the IP range rules all at once, while everything still reports success. These let a named upstream pass on the real client address. Both are off by default and trust nobody until an address is listed, because a peer that can rewrite its own source address has defeated every IP-based control on this server. The upstream has to be configured to send it or nothing here changes: HAProxy needs send-proxy or send-proxy-v2 on its server line, and a Postfix relay needs XCLIENT enabled towards this host. hMailServer cannot check that from here - and note that once an address is listed as a PROXY protocol proxy the header becomes REQUIRED from it, so a proxy that does not send one will have its connections dropped."),
                   Settings =
                   {
-                     new BoolSetting { Key = "SMTPProxyProtocolEnabled", Default = false, Label = "Accept the PROXY protocol (v1 and v2) on the SMTP listener" },
+                     new BoolSetting { Key = "SMTPProxyProtocolEnabled", Default = false, Label = L("Accept the PROXY protocol (v1 and v2) on the SMTP listener") },
                      new TextSetting
                      {
                         Key = "SMTPProxyProtocolTrustedIPs",
-                        Label = "Proxies allowed to send a PROXY header (comma-separated addresses or CIDR ranges)",
+                        Label = L("Proxies allowed to send a PROXY header (comma-separated addresses or CIDR ranges)"),
                         Placeholder = "10.0.0.5, 192.168.10.0/24",
-                        Blurb = "Empty means nobody, which is the safe default. Matched against the real TCP peer. " +
-                                "An entry that does not parse matches nothing rather than everything, and is " +
-                                "reported in the error log once per run."
+                        Blurb = L("Empty means nobody, which is the safe default. Matched against the real TCP peer. An entry that does not parse matches nothing rather than everything, and is reported in the error log once per run.")
                      },
-                     new BoolSetting { Key = "SMTPXClientEnabled", Default = false, Label = "Accept the XCLIENT command (Postfix)" },
+                     new BoolSetting { Key = "SMTPXClientEnabled", Default = false, Label = L("Accept the XCLIENT command (Postfix)") },
                      new TextSetting
                      {
                         Key = "SMTPXClientTrustedIPs",
-                        Label = "Upstreams allowed to use XCLIENT (comma-separated addresses or CIDR ranges)",
+                        Label = L("Upstreams allowed to use XCLIENT (comma-separated addresses or CIDR ranges)"),
                         Placeholder = "10.0.0.6",
-                        Blurb = "Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is " +
-                                "not listed here, so an attacker learns nothing about the deployment by asking."
+                        Blurb = L("Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking.")
                      }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Received headers",
-                  Blurb = "Submission identity handling and the diagnostic headers added to received mail. " +
-                          "(Where SMTP AUTH is offered is on the Authentication page.)",
+                  Title = L("Received headers"),
+                  Blurb = L("Submission identity handling and the diagnostic headers added to received mail. (Where SMTP AUTH is offered is on the Authentication page.)"),
                   Settings =
                   {
-                     new TextSetting { Key = "AuthUserReplacementIP", Label = "Replace the client IP for authenticated users (empty = keep the real IP)", Placeholder = "e.g. 127.0.0.1" },
-                     new BoolSetting { Key = "AddXAuthUserHeader", Default = false, Label = "Add an X-AuthUser header with the authenticated account" },
-                     new BoolSetting { Key = "AddXAuthUserIP", Default = true, Label = "Include the client IP in the X-AuthUser header" },
-                     new BoolSetting { Key = "AddXOriginalRcptTo", Default = false, Label = "Add an X-OriginalRcptTo header" }
+                     new TextSetting { Key = "AuthUserReplacementIP", Label = L("Replace the client IP for authenticated users (empty = keep the real IP)"), Placeholder = "e.g. 127.0.0.1" },
+                     new BoolSetting { Key = "AddXAuthUserHeader", Default = false, Label = L("Add an X-AuthUser header with the authenticated account") },
+                     new BoolSetting { Key = "AddXAuthUserIP", Default = true, Label = L("Include the client IP in the X-AuthUser header") },
+                     new BoolSetting { Key = "AddXOriginalRcptTo", Default = false, Label = L("Add an X-OriginalRcptTo header") }
                   }
                });
                cards_.Add(new CardDef
@@ -2243,34 +2063,27 @@ namespace hMailServer.ControlPanel.Views
                   // limit for that range - and nowhere else. It is not an auto-ban
                   // setting, and the blurb says which page each of those is on so
                   // nobody comes here looking for one and changes this instead.
-                  Title = "Refused connections",
-                  Blurb = "What happens to a TCP connection this server refuses before any protocol conversation starts: " +
-                          "one from an address no IP range allows, or one over that range's connection limit. Both of " +
-                          "those are configured on the IP ranges page. Locking out an address that keeps failing to log " +
-                          "on is a different mechanism entirely and is on the Auto-ban page.",
+                  Title = L("Refused connections"),
+                  Blurb = L("What happens to a TCP connection this server refuses before any protocol conversation starts: one from an address no IP range allows, or one over that range's connection limit. Both of those are configured on the IP ranges page. Locking out an address that keeps failing to log on is a different mechanism entirely and is on the Auto-ban page."),
                   Settings =
                   {
                      new TextSetting
                      {
                         Key = "BlockedIPHoldSeconds",
                         Default = "0",
-                        Label = "Hold a refused connection open before dropping it (seconds, 0 = drop immediately)",
-                        Blurb = "Anti-pounding: a host that reconnects the instant it is dropped can do so thousands of " +
-                                "times a minute, and holding the socket open slows it to one connection per interval " +
-                                "without costing this server a thread. The connection is held by a timer, so it consumes " +
-                                "nothing while it waits."
+                        Label = L("Hold a refused connection open before dropping it (seconds, 0 = drop immediately)"),
+                        Blurb = L("Anti-pounding: a host that reconnects the instant it is dropped can do so thousands of times a minute, and holding the socket open slows it to one connection per interval without costing this server a thread. The connection is held by a timer, so it consumes nothing while it waits.")
                      }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Message store durability",
-                  Blurb = "Crash-durability barrier and an optional integrity scan for the on-disk message store. " +
-                          "The defaults preserve the previous behaviour; enabling fsync adds a small per-message cost.",
+                  Title = L("Message store durability"),
+                  Blurb = L("Crash-durability barrier and an optional integrity scan for the on-disk message store. The defaults preserve the previous behaviour; enabling fsync adds a small per-message cost."),
                   Settings =
                   {
-                     new BoolSetting { Key = "MessageStoreFsync", Default = false, Label = "Flush each received message to disk before it is acknowledged (durable, slower)" },
-                     new BoolSetting { Key = "MessageStoreConsistencyCheck", Default = false, Label = "Periodically cross-check message rows against files on disk (read-only; writes a report on divergence)" }
+                     new BoolSetting { Key = "MessageStoreFsync", Default = false, Label = L("Flush each received message to disk before it is acknowledged (durable, slower)") },
+                     new BoolSetting { Key = "MessageStoreConsistencyCheck", Default = false, Label = L("Periodically cross-check message rows against files on disk (read-only; writes a report on divergence)") }
                   }
                });
                cards_.Add(new CardDef
@@ -2280,14 +2093,8 @@ namespace hMailServer.ControlPanel.Views
                   // directly and MaybeRefreshSettings_ stats the INI every couple
                   // of seconds, so unlike everything else on this page these apply
                   // without a service restart.
-                  Title = "Per-account sending limits",
-                  Blurb = "Ceilings on what one authenticated account may submit over a rolling period - the brake on a " +
-                          "compromised account being used to spam. Counted per account at SMTP submission: messages and " +
-                          "envelope recipients separately, and a message refused by the limit gets a temporary error so " +
-                          "a real client retries later. Unlike the rest of this page these live in the [SendingLimits] " +
-                          "and [SendingLimitsOverrides] sections of hMailServer.INI and are re-read within a couple of " +
-                          "seconds of the file changing - saving here applies them WITHOUT a service restart. Counters " +
-                          "survive a restart via a state file in the data directory.",
+                  Title = L("Per-account sending limits"),
+                  Blurb = L("Ceilings on what one authenticated account may submit over a rolling period - the brake on a compromised account being used to spam. Counted per account at SMTP submission: messages and envelope recipients separately, and a message refused by the limit gets a temporary error so a real client retries later. Unlike the rest of this page these live in the [SendingLimits] and [SendingLimitsOverrides] sections of hMailServer.INI and are re-read within a couple of seconds of the file changing - saving here applies them WITHOUT a service restart. Counters survive a restart via a state file in the data directory."),
                   Settings =
                   {
                      new SectionTextSetting
@@ -2295,7 +2102,7 @@ namespace hMailServer.ControlPanel.Views
                         Key = "MaxMessagesPerAccountPerPeriod",
                         Section = "SendingLimits",
                         Default = "0",
-                        Label = "Max messages per account per period (0 = no limit)",
+                        Label = L("Max messages per account per period (0 = no limit)"),
                         Placeholder = "500"
                      },
                      new SectionTextSetting
@@ -2303,50 +2110,43 @@ namespace hMailServer.ControlPanel.Views
                         Key = "MaxRecipientsPerAccountPerPeriod",
                         Section = "SendingLimits",
                         Default = "0",
-                        Label = "Max recipients per account per period (0 = no limit)",
+                        Label = L("Max recipients per account per period (0 = no limit)"),
                         Placeholder = "2000",
-                        Blurb = "Recipients are the stricter measure: one message to two thousand addresses is two " +
-                                "thousand recipients."
+                        Blurb = L("Recipients are the stricter measure: one message to two thousand addresses is two thousand recipients.")
                      },
                      new SectionTextSetting
                      {
                         Key = "PeriodHours",
                         Section = "SendingLimits",
                         Default = "24",
-                        Label = "Period length in hours (default 24)",
-                        Blurb = "Clamped to 1-168 by the server: a value outside that range is not an error, it is " +
-                                "quietly pulled to the nearest bound."
+                        Label = L("Period length in hours (default 24)"),
+                        Blurb = L("Clamped to 1-168 by the server: a value outside that range is not an error, it is quietly pulled to the nearest bound.")
                      },
                      new SectionTextSetting
                      {
                         Key = "StateSaveIntervalSeconds",
                         Section = "SendingLimits",
                         Default = "10",
-                        Label = "Save the counters to disk every N seconds (default 10)",
-                        Blurb = "How much sending history a crash can forget. Clamped to 1-3600; a value below 1 falls " +
-                                "back to the default of 10."
+                        Label = L("Save the counters to disk every N seconds (default 10)"),
+                        Blurb = L("How much sending history a crash can forget. Clamped to 1-3600; a value below 1 falls back to the default of 10.")
                      },
                      new SectionLinesSetting
                      {
                         Key = "SendingLimitsOverrides",
                         Section = "SendingLimitsOverrides",
-                        Label = "Per-address overrides, one per line: address=messages:recipients[:hours]",
+                        Label = L("Per-address overrides, one per line: address=messages:recipients[:hours]"),
                         Placeholder = "newsletter@yourdomain.com=5000:50000\nceo@yourdomain.com=0:0",
-                        Blurb = "An override replaces the global ceilings for that address; 0:0 exempts it entirely. " +
-                                "Without the optional :hours the override uses the global period. A malformed line is " +
-                                "ignored with a log entry and the global limit still applies to that account. Comment " +
-                                "lines in this INI section are not shown here and are dropped if the list is saved."
+                        Blurb = L("An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved.")
                      }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Submission rate limits",
-                  Blurb = "Throttle abusive senders submitting to this server. Limits are per minute; 0 disables the limit. " +
-                          "(Throttling your own outbound rate to a destination is on the Delivery of e-mail page.)",
+                  Title = L("Submission rate limits"),
+                  Blurb = L("Throttle abusive senders submitting to this server. Limits are per minute; 0 disables the limit. (Throttling your own outbound rate to a destination is on the Delivery of e-mail page.)"),
                   Settings =
                   {
-                     new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = "Max authenticated submissions per client IP per minute (0 = unlimited)", Placeholder = "60" }
+                     new TextSetting { Key = "MaxSubmissionsPerIPPerMinute", Default = "0", Label = L("Max authenticated submissions per client IP per minute (0 = unlimited)"), Placeholder = "60" }
                   }
                });
                // Logging detail moved to the Logging page, indexer cadence to
@@ -2355,31 +2155,28 @@ namespace hMailServer.ControlPanel.Views
                // with the feature it configures rather than on this catch-all page.
                cards_.Add(new CardDef
                {
-                  Title = "Server-generated mail",
+                  Title = L("Server-generated mail"),
                   // The server builds mailer-daemon@<domain> from this and puts it
                   // in the From: header of bounces and virus notices; it has no
                   // effect on how or where mail is delivered.
-                  Blurb = "Bounces and virus notifications are sent from mailer-daemon@<domain>. This overrides the " +
-                          "<domain> part. Left empty, the server uses its own host name, then the local domain the " +
-                          "message involves, then this computer's name. It is not a delivery setting and does not " +
-                          "change where mail is routed.",
+                  Blurb = L("Bounces and virus notifications are sent from mailer-daemon@<domain>. This overrides the <domain> part. Left empty, the server uses its own host name, then the local domain the message involves, then this computer's name. It is not a delivery setting and does not change where mail is routed."),
                   Settings =
                   {
-                     new TextSetting { Key = "DaemonAddressDomain", Label = "Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)", Placeholder = "yourdomain.com" }
+                     new TextSetting { Key = "DaemonAddressDomain", Label = L("Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)"), Placeholder = "yourdomain.com" }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Low-level tuning",
-                  Blurb = "Specialist knobs — leave at the defaults unless you have a specific reason.",
+                  Title = L("Low-level tuning"),
+                  Blurb = L("Specialist knobs — leave at the defaults unless you have a specific reason."),
                   Settings =
                   {
-                     new TextSetting { Key = "SMTPDMaxSizeDrop", Default = "0", Label = "Drop oversized inbound messages above N bytes mid-transfer (0 = off)" },
+                     new TextSetting { Key = "SMTPDMaxSizeDrop", Default = "0", Label = L("Drop oversized inbound messages above N bytes mid-transfer (0 = off)") },
                      // SAMoveVsCopy went to Anti-spam > SpamAssassin: it configures
                      // how a message reaches that scanner, and belongs with the host,
                      // port and timeouts that configure the rest of the same handoff.
-                     new TextSetting { Key = "LoadHeaderReadSize", Default = "4000", Label = "Header read chunk size (bytes)" },
-                     new TextSetting { Key = "LoadBodyReadSize", Default = "4000", Label = "Body read chunk size (bytes)" }
+                     new TextSetting { Key = "LoadHeaderReadSize", Default = "4000", Label = L("Header read chunk size (bytes)") },
+                     new TextSetting { Key = "LoadBodyReadSize", Default = "4000", Label = L("Body read chunk size (bytes)") }
                   }
                });
                cards_.Add(new CardDef
@@ -2397,7 +2194,7 @@ namespace hMailServer.ControlPanel.Views
                   // switch has never touched one of them. The database password is
                   // the only INI value it governs, and only at the moment it is
                   // set, through IniFileSettings::SetPassword.
-                  Title = "Stored secret protection",
+                  Title = L("Stored secret protection"),
                   // "Turn it off to restore a backup onto a different machine" was
                   // the one reason this card gave, and it was misdirection: no
                   // backed-up secret is in a DPAPI envelope. Configuration::XMLStore
@@ -2408,27 +2205,15 @@ namespace hMailServer.ControlPanel.Views
                   // destination machine's own setting. So a cross-machine restore
                   // works with this left on, and following the old advice downgraded
                   // every future secret write to a key that ships in the source.
-                  Blurb = "Chooses the envelope hMailServer puts around the secrets it stores for its own use: machine-scoped " +
-                          "Windows DPAPI, which cannot be decrypted on any other machine, or the legacy Blowfish scheme, " +
-                          "which can. Leave it on. It does not affect backup and restore - nothing in a backup archive is " +
-                          "DPAPI-protected, and a restore re-protects each secret under the destination machine's own " +
-                          "setting - so a backup taken here restores onto another machine with this switched on.",
+                  Blurb = L("Chooses the envelope hMailServer puts around the secrets it stores for its own use: machine-scoped Windows DPAPI, which cannot be decrypted on any other machine, or the legacy Blowfish scheme, which can. Leave it on. It does not affect backup and restore - nothing in a backup archive is DPAPI-protected, and a restore re-protects each secret under the destination machine's own setting - so a backup taken here restores onto another machine with this switched on."),
                   Settings =
                   {
                      new BoolSetting
                      {
                         Key = "ProtectStoredSecretsWithDPAPI",
                         Default = true,
-                        Label = "Protect stored secrets with Windows DPAPI",
-                        Blurb = "It covers exactly five things, and each is re-enveloped only when it is next saved rather " +
-                                "than at start-up: the database password in hMailServer.INI, the SMTP relayer password, " +
-                                "each route's authentication password, each external fetch account's password, and each " +
-                                "SSL certificate's private-key passphrase. It does NOT cover the other secrets in " +
-                                "hMailServer.INI - the SRS and BATV secrets, the OAuth2 HMAC secret, the password pepper, " +
-                                "the metrics bearer token, the metrics HTTP Basic password and the Windows service " +
-                                "account password are all stored as you typed them. Protecting those is the file's own " +
-                                "permissions: hMailServer.INI should be readable only by Administrators and by the " +
-                                "account the service runs as."
+                        Label = L("Protect stored secrets with Windows DPAPI"),
+                        Blurb = L("It covers exactly five things, and each is re-enveloped only when it is next saved rather than at start-up: the database password in hMailServer.INI, the SMTP relayer password, each route's authentication password, each external fetch account's password, and each SSL certificate's private-key passphrase. It does NOT cover the other secrets in hMailServer.INI - the SRS and BATV secrets, the OAuth2 HMAC secret, the password pepper, the metrics bearer token, the metrics HTTP Basic password and the Windows service account password are all stored as you typed them. Protecting those is the file's own permissions: hMailServer.INI should be readable only by Administrators and by the account the service runs as.")
                      }
                   }
                });
@@ -2442,12 +2227,8 @@ namespace hMailServer.ControlPanel.Views
                   // Manager disagree, and only one of them is what the machine
                   // actually does. Hence the live readout of the SCM below, and the
                   // exact command rather than a description of one.
-                  Title = "Windows service account",
-                  Blurb = "Which Windows account the hMailServer service logs on as. By default that is LocalSystem - the " +
-                          "most privileged account on the machine - so a flaw reachable through SMTP, IMAP or POP3 is " +
-                          "reachable with full control of the computer. Running the service as a dedicated account is the " +
-                          "single largest reduction in what a compromise is worth, and the recommended one is the " +
-                          "password-less virtual account NT SERVICE\\hMailServer.",
+                  Title = L("Windows service account"),
+                  Blurb = L("Which Windows account the hMailServer service logs on as. By default that is LocalSystem - the most privileged account on the machine - so a flaw reachable through SMTP, IMAP or POP3 is reachable with full control of the computer. Running the service as a dedicated account is the single largest reduction in what a compromise is worth, and the recommended one is the password-less virtual account NT SERVICE\\hMailServer."),
                   Settings =
                   {
                      new TextSetting
@@ -2461,24 +2242,16 @@ namespace hMailServer.ControlPanel.Views
                         // value becomes NULL and ChangeServiceConfig is told to
                         // leave the logon account alone. Clearing the box to go back
                         // to LocalSystem therefore does nothing at all, silently.
-                        Label = "Account for the service to log on as (empty = leave the current account unchanged)",
-                        Placeholder = "NT SERVICE\\hMailServer",
-                        Blurb = "Saving this does not move the service: it is read when the service is REGISTERED, so it " +
-                                "takes effect only after the command in the status line below has been run. Clearing it " +
-                                "does not move the service back to LocalSystem either - on an already-registered service " +
-                                "an empty value means \"leave the account as it is\". To return to LocalSystem, set this " +
-                                "to LocalSystem explicitly and re-register."
+                        Label = L("Account for the service to log on as (empty = leave the current account unchanged)"),
+                        Placeholder = "NT SERVICE\\hMailServer", // no-loc
+                        Blurb = L("Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means \"leave the account as it is\". To return to LocalSystem, set this to LocalSystem explicitly and re-register.")
                      },
                      new SecretSetting
                      {
                         Key = "ServiceAccountPassword",
-                        Label = "Password for that account (leave empty for NT SERVICE\\ and gMSA accounts)",
-                        Hint = "Not needed for a virtual or managed account",
-                        Blurb = "Stored in hMailServer.INI exactly as typed - the DPAPI switch above does not cover it, " +
-                                "and there is nowhere else for the Service Control Manager's registration step to read " +
-                                "it from. That is the strongest reason to use NT SERVICE\\hMailServer or a group managed " +
-                                "service account instead: neither has a password to store. If you do set one here, clear " +
-                                "it again once the registration has been run - the SCM keeps its own copy from then on."
+                        Label = L("Password for that account (leave empty for NT SERVICE\\ and gMSA accounts)"),
+                        Hint = L("Not needed for a virtual or managed account"),
+                        Blurb = L("Stored in hMailServer.INI exactly as typed - the DPAPI switch above does not cover it, and there is nowhere else for the Service Control Manager's registration step to read it from. That is the strongest reason to use NT SERVICE\\hMailServer or a group managed service account instead: neither has a password to store. If you do set one here, clear it again once the registration has been run - the SCM keeps its own copy from then on.")
                      }
                   },
                   Warnings =
@@ -2514,17 +2287,7 @@ namespace hMailServer.ControlPanel.Views
                            return new WarningState
                            {
                               Level = StatusLevel.Information,
-                              Text = "Three things have to be true of that account before the service will start under it, "
-                                     + "and none of them can be done from here. It needs the \"Log on as a service\" right "
-                                     + "(secpol.msc > Local Policies > User Rights Assignment, or your domain policy). It "
-                                     + "needs full control of the data folder, the log folder and - for the built-in "
-                                     + "database - the database folder, plus read access to the program folder AND write "
-                                     + "access to hMailServer.INI inside it, because the service writes its own settings "
-                                     + "there; if that file is read-only to the account, saved settings are lost at the "
-                                     + "next restart with no error. And for an external database it needs whatever that "
-                                     + "server requires, which for MSSQL with integrated security means a login of its "
-                                     + "own. A service that cannot log on reports error 1069 in the Windows event log "
-                                     + "and does not start."
+                              Text = L("Three things have to be true of that account before the service will start under it, and none of them can be done from here. It needs the \"Log on as a service\" right (secpol.msc > Local Policies > User Rights Assignment, or your domain policy). It needs full control of the data folder, the log folder and - for the built-in database - the database folder, plus read access to the program folder AND write access to hMailServer.INI inside it, because the service writes its own settings there; if that file is read-only to the account, saved settings are lost at the next restart with no error. And for an external database it needs whatever that server requires, which for MSSQL with integrated security means a login of its own. A service that cannot log on reports error 1069 in the Windows event log and does not start.")
                            };
                         }
                      }
@@ -2532,53 +2295,47 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Settings that used to be on this page",
-                  Blurb = "This page used to collect every hMailServer.INI value without a home, which meant it was " +
-                          "filed by where the value is stored rather than by what it does - and where a value is " +
-                          "stored is the one thing you never need to know. Each of these now sits with the rest of " +
-                          "its own feature. Nothing was removed and no value changed; only the page it is edited on.",
+                  Title = L("Settings that used to be on this page"),
+                  Blurb = L("This page used to collect every hMailServer.INI value without a home, which meant it was filed by where the value is stored rather than by what it does - and where a value is stored is the one thing you never need to know. Each of these now sits with the rest of its own feature. Nothing was removed and no value changed; only the page it is edited on."),
                   Settings =
                   {
-                     new ElsewhereSetting("antispam", "Greylisting record expiration, and SpamAssassin move-vs-copy"),
-                     new ElsewhereSetting("protocols", "IMAP search time and size limits, and the eight per-protocol idle timeouts"),
-                     new ElsewhereSetting("tls", "TLS session tickets, session cache size, resumption lifetime and ticket-key rotation"),
-                     new ElsewhereSetting("delivery", "Extra delivery attempts per additional MX host"),
-                     new ElsewhereSetting("performance", "Max parallel external POP3 fetch threads"),
-                     new ElsewhereSetting("security", "SRS, BATV and the plain envelope-sender rewrite for forwarded mail")
+                     new ElsewhereSetting("antispam", L("Greylisting record expiration, and SpamAssassin move-vs-copy")),
+                     new ElsewhereSetting("protocols", L("IMAP search time and size limits, and the eight per-protocol idle timeouts")),
+                     new ElsewhereSetting("tls", L("TLS session tickets, session cache size, resumption lifetime and ticket-key rotation")),
+                     new ElsewhereSetting("delivery", L("Extra delivery attempts per additional MX host")),
+                     new ElsewhereSetting("performance", L("Max parallel external POP3 fetch threads")),
+                     new ElsewhereSetting("security", L("SRS, BATV and the plain envelope-sender rewrite for forwarded mail"))
                   }
                });
                break;
 
             case Section.Authentication:
-               TitleText.Text = "Authentication";
-               SubtitleText.Text = "How mailbox users prove who they are: external identity providers, how " +
-                                   "passwords are stored, and where SMTP AUTH is offered (hMailServer.INI). " +
-                                   "Changes take effect after a service restart.";
+               TitleText.Text = L("Authentication");
+               SubtitleText.Text = L("How mailbox users prove who they are: external identity providers, how passwords are stored, and where SMTP AUTH is offered (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
-                  Title = "OAuth2 / external identity provider",
-                  Blurb = "Accept OAuth2 / OpenID Connect bearer tokens (XOAUTH2) from an external identity provider for IMAP, POP3 and SMTP submission, validated against the issuer's signing key. " +
-                          "The mailbox named by the token still has to exist as a local account.",
+                  Title = L("OAuth2 / external identity provider"),
+                  Blurb = L("Accept OAuth2 / OpenID Connect bearer tokens (XOAUTH2) from an external identity provider for IMAP, POP3 and SMTP submission, validated against the issuer's signing key. The mailbox named by the token still has to exist as a local account."),
                   Settings =
                   {
-                     new BoolSetting { Key = "OAuth2Enabled", Default = false, Label = "Accept OAuth2 bearer tokens (XOAUTH2)" },
-                     new BoolSetting { Key = "OAuth2RequireTLS", Default = true, Label = "Require TLS for token authentication" },
-                     new TextSetting { Key = "OAuth2Issuer", Label = "Expected token issuer (iss)", Placeholder = "https://login.microsoftonline.com/<tenant>/v2.0" },
-                     new TextSetting { Key = "OAuth2Audience", Label = "Expected audience (aud)", Placeholder = "your application / client id" },
-                     new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = "Allowed signing algorithms (comma separated)", Placeholder = "RS256, ES256" },
-                     new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = "Claim that holds the mailbox address", Placeholder = "email" },
-                     new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = "PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*", Label = "RSA/EC public key file (PEM, for RS*/ES* tokens)", Placeholder = "Path to the issuer's public key" },
-                     new SecretSetting { Key = "OAuth2HmacSecret", Label = "Shared HMAC secret (only for HS256/384/512 tokens)", Hint = "Only needed for HS* algorithms" },
+                     new BoolSetting { Key = "OAuth2Enabled", Default = false, Label = L("Accept OAuth2 bearer tokens (XOAUTH2)") },
+                     new BoolSetting { Key = "OAuth2RequireTLS", Default = true, Label = L("Require TLS for token authentication") },
+                     new TextSetting { Key = "OAuth2Issuer", Label = L("Expected token issuer (iss)"), Placeholder = "https://login.microsoftonline.com/<tenant>/v2.0" },
+                     new TextSetting { Key = "OAuth2Audience", Label = L("Expected audience (aud)"), Placeholder = L("your application / client id") },
+                     new TextSetting { Key = "OAuth2AllowedAlgorithms", Default = "RS256", Label = L("Allowed signing algorithms (comma separated)"), Placeholder = "RS256, ES256" }, // no-loc
+                     new TextSetting { Key = "OAuth2UsernameClaim", Default = "email", Label = L("Claim that holds the mailbox address"), Placeholder = "email" },
+                     new PathSetting { Key = "OAuth2PublicKeyFile", FileFilter = L("PEM/key files (*.pem;*.crt;*.cer;*.key;*.pub)|*.pem;*.crt;*.cer;*.key;*.pub|All files (*.*)|*.*"), Label = L("RSA/EC public key file (PEM, for RS*/ES* tokens)"), Placeholder = L("Path to the issuer's public key") },
+                     new SecretSetting { Key = "OAuth2HmacSecret", Label = L("Shared HMAC secret (only for HS256/384/512 tokens)"), Hint = L("Only needed for HS* algorithms") },
                      // The two round trips to the provider, both off unless set: its
                      // published keys instead of a hand-copied PEM file, and a live
                      // revocation check after a token verifies.
-                     new TextSetting { Key = "OAuth2JwksUrl", Label = "JWK Set URL (the provider's published signing keys; empty = the key file only)", Placeholder = "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys" },
-                     new TextSetting { Key = "OAuth2JwksCacheSeconds", Default = "3600", Label = "Seconds to keep the JWK Set before re-fetching (a token naming an unknown key id re-fetches at once)" },
-                     new TextSetting { Key = "OAuth2IntrospectionUrl", Label = "Token introspection endpoint (RFC 7662; empty = no revocation check)", Placeholder = "https://idp.example.com/oauth2/introspect" },
-                     new TextSetting { Key = "OAuth2IntrospectionClientId", Label = "Client id this server introspects as" },
-                     new SecretSetting { Key = "OAuth2IntrospectionClientSecret", Label = "Client secret for introspection", Hint = "Issued by the provider together with the client id" },
-                     new TextSetting { Key = "OAuth2IntrospectionCacheSeconds", Default = "300", Label = "Seconds an introspection verdict is reused (never past the token's own expiry)" },
-                     new BoolSetting { Key = "OAuth2IntrospectionFailOpen", Default = false, Label = "Accept a token when the introspection endpoint cannot answer (availability over the revocation check)" }
+                     new TextSetting { Key = "OAuth2JwksUrl", Label = L("JWK Set URL (the provider's published signing keys; empty = the key file only)"), Placeholder = "https://login.microsoftonline.com/<tenant>/discovery/v2.0/keys" },
+                     new TextSetting { Key = "OAuth2JwksCacheSeconds", Default = "3600", Label = L("Seconds to keep the JWK Set before re-fetching (a token naming an unknown key id re-fetches at once)") },
+                     new TextSetting { Key = "OAuth2IntrospectionUrl", Label = L("Token introspection endpoint (RFC 7662; empty = no revocation check)"), Placeholder = "https://idp.example.com/oauth2/introspect" },
+                     new TextSetting { Key = "OAuth2IntrospectionClientId", Label = L("Client id this server introspects as") },
+                     new SecretSetting { Key = "OAuth2IntrospectionClientSecret", Label = L("Client secret for introspection"), Hint = L("Issued by the provider together with the client id") },
+                     new TextSetting { Key = "OAuth2IntrospectionCacheSeconds", Default = "300", Label = L("Seconds an introspection verdict is reused (never past the token's own expiry)") },
+                     new BoolSetting { Key = "OAuth2IntrospectionFailOpen", Default = false, Label = L("Accept a token when the introspection endpoint cannot answer (availability over the revocation check)") }
                   },
                   Warnings =
                   {
@@ -2597,171 +2354,150 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  Title = "Password storage",
-                  Blurb = "How account passwords are hashed, how much work a new hash costs, and the weakest stored hash still allowed to log on. " +
-                          "Existing passwords keep their current hash until they are next changed - or, when a work factor was raised, until they are next used to log on.",
+                  Title = L("Password storage"),
+                  Blurb = L("How account passwords are hashed, how much work a new hash costs, and the weakest stored hash still allowed to log on. Existing passwords keep their current hash until they are next changed - or, when a work factor was raised, until they are next used to log on."),
                   Settings =
                   {
                      new ChoiceSetting
                      {
                         Key = "PreferredHashAlgorithm",
                         Default = 4,
-                        Label = "Password hash for new or changed account passwords",
+                        Label = L("Password hash for new or changed account passwords"),
                         Options = new (int, string)[]
                         {
-                           (5, "Argon2id (memory-hard, recommended)"),
-                           (7, "scrypt (memory-hard, RFC 7914)"),
-                           (4, "PBKDF2 (default)"),
-                           (3, "SHA-256"),
-                           (2, "MD5 (legacy)"),
-                           (1, "Blowfish (legacy)")
+                           (5, L("Argon2id (memory-hard, recommended)")),
+                           (7, L("scrypt (memory-hard, RFC 7914)")),
+                           (4, L("PBKDF2 (default)")),
+                           (3, L("SHA-256")),
+                           (2, L("MD5 (legacy)")),
+                           (1, L("Blowfish (legacy)"))
                         }
                      },
                      new ChoiceSetting
                      {
                         Key = "MinimumAcceptedHashAlgorithm",
                         Default = 0,
-                        Label = "Reject logins using a weaker stored hash than",
+                        Label = L("Reject logins using a weaker stored hash than"),
                         Options = new (int, string)[]
                         {
-                           (0, "Accept any stored hash"),
-                           (3, "SHA-256 or stronger"),
-                           (4, "PBKDF2 or stronger"),
-                           (5, "Argon2id or scrypt only")
+                           (0, L("Accept any stored hash")),
+                           (3, L("SHA-256 or stronger")),
+                           (4, L("PBKDF2 or stronger")),
+                           (5, L("Argon2id or scrypt only"))
                         }
                      },
-                     new SecretSetting { Key = "PasswordPepper", Label = "Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords", Hint = "Server-wide secret mixed into password hashes" },
-                     new TextSetting { Key = "PasswordHashIterations", Default = "0", Placeholder = "0 = 210,000", Label = "PBKDF2 iterations for new hashes (0 = the built-in 210,000; 10,000 to 10,000,000)" },
-                     new TextSetting { Key = "PasswordHashMemoryKB", Default = "0", Placeholder = "0 = 19,456", Label = "Argon2id memory for new hashes, in KiB (0 = the built-in 19,456; 4,096 to 1,048,576)" },
-                     new TextSetting { Key = "PasswordHashTimeCost", Default = "0", Placeholder = "0 = 2", Label = "Argon2id passes for new hashes (0 = the built-in 2; 1 to 20)" }
+                     new SecretSetting { Key = "PasswordPepper", Label = L("Password pepper — WARNING: set before creating accounts; changing it later invalidates ALL existing passwords"), Hint = L("Server-wide secret mixed into password hashes") },
+                     new TextSetting { Key = "PasswordHashIterations", Default = "0", Placeholder = "0 = 210,000", Label = L("PBKDF2 iterations for new hashes (0 = the built-in 210,000; 10,000 to 10,000,000)") },
+                     new TextSetting { Key = "PasswordHashMemoryKB", Default = "0", Placeholder = "0 = 19,456", Label = L("Argon2id memory for new hashes, in KiB (0 = the built-in 19,456; 4,096 to 1,048,576)") },
+                     new TextSetting { Key = "PasswordHashTimeCost", Default = "0", Placeholder = "0 = 2", Label = L("Argon2id passes for new hashes (0 = the built-in 2; 1 to 20)") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "SMTP authentication",
-                  Blurb = "AUTH is normally offered on every SMTP port. List the local TCP ports where it should not be, " +
-                          "for example a port 25 that only accepts inbound mail from other servers.",
+                  Title = L("SMTP authentication"),
+                  Blurb = L("AUTH is normally offered on every SMTP port. List the local TCP ports where it should not be, for example a port 25 that only accepts inbound mail from other servers."),
                   Settings =
                   {
-                     new TextSetting { Key = "DisableAUTHList", Label = "Do not offer AUTH on these local TCP ports (comma separated)", Placeholder = "25" }
+                     new TextSetting { Key = "DisableAUTHList", Label = L("Do not offer AUTH on these local TCP ports (comma separated)"), Placeholder = "25" }
                   }
                });
                break;
 
             case Section.Dns:
-               TitleText.Text = "DNS resolver";
-               SubtitleText.Text = "How this server resolves MX, PTR, SPF, DKIM, DMARC and blacklist lookups " +
-                                   "(hMailServer.INI). Changes take effect after a service restart.";
+               TitleText.Text = L("DNS resolver");
+               SubtitleText.Text = L("How this server resolves MX, PTR, SPF, DKIM, DMARC and blacklist lookups (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
-                  Title = "Name servers",
-                  Blurb = "Which resolver hMailServer queries. Leave empty to use the name servers Windows is configured with. " +
-                          "The override takes a single IPv4 address and is used on port 53; DNSSEC validation and its trust " +
-                          "anchors are on the Transport security page.",
+                  Title = L("Name servers"),
+                  Blurb = L("Which resolver hMailServer queries. Leave empty to use the name servers Windows is configured with. The override takes a single IPv4 address and is used on port 53; DNSSEC validation and its trust anchors are on the Transport security page."),
                   Settings =
                   {
-                     new TextSetting { Key = "DNSServer", Label = "Override DNS server (empty = the name servers Windows uses)", Placeholder = "1.1.1.1" }
+                     new TextSetting { Key = "DNSServer", Label = L("Override DNS server (empty = the name servers Windows uses)"), Placeholder = "1.1.1.1" }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "DNS cache",
+                  Title = L("DNS cache"),
                   // Corrected 2026-08-15: the previous text described an in-process cache that
                   // keeps answers "in memory for their TTL". There is no such cache anywhere in
                   // the server. The setting toggles DNS_QUERY_BYPASS_CACHE on the DnsQueryEx
                   // call - i.e. whether WINDOWS' resolver cache is consulted - and a custom DNS
                   // server forces the bypass regardless, because the system cache would answer
                   // from the wrong resolver.
-                  Blurb = "Whether lookups may be answered from the Windows DNS resolver cache. Off, every lookup goes to " +
-                          "the network. Ignored when an override DNS server is set above — those lookups always bypass " +
-                          "the system cache, because its answers would come from the wrong resolver.",
+                  Blurb = L("Whether lookups may be answered from the Windows DNS resolver cache. Off, every lookup goes to the network. Ignored when an override DNS server is set above — those lookups always bypass the system cache, because its answers would come from the wrong resolver."),
                   Settings =
                   {
-                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = "Answer from the Windows DNS resolver cache when possible" }
+                     new BoolSetting { Key = "UseDNSCache", Default = true, Label = L("Answer from the Windows DNS resolver cache when possible") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "DNS blacklist checks",
-                  Blurb = "When during the SMTP conversation blacklist lookups happen. Which blacklists are queried is on the " +
-                          "DNS blacklists page.",
+                  Title = L("DNS blacklist checks"),
+                  Blurb = L("When during the SMTP conversation blacklist lookups happen. Which blacklists are queried is on the DNS blacklists page."),
                   Settings =
                   {
-                     new BoolSetting { Key = "DNSBLChecksAfterMailFrom", Default = true, Label = "Run DNSBL checks after MAIL FROM (rather than at connect)" }
+                     new BoolSetting { Key = "DNSBLChecksAfterMailFrom", Default = true, Label = L("Run DNSBL checks after MAIL FROM (rather than at connect)") }
                   }
                });
                break;
 
             case Section.WebServices:
-               TitleText.Text = "Web services & client autoconfiguration";
-               SubtitleText.Text = "The built-in HTTP listener that serves mail-client autoconfiguration and MTA-STS " +
-                                   "policies for your local domains (hMailServer.INI). Changes take effect after a " +
-                                   "service restart.";
+               TitleText.Text = L("Web services & client autoconfiguration");
+               SubtitleText.Text = L("The built-in HTTP listener that serves mail-client autoconfiguration and MTA-STS policies for your local domains (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
-                  Title = "Listener",
-                  Blurb = "Nothing below is served until a port is set here. The server answers on either port, but an " +
-                          "MTA-STS policy is only valid over HTTPS and Outlook only accepts autodiscover over HTTPS — " +
-                          "so in practice set the HTTPS port and a certificate covering the host names clients use.",
+                  Title = L("Listener"),
+                  Blurb = L("Nothing below is served until a port is set here. The server answers on either port, but an MTA-STS policy is only valid over HTTPS and Outlook only accepts autodiscover over HTTPS — so in practice set the HTTPS port and a certificate covering the host names clients use."),
                   Settings =
                   {
-                     new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = "HTTP port (80 to enable, 0 = disabled)" },
-                     new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = "HTTPS port (443 to enable, 0 = disabled)" },
-                     new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = "Bind address" },
-                     new PathSetting { Key = "WebServicesCertificateFile", FileFilter = "PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*", Label = "TLS certificate file (PEM, optional)", Placeholder = "Falls back to the ACME certificate" },
-                     new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*", Label = "TLS private key file (PEM, optional)" }
+                     new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = L("HTTP port (80 to enable, 0 = disabled)") },
+                     new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = L("HTTPS port (443 to enable, 0 = disabled)") },
+                     new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = L("Bind address") },
+                     new PathSetting { Key = "WebServicesCertificateFile", FileFilter = L("PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*"), Label = L("TLS certificate file (PEM, optional)"), Placeholder = L("Falls back to the ACME certificate") },
+                     new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = L("PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*"), Label = L("TLS private key file (PEM, optional)") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Client autoconfiguration (autoconfig & autodiscover)",
-                  Blurb = "Hands mail clients the right host names, ports and security settings automatically: Thunderbird-style " +
-                          "autoconfig and Outlook autodiscover, for every local domain. Point autoconfig.<domain> and " +
-                          "autodiscover.<domain> at this server in DNS.",
+                  Title = L("Client autoconfiguration (autoconfig & autodiscover)"),
+                  Blurb = L("Hands mail clients the right host names, ports and security settings automatically: Thunderbird-style autoconfig and Outlook autodiscover, for every local domain. Point autoconfig.<domain> and autodiscover.<domain> at this server in DNS."),
                   Settings =
                   {
-                     new BoolSetting { Key = "AutoconfigEnabled", Default = true, Label = "Thunderbird autoconfig + Outlook autodiscover" },
-                     new TextSetting { Key = "AutoconfigClientHost", Label = "Host name clients connect to (empty = server host name)" }
+                     new BoolSetting { Key = "AutoconfigEnabled", Default = true, Label = L("Thunderbird autoconfig + Outlook autodiscover") },
+                     new TextSetting { Key = "AutoconfigClientHost", Label = L("Host name clients connect to (empty = server host name)") }
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "MTA-STS policy hosting",
-                  Blurb = "Publishes https://mta-sts.<domain>/.well-known/mta-sts.txt so other servers require TLS when they " +
-                          "deliver to you. Honouring other domains' policies is on the Transport security page.",
+                  Title = L("MTA-STS policy hosting"),
+                  Blurb = L("Publishes https://mta-sts.<domain>/.well-known/mta-sts.txt so other servers require TLS when they deliver to you. Honouring other domains' policies is on the Transport security page."),
                   Settings =
                   {
-                     new BoolSetting { Key = "MtaStsHostingEnabled", Default = true, Label = "Serve MTA-STS policies for local domains" },
-                     new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = "MTA-STS policy mode (enforce / testing / none)" },
-                     new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = "Policy max age (seconds; default 604800 = 7 days)" },
-                     new TextSetting { Key = "MtaStsPolicyMx", Label = "Policy MX host patterns (empty = derive from each domain's MX)", Placeholder = "mail.yourdomain.com, *.yourdomain.com" }
+                     new BoolSetting { Key = "MtaStsHostingEnabled", Default = true, Label = L("Serve MTA-STS policies for local domains") },
+                     new TextSetting { Key = "MtaStsPolicyMode", Default = "enforce", Label = L("MTA-STS policy mode (enforce / testing / none)") },
+                     new TextSetting { Key = "MtaStsPolicyMaxAge", Default = "604800", Label = L("Policy max age (seconds; default 604800 = 7 days)") },
+                     new TextSetting { Key = "MtaStsPolicyMx", Label = L("Policy MX host patterns (empty = derive from each domain's MX)"), Placeholder = "mail.yourdomain.com, *.yourdomain.com" } // no-loc
                   }
                });
                cards_.Add(new CardDef
                {
-                  Title = "Calendar and contacts discovery (CalDAV / CardDAV)",
-                  Blurb = "hMailServer does NOT implement CalDAV or CardDAV. These settings only answer the well-known " +
-                          "discovery URLs (RFC 6764) with a redirect to the server that does, so a client configured " +
-                          "with a user's mail address finds their calendar without being told a second address. Leave " +
-                          "both empty unless you run such a server: empty means the discovery URLs answer 404, which " +
-                          "is the honest response when there is nothing to point at. They need the web services " +
-                          "listener above to be running, like everything else on this page.",
+                  Title = L("Calendar and contacts discovery (CalDAV / CardDAV)"),
+                  Blurb = L("hMailServer does NOT implement CalDAV or CardDAV. These settings only answer the well-known discovery URLs (RFC 6764) with a redirect to the server that does, so a client configured with a user's mail address finds their calendar without being told a second address. Leave both empty unless you run such a server: empty means the discovery URLs answer 404, which is the honest response when there is nothing to point at. They need the web services listener above to be running, like everything else on this page."),
                   Settings =
                   {
                      new TextSetting
                      {
                         Key = "CalDavRedirectUrl",
-                        Label = "Redirect /.well-known/caldav to (empty = answer 404)",
+                        Label = L("Redirect /.well-known/caldav to (empty = answer 404)"),
                         Placeholder = "https://calendar.yourdomain.com/dav/",
-                        Blurb = "Must be an absolute URL. A relative one is refused and the discovery URL answers 404 instead, " +
-                                "with the reason reported once in the error log."
+                        Blurb = L("Must be an absolute URL. A relative one is refused and the discovery URL answers 404 instead, with the reason reported once in the error log.")
                      },
                      new TextSetting
                      {
                         Key = "CardDavRedirectUrl",
-                        Label = "Redirect /.well-known/carddav to (empty = answer 404)",
+                        Label = L("Redirect /.well-known/carddav to (empty = answer 404)"),
                         Placeholder = "https://contacts.yourdomain.com/dav/",
-                        Blurb = "Must be an absolute URL, as above."
+                        Blurb = L("Must be an absolute URL, as above.")
                      }
                   }
                });
@@ -2809,8 +2545,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (!store_.IsAvailable)
          {
-            SubtitleText.Text = "hMailServer.INI was not found on this machine. " +
-                                "These settings can only be edited on the server itself.";
+            SubtitleText.Text = L("hMailServer.INI was not found on this machine. These settings can only be edited on the server itself.");
             SaveButton.IsEnabled = false;
             return;
          }
@@ -2863,7 +2598,7 @@ namespace hMailServer.ControlPanel.Views
 
          RefreshWarnings_();
 
-         StatusText.Text = "Editing " + store_.IniPath;
+         StatusText.Text = F("Editing {0}", store_.IniPath);
       }
 
       /// <summary>
@@ -2982,16 +2717,16 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save: " + ex.Message, "Control Panel",
+            MessageBox.Show(F("Could not save: {0}", ex.Message), L("Control Panel"),
                MessageBoxButton.OK, MessageBoxImage.Error);
             return;
          }
 
-         StatusText.Text = "Saved " + DateTime.Now.ToLongTimeString() + " - restart the service to apply.";
+         StatusText.Text = F("Saved {0} - restart the service to apply.", DateTime.Now.ToLongTimeString());
 
          if (MessageBox.Show(
-                "Settings saved. The hMailServer service must be restarted for the changes to take effect.\n\nRestart it now?",
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
+                L("Settings saved. The hMailServer service must be restarted for the changes to take effect.\n\nRestart it now?"),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes)
          {
             RestartService();
          }
@@ -2999,18 +2734,18 @@ namespace hMailServer.ControlPanel.Views
 
       private async void RestartService()
       {
-         StatusText.Text = "Restarting the hMailServer service...";
+         StatusText.Text = L("Restarting the hMailServer service...");
 
          string error = await Task.Run(() => TryRestartService());
          if (error != null)
          {
-            StatusText.Text = "The service could not be restarted.";
-            MessageBox.Show("Could not restart the service: " + error,
-               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            StatusText.Text = L("The service could not be restarted.");
+            MessageBox.Show(F("Could not restart the service: {0}", error),
+               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
-         StatusText.Text = "Service restarted - settings are live.";
+         StatusText.Text = L("Service restarted - settings are live.");
          Reattach();
       }
 
@@ -3050,7 +2785,7 @@ namespace hMailServer.ControlPanel.Views
             var startInfo = new System.Diagnostics.ProcessStartInfo
             {
                FileName = "cmd.exe",
-               Arguments = "/c net stop hMailServer & net start hMailServer",
+               Arguments = "/c net stop hMailServer & net start hMailServer", // no-loc
                UseShellExecute = true,
                Verb = "runas",
                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
@@ -3065,7 +2800,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
          {
-            return "the elevation prompt was cancelled.";
+            return L("the elevation prompt was cancelled.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -3093,11 +2828,10 @@ namespace hMailServer.ControlPanel.Views
                return;
 
             session.Invalidate();
-            StatusText.Text = "Service restarted, but the Control Panel could not reconnect.";
+            StatusText.Text = L("Service restarted, but the Control Panel could not reconnect.");
             MessageBox.Show(
-               "The service was restarted but the Control Panel could not reconnect to it: " + error +
-               "\n\nIt will keep trying as you use the application.",
-               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+               F("The service was restarted but the Control Panel could not reconnect to it: {0}\n\nIt will keep trying as you use the application.", error),
+               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
          }
          finally
          {
