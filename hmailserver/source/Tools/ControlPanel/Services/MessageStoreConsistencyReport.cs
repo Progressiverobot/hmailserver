@@ -39,8 +39,8 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Name of the report file inside the configured log folder.</summary>
       public const string FileName = "hMailServer_messagestore_consistency.report";
 
-      private const string GeneratedPrefix = "# Generated:";
-      private const string MissingPrefix = "# Missing files:";
+      private const string GeneratedPrefix = "# Generated:"; // no-loc
+      private const string MissingPrefix = "# Missing files:"; // no-loc
 
       /// <summary>Timestamp string from the report header, or null when absent.</summary>
       public string Generated { get; private set; }

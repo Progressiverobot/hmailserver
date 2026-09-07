@@ -47,11 +47,11 @@ namespace hMailServer.ControlPanel.Services
       /// single cheapest "looks native" property in the application; classic
       /// Segoe UI is the Windows 10 fallback. Nothing set any FontFamily at all
       /// before this existed, which left classic Segoe UI everywhere.</summary>
-      public const string UiFontFamily = "Segoe UI Variable Text, Segoe UI";
+      public const string UiFontFamily = "Segoe UI Variable Text, Segoe UI"; // no-loc
 
       /// <summary>The one monospace stack. There were four divergent ones
       /// (Consolas alone, two orderings of Cascadia/Consolas, and one with a
       /// css-ish "monospace" entry WPF ignores).</summary>
-      public const string MonoFontFamily = "Cascadia Mono, Consolas";
+      public const string MonoFontFamily = "Cascadia Mono, Consolas"; // no-loc
    }
 }

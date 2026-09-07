@@ -45,7 +45,7 @@ namespace hMailServer.ControlPanel.Services
          {
             PrivateKeyPem = privatePem + Environment.NewLine,
             DnsHost = selector + "._domainkey." + domain,
-            DnsTxtValue = "v=DKIM1; k=rsa; p=" + publicBase64
+            DnsTxtValue = "v=DKIM1; k=rsa; p=" + publicBase64 // no-loc
          };
       }
    }

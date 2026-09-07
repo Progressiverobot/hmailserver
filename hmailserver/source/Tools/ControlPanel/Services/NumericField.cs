@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using static hMailServer.ControlPanel.Services.Loc;
+
 namespace hMailServer.ControlPanel.Services
 {
    /// <summary>
@@ -24,13 +26,13 @@ namespace hMailServer.ControlPanel.Services
 
          if (!int.TryParse(trimmed, out int parsed))
          {
-            error = label + " must be a whole number.";
+            error = F("{0} must be a whole number.", label);
             return false;
          }
 
          if (parsed < min || parsed > max)
          {
-            error = string.Format("{0} must be between {1} and {2}.", label, min, max);
+            error = F("{0} must be between {1} and {2}.", label, min, max);
             return false;
          }
 

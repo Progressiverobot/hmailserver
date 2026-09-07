@@ -13,7 +13,7 @@ namespace hMailServer.ControlPanel.Services
    /// </summary>
    public class IniFeatureStore
    {
-      private const string Section = "Settings";
+      private const string Section = "Settings"; // no-loc
 
       public string IniPath { get; }
 
@@ -89,7 +89,7 @@ namespace hMailServer.ControlPanel.Services
          try
          {
             using var searcher = new System.Management.ManagementObjectSearcher(
-               "SELECT PathName FROM Win32_Service WHERE Name='hMailServer'");
+               "SELECT PathName FROM Win32_Service WHERE Name='hMailServer'"); // no-loc
             foreach (System.Management.ManagementObject service in searcher.Get())
             {
                string pathName = service["PathName"] as string;

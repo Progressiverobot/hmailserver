@@ -23,7 +23,7 @@ namespace hMailServer.ControlPanel.Services
    public static class LanguageChoice
    {
       private const string RegistryPath = @"Software\hMailServer\ControlPanel";
-      private const string ValueName = "Language";
+      private const string ValueName = "Language"; // no-loc
 
       // The catalogue: Resources/Strings.resx (English, generated) and one
       // Strings.<culture>.resx per language, compiled by the SDK into satellite

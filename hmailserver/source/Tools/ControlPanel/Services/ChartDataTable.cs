@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -352,11 +353,10 @@ namespace hMailServer.ControlPanel.Services
                                          IReadOnlyList<ChartSeriesSummary> summaries, bool hasData)
       {
          if (!hasData)
-            return "No samples yet.";
+            return L("No samples yet.");
 
          var text = new StringBuilder();
-         text.Append("Latest ").Append(Values_(definition, summaries, true));
-         text.Append("; peak ").Append(Values_(definition, summaries, false));
+         text.Append(F("Latest {0}; peak {1}", Values_(definition, summaries, true), Values_(definition, summaries, false)));
 
          if (definition.Unit.Length > 0)
             text.Append(' ').Append(definition.Unit);
@@ -364,8 +364,7 @@ namespace hMailServer.ControlPanel.Services
          int samples = 0;
          foreach (ChartSeriesSummary summary in summaries)
             samples = Math.Max(samples, summary.SampleCount);
-         text.Append("; ").Append(samples.ToString(CultureInfo.CurrentCulture));
-         text.Append(samples == 1 ? " sample." : " samples.");
+         text.Append("; ").Append(samples == 1 ? L("1 sample.") : F("{0} samples.", samples));
 
          return text.ToString();
       }

@@ -87,14 +87,14 @@ namespace hMailServer.ControlPanel.Views
          var stack = new StackPanel();
          stack.Children.Add(new TextBlock
          {
-            Text = intent.Heading,
+            Text = L(intent.Heading),
             FontSize = 14,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 3)
          });
          stack.Children.Add(new TextBlock
          {
-            Text = intent.Blurb,
+            Text = L(intent.Blurb),
             FontSize = Typography.Caption,
             Opacity = 0.72,
             TextWrapping = TextWrapping.Wrap
@@ -111,7 +111,7 @@ namespace hMailServer.ControlPanel.Views
             VerticalContentAlignment = VerticalAlignment.Top,
             Cursor = System.Windows.Input.Cursors.Hand
          };
-         System.Windows.Automation.AutomationProperties.SetName(btn, intent.Heading);
+         System.Windows.Automation.AutomationProperties.SetName(btn, L(intent.Heading));
          btn.Click += (s, e) => (Application.Current.MainWindow as MainWindow)?.NavigateTo(intent.Page);
          return btn;
       }

@@ -181,13 +181,13 @@ namespace hMailServer.ControlPanel.Services
       /// assertion alike.
       /// </summary>
       public static string LocationOf(string key)
-         => string.Join(" > ", PathTo(key).Select(n => n.Title));
+         => string.Join(" > ", PathTo(key).Select(n => L(n.Title)));
 
       /// <summary>The title of the group a page sits in, or "" at the top level.</summary>
       public static string GroupOf(string key)
       {
          NavNode node = Find(key);
-         return node?.Parent != null ? node.Parent.Title : "";
+         return node?.Parent != null ? L(node.Parent.Title) : "";
       }
 
       /// <summary>

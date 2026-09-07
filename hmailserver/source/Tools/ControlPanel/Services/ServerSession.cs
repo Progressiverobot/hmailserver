@@ -5,6 +5,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.ServiceProcess;
 using System.Threading;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -160,13 +161,13 @@ namespace hMailServer.ControlPanel.Services
          {
             if (password_ == null)
             {
-               error = "the session has no stored credentials to reconnect with.";
+               error = L("the session has no stored credentials to reconnect with.");
                return false;
             }
 
             if (healing_)
             {
-               error = "a reconnect is already in progress.";
+               error = L("a reconnect is already in progress.");
                return false;
             }
 
@@ -200,7 +201,7 @@ namespace hMailServer.ControlPanel.Services
                   // still-starting server is more useful than none.
                   if (attempt < total - 1 && !IsServerReady(app))
                   {
-                     error = "the server is still starting up.";
+                     error = L("the server is still starting up.");
                      Release((object)app);
                      continue;
                   }
@@ -471,7 +472,7 @@ namespace hMailServer.ControlPanel.Services
 
             if (comType == null)
             {
-               error = "hMailServer COM API is not registered on the target machine.";
+               error = L("hMailServer COM API is not registered on the target machine.");
                return false;
             }
 
@@ -502,8 +503,8 @@ namespace hMailServer.ControlPanel.Services
                }
 
                error = secondFactorRequired
-                  ? "This server requires a one-time code for the administrator."
-                  : "Authentication failed. Check the user name and password.";
+                  ? L("This server requires a one-time code for the administrator.")
+                  : L("Authentication failed. Check the user name and password.");
                return false;
             }
 
@@ -515,7 +516,7 @@ namespace hMailServer.ControlPanel.Services
          catch (COMException ex)
          {
             error = ex.ErrorCode == -2147023174
-               ? "Unable to reach the server (RPC unavailable)."
+               ? L("Unable to reach the server (RPC unavailable).")
                : ex.Message;
             return false;
          }
@@ -626,19 +627,18 @@ namespace hMailServer.ControlPanel.Services
          if (IsTransportFailure(ex))
          {
             Current?.Invalidate();
-            return "the connection to the hMailServer service was lost - it was most likely restarted. " +
-                   "The Control Panel will reconnect by itself; press Reload to try again.";
+            return L("the connection to the hMailServer service was lost - it was most likely restarted. The Control Panel will reconnect by itself; press Reload to try again.");
          }
 
          Exception real = ex;
          while (real.InnerException != null)
             real = real.InnerException;
-         string msg = string.IsNullOrEmpty(real.Message) ? (ex.Message ?? "Unknown error.") : real.Message;
+         string msg = string.IsNullOrEmpty(real.Message) ? (ex.Message ?? L("Unknown error.")) : real.Message;
 
          if (msg.IndexOf("connection to the database", StringComparison.OrdinalIgnoreCase) >= 0)
-            return "the server cannot reach its database. Check the database connection and the hMailServer error log, then press Reload. (" + msg + ")";
+            return F("the server cannot reach its database. Check the database connection and the hMailServer error log, then press Reload. ({0})", msg);
          if (msg.IndexOf("do not have access", StringComparison.OrdinalIgnoreCase) >= 0)
-            return "you must connect with the hMailServer server-administrator account to view or change these settings. (" + msg + ")";
+            return F("you must connect with the hMailServer server-administrator account to view or change these settings. ({0})", msg);
          return msg;
       }
    }

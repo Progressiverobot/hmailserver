@@ -13,7 +13,7 @@ namespace hMailServer.ControlPanel.Services
    public static class PasswordGenerator
    {
       private const string Lower = "abcdefghijkmnpqrstuvwxyz";
-      private const string Upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+      private const string Upper = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no-loc
       private const string Digits = "23456789";
       private const string Symbols = "!@#$%^&*-_=+?";
 
