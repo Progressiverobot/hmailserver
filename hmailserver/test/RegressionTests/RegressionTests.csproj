@@ -661,6 +661,7 @@
     <Compile Include="API\UpdateApply.cs" />
     <Compile Include="API\UpdateSchedule.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
+    <Compile Include="API\RestApiSelfService.cs" />
     <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />
     <Compile Include="SMTP\DistributionListHeaders.cs" />

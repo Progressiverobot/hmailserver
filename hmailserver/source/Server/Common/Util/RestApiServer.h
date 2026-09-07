@@ -67,6 +67,7 @@
 namespace HM
 {
    class IPAddress;
+   class Account;
 
    class RestApiServer
    {
@@ -89,7 +90,11 @@ namespace HM
       {
          AuthenticationFailed = 0,
          AuthenticatedAsAdministrator = 1,
-         AuthenticatedWithApiKey = 2
+         AuthenticatedWithApiKey = 2,
+
+         // An account's own credentials, for the account's own endpoints
+         // under /api/v1/me. Reaches nothing else.
+         AuthenticatedAsAccount = 3
       };
 
       // What a request asks for, decided once from the method and the path.
@@ -150,6 +155,11 @@ namespace HM
          RouteArchiveGet,
          RouteArchiveHold,
          RouteArchiveRelease,
+         // The account's own endpoints: answered to the account's credentials
+         // and to nothing else.
+         RouteMe,
+         RouteMePassword,
+         RouteMeVacation,
          RouteOpenApi
       };
 
@@ -201,6 +211,13 @@ namespace HM
 
          bool read_only;
          std::vector<String> domains;
+
+         // Set when result is AuthenticatedAsAccount.
+         std::shared_ptr<const Account> account;
+
+         // Where the request came from, for the handlers that count a
+         // failure against it.
+         IPAddress peer;
       };
 
       enum AuthorizationResult
@@ -229,6 +246,13 @@ namespace HM
 
       static bool IsMutatingRoute_(RouteKind kind);
       static bool IsApiKeyRoute_(RouteKind kind);
+      static bool IsSelfServiceRoute_(RouteKind kind);
+      static bool AuthenticateAccount_(const String &username, const String &password, const IPAddress &peer_address, Caller &caller);
+      static HttpResponse HandleMe_(const Caller &caller);
+      static HttpResponse HandleMePassword_(const Caller &caller, const AnsiString &request);
+      static HttpResponse HandleMeVacation_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandlePortalPage_();
+      static HttpResponse HandlePortalScript_();
       static bool IsDomainAllowed_(const std::vector<String> &domains, const String &domainName);
 
       static Caller Authenticate_(const AnsiString &request, const IPAddress &peer_address);
