@@ -35,6 +35,9 @@
 #include "../../IMAP/IMAPSpecialUse.h"
 #include "../../IMAP/MessagesContainer.h"
 #include "../../SMTP/RecipientParser.h"
+#include "../Persistence/PersistentMessageIndex.h"
+#include <iterator>
+#include <set>
 #include "../BO/MessageRecipients.h"
 #include "../BO/MessageRecipient.h"
 #include "Unicode.h"
@@ -1478,6 +1481,9 @@ namespace HM
          case RouteMeMessageAttachment:
             return HandleMeMessageAttachment_(caller, route.message_id, route.attachment_index);
 
+         case RouteMeSearch:
+            return HandleMeSearch_(caller, route.query);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1597,6 +1603,12 @@ namespace HM
                route.kind = RouteMeFolderMessages;
          }
 
+         return;
+      }
+
+      if (path == "/api/v1/me/search" && method == "GET")
+      {
+         route.kind = RouteMeSearch;
          return;
       }
 
@@ -2596,12 +2608,12 @@ namespace HM
          AnsiString item;
          item.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"scope\":\"%hs\",\"domains\":\"%hs\","
                      "\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"expired\":%hs}",
-            JsonEscape_(AnsiString(key.id)).c_str(),
-            JsonEscape_(AnsiString(key.label)).c_str(),
+            JsonEscape_(Utf8_(key.id)).c_str(),
+            JsonEscape_(Utf8_(key.label)).c_str(),
             key.read_only ? ApiKeyScopeReadOnlyNarrow : ApiKeyScopeFullNarrow,
-            JsonEscape_(AnsiString(StringParser::JoinVector(key.domains, _T(",")))).c_str(),
-            JsonEscape_(AnsiString(key.expires)).c_str(),
-            JsonEscape_(AnsiString(key.allowed_from)).c_str(),
+            JsonEscape_(Utf8_(StringParser::JoinVector(key.domains, _T(",")))).c_str(),
+            JsonEscape_(Utf8_(key.expires)).c_str(),
+            JsonEscape_(Utf8_(key.allowed_from)).c_str(),
             IsExpired_(key.expires) ? "true" : "false");
 
          if (count > 0)
@@ -2851,10 +2863,10 @@ namespace HM
       AnsiString body;
       body.Format("{\"id\":\"%hs\",\"label\":\"%hs\",\"scope\":\"%hs\",\"domains\":\"%hs\","
                   "\"expires\":\"%hs\",\"allowed_from\":\"%hs\",\"key\":\"%hs\"}",
-         JsonEscape_(AnsiString(id)).c_str(),
+         JsonEscape_(Utf8_(id)).c_str(),
          JsonEscape_(label).c_str(),
          readOnly ? ApiKeyScopeReadOnlyNarrow : ApiKeyScopeFullNarrow,
-         JsonEscape_(AnsiString(normalizedDomains)).c_str(),
+         JsonEscape_(Utf8_(normalizedDomains)).c_str(),
          JsonEscape_(expires).c_str(),
          JsonEscape_(allowedFrom).c_str(),
          JsonEscape_(token).c_str());
@@ -2988,7 +3000,7 @@ namespace HM
 
          AnsiString entry;
          entry.Format("{\"name\":\"%hs\",\"active\":%hs}",
-            JsonEscape_(AnsiString(domain->GetName())).c_str(),
+            JsonEscape_(Utf8_(domain->GetName())).c_str(),
             domain->GetIsActive() ? "true" : "false");
 
          body += entry;
@@ -3030,7 +3042,7 @@ namespace HM
 
          AnsiString entry;
          entry.Format("{\"address\":\"%hs\",\"active\":%hs}",
-            JsonEscape_(AnsiString(account->GetAddress())).c_str(),
+            JsonEscape_(Utf8_(account->GetAddress())).c_str(),
             account->GetActive() ? "true" : "false");
 
          body += entry;
@@ -3127,7 +3139,7 @@ namespace HM
             LOG_APPLICATION("RestApi: Refused to create account " + String(address) + ": " + saveError);
 
             AnsiString body;
-            body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError)).c_str());
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError)).c_str());
 
             return BuildResponse_(400, body);
          }
@@ -3294,13 +3306,13 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"sender\":\"%hs\",\"recipients\":\"%hs\",\"subject\":\"%hs\",\"reason\":\"%hs\",\"score\":%d,\"size\":%d,\"created\":\"%hs\"}",
             message.id,
-            JsonEscape_(AnsiString(message.sender)).c_str(),
-            JsonEscape_(AnsiString(message.recipients)).c_str(),
-            JsonEscape_(AnsiString(message.subject)).c_str(),
-            JsonEscape_(AnsiString(message.reason)).c_str(),
+            JsonEscape_(Utf8_(message.sender)).c_str(),
+            JsonEscape_(Utf8_(message.recipients)).c_str(),
+            JsonEscape_(Utf8_(message.subject)).c_str(),
+            JsonEscape_(Utf8_(message.reason)).c_str(),
             message.score,
             message.size,
-            JsonEscape_(AnsiString(message.created)).c_str());
+            JsonEscape_(Utf8_(message.created)).c_str());
 
          body += entry;
          count++;
@@ -3325,7 +3337,7 @@ namespace HM
       if (!QuarantineStore::Release(id, error))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(error)).c_str());
          return BuildResponse_(500, body);
       }
 
@@ -3375,8 +3387,8 @@ namespace HM
 
          AnsiString entry;
          entry.Format("{\"name\":\"%hs\",\"value\":\"%hs\",\"active\":%hs}",
-            JsonEscape_(AnsiString(alias->GetName())).c_str(),
-            JsonEscape_(AnsiString(alias->GetValue())).c_str(),
+            JsonEscape_(Utf8_(alias->GetName())).c_str(),
+            JsonEscape_(Utf8_(alias->GetValue())).c_str(),
             alias->GetIsActive() ? "true" : "false");
 
          body += entry;
@@ -3414,9 +3426,9 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"lower\":\"%hs\",\"upper\":\"%hs\",\"priority\":%d",
             range->GetID(),
-            JsonEscape_(AnsiString(range->GetName())).c_str(),
-            JsonEscape_(AnsiString(range->GetLowerIPString())).c_str(),
-            JsonEscape_(AnsiString(range->GetUpperIPString())).c_str(),
+            JsonEscape_(Utf8_(range->GetName())).c_str(),
+            JsonEscape_(Utf8_(range->GetLowerIPString())).c_str(),
+            JsonEscape_(Utf8_(range->GetUpperIPString())).c_str(),
             (int) range->GetPriority());
          // The flags one at a time: Format has a fixed arity and this row has
          // more of them than it takes.
@@ -3517,7 +3529,7 @@ namespace HM
       if (!PersistentSecurityRange::SaveObject(range, result, PersistenceModeNormal))
       {
          AnsiString error;
-         error.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(result)).c_str());
+         error.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(result)).c_str());
          return BuildResponse_(400, error);
       }
 
@@ -3577,7 +3589,7 @@ namespace HM
                   continue;
                if (memberCount > 0)
                   members += ",";
-               members += "\"" + JsonEscape_(AnsiString(recipient->GetAddress())) + "\"";
+               members += "\"" + JsonEscape_(Utf8_(recipient->GetAddress())) + "\"";
                memberCount++;
             }
          }
@@ -3588,7 +3600,7 @@ namespace HM
 
          AnsiString entry;
          entry.Format("{\"address\":\"%hs\",\"active\":%hs,\"require_auth\":%hs,\"members\":%hs}",
-            JsonEscape_(AnsiString(list->GetAddress())).c_str(),
+            JsonEscape_(Utf8_(list->GetAddress())).c_str(),
             list->GetActive() ? "true" : "false",
             list->GetRequireAuth() ? "true" : "false",
             members.c_str());
@@ -3632,7 +3644,7 @@ namespace HM
       if (!PersistentDistributionList::SaveObject(list, error, PersistenceModeNormal))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(error)).c_str());
          return BuildResponse_(400, body);
       }
 
@@ -3701,9 +3713,9 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"certificate_file\":\"%hs\",\"private_key_file\":\"%hs\"}",
             certificate->GetID(),
-            JsonEscape_(AnsiString(certificate->GetName())).c_str(),
-            JsonEscape_(AnsiString(certificate->GetCertificateFile())).c_str(),
-            JsonEscape_(AnsiString(certificate->GetPrivateKeyFile())).c_str());
+            JsonEscape_(Utf8_(certificate->GetName())).c_str(),
+            JsonEscape_(Utf8_(certificate->GetCertificateFile())).c_str(),
+            JsonEscape_(Utf8_(certificate->GetPrivateKeyFile())).c_str());
          body += entry;
          count++;
       }
@@ -3722,11 +3734,11 @@ namespace HM
 
       AnsiString body;
       body.Format("{\"domain\":\"%hs\",\"enabled\":%hs,\"selector\":\"%hs\",\"sign_aliases\":%hs,\"private_key_file\":\"%hs\"}",
-         JsonEscape_(AnsiString(domain->GetName())).c_str(),
+         JsonEscape_(Utf8_(domain->GetName())).c_str(),
          domain->GetDKIMEnabled() ? "true" : "false",
          JsonEscape_(domain->GetDKIMSelector()).c_str(),
          domain->GetDKIMAliasesEnabled() ? "true" : "false",
-         JsonEscape_(AnsiString(domain->GetDKIMPrivateKeyFile())).c_str());
+         JsonEscape_(Utf8_(domain->GetDKIMPrivateKeyFile())).c_str());
       return BuildResponse_(200, body);
    }
 
@@ -3815,9 +3827,9 @@ namespace HM
                AnsiString entry;
                entry.Format("{\"field\":\"%hs\",\"header\":\"%hs\",\"match\":\"%hs\",\"value\":\"%hs\"}",
                   criterion->GetUsePredefined() ? RuleFieldName(criterion->GetPredefinedField()) : "header",
-                  JsonEscape_(AnsiString(criterion->GetHeaderField())).c_str(),
+                  JsonEscape_(Utf8_(criterion->GetHeaderField())).c_str(),
                   RuleMatchName(criterion->GetMatchType()),
-                  JsonEscape_(AnsiString(criterion->GetMatchValue())).c_str());
+                  JsonEscape_(Utf8_(criterion->GetMatchValue())).c_str());
                criteria += entry;
                criterionCount++;
             }
@@ -3864,7 +3876,7 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"active\":%hs,\"all_criteria\":%hs,\"criteria\":%hs,\"actions\":%hs}",
             rule->GetID(),
-            JsonEscape_(AnsiString(rule->GetName())).c_str(),
+            JsonEscape_(Utf8_(rule->GetName())).c_str(),
             rule->GetActive() ? "true" : "false",
             rule->GetUseAND() ? "true" : "false",
             criteria.c_str(), actions.c_str());
@@ -3920,7 +3932,7 @@ namespace HM
          entry.Format("{\"name\":\"%hs\",\"size\":%I64u,\"created\":\"%hs\"}",
             JsonEscape_(name).c_str(),
             size,
-            JsonEscape_(AnsiString(Time::GetTimeStampFromDateTime(file.GetCreateTime()))).c_str());
+            JsonEscape_(Utf8_(Time::GetTimeStampFromDateTime(file.GetCreateTime()))).c_str());
          body += entry;
          count++;
       }
@@ -4021,7 +4033,7 @@ namespace HM
       {
          if (i > first)
             body += ",";
-         body += "\"" + JsonEscape_(AnsiString(all[i].c_str())) + "\"";
+         body += "\"" + JsonEscape_(Utf8_(all[i].c_str())) + "\"";
       }
       body += "]}";
       return BuildResponse_(200, body);
@@ -4038,7 +4050,7 @@ namespace HM
       {
          AnsiString body;
          body.Format("{\"error\":\"the backup did not start\",\"status\":\"%hs\"}",
-            JsonEscape_(AnsiString(manager->GetStatus())).c_str());
+            JsonEscape_(Utf8_(manager->GetStatus())).c_str());
          return BuildResponse_(409, body);
       }
 
@@ -4058,7 +4070,7 @@ namespace HM
       // the regression fixtures read. Both are here: status, and the last
       // twenty lines of hmailserver_backup.log, newest last.
       AnsiString body;
-      body.Format("{\"status\":\"%hs\",\"log\":[", JsonEscape_(AnsiString(manager->GetStatus())).c_str());
+      body.Format("{\"status\":\"%hs\",\"log\":[", JsonEscape_(Utf8_(manager->GetStatus())).c_str());
 
       String logPath = FileUtilities::Combine(IniFileSettings::Instance()->GetLogDirectory(), _T("hmailserver_backup.log"));
       if (FileUtilities::Exists(logPath))
@@ -4106,13 +4118,13 @@ namespace HM
                   "\"max_smtp_connections\":%d,\"max_imap_connections\":%d,\"max_pop3_connections\":%d,"
                   "\"smtp_relayer\":\"%hs\",\"smtp_relayer_port\":%d,"
                   "\"log_smtp_conversations\":%hs,\"log_imap_conversations\":%hs}",
-         JsonEscape_(AnsiString(configuration->GetHostName())).c_str(),
-         JsonEscape_(AnsiString(configuration->GetDefaultDomain())).c_str(),
+         JsonEscape_(Utf8_(configuration->GetHostName())).c_str(),
+         JsonEscape_(Utf8_(configuration->GetDefaultDomain())).c_str(),
          smtp ? smtp->GetMaxMessageSize() : 0,
          smtp ? smtp->GetMaxSMTPConnections() : 0,
          imap ? (int) imap->GetMaxIMAPConnections() : 0,
          pop3 ? (int) pop3->GetMaxPOP3Connections() : 0,
-         smtp ? JsonEscape_(AnsiString(smtp->GetSMTPRelayer())).c_str() : "",
+         smtp ? JsonEscape_(Utf8_(smtp->GetSMTPRelayer())).c_str() : "",
          smtp ? (int) smtp->GetSMTPRelayerPort() : 0,
          configuration->GetLogSMTPConversations() ? "true" : "false",
          configuration->GetLogIMAPConversations() ? "true" : "false");
@@ -4303,6 +4315,7 @@ namespace HM
       case RouteMeMessageDelete:
       case RouteMeMessageSend:
       case RouteMeMessageAttachment:
+      case RouteMeSearch:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4331,20 +4344,20 @@ namespace HM
          "\"quota\":{\"limit_mb\":%d,\"used_bytes\":%I64d},"
          "\"vacation\":{\"enabled\":%hs,\"active\":%hs,\"subject\":\"%hs\",\"message\":\"%hs\",\"expires\":%hs,\"expires_date\":\"%hs\"},"
          "\"password_changed\":\"%hs\",\"second_factor\":%hs,\"directory_linked\":%hs}",
-         JsonEscape_(AnsiString(account->GetAddress())).c_str(),
-         JsonEscape_(AnsiString(StringParser::ExtractDomain(account->GetAddress()))).c_str(),
+         JsonEscape_(Utf8_(account->GetAddress())).c_str(),
+         JsonEscape_(Utf8_(StringParser::ExtractDomain(account->GetAddress()))).c_str(),
          account->GetActive() ? "true" : "false",
          (int) account->GetAccountMaxSize(),
          usedBytes,
          account->GetVacationMessageIsOn() ? "true" : "false",
          PersistentAccount::GetIsVacationMessageOn(account) ? "true" : "false",
-         JsonEscape_(AnsiString(account->GetVacationSubject())).c_str(),
-         JsonEscape_(AnsiString(account->GetVacationMessage())).c_str(),
+         JsonEscape_(Utf8_(account->GetVacationSubject())).c_str(),
+         JsonEscape_(Utf8_(account->GetVacationMessage())).c_str(),
          account->GetVacationExpires() ? "true" : "false",
          // The store keeps a date-time ("2099-12-31 00:00:00"); the day is the
          // part that was chosen, and the form the PUT accepts back.
-         JsonEscape_(AnsiString(account->GetVacationExpiresDate().Mid(0, 10))).c_str(),
-         JsonEscape_(AnsiString(account->GetPasswordChanged())).c_str(),
+         JsonEscape_(Utf8_(account->GetVacationExpiresDate().Mid(0, 10))).c_str(),
+         JsonEscape_(Utf8_(account->GetPasswordChanged())).c_str(),
          account->GetTotpSecret().IsEmpty() ? "false" : "true",
          account->GetIsAD() ? "true" : "false");
 
@@ -4359,8 +4372,8 @@ namespace HM
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
       AnsiString requestBody = GetRequestBody_(request);
-      String currentPassword = String(GetJsonStringValue_(requestBody, "current"));
-      String newPassword = String(GetJsonStringValue_(requestBody, "new"));
+      String currentPassword = JsonUtf8Value_(requestBody, "current");
+      String newPassword = JsonUtf8Value_(requestBody, "new");
 
       if (currentPassword.IsEmpty() || newPassword.IsEmpty())
          return BuildResponse_(400, "{\"error\":\"current and new are required\"}");
@@ -4403,7 +4416,7 @@ namespace HM
       if (!PasswordPolicy::IsAcceptable(account->GetAddress(), newPassword, policyFailure))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(policyFailure)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(policyFailure)).c_str());
          return BuildResponse_(400, body);
       }
 
@@ -4425,7 +4438,7 @@ namespace HM
       if (!PersistentAccount::SaveObject(mutableAccount, saveError, PersistenceModeNormal))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
          return BuildResponse_(500, body);
       }
 
@@ -4451,10 +4464,10 @@ namespace HM
       // body said, and nothing is left over from before.
       AnsiString enabledText = GetJsonStringValue_(requestBody, "enabled");
       bool enabled = GetJsonBoolValue_(requestBody, "enabled", false);
-      String subject = String(GetJsonStringValue_(requestBody, "subject"));
-      String message = String(GetJsonStringValue_(requestBody, "message"));
+      String subject = JsonUtf8Value_(requestBody, "subject");
+      String message = JsonUtf8Value_(requestBody, "message");
       bool expires = GetJsonBoolValue_(requestBody, "expires", false);
-      String expiresDate = String(GetJsonStringValue_(requestBody, "expires_date"));
+      String expiresDate = JsonUtf8Value_(requestBody, "expires_date");
 
       if (requestBody.Find("\"enabled\"") < 0)
          return BuildResponse_(400, "{\"error\":\"enabled is required\"}");
@@ -4492,17 +4505,17 @@ namespace HM
       if (!PersistentAccount::SaveObject(mutableAccount, saveError, PersistenceModeNormal))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
          return BuildResponse_(500, body);
       }
 
       AnsiString json;
       json.Format("{\"enabled\":%hs,\"subject\":\"%hs\",\"message\":\"%hs\",\"expires\":%hs,\"expires_date\":\"%hs\"}",
          enabled ? "true" : "false",
-         JsonEscape_(AnsiString(subject)).c_str(),
-         JsonEscape_(AnsiString(message)).c_str(),
+         JsonEscape_(Utf8_(subject)).c_str(),
+         JsonEscape_(Utf8_(message)).c_str(),
          expires ? "true" : "false",
-         JsonEscape_(AnsiString(expires ? expiresDate : String())).c_str());
+         JsonEscape_(Utf8_(expires ? expiresDate : String())).c_str());
 
       return BuildResponse_(200, json);
    }
@@ -4659,7 +4672,7 @@ namespace HM
 
       AnsiString body;
       body.Format("{\"address\":\"%hs\",\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
-         JsonEscape_(AnsiString(account->GetAddress())).c_str(),
+         JsonEscape_(Utf8_(account->GetAddress())).c_str(),
          (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
 
       return BuildResponse_(201, body, cookie);
@@ -4740,12 +4753,12 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"sender\":\"%hs\",\"subject\":\"%hs\",\"reason\":\"%hs\",\"score\":%d,\"size\":%d,\"created\":\"%hs\"}",
             message.id,
-            JsonEscape_(AnsiString(message.sender)).c_str(),
-            JsonEscape_(AnsiString(message.subject)).c_str(),
-            JsonEscape_(AnsiString(message.reason)).c_str(),
+            JsonEscape_(Utf8_(message.sender)).c_str(),
+            JsonEscape_(Utf8_(message.subject)).c_str(),
+            JsonEscape_(Utf8_(message.reason)).c_str(),
             message.score,
             message.size,
-            JsonEscape_(AnsiString(message.created)).c_str());
+            JsonEscape_(Utf8_(message.created)).c_str());
 
          body += entry;
          count++;
@@ -4774,7 +4787,7 @@ namespace HM
       if (!QuarantineStore::ReleaseTo(id, account->GetAddress(), error))
       {
          AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(error)).c_str());
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(error)).c_str());
          return BuildResponse_(500, body);
       }
 
@@ -4832,7 +4845,7 @@ namespace HM
       // The listing decodes Subject, From and Date from the head of each
       // message's file - what IMAP FETCH ENVELOPE does - rather than parsing
       // the MIME tree, so a folder of thousands stays cheap.
-      void DescribeHeader(const String &fileName, AnsiString &subject, AnsiString &from, AnsiString &date)
+      void DescribeHeaderWide(const String &fileName, String &subject, String &from, String &date)
       {
          AnsiString header = PersistentMessage::LoadHeader(fileName, false);
          if (header.IsEmpty())
@@ -4841,11 +4854,22 @@ namespace HM
          MimeHeader mimeHeader;
          mimeHeader.Load(header.c_str(), header.GetLength(), true);
 
-         subject = AnsiString(mimeHeader.GetUnicodeFieldValue("Subject"));
-         from = AnsiString(mimeHeader.GetUnicodeFieldValue("From"));
+         subject = mimeHeader.GetUnicodeFieldValue("Subject");
+         from = mimeHeader.GetUnicodeFieldValue("From");
 
          const char *rawDate = mimeHeader.GetRawFieldValue("Date");
-         date = rawDate ? rawDate : "";
+         date = rawDate ? String(rawDate) : String();
+      }
+
+      // The same, as UTF-8 for the JSON.
+      void DescribeHeader(const String &fileName, AnsiString &subject, AnsiString &from, AnsiString &date)
+      {
+         String wideSubject, wideFrom, wideDate;
+         DescribeHeaderWide(fileName, wideSubject, wideFrom, wideDate);
+
+         Unicode::WideToMultiByte(wideSubject, subject);
+         Unicode::WideToMultiByte(wideFrom, from);
+         Unicode::WideToMultiByte(wideDate, date);
       }
 
       AnsiString FlagsJson(std::shared_ptr<Message> message)
@@ -4858,6 +4882,123 @@ namespace HM
             message->GetFlagDraft() ? "true" : "false",
             message->GetFlagDeleted() ? "true" : "false");
          return flags;
+      }
+
+      // The messages one search may look at before answering; the client
+      // continues from next_before_uid. A mailbox is never scanned whole in
+      // one request.
+      const int MaxSearchScan = 2000;
+
+      String ToLowerCopy(const String &value)
+      {
+         String lowered = value;
+         lowered.ToLower();
+         return lowered;
+      }
+
+      bool ContainsNoCase(const String &haystack, const String &needleLower)
+      {
+         if (needleLower.IsEmpty())
+            return true;
+
+         return ToLowerCopy(haystack).Find(needleLower) >= 0;
+      }
+
+      // What the full-text index can prove for one query: which of the
+      // account's fully indexed messages cannot contain the text. The filter
+      // SEARCH uses (IMAPCommandSearch.cpp), and it fails open the same way:
+      // anything the index cannot answer for is read.
+      class SearchIndexPrune
+      {
+      public:
+         SearchIndexPrune(__int64 accountId, const String &text) :
+            usable_(false)
+         {
+            if (text.IsEmpty() || !IniFileSettings::Instance()->GetIndexerFullTextEnabled())
+               return;
+
+            std::vector<String> needles;
+            PersistentMessageIndex::CreateQueryNeedles(text, IniFileSettings::Instance()->GetIndexerFullTextMinTokenLength(), needles);
+            if (needles.empty())
+               return;
+
+            if (!PersistentMessageIndex::GetMessagesWithTerm(accountId, PersistentMessageIndex::CompleteMarker(), complete_))
+               return;
+
+            if (!PersistentMessageIndex::GetMessagesWithTerm(accountId, PersistentMessageIndex::OverflowMarker(), overflow_))
+               return;
+
+            bool first = true;
+            for (size_t i = 0; i < needles.size(); i++)
+            {
+               std::set<__int64> matches;
+               if (!PersistentMessageIndex::GetMessagesWithTermContaining(accountId, needles[i], matches))
+                  return;
+
+               if (first)
+               {
+                  candidates_.swap(matches);
+                  first = false;
+               }
+               else
+               {
+                  std::set<__int64> merged;
+                  std::set_intersection(candidates_.begin(), candidates_.end(), matches.begin(), matches.end(), std::inserter(merged, merged.begin()));
+                  candidates_.swap(merged);
+               }
+
+               if (candidates_.empty())
+                  break;
+            }
+
+            usable_ = true;
+         }
+
+         bool CannotContain(__int64 messageId) const
+         {
+            if (!usable_)
+               return false;
+
+            if (complete_.find(messageId) == complete_.end())
+               return false;
+
+            if (overflow_.find(messageId) != overflow_.end())
+               return false;
+
+            return candidates_.find(messageId) == candidates_.end();
+         }
+
+      private:
+         bool usable_;
+         std::set<__int64> complete_;
+         std::set<__int64> overflow_;
+         std::set<__int64> candidates_;
+      };
+
+      // Whether one message contains the text: in its Subject or From, read
+      // from the head of the file; failing that in its To, Cc, text and
+      // HTML, for a message small enough to read whole and not ruled out by
+      // the index.
+      bool MessageMatches(const String &fileName, std::shared_ptr<Message> message, const String &needleLower, const SearchIndexPrune &prune)
+      {
+         String subject, from, date;
+         DescribeHeaderWide(fileName, subject, from, date);
+
+         if (ContainsNoCase(subject, needleLower) || ContainsNoCase(from, needleLower))
+            return true;
+
+         if (message->GetSize() > MaxMessageBodyBytes)
+            return false;
+
+         if (prune.CannotContain(message->GetID()))
+            return false;
+
+         MessageData data;
+         if (!data.LoadFromMessage(fileName, message))
+            return false;
+
+         return ContainsNoCase(data.GetTo(), needleLower) || ContainsNoCase(data.GetCC(), needleLower) ||
+                ContainsNoCase(data.GetBody(), needleLower) || ContainsNoCase(data.GetHTMLBody(), needleLower);
       }
    }
 
@@ -4927,10 +5068,10 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
             folder->GetID(),
-            JsonEscape_(AnsiString(folder->GetFolderName())).c_str(),
-            JsonEscape_(AnsiString(path)).c_str(),
+            JsonEscape_(Utf8_(folder->GetFolderName())).c_str(),
+            JsonEscape_(Utf8_(path)).c_str(),
             folder->GetParentFolderID(),
-            JsonEscape_(AnsiString(specialUse)).c_str(),
+            JsonEscape_(Utf8_(specialUse)).c_str(),
             folder->GetIsSubscribed() ? "true" : "false",
             writeAccess ? "true" : "false",
             messageCount,
@@ -4961,7 +5102,7 @@ namespace HM
       String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
 
       AnsiString json;
-      json.Format("{\"delimiter\":\"%hs\",\"folders\":[", JsonEscape_(AnsiString(delimiter)).c_str());
+      json.Format("{\"delimiter\":\"%hs\",\"folders\":[", JsonEscape_(Utf8_(delimiter)).c_str());
       AppendFolderJson_(account, folders, String(), designations, delimiter, json, 0);
       json += "]}";
 
@@ -4993,6 +5134,15 @@ namespace HM
       if (!beforeText.IsEmpty())
          beforeUid = (unsigned int) strtoul(beforeText.c_str(), nullptr, 10);
 
+      // q narrows the listing to the messages containing the text.
+      String text;
+      Unicode::MultiByteToWide(QueryParameter_(query, "q"), text);
+      text.TrimLeft();
+      text.TrimRight();
+      const String needleLower = ToLowerCopy(text);
+      const bool searching = !text.IsEmpty();
+      SearchIndexPrune prune(account->GetID(), text);
+
       // A snapshot, walked newest UID first: the collection is shared with
       // every IMAP session on the mailbox, and a copy is what lets this read
       // files without holding its lock.
@@ -5007,10 +5157,14 @@ namespace HM
       }
 
       AnsiString json;
-      json.Format("{\"folder_id\":%I64d,\"total\":%d,\"messages\":[", folder->GetID(), total);
+      json.Format("{\"folder_id\":%I64d,\"total\":%d,\"query\":\"%hs\",\"messages\":[", folder->GetID(), total, JsonEscape_(Utf8_(text)).c_str());
 
       int written = 0;
-      for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend() && written < limit; ++it)
+      int scanned = 0;
+      bool complete = true;
+      unsigned int lastUid = 0;
+
+      for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend(); ++it)
       {
          std::shared_ptr<Message> message = *it;
          if (!message || message->GetFlagDeleted())
@@ -5019,8 +5173,34 @@ namespace HM
          if (beforeUid > 0 && message->GetUID() >= beforeUid)
             continue;
 
+         if (written >= limit)
+         {
+            // A page is full. For a search that is a place to continue from;
+            // a plain listing pages by before_uid as before.
+            if (searching)
+               complete = false;
+            break;
+         }
+
+         const String fileName = PersistentMessage::GetFileName(account, message);
+
+         if (searching)
+         {
+            if (scanned >= MaxSearchScan)
+            {
+               complete = false;
+               break;
+            }
+
+            scanned++;
+            lastUid = message->GetUID();
+
+            if (!MessageMatches(fileName, message, needleLower, prune))
+               continue;
+         }
+
          AnsiString subject, from, date;
-         DescribeHeader(PersistentMessage::GetFileName(account, message), subject, from, date);
+         DescribeHeader(fileName, subject, from, date);
 
          if (written > 0)
             json += ",";
@@ -5030,17 +5210,164 @@ namespace HM
             message->GetID(),
             message->GetUID(),
             message->GetSize(),
-            JsonEscape_(AnsiString(message->GetCreateTime())).c_str(),
+            JsonEscape_(Utf8_(message->GetCreateTime())).c_str(),
             JsonEscape_(subject).c_str(),
             JsonEscape_(from).c_str(),
             JsonEscape_(date).c_str(),
             FlagsJson(message).c_str());
          json += entry;
          written++;
+         lastUid = message->GetUID();
+      }
+
+      AnsiString tail;
+      tail.Format("],\"scanned\":%d,\"complete\":%hs,\"next_before_uid\":%u}", scanned, complete ? "true" : "false", complete ? 0 : lastUid);
+      json += tail;
+
+      return BuildResponse_(200, json);
+   }
+
+   // Every folder of the account's own tree the account may read, with its
+   // path, depth-first as the tree lists them.
+   void
+   RestApiServer::CollectReadableFolders_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders, const String &parentPath,
+                                          const String &delimiter, std::vector<std::pair<std::shared_ptr<IMAPFolder>, String>> &out, int depth)
+   {
+      if (!folders || depth > 32)
+         return;
+
+      for (int i = 0; i < folders->GetCount(); i++)
+      {
+         std::shared_ptr<IMAPFolder> folder = folders->GetItem(i);
+         if (!folder)
+            continue;
+
+         bool readAccess = false;
+         bool writeAccess = false;
+         ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
+         if (!readAccess)
+            continue;
+
+         String path = parentPath.IsEmpty() ? folder->GetFolderName() : parentPath + delimiter + folder->GetFolderName();
+         out.push_back(std::make_pair(folder, path));
+
+         CollectReadableFolders_(account, folder->GetSubFolders(), path, delimiter, out, depth + 1);
+      }
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeSearch_(const Caller &caller, const AnsiString &query)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      String text;
+      Unicode::MultiByteToWide(QueryParameter_(query, "q"), text);
+      text.TrimLeft();
+      text.TrimRight();
+      if (text.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"q is required\"}");
+
+      int limit = 50;
+      AnsiString limitText = QueryParameter_(query, "limit");
+      if (!limitText.IsEmpty())
+      {
+         limit = atoi(limitText.c_str());
+         if (limit < 1 || limit > MaxMessagesPerPage)
+            limit = MaxMessagesPerPage;
+      }
+
+      const String needleLower = ToLowerCopy(text);
+      SearchIndexPrune prune(account->GetID(), text);
+
+      String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
+      std::vector<std::pair<std::shared_ptr<IMAPFolder>, String>> folders;
+      CollectReadableFolders_(account, IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID()), String(), delimiter, folders, 0);
+
+      struct Hit
+      {
+         std::shared_ptr<Message> message;
+         std::shared_ptr<IMAPFolder> folder;
+         String path;
+      };
+
+      std::vector<Hit> hits;
+      int scanned = 0;
+      bool complete = true;
+
+      // Every folder, newest first within each, under one budget for the
+      // whole request.
+      for (size_t f = 0; f < folders.size() && complete; f++)
+      {
+         std::shared_ptr<Messages> messages = folders[f].first->GetMessages();
+         if (!messages)
+            continue;
+
+         std::vector<std::shared_ptr<Message>> snapshot = messages->GetCopy();
+         for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend(); ++it)
+         {
+            std::shared_ptr<Message> message = *it;
+            if (!message || message->GetFlagDeleted())
+               continue;
+
+            if (scanned >= MaxSearchScan)
+            {
+               complete = false;
+               break;
+            }
+
+            scanned++;
+
+            if (!MessageMatches(PersistentMessage::GetFileName(account, message), message, needleLower, prune))
+               continue;
+
+            Hit hit;
+            hit.message = message;
+            hit.folder = folders[f].first;
+            hit.path = folders[f].second;
+            hits.push_back(hit);
+         }
+      }
+
+      // Newest first across folders: ids grow with time.
+      std::sort(hits.begin(), hits.end(), [](const Hit &a, const Hit &b) { return a.message->GetID() > b.message->GetID(); });
+
+      bool more = (int) hits.size() > limit;
+      if (more)
+         hits.resize(limit);
+
+      AnsiString json;
+      json.Format("{\"query\":\"%hs\",\"scanned\":%d,\"complete\":%hs,\"more\":%hs,\"messages\":[",
+         JsonEscape_(Utf8_(text)).c_str(), scanned, complete ? "true" : "false", more ? "true" : "false");
+
+      for (size_t i = 0; i < hits.size(); i++)
+      {
+         std::shared_ptr<Message> message = hits[i].message;
+
+         AnsiString subject, from, date;
+         DescribeHeader(PersistentMessage::GetFileName(account, message), subject, from, date);
+
+         if (i > 0)
+            json += ",";
+
+         AnsiString entry;
+         entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs}",
+            hits[i].folder->GetID(),
+            JsonEscape_(Utf8_(hits[i].path)).c_str(),
+            message->GetID(),
+            message->GetUID(),
+            message->GetSize(),
+            JsonEscape_(Utf8_(message->GetCreateTime())).c_str(),
+            JsonEscape_(subject).c_str(),
+            JsonEscape_(from).c_str(),
+            JsonEscape_(date).c_str(),
+            FlagsJson(message).c_str());
+         json += entry;
       }
 
       json += "]}";
-
       return BuildResponse_(200, json);
    }
 
@@ -5077,7 +5404,7 @@ namespace HM
          message->GetUID(),
          message->GetFolderID(),
          message->GetSize(),
-         JsonEscape_(AnsiString(message->GetCreateTime())).c_str(),
+         JsonEscape_(Utf8_(message->GetCreateTime())).c_str(),
          FlagsJson(message).c_str(),
          JsonEscape_(subject).c_str(),
          JsonEscape_(from).c_str(),
@@ -5113,20 +5440,20 @@ namespace HM
 
             AnsiString entry;
             entry.Format("{\"index\":%d,\"name\":\"%hs\",\"size\":%d}",
-               (int) i, JsonEscape_(AnsiString(attachment->GetFileName())).c_str(), AttachmentSize(attachment, message->GetSize() <= MaxMessageBodyBytes));
+               (int) i, JsonEscape_(Utf8_(attachment->GetFileName())).c_str(), AttachmentSize(attachment, message->GetSize() <= MaxMessageBodyBytes));
             attachments += entry;
          }
       }
       attachments += "]";
 
       AnsiString tail;
-      AnsiString text = bodyTooLarge ? AnsiString() : JsonEscape_(AnsiString(messageData.GetBody()));
-      AnsiString html = bodyTooLarge ? AnsiString() : JsonEscape_(AnsiString(messageData.GetHTMLBody()));
+      AnsiString text = bodyTooLarge ? AnsiString() : JsonEscape_(Utf8_(messageData.GetBody()));
+      AnsiString html = bodyTooLarge ? AnsiString() : JsonEscape_(Utf8_(messageData.GetHTMLBody()));
 
       tail.Format("\"truncated\":%hs,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"attachments\":%hs}",
          bodyTooLarge ? "true" : "false",
-         JsonEscape_(AnsiString(messageData.GetTo())).c_str(),
-         JsonEscape_(AnsiString(messageData.GetCC())).c_str(),
+         JsonEscape_(Utf8_(messageData.GetTo())).c_str(),
+         JsonEscape_(Utf8_(messageData.GetCC())).c_str(),
          text.c_str(),
          html.c_str(),
          attachments.c_str());
@@ -5520,7 +5847,7 @@ namespace HM
          const String &address = recipients[i];
 
          if (!StringParser::IsValidEmailAddress(address))
-            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": not an e-mail address\"}");
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(Utf8_(address)) + ": not an e-mail address\"}");
 
          String reason;
          bool treatSecurityAsLocal = false;
@@ -5539,13 +5866,13 @@ namespace HM
                   reason = _T("delivery is not permitted");
             }
 
-            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": " + JsonEscape_(AnsiString(reason)) + "\"}");
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(Utf8_(address)) + ": " + JsonEscape_(Utf8_(reason)) + "\"}");
          }
 
          bool recipientOK = false;
          parser.CreateMessageRecipientList(address, message->GetRecipients(), recipientOK);
          if (!recipientOK)
-            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(AnsiString(address)) + ": unknown recipient\"}");
+            return BuildResponse_(400, "{\"error\":\"" + JsonEscape_(Utf8_(address)) + ": unknown recipient\"}");
       }
 
       if (message->GetRecipients()->GetCount() == 0)
@@ -5802,6 +6129,7 @@ namespace HM
          ".msg{border-top:1px solid #e4e6ea;padding:.5rem 0;cursor:pointer}.msg.unseen .msg-subject{font-weight:600}.msg-detail{font-size:.85rem;color:#4b5563}\n"
          "pre{white-space:pre-wrap;word-break:break-word;font:inherit;background:#f4f5f7;padding:.75rem;border-radius:.3rem;max-height:30rem;overflow:auto}\n"
          "#message-actions{margin:.5rem 0}#message-actions button{margin:0 .5rem .5rem 0}#message-actions select{width:auto;display:inline-block;margin-right:.5rem}\n"
+         "input[type=search]{width:100%;box-sizing:border-box;padding:.45rem;border:1px solid #b9bec7;border-radius:.3rem;font:inherit}.search button{margin:.5rem .5rem 0 0}.search label.inline{display:inline-block;margin:.5rem 0 0}\n"
          "[hidden]{display:none!important}\n"
          "</style>\n"
          "</head>\n"
@@ -5846,6 +6174,7 @@ namespace HM
          "<section id=\"mail-section\">\n"
          "<h2>Mail</h2>\n"
          "<label for=\"folder\">Folder</label><select id=\"folder\"></select>\n"
+         "<form id=\"mail-search-form\" class=\"search\"><label for=\"mail-search\">Search</label><input id=\"mail-search\" type=\"search\" maxlength=\"200\"><label class=\"inline\"><input id=\"mail-search-everywhere\" type=\"checkbox\"> All folders</label><button type=\"submit\" class=\"secondary\">Search</button><button id=\"mail-search-clear\" type=\"button\" class=\"secondary\">Clear</button></form>\n"
          "<div id=\"message-list\"></div>\n"
          "<div id=\"message-view\" hidden>\n"
          "<button id=\"message-back\" class=\"secondary\" type=\"button\">Back to the list</button>\n"
@@ -6007,20 +6336,28 @@ namespace HM
          "  var renderMessages = function (page) {\n"
          "    var list = el('message-list');\n"
          "    while (list.firstChild) { list.removeChild(list.firstChild); }\n"
-         "    if (!page.messages.length) { list.appendChild(node('div', 'This folder is empty.', 'msg-detail')); return; }\n"
+         "    if (!page.messages.length) { list.appendChild(node('div', page.query ? 'Nothing matched.' : 'This folder is empty.', 'msg-detail')); renderSearchNote(list, page); return; }\n"
          "    page.messages.forEach(function (m) {\n"
          "      var row = node('div', undefined, m.flags.seen ? 'msg' : 'msg unseen');\n"
          "      row.appendChild(node('div', m.subject || '(no subject)', 'msg-subject'));\n"
-         "      row.appendChild(node('div', (m.from || '?') + ' - ' + (m.date || m.received) + ' - ' + format(m.size), 'msg-detail'));\n"
+         "      row.appendChild(node('div', (m.from || '?') + ' - ' + (m.date || m.received) + ' - ' + format(m.size) + (m.folder ? ' - in ' + m.folder : ''), 'msg-detail'));\n"
          "      row.addEventListener('click', function () { openMessage(m.id); });\n"
          "      list.appendChild(row);\n"
          "    });\n"
-         "    if (page.total > page.messages.length) { list.appendChild(node('div', 'The newest ' + page.messages.length + ' of ' + page.total + ' are shown.', 'msg-detail')); }\n"
+         "    if (!page.query && page.total > page.messages.length) { list.appendChild(node('div', 'The newest ' + page.messages.length + ' of ' + page.total + ' are shown.', 'msg-detail')); }\n"
+         "    renderSearchNote(list, page);\n"
          "  };\n"
          "  var loadMessages = function () {\n"
          "    var id = el('folder').value;\n"
-         "    if (!id) { renderMessages({ total: 0, messages: [] }); return; }\n"
-         "    call('GET', '/api/v1/me/folders/' + id + '/messages').then(function (result) {\n"
+         "    var url;\n"
+         "    if (search.text && search.everywhere) {\n"
+         "      url = '/api/v1/me/search?q=' + encodeURIComponent(search.text);\n"
+         "    } else {\n"
+         "      if (!id) { renderMessages({ total: 0, messages: [] }); return; }\n"
+         "      url = '/api/v1/me/folders/' + id + '/messages';\n"
+         "      if (search.text) { url += '?q=' + encodeURIComponent(search.text) + (search.before ? '&before_uid=' + search.before : ''); }\n"
+         "    }\n"
+         "    call('GET', url).then(function (result) {\n"
          "      if (result.status === 200 && result.data) { renderMessages(result.data); return; }\n"
          "      say('mail-status', describe(result, 'Could not read the folder'), false);\n"
          "    });\n"
@@ -6177,6 +6514,35 @@ namespace HM
          "      say('compose-status', describe(result, 'Could not send'), false);\n"
          "    });\n"
          "  });\n"
+         "  // Search: the text narrows the open folder's list, or every folder.\n"
+         "  var search = { text: '', before: 0, everywhere: false };\n"
+         "  var renderSearchNote = function (list, page) {\n"
+         "    if (!page.query) { return; }\n"
+         "    var note = 'Searched ' + page.scanned + ' message' + (page.scanned === 1 ? '' : 's') + ' for \\'' + page.query + '\\'.';\n"
+         "    if (page.more) { note += ' Only the newest are shown.'; }\n"
+         "    var row = node('div', note, 'msg-detail');\n"
+         "    if (!page.complete && page.next_before_uid) {\n"
+         "      var older = node('button', 'Search older messages', 'secondary'); older.type = 'button';\n"
+         "      older.addEventListener('click', function () { search.before = page.next_before_uid; loadMessages(); });\n"
+         "      row.appendChild(older);\n"
+         "    }\n"
+         "    list.appendChild(row);\n"
+         "  };\n"
+         "  el('mail-search-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    search.text = el('mail-search').value.trim();\n"
+         "    search.before = 0;\n"
+         "    search.everywhere = el('mail-search-everywhere').checked;\n"
+         "    showList();\n"
+         "    loadMessages();\n"
+         "  });\n"
+         "  el('mail-search-clear').addEventListener('click', function () {\n"
+         "    el('mail-search').value = '';\n"
+         "    search.text = ''; search.before = 0; search.everywhere = false;\n"
+         "    el('mail-search-everywhere').checked = false;\n"
+         "    showList();\n"
+         "    loadMessages();\n"
+         "  });\n"
          "  // A session from an earlier visit is still good until it has been idle\n"
          "  // too long: try it first, and only ask for the password when it is not.\n"
          "  load(true);\n"
@@ -6235,7 +6601,8 @@ namespace HM
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"}}}},"
-         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200) and before_uid (only messages with a lower UID - the way to page back). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text. Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
@@ -6321,7 +6688,7 @@ namespace HM
 
          AnsiString item;
          item.Format("{\"certificate\":\"%hs\",\"spki_sha256\":\"%hs\",\"record\":\"_25._tcp.%hs. IN TLSA 3 1 1 %hs\"}",
-            JsonEscape_(AnsiString(name)).c_str(),
+            JsonEscape_(Utf8_(name)).c_str(),
             spkiHex.c_str(),
             JsonEscape_(hostName).c_str(),
             spkiHex.c_str());
@@ -6665,7 +7032,7 @@ namespace HM
          if (!IsDomainAllowed_(allowedDomains, domain->GetName()))
             continue;
 
-         AnsiString domainName = JsonEscape_(AnsiString(domain->GetName()));
+         AnsiString domainName = JsonEscape_(Utf8_(domain->GetName()));
 
          for (const ServiceRecord &service : services)
          {
@@ -6780,6 +7147,14 @@ namespace HM
       String error;
       UpdateChecker::CheckNow(error);
       return BuildResponse_(200, UpdateChecker::ToJson(UpdateChecker::Current()));
+   }
+
+   AnsiString
+   RestApiServer::Utf8_(const String &value)
+   {
+      AnsiString utf8;
+      Unicode::WideToMultiByte(value, utf8);
+      return utf8;
    }
 
    AnsiString
