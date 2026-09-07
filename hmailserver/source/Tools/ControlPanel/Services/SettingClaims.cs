@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -116,8 +117,8 @@ namespace hMailServer.ControlPanel.Services
       public static readonly IReadOnlyList<(int Value, string Label)> LogFormatOptions =
          new (int, string)[]
          {
-            (LogFormatDefault, "hMailServer (tab separated)"),
-            (LogFormatNcsa, "NCSA Common Log Format")
+            (LogFormatDefault, N("hMailServer (tab separated)")),
+            (LogFormatNcsa, N("NCSA Common Log Format"))
          };
 
       // ---- Logging.Device ----------------------------------------------------
@@ -136,8 +137,8 @@ namespace hMailServer.ControlPanel.Services
       public static readonly IReadOnlyList<(int Value, string Label)> LogDeviceOptions =
          new (int, string)[]
          {
-            (LogDeviceFile, "Files on disk"),
-            (LogDeviceSql, "Database (SQL)")
+            (LogDeviceFile, N("Files on disk")),
+            (LogDeviceSql, N("Database (SQL)"))
          };
 
       /// <summary>
@@ -159,20 +160,16 @@ namespace hMailServer.ControlPanel.Services
       /// reports its own state truthfully. What it must not do is pass itself off
       /// as a persistent setting - that is this note's one job.
       /// </summary>
-      public const string CacheMaxSizeIsSessionOnly =
-         "Takes effect immediately, but is held in memory only: nothing stores this value, so every service "
-         + "restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again "
-         + "after each restart, for example from a startup script through the COM API. The TTLs and the enable "
-         + "switch on this card are stored and do survive restarts.";
+      public static readonly string CacheMaxSizeIsSessionOnly = N(
+         "Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts.");
 
       /// <summary>
       /// Shown on the JSON-lines checkbox while NCSA is selected. Logger::Render_
       /// checks the format setting first, so NCSA wins and the JSON switch has no
       /// effect - a precedence that was previously visible nowhere.
       /// </summary>
-      public const string JsonOverriddenByNcsa =
-         "The NCSA log line format above takes precedence, so this has no effect while it is selected. "
-         + "The setting is remembered and applies again as soon as the format goes back to hMailServer's own.";
+      public static readonly string JsonOverriddenByNcsa = N(
+         "The NCSA log line format above takes precedence, so this has no effect while it is selected. The setting is remembered and applies again as soon as the format goes back to hMailServer's own.");
 
       private static readonly List<SettingClaim> entries_ = new List<SettingClaim>
       {
@@ -181,31 +178,19 @@ namespace hMailServer.ControlPanel.Services
          // call anywhere in the tree. The value goes into the settings table and
          // is read back out again, and that is all that happens to it.
          new SettingClaim("WorkerThreadPriority", ClaimKind.Inert,
-            "The server stores this value and never reads it - nothing sets a thread priority from it, so "
-            + "changing it has no effect. It is shown rather than removed so that an administrator who set it "
-            + "years ago can see it is still there and why nothing happened, and it is not editable because a "
-            + "box that accepts a value nothing acts on is worse than no box at all. The thread counts above "
-            + "are honoured."),
+            N("The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured.")),
 
          // IniFileSettings reads [Settings] UseLanguage and hands it back over
          // COM; nothing else in the server consults it. The classic Administrator
          // was the tool that did, and it was removed in 6.2.10.
          new SettingClaim("UserInterfaceLanguage", ClaimKind.Conditional,
-            "This is [Settings] UseLanguage in hMailServer.INI. The server only hands it back over the COM API - "
-            + "it does not translate anything itself - and this Control Panel has no translations, so it affects "
-            + "third-party administration tools only. Bounce and error wording is on the Server messages page."),
+            N("This is [Settings] UseLanguage in hMailServer.INI. The server only hands it back over the COM API - it does not translate anything itself, and this Control Panel has a language setting of its own (the globe button in the sidebar) - so it affects third-party administration tools only. Bounce and error wording is on the Server messages page.")),
 
          new SettingClaim("Logging.LogFormat", ClaimKind.Honoured,
-            "NCSA Common Log Format writes one line per entry as host, ident, session, [date], \"category and "
-            + "message\", status, bytes - so a log analyser can count 5xx replies without knowing anything about "
-            + "hMailServer. Ident and bytes are always \"-\" (the server never queries identd and the logger is "
-            + "not told transfer sizes), and the AWStats journal is a separate file that this setting does not "
-            + "change: its own switch is above."),
+            N("NCSA Common Log Format writes one line per entry as host, ident, session, [date], \"category and message\", status, bytes - so a log analyser can count 5xx replies without knowing anything about hMailServer. Ident and bytes are always \"-\" (the server never queries identd and the logger is not told transfer sizes), and the AWStats journal is a separate file that this setting does not change: its own switch is above.")),
 
          new SettingClaim("Logging.Device", ClaimKind.Honoured,
-            "The database destination creates its table on first use and inserts asynchronously, so a log write "
-            + "never blocks a mail session. If the database is unreachable the entries go to the log files "
-            + "instead and the server says so in the application log - nothing is discarded."),
+            N("The database destination creates its table on first use and inserts asynchronously, so a log write never blocks a mail session. If the database is unreachable the entries go to the log files instead and the server says so in the application log - nothing is discarded.")),
 
          new SettingClaim("JsonLogging", ClaimKind.Conditional, JsonOverriddenByNcsa),
 
@@ -221,18 +206,11 @@ namespace hMailServer.ControlPanel.Services
          new SettingClaim("Cache.DistributionListCacheMaxSizeKb", ClaimKind.Honoured, CacheMaxSizeIsSessionOnly),
 
          new SettingClaim("OtelEndpoint", ClaimKind.Honoured,
-            "Traces only. A collector configured here receives spans and nothing else - metrics and logs have "
-            + "their own endpoints below, each off until it is set. Prometheus metrics are the port above, and "
-            + "are the same counters the metrics endpoint pushes rather than a second tally."),
+            N("Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally.")),
          new SettingClaim("OtelMetricsEndpoint", ClaimKind.Honoured,
-            "Pushes the same counters the Prometheus endpoint serves, under the same names, on the interval "
-            + "below. Not everything on /metrics is exported: queue depth, database probes and certificate "
-            + "expiry are computed by the metrics listener from database and file reads, and a push exporter "
-            + "does not own those."),
+            N("Pushes the same counters the Prometheus endpoint serves, under the same names, on the interval below. Not everything on /metrics is exported: queue depth, database probes and certificate expiry are computed by the metrics listener from database and file reads, and a push exporter does not own those.")),
          new SettingClaim("OtelLogsEndpoint", ClaimKind.Honoured,
-            "The same lines, categories and mask the log files get, with the trace and span id attached "
-            + "whenever a span is active on the thread that logged. The exporter never exports its own "
-            + "failure lines, or a dead collector would feed itself.")
+            N("The same lines, categories and mask the log files get, with the trace and span id attached whenever a span is active on the thread that logged. The exporter never exports its own failure lines, or a dead collector would feed itself."))
       };
 
       /// <summary>Every setting whose interface wording is pinned by a test.</summary>

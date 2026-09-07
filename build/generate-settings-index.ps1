@@ -191,11 +191,14 @@ for ($i = 1; $i -lt $featureParts.Count; $i += 2) {
    $page = $featurePages[$section]
    if (-not $page) { continue }
 
-   foreach ($m in [regex]::Matches($body, 'Key = "([^"]+)"[^}]*?Label = "((?:[^"\\]|\\.)*)"')) {
+   foreach ($m in [regex]::Matches($body, 'Key = "([^"]+)"[^}]*?Label = (?:L\()?"((?:[^"\\]|\\.)*)"')) {
       Add-Entry $entries (ConvertFrom-CSharpLiteral $m.Groups[2].Value) $m.Groups[1].Value $page
    }
 }
 
+# A label marked for translation is written Label = L("..."): the same English
+# text, one call deeper (see Services/Loc.cs), so the patterns below accept the
+# wrapper and the index keeps holding the English text.
 # --- COM-backed pages (ServerSettingsView): "private void Build<Section>()" ---
 $serverText = Read-SourceText $serverPath
 foreach ($m in [regex]::Matches($serverText, '(?s)private void Build(\w+)\(\)\s*\{(.*?)\n      \}')) {
@@ -204,10 +207,10 @@ foreach ($m in [regex]::Matches($serverText, '(?s)private void Build(\w+)\(\)\s*
    $page = $serverPages[$section]
    if (-not $page) { continue }
 
-   foreach ($s in [regex]::Matches($body, 'Path = "([^"]+)",\s*Label = "((?:[^"\\]|\\.)*)"')) {
+   foreach ($s in [regex]::Matches($body, 'Path = "([^"]+)",\s*Label = (?:L\()?"((?:[^"\\]|\\.)*)"')) {
       Add-Entry $entries (ConvertFrom-CSharpLiteral $s.Groups[2].Value) $s.Groups[1].Value $page
    }
-   foreach ($s in [regex]::Matches($body, 'Label = "((?:[^"\\]|\\.)*)",\s*Path = "([^"]+)"')) {
+   foreach ($s in [regex]::Matches($body, 'Label = (?:L\()?"((?:[^"\\]|\\.)*)"\)?,\s*Path = "([^"]+)"')) {
       Add-Entry $entries (ConvertFrom-CSharpLiteral $s.Groups[1].Value) $s.Groups[2].Value $page
    }
 }
