@@ -1020,6 +1020,94 @@ namespace RegressionTests.API
          CustomAsserts.AssertRecipientsInDeliveryQueue(0);
       }
 
+      private static byte[] Pattern(int length)
+      {
+         var bytes = new byte[length];
+         for (int i = 0; i < length; i++)
+            bytes[i] = (byte) (i % 251);
+         return bytes;
+      }
+
+      private static string Base64Part(string contentType, string name, byte[] content)
+      {
+         return "--b1\r\n" +
+                "Content-Type: " + contentType + "; name=\"" + name + "\"\r\n" +
+                "Content-Transfer-Encoding: base64\r\n" +
+                "Content-Disposition: attachment; filename=\"" + name + "\"\r\n" +
+                "\r\n" +
+                Convert.ToBase64String(content, Base64FormattingOptions.InsertLineBreaks) + "\r\n";
+      }
+
+      [Test]
+      [Description("GET /api/v1/me/messages/{id}/attachments/{index} serves one attachment decoded, as a download, and only to its owner")]
+      public void AnAttachmentIsDownloadedAsAFile()
+      {
+         byte[] numbers = Pattern(1000);
+         byte[] page = Encoding.ASCII.GetBytes("<html><script>alert(1)</script></html>");
+         string accented = "Résumé \"final\".pdf";
+         string encodedName = "=?utf-8?B?" + Convert.ToBase64String(Encoding.UTF8.GetBytes(accented)) + "?=";
+
+         string raw =
+            "From: sender@example.com\r\n" +
+            "To: " + Address + "\r\n" +
+            "Subject: With files\r\n" +
+            "MIME-Version: 1.0\r\n" +
+            "Content-Type: multipart/mixed; boundary=\"b1\"\r\n" +
+            "\r\n" +
+            "--b1\r\n" +
+            "Content-Type: text/plain\r\n" +
+            "\r\n" +
+            "See attached.\r\n" +
+            Base64Part("application/octet-stream", "numbers.bin", numbers) +
+            Base64Part("text/html", "page.html", page) +
+            Base64Part("application/pdf", encodedName, Pattern(10)) +
+            "--b1--\r\n";
+
+         SmtpClientSimulator.StaticSendRaw("sender@example.com", Address, raw);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         long messageId = IdBefore(Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword)).body, "\"subject\":\"With files\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000}", message.body);
+         StringAssert.Contains("\"name\":\"page.html\"", message.body);
+         StringAssert.Contains("See attached.", message.body);
+
+         string path = "/api/v1/me/messages/" + messageId + "/attachments/";
+
+         Response numbersFile = Raw("GET", path + "0", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, numbersFile.Status, numbersFile.Body);
+         Assert.AreEqual("application/octet-stream", numbersFile.Header("Content-Type"));
+         StringAssert.Contains("attachment; filename=\"numbers.bin\"", numbersFile.Header("Content-Disposition"));
+         Assert.AreEqual("nosniff", numbersFile.Header("X-Content-Type-Options"));
+         Assert.AreEqual("no-store", numbersFile.Header("Cache-Control"));
+         Assert.AreEqual(numbers, numbersFile.BodyBytes, "The bytes come back exactly as attached.");
+
+         Response html = Raw("GET", path + "1", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, html.Status, html.Body);
+         Assert.AreEqual("application/octet-stream", html.Header("Content-Type"), "A type a browser would render is not served under it.");
+         StringAssert.Contains("sandbox", html.Header("Content-Security-Policy"));
+         Assert.AreEqual(page, html.BodyBytes);
+
+         Response pdf = Raw("GET", path + "2", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, pdf.Status, pdf.Body);
+         Assert.AreEqual("application/pdf", pdf.Header("Content-Type"));
+         StringAssert.Contains("filename=\"R_sum_ _final_.pdf\"", pdf.Header("Content-Disposition"));
+         StringAssert.Contains("filename*=UTF-8''R%C3%A9sum%C3%A9%20%22final%22.pdf", pdf.Header("Content-Disposition"));
+
+         (int status, string body) missing = Http("GET", path + "3", UserHeader(UserPassword));
+         Assert.AreEqual(404, missing.status, "Body: " + missing.body);
+
+         (int status, string body) others = Http("GET", path + "0", BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, others.status, "Body: " + others.body);
+
+         (int status, string body) admin = Http("GET", path + "0", AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()
@@ -1055,6 +1143,7 @@ namespace RegressionTests.API
       {
          public int Status;
          public string Body = "";
+         public byte[] BodyBytes = new byte[0];
          public readonly System.Collections.Generic.Dictionary<string, string> Headers =
             new System.Collections.Generic.Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
@@ -1124,12 +1213,20 @@ namespace RegressionTests.API
                while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
                   memory.Write(buffer, 0, read);
 
-               string raw = Encoding.UTF8.GetString(memory.ToArray());
+               byte[] all = memory.ToArray();
+               string raw = Encoding.UTF8.GetString(all);
                var response = new Response();
 
                int separator = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
                string head = separator >= 0 ? raw.Substring(0, separator) : raw;
                response.Body = separator >= 0 ? raw.Substring(separator + 4) : "";
+               // The head is ASCII, so its length in characters is its length in
+               // bytes; the body is kept as bytes too, for a download.
+               if (separator >= 0)
+               {
+                  response.BodyBytes = new byte[all.Length - separator - 4];
+                  Array.Copy(all, separator + 4, response.BodyBytes, 0, response.BodyBytes.Length);
+               }
 
                string[] lines = head.Split(new[] { "\r\n" }, StringSplitOptions.None);
                if (lines.Length > 0)

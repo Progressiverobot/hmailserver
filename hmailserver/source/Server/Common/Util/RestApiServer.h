@@ -174,6 +174,7 @@ namespace HM
          RouteMeMessageMove,
          RouteMeMessageDelete,
          RouteMeMessageSend,
+         RouteMeMessageAttachment,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -181,7 +182,7 @@ namespace HM
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0), attachment_index(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
@@ -189,6 +190,7 @@ namespace HM
          __int64 range_id;        // an IP range id, for the routes that name one
          __int64 archive_id;      // an archive index row id, for the routes that name one
          __int64 folder_id;       // an IMAP folder id, for the account's own mailbox routes
+         int attachment_index;    // which attachment of a message, for the download route
          AnsiString query;        // the part after "?", for the routes that take one
       };
 
@@ -292,6 +294,7 @@ namespace HM
       static std::shared_ptr<IMAPFolder> FindDesignatedFolder_(std::shared_ptr<const Account> account, int designation);
       static HttpResponse HandleMeMessageSend_(const Caller &caller, const AnsiString &requestBody);
       static String JsonUtf8Value_(const AnsiString &json, const AnsiString &key);
+      static HttpResponse HandleMeMessageAttachment_(const Caller &caller, __int64 messageId, int index);
       static bool DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);
