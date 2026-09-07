@@ -18,7 +18,9 @@
       "left is libraries/mssqlce3.5: two SQL Server Compact headers that are",
       "Microsoft's, vendored as shipped, and a reformatted vendor header is one whose",
       "next diff against upstream means nothing. Everything else in the repository",
-      "is checked."
+      "is checked - except hmailserver/source/Server/zlib, zlib 1.3.1 vendored as",
+      "shipped for IMAP COMPRESS=DEFLATE, excluded for the same reason: reformatting",
+      "a vendor source is a diff against upstream that means nothing."
    ],
    "Verbose": false,
    "Debug": false,
@@ -26,7 +28,8 @@
    "SpacesAfterTabs": false,
    "NoColor": true,
    "Exclude": [
-      "^libraries/mssqlce3\\.5/"
+      "^libraries/mssqlce3\\.5/",
+      "^hmailserver/source/Server/zlib/"
    ],
    "AllowedContentTypes": [],
    "PassedFiles": [],

@@ -8,6 +8,7 @@
 #include "IMAPCommandCapability.h"
 #include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
+#include "../Common/Application/IniFileSettings.h"
 #include "IMAPConfiguration.h"
 #include "../common/BO/SecurityRange.h"
 #include "../common/Util/OAuth2TokenValidator.h"
@@ -53,6 +54,11 @@ namespace HM
       if (pConnection->GetConnectionSecurity() == CSSTARTTLSOptional ||
           pConnection->GetConnectionSecurity() == CSSTARTTLSRequired)
          sResponse += " STARTTLS";
+
+      // RFC 4978: offered until it is in use - once compression is on it is not a
+      // capability of this connection any more, and a second COMPRESS is refused.
+      if (IniFileSettings::Instance()->GetImapCompressionEnabled() && !pConnection->IsCompressed())
+         sResponse += " COMPRESS=DEFLATE";
 
       // RFC 3501 section 6.1.1: a capability must not be advertised if the server will
       // not honour it on this connection. Authentication is refused on a cleartext

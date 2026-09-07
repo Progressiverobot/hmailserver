@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
+#include <algorithm>
 #include "TCPConnection.h"
 
 #include <limits>
@@ -452,6 +453,10 @@ namespace HM
       case IOOperation::BCTWrite:
          {
             std::shared_ptr<ByteBuffer> pBuf = operation->GetBuffer();
+            // The write that announces compression goes out plain; the deflater is
+            // turned on when it completes (AsyncWriteCompleted).
+            if (operation->GetEnablesCompression())
+               enable_write_compression_on_completion_ = true;
             AsyncWrite(pBuf);
             break;
          }
@@ -972,6 +977,13 @@ namespace HM
    {
       UpdateAutoLogoutTimer();
 
+      if (compression_read_enabled_)
+      {
+         compressed_read_delimiter_ = delimitor;
+         StartCompressedRead_();
+         return;
+      }
+
       // Not a std::function: type erasure would drop the executor binding, and the
       // completion - and every internal step of the composed read - must run in
       // the strand.
@@ -1247,6 +1259,21 @@ namespace HM
    {
       UpdateAutoLogoutTimer();
 
+      if (compression_write_enabled_ && deflate_streams_)
+      {
+         std::string deflated;
+         std::string error;
+         if (!deflate_streams_->Deflate(buffer->GetCharBuffer(), buffer->GetSize(), deflated, error))
+         {
+            ReportError(ErrorManager::Medium, 6290, "TCPConnection::AsyncWrite", Formatter::Format(_T("The response could not be deflated: {0}"), String(error.c_str())));
+            AsyncWriteCompleted(boost::asio::error::make_error_code(boost::asio::error::invalid_argument), 0);
+            return;
+         }
+         compressed_write_buffer_ = std::shared_ptr<ByteBuffer>(new ByteBuffer());
+         compressed_write_buffer_->Add((const BYTE *) deflated.data(), deflated.size());
+         buffer = compressed_write_buffer_;
+      }
+
       auto AsyncWriteCompletedFunction = boost::asio::bind_executor(strand_,
          std::bind(&TCPConnection::AsyncWriteCompleted, shared_from_this(),
             std::placeholders::_1,
@@ -1284,6 +1311,14 @@ namespace HM
       }
       else
       {
+         // The write that announced compression has gone out plain; everything
+         // from here on is deflated.
+         if (enable_write_compression_on_completion_)
+         {
+            enable_write_compression_on_completion_ = false;
+            compression_write_enabled_ = true;
+         }
+
          bool containsQueuedSendOperations = operation_queue_.ContainsQueuedSendOperation();
 
          if (!containsQueuedSendOperations)
@@ -1338,6 +1373,131 @@ namespace HM
 
       return localEndpoint.port();
 
+   }
+
+
+   bool
+   TCPConnection::EnableCompression(const AnsiString &lastPlainResponse)
+   {
+      if (compression_read_enabled_)
+         return false;
+
+      std::unique_ptr<DeflateStreams> streams(new DeflateStreams());
+      if (!streams->Start())
+         return false;
+
+      ThrowIfNotConnected_();
+      deflate_streams_ = std::move(streams);
+
+      // The announcement goes out plain, and the write that carries it turns the
+      // deflater on when it completes (AsyncWriteCompleted). The peer compresses
+      // from the moment it reads the announcement, and the read for its next
+      // command is issued after the command that called this returns - so the
+      // inflater is armed now.
+      std::shared_ptr<ByteBuffer> pBuffer = std::shared_ptr<ByteBuffer>(new ByteBuffer());
+      pBuffer->Add((const BYTE *) lastPlainResponse.c_str(), lastPlainResponse.GetLength());
+      std::shared_ptr<IOOperation> operation = std::shared_ptr<IOOperation>(new IOOperation(IOOperation::BCTWrite, pBuffer));
+      operation->SetEnablesCompression(true);
+      operation_queue_.Push(operation);
+
+      compression_read_enabled_ = true;
+      DispatchOperationQueue_();
+      return true;
+   }
+
+   bool
+   TCPConnection::CompressedReadSatisfied_(size_t &available)
+   {
+      available = receive_buffer_.size();
+
+      if (exact_read_target_ > 0)
+         return available >= exact_read_target_;
+
+      if (compressed_read_delimiter_.GetLength() == 0)
+         return available > 0;
+
+      boost::asio::streambuf::const_buffers_type data = receive_buffer_.data();
+      boost::asio::buffers_iterator<boost::asio::streambuf::const_buffers_type> begin = boost::asio::buffers_begin(data);
+      boost::asio::buffers_iterator<boost::asio::streambuf::const_buffers_type> end = boost::asio::buffers_end(data);
+      std::string delimiter(compressed_read_delimiter_.c_str());
+      boost::asio::buffers_iterator<boost::asio::streambuf::const_buffers_type> found = std::search(begin, end, delimiter.begin(), delimiter.end());
+      if (found == end)
+         return false;
+
+      available = (size_t) std::distance(begin, found) + delimiter.size();
+      return true;
+   }
+
+   void
+   TCPConnection::StartCompressedRead_()
+   {
+      size_t available = 0;
+      if (CompressedReadSatisfied_(available))
+      {
+         // What the read asked for has already been inflated: complete it on the
+         // strand, as the socket would have.
+         boost::asio::post(strand_, std::bind(&TCPConnection::AsyncReadCompleted, shared_from_this(), boost::system::error_code(), available));
+         return;
+      }
+
+      auto handler = boost::asio::bind_executor(strand_,
+         std::bind(&TCPConnection::AsyncCompressedReadCompleted, shared_from_this(),
+            std::placeholders::_1,
+            std::placeholders::_2));
+
+      if (is_ssl_)
+         boost::asio::async_read(ssl_socket_, compressed_buffer_, boost::asio::transfer_at_least(1), handler);
+      else
+         boost::asio::async_read(socket_, compressed_buffer_, boost::asio::transfer_at_least(1), handler);
+   }
+
+   void
+   TCPConnection::AsyncCompressedReadCompleted(const boost::system::error_code& error, size_t bytes_transferred)
+   {
+      if (error)
+      {
+         // The usual handling: end of stream, a reset, a timeout.
+         AsyncReadCompleted(error, bytes_transferred);
+         return;
+      }
+
+      boost::asio::streambuf::const_buffers_type data = compressed_buffer_.data();
+      std::string raw(boost::asio::buffers_begin(data), boost::asio::buffers_end(data));
+      compressed_buffer_.consume(compressed_buffer_.size());
+
+      std::string plain;
+      std::string zlibError;
+      if (!deflate_streams_ || !deflate_streams_->Inflate(raw.data(), raw.size(), plain, zlibError))
+      {
+         ReportError(ErrorManager::Medium, 6291, "TCPConnection::AsyncCompressedReadCompleted",
+            Formatter::Format(_T("The peer's DEFLATE stream could not be read: {0}"), String(zlibError.c_str())));
+         operation_queue_.Pop(IOOperation::BCTRead);
+         EnqueueDisconnect();
+         return;
+      }
+
+      if (!plain.empty())
+      {
+         std::ostream stream(&receive_buffer_);
+         stream.write(plain.data(), (std::streamsize) plain.size());
+      }
+
+      size_t available = 0;
+      if (CompressedReadSatisfied_(available))
+      {
+         AsyncReadCompleted(boost::system::error_code(), available);
+         return;
+      }
+
+      // A line that never ends: the same ceiling async_read_until enforces, and
+      // the same answer (OnExcessiveDataReceived, through the not_found path).
+      if (receive_buffer_.size() >= receive_buffer_.max_size())
+      {
+         AsyncReadCompleted(boost::asio::error::make_error_code(boost::asio::error::not_found), 0);
+         return;
+      }
+
+      StartCompressedRead_();
    }
 
    void

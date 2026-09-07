@@ -32,7 +32,7 @@ Mail protocols
 --------------
 
 * **SMTP** with PIPELINING, ENHANCEDSTATUSCODES, 8BITMIME, SIZE, CHUNKING/BDAT (RFC 3030), DSN delivery status notifications (RFC 3461/3464) and SMTPUTF8/EAI for internationalised addresses.
-* **IMAP4rev1**, plus **IMAP4rev2** (RFC 9051) advertised with its behavioural deltas implemented, including the extensions rev2 folds in (LIST-STATUS, non-synchronising literals, BINARY) — with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT and THREAD (RFC 5256, both ORDEREDSUBJECT and REFERENCES), ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154, including explicit designation via `CREATE ... (USE (\Sent))`) and QUOTA.
+* **IMAP4rev1**, plus **IMAP4rev2** (RFC 9051) advertised with its behavioural deltas implemented, including the extensions rev2 folds in (LIST-STATUS, non-synchronising literals, BINARY) — with IDLE, MOVE (RFC 6851), UIDPLUS (RFC 4315), CONDSTORE/QRESYNC (RFC 7162), SEARCHRES (RFC 5182), ESEARCH (RFC 4731), SORT and THREAD (RFC 5256, both ORDEREDSUBJECT and REFERENCES), ACL, NAMESPACE, ID (RFC 2971), SPECIAL-USE (RFC 6154, including explicit designation via `CREATE ... (USE (\Sent))`) and QUOTA. **COMPRESS=DEFLATE** (RFC 4978) compresses both directions of a session on request, with the response that announces it the last plain line and every response flushed as it is sent, so a mobile client on a slow link pays for headers and bodies once at a fraction of the bytes; `IMAPCompressionEnabled=0` withdraws it.
 * **POP3**, including retrieval from external POP3 accounts on a schedule - and from external **IMAP** accounts (`ServerType` 1: the INBOX, collected once by UID and left on the server unless told otherwise; with `MirrorFolders` on, every folder, byte for byte with flags and dates - a migration, see [Migration.md](hmailserver/docs/Migration.md)).
 * **Public folders**, shared across accounts with per-user ACLs.
 
@@ -467,6 +467,7 @@ Administration and monitoring:
                                  ; "03:00" every day from 03:00 for an hour; "Sun 03:00"; "Sat,Sun 02:00-05:00"
    UpdateBackupBeforeApply=1     ; an unattended apply runs a backup first (to the configured destination)
                                  ; and does not go ahead if there is no destination or the backup fails
+   IMAPCompressionEnabled=1      ; offer COMPRESS=DEFLATE (RFC 4978) on IMAP; 0 withdraws it
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
                                  ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read

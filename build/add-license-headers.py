@@ -51,7 +51,9 @@ LINE_COMMENT = {
 BLOCK_COMMENT = {'.xaml': ('<!--', '-->')}
 
 SKIP_DIRS = {'.git', 'libraries', 'obj', 'bin', 'publish', 'packages', 'Output',
-             'x64', 'Debug', 'Release', 'node_modules', 'DotNet', 'coverage'}
+             'x64', 'Debug', 'Release', 'node_modules', 'DotNet', 'coverage',
+             # Vendored third-party source under its own licence (see docs/Licenses).
+             'zlib'}
 
 # MIDL output, regenerated on every build.
 SKIP_FILES = {'dlldata.c', 'hMailServer_i.c', 'hMailServer_p.c'}

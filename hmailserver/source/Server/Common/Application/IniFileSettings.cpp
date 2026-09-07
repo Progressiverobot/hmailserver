@@ -492,6 +492,7 @@ namespace HM
       update_check_hours_ = ReadIniSettingInteger_("Settings", "UpdateCheckHours", 24);
       if (update_check_hours_ < 1)
          update_check_hours_ = 1;
+      imap_compression_enabled_ = ReadIniSettingInteger_("Settings", "IMAPCompressionEnabled", 1) == 1;
       update_trust_roots_file_ = ReadIniSettingString_("Settings", "UpdateTrustRootsFile", "");
       update_log_public_key_file_ = ReadIniSettingString_("Settings", "UpdateLogPublicKeyFile", "");
       update_signing_identity_ = ReadIniSettingString_("Settings", "UpdateSigningIdentity", "");

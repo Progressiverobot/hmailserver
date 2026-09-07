@@ -567,6 +567,8 @@ namespace HM
       String GetUpdateChannel() const { return update_channel_; }
       String GetUpdateFeedUrl() const { return update_feed_url_; }
       int GetUpdateCheckHours() const { return update_check_hours_; }
+      // RFC 4978 COMPRESS=DEFLATE on IMAP; on unless an operator says otherwise.
+      bool GetImapCompressionEnabled() const { return imap_compression_enabled_; }
       // The verify: what the installer's Sigstore bundle is checked against. Empty
       // means the public Sigstore instance and this repository's release workflow.
       String GetUpdateTrustRootsFile() const { return update_trust_roots_file_; }
@@ -1129,6 +1131,7 @@ namespace HM
       String update_channel_;
       String update_feed_url_;
       int update_check_hours_ = 24;
+      bool imap_compression_enabled_ = true;
       String update_trust_roots_file_;
       String update_log_public_key_file_;
       String update_signing_identity_;

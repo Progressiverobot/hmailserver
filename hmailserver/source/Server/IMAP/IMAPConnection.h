@@ -94,7 +94,8 @@ namespace HM
          IMAP_SETQUOTA = 142,
          IMAP_REPLACE = 143,
          IMAP_GETMETADATA = 144,
-         IMAP_SETMETADATA = 145
+         IMAP_SETMETADATA = 145,
+         IMAP_COMPRESS = 146
       };
 
       void ParseData(const AnsiString &Request);
