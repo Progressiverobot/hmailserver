@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -28,12 +29,12 @@ namespace hMailServer.ControlPanel.Views
       };
 
       // General
-      private readonly CheckBox active_ = new() { Content = "Account _enabled", FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = L("Account _enabled"), FontSize = Typography.Body };
       private readonly TextBox addressBox_ = NewInput();
       private readonly ComboBox adminLevel_ = new();
       private readonly TextBox quota_ = NewInput();
       private readonly TextBox retentionDays_ = NewInput();
-      private readonly CheckBox spamFilterOn_ = new() { Content = "Apply the server's spam _filtering to this account", FontSize = Typography.Body };
+      private readonly CheckBox spamFilterOn_ = new() { Content = L("Apply the server's spam _filtering to this account"), FontSize = Typography.Body };
       private readonly TextBox spamMark_ = NewInput();
       private readonly TextBox spamDelete_ = NewInput();
       private readonly TextBox firstName_ = NewInput();
@@ -44,22 +45,22 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBlock lastLogon_ = new() { FontSize = Typography.Label, Margin = new Thickness(0, 0, 0, 8) };
 
       // Forwarding
-      private readonly CheckBox forwardOn_ = new() { Content = "_Forward incoming mail", FontSize = Typography.Body };
+      private readonly CheckBox forwardOn_ = new() { Content = L("_Forward incoming mail"), FontSize = Typography.Body };
       private readonly TextBox forwardTo_ = NewInput();
-      private readonly CheckBox forwardKeep_ = new() { Content = "_Keep original message", FontSize = Typography.Body };
-      private readonly CheckBox forwardAbortSpam_ = new() { Content = "Do _not forward messages flagged as spam", FontSize = Typography.Body };
+      private readonly CheckBox forwardKeep_ = new() { Content = L("_Keep original message"), FontSize = Typography.Body };
+      private readonly CheckBox forwardAbortSpam_ = new() { Content = L("Do _not forward messages flagged as spam"), FontSize = Typography.Body };
 
       // Auto-reply
-      private readonly CheckBox vacationOn_ = new() { Content = "Send _automatic reply (vacation message)", FontSize = Typography.Body };
+      private readonly CheckBox vacationOn_ = new() { Content = L("Send _automatic reply (vacation message)"), FontSize = Typography.Body };
       private readonly TextBox vacationSubject_ = NewInput();
       private readonly TextBox vacationBody_ = NewMemo();
-      private readonly CheckBox vacationExpires_ = new() { Content = "Stop sending replies after a _date", FontSize = Typography.Body };
+      private readonly CheckBox vacationExpires_ = new() { Content = L("Stop sending replies after a _date"), FontSize = Typography.Body };
       private readonly DatePicker vacationExpiresDate_ = new();
       private readonly DatePicker vacationBeginDate_ = new();
-      private readonly CheckBox vacationAbortSpam_ = new() { Content = "Do _not reply to messages flagged as spam", FontSize = Typography.Body };
+      private readonly CheckBox vacationAbortSpam_ = new() { Content = L("Do _not reply to messages flagged as spam"), FontSize = Typography.Body };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = "_Add signature to outgoing messages", FontSize = Typography.Body };
+      private readonly CheckBox signatureOn_ = new() { Content = L("_Add signature to outgoing messages"), FontSize = Typography.Body };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
@@ -80,7 +81,7 @@ namespace hMailServer.ControlPanel.Views
       // throughout, and an empty domain quietly means "a local Windows account on this
       // computer" - which is the only form of this feature available to anyone with no
       // domain at all, and was undiscoverable from the interface.
-      private readonly CheckBox isAd_ = new() { Content = "_Check this password against Windows (Active Directory, or a local Windows account)", FontSize = Typography.Body };
+      private readonly CheckBox isAd_ = new() { Content = L("_Check this password against Windows (Active Directory, or a local Windows account)"), FontSize = Typography.Body };
 
       // What the values below actually do, restated as a sentence. Updated as the
       // domain box is typed in, because the difference between the two behaviours is
@@ -112,7 +113,7 @@ namespace hMailServer.ControlPanel.Views
          address_ = address;
 
          Owner = owner;
-         Title = "Account - " + address;
+         Title = L("Account - ") + address;
          Width = 640;
          Height = 680;
          MinWidth = 560;
@@ -137,25 +138,25 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
-         tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
-         tabs.Items.Add(new TabItem { Header = "Forwarding", Content = BuildForwarding() });
-         tabs.Items.Add(new TabItem { Header = "Auto-reply", Content = BuildAutoReply() });
-         tabs.Items.Add(new TabItem { Header = "Spam", Content = BuildSpam() });
-         tabs.Items.Add(new TabItem { Header = "Signature", Content = BuildSignature() });
-         tabs.Items.Add(new TabItem { Header = "Sieve", Content = BuildSieve() });
-         tabs.Items.Add(new TabItem { Header = "External", Content = BuildExternal() });
-         tabs.Items.Add(new TabItem { Header = "App passwords", Content = BuildAppPasswords() });
-         tabs.Items.Add(new TabItem { Header = "Two-factor", Content = BuildTwoFactor() });
-         tabs.Items.Add(new TabItem { Header = "Rules", Content = BuildRules() });
-         tabs.Items.Add(new TabItem { Header = "Folders", Content = BuildFolders() });
-         tabs.Items.Add(new TabItem { Header = "Directory", Content = BuildDirectory() });
+         tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
+         tabs.Items.Add(new TabItem { Header = L("Forwarding"), Content = BuildForwarding() });
+         tabs.Items.Add(new TabItem { Header = L("Auto-reply"), Content = BuildAutoReply() });
+         tabs.Items.Add(new TabItem { Header = L("Spam"), Content = BuildSpam() });
+         tabs.Items.Add(new TabItem { Header = L("Signature"), Content = BuildSignature() });
+         tabs.Items.Add(new TabItem { Header = L("Sieve"), Content = BuildSieve() });
+         tabs.Items.Add(new TabItem { Header = L("External"), Content = BuildExternal() });
+         tabs.Items.Add(new TabItem { Header = L("App passwords"), Content = BuildAppPasswords() });
+         tabs.Items.Add(new TabItem { Header = L("Two-factor"), Content = BuildTwoFactor() });
+         tabs.Items.Add(new TabItem { Header = L("Rules"), Content = BuildRules() });
+         tabs.Items.Add(new TabItem { Header = L("Folders"), Content = BuildFolders() });
+         tabs.Items.Add(new TabItem { Header = L("Directory"), Content = BuildDirectory() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -181,26 +182,26 @@ namespace hMailServer.ControlPanel.Views
 
       private ScrollViewer BuildGeneral()
       {
-         adminLevel_.Items.Add(Combo("Normal user", 0));
-         adminLevel_.Items.Add(Combo("Domain administrator", 1));
-         adminLevel_.Items.Add(Combo("Server administrator", 2));
+         adminLevel_.Items.Add(Combo(L("Normal user"), 0));
+         adminLevel_.Items.Add(Combo(L("Domain administrator"), 1));
+         adminLevel_.Items.Add(Combo(L("Server administrator"), 2));
          StyleCombo(adminLevel_);
 
          var panel = TabPanel();
          panel.Children.Add(active_);
-         panel.Children.Add(Label("_Address (changing it renames the mailbox; it must stay in this domain)", addressBox_));
+         panel.Children.Add(Label(L("_Address (changing it renames the mailbox; it must stay in this domain)"), addressBox_));
          panel.Children.Add(Input(addressBox_));
-         panel.Children.Add(Label("Ad_ministration level", adminLevel_));
+         panel.Children.Add(Label(L("Ad_ministration level"), adminLevel_));
          panel.Children.Add(adminLevel_);
-         panel.Children.Add(Label("_Quota (MB, 0 = unlimited)", quota_));
+         panel.Children.Add(Label(L("_Quota (MB, 0 = unlimited)"), quota_));
          panel.Children.Add(Input(quota_));
-         panel.Children.Add(Label("_Delete messages older than (days; 0 = the domain's policy, -1 = keep forever)", retentionDays_));
+         panel.Children.Add(Label(L("_Delete messages older than (days; 0 = the domain's policy, -1 = keep forever)"), retentionDays_));
          panel.Children.Add(Input(retentionDays_));
-         panel.Children.Add(Label("_First name", firstName_));
+         panel.Children.Add(Label(L("_First name"), firstName_));
          panel.Children.Add(Input(firstName_));
-         panel.Children.Add(Label("_Last name", lastName_));
+         panel.Children.Add(Label(L("_Last name"), lastName_));
          panel.Children.Add(Input(lastName_));
-         panel.Children.Add(Label("New _password (leave empty to keep current)", password_));
+         panel.Children.Add(Label(L("New _password (leave empty to keep current)"), password_));
          password_.FontSize = Typography.Body;
          password_.Padding = new Thickness(6);
          password_.Margin = new Thickness(0, 0, 0, 6);
@@ -211,7 +212,7 @@ namespace hMailServer.ControlPanel.Views
          };
          panel.Children.Add(password_);
 
-         var genBtn = new Wpf.Ui.Controls.Button { Content = "_Generate strong password", Margin = new Thickness(0, 0, 0, 6) };
+         var genBtn = new Wpf.Ui.Controls.Button { Content = L("_Generate strong password"), Margin = new Thickness(0, 0, 0, 6) };
          System.Windows.Automation.AutomationProperties.SetAutomationId(genBtn, "GeneratePassword");
          genBtn.Click += (s, e) => GeneratePassword();
          panel.Children.Add(genBtn);
@@ -221,7 +222,7 @@ namespace hMailServer.ControlPanel.Views
          generatedShow_.FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily);
          // No caption above it, so name it directly - otherwise the one-time
          // password value is announced as an anonymous read-only "edit".
-         AutomationProperties.SetName(generatedShow_, "Generated password");
+         AutomationProperties.SetName(generatedShow_, L("Generated password"));
          generatedShow_.Visibility = Visibility.Collapsed;
          generatedShow_.Margin = new Thickness(0, 0, 0, 6);
          generatedShow_.MaxWidth = 320;
@@ -231,7 +232,7 @@ namespace hMailServer.ControlPanel.Views
 
          panel.Children.Add(pwStrength_);
          UpdatePasswordStrength();
-         panel.Children.Add(Label("Last l_ogon", lastLogon_));
+         panel.Children.Add(Label(L("Last l_ogon"), lastLogon_));
          lastLogon_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(lastLogon_);
          return Scroll(panel);
@@ -241,7 +242,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(forwardOn_);
-         panel.Children.Add(Label("Forward _to", forwardTo_));
+         panel.Children.Add(Label(L("Forward _to"), forwardTo_));
          panel.Children.Add(Input(forwardTo_));
          panel.Children.Add(forwardKeep_);
          panel.Children.Add(forwardAbortSpam_);
@@ -252,19 +253,19 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(vacationOn_);
-         panel.Children.Add(Label("Reply su_bject", vacationSubject_));
+         panel.Children.Add(Label(L("Reply su_bject"), vacationSubject_));
          panel.Children.Add(Input(vacationSubject_));
-         panel.Children.Add(Label("Reply _message", vacationBody_));
+         panel.Children.Add(Label(L("Reply _message"), vacationBody_));
          panel.Children.Add(vacationBody_);
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("Sta_rt date", vacationBeginDate_));
+         panel.Children.Add(Label(L("Sta_rt date"), vacationBeginDate_));
          vacationBeginDate_.HorizontalAlignment = HorizontalAlignment.Left;
          vacationBeginDate_.MinWidth = 160;
          vacationBeginDate_.Margin = new Thickness(0, 0, 0, 8);
          panel.Children.Add(vacationBeginDate_);
 
          panel.Children.Add(vacationExpires_);
-         panel.Children.Add(Label("_Expiry date", vacationExpiresDate_));
+         panel.Children.Add(Label(L("_Expiry date"), vacationExpiresDate_));
          vacationExpiresDate_.HorizontalAlignment = HorizontalAlignment.Left;
          vacationExpiresDate_.MinWidth = 160;
          vacationExpiresDate_.Margin = new Thickness(0, 0, 0, 8);
@@ -276,30 +277,15 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildSpam()
       {
          var panel = TabPanel();
-         panel.Children.Add(Note(
-            "Per-account overrides of the server-wide spam handling, applied to THIS account's copy at " +
-            "delivery. They cannot reach back into the SMTP conversation: a message the global settings " +
-            "refuse, quarantine or greylist is stopped for every recipient before any per-account setting " +
-            "can run."));
+         panel.Children.Add(Note(L("Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run.")));
          panel.Children.Add(spamFilterOn_);
-         panel.Children.Add(Note(
-            "Unticked, a message the server classified as spam is still delivered here, unmarked - the " +
-            "spam headers and subject tag are removed from this account's copy. For the address that must " +
-            "never lose a mail."));
-         panel.Children.Add(Label("_Mark threshold override (-1 = use the global setting, 0 = never mark)", spamMark_));
+         panel.Children.Add(Note(L("Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail.")));
+         panel.Children.Add(Label(L("_Mark threshold override (-1 = use the global setting, 0 = never mark)"), spamMark_));
          panel.Children.Add(Input(spamMark_));
-         panel.Children.Add(Label("_Delete threshold override (-1 or 0 = off)", spamDelete_));
+         panel.Children.Add(Label(L("_Delete threshold override (-1 or 0 = off)"), spamDelete_));
          panel.Children.Add(Input(spamDelete_));
-         panel.Children.Add(Note(
-            "Both overrides read the score this server recorded in the message, so they need " +
-            "\"Add reason to header\" switched on (Anti-spam settings). With it off no score is " +
-            "recorded, nothing is provable, and neither override acts - the account keeps the " +
-            "server-wide behaviour. The value in the file is not trusted in that case because " +
-            "nothing stops a SENDER putting one there."));
-         panel.Children.Add(Note(
-            "The delete override never deletes on a guess: the copy is removed only when the " +
-            "recorded score actually reached the value, and it goes to the quarantine store " +
-            "instead when that is enabled."));
+         panel.Children.Add(Note(L("Both overrides read the score this server recorded in the message, so they need \"Add reason to header\" switched on (Anti-spam settings). With it off no score is recorded, nothing is provable, and neither override acts - the account keeps the server-wide behaviour. The value in the file is not trusted in that case because nothing stops a SENDER putting one there.")));
+         panel.Children.Add(Note(L("The delete override never deletes on a guess: the copy is removed only when the recorded score actually reached the value, and it goes to the quarantine store instead when that is enabled.")));
          return Scroll(panel);
       }
 
@@ -307,9 +293,9 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = TabPanel();
          panel.Children.Add(signatureOn_);
-         panel.Children.Add(Label("_Plain-text signature", signaturePlain_));
+         panel.Children.Add(Label(L("_Plain-text signature"), signaturePlain_));
          panel.Children.Add(signaturePlain_);
-         panel.Children.Add(Label("_HTML signature", signatureHtml_));
+         panel.Children.Add(Label(L("_HTML signature"), signatureHtml_));
          panel.Children.Add(signatureHtml_);
          return Scroll(panel);
       }
@@ -319,16 +305,14 @@ namespace hMailServer.ControlPanel.Views
          var panel = TabPanel();
          panel.Children.Add(new TextBlock
          {
-            Text = "Active Sieve (RFC 5228) filter script for this account. It runs during local " +
-                   "delivery and supports keep, fileinto, discard and redirect. Leave empty to disable. " +
-                   "Multiple named scripts can be managed over ManageSieve.",
+            Text = L("Active Sieve (RFC 5228) filter script for this account. It runs during local delivery and supports keep, fileinto, discard and redirect. Leave empty to disable. Multiple named scripts can be managed over ManageSieve."),
             FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
          });
          // The explanation above is prose, not a caption, so the editor is
          // named directly rather than through Label().
-         AutomationProperties.SetName(sieveScript_, "Sieve filter script");
+         AutomationProperties.SetName(sieveScript_, L("Sieve filter script"));
          panel.Children.Add(sieveScript_);
          return Scroll(panel);
       }
@@ -364,32 +348,24 @@ namespace hMailServer.ControlPanel.Views
          var panel = TabPanel();
          panel.Children.Add(isAd_);
 
-         panel.Children.Add(Note(
-            "With this on, the password is not stored here at all - Windows is asked to check it. Leave it off "
-            + "and the account uses the password on the Account tab."));
+         panel.Children.Add(Note(L("With this on, the password is not stored here at all - Windows is asked to check it. Leave it off and the account uses the password on the Account tab.")));
 
-         panel.Children.Add(Label("Windows _domain (leave empty for a local Windows account)", adDomain_));
+         panel.Children.Add(Label(L("Windows _domain (leave empty for a local Windows account)"), adDomain_));
          panel.Children.Add(Input(adDomain_));
          panel.Children.Add(directoryEffect_);
 
-         panel.Children.Add(Label("Windows _user name", adUser_));
+         panel.Children.Add(Label(L("Windows _user name"), adUser_));
          panel.Children.Add(Input(adUser_));
 
          var browse = new Wpf.Ui.Controls.Button
          {
-            Content = "_Browse Active Directory\u2026",
+            Content = L("_Browse Active Directory\u2026"),
             Margin = new Thickness(0, 4, 0, 0)
          };
          browse.Click += (s, e) => BrowseActiveDirectory();
          panel.Children.Add(browse);
 
-         panel.Children.Add(Note(
-            "A domain name here needs the SERVER's own computer to be joined to that domain, because Windows "
-            + "validates it with LogonUser. From a computer that is not joined, every attempt fails as though the "
-            + "password were wrong - including when the domain name is simply misspelt - so a mailbox configured "
-            + "this way on an unjoined server can never log in and never says why. If the server is not "
-            + "domain-joined, use LDAP directory authentication on the Directory authentication page instead: it "
-            + "binds to the directory over the network and needs no domain join."));
+         panel.Children.Add(Note(L("A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join.")));
 
          adDomain_.TextChanged += (s, e) => RefreshDirectoryEffect_();
          isAd_.Checked += (s, e) => RefreshDirectoryEffect_();
@@ -424,9 +400,8 @@ namespace hMailServer.ControlPanel.Views
             || string.Equals(domain, Environment.MachineName, StringComparison.OrdinalIgnoreCase);
 
          directoryEffect_.Text = local
-            ? "This validates against a LOCAL Windows account on the server's own computer, not against a domain. "
-              + "That is the right setting when there is no Active Directory."
-            : "This validates against the domain \"" + domain + "\". The server's own computer must be joined to it.";
+            ? L("This validates against a LOCAL Windows account on the server's own computer, not against a domain. That is the right setting when there is no Active Directory.")
+            : F("This validates against the domain \"{0}\". The server's own computer must be joined to it.", domain);
 
          directoryEffect_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
       }
@@ -488,15 +463,15 @@ namespace hMailServer.ControlPanel.Views
       private FrameworkElement BuildFolders()
       {
          var panel = TabPanel();
-         panel.Children.Add(Label("_IMAP folders in this mailbox", folderList_));
+         panel.Children.Add(Label(L("_IMAP folders in this mailbox"), folderList_));
          panel.Children.Add(folderList_);
 
          var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
-         var add = new Wpf.Ui.Controls.Button { Content = "_Add folder", Margin = new Thickness(0, 0, 8, 0) };
+         var add = new Wpf.Ui.Controls.Button { Content = L("_Add folder"), Margin = new Thickness(0, 0, 8, 0) };
          add.Click += (s, e) => AddFolder();
-         var del = new Wpf.Ui.Controls.Button { Content = "_Delete folder", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
+         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete folder"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
          del.Click += (s, e) => DeleteFolder();
-         var refresh = new Wpf.Ui.Controls.Button { Content = "_Refresh" };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          refresh.Click += (s, e) => LoadFolders();
          actions.Children.Add(add);
          actions.Children.Add(del);
@@ -504,11 +479,11 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(actions);
 
          panel.Children.Add(Separator());
-         panel.Children.Add(Label("Maintenance"));
+         panel.Children.Add(Label(L("Maintenance")));
          var maint = new StackPanel { Orientation = Orientation.Horizontal };
-         var empty = new Wpf.Ui.Controls.Button { Content = "_Empty mailbox", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
+         var empty = new Wpf.Ui.Controls.Button { Content = L("_Empty mailbox"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0) };
          empty.Click += (s, e) => EmptyMailbox();
-         var unlock = new Wpf.Ui.Controls.Button { Content = "_Unlock mailbox" };
+         var unlock = new Wpf.Ui.Controls.Button { Content = L("_Unlock mailbox") };
          unlock.Click += (s, e) => UnlockMailbox();
          maint.Children.Add(empty);
          maint.Children.Add(unlock);
@@ -533,7 +508,7 @@ namespace hMailServer.ControlPanel.Views
                dynamic f = folders.Item[i];
                string name = (string)f.Name;
                bool sub = (bool)f.Subscribed;
-               folderList_.Items.Add(sub ? name : name + "  (not subscribed)");
+               folderList_.Items.Add(sub ? name : F("{0}  (not subscribed)", name));
                ServerSession.Release(f);
             }
             ServerSession.Release(folders);
@@ -542,7 +517,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            folderStatus_.Text = "Could not load folders: " + ex.Message;
+            folderStatus_.Text = L("Could not load folders: ") + ex.Message;
          }
          finally
          {
@@ -552,7 +527,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void AddFolder()
       {
-         string name = PromptText("New IMAP folder", "Folder name (use the hierarchy delimiter for sub-folders):");
+         string name = PromptText(L("New IMAP folder"), L("Folder name (use the hierarchy delimiter for sub-folders):"));
          if (string.IsNullOrWhiteSpace(name))
             return;
 
@@ -568,7 +543,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the folder: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the folder: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -581,11 +556,11 @@ namespace hMailServer.ControlPanel.Views
       {
          if (folderList_.SelectedItem is not string display)
          {
-            folderStatus_.Text = "Select a folder first.";
+            folderStatus_.Text = L("Select a folder first.");
             return;
          }
          string name = display.Replace("  (not subscribed)", "");
-         if (MessageBox.Show("Delete the folder '" + name + "' and all messages in it?", "Control Panel",
+         if (MessageBox.Show(F("Delete the folder '{0}' and all messages in it?", name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -602,7 +577,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the folder: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the folder: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -613,7 +588,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void EmptyMailbox()
       {
-         if (MessageBox.Show("Permanently delete ALL folders and messages in this mailbox?", "Control Panel",
+         if (MessageBox.Show(L("Permanently delete ALL folders and messages in this mailbox?"), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -623,11 +598,11 @@ namespace hMailServer.ControlPanel.Views
             dynamic a = OpenAccount(domains);
             a.DeleteMessages();
             ServerSession.Release(a);
-            folderStatus_.Text = "Mailbox emptied.";
+            folderStatus_.Text = L("Mailbox emptied.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not empty the mailbox: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not empty the mailbox: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -644,11 +619,11 @@ namespace hMailServer.ControlPanel.Views
             dynamic a = OpenAccount(domains);
             a.UnlockMailbox();
             ServerSession.Release(a);
-            folderStatus_.Text = "Mailbox unlocked.";
+            folderStatus_.Text = L("Mailbox unlocked.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not unlock the mailbox: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not unlock the mailbox: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -676,7 +651,7 @@ namespace hMailServer.ControlPanel.Views
          string result = null;
          var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => { result = box.Text; dlg.DialogResult = true; dlg.Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => dlg.Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -712,8 +687,8 @@ namespace hMailServer.ControlPanel.Views
             spamDelete_.Text = ((int)a.SpamDeleteThreshold).ToString();
             firstName_.Text = (string)a.PersonFirstName ?? "";
             lastName_.Text = (string)a.PersonLastName ?? "";
-            try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { lastLogon_.Text = "Never"; }
-            if (string.IsNullOrWhiteSpace(lastLogon_.Text)) lastLogon_.Text = "Never";
+            try { lastLogon_.Text = Convert.ToString(a.LastLogonTime); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { lastLogon_.Text = L("Never"); }
+            if (string.IsNullOrWhiteSpace(lastLogon_.Text)) lastLogon_.Text = L("Never");
 
             forwardOn_.IsChecked = (bool)a.ForwardEnabled;
             forwardTo_.Text = (string)a.ForwardAddress ?? "";
@@ -757,7 +732,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the account: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the account: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -800,8 +775,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         if (!NumericField.TryValidate(quota_.Text, "Maximum size (MB)", 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error)
-          || !NumericField.TryValidate(retentionDays_.Text, "Delete messages older than (days)", -1, int.MaxValue, out int retentionV, out bool hasRetention, out error))
+         if (!NumericField.TryValidate(quota_.Text, L("Maximum size (MB)"), 0, int.MaxValue, out int quotaV, out bool hasQuota, out string error)
+          || !NumericField.TryValidate(retentionDays_.Text, L("Delete messages older than (days)"), -1, int.MaxValue, out int retentionV, out bool hasRetention, out error))
          {
             status_.Text = error;
             return;
@@ -812,7 +787,7 @@ namespace hMailServer.ControlPanel.Views
          {
             (PasswordStrength.Level level, string summary) = PasswordStrength.Evaluate(password_.Password);
             if (level == PasswordStrength.Level.Weak &&
-                MessageBox.Show(summary + "\n\nSave this weak password anyway?", "Control Panel",
+                MessageBox.Show(summary + L("\n\nSave this weak password anyway?"), L("Control Panel"),
                    MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                return;
@@ -829,15 +804,13 @@ namespace hMailServer.ControlPanel.Views
             if (!newAddress.ToLowerInvariant().EndsWith("@" + domainName_.ToLowerInvariant()) ||
                 newAddress.IndexOf('@') <= 0)
             {
-               status_.Text = "The address must be a name followed by @" + domainName_ + ".";
+               status_.Text = L("The address must be a name followed by @") + domainName_ + ".";
                return;
             }
 
             if (MessageBox.Show(
-                   "Rename " + address_ + " to " + newAddress + "?\n\nThe mailbox and its messages move to " +
-                   "the new address. Mail sent to the old address will no longer reach this account unless " +
-                   "an alias is created for it.",
-                   "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                   F("Rename {0} to {1}?\n\nThe mailbox and its messages move to the new address. Mail sent to the old address will no longer reach this account unless an alias is created for it.", address_, newAddress),
+                   L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                return;
          }
 
@@ -917,7 +890,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the account: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the account: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

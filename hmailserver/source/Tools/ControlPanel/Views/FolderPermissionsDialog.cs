@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -45,7 +46,7 @@ namespace hMailServer.ControlPanel.Views
          // did nothing at all.
          var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => { result = box.Text; dlg.DialogResult = true; dlg.Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => dlg.Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -66,22 +67,22 @@ namespace hMailServer.ControlPanel.Views
       // eACLPermission bit flags.
       private static readonly (string Label, int Bit)[] Flags =
       {
-         ("Lookup (folder is visible)", 1),
-         ("Read messages", 2),
-         ("Keep seen/unseen state", 4),
-         ("Set flags", 8),
-         ("Insert / append messages", 16),
-         ("Post - and send as this mailbox's address over SMTP (Send-As, when SmtpAuthenticatedSenderCheck is on)", 32),
-         ("Create sub-folders", 64),
-         ("Delete folder", 128),
-         ("Delete messages", 256),
-         ("Expunge", 512),
-         ("Administer (manage ACL)", 1024)
+         (L("Lookup (folder is visible)"), 1),
+         (L("Read messages"), 2),
+         (L("Keep seen/unseen state"), 4),
+         (L("Set flags"), 8),
+         (L("Insert / append messages"), 16),
+         (L("Post - and send as this mailbox's address over SMTP (Send-As, when SmtpAuthenticatedSenderCheck is on)"), 32),
+         (L("Create sub-folders"), 64),
+         (L("Delete folder"), 128),
+         (L("Delete messages"), 256),
+         (L("Expunge"), 512),
+         (L("Administer (manage ACL)"), 1024)
       };
 
       private static readonly (int Value, string Label)[] Types =
       {
-         (0, "Account (user)"), (1, "Group"), (2, "Anyone")
+         (0, L("Account (user)")), (1, L("Group")), (2, L("Anyone"))
       };
 
       private readonly string folderName_;
@@ -92,7 +93,7 @@ namespace hMailServer.ControlPanel.Views
       {
          folderName_ = folderName;
          Owner = owner;
-         Title = "Permissions - " + folderName;
+         Title = L("Permissions - ") + folderName;
          Width = 520;
          SizeToContent = SizeToContent.Height;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -106,19 +107,19 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(list_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var add = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var add = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          add.Click += (s, e) => AddOrEdit(-1);
-         var edit = new Wpf.Ui.Controls.Button { Content = "_Edit", Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var edit = new Wpf.Ui.Controls.Button { Content = L("_Edit"), Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          edit.Click += (s, e) => { if (list_.SelectedIndex >= 0) AddOrEdit(ids_[list_.SelectedIndex]); };
-         var del = new Wpf.Ui.Controls.Button { Content = "_Delete", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
          del.Click += (s, e) => DeleteSelected();
          // IsCancel only. "Add" is deliberately not the default button: Enter with a
          // row selected in the list must not open the add dialog, and the list's own
          // double-click already covers "open the thing I am looking at".
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", MinWidth = 80, IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 80, IsCancel = true };
          close.Click += (s, e) => Close();
          System.Windows.Automation.AutomationProperties.SetName(list_,
-            "Access-control entries for " + folderName);
+            F("Access-control entries for {0}", folderName));
          buttons.Children.Add(add);
          buttons.Children.Add(edit);
          buttons.Children.Add(del);
@@ -154,7 +155,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load permissions: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load permissions: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -169,26 +170,26 @@ namespace hMailServer.ControlPanel.Views
          {
             0 => SafeAccount(p),
             1 => SafeGroup(p),
-            _ => "Anyone"
+            _ => L("Anyone")
          };
          int value = (int)p.Value;
          var rights = new List<string>();
          foreach ((string label, int bit) in Flags)
             if ((value & bit) != 0)
                rights.Add(label.Split(' ')[0]);
-         return subject + "   —   " + (rights.Count == 0 ? "no rights" : string.Join(", ", rights));
+         return subject + "   —   " + (rights.Count == 0 ? L("no rights") : string.Join(", ", rights));
       }
 
       private static string SafeAccount(dynamic p)
       {
          try { dynamic a = p.Account; string addr = (string)a.Address; ServerSession.Release(a); return addr; }
-         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return "(account #" + (int)p.PermissionAccountID + ")"; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return F("(account #{0})", (int)p.PermissionAccountID); }
       }
 
       private static string SafeGroup(dynamic p)
       {
          try { dynamic g = p.Group; string n = (string)g.Name; ServerSession.Release(g); return "Group: " + n; }
-         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return "(group #" + (int)p.PermissionGroupID + ")"; }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { return F("(group #{0})", (int)p.PermissionGroupID); }
       }
 
       private void DeleteSelected()
@@ -208,7 +209,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the permission: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the permission: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -248,12 +249,12 @@ namespace hMailServer.ControlPanel.Views
          if (dlg.SelectedType == 0)
          {
             subjectId = ResolveAccountId(dlg.Subject);
-            if (subjectId == 0) { MessageBox.Show("No account found with address '" + dlg.Subject + "'.", "Control Panel"); return; }
+            if (subjectId == 0) { MessageBox.Show(F("No account found with address '{0}'.", dlg.Subject), L("Control Panel")); return; }
          }
          else if (dlg.SelectedType == 1)
          {
             subjectId = ResolveGroupId(dlg.Subject);
-            if (subjectId == 0) { MessageBox.Show("No group found named '" + dlg.Subject + "'.", "Control Panel"); return; }
+            if (subjectId == 0) { MessageBox.Show(F("No group found named '{0}'.", dlg.Subject), L("Control Panel")); return; }
          }
 
          dynamic folders2 = ServerSession.Current.Application.Settings.PublicFolders;
@@ -273,7 +274,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the permission: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the permission: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -342,7 +343,7 @@ namespace hMailServer.ControlPanel.Views
       public PermissionEditDialog(Window owner, (int Value, string Label)[] types, (string Label, int Bit)[] flags)
       {
          Owner = owner;
-         Title = "Access-control entry";
+         Title = L("Access-control entry");
          Width = 420;
          SizeToContent = SizeToContent.Height;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -350,18 +351,18 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(20) };
-         panel.Children.Add(Label("Applies _to", typeCombo_));
+         panel.Children.Add(Label(L("Applies _to"), typeCombo_));
          foreach ((int value, string label) in types)
             typeCombo_.Items.Add(new ComboBoxItem { Content = label, Tag = value });
          typeCombo_.SelectedIndex = 0;
          typeCombo_.SelectionChanged += (s, e) => UpdateSubjectState();
          panel.Children.Add(typeCombo_);
 
-         subjectLabel_ = Label("_Account address", subject_);
+         subjectLabel_ = Label(L("_Account address"), subject_);
          panel.Children.Add(subjectLabel_);
          panel.Children.Add(subject_);
 
-         panel.Children.Add(Label("Permissions"));
+         panel.Children.Add(Label(L("Permissions")));
          foreach ((string label, int bit) in flags)
          {
             var cb = new CheckBox { Content = label, FontSize = Typography.Label, Margin = new Thickness(0, 2, 0, 2) };
@@ -371,9 +372,9 @@ namespace hMailServer.ControlPanel.Views
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var ok = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var ok = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          ok.Click += (s, e) => Commit();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);
@@ -398,7 +399,7 @@ namespace hMailServer.ControlPanel.Views
       {
          int type = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
          bool needsSubject = type != 2; // Anyone needs no subject
-         subjectLabel_.Text = type == 1 ? "Group name" : "Account address";
+         subjectLabel_.Text = type == 1 ? L("Group name") : L("Account address");
          subjectLabel_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
          subject_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
 

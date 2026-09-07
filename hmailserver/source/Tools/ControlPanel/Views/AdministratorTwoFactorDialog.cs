@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using QRCoder;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -69,7 +70,7 @@ namespace hMailServer.ControlPanel.Views
       public AdministratorTwoFactorDialog(Window owner)
       {
          Owner = owner;
-         Title = "Server-enforced two-factor authentication";
+         Title = L("Server-enforced two-factor authentication");
          Width = 560;
          Height = 640;
          MinWidth = 520;
@@ -81,7 +82,7 @@ namespace hMailServer.ControlPanel.Views
 
          var header = new TextBlock
          {
-            Text = "Second factor on the administrator credential",
+            Text = L("Second factor on the administrator credential"),
             FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 12)
@@ -95,7 +96,7 @@ namespace hMailServer.ControlPanel.Views
          BuildEnrolPanel();
          panel.Children.Add(enrolPanel_);
 
-         panel.Children.Add(Label("Verification code from your authenticator app"));
+         panel.Children.Add(Label(L("Verification code from your authenticator app")));
          code_.Margin = new Thickness(0, 0, 0, 4);
          panel.Children.Add(code_);
 
@@ -107,7 +108,7 @@ namespace hMailServer.ControlPanel.Views
          };
          action_.Click += (s, e) => Apply();
          action_.Margin = new Thickness(0, 0, 8, 0);
-         var close = new Wpf.Ui.Controls.Button { Content = "Close", IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), IsCancel = true };
          close.Click += (s, e) => Close();
          buttons.Children.Add(action_);
          buttons.Children.Add(close);
@@ -138,15 +139,15 @@ namespace hMailServer.ControlPanel.Views
       {
          if (IsEnrolled() && pendingSecret_ == null)
          {
-            status_.Text = "A second factor is enrolled. Every sign-in with the administrator credential - this tool, the COM API and the REST API - needs a code. Enter a current code to turn it off.";
+            status_.Text = L("A second factor is enrolled. Every sign-in with the administrator credential - this tool, the COM API and the REST API - needs a code. Enter a current code to turn it off.");
             enrolPanel_.Visibility = Visibility.Collapsed;
-            action_.Content = "_Disable second factor";
+            action_.Content = L("_Disable second factor");
          }
          else
          {
-            status_.Text = "Add the key below to an authenticator app, then confirm with a code. Once enrolled, the administrator password alone will not sign in - the COM API and REST API will need a code too. Keep the key somewhere safe: if you lose the authenticator, a local administrator must clear AdministratorTotpSecret from hMailServer.ini to recover.";
+            status_.Text = L("Add the key below to an authenticator app, then confirm with a code. Once enrolled, the administrator password alone will not sign in - the COM API and REST API will need a code too. Keep the key somewhere safe: if you lose the authenticator, a local administrator must clear AdministratorTotpSecret from hMailServer.ini to recover.");
             EnsureEnrolled();
-            action_.Content = "Confirm and _enable";
+            action_.Content = L("Confirm and _enable");
          }
 
          code_.Text = "";
@@ -168,7 +169,7 @@ namespace hMailServer.ControlPanel.Views
 
             if (!match.Success)
             {
-               status_.Text = "The server did not return a usable enrolment. See its error log.";
+               status_.Text = L("The server did not return a usable enrolment. See its error log.");
                enrolPanel_.Visibility = Visibility.Collapsed;
                action_.IsEnabled = false;
                return;
@@ -205,12 +206,12 @@ namespace hMailServer.ControlPanel.Views
                // authenticator is the ini-file recovery path named above.
                if (entered.Length != 6)
                {
-                  MessageBox.Show("Enter the current 6-digit code to turn the second factor off.", Title);
+                  MessageBox.Show(L("Enter the current 6-digit code to turn the second factor off."), Title);
                   return;
                }
 
                ServerSession.Current.Application.Settings.DisableAdministratorTOTP();
-               MessageBox.Show("The second factor has been removed. The administrator password alone signs in again.", Title);
+               MessageBox.Show(L("The second factor has been removed. The administrator password alone signs in again."), Title);
                RefreshState();
                return;
             }
@@ -220,13 +221,13 @@ namespace hMailServer.ControlPanel.Views
             // the next sign-in.
             if (!Totp.VerifyCode(pendingSecret_, entered))
             {
-               MessageBox.Show("That code does not match. Make sure the authenticator app has the new key, then try the current code.", Title);
+               MessageBox.Show(L("That code does not match. Make sure the authenticator app has the new key, then try the current code."), Title);
                return;
             }
 
             // Confirmed: keep it, and stop the Closing handler rolling it back.
             pendingSecret_ = null;
-            MessageBox.Show("The second factor is enabled. The next sign-in with the administrator credential will need a code.", Title);
+            MessageBox.Show(L("The second factor is enabled. The next sign-in with the administrator credential will need a code."), Title);
             RefreshState();
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
@@ -272,21 +273,21 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(qrCard);
 
          var right = new StackPanel { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-         right.Children.Add(StepText("1.  Scan this QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy, 1Password…)."));
-         right.Children.Add(StepText("2.  Or enter the setup key shown below by hand."));
+         right.Children.Add(StepText(L("1.  Scan this QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy, 1Password…).")));
+         right.Children.Add(StepText(L("2.  Or enter the setup key shown below by hand.")));
          Grid.SetColumn(right, 1);
          grid.Children.Add(right);
 
          enrolPanel_.Children.Add(grid);
 
-         enrolPanel_.Children.Add(Label("Setup key (for manual entry)"));
+         enrolPanel_.Children.Add(Label(L("Setup key (for manual entry)")));
          var keyRow = new Grid();
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          secretBox_.HorizontalAlignment = HorizontalAlignment.Stretch;
          Grid.SetColumn(secretBox_, 0);
          keyRow.Children.Add(secretBox_);
-         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secretBox_.Text)) Clipboard.SetText(secretBox_.Text.Replace(" ", "")); }

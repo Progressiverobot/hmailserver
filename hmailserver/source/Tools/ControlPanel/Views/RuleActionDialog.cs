@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -21,7 +22,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox type_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 12) };
 
       private readonly TextBox to_ = new();
-      private readonly CheckBox abortSpam_ = new() { Content = "Abort on messages _marked as spam", FontSize = Typography.Body, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly CheckBox abortSpam_ = new() { Content = L("Abort on messages _marked as spam"), FontSize = Typography.Body, Margin = new Thickness(0, 4, 0, 0) };
       private readonly TextBox fromName_ = new();
       private readonly TextBox fromAddress_ = new();
       private readonly TextBox subject_ = new();
@@ -40,7 +41,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly StackPanel headerPanel_ = new();
       private readonly StackPanel routePanel_ = new();
       private readonly StackPanel bindPanel_ = new();
-      private readonly TextBlock noParams_ = new() { Text = "This action has no additional parameters.", FontSize = Typography.Label, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly TextBlock noParams_ = new() { Text = L("This action has no additional parameters."), FontSize = Typography.Label, Margin = new Thickness(0, 4, 0, 0) };
 
       public RuleActionDialog(Window owner, int ruleId, int actionId, Func<dynamic> rulesProvider = null, bool serverLevel = true)
       {
@@ -49,7 +50,7 @@ namespace hMailServer.ControlPanel.Views
          rulesProvider_ = rulesProvider ?? (() => ServerSession.Current.Application.Rules);
          serverLevel_ = serverLevel;
          Owner = owner;
-         Title = actionId == 0 ? "Add action" : "Edit action";
+         Title = actionId == 0 ? L("Add action") : L("Edit action");
          Width = 520;
          Height = 540;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -63,70 +64,70 @@ namespace hMailServer.ControlPanel.Views
          // Upper-case deliberately, sentence-case sweep notwithstanding: "THEN"
          // is the rule grammar's keyword, not prose - the pair to RuleCriteria-
          // Dialog's "IF", both echoing RulesView's editor panes.
-         var header = new TextBlock { Text = "THEN", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = L("THEN"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
 
          var body = new StackPanel();
-         body.Children.Add(Label("_Action", type_));
-         type_.Items.Add(Combo("Delete e-mail", 1));
-         type_.Items.Add(Combo("Forward e-mail", 2));
-         type_.Items.Add(Combo("Reply", 3));
-         type_.Items.Add(Combo("Move to IMAP folder", 4));
-         type_.Items.Add(Combo("Run script function", 5));
-         type_.Items.Add(Combo("Stop rule processing", 6));
-         type_.Items.Add(Combo("Set header value", 7));
+         body.Children.Add(Label(L("_Action"), type_));
+         type_.Items.Add(Combo(L("Delete e-mail"), 1));
+         type_.Items.Add(Combo(L("Forward e-mail"), 2));
+         type_.Items.Add(Combo(L("Reply"), 3));
+         type_.Items.Add(Combo(L("Move to IMAP folder"), 4));
+         type_.Items.Add(Combo(L("Run script function"), 5));
+         type_.Items.Add(Combo(L("Stop rule processing"), 6));
+         type_.Items.Add(Combo(L("Set header value"), 7));
          if (serverLevel)
-            type_.Items.Add(Combo("Send using route", 8));
-         type_.Items.Add(Combo("Create copy", 9));
+            type_.Items.Add(Combo(L("Send using route"), 8));
+         type_.Items.Add(Combo(L("Create copy"), 9));
          if (serverLevel)
-            type_.Items.Add(Combo("Bind to address", 10));
+            type_.Items.Add(Combo(L("Bind to address"), 10));
          type_.SelectionChanged += (s, e) => UpdateVisibility();
          body.Children.Add(type_);
 
          // Forward
-         forwardPanel_.Children.Add(Label("_To", to_));
+         forwardPanel_.Children.Add(Label(L("_To"), to_));
          forwardPanel_.Children.Add(Input(to_));
          forwardPanel_.Children.Add(abortSpam_);
          body.Children.Add(forwardPanel_);
 
          // Reply
-         replyPanel_.Children.Add(Label("From (_name)", fromName_));
+         replyPanel_.Children.Add(Label(L("From (_name)"), fromName_));
          replyPanel_.Children.Add(Input(fromName_));
-         replyPanel_.Children.Add(Label("From (a_ddress)", fromAddress_));
+         replyPanel_.Children.Add(Label(L("From (a_ddress)"), fromAddress_));
          replyPanel_.Children.Add(Input(fromAddress_));
-         replyPanel_.Children.Add(Label("Su_bject", subject_));
+         replyPanel_.Children.Add(Label(L("Su_bject"), subject_));
          replyPanel_.Children.Add(Input(subject_));
-         replyPanel_.Children.Add(Label("Bod_y", body_));
+         replyPanel_.Children.Add(Label(L("Bod_y"), body_));
          Input(body_);
          replyPanel_.Children.Add(body_);
          body.Children.Add(replyPanel_);
 
          // Move to folder
-         folderPanel_.Children.Add(Label("_IMAP folder (e.g. INBOX.Archive)", imapFolder_));
+         folderPanel_.Children.Add(Label(L("_IMAP folder (e.g. INBOX.Archive)"), imapFolder_));
          folderPanel_.Children.Add(Input(imapFolder_));
          body.Children.Add(folderPanel_);
 
          // Script
-         scriptPanel_.Children.Add(Label("Script _function", scriptFunction_));
+         scriptPanel_.Children.Add(Label(L("Script _function"), scriptFunction_));
          scriptPanel_.Children.Add(Input(scriptFunction_));
          body.Children.Add(scriptPanel_);
 
          // Set header
-         headerPanel_.Children.Add(Label("_Header name", headerName_));
+         headerPanel_.Children.Add(Label(L("_Header name"), headerName_));
          headerPanel_.Children.Add(Input(headerName_));
-         headerPanel_.Children.Add(Label("_Value", value_));
+         headerPanel_.Children.Add(Label(L("_Value"), value_));
          headerPanel_.Children.Add(Input(value_));
          body.Children.Add(headerPanel_);
 
          // Route
-         routePanel_.Children.Add(Label("_Route", route_));
+         routePanel_.Children.Add(Label(L("_Route"), route_));
          routePanel_.Children.Add(route_);
          body.Children.Add(routePanel_);
 
          // Bind to address
-         bindPanel_.Children.Add(Label("I_P address", bindAddress_));
+         bindPanel_.Children.Add(Label(L("I_P address"), bindAddress_));
          bindPanel_.Children.Add(Input(bindAddress_));
          body.Children.Add(bindPanel_);
 
@@ -140,9 +141,9 @@ namespace hMailServer.ControlPanel.Views
          // Enter saves, Escape cancels. Neither worked before. Safe alongside the
          // multi-line reply body: a TextBox with AcceptsReturn handles Enter itself
          // and marks the key handled, so it never reaches the default button.
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -232,7 +233,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the action: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the action: {0}", ex.Message), L("Control Panel"));
             Close();
             return;
          }
@@ -302,7 +303,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the action: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the action: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

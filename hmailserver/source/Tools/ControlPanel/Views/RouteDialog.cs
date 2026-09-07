@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -21,16 +22,16 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox description_ = new();
       private readonly Wpf.Ui.Controls.TextBox tries_ = new();
       private readonly Wpf.Ui.Controls.TextBox minutes_ = new();
-      private readonly CheckBox allAddresses_ = new() { Content = "Deliver to _all addresses (not only known accounts)", FontSize = Typography.Body };
+      private readonly CheckBox allAddresses_ = new() { Content = L("Deliver to _all addresses (not only known accounts)"), FontSize = Typography.Body };
 
       private readonly ListBox addressList_ = new() { Height = 200, FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox newAddress_ = new();
 
       private readonly ComboBox connSecurity_ = new();
-      private readonly CheckBox treatSenderLocal_ = new() { Content = "Treat sender domain as _local", FontSize = Typography.Body };
-      private readonly CheckBox treatRecipientLocal_ = new() { Content = "Treat _recipient domain as local", FontSize = Typography.Body };
+      private readonly CheckBox treatSenderLocal_ = new() { Content = L("Treat sender domain as _local"), FontSize = Typography.Body };
+      private readonly CheckBox treatRecipientLocal_ = new() { Content = L("Treat _recipient domain as local"), FontSize = Typography.Body };
 
-      private readonly CheckBox requiresAuth_ = new() { Content = "Target server requires _authentication", FontSize = Typography.Body };
+      private readonly CheckBox requiresAuth_ = new() { Content = L("Target server requires _authentication"), FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
       private readonly Wpf.Ui.Controls.PasswordBox authPassword_ = new();
 
@@ -46,7 +47,7 @@ namespace hMailServer.ControlPanel.Views
       {
          domainName_ = domainName;
          Owner = owner;
-         Title = "Route - " + domainName;
+         Title = L("Route - ") + domainName;
          Width = 560;
          Height = 560;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -63,18 +64,18 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
-         tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
-         tabs.Items.Add(new TabItem { Header = "Delivery", Content = BuildDelivery() });
-         tabs.Items.Add(new TabItem { Header = "Addresses", Content = BuildAddresses() });
-         tabs.Items.Add(new TabItem { Header = "Security", Content = BuildSecurity() });
-         tabs.Items.Add(new TabItem { Header = "Authentication", Content = BuildAuth() });
+         tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
+         tabs.Items.Add(new TabItem { Header = L("Delivery"), Content = BuildDelivery() });
+         tabs.Items.Add(new TabItem { Header = L("Addresses"), Content = BuildAddresses() });
+         tabs.Items.Add(new TabItem { Header = L("Security"), Content = BuildSecurity() });
+         tabs.Items.Add(new TabItem { Header = L("Authentication"), Content = BuildAuth() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -95,11 +96,11 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = TabPanel();
-         p.Children.Add(Label("_Target SMTP host", host_));
+         p.Children.Add(Label(L("_Target SMTP host"), host_));
          p.Children.Add(Input(host_));
-         p.Children.Add(Label("Target SMTP _port", port_));
+         p.Children.Add(Label(L("Target SMTP _port"), port_));
          p.Children.Add(Input(port_));
-         p.Children.Add(Label("_Description", description_));
+         p.Children.Add(Label(L("_Description"), description_));
          p.Children.Add(Input(description_));
          return Scroll(p);
       }
@@ -107,9 +108,9 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildDelivery()
       {
          var p = TabPanel();
-         p.Children.Add(Label("_Number of delivery retries", tries_));
+         p.Children.Add(Label(L("_Number of delivery retries"), tries_));
          p.Children.Add(Input(tries_));
-         p.Children.Add(Label("_Minutes between retries", minutes_));
+         p.Children.Add(Label(L("_Minutes between retries"), minutes_));
          p.Children.Add(Input(minutes_));
          p.Children.Add(allAddresses_);
          return Scroll(p);
@@ -118,17 +119,17 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildAddresses()
       {
          var p = TabPanel();
-         p.Children.Add(Label("Specific addresses to route (used when \u201cDeliver to all addresses\u201d is off)"));
-         addressList_.DisplayMemberPath = "Address";
+         p.Children.Add(Label(L("Specific addresses to route (used when \u201cDeliver to all addresses\u201d is off)")));
+         addressList_.DisplayMemberPath = "Address"; // no-loc
          p.Children.Add(addressList_);
 
          var addRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 8, 0, 0) };
          newAddress_.Width = 320;
          Input(newAddress_);
          newAddress_.Margin = new Thickness(0, 0, 8, 0);
-         var addBtn = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         var addBtn = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          addBtn.Click += (s, e) => AddAddress();
-         var removeBtn = new Wpf.Ui.Controls.Button { Content = "_Remove" };
+         var removeBtn = new Wpf.Ui.Controls.Button { Content = L("_Remove") };
          removeBtn.Click += (s, e) => RemoveAddress();
          addRow.Children.Add(newAddress_);
          addRow.Children.Add(addBtn);
@@ -139,15 +140,15 @@ namespace hMailServer.ControlPanel.Views
 
       private ScrollViewer BuildSecurity()
       {
-         connSecurity_.Items.Add(Combo("None", 0));
-         connSecurity_.Items.Add(Combo("SSL/TLS", 1));
-         connSecurity_.Items.Add(Combo("STARTTLS (optional)", 2));
-         connSecurity_.Items.Add(Combo("STARTTLS (required)", 3));
+         connSecurity_.Items.Add(Combo(L("None"), 0));
+         connSecurity_.Items.Add(Combo(L("SSL/TLS"), 1));
+         connSecurity_.Items.Add(Combo(L("STARTTLS (optional)"), 2));
+         connSecurity_.Items.Add(Combo(L("STARTTLS (required)"), 3));
          connSecurity_.FontSize = Typography.Body;
          connSecurity_.Margin = new Thickness(0, 0, 0, 8);
 
          var p = TabPanel();
-         p.Children.Add(Label("_Connection security", connSecurity_));
+         p.Children.Add(Label(L("_Connection security"), connSecurity_));
          p.Children.Add(connSecurity_);
          p.Children.Add(treatSenderLocal_);
          p.Children.Add(treatRecipientLocal_);
@@ -158,9 +159,9 @@ namespace hMailServer.ControlPanel.Views
       {
          var p = TabPanel();
          p.Children.Add(requiresAuth_);
-         p.Children.Add(Label("_User name", authUser_));
+         p.Children.Add(Label(L("_User name"), authUser_));
          p.Children.Add(Input(authUser_));
-         p.Children.Add(Label("Password (leave empty to keep current)"));
+         p.Children.Add(Label(L("Password (leave empty to keep current)")));
          authPassword_.FontSize = Typography.Body;
          authPassword_.Padding = new Thickness(6);
          authPassword_.Margin = new Thickness(0, 0, 0, 8);
@@ -205,7 +206,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the route: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the route: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -216,9 +217,9 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         if (!NumericField.TryValidate(port_.Text, "Target SMTP port", 1, 65535, out int portV, out bool hasPort, out string error)
-          || !NumericField.TryValidate(tries_.Text, "Number of delivery retries", 0, int.MaxValue, out int triesV, out bool hasTries, out error)
-          || !NumericField.TryValidate(minutes_.Text, "Minutes between retries", 0, int.MaxValue, out int minutesV, out bool hasMinutes, out error))
+         if (!NumericField.TryValidate(port_.Text, L("Target SMTP port"), 1, 65535, out int portV, out bool hasPort, out string error)
+          || !NumericField.TryValidate(tries_.Text, L("Number of delivery retries"), 0, int.MaxValue, out int triesV, out bool hasTries, out error)
+          || !NumericField.TryValidate(minutes_.Text, L("Minutes between retries"), 0, int.MaxValue, out int minutesV, out bool hasMinutes, out error))
          {
             status_.Text = error;
             return;
@@ -250,7 +251,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the route: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the route: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -331,7 +332,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the address: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the address: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -366,7 +367,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not remove the address: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not remove the address: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally

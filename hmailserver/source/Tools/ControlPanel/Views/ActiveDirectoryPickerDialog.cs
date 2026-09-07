@@ -10,6 +10,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -34,7 +35,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly Wpf.Ui.Controls.Button okButton_ = new()
       {
-         Content = "_Select",
+         Content = L("_Select"),
          Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
          Margin = new Thickness(0, 0, 8, 0),
          IsEnabled = false
@@ -51,7 +52,7 @@ namespace hMailServer.ControlPanel.Views
          multiSelect_ = multiSelect;
 
          Owner = owner;
-         Title = "Browse Active Directory";
+         Title = L("Browse Active Directory");
          Width = 680;
          Height = 560;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -66,7 +67,7 @@ namespace hMailServer.ControlPanel.Views
 
          var header = new TextBlock
          {
-            Text = multiSelect ? "Select Active Directory accounts" : "Select an Active Directory account",
+            Text = multiSelect ? L("Select Active Directory accounts") : L("Select an Active Directory account"),
             FontSize = Typography.DialogTitle,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(2, 0, 0, 12)
@@ -102,7 +103,7 @@ namespace hMailServer.ControlPanel.Views
          // accept a selection the search had just cleared. Enter on the results list
          // is the natural "select" gesture and is reached by tabbing to the list,
          // which is why the list's key handling is left to the ListView.
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => { DialogResult = false; Close(); };
          buttons.Children.Add(okButton_);
          buttons.Children.Add(cancel);
@@ -123,7 +124,7 @@ namespace hMailServer.ControlPanel.Views
 
          var domainLabel = new TextBlock
          {
-            Text = "Domain",
+            Text = L("Domain"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0),
             FontSize = Typography.Body
@@ -133,7 +134,7 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(domainLabel);
 
          domainBox_.Margin = new Thickness(0, 0, 12, 0);
-         AutomationProperties.SetName(domainBox_, "Domain");
+         AutomationProperties.SetName(domainBox_, L("Domain"));
          Grid.SetColumn(domainBox_, 1);
          grid.Children.Add(domainBox_);
 
@@ -147,7 +148,7 @@ namespace hMailServer.ControlPanel.Views
          // because "search with an empty box to list all users" is real behaviour
          // that only the status line mentions.
          AutomationProperties.SetName(searchBox_,
-            "Search for part of an account name. Leave empty to list every user in the domain.");
+            L("Search for part of an account name. Leave empty to list every user in the domain."));
 
          // Handled, so the keystroke stops here. Without that, adding a default
          // button anywhere in this dialog would make one Enter both search and
@@ -165,7 +166,7 @@ namespace hMailServer.ControlPanel.Views
 
          var searchButton = new Wpf.Ui.Controls.Button
          {
-            Content = "Sea_rch",
+            Content = L("Sea_rch"),
             Margin = new Thickness(8, 0, 0, 0)
          };
          searchButton.Click += (s, e) => Search();
@@ -185,14 +186,14 @@ namespace hMailServer.ControlPanel.Views
          list_.Background = System.Windows.Media.Brushes.Transparent;
 
          var gridView = new GridView();
-         gridView.Columns.Add(new GridViewColumn { Header = "Account", DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.SamAccountName)), Width = 160 });
-         gridView.Columns.Add(new GridViewColumn { Header = "Name", DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.DisplayName)), Width = 200 });
-         gridView.Columns.Add(new GridViewColumn { Header = "E-mail", DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.Email)), Width = 240 });
+         gridView.Columns.Add(new GridViewColumn { Header = L("Account"), DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.SamAccountName)), Width = 160 });
+         gridView.Columns.Add(new GridViewColumn { Header = L("Name"), DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.DisplayName)), Width = 200 });
+         gridView.Columns.Add(new GridViewColumn { Header = L("E-mail"), DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.Email)), Width = 240 });
          list_.View = gridView;
 
          AutomationProperties.SetName(list_, multiSelect_
-            ? "Matching Active Directory accounts. Select one or more."
-            : "Matching Active Directory accounts. Select one.");
+            ? L("Matching Active Directory accounts. Select one or more.")
+            : L("Matching Active Directory accounts. Select one."));
 
          list_.SelectionChanged += (s, e) => okButton_.IsEnabled = list_.SelectedItems.Count > 0;
          list_.MouseDoubleClick += (s, e) => { if (!multiSelect_ && list_.SelectedItem is AdUser) Accept(); };
@@ -225,17 +226,17 @@ namespace hMailServer.ControlPanel.Views
             var domains = ActiveDirectoryService.ListDomains();
             if (domains.Count == 0)
             {
-               status_.Text = "No Active Directory domains could be found in the current forest.";
+               status_.Text = L("No Active Directory domains could be found in the current forest.");
                return;
             }
 
             domainBox_.ItemsSource = domains;
             domainBox_.SelectedIndex = 0;
-            status_.Text = "Enter part of a name and press Search, or search with an empty box to list all users.";
+            status_.Text = L("Enter part of a name and press Search, or search with an empty box to list all users.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Could not list domains — " + ServerSession.DescribeComError(ex);
+            status_.Text = L("Could not list domains — ") + ServerSession.DescribeComError(ex);
          }
       }
 
@@ -244,12 +245,12 @@ namespace hMailServer.ControlPanel.Views
          string domain = domainBox_.SelectedItem as string;
          if (string.IsNullOrEmpty(domain))
          {
-            status_.Text = "Select a domain first.";
+            status_.Text = L("Select a domain first.");
             return;
          }
 
          string filter = searchBox_.Text;
-         status_.Text = "Searching " + domain + "\u2026";
+         status_.Text = L("Searching ") + domain + "\u2026";
          Mouse.OverrideCursor = Cursors.Wait;
          list_.ItemsSource = null;
          okButton_.IsEnabled = false;
@@ -259,12 +260,12 @@ namespace hMailServer.ControlPanel.Views
             List<AdUser> users = await Task.Run(() => ActiveDirectoryService.QueryUsers(domain, filter, 1000));
             list_.ItemsSource = users;
             status_.Text = users.Count == 0
-               ? "No matching accounts in " + domain + "."
-               : users.Count + " account(s) found" + (users.Count >= 1000 ? " (showing first 1000 — refine your search)" : "") + ".";
+               ? F("No matching accounts in {0}.", domain)
+               : F("{0} account(s) found{1}.", users.Count, users.Count >= 1000 ? L(" (showing first 1000 — refine your search)") : "");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Search failed — " + ServerSession.DescribeComError(ex);
+            status_.Text = L("Search failed — ") + ServerSession.DescribeComError(ex);
          }
          finally
          {

@@ -19,6 +19,7 @@ using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxResult = System.Windows.MessageBoxResult;
 using System.Linq;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -52,7 +53,7 @@ namespace hMailServer.ControlPanel.Views
          public List<FieldSpec> Fields = new();
          public bool CanAdd = true;
          public bool CanDelete = true;
-         public string ItemNoun = "item";
+         public string ItemNoun = L("item");
       }
 
       internal sealed class Row
@@ -159,15 +160,15 @@ namespace hMailServer.ControlPanel.Views
          var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          Grid.SetColumn(actions, 1);
          if (spec_.CanAdd)
-            actions.Children.Add(MakeButton("_Add", ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
-         actions.Children.Add(MakeButton("_Edit", ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
+            actions.Children.Add(MakeButton(L("_Add"), ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
+         actions.Children.Add(MakeButton(L("_Edit"), ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
          if (spec_.CanDelete)
          {
-            var del = MakeButton("_Delete", ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
+            var del = MakeButton(L("_Delete"), ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
             del.Foreground = Services.ThemeTokens.Danger;
             actions.Children.Add(del);
          }
-         actions.Children.Add(MakeButton("_Refresh", ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
+         actions.Children.Add(MakeButton(L("_Refresh"), ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
          toolbar.Children.Add(actions);
          Grid.SetRow(toolbar, 1);
          root.Children.Add(toolbar);
@@ -259,11 +260,11 @@ namespace hMailServer.ControlPanel.Views
                rows_.Add(row);
                ServerSession.Release(item);
             }
-            status_.Text = "Loaded from server.";
+            status_.Text = L("Loaded from server.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Could not load — " + ServerSession.DescribeComError(ex);
+            status_.Text = L("Could not load — ") + ServerSession.DescribeComError(ex);
          }
          finally
          {
@@ -292,7 +293,7 @@ namespace hMailServer.ControlPanel.Views
          if (grid_.SelectedItem is Row row)
             OpenDialog(row);
          else
-            status_.Text = "Select a row first.";
+            status_.Text = L("Select a row first.");
       }
 
       private void OpenDialog(Row existing)
@@ -309,7 +310,7 @@ namespace hMailServer.ControlPanel.Views
             item = existing == null ? collection.Add() : FindById(collection, existing.Id);
             if (item == null)
             {
-               status_.Text = "The item no longer exists.";
+               status_.Text = L("The item no longer exists.");
                return;
             }
 
@@ -317,11 +318,11 @@ namespace hMailServer.ControlPanel.Views
                SetProp(item, kv.Key, kv.Value);
 
             item.Save();
-            status_.Text = (existing == null ? "Added" : "Saved") + " at " + DateTime.Now.ToLongTimeString() + ".";
+            status_.Text = existing == null ? F("Added at {0}.", DateTime.Now.ToLongTimeString()) : F("Saved at {0}.", DateTime.Now.ToLongTimeString());
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -336,11 +337,11 @@ namespace hMailServer.ControlPanel.Views
       {
          if (grid_.SelectedItem is not Row row)
          {
-            status_.Text = "Select a row first.";
+            status_.Text = L("Select a row first.");
             return;
          }
 
-         if (MessageBox.Show($"Delete this {spec_.ItemNoun}?", "Control Panel",
+         if (MessageBox.Show(F("Delete this {0}?", spec_.ItemNoun), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -356,7 +357,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -397,7 +398,7 @@ namespace hMailServer.ControlPanel.Views
       internal static string FormatCell(object v)
       {
          if (v == null) return "";
-         if (v is bool b) return b ? "Yes" : "No";
+         if (v is bool b) return b ? L("Yes") : L("No");
          return Convert.ToString(v, CultureInfo.CurrentCulture);
       }
 

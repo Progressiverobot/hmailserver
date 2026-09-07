@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -19,10 +20,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly string domainName_;
       private readonly string address_;
 
-      private readonly CheckBox active_ = new() { Content = "List is _active", FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = L("List is _active"), FontSize = Typography.Body };
       private readonly TextBox addressBox_ = new();
       private readonly ComboBox mode_ = new();
-      private readonly CheckBox requireAuth_ = new() { Content = "Require SMTP au_thentication to send to the list", FontSize = Typography.Body };
+      private readonly CheckBox requireAuth_ = new() { Content = L("Require SMTP au_thentication to send to the list"), FontSize = Typography.Body };
       private readonly TextBox requireSender_ = new();
       private readonly TextBox moderator_ = new();
       private readonly TextBox bounce_ = new();
@@ -32,7 +33,7 @@ namespace hMailServer.ControlPanel.Views
          domainName_ = domainName;
          address_ = address;
          Owner = owner;
-         Title = "Distribution list - " + address;
+         Title = L("Distribution list - ") + address;
          Width = 520;
          SizeToContent = SizeToContent.Height;
          ResizeMode = ResizeMode.NoResize;
@@ -45,7 +46,7 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(header);
 
          panel.Children.Add(active_);
-         panel.Children.Add(Label("_List address", addressBox_));
+         panel.Children.Add(Label(L("_List address"), addressBox_));
          panel.Children.Add(Input(addressBox_));
 
          // Four modes, not five. There used to be a fifth - "Anyone with a server
@@ -64,19 +65,17 @@ namespace hMailServer.ControlPanel.Views
          // "anyone..." entries, to keep outsiders off a list, was silently given
          // the single most permissive setting the server has. put_Mode now refuses
          // the value outright; the option is gone from here so nobody can reach it.
-         mode_.Items.Add(Combo("Public — anyone can send", 0));
-         mode_.Items.Add(Combo("Membership — only list members can send", 1));
-         mode_.Items.Add(Combo("Announcements only", 2));
-         mode_.Items.Add(Combo("Anyone in the domain can send", 3));
+         mode_.Items.Add(Combo(L("Public — anyone can send"), 0));
+         mode_.Items.Add(Combo(L("Membership — only list members can send"), 1));
+         mode_.Items.Add(Combo(L("Announcements only"), 2));
+         mode_.Items.Add(Combo(L("Anyone in the domain can send"), 3));
          mode_.FontSize = Typography.Body;
          mode_.Margin = new Thickness(0, 0, 0, 8);
-         panel.Children.Add(Label("_Who may send to this list", mode_));
+         panel.Children.Add(Label(L("_Who may send to this list"), mode_));
          panel.Children.Add(mode_);
          panel.Children.Add(new TextBlock
          {
-            Text = "\"Anyone in the domain\" means the sender's address is at a domain this server hosts, which an "
-                   + "outsider can claim unless the list also requires authentication. Tick that below if the list "
-                   + "must be restricted to people who have logged in.",
+            Text = L("\"Anyone in the domain\" means the sender's address is at a domain this server hosts, which an outsider can claim unless the list also requires authentication. Tick that below if the list must be restricted to people who have logged in."),
             FontSize = Services.Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             Opacity = 0.65,
@@ -84,28 +83,22 @@ namespace hMailServer.ControlPanel.Views
          });
 
          panel.Children.Add(requireAuth_);
-         panel.Children.Add(Label("_Require sender address (empty = any)", requireSender_));
+         panel.Children.Add(Label(L("_Require sender address (empty = any)"), requireSender_));
          panel.Children.Add(Input(requireSender_));
 
-         panel.Children.Add(Label("_Moderator (empty = no moderation)", moderator_));
+         panel.Children.Add(Label(L("_Moderator (empty = no moderation)"), moderator_));
          panel.Children.Add(Input(moderator_));
-         panel.Children.Add(Note(
-            "With a moderator set, a sender the rules above refuse is forwarded to the moderator " +
-            "instead of being rejected. The moderator approves by resending the message to the " +
-            "list from an authenticated session."));
+         panel.Children.Add(Note(L("With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session.")));
 
-         panel.Children.Add(Label("_Bounce address (empty = bounces go to the poster)", bounce_));
+         panel.Children.Add(Label(L("_Bounce address (empty = bounces go to the poster)"), bounce_));
          panel.Children.Add(Input(bounce_));
-         panel.Children.Add(Note(
-            "Used as the envelope sender of every copy the list sends, so delivery failures - a " +
-            "dead subscriber, a full mailbox - reach the list owner instead of whoever happened " +
-            "to post last."));
+         panel.Children.Add(Note(L("Used as the envelope sender of every copy the list sends, so delivery failures - a dead subscriber, a full mailbox - reach the list owner instead of whoever happened to post last.")));
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -142,7 +135,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the list: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the list: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -171,7 +164,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the list: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the list: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

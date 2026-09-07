@@ -13,6 +13,7 @@ using TextBlock = System.Windows.Controls.TextBlock;
 using MessageBox = System.Windows.MessageBox;
 using hMailServer.ControlPanel.Services;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -37,7 +38,7 @@ namespace hMailServer.ControlPanel.Views
       public FieldDialog(CollectionEditorView.CollectionSpec spec, CollectionEditorView.Row existing, Window owner)
       {
          Owner = owner;
-         Title = (existing == null ? "Add " : "Edit ") + spec.ItemNoun;
+         Title = existing == null ? F("Add {0}", spec.ItemNoun) : F("Edit {0}", spec.ItemNoun);
          Width = 460;
          SizeToContent = SizeToContent.Height;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -73,7 +74,7 @@ namespace hMailServer.ControlPanel.Views
             HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 8, 0, 0)
          };
-         var ok = new Button { Content = "_Save", Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
+         var ok = new Button { Content = L("_Save"), Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
          ok.Click += (_, _) =>
          {
             if (committers_.Any(commit => !commit()))
@@ -81,7 +82,7 @@ namespace hMailServer.ControlPanel.Views
             DialogResult = true;
             Close();
          };
-         var cancel = new Button { Content = "Cancel", MinWidth = 88, IsCancel = true };
+         var cancel = new Button { Content = L("Cancel"), MinWidth = 88, IsCancel = true };
          cancel.Click += (_, _) => Close();
          buttons.Children.Add(ok);
          buttons.Children.Add(cancel);

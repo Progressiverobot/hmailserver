@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -33,7 +34,7 @@ namespace hMailServer.ControlPanel.Views
       {
          portId_ = portId;
          Owner = owner;
-         Title = "TCP/IP port";
+         Title = L("TCP/IP port");
          Width = 520;
          SizeToContent = SizeToContent.Height;
          ResizeMode = ResizeMode.NoResize;
@@ -41,7 +42,7 @@ namespace hMailServer.ControlPanel.Views
          SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
          var panel = new StackPanel { Margin = new Thickness(22) };
-         var header = new TextBlock { Text = "Port binding", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
+         var header = new TextBlock { Text = L("Port binding"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          panel.Children.Add(header);
 
@@ -49,51 +50,48 @@ namespace hMailServer.ControlPanel.Views
          protocol_.Items.Add(Combo("POP3", ServerSession.SessionPop3));
          protocol_.Items.Add(Combo("IMAP", ServerSession.SessionImap));
          StyleCombo(protocol_);
-         panel.Children.Add(Label("_Protocol", protocol_));
+         panel.Children.Add(Label(L("_Protocol"), protocol_));
          panel.Children.Add(protocol_);
 
-         panel.Children.Add(Label("_Bind address", address_));
+         panel.Children.Add(Label(L("_Bind address"), address_));
          panel.Children.Add(Input(address_));
-         panel.Children.Add(Label("P_ort", port_));
+         panel.Children.Add(Label(L("P_ort"), port_));
          panel.Children.Add(Input(port_));
 
-         security_.Items.Add(Combo("None", 0));
-         security_.Items.Add(Combo("SSL/TLS", 1));
-         security_.Items.Add(Combo("STARTTLS (optional)", 2));
-         security_.Items.Add(Combo("STARTTLS (required)", 3));
+         security_.Items.Add(Combo(L("None"), 0));
+         security_.Items.Add(Combo(L("SSL/TLS"), 1));
+         security_.Items.Add(Combo(L("STARTTLS (optional)"), 2));
+         security_.Items.Add(Combo(L("STARTTLS (required)"), 3));
          StyleCombo(security_);
-         panel.Children.Add(Label("_Connection security", security_));
+         panel.Children.Add(Label(L("_Connection security"), security_));
          panel.Children.Add(security_);
 
          StyleCombo(certificate_);
-         panel.Children.Add(Label("SSL c_ertificate (required for SSL/TLS and STARTTLS)", certificate_));
+         panel.Children.Add(Label(L("SSL c_ertificate (required for SSL/TLS and STARTTLS)"), certificate_));
          panel.Children.Add(certificate_);
 
          // Client certificates (mutual TLS), per port. The three options are the
          // three values of ClientCertificatePolicy in SocketConstants.h, spelled
          // out as what each one does to a connection.
-         clientCertPolicy_.Items.Add(Combo("Off", 0));
-         clientCertPolicy_.Items.Add(Combo("Request (verify and log, never refuse)", 1));
-         clientCertPolicy_.Items.Add(Combo("Require (refuse a connection without a trusted certificate)", 2));
+         clientCertPolicy_.Items.Add(Combo(L("Off"), 0));
+         clientCertPolicy_.Items.Add(Combo(L("Request (verify and log, never refuse)"), 1));
+         clientCertPolicy_.Items.Add(Combo(L("Require (refuse a connection without a trusted certificate)"), 2));
          StyleCombo(clientCertPolicy_);
-         panel.Children.Add(Label("Client certificate polic_y (mutual TLS)", clientCertPolicy_));
+         panel.Children.Add(Label(L("Client certificate polic_y (mutual TLS)"), clientCertPolicy_));
          AutomationProperties.SetHelpText(clientCertPolicy_,
-            "Request asks every client for a certificate, verifies and logs one if it is offered, and never " +
-            "refuses the connection - use it to inventory which clients would survive Require before enforcing " +
-            "it. Require refuses the connection unless the client presents a certificate that chains to the " +
-            "CA bundle below.");
+            L("Request asks every client for a certificate, verifies and logs one if it is offered, and never refuses the connection - use it to inventory which clients would survive Require before enforcing it. Require refuses the connection unless the client presents a certificate that chains to the CA bundle below."));
          panel.Children.Add(clientCertPolicy_);
 
-         panel.Children.Add(Label("C_A certificate bundle (PEM) that client certificates must chain to", clientCertCaFile_));
+         panel.Children.Add(Label(L("C_A certificate bundle (PEM) that client certificates must chain to"), clientCertCaFile_));
          var caRow = new Grid();
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          Input(clientCertCaFile_);
          Grid.SetColumn(clientCertCaFile_, 0);
          caRow.Children.Add(clientCertCaFile_);
-         var caBrowse = new Wpf.Ui.Controls.Button { Content = "B_rowse…", Margin = new Thickness(8, 0, 0, 4), VerticalAlignment = VerticalAlignment.Top };
+         var caBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(8, 0, 0, 4), VerticalAlignment = VerticalAlignment.Top };
          AutomationProperties.SetAutomationId(caBrowse, "ClientCertCaBrowse");
-         AutomationProperties.SetName(caBrowse, "Browse for a CA certificate bundle file");
+         AutomationProperties.SetName(caBrowse, L("Browse for a CA certificate bundle file"));
          caBrowse.Click += (s, e) =>
          {
             string file = PathPicker.PickFile(clientCertCaFile_.Text,
@@ -105,10 +103,7 @@ namespace hMailServer.ControlPanel.Views
          caRow.Children.Add(caBrowse);
          panel.Children.Add(caRow);
 
-         TextBlock caNote = Note(
-            "hMailServer does not create or manage client certificates. The certificate authority and the " +
-            "client certificates themselves must be produced outside hMailServer (for example with OpenSSL " +
-            "or an internal PKI) - the server only trusts the CA bundle it is given here.");
+         TextBlock caNote = Note(L("hMailServer does not create or manage client certificates. The certificate authority and the client certificates themselves must be produced outside hMailServer (for example with OpenSSL or an internal PKI) - the server only trusts the CA bundle it is given here."));
          AutomationProperties.SetHelpText(clientCertCaFile_, caNote.Text);
          panel.Children.Add(caNote);
 
@@ -134,9 +129,9 @@ namespace hMailServer.ControlPanel.Views
          // only way out is the mouse or Alt+F4 is a dialog a keyboard user is stuck
          // in, and the two properties that fix it are the ones the account and domain
          // dialogs already set.
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -148,7 +143,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void LoadCertificates(int selectedId)
       {
-         certificate_.Items.Add(Combo("(none)", 0));
+         certificate_.Items.Add(Combo(L("(none)"), 0));
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
@@ -197,7 +192,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the port: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the port: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -210,7 +205,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!int.TryParse(port_.Text.Trim(), out int portNumber) || portNumber <= 0 || portNumber > 65535)
          {
-            MessageBox.Show("Enter a valid port number.", "Control Panel");
+            MessageBox.Show(L("Enter a valid port number."), L("Control Panel"));
             return;
          }
 
@@ -221,7 +216,7 @@ namespace hMailServer.ControlPanel.Views
          if (clientCertError != null)
          {
             UpdateClientCertificateValidation();
-            MessageBox.Show(clientCertError, "Control Panel");
+            MessageBox.Show(clientCertError, L("Control Panel"));
             return;
          }
 
@@ -243,7 +238,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the port: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the port: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -270,24 +265,19 @@ namespace hMailServer.ControlPanel.Views
          // A client certificate is only ever exchanged during a TLS handshake,
          // so on a plaintext port the policy could never run.
          if (security == 0)
-            return "Client certificates can only be requested or required on a port that uses SSL/TLS or " +
-                   "STARTTLS. On a port with no connection security there is no TLS handshake, so no client " +
-                   "would ever be asked for a certificate.";
+            return L("Client certificates can only be requested or required on a port that uses SSL/TLS or STARTTLS. On a port with no connection security there is no TLS handshake, so no client would ever be asked for a certificate.");
 
          // Without trust anchors, Require rejects every client (nothing chains
          // to an empty CA set) and Request verifies nothing while looking
          // configured.
          if (clientCertCaFile_.Text.Trim().Length == 0)
-            return "A CA certificate bundle file must be specified when client certificates are requested or " +
-                   "required. Without one, Require would reject every client and Request would verify nothing.";
+            return L("A CA certificate bundle file must be specified when client certificates are requested or required. Without one, Require would reject every client and Request would verify nothing.");
 
          // On an optional-STARTTLS port a client that never issues STARTTLS is
          // never asked for a certificate at all, so Require there is a lock on
          // an open door.
          if (policy == 2 && security == 2)
-            return "Require cannot be combined with STARTTLS (optional): a client that simply never issues " +
-                   "STARTTLS is never asked for a certificate, so the requirement would not be enforced. " +
-                   "Use SSL/TLS or STARTTLS (required).";
+            return L("Require cannot be combined with STARTTLS (optional): a client that simply never issues STARTTLS is never asked for a certificate, so the requirement would not be enforced. Use SSL/TLS or STARTTLS (required).");
 
          return null;
       }
@@ -295,7 +285,7 @@ namespace hMailServer.ControlPanel.Views
       private void UpdateClientCertificateValidation()
       {
          string error = ClientCertificateValidationError();
-         clientCertWarning_.Text = error == null ? "" : "Cannot save: " + error;
+         clientCertWarning_.Text = error == null ? "" : F("Cannot save: {0}", error);
          clientCertWarning_.Visibility = error == null ? Visibility.Collapsed : Visibility.Visible;
       }
 

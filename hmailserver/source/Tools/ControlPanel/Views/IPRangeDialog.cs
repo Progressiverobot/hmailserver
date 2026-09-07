@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -27,34 +28,34 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox priority_ = new();
 
       // Connections
-      private readonly CheckBox smtp_ = new() { Content = "Allow SM_TP connections", FontSize = Typography.Body };
-      private readonly CheckBox imap_ = new() { Content = "Allow _IMAP connections", FontSize = Typography.Body };
-      private readonly CheckBox pop3_ = new() { Content = "Allow _POP3 connections", FontSize = Typography.Body };
+      private readonly CheckBox smtp_ = new() { Content = L("Allow SM_TP connections"), FontSize = Typography.Body };
+      private readonly CheckBox imap_ = new() { Content = L("Allow _IMAP connections"), FontSize = Typography.Body };
+      private readonly CheckBox pop3_ = new() { Content = L("Allow _POP3 connections"), FontSize = Typography.Body };
 
       // Relaying
-      private readonly CheckBox ll_ = new() { Content = "_Local to local", FontSize = Typography.Body };
-      private readonly CheckBox lr_ = new() { Content = "Local to _external (relay out)", FontSize = Typography.Body };
-      private readonly CheckBox rl_ = new() { Content = "E_xternal to local", FontSize = Typography.Body };
-      private readonly CheckBox rr_ = new() { Content = "External to external (_open relay!)", FontSize = Typography.Body };
+      private readonly CheckBox ll_ = new() { Content = L("_Local to local"), FontSize = Typography.Body };
+      private readonly CheckBox lr_ = new() { Content = L("Local to _external (relay out)"), FontSize = Typography.Body };
+      private readonly CheckBox rl_ = new() { Content = L("E_xternal to local"), FontSize = Typography.Body };
+      private readonly CheckBox rr_ = new() { Content = L("External to external (_open relay!)"), FontSize = Typography.Body };
 
       // SMTP authentication required
-      private readonly CheckBox authLL_ = new() { Content = "Require auth: _local to local", FontSize = Typography.Body };
-      private readonly CheckBox authLE_ = new() { Content = "Require auth: local to _external", FontSize = Typography.Body };
-      private readonly CheckBox authEL_ = new() { Content = "Require auth: e_xternal to local", FontSize = Typography.Body };
-      private readonly CheckBox authEE_ = new() { Content = "Require auth: external to exte_rnal", FontSize = Typography.Body };
-      private readonly CheckBox tlsAuth_ = new() { Content = "Require SSL/_TLS when authenticating", FontSize = Typography.Body };
+      private readonly CheckBox authLL_ = new() { Content = L("Require auth: _local to local"), FontSize = Typography.Body };
+      private readonly CheckBox authLE_ = new() { Content = L("Require auth: local to _external"), FontSize = Typography.Body };
+      private readonly CheckBox authEL_ = new() { Content = L("Require auth: e_xternal to local"), FontSize = Typography.Body };
+      private readonly CheckBox authEE_ = new() { Content = L("Require auth: external to exte_rnal"), FontSize = Typography.Body };
+      private readonly CheckBox tlsAuth_ = new() { Content = L("Require SSL/_TLS when authenticating"), FontSize = Typography.Body };
 
       // Protection + expiry
-      private readonly CheckBox spam_ = new() { Content = "Enable _anti-spam for this range", FontSize = Typography.Body };
-      private readonly CheckBox virus_ = new() { Content = "Enable anti-_virus for this range", FontSize = Typography.Body };
-      private readonly CheckBox expires_ = new() { Content = "This range _expires", FontSize = Typography.Body };
+      private readonly CheckBox spam_ = new() { Content = L("Enable _anti-spam for this range"), FontSize = Typography.Body };
+      private readonly CheckBox virus_ = new() { Content = L("Enable anti-_virus for this range"), FontSize = Typography.Body };
+      private readonly CheckBox expires_ = new() { Content = L("This range _expires"), FontSize = Typography.Body };
       private readonly TextBox expiresTime_ = new();
 
       public IPRangeDialog(Window owner, int rangeId)
       {
          rangeId_ = rangeId;
          Owner = owner;
-         Title = "IP range";
+         Title = L("IP range");
          Width = 560;
          Height = 560;
          WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -65,25 +66,25 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new TextBlock { Text = "IP range", FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
+         var header = new TextBlock { Text = L("IP range"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
          header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          Grid.SetRow(header, 0);
          root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
-         tabs.Items.Add(new TabItem { Header = "General", Content = BuildGeneral() });
-         tabs.Items.Add(new TabItem { Header = "Connections", Content = BuildConnections() });
-         tabs.Items.Add(new TabItem { Header = "Relaying", Content = BuildRelaying() });
-         tabs.Items.Add(new TabItem { Header = "Require auth", Content = BuildAuth() });
-         tabs.Items.Add(new TabItem { Header = "Protection", Content = BuildProtection() });
+         tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
+         tabs.Items.Add(new TabItem { Header = L("Connections"), Content = BuildConnections() });
+         tabs.Items.Add(new TabItem { Header = L("Relaying"), Content = BuildRelaying() });
+         tabs.Items.Add(new TabItem { Header = L("Require auth"), Content = BuildAuth() });
+         tabs.Items.Add(new TabItem { Header = L("Protection"), Content = BuildProtection() });
          Grid.SetRow(tabs, 1);
          root.Children.Add(tabs);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
          // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = "_Save", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
          cancel.Click += (s, e) => Close();
          buttons.Children.Add(save);
          buttons.Children.Add(cancel);
@@ -97,13 +98,13 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildGeneral()
       {
          var p = Panel();
-         p.Children.Add(Label("_Name", name_));
+         p.Children.Add(Label(L("_Name"), name_));
          p.Children.Add(Input(name_));
-         p.Children.Add(Label("_Lower IP address", lower_));
+         p.Children.Add(Label(L("_Lower IP address"), lower_));
          p.Children.Add(Input(lower_));
-         p.Children.Add(Label("_Upper IP address", upper_));
+         p.Children.Add(Label(L("_Upper IP address"), upper_));
          p.Children.Add(Input(upper_));
-         p.Children.Add(Label("_Priority (higher wins when ranges overlap)", priority_));
+         p.Children.Add(Label(L("_Priority (higher wins when ranges overlap)"), priority_));
          p.Children.Add(Input(priority_));
          return Scroll(p);
       }
@@ -120,7 +121,7 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildRelaying()
       {
          var p = Panel();
-         p.Children.Add(Label("Which deliveries are allowed from this range"));
+         p.Children.Add(Label(L("Which deliveries are allowed from this range")));
          p.Children.Add(ll_);
          p.Children.Add(lr_);
          p.Children.Add(rl_);
@@ -131,7 +132,7 @@ namespace hMailServer.ControlPanel.Views
       private ScrollViewer BuildAuth()
       {
          var p = Panel();
-         p.Children.Add(Label("Require SMTP authentication for each delivery direction"));
+         p.Children.Add(Label(L("Require SMTP authentication for each delivery direction")));
          p.Children.Add(authLL_);
          p.Children.Add(authLE_);
          p.Children.Add(authEL_);
@@ -148,7 +149,7 @@ namespace hMailServer.ControlPanel.Views
          p.Children.Add(virus_);
          p.Children.Add(Separator());
          p.Children.Add(expires_);
-         p.Children.Add(Label("Expiry _time (YYYY-MM-DD HH:MM:SS)", expiresTime_));
+         p.Children.Add(Label(L("Expiry _time (YYYY-MM-DD HH:MM:SS)"), expiresTime_));
          p.Children.Add(Input(expiresTime_));
          return Scroll(p);
       }
@@ -203,7 +204,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not load the range: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not load the range: {0}", ex.Message), L("Control Panel"));
             Close();
          }
          finally
@@ -254,7 +255,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the range: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the range: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

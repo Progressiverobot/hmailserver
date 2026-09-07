@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -94,7 +95,7 @@ namespace hMailServer.ControlPanel.Views
             // built when the dialog opens, so it does not learn the address the moment
             // the account is saved - say so plainly rather than failing on the first
             // button press.
-            status_.Text = "Save the account and reopen it - an app password belongs to an account that exists.";
+            status_.Text = L("Save the account and reopen it - an app password belongs to an account that exists.");
             newName_.IsEnabled = false;
             return;
          }
@@ -133,8 +134,8 @@ namespace hMailServer.ControlPanel.Views
                list_.Items.Refresh();
 
                status_.Text = count == 0
-                  ? "No app passwords. Create one per mail client, so that losing a device revokes only that device."
-                  : count + (count == 1 ? " app password." : " app passwords.");
+                  ? L("No app passwords. Create one per mail client, so that losing a device revokes only that device.")
+                  : (count == 1 ? L("1 app password.") : F("{0} app passwords.", count));
             }
             finally
             {
@@ -177,9 +178,9 @@ namespace hMailServer.ControlPanel.Views
          /// missing data, and this is the field somebody is checking when they come
          /// here after losing a phone.
          /// </summary>
-         public string State => Active ? "Active" : "Revoked";
+         public string State => Active ? L("Active") : L("Revoked");
 
-         public string LastUsedText => string.IsNullOrEmpty(LastUsed) ? "Never" : LastUsed;
+         public string LastUsedText => string.IsNullOrEmpty(LastUsed) ? L("Never") : LastUsed;
       }
 
       /// <summary>
@@ -193,14 +194,14 @@ namespace hMailServer.ControlPanel.Views
       {
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Name",
+            Header = L("Name"),
             Binding = new System.Windows.Data.Binding(nameof(CredentialRow.Name)),
             Width = new DataGridLength(2, DataGridLengthUnitType.Star)
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "State",
+            Header = L("State"),
             Binding = new System.Windows.Data.Binding(nameof(CredentialRow.State)),
             // Auto, not SizeToCells. SizeToCells measures the CELLS only, so on an
             // empty grid the column collapses to zero and its header disappears
@@ -213,14 +214,14 @@ namespace hMailServer.ControlPanel.Views
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Issued",
+            Header = L("Issued"),
             Binding = new System.Windows.Data.Binding(nameof(CredentialRow.CreatedTime)),
             Width = DataGridLength.Auto
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Last used",
+            Header = L("Last used"),
             Binding = new System.Windows.Data.Binding(nameof(CredentialRow.LastUsedText)),
             Width = DataGridLength.Auto
          });
@@ -232,8 +233,7 @@ namespace hMailServer.ControlPanel.Views
 
          var hint = new TextBlock
          {
-            Text = "A separate password for one mail client. Losing a laptop then means revoking one line here, "
-                 + "rather than changing the account password and reconfiguring every other client.",
+            Text = L("A separate password for one mail client. Losing a laptop then means revoking one line here, rather than changing the account password and reconfiguring every other client."),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 12)
          };
@@ -243,16 +243,16 @@ namespace hMailServer.ControlPanel.Views
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
          toolbar.Children.Add(new TextBlock
          {
-            Text = "Name",
+            Text = L("Name"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
          });
          newName_.Text = "";
          toolbar.Children.Add(newName_);
-         toolbar.Children.Add(MakeButton("_Create", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Create()));
-         toolbar.Children.Add(MakeButton("Re_voke / restore", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => ToggleActive()));
-         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Delete()));
-         toolbar.Children.Add(MakeButton("_Refresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton(L("_Create"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Create()));
+         toolbar.Children.Add(MakeButton(L("Re_voke / restore"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => ToggleActive()));
+         toolbar.Children.Add(MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => Delete()));
+         toolbar.Children.Add(MakeButton(L("_Refresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
@@ -265,14 +265,14 @@ namespace hMailServer.ControlPanel.Views
          var issued = new StackPanel();
          var issuedTitle = new TextBlock
          {
-            Text = "Copy this now - it is not stored and cannot be shown again",
+            Text = L("Copy this now - it is not stored and cannot be shown again"),
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 6),
             TextWrapping = TextWrapping.Wrap
          };
          issued.Children.Add(issuedTitle);
          issued.Children.Add(issuedValue_);
-         var copy = MakeButton("Cop_y", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CopyIssued());
+         var copy = MakeButton(L("Cop_y"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CopyIssued());
          copy.Margin = new Thickness(0, 8, 0, 0);
          copy.HorizontalAlignment = HorizontalAlignment.Left;
          issued.Children.Add(copy);
@@ -296,7 +296,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (string.IsNullOrEmpty(address_))
          {
-            status_.Text = "Save the account and reopen it first.";
+            status_.Text = L("Save the account and reopen it first.");
             return;
          }
 
@@ -304,7 +304,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (name.Length == 0)
          {
-            status_.Text = "Give it a name first - it is what you will recognise this credential by when you come to revoke it.";
+            status_.Text = L("Give it a name first - it is what you will recognise this credential by when you come to revoke it.");
             return;
          }
 
@@ -335,7 +335,7 @@ namespace hMailServer.ControlPanel.Views
             }
 
             Reload();
-            status_.Text = "Created \"" + name + "\". Enter it in the client as that account's password.";
+            status_.Text = F("Created \"{0}\". Enter it in the client as that account's password.", name);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -353,7 +353,7 @@ namespace hMailServer.ControlPanel.Views
          int id = SelectedId();
          if (id == 0)
          {
-            status_.Text = "Select an app password first.";
+            status_.Text = L("Select an app password first.");
             return;
          }
 
@@ -391,13 +391,13 @@ namespace hMailServer.ControlPanel.Views
          int id = SelectedId();
          if (id == 0)
          {
-            status_.Text = "Select an app password first.";
+            status_.Text = L("Select an app password first.");
             return;
          }
 
          if (MessageBox.Show(
-               "Delete this app password? The client using it will stop connecting immediately.",
-               "Delete app password", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+               L("Delete this app password? The client using it will stop connecting immediately."),
+               L("Delete app password"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          try
@@ -429,7 +429,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = "Could not copy: " + ex.Message;
+            status_.Text = L("Could not copy: ") + ex.Message;
          }
       }
    }
