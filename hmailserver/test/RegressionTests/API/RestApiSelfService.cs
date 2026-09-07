@@ -237,6 +237,7 @@ namespace RegressionTests.API
          Assert.AreEqual(200, script.Status, script.Body);
          StringAssert.StartsWith("text/javascript", script.Header("Content-Type"));
          StringAssert.Contains("/api/v1/me", script.Body);
+         StringAssert.Contains("/api/v1/me/folders", script.Body);
       }
 
       [Test]
@@ -532,6 +533,198 @@ namespace RegressionTests.API
          {
             DisableQuarantine();
          }
+      }
+
+      // ------------------------------------------------------- the mailbox ---
+
+      private static void Deliver(string to, string subject, string body)
+      {
+         SmtpClientSimulator.StaticSend("sender@example.com", to, subject, body);
+      }
+
+      private static long NumberAt(string body, int start)
+      {
+         int end = start;
+         while (end < body.Length && char.IsDigit(body[end]))
+            end++;
+         return long.Parse(body.Substring(start, end - start));
+      }
+
+      // The id of the object a marker sits in: the last "id" before it.
+      private static long IdBefore(string body, string marker)
+      {
+         int at = body.IndexOf(marker, StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "Missing " + marker + " in: " + body);
+         int idAt = body.LastIndexOf("\"id\":", at, StringComparison.Ordinal);
+         Assert.IsTrue(idAt >= 0, "No id before " + marker + " in: " + body);
+         return NumberAt(body, idAt + 5);
+      }
+
+      private static string Between(string body, string after, string until)
+      {
+         int start = body.IndexOf(after, StringComparison.Ordinal);
+         Assert.IsTrue(start >= 0, "Missing " + after + " in: " + body);
+         start += after.Length;
+         int end = body.IndexOf(until, start, StringComparison.Ordinal);
+         Assert.IsTrue(end >= start, "Unterminated " + after + " in: " + body);
+         return body.Substring(start, end - start);
+      }
+
+      // One folder's own fields, cut out of the tree by its path: from the
+      // "{" that opens it to its subfolders, so an assertion about its counts
+      // cannot read a child's or a neighbour's.
+      private static string FolderEntry(string tree, string path)
+      {
+         int at = tree.IndexOf("\"path\":\"" + path + "\"", StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "No folder " + path + " in: " + tree);
+         int start = tree.LastIndexOf('{', at);
+         int end = tree.IndexOf("\"subfolders\":[", at, StringComparison.Ordinal);
+         return tree.Substring(start, end - start);
+      }
+
+      // One message's entry in a listing, by its subject: from the "{" that
+      // opens it to the "}}" that closes its flags.
+      private static string EntryFor(string listing, string subject)
+      {
+         int at = listing.IndexOf("\"subject\":\"" + subject + "\"", StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "No entry for " + subject + " in: " + listing);
+         int start = listing.LastIndexOf('{', at);
+         int end = listing.IndexOf("}}", at, StringComparison.Ordinal);
+         return listing.Substring(start, end + 2 - start);
+      }
+
+      private string OtherAccount()
+      {
+         string address = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, UserPassword);
+         return address;
+      }
+
+      [Test]
+      [Description("GET /api/v1/me/folders is the account's own folder tree with its counts, and nobody else's")]
+      public void TheFolderTreeIsTheAccountsOwn()
+      {
+         Deliver(Address, "First things", "One.");
+         Deliver(Address, "Second things", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) before = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         Assert.AreEqual(200, before.status, "Body: " + before.body);
+         string delimiter = Between(before.body, "\"delimiter\":\"", "\"");
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Projects" + delimiter + "Alpha"));
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         Assert.AreEqual(200, tree.status, "Body: " + tree.body);
+
+         string inbox = FolderEntry(tree.body, "INBOX");
+         StringAssert.Contains("\"name\":\"INBOX\"", inbox);
+         StringAssert.Contains("\"writable\":true", inbox);
+         StringAssert.Contains("\"messages\":2,\"unseen\":2", inbox);
+
+         string alpha = FolderEntry(tree.body, "Projects" + delimiter + "Alpha");
+         StringAssert.Contains("\"name\":\"Alpha\"", alpha);
+         long projectsId = IdBefore(tree.body, "\"path\":\"Projects\"");
+         Assert.AreEqual(projectsId.ToString(), Between(alpha, "\"parent_id\":", ","), "Alpha's parent is Projects: " + tree.body);
+         StringAssert.Contains("\"messages\":0,\"unseen\":0", alpha);
+
+         (int status, string body) others = Http("GET", "/api/v1/me/folders", BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(200, others.status, "Body: " + others.body);
+         Assert.IsFalse(others.body.Contains("Alpha"), "Another account's tree is its own: " + others.body);
+
+         (int status, string body) admin = Http("GET", "/api/v1/me/folders", AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("A folder's messages are listed newest first with their headers and live flags, paged, and to their owner only")]
+      public void MessagesAreListedNewestFirstWithTheirFlags()
+      {
+         Deliver(Address, "First things", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         Deliver(Address, "Second things", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, page.status, "Body: " + page.body);
+         StringAssert.Contains("\"folder_id\":" + inboxId + ",\"total\":2", page.body);
+         Assert.Less(page.body.IndexOf("Second things", StringComparison.Ordinal), page.body.IndexOf("First things", StringComparison.Ordinal),
+            "Newest first: " + page.body);
+
+         string second = EntryFor(page.body, "Second things");
+         StringAssert.Contains("\"from\":\"sender@example.com\"", second);
+         StringAssert.Contains("\"seen\":false", second);
+         long secondUid = long.Parse(Between(second, "\"uid\":", ","));
+
+         (int status, string body) one = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?limit=1", UserHeader(UserPassword));
+         Assert.AreEqual(200, one.status, "Body: " + one.body);
+         StringAssert.Contains("\"total\":2", one.body);
+         StringAssert.Contains("Second things", one.body);
+         Assert.IsFalse(one.body.Contains("First things"), "limit=1 is the newest one only: " + one.body);
+
+         (int status, string body) older = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?before_uid=" + secondUid, UserHeader(UserPassword));
+         Assert.AreEqual(200, older.status, "Body: " + older.body);
+         StringAssert.Contains("First things", older.body);
+         Assert.IsFalse(older.body.Contains("Second things"), "before_uid pages past the newest: " + older.body);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         Assert.IsTrue(imap.SetFlagOnMessage(1, true, "\\Seen"));
+         imap.Disconnect();
+
+         (int status, string body) after = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, after.status, "Body: " + after.body);
+         StringAssert.Contains("\"seen\":true", EntryFor(after.body, "First things"));
+         StringAssert.Contains("\"seen\":false", EntryFor(after.body, "Second things"));
+
+         (int status, string body) counts = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":2,\"unseen\":1", FolderEntry(counts.body, "INBOX"));
+
+         (int status, string body) unknown = Http("GET", "/api/v1/me/folders/987654321/messages", UserHeader(UserPassword));
+         Assert.AreEqual(404, unknown.status, "Body: " + unknown.body);
+
+         (int status, string body) others = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, others.status, "Another account's folder is not found, not forbidden. Body: " + others.body);
+      }
+
+      [Test]
+      [Description("GET /api/v1/me/messages/{id} reads one message with its text, for the account it belongs to and no other")]
+      public void AMessageIsReadByItsOwnerOnly()
+      {
+         Deliver(Address, "Numbers", "The quarterly numbers are attached in spirit.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Numbers\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"subject\":\"Numbers\"", message.body);
+         StringAssert.Contains("\"folder_id\":" + inboxId, message.body);
+         StringAssert.Contains("\"from\":\"sender@example.com\"", message.body);
+         StringAssert.Contains("\"to\":\"" + Address + "\"", message.body);
+         StringAssert.Contains("\"truncated\":false", message.body);
+         StringAssert.Contains("The quarterly numbers are attached in spirit.", message.body);
+         StringAssert.Contains("\"attachments\":[]", message.body);
+         StringAssert.Contains("\"seen\":false", message.body);
+
+         (int status, string body) others = Http("GET", "/api/v1/me/messages/" + messageId, BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, others.status, "Another account's message is not found, not forbidden. Body: " + others.body);
+
+         (int status, string body) unknown = Http("GET", "/api/v1/me/messages/987654321", UserHeader(UserPassword));
+         Assert.AreEqual(404, unknown.status, "Body: " + unknown.body);
+
+         (int status, string body) admin = Http("GET", "/api/v1/me/messages/" + messageId, AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
       }
 
       // ------------------------------------------------------------ helpers ---
