@@ -3221,6 +3221,7 @@ interface IInterfaceDiagnostics : IDispatch
    [propget, id(4), helpstring("True when this server binary keeps its assertions and reports a violated one as HM6364 (a Release build made with build.ps1 -Asserts). The shipped binary answers false.")] HRESULT AssertionsEnabled([out, retval] VARIANT_BOOL *pVal);
    [id(5), helpstring("Fails one assertion on purpose so the reporting path can be exercised: on a build that keeps assertions it writes HM6364 to the ERROR log and returns; on the shipped binary it does nothing. Server administrators only.")] HRESULT TriggerAssertion();
    [id(6), helpstring("The DNSSEC chain status of a name's records of a type - TXT, MX, or TLSA with the name given as host:port - as the validating resolver sees it: 0 secure, 1 insecure, 2 bogus. For tests that sign a zone of their own and point the trust anchors at it; not a lookup of anything a client would use.")] HRESULT DnssecChainStatus([in] BSTR sName, [in] BSTR sType, [out, retval] long *pVal);
+   [id(7), helpstring("When an ACME certificate valid from notBefore to notAfter (Unix seconds) would be renewed by this server's own arithmetic, as Unix seconds: two thirds of the way through its lifetime, never later than a day before it expires, and at issue when it does not live a day. The CA's suggested renewal window (ARI) is not consulted. For tests.")] HRESULT AcmeRenewalTime([in] double notBefore, [in] double notAfter, [out, retval] double *pVal);
 
 };
 
