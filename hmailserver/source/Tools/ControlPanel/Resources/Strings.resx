@@ -1019,6 +1019,9 @@ The Control Panel can only read message files when it runs on the same machine a
   <data name="Also mark accounts inactive when their directory entry has gone" xml:space="preserve">
     <value>Also mark accounts inactive when their directory entry has gone</value>
   </data>
+  <data name="Also require a valid Authenticode signature on the installer" xml:space="preserve">
+    <value>Also require a valid Authenticode signature on the installer</value>
+  </data>
   <data name="Also turned off by a limit of 0 below, whatever this box says." xml:space="preserve">
     <value>Also turned off by a limit of 0 below, whatever this box says.</value>
   </data>
@@ -1293,6 +1296,9 @@ Restart the Control Panel now? Choose No to try to keep working.</value>
   <data name="Back up the configuration and the mail" xml:space="preserve">
     <value>Back up the configuration and the mail</value>
   </data>
+  <data name="Back up to the configured destination before an unattended apply (no destination or a failed backup means no apply)" xml:space="preserve">
+    <value>Back up to the configured destination before an unattended apply (no destination or a failed backup means no apply)</value>
+  </data>
   <data name="Back_up file (HMBackup*.xml on the server)" xml:space="preserve">
     <value>Back_up file (HMBackup*.xml on the server)</value>
   </data>
@@ -1562,6 +1568,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   <data name="Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again." xml:space="preserve">
     <value>Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again.</value>
   </data>
+  <data name="Channel: stable, or prerelease to run ahead on a test machine" xml:space="preserve">
+    <value>Channel: stable, or prerelease to run ahead on a test machine</value>
+  </data>
   <data name="Check" xml:space="preserve">
     <value>Check</value>
   </data>
@@ -1579,6 +1588,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   </data>
   <data name="Check for _updates" xml:space="preserve">
     <value>Check for _updates</value>
+  </data>
+  <data name="Check for a new release once a day (UpdateCheckEnabled)" xml:space="preserve">
+    <value>Check for a new release once a day (UpdateCheckEnabled)</value>
   </data>
   <data name="Check host in HELO" xml:space="preserve">
     <value>Check host in HELO</value>
@@ -2722,6 +2734,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Dow_n" xml:space="preserve">
     <value>Dow_n</value>
   </data>
+  <data name="Download and verify the installer as soon as a release is found" xml:space="preserve">
+    <value>Download and verify the installer as soon as a release is found</value>
+  </data>
   <data name="Drop oversized inbound messages above N bytes mid-transfer (0 = off)" xml:space="preserve">
     <value>Drop oversized inbound messages above N bytes mid-transfer (0 = off)</value>
   </data>
@@ -3091,6 +3106,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Falls back to the ACME certificate" xml:space="preserve">
     <value>Falls back to the ACME certificate</value>
   </data>
+  <data name="Feed URL (empty = this project's GitHub releases; set for a mirror)" xml:space="preserve">
+    <value>Feed URL (empty = this project's GitHub releases; set for a mirror)</value>
+  </data>
   <data name="Fetch the MTA-STS policy for {0} over HTTPS and show what is served" xml:space="preserve">
     <value>Fetch the MTA-STS policy for {0} over HTTPS and show what is served</value>
   </data>
@@ -3391,6 +3409,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Host/Name:  {0}</value>
   </data>
+  <data name="Hours between checks (1 to 168)" xml:space="preserve">
+    <value>Hours between checks (1 to 168)</value>
+  </data>
   <data name="Housekeeping for the log folder, so logs do not accumulate indefinitely." xml:space="preserve">
     <value>Housekeeping for the log folder, so logs do not accumulate indefinitely.</value>
   </data>
@@ -3594,6 +3615,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   </data>
   <data name="Insert template…" xml:space="preserve">
     <value>Insert template…</value>
+  </data>
+  <data name="Inside the window the scheduled task applies a verified installer without a click: the service stops, files and schema upgrade, the service starts, and the outcome goes to the log, the Windows event log and the Status page. A service that does not come back is rolled back to the previous installer." xml:space="preserve">
+    <value>Inside the window the scheduled task applies a verified installer without a click: the service stops, files and schema upgrade, the service starts, and the outcome goes to the log, the Windows event log and the Status page. A service that does not come back is rolled back to the previous installer.</value>
   </data>
   <data name="Install the update now?&#10;&#10;The verified installer is handed to the update helper: the service stops, the new version is installed, and the service starts again. If it does not come back, the previous version is reinstalled. This Control Panel loses its connection while that happens; reconnect afterwards to see the outcome here." xml:space="preserve">
     <value>Install the update now?
@@ -6357,6 +6381,9 @@ Continue?</value>
   <data name="Seconds to keep the JWK Set before re-fetching (a token naming an unknown key id re-fetches at once)" xml:space="preserve">
     <value>Seconds to keep the JWK Set before re-fetching (a token naming an unknown key id re-fetches at once)</value>
   </data>
+  <data name="Seconds to wait for the service after an apply before rolling back" xml:space="preserve">
+    <value>Seconds to wait for the service after an apply before rolling back</value>
+  </data>
   <data name="Security" xml:space="preserve">
     <value>Security</value>
   </data>
@@ -7639,6 +7666,9 @@ Keep the old DNS record ({1}) for a few more days while mail signed with the old
   <data name="The server administration password, and who is allowed to use these tools at all." xml:space="preserve">
     <value>The server administration password, and who is allowed to use these tools at all.</value>
   </data>
+  <data name="The server can notice a new release, verify it against the release's own Sigstore signature, and apply it - by a click on the Status page, or on its own inside a window you set. Off until you turn the check on; the check sends nothing but the request. Every setting here is in hMailServer.ini and applies after a service restart." xml:space="preserve">
+    <value>The server can notice a new release, verify it against the release's own Sigstore signature, and apply it - by a click on the Status page, or on its own inside a window you set. Off until you turn the check on; the check sends nothing but the request. Every setting here is in hMailServer.ini and applies after a service restart.</value>
+  </data>
   <data name="The server did not queue the sendout. Check the address wildcard and the hMailServer error log." xml:space="preserve">
     <value>The server did not queue the sendout. Check the address wildcard and the hMailServer error log.</value>
   </data>
@@ -8068,6 +8098,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="Unattended synchronisation" xml:space="preserve">
     <value>Unattended synchronisation</value>
   </data>
+  <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
+    <value>Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Unknown</value>
   </data>
@@ -8085,6 +8118,9 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="Update" xml:space="preserve">
     <value>Update</value>
+  </data>
+  <data name="Updates" xml:space="preserve">
+    <value>Updates</value>
   </data>
   <data name="Upper IP" xml:space="preserve">
     <value>Upper IP</value>
