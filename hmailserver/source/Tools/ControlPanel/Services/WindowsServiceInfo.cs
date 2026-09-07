@@ -3,6 +3,7 @@
 
 using System;
 using System.Management;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -69,7 +70,7 @@ namespace hMailServer.ControlPanel.Services
             string escaped = (serviceName ?? "").Replace("\\", "\\\\").Replace("'", "\\'");
 
             using var searcher = new ManagementObjectSearcher(
-               "SELECT Name, StartName, StartMode, State, PathName FROM Win32_Service WHERE Name='" + escaped + "'");
+               "SELECT Name, StartName, StartMode, State, PathName FROM Win32_Service WHERE Name='" + escaped + "'"); // no-loc
 
             foreach (ManagementObject service in searcher.Get())
             {
@@ -123,7 +124,7 @@ namespace hMailServer.ControlPanel.Services
          // ServiceAccountName produces at registration.
          if (string.Equals(value, "LocalSystem", StringComparison.OrdinalIgnoreCase) ||
              string.Equals(value, ".\\LocalSystem", StringComparison.OrdinalIgnoreCase) ||
-             string.Equals(value, "NT AUTHORITY\\System", StringComparison.OrdinalIgnoreCase))
+             string.Equals(value, "NT AUTHORITY\\System", StringComparison.OrdinalIgnoreCase)) // no-loc
          {
             return "localsystem";
          }
@@ -194,13 +195,13 @@ namespace hMailServer.ControlPanel.Services
       {
          string value = (startName ?? "").Trim();
          if (value.Length == 0)
-            return "an account Windows did not report";
+            return L("an account Windows did not report");
 
          if (string.Equals(Canonical(value, null), "localsystem", StringComparison.OrdinalIgnoreCase))
-            return "LocalSystem, which is the most privileged account on this machine";
+            return L("LocalSystem, which is the most privileged account on this machine");
 
          if (value.StartsWith("NT SERVICE\\", StringComparison.OrdinalIgnoreCase))
-            return value + ", a virtual service account with no password";
+            return F("{0}, a virtual service account with no password", value);
 
          return value;
       }

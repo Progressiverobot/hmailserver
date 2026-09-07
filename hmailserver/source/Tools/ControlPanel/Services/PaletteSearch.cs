@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -94,11 +95,11 @@ namespace hMailServer.ControlPanel.Services
    /// </summary>
    public static class PaletteSearch
    {
-      public const string RecentSection = "Recently visited";
-      public const string MostUsedSection = "Most used";
-      public const string TaskSection = "Tasks";
-      public const string PageSection = "Pages";
-      public const string SettingSection = "Settings";
+      public static readonly string RecentSection = N("Recently visited");
+      public static readonly string MostUsedSection = N("Most used");
+      public static readonly string TaskSection = N("Tasks");
+      public static readonly string PageSection = N("Pages");
+      public static readonly string SettingSection = N("Settings");
 
       /// <summary>Rows offered per shortcut section when nothing has been typed.</summary>
       public const int MaxShortcuts = 5;
@@ -296,7 +297,7 @@ namespace hMailServer.ControlPanel.Services
          foreach (IntentEntry intent in IntentIndex.Entries
             .Where(intent => NavigationMap.Find(intent.Page) != null))
          {
-            int score = query.Score(intent.Phrase);
+            int score = query.Score(L(intent.Phrase));
             if (score == SearchTerms.NoMatch)
                continue;
 
@@ -305,8 +306,8 @@ namespace hMailServer.ControlPanel.Services
             if (best.TryGetValue(intent.Page, out PaletteRow existing) && existing.Score <= score)
                continue;
 
-            best[intent.Page] = new PaletteRow(PaletteRowKind.Task, TaskSection, intent.Phrase,
-               NavigationMap.LocationOf(intent.Page), intent.Answer, intent.Page, score);
+            best[intent.Page] = new PaletteRow(PaletteRowKind.Task, TaskSection, L(intent.Phrase),
+               NavigationMap.LocationOf(intent.Page), L(intent.Answer), intent.Page, score);
          }
 
          return best.Values.ToList();
@@ -323,9 +324,9 @@ namespace hMailServer.ControlPanel.Services
             // but a subsequence over a dozen aliases and a sentence of prose
             // matches nearly everything and would make short queries useless.
             int score = Min(
-               Add(query.ScoreLoose(page.Title), PageTitleBase),
+               Add(query.ScoreLoose(L(page.Title)), PageTitleBase),
                Add(query.BestScore(page.Aliases), PageAliasBase),
-               Add(query.Score(page.Purpose), PagePurposeBase));
+               Add(query.Score(L(page.Purpose)), PagePurposeBase));
 
             if (score != SearchTerms.NoMatch)
                scores[page.Key] = score;
@@ -346,7 +347,7 @@ namespace hMailServer.ControlPanel.Services
          // without this the query finds nothing at all.
          foreach (NavNode group in NavigationMap.Groups)
          {
-            int score = Min(query.Score(group.Title), query.BestScore(group.Aliases));
+            int score = Min(query.Score(L(group.Title)), query.BestScore(group.Aliases));
             if (score == SearchTerms.NoMatch)
                continue;
 
@@ -373,8 +374,8 @@ namespace hMailServer.ControlPanel.Services
             // both is a duplicate row.
             .DistinctBy(match => match.Label + " | " + match.Page, StringComparer.OrdinalIgnoreCase))
          {
-            rows.Add(new PaletteRow(PaletteRowKind.Setting, SettingSection, match.Label,
-               match.Location, "Setting  -  " + match.Key,
+            rows.Add(new PaletteRow(PaletteRowKind.Setting, SettingSection, L(match.Label),
+               match.Location, F("Setting  -  {0}", match.Key),
                match.Page, Add(match.Rank, SettingBase)));
          }
 
@@ -387,8 +388,8 @@ namespace hMailServer.ControlPanel.Services
          // location line says nothing; the group is the part that locates it.
          // Task and setting rows are titled with something else, so those show
          // the whole trail including the page.
-         string location = page.Parent != null ? page.Parent.Title : "";
-         return new PaletteRow(PaletteRowKind.Page, section, page.Title, location, page.Purpose, page.Key, score);
+         string location = page.Parent != null ? L(page.Parent.Title) : "";
+         return new PaletteRow(PaletteRowKind.Page, section, L(page.Title), location, L(page.Purpose), page.Key, score);
       }
 
       private static void Emit(List<PaletteRow> rows, string section, List<PaletteRow> sectionRows)

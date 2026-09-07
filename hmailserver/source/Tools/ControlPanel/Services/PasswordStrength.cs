@@ -3,6 +3,7 @@
 
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -35,11 +36,11 @@ namespace hMailServer.ControlPanel.Services
          int classes = (lower ? 1 : 0) + (upper ? 1 : 0) + (digit ? 1 : 0) + (symbol ? 1 : 0);
 
          var missing = new List<string>();
-         if (length < 12) missing.Add("12+ characters");
-         if (!upper) missing.Add("an uppercase letter");
-         if (!lower) missing.Add("a lowercase letter");
-         if (!digit) missing.Add("a digit");
-         if (!symbol) missing.Add("a symbol");
+         if (length < 12) missing.Add(L("12+ characters"));
+         if (!upper) missing.Add(L("an uppercase letter"));
+         if (!lower) missing.Add(L("a lowercase letter"));
+         if (!digit) missing.Add(L("a digit"));
+         if (!symbol) missing.Add(L("a symbol"));
 
          Level level;
          if (length < 8 || classes <= 1)
@@ -51,11 +52,11 @@ namespace hMailServer.ControlPanel.Services
 
          string summary = level switch
          {
-            Level.Strong => "Strong password.",
+            Level.Strong => L("Strong password."),
             Level.Fair => missing.Count > 0
-               ? "Fair password \u2013 consider adding " + string.Join(", ", missing) + "."
-               : "Fair password.",
-            _ => "Weak password \u2013 add " + string.Join(", ", missing) + ".",
+               ? F("Fair password \u2013 consider adding {0}.", string.Join(", ", missing))
+               : L("Fair password."),
+            _ => F("Weak password \u2013 add {0}.", string.Join(", ", missing)),
          };
 
          return (level, summary);

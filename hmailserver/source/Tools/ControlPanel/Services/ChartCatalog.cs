@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -32,7 +33,7 @@ namespace hMailServer.ControlPanel.Services
          Description = description ?? "";
          Unit = unit ?? "";
          ValueFormat = string.IsNullOrEmpty(valueFormat) ? "N0" : valueFormat;
-         TimeHeader = "Time";
+         TimeHeader = L("Time");
 
          var names = new string[seriesNames.Length];
          Array.Copy(seriesNames, names, seriesNames.Length);
@@ -89,21 +90,21 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Messages delivered per minute, on the Dashboard page.</summary>
       public static ChartDefinition DashboardThroughput { get; } = new ChartDefinition(
          DashboardThroughputId,
-         "Delivery throughput",
-         "Messages the server finished processing, per minute, sampled every 2 seconds.",
-         "messages / minute",
+         L("Delivery throughput"),
+         L("Messages the server finished processing, per minute, sampled every 2 seconds."),
+         L("messages / minute"),
          // A rate derived from a counter difference over a ~2 second window is
          // rarely a whole number; rounding it to "0" or "60" in the table would
          // be inventing precision the chart does not have.
          "N1",
-         "Delivered");
+         L("Delivered"));
 
       /// <summary>Concurrent protocol sessions, on the Dashboard page.</summary>
       public static ChartDefinition DashboardSessions { get; } = new ChartDefinition(
          DashboardSessionsId,
-         "Active sessions",
-         "Concurrent SMTP, IMAP and POP3 sessions, sampled every 2 seconds.",
-         "sessions",
+         L("Active sessions"),
+         L("Concurrent SMTP, IMAP and POP3 sessions, sampled every 2 seconds."),
+         L("sessions"),
          "N0",
          "SMTP", "IMAP", "POP3");
 

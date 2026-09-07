@@ -200,7 +200,7 @@ namespace hMailServer.ControlPanel.Views
          {
             var caption = new TextBlock
             {
-               Text = row.Title.ToUpperInvariant(),
+               Text = L(row.Title).ToUpperInvariant(),
                FontSize = Typography.Caption,
                FontWeight = FontWeights.SemiBold,
                Margin = new Thickness(2, 8, 2, 2)
@@ -222,7 +222,7 @@ namespace hMailServer.ControlPanel.Views
          var stack = new StackPanel();
          stack.Children.Add(new TextBlock
          {
-            Text = row.Title,
+            Text = L(row.Title),
             FontSize = Typography.Control,
             TextTrimming = TextTrimming.CharacterEllipsis
          });
@@ -251,7 +251,7 @@ namespace hMailServer.ControlPanel.Views
          // The accessible name is the whole result, because a screen-reader user
          // arrowing through the list gets one announcement per row and the
          // destination is the half that matters.
-         AutomationProperties.SetName(item, secondary.Length > 0 ? row.Title + ". " + secondary : row.Title);
+         AutomationProperties.SetName(item, secondary.Length > 0 ? L(row.Title) + ". " + secondary : L(row.Title));
 
          item.MouseLeftButtonUp += (s, e) =>
          {

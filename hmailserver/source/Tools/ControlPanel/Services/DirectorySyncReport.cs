@@ -241,7 +241,7 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>The literal the server writes above the aggregate.</summary>
-      private const string SkipBreakdownHeader = "Skipped, by reason:";
+      private const string SkipBreakdownHeader = "Skipped, by reason:"; // no-loc: the server's report
 
       private static DirectorySyncOutcome OutcomeOf(string state)
       {

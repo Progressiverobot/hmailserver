@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Generic;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -99,15 +100,15 @@ namespace hMailServer.ControlPanel.Services
       private static readonly Dictionary<StatusLevel, StatusPresentation> Map = new()
       {
          [StatusLevel.Normal] =
-            new StatusPresentation(StatusLevel.Normal, "Normal", ShapeMark.Circle, "TextFillColorPrimaryBrush"),
+            new StatusPresentation(StatusLevel.Normal, L("Normal"), ShapeMark.Circle, "TextFillColorPrimaryBrush"),
          [StatusLevel.Good] =
             new StatusPresentation(StatusLevel.Good, "OK", ShapeMark.Square, "AppSuccessBrush"),
          [StatusLevel.Information] =
-            new StatusPresentation(StatusLevel.Information, "Information", ShapeMark.Diamond, "AppInfoBrush"),
+            new StatusPresentation(StatusLevel.Information, L("Information"), ShapeMark.Diamond, "AppInfoBrush"),
          [StatusLevel.Warning] =
-            new StatusPresentation(StatusLevel.Warning, "Warning", ShapeMark.Triangle, "AppWarningBrush"),
+            new StatusPresentation(StatusLevel.Warning, L("Warning"), ShapeMark.Triangle, "AppWarningBrush"),
          [StatusLevel.Critical] =
-            new StatusPresentation(StatusLevel.Critical, "Critical", ShapeMark.Cross, "AppDangerBrush")
+            new StatusPresentation(StatusLevel.Critical, L("Critical"), ShapeMark.Cross, "AppDangerBrush")
       };
 
       /// <summary>Never returns null; an unknown level is treated as Normal.</summary>
@@ -143,7 +144,7 @@ namespace hMailServer.ControlPanel.Services
       /// </summary>
       public static IReadOnlyList<string> ConfigurationWarningSeverities { get; } = new[]
       {
-         "Critical", "High", "Medium", "Info"
+         "Critical", "High", "Medium", "Info" // no-loc: the words the server prints
       };
 
       /// <summary>

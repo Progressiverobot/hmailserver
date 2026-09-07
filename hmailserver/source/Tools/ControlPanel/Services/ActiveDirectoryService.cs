@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.DirectoryServices;
 using System.Text;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -46,7 +47,7 @@ namespace hMailServer.ControlPanel.Services
             object dnc = rootDse.Properties["defaultNamingContext"].Value;
             if (dnc == null || string.IsNullOrEmpty(dnc.ToString()))
             {
-               reason = "This computer is not joined to an Active Directory domain.";
+               reason = L("This computer is not joined to an Active Directory domain.");
                return false;
             }
             reason = "";
@@ -54,8 +55,7 @@ namespace hMailServer.ControlPanel.Services
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            reason = "Active Directory is not reachable from this computer — " +
-                     ServerSession.DescribeComError(ex);
+            reason = F("Active Directory is not reachable from this computer — {0}", ServerSession.DescribeComError(ex));
             return false;
          }
       }
@@ -149,7 +149,7 @@ namespace hMailServer.ControlPanel.Services
             string f = EscapeLdap(filter.Trim());
             sb.Append("(|(sAMAccountName=*").Append(f).Append("*)")
               .Append("(displayName=*").Append(f).Append("*)")
-              .Append("(mail=*").Append(f).Append("*)")
+              .Append("(mail=*").Append(f).Append("*)") // no-loc
               .Append("(userPrincipalName=*").Append(f).Append("*))");
          }
          sb.Append(')');

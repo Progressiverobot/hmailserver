@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -131,16 +132,14 @@ namespace hMailServer.ControlPanel.Services
          }
 
          return Result.Fail(
-            Quote(host) + " did not answer on port " + EndpointMapperPort + ", which Windows needs in order to reach " +
-            "the hMailServer COM API remotely. Check that the machine is switched on, that its firewall allows DCOM, " +
-            "and that you are connecting to the right name.");
+            F("{0} did not answer on port {1}, which Windows needs in order to reach the hMailServer COM API remotely. Check that the machine is switched on, that its firewall allows DCOM, and that you are connecting to the right name.", Quote(host), EndpointMapperPort));
       }
 
       private static string NotFound(string host, bool timedOut)
       {
          return timedOut
-            ? "Timed out looking up " + Quote(host) + ". Check the name, and that this machine can reach a DNS server."
-            : Quote(host) + " could not be found. Check the spelling, or enter the server's IP address instead.";
+            ? F("Timed out looking up {0}. Check the name, and that this machine can reach a DNS server.", Quote(host))
+            : F("{0} could not be found. Check the spelling, or enter the server's IP address instead.", Quote(host));
       }
 
       private static string Quote(string value)

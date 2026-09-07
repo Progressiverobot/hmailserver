@@ -4,6 +4,7 @@
 using System;
 using System.IO;
 using Microsoft.Win32;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -35,7 +36,7 @@ namespace hMailServer.ControlPanel.Services
          // WinForms one of the same name.
          var dialog = new Microsoft.Win32.OpenFileDialog
          {
-            Filter = string.IsNullOrEmpty(filter) ? "All files (*.*)|*.*" : filter
+            Filter = string.IsNullOrEmpty(filter) ? L("All files (*.*)|*.*") : filter
          };
          SeedInitialDirectory(dialog, current);
          return dialog.ShowDialog() == true ? dialog.FileName : null;

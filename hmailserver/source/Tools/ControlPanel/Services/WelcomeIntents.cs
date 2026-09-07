@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Generic;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -41,41 +42,41 @@ namespace hMailServer.ControlPanel.Services
    {
       public static readonly IReadOnlyList<WelcomeIntent> Entries = new List<WelcomeIntent>
       {
-         new WelcomeIntent("Mail is stuck or slow",
-            "Work out which half has stalled - accepting or delivering - turn on the logging that names the cause, and read the lines that do.",
+         new WelcomeIntent(N("Mail is stuck or slow"),
+            N("Work out which half has stalled - accepting or delivering - turn on the logging that names the cause, and read the lines that do."),
             "stalledmail"),
-         new WelcomeIntent("See what is waiting to go out",
-            "Every message still in the delivery queue, the last error the server got for it, and when it is retried.",
+         new WelcomeIntent(N("See what is waiting to go out"),
+            N("Every message still in the delivery queue, the last error the server got for it, and when it is retried."),
             "queue"),
-         new WelcomeIntent("Watch the server work",
-            "The log as it is written, filtered by protocol - the fastest way to see what happened to one message.",
+         new WelcomeIntent(N("Watch the server work"),
+            N("The log as it is written, filtered by protocol - the fastest way to see what happened to one message."),
             "logs"),
-         new WelcomeIntent("Add a domain or a mailbox",
-            "Domains, accounts, aliases and distribution lists, and each account's passwords, forwarding and folders.",
+         new WelcomeIntent(N("Add a domain or a mailbox"),
+            N("Domains, accounts, aliases and distribution lists, and each account's passwords, forwarding and folders."),
             "domains"),
-         new WelcomeIntent("Stop spam",
-            "What every spam check is doing right now, in the order the server runs them, and where each is switched on.",
+         new WelcomeIntent(N("Stop the spam"),
+            N("What every spam check is doing right now, in the order the server runs them, and where each is switched on."),
             "spamoverview"),
-         new WelcomeIntent("Someone is guessing passwords",
-            "Auto-ban by address, the per-name lockout, and the logon tarpit that makes each guess cost seconds.",
+         new WelcomeIntent(N("Someone is guessing passwords"),
+            N("Auto-ban by address, the per-name lockout, and the logon tarpit that makes each guess cost seconds."),
             "autoban"),
-         new WelcomeIntent("Let a device or printer send mail",
-            "IP ranges: which addresses may relay, which must authenticate, and which are exempt from spam checks.",
+         new WelcomeIntent(N("Let a device or printer send mail"),
+            N("IP ranges: which addresses may relay, which must authenticate, and which are exempt from spam checks."),
             "ipranges"),
-         new WelcomeIntent("Renew or install a certificate",
-            "The certificates the listeners present, and automatic renewal through ACME.",
+         new WelcomeIntent(N("Renew or install a certificate"),
+            N("The certificates the listeners present, and automatic renewal through ACME."),
             "certs"),
-         new WelcomeIntent("Send all mail through my provider",
-            "The smart host, its port and credentials, and the retry schedule for delivery.",
+         new WelcomeIntent(N("Send everything through my provider"),
+            N("The smart host, its port and credentials, and the retry schedule for delivery."),
             "delivery"),
-         new WelcomeIntent("Check the server is healthy",
-            "The built-in connectivity and configuration checks, and the last message-store consistency scan.",
+         new WelcomeIntent(N("Check the server is healthy"),
+            N("The built-in connectivity and configuration checks, and the last message-store consistency scan."),
             "diagnostics"),
-         new WelcomeIntent("Back up the configuration and the mail",
-            "What a backup holds, the schedule, verification of every archive, and restore.",
+         new WelcomeIntent(N("Back up the configuration and the mail"),
+            N("What a backup holds, the schedule, verification of every archive, and restore."),
             "backup"),
-         new WelcomeIntent("Protect the administrator credential",
-            "The administrator password, and a second factor the server itself enforces on every client.",
+         new WelcomeIntent(N("Protect the administrator credential"),
+            N("The administrator password, and a second factor the server itself enforces on every client."),
             "adminaccess"),
       };
    }

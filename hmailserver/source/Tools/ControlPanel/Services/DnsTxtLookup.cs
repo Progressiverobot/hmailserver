@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -94,7 +95,7 @@ namespace hMailServer.ControlPanel.Services
          if (string.IsNullOrWhiteSpace(host))
          {
             result.Status = LookupStatus.Failed;
-            result.Error = "No host name to look up.";
+            result.Error = L("No host name to look up.");
             return result;
          }
 

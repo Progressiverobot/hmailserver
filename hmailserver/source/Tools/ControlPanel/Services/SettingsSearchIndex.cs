@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -106,7 +107,7 @@ namespace hMailServer.ControlPanel.Services
 
          foreach (SettingEntry entry in Entries)
          {
-            int byLabel = query.Score(entry.Label);
+            int byLabel = query.Score(L(entry.Label));
             int byKey = query.Score(entry.Key);
             if (byKey != SearchTerms.NoMatch)
                byKey += KeyPenalty;
