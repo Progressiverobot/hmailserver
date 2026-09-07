@@ -1347,6 +1347,118 @@ namespace RegressionTests.API
          Assert.AreEqual(404, third.status, "No right on the public folder: " + third.body);
       }
 
+      [Test]
+      [Description("PUT /api/v1/me/settings sets the name, the forwarding and the signature COM reads back, and refuses a forwarding that would loop")]
+      public void SettingsRoundTrip()
+      {
+         string other = OtherAccount();
+
+         (int status, string body) saved = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword),
+            "{\"name\":{\"first\":\"Ada\",\"last\":\"Lovelace\"}," +
+            "\"forwarding\":{\"enabled\":true,\"address\":\"" + other + "\",\"keep_original\":true}," +
+            "\"signature\":{\"enabled\":true,\"text\":\"-- \\nAda\",\"html\":\"\"}}");
+         Assert.AreEqual(200, saved.status, "Body: " + saved.body);
+         StringAssert.Contains("\"first\":\"Ada\"", saved.body);
+         StringAssert.Contains("\"address\":\"" + other + "\"", saved.body);
+
+         Account reread = _domain.Accounts.ItemByAddress[Address];
+         Assert.AreEqual("Ada", reread.PersonFirstName);
+         Assert.AreEqual("Lovelace", reread.PersonLastName);
+         Assert.IsTrue(reread.ForwardEnabled);
+         Assert.AreEqual(other, reread.ForwardAddress);
+         Assert.IsTrue(reread.ForwardKeepOriginal);
+         Assert.IsTrue(reread.SignatureEnabled);
+         Assert.AreEqual("-- \nAda", reread.SignaturePlainText);
+
+         (int status, string body) read = Http("GET", "/api/v1/me/settings", UserHeader(UserPassword));
+         Assert.AreEqual(200, read.status, "Body: " + read.body);
+         StringAssert.Contains("\"name\":{\"first\":\"Ada\",\"last\":\"Lovelace\"}", read.body);
+         StringAssert.Contains("\"forwarding\":{\"enabled\":true,\"address\":\"" + other + "\",\"keep_original\":true}", read.body);
+         StringAssert.Contains("\"signature\":{\"enabled\":true,\"text\":\"-- \\nAda\"", read.body);
+
+         (int status, string body) partial = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword),
+            "{\"forwarding\":{\"enabled\":false,\"address\":\"\",\"keep_original\":true}}");
+         Assert.AreEqual(200, partial.status, "Body: " + partial.body);
+         reread = _domain.Accounts.ItemByAddress[Address];
+         Assert.IsFalse(reread.ForwardEnabled);
+         Assert.AreEqual("Ada", reread.PersonFirstName, "An object the body does not name is left as it is.");
+
+         (int status, string body) loop = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword),
+            "{\"forwarding\":{\"enabled\":true,\"address\":\"" + Address.ToUpperInvariant() + "\"}}");
+         Assert.AreEqual(400, loop.status, "Body: " + loop.body);
+
+         (int status, string body) malformed = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword),
+            "{\"forwarding\":{\"enabled\":true,\"address\":\"nowhere\"}}");
+         Assert.AreEqual(400, malformed.status, "Body: " + malformed.body);
+
+         (int status, string body) nothing = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword), "{}");
+         Assert.AreEqual(400, nothing.status, "Body: " + nothing.body);
+
+         (int status, string body) admin = Http("GET", "/api/v1/me/settings", AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("PUT /api/v1/me/filters stores a Sieve script that runs at delivery, refuses one that does not parse, and removes it when empty")]
+      public void FiltersRunAtDelivery()
+      {
+         _account.IMAPFolders.Add("Spam");
+
+         string script =
+            "require \"fileinto\";\r\n" +
+            "if header :contains \"Subject\" \"lottery\" {\r\n" +
+            "  fileinto \"Spam\";\r\n" +
+            "}\r\n";
+         string scriptJson = script.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n");
+
+         (int status, string body) bad = Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword), "{\"script\":\"if header :contains {\\r\\n\"}");
+         Assert.AreEqual(400, bad.status, "Body: " + bad.body);
+         StringAssert.Contains("\"error\":", bad.body);
+
+         (int status, string body) missing = Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword), "{}");
+         Assert.AreEqual(400, missing.status, "Body: " + missing.body);
+
+         (int status, string body) saved = Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword), "{\"script\":\"" + scriptJson + "\"}");
+         Assert.AreEqual(200, saved.status, "Body: " + saved.body);
+
+         (int status, string body) read = Http("GET", "/api/v1/me/filters", UserHeader(UserPassword));
+         Assert.AreEqual(200, read.status, "Body: " + read.body);
+         StringAssert.Contains("\"active\":\"" + scriptJson + "\"", read.body);
+
+         SmtpClientSimulator.StaticSend("sender@example.com", Address, "You won the lottery!", "Congratulations.");
+         CustomAsserts.AssertFolderMessageCount(_account.IMAPFolders.get_ItemByName("Spam"), 1);
+         CustomAsserts.AssertFolderMessageCount(_account.IMAPFolders.get_ItemByName("INBOX"), 0);
+
+         (int status, string body) cleared = Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword), "{\"script\":\"\"}");
+         Assert.AreEqual(200, cleared.status, "Body: " + cleared.body);
+         (int status, string body) empty = Http("GET", "/api/v1/me/filters", UserHeader(UserPassword));
+         StringAssert.Contains("\"active\":\"\"", empty.body);
+
+         SmtpClientSimulator.StaticSend("sender@example.com", Address, "Another lottery", "Again.");
+         CustomAsserts.AssertFolderMessageCount(_account.IMAPFolders.get_ItemByName("INBOX"), 1);
+         CustomAsserts.AssertFolderMessageCount(_account.IMAPFolders.get_ItemByName("Spam"), 1);
+
+         (int status, string body) admin = Http("PUT", "/api/v1/me/filters", AdminHeader(), "{\"script\":\"\"}");
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("The escapes a JSON string may carry - newlines, tabs, \\u code points, a surrogate pair - are read as the characters they stand for")]
+      public void JsonEscapesAreReadAsCharacters()
+      {
+         (int status, string body) vacation = Http("PUT", "/api/v1/me/vacation", UserHeader(UserPassword),
+            "{\"enabled\":true,\"subject\":\"Caf\\u00e9 \\ud83d\\ude80\",\"message\":\"Line one\\nLine two\\ttabbed\"}");
+         Assert.AreEqual(200, vacation.status, "Body: " + vacation.body);
+
+         Account reread = _domain.Accounts.ItemByAddress[Address];
+         Assert.AreEqual("Café \U0001F680", reread.VacationSubject);
+         Assert.AreEqual("Line one\nLine two\ttabbed", reread.VacationMessage);
+
+         (int status, string body) me = Http("GET", "/api/v1/me", UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"Café \U0001F680\"", me.body);
+         StringAssert.Contains("\"message\":\"Line one\\nLine two\\ttabbed\"", me.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()

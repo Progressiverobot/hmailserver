@@ -176,6 +176,10 @@ namespace HM
          RouteMeMessageSend,
          RouteMeMessageAttachment,
          RouteMeSearch,
+         RouteMeSettings,
+         RouteMeSettingsPut,
+         RouteMeFilters,
+         RouteMeFiltersPut,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -299,6 +303,13 @@ namespace HM
       static String JsonUtf8Value_(const AnsiString &json, const AnsiString &key);
       static HttpResponse HandleMeMessageAttachment_(const Caller &caller, __int64 messageId, int index);
       static HttpResponse HandleMeSearch_(const Caller &caller, const AnsiString &query);
+      static HttpResponse HandleMeSettings_(const Caller &caller);
+      static HttpResponse HandleMeSettingsPut_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeFilters_(const Caller &caller);
+      static HttpResponse HandleMeFiltersPut_(const Caller &caller, const AnsiString &requestBody);
+      static AnsiString SettingsJson_(std::shared_ptr<const Account> account);
+      static bool ReadJsonHex4_(const AnsiString &json, int at, unsigned int &value);
+      static void AppendUtf8_(AnsiString &out, unsigned int codePoint);
       static void CollectReadableFolders_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders, const String &parentPath,
                                           const String &delimiter, std::vector<std::pair<std::shared_ptr<IMAPFolder>, String>> &out, int depth);
       // UTF-8 for the JSON: the plain String-to-AnsiString conversion is the
