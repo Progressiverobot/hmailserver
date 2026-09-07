@@ -39,7 +39,9 @@
 
 #pragma once
 
-#include <thread>
+#include <memory>
+
+#include "HttpServer.h"
 
 namespace HM
 {
@@ -102,15 +104,11 @@ namespace HM
       // reaches it.
       static void ReportUnreachableFeatures_(int http_port, int https_port);
 
-      bool StartListener_(const String &bind_address, int port, SOCKET &listen_socket);
-      void Run_(SOCKET listen_socket, bool use_tls);
-      void HandleClient_(SOCKET client_socket, bool use_tls);
+      static HttpResponse ProcessRequest_(const AnsiString &request, bool over_tls);
 
-      static AnsiString ProcessRequest_(const AnsiString &request, bool over_tls);
-
-      static AnsiString BuildResponse_(int status_code, const AnsiString &content_type, const AnsiString &body,
+      static HttpResponse BuildResponse_(int status_code, const AnsiString &content_type, const AnsiString &body,
                                        const AnsiString &extra_headers = "");
-      static AnsiString BuildRedirectResponse_(const AnsiString &location);
+      static HttpResponse BuildRedirectResponse_(const AnsiString &location);
 
       // True when the request reached this listener over TLS, or a proxy that
       // terminated TLS on the client's behalf says so in X-Forwarded-Proto.
@@ -118,22 +116,22 @@ namespace HM
       // The answer to a configuration profile asked for over plain HTTP: the same
       // URL on the HTTPS listener when one is configured, otherwise 403 with the
       // reason.
-      static AnsiString RefusePlainHttpProfile_(const AnsiString &host, const AnsiString &path, const AnsiString &query);
+      static HttpResponse RefusePlainHttpProfile_(const AnsiString &host, const AnsiString &path, const AnsiString &query);
       static AnsiString GetRequestHost_(const AnsiString &request);
       static AnsiString GetRequestBody_(const AnsiString &request);
 
-      static AnsiString HandleAcmeChallenge_(const AnsiString &path);
-      static AnsiString HandleMtaStsPolicy_(const AnsiString &host);
-      static AnsiString HandleAutoconfig_(const AnsiString &host, const AnsiString &query);
-      static AnsiString HandleAutodiscover_(const AnsiString &body);
-      static AnsiString HandleSecurityTxt_(const AnsiString &host);
+      static HttpResponse HandleAcmeChallenge_(const AnsiString &path);
+      static HttpResponse HandleMtaStsPolicy_(const AnsiString &host);
+      static HttpResponse HandleAutoconfig_(const AnsiString &host, const AnsiString &query);
+      static HttpResponse HandleAutodiscover_(const AnsiString &body);
+      static HttpResponse HandleSecurityTxt_(const AnsiString &host);
 
       // Apple .mobileconfig configuration profile, built from the same
       // GetClientAccessSettings_ data the two XML handlers use.
-      static AnsiString HandleAppleProfile_(const AnsiString &host, const AnsiString &query);
+      static HttpResponse HandleAppleProfile_(const AnsiString &host, const AnsiString &query);
 
       // RFC 6764 well-known redirect. calendar selects caldav over carddav.
-      static AnsiString HandleWellKnownDavRedirect_(bool calendar);
+      static HttpResponse HandleWellKnownDavRedirect_(bool calendar);
 
       // The configured redirect target, if there is a usable one.
       // GetDavRedirectSetting_ answers only "is anything configured", without
@@ -166,10 +164,7 @@ namespace HM
       // account beside it. Deriving it means no state has to be persisted.
       static AnsiString MakeStableUuid_(const AnsiString &seed);
 
-      SOCKET http_socket_;
-      SOCKET https_socket_;
-      std::thread http_worker_;
-      std::thread https_worker_;
+      std::shared_ptr<HttpServer> server_;
       bool running_;
       bool tls_available_;
    };
