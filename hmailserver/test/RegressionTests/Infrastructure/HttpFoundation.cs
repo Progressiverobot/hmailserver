@@ -74,6 +74,10 @@ namespace RegressionTests.Infrastructure
             StringAssert.StartsWith("HTTP/1.1 ", first.StatusLine);
             StringAssert.Contains("\"version\"", first.Body);
 
+            // The API's answers are the server's state at that moment, given
+            // to a credential; nothing in between may keep one.
+            Assert.AreEqual("no-store", first.Header("cache-control"));
+
             // Same socket, no reconnect.
             Send(stream, Request("GET", "/api/v1/status", "HTTP/1.1", Basic()));
             HttpReply second = reader.Read();
@@ -292,6 +296,10 @@ namespace RegressionTests.Infrastructure
             HttpReply first = reader.Read();
             Assert.AreEqual(404, first.Status, "Body: " + first.Body);
             Assert.AreEqual("keep-alive", first.Header("connection"));
+
+            // The web services listener's default: not cacheable unless a
+            // handler says so. A refusal never says so.
+            Assert.AreEqual("no-store", first.Header("cache-control"));
 
             Send(stream, Request("GET", "/no-such-path", "HTTP/1.1", ""));
             HttpReply second = reader.Read();

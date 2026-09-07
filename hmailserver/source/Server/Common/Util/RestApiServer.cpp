@@ -1933,6 +1933,12 @@ namespace HM
       response.body = body;
       response.extra_headers = extraHeaders;
 
+      // Nothing the API answers may be served from a cache: every response is
+      // the state of the server at that moment, and most of them were only
+      // given because a credential was presented with the request. A browser
+      // or a proxy that kept one would hand it to the next caller.
+      response.extra_headers += "Cache-Control: no-store\r\n";
+
       return response;
    }
 
@@ -2617,6 +2623,7 @@ namespace HM
       HttpResponse response;
       response.content_type = "text/html; charset=utf-8";
       response.body = body;
+      response.extra_headers = "Cache-Control: no-store\r\n";
 
       return response;
    }
