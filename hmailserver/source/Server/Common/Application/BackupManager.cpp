@@ -341,11 +341,19 @@ namespace HM
       return sVal;
    }
 
+   bool
+   BackupManager::IsRunning()
+   {
+      boost::lock_guard<boost::mutex> guard(run_slot_mutex_);
+      return !run_slot_owner_.expired();
+   }
+
    void
    BackupManager::OnBackupCompleted()
    {
       LOG_DEBUG("BackupManager::OnBackupCompleted()");
       Logger::Instance()->LogBackup("Backup completed successfully");
+      last_backup_succeeded_ = true;
 
       if (Configuration::Instance()->GetUseScriptServer())
       {
@@ -364,6 +372,7 @@ namespace HM
       LOG_DEBUG("BackupManager::OnBackupFailed()");
       String sErrorMsg = "BACKUP ERROR: " + sReason;
       Logger::Instance()->LogBackup(sErrorMsg);
+      last_backup_succeeded_ = false;
 
       ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5014, "BackupManager::OnBackupFailed", sErrorMsg);
 

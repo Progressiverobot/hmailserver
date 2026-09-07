@@ -68,6 +68,7 @@
 #include "MailboxRetentionTask.h"
 #include "MetricsHistoryTask.h"
 #include "UpdateCheckTask.h"
+#include "../Util/UpdateChecker.h"
 #include "IMAPExpungeRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
@@ -692,14 +693,17 @@ namespace HM
       // The update check: does the project have a newer release than this one.
       // The task no-ops until UpdateCheckEnabled=1 (Status.CheckForUpdate is the
       // on-demand form and needs no opt-in). Once at startup, so a server that is
-      // only ever restarted still hears, then every UpdateCheckHours.
+      // only ever restarted still hears, then every quarter hour - the feed is
+      // read every UpdateCheckHours, but an UpdateWindow an hour long must not be
+      // missed, and it is the task that notices the window is open.
+      UpdateChecker::ResetSchedule();
       std::shared_ptr<UpdateCheckTask> updateCheckStartupTask = std::shared_ptr<UpdateCheckTask>(new UpdateCheckTask);
       updateCheckStartupTask->SetReoccurance(ScheduledTask::RunOnce);
       scheduler_->ScheduleTask(updateCheckStartupTask);
 
       std::shared_ptr<UpdateCheckTask> updateCheckTask = std::shared_ptr<UpdateCheckTask>(new UpdateCheckTask);
       updateCheckTask->SetReoccurance(ScheduledTask::RunInfinitely);
-      updateCheckTask->SetMinutesBetweenRun(IniFileSettings::Instance()->GetUpdateCheckHours() * 60);
+      updateCheckTask->SetMinutesBetweenRun(15);
       scheduler_->ScheduleTask(updateCheckTask);
 
       // QRESYNC expunge records: cap hm_imapexpunged at IMAPExpungeRetentionRecords

@@ -5,6 +5,7 @@ using System;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using hMailServer.ControlPanel.Services;
@@ -36,6 +37,50 @@ namespace hMailServer.ControlPanel.Views
       }
 
       private void Refresh_Click(object sender, RoutedEventArgs e) => Reload();
+
+      private void CheckUpdate_Click(object sender, RoutedEventArgs e) => RunUpdateAction_("check");
+      private void DownloadUpdate_Click(object sender, RoutedEventArgs e) => RunUpdateAction_("download");
+      private void InstallUpdate_Click(object sender, RoutedEventArgs e) => RunUpdateAction_("install");
+
+      // The three update steps, on the server: a check reads the feed, a download
+      // fetches and verifies the installer, an install hands it to the helper. Each
+      // answers when it is done, so the cursor waits with it.
+      private void RunUpdateAction_(string action)
+      {
+         dynamic app = ServerSession.Current?.Application;
+         if (app == null)
+            return;
+
+         if (action == "install" && MessageBox.Show(
+                "Install the update now?\n\nThe verified installer is handed to the update helper: the " +
+                "service stops, the new version is installed, and the service starts again. If it does " +
+                "not come back, the previous version is reinstalled. This Control Panel loses its " +
+                "connection while that happens; reconnect afterwards to see the outcome here.",
+                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+
+         Mouse.OverrideCursor = Cursors.Wait;
+         try
+         {
+            dynamic status = app.Status;
+            bool done = action == "check" ? (bool)status.CheckForUpdate()
+               : action == "download" ? (bool)status.DownloadUpdate()
+               : (bool)status.InstallUpdate();
+            string error = (string)status.UpdateLastError;
+            ServerSession.Release(status);
+            if (!done && !string.IsNullOrEmpty(error))
+               MessageBox.Show(error, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+         }
+         catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
+         {
+            MessageBox.Show("The update step could not be run: " + ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+         }
+         finally
+         {
+            Mouse.OverrideCursor = null;
+         }
+         Reload();
+      }
 
       /// <summary>
       /// Pause and resume are Application.Stop()/Start() over COM - the engine stops
@@ -147,11 +192,23 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             dynamic status = app.Status;
-            SetValue_(UpdateValue, "Update", UpdateText_((int)status.UpdateState, (string)status.AvailableVersion,
-               (string)status.AvailableVersionPublished, (string)status.UpdateLastChecked, (string)status.UpdateLastError));
+            int updateState = (int)status.UpdateState;
+            string availableVersion = (string)status.AvailableVersion;
+            string applyOutcome = (string)status.UpdateApplyOutcome;
+            SetValue_(UpdateValue, "Update", UpdateText_(updateState, availableVersion,
+               (string)status.AvailableVersionPublished, (string)status.UpdateLastChecked, (string)status.UpdateLastError, applyOutcome));
             ServerSession.Release(status);
+            // Download once a newer release is known (a failed download can be retried);
+            // install once one is verified and waiting.
+            DownloadUpdateButton.IsEnabled = updateState == 2 || (updateState == 5 && !string.IsNullOrEmpty(availableVersion));
+            InstallUpdateButton.IsEnabled = updateState == 3;
          }
-         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(UpdateValue, "Update", "-"); }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+         {
+            SetValue_(UpdateValue, "Update", "-");
+            DownloadUpdateButton.IsEnabled = false;
+            InstallUpdateButton.IsEnabled = false;
+         }
 
          try
          {
@@ -226,18 +283,21 @@ namespace hMailServer.ControlPanel.Views
       /// what the dashboard's KPI row already does, and doing the same here means
       /// the two pages sound alike.
       /// </summary>
-      // One line for the status card, from Status.UpdateState and its companions.
-      internal static string UpdateText_(int state, string version, string published, string checkedAt, string error)
+      // One line for the status card, from Status.UpdateState and its companions. The
+      // last apply's outcome, reported when the service came back, comes first when
+      // there is one: it is what the administrator who clicked Install is waiting for.
+      internal static string UpdateText_(int state, string version, string published, string checkedAt, string error, string applyOutcome = null)
       {
          string when = string.IsNullOrEmpty(published) ? "" : " (published " + published + ")";
+         string outcome = string.IsNullOrEmpty(applyOutcome) ? "" : "Last update: " + applyOutcome + ". ";
          switch (state)
          {
-            case 1: return "This is the latest release" + (string.IsNullOrEmpty(checkedAt) ? "" : ", checked " + checkedAt);
-            case 2: return version + " is available" + when;
-            case 3: return version + " is downloaded and verified" + when;
-            case 4: return "Installing " + version;
-            case 5: return "The last check failed: " + error;
-            default: return "Not checked yet (UpdateCheckEnabled in hMailServer.INI turns the daily check on)";
+            case 1: return outcome + "This is the latest release" + (string.IsNullOrEmpty(checkedAt) ? "" : ", checked " + checkedAt);
+            case 2: return outcome + version + " is available" + when;
+            case 3: return outcome + version + " is downloaded and verified" + when + "; Install update applies it";
+            case 4: return outcome + "Installing " + version + ": the service will stop and start";
+            case 5: return outcome + "The last update step failed: " + error;
+            default: return outcome + "Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)";
          }
       }
 
