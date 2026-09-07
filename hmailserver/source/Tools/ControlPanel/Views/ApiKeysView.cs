@@ -12,6 +12,7 @@ using hMailServer.ControlPanel.Services;
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using Path = System.Windows.Shapes.Path;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -57,16 +58,13 @@ namespace hMailServer.ControlPanel.Views
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
          var heading = new StackPanel();
-         var title = new TextBlock { Text = "REST API keys" };
+         var title = new TextBlock { Text = L("REST API keys") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          heading.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Credentials for the REST administration API that are not the administrator password: each one "
-                   + "expires, can be limited to reading only, to particular domains and to particular source "
-                   + "addresses, and can be revoked on its own. The server re-reads the key store on every request, "
-                   + "so anything changed here is live at once - no service restart."
+            Text = L("Credentials for the REST administration API that are not the administrator password: each one expires, can be limited to reading only, to particular domains and to particular source addresses, and can be revoked on its own. The server re-reads the key store on every request, so anything changed here is live at once - no service restart.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          heading.Children.Add(subtitle);
@@ -133,7 +131,7 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildSummaryCard_()
       {
-         Border card = Card_("Key store", null, out StackPanel content);
+         Border card = Card_(L("Key store"), null, out StackPanel content);
 
          var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
 
@@ -159,17 +157,17 @@ namespace hMailServer.ControlPanel.Views
 
          var create = new Wpf.Ui.Controls.Button
          {
-            Content = "_Create a key…",
+            Content = L("_Create a key…"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(create, "Create a new REST API key");
+         System.Windows.Automation.AutomationProperties.SetName(create, L("Create a new REST API key"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(create, "apikeys-create");
          create.Click += (s, e) => CreateKey_();
          buttons.Children.Add(create);
 
-         var reload = new Wpf.Ui.Controls.Button { Content = "_Reload" };
-         System.Windows.Automation.AutomationProperties.SetName(reload, "Re-read the key store from disk");
+         var reload = new Wpf.Ui.Controls.Button { Content = L("_Reload") };
+         System.Windows.Automation.AutomationProperties.SetName(reload, L("Re-read the key store from disk"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "apikeys-reload");
          reload.Click += (s, e) => Reload_();
          buttons.Children.Add(reload);
@@ -184,9 +182,8 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private Border BuildNewKeyCard_()
       {
-         Border card = Card_("Copy this key now",
-            "This is the only time it will ever be shown. The store keeps a SHA-256 digest, not the key, so it "
-            + "cannot be recovered or re-displayed - if it is lost, revoke it here and create another.",
+         Border card = Card_(L("Copy this key now"),
+            L("This is the only time it will ever be shown. The store keeps a SHA-256 digest, not the key, so it cannot be recovered or re-displayed - if it is lost, revoke it here and create another."),
             out StackPanel content);
 
          card.Visibility = Visibility.Collapsed;
@@ -201,18 +198,18 @@ namespace hMailServer.ControlPanel.Views
          newKeyToken_.TextWrapping = TextWrapping.Wrap;
          newKeyToken_.Margin = new Thickness(0, 0, 0, 12);
          System.Windows.Automation.AutomationProperties.SetAutomationId(newKeyToken_, "apikeys-new-token");
-         System.Windows.Automation.AutomationProperties.SetName(newKeyToken_, "The new API key, shown once");
+         System.Windows.Automation.AutomationProperties.SetName(newKeyToken_, L("The new API key, shown once"));
          content.Children.Add(newKeyToken_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal };
 
          var copy = new Wpf.Ui.Controls.Button
          {
-            Content = "Copy to clip_board",
+            Content = L("Copy to clip_board"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0)
          };
-         System.Windows.Automation.AutomationProperties.SetName(copy, "Copy the new API key to the clipboard");
+         System.Windows.Automation.AutomationProperties.SetName(copy, L("Copy the new API key to the clipboard"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(copy, "apikeys-copy");
          copy.Click += (s, e) =>
          {
@@ -225,15 +222,14 @@ namespace hMailServer.ControlPanel.Views
                // Another process can hold the clipboard open. Saying so is better
                // than a button that silently did nothing with a value that cannot
                // be shown again.
-               MessageBox.Show("The clipboard could not be written: " + ex.Message
-                               + "\r\n\r\nSelect the key above and copy it by hand - it will not be shown again.",
-                  "Control Panel");
+               MessageBox.Show(F("The clipboard could not be written: {0}\r\n\r\nSelect the key above and copy it by hand - it will not be shown again.", ex.Message),
+                  L("Control Panel"));
             }
          };
          buttons.Children.Add(copy);
 
-         var done = new Wpf.Ui.Controls.Button { Content = "_I have copied it" };
-         System.Windows.Automation.AutomationProperties.SetName(done, "Hide the new API key");
+         var done = new Wpf.Ui.Controls.Button { Content = L("_I have copied it") };
+         System.Windows.Automation.AutomationProperties.SetName(done, L("Hide the new API key"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(done, "apikeys-dismiss");
          done.Click += (s, e) => HideNewKey_();
          buttons.Children.Add(done);
@@ -244,9 +240,8 @@ namespace hMailServer.ControlPanel.Views
 
       private Border BuildListCard_()
       {
-         Border card = Card_("Keys",
-            "Only a digest of each key is stored, so a key cannot be read back from here or from the file. "
-            + "Revoking one removes its section from the store and takes effect on the very next request.",
+         Border card = Card_(L("API keys"),
+            L("Only a digest of each key is stored, so a key cannot be read back from here or from the file. Revoking one removes its section from the store and takes effect on the very next request."),
             out StackPanel content);
 
          System.Windows.Automation.AutomationProperties.SetAutomationId(list_, "apikeys-list");
@@ -256,28 +251,20 @@ namespace hMailServer.ControlPanel.Views
 
       private static Border BuildExplanationCard_()
       {
-         Border card = Card_("How a key is used", null, out StackPanel content);
+         Border card = Card_(L("How a key is used"), null, out StackPanel content);
 
          content.Children.Add(Paragraph_(
-            "Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the "
-            + "API & monitoring page. The administrator password also works and is unrestricted, which is the "
-            + "reason to prefer a key: a key can be read-only, limited to named domains, limited to one source "
-            + "address, given an expiry, and revoked without changing anything else."));
+            L("Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API & monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else.")));
 
          content.Children.Add(Paragraph_(
-            "No key of any scope can create or revoke keys - that needs the administrator password, or this page. "
-            + "A key restricted to particular domains is also refused the delivery-queue endpoints outright, "
-            + "because the queue is server-wide and cannot be filtered by domain."));
+            L("No key of any scope can create or revoke keys - that needs the administrator password, or this page. A key restricted to particular domains is also refused the delivery-queue endpoints outright, because the queue is server-wide and cannot be filtered by domain.")));
 
          content.Children.Add(Paragraph_(
-            "Every value fails closed. A section whose Scope is anything but the literal \"full\" is read-only, a "
-            + "key whose expiry is missing or unreadable counts as expired, and a section with no usable digest is "
-            + "ignored entirely. That is what makes the store safe to edit by hand: a typo can only ever narrow a "
-            + "key, never widen one."));
+            L("Every value fails closed. A section whose Scope is anything but the literal \"full\" is read-only, a key whose expiry is missing or unreadable counts as expired, and a section with no usable digest is ignored entirely. That is what makes the store safe to edit by hand: a typo can only ever narrow a key, never widen one.")));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-         links.Children.Add(PageLink_("api", "REST listener settings…",
-            "Open API & monitoring, which owns the REST listener's port and TLS settings"));
+         links.Children.Add(PageLink_("api", L("REST listener settings…"),
+            L("Open API & monitoring, which owns the REST listener's port and TLS settings")));
          content.Children.Add(links);
 
          return card;
@@ -326,22 +313,19 @@ namespace hMailServer.ControlPanel.Views
          if (path == null)
          {
             SetSummary_(StatusLevel.Information,
-               "The key store's location is not known from here. It sits beside hMailServer.INI, which is found "
-               + "through this machine's registry and service table - so keys can only be managed from the server "
-               + "itself, not from a Control Panel connected to another host.");
+               L("The key store's location is not known from here. It sits beside hMailServer.INI, which is found through this machine's registry and service table - so keys can only be managed from the server itself, not from a Control Panel connected to another host."));
             storePath_.Text = "";
             return;
          }
 
-         storePath_.Text = "Store: " + path;
+         storePath_.Text = L("Store: ") + path;
 
          List<ApiKeyRecord> keys = ApiKeyStore.Read();
 
          if (keys.Count == 0)
          {
             SetSummary_(StatusLevel.Normal,
-               "No API keys exist. Every REST request therefore has to carry the administrator password, which "
-               + "carries full authority over every domain and cannot be scoped, expired or revoked on its own.");
+               L("No API keys exist. Every REST request therefore has to carry the administrator password, which carries full authority over every domain and cannot be scoped, expired or revoked on its own."));
          }
          else
          {
@@ -349,13 +333,13 @@ namespace hMailServer.ControlPanel.Views
             int full = keys.FindAll(k => !k.ReadOnly && !k.IsExpired).Count;
             int unusable = keys.FindAll(k => k.Unusable).Count;
 
-            var parts = new List<string> { Plural_(keys.Count, "key", "keys") };
+            var parts = new List<string> { Plural_(keys.Count, L("key"), L("keys")) };
             if (full > 0)
-               parts.Add(full + " with full authority");
+               parts.Add(F("{0} with full authority", full));
             if (expired > 0)
-               parts.Add(expired + " expired and now refused");
+               parts.Add(F("{0} expired and now refused", expired));
             if (unusable > 0)
-               parts.Add(unusable + " with no usable digest, which the server ignores");
+               parts.Add(F("{0} with no usable digest, which the server ignores", unusable));
 
             SetSummary_(unusable > 0 ? StatusLevel.Warning : StatusLevel.Good, string.Join(", ", parts) + ".");
          }
@@ -367,7 +351,7 @@ namespace hMailServer.ControlPanel.Views
          {
             list_.Children.Add(new TextBlock
             {
-               Text = "No keys yet.",
+               Text = L("No keys yet."),
                FontSize = Typography.Body,
                Opacity = 0.65
             });
@@ -395,7 +379,7 @@ namespace hMailServer.ControlPanel.Views
          var details = new StackPanel();
 
          var headline = new TextBlock { FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap };
-         headline.Inlines.Add(new Run(key.Label.Length > 0 ? key.Label : "(no label)") { FontWeight = FontWeights.SemiBold });
+         headline.Inlines.Add(new Run(key.Label.Length > 0 ? key.Label : L("(no label)")) { FontWeight = FontWeights.SemiBold });
          // A Run is an Inline and has no Opacity; the secondary text brush is how
          // the rest of the application recedes a caption, and it is theme-aware,
          // which a hard-coded opacity would not be.
@@ -413,8 +397,7 @@ namespace hMailServer.ControlPanel.Views
          if (key.Unusable)
          {
             level = StatusLevel.Warning;
-            state = "Ignored by the server - the stored digest is not a usable SHA-256 value, so this section "
-                    + "authenticates nothing. Revoke it and create a replacement.";
+            state = L("Ignored by the server - the stored digest is not a usable SHA-256 value, so this section authenticates nothing. Revoke it and create a replacement.");
          }
          else if (key.IsExpired)
          {
@@ -428,23 +411,18 @@ namespace hMailServer.ControlPanel.Views
             // (rewrite the line, or revoke and re-create) is the same either way
             // without needing to assert which of us is right.
             state = key.ExpiresAt == null
-               ? "The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so "
-                 + "whether the server still accepts this key cannot be told from here. If the line was edited by "
-                 + "hand, correct it; otherwise revoke the key and create a replacement."
-               : "Expired on " + key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)
-                 + ". Every request it makes is refused.";
+               ? L("The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement.")
+               : F("Expired on {0}. Every request it makes is refused.", key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)); // no-loc
          }
          else if (!key.ReadOnly)
          {
             level = StatusLevel.Warning;
-            state = "Full authority - this key can change and delete things. Expires "
-                    + key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture) + ".";
+            state = F("Full authority - this key can change and delete things. Expires {0}.", key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)); // no-loc
          }
          else
          {
             level = StatusLevel.Good;
-            state = "Read-only. Expires "
-                    + key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture) + ".";
+            state = F("Read-only. Expires {0}.", key.ExpiresAt.Value.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)); // no-loc
          }
 
          StatusPresentation presentation = StatusSemantics.For(level);
@@ -471,13 +449,13 @@ namespace hMailServer.ControlPanel.Views
 
          var restrictions = new List<string>
          {
-            key.Domains.Count == 0 ? "every domain" : "domains: " + string.Join(", ", key.Domains),
-            key.AllowedFrom.Length == 0 ? "any source address" : "only from " + key.AllowedFrom
+            key.Domains.Count == 0 ? L("every domain") : F("domains: {0}", string.Join(", ", key.Domains)),
+            key.AllowedFrom.Length == 0 ? L("any source address") : F("only from {0}", key.AllowedFrom)
          };
 
          details.Children.Add(new TextBlock
          {
-            Text = "Scope: " + string.Join("; ", restrictions) + ".",
+            Text = L("Scope: ") + string.Join("; ", restrictions) + ".",
             FontSize = Typography.Caption,
             Opacity = 0.65,
             TextWrapping = TextWrapping.Wrap,
@@ -489,13 +467,13 @@ namespace hMailServer.ControlPanel.Views
 
          var revoke = new Wpf.Ui.Controls.Button   // per row: no access key, the rows are reached with the arrow keys
          {
-            Content = "Revoke",
+            Content = L("Revoke"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger,
             VerticalAlignment = VerticalAlignment.Top,
             MinWidth = 84
          };
          System.Windows.Automation.AutomationProperties.SetName(revoke,
-            "Revoke the API key " + (key.Label.Length > 0 ? key.Label : key.Id));
+            F("Revoke the API key {0}", key.Label.Length > 0 ? key.Label : key.Id));
          System.Windows.Automation.AutomationProperties.SetAutomationId(revoke, "apikeys-revoke-" + key.Id);
          revoke.Click += (s, e) => RevokeKey_(key);
          Grid.SetColumn(revoke, 1);
@@ -532,12 +510,12 @@ namespace hMailServer.ControlPanel.Views
 
          if (!result.Succeeded)
          {
-            MessageBox.Show(result.Error, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(result.Error, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
-         newKeyLabel_.Text = request.Label + "  -  " + (request.Full ? "full authority" : "read-only")
-                             + ", expires " + request.Expires.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture);
+         newKeyLabel_.Text = F("{0}  -  {1}, expires {2}", request.Label, request.Full ? L("full authority") : "read-only",
+                             request.Expires.ToString("d MMMM yyyy HH:mm", CultureInfo.CurrentCulture)); // no-loc // no-loc
          newKeyToken_.Text = result.Token;
          newKeyCard_.Visibility = Visibility.Visible;
          newKeyCard_.BringIntoView();
@@ -557,19 +535,18 @@ namespace hMailServer.ControlPanel.Views
          string name = key.Label.Length > 0 ? key.Label : key.Id;
 
          string consequence = key.IsExpired
-            ? "It is already expired, so nothing is using it successfully; revoking removes it from this list."
-            : "Anything using it stops working on its very next request, and the key cannot be restored - only "
-              + "replaced with a new one.";
+            ? L("It is already expired, so nothing is using it successfully; revoking removes it from this list.")
+            : L("Anything using it stops working on its very next request, and the key cannot be restored - only replaced with a new one.");
 
-         if (MessageBox.Show("Revoke the API key \"" + name + "\"?\r\n\r\n" + consequence,
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+         if (MessageBox.Show(F("Revoke the API key \"{0}\"?\r\n\r\n{1}", name, consequence),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
          {
             return;
          }
 
          if (!ApiKeyStore.Revoke(key.Id, out string error))
          {
-            MessageBox.Show(error, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(error, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
          }
 
@@ -599,7 +576,7 @@ namespace hMailServer.ControlPanel.Views
          var dlg = new FluentDialogWindow
          {
             Owner = owner,
-            Title = "Create a REST API key",
+            Title = L("Create a REST API key"),
             Width = 560,
             SizeToContent = SizeToContent.Height,
             ResizeMode = ResizeMode.NoResize,
@@ -610,20 +587,19 @@ namespace hMailServer.ControlPanel.Views
          var panel = new StackPanel { Margin = new Thickness(20) };
 
          panel.Children.Add(Note_(
-            "The key is shown once, when it is created, and never again. It is live immediately - the server "
-            + "re-reads its key store on every request."));
+            L("The key is shown once, when it is created, and never again. It is live immediately - the server re-reads its key store on every request.")));
 
-         Field_(panel, "Label", "What this key is for, e.g. \"Grafana probe\"", out TextBox labelBox);
+         Field_(panel, L("Label"), L("What this key is for, e.g. \"Grafana probe\""), out TextBox labelBox);
          System.Windows.Automation.AutomationProperties.SetAutomationId(labelBox, "apikeys-dialog-label");
 
          // Read-only first and selected by default, matching the server: a create
          // request that names no scope gets a read-only key, because a key is most
          // often minted for something that only reads and the alternative default
          // hands out a credential that can delete accounts.
-         panel.Children.Add(Caption_("What it may do"));
+         panel.Children.Add(Caption_(L("What it may do")));
          var readOnly = new RadioButton
          {
-            Content = "_Read-only - can list and read, and is refused every request that changes something",
+            Content = L("_Read-only - can list and read, and is refused every request that changes something"),
             IsChecked = true,
             Margin = new Thickness(0, 0, 0, 4)
          };
@@ -632,13 +608,13 @@ namespace hMailServer.ControlPanel.Views
 
          var full = new RadioButton
          {
-            Content = "_Full authority - can create, change and delete",
+            Content = L("_Full authority - can create, change and delete"),
             Margin = new Thickness(0, 0, 0, 12)
          };
          System.Windows.Automation.AutomationProperties.SetAutomationId(full, "apikeys-dialog-full");
          panel.Children.Add(full);
 
-         panel.Children.Add(Caption_("Expires"));
+         panel.Children.Add(Caption_(L("Expires")));
          var expires = new DatePicker
          {
             SelectedDate = DateTime.Today.AddDays(ApiKeyStore.DefaultLifetimeDays),
@@ -646,23 +622,20 @@ namespace hMailServer.ControlPanel.Views
             HorizontalAlignment = HorizontalAlignment.Left,
             Width = 200
          };
-         System.Windows.Automation.AutomationProperties.SetName(expires, "Date this key stops working");
+         System.Windows.Automation.AutomationProperties.SetName(expires, L("Date this key stops working"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(expires, "apikeys-dialog-expires");
          panel.Children.Add(expires);
          panel.Children.Add(Note_(
-            "Defaults to " + ApiKeyStore.DefaultLifetimeDays + " days, which is what the API itself uses when a "
-            + "request does not name one. A key with no expiry is the property that makes the administrator "
-            + "password dangerous, so there is no \"never\" option."));
+            F("Defaults to {0} days, which is what the API itself uses when a request does not name one. A key with no expiry is the property that makes the administrator password dangerous, so there is no \"never\" option.", ApiKeyStore.DefaultLifetimeDays)));
 
-         Field_(panel, "Domains it may act on (optional)",
-            "example.com, example.net - empty means every domain", out TextBox domainsBox);
+         Field_(panel, L("Domains it may act on (optional)"),
+            L("example.com, example.net - empty means every domain"), out TextBox domainsBox);
          System.Windows.Automation.AutomationProperties.SetAutomationId(domainsBox, "apikeys-dialog-domains");
          panel.Children.Add(Note_(
-            "A key with a domain list is also refused the delivery-queue endpoints, because the queue is "
-            + "server-wide and cannot be filtered by domain."));
+            L("A key with a domain list is also refused the delivery-queue endpoints, because the queue is server-wide and cannot be filtered by domain.")));
 
-         Field_(panel, "Source addresses it may be used from (optional)",
-            "10.0.0.5, or 10.0.0.0/24, or 10.0.0.1-10.0.0.99", out TextBox sourceBox);
+         Field_(panel, L("Source addresses it may be used from (optional)"),
+            "10.0.0.5, or 10.0.0.0/24, or 10.0.0.1-10.0.0.99", out TextBox sourceBox); // no-loc
          System.Windows.Automation.AutomationProperties.SetAutomationId(sourceBox, "apikeys-dialog-source");
 
          ApiKeyRequest result = null;
@@ -671,7 +644,7 @@ namespace hMailServer.ControlPanel.Views
 
          var ok = new Wpf.Ui.Controls.Button
          {
-            Content = "_Create key",
+            Content = L("_Create key"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 0, 8, 0),
             MinWidth = 100,
@@ -685,22 +658,21 @@ namespace hMailServer.ControlPanel.Views
             string error = ApiKeyStore.ValidateLabel(labelBox.Text);
             if (error != null)
             {
-               MessageBox.Show(error, "Control Panel");
+               MessageBox.Show(error, L("Control Panel"));
                labelBox.Focus();
                return;
             }
 
             if (expires.SelectedDate == null || expires.SelectedDate.Value.Date < DateTime.Today.AddDays(1).Date)
             {
-               MessageBox.Show("Choose an expiry date at least a day away. A key that expires today would stop "
-                               + "working part-way through the day it was made.", "Control Panel");
+               MessageBox.Show(L("Choose an expiry date at least a day away. A key that expires today would stop working part-way through the day it was made."), L("Control Panel"));
                return;
             }
 
             ApiKeyStore.NormalizeDomains(domainsBox.Text, out error);
             if (error != null)
             {
-               MessageBox.Show(error, "Control Panel");
+               MessageBox.Show(error, L("Control Panel"));
                domainsBox.Focus();
                return;
             }
@@ -708,9 +680,7 @@ namespace hMailServer.ControlPanel.Views
             string source = sourceBox.Text.Trim();
             if (source.Length > 0 && !ApiKeyStore.LooksLikeSourceRestriction(source))
             {
-               MessageBox.Show("The source restriction has to be an address (10.0.0.5), a range "
-                               + "(10.0.0.1-10.0.0.99) or CIDR (10.0.0.0/24). Leave it empty to accept the key "
-                               + "from any address.", "Control Panel");
+               MessageBox.Show(L("The source restriction has to be an address (10.0.0.5), a range (10.0.0.1-10.0.0.99) or CIDR (10.0.0.0/24). Leave it empty to accept the key from any address."), L("Control Panel"));
                sourceBox.Focus();
                return;
             }
@@ -732,7 +702,7 @@ namespace hMailServer.ControlPanel.Views
          };
          buttons.Children.Add(ok);
 
-         var cancel = new Wpf.Ui.Controls.Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
          cancel.Click += (s, e) => dlg.Close();
          buttons.Children.Add(cancel);
 
