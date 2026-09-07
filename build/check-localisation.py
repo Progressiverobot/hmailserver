@@ -53,6 +53,7 @@ COMPLETE = {"sv"}
 
 # Files (relative to ROOT, forward slashes) in which every caption is marked.
 LOCALISED = {
+   "App.xaml",
    "App.xaml.cs",
    "MainWindow.xaml",
    "MainWindow.xaml.cs",
@@ -92,6 +93,13 @@ LOCALISED = {
    "Views/LdapSettingsView.cs",
    "Views/DirectorySyncView.cs",
    "Views/ApiKeysView.cs",
+   "Services/ExternalSetupChecks.cs",
+   "Services/TlsPosture.cs",
+   "Services/SpamPipeline.cs",
+   "Services/VirusPipeline.cs",
+   "Services/CertificateInspector.cs",
+   "Services/ApiKeyStore.cs",
+   "Services/ListenerProbe.cs",
    "Services/PaletteSearch.cs",
    "Services/StatusSemantics.cs",
    "Services/ChartCatalog.cs",
@@ -310,7 +318,7 @@ def is_caption(text):
 
 NON_UI_CALL = re.compile(
    r"\b(?:GetMetricHistory|TryGetProperty|GetProperty|ReadString|WriteString|ReadBool|WriteBool|ReadInt|WriteInt"
-   r"|GetValue|SetValue|ReadFrom|WriteTo|ReadValue|IniRead_|IniWrite_|IniReadInt_|IniWriteInt_|IniReadBool_|IniWriteBool_|LiveBool_|LiveText_|LiveInt_|SecretConfigured_|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
+   r"|GetValue|SetValue|ReadFrom|WriteTo|ReadValue|Read|IniRead_|IniWrite_|IniReadInt_|IniWriteInt_|IniReadBool_|IniWriteBool_|LiveBool_|LiveText_|LiveInt_|SecretConfigured_|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
    r"|Split|Replace|IndexOf|TryParse|TryParseExact|ParseExact|GetFiles|Path\.Join|Path\.Combine|nameof|Debug\.Fail"
    r"|Debug\.Assert|LogException|RunUpdateAction_|NavigateTo|Slug|GetString|Equals|Compare|Regex|Match|\w+Exception)\s*\(")
 NON_UI_CONTEXT = re.compile(r"(?:\bcase\s|==|!=|\bis\s|\[|\bTag\s*=|\bKey\s*=|\bPath\s*=|\bProp\s*=|\bconst\s)\s*$")

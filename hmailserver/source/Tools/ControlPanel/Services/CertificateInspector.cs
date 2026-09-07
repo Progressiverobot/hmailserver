@@ -5,6 +5,7 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -151,22 +152,21 @@ namespace hMailServer.ControlPanel.Services
       {
          if (string.IsNullOrWhiteSpace(path))
          {
-            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, "No file set",
-               "No certificate file is configured, so this entry cannot be used by any TLS port.");
+            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, L("No file set"),
+               L("No certificate file is configured, so this entry cannot be used by any TLS port."));
             return null;
          }
 
          if (!local)
          {
-            health.CertificateFile = CannotCheckFromHere_("certificate file");
+            health.CertificateFile = CannotCheckFromHere_("certificate");
             return null;
          }
 
          if (!File.Exists(path))
          {
-            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, "File missing",
-               "The certificate file does not exist on this machine (" + path + "). Every TLS port configured "
-               + "to use this certificate will fail to start (the server logs error 5113) - mail on those ports stops.");
+            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, L("File missing"),
+               F("The certificate file does not exist on this machine ({0}). Every TLS port configured to use this certificate will fail to start (the server logs error 5113) - mail on those ports stops.", path));
             return null;
          }
 
@@ -177,9 +177,8 @@ namespace hMailServer.ControlPanel.Services
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            health.CertificateFile = new CertificateFinding(StatusLevel.Information, "Cannot read",
-               "The certificate file exists but could not be read from this panel (" + ex.Message
-               + "), so nothing about it is verified.");
+            health.CertificateFile = new CertificateFinding(StatusLevel.Information, L("Cannot read"),
+               F("The certificate file exists but could not be read from this panel ({0}), so nothing about it is verified.", ex.Message));
             return null;
          }
 
@@ -192,9 +191,8 @@ namespace hMailServer.ControlPanel.Services
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, "Not a PEM certificate",
-               "The file could not be parsed as a PEM certificate. The server loads certificates in PEM format "
-               + "only, so this file will not load and every TLS port using it will fail to start (server error 5113).");
+            health.CertificateFile = new CertificateFinding(StatusLevel.Critical, L("Not a PEM certificate"),
+               L("The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)."));
             return null;
          }
 
@@ -211,32 +209,26 @@ namespace hMailServer.ControlPanel.Services
          {
             int daysAgo = Math.Max(0, (int)Math.Floor((now - expires).TotalDays));
             health.CertificateFile = new CertificateFinding(StatusLevel.Critical,
-               "Expired " + date + " (" + Days_(daysAgo) + " ago)",
-               "The certificate expired on " + date + ". The server still loads it and its ports still start "
-               + "(it reports error 5991 in the application log), but every client and mail server that checks "
-               + "the date refuses to connect - which, today, is nearly all of them. Replace the certificate.");
+               F("Expired {0} ({1} ago)", date, Days_(daysAgo)),
+               F("The certificate expired on {0}. The server still loads it and its ports still start (it reports error 5991 in the application log), but every client and mail server that checks the date refuses to connect - which, today, is nearly all of them. Replace the certificate.", date));
          }
          else if (certificate.NotBefore > now)
          {
             health.CertificateFile = new CertificateFinding(StatusLevel.Warning,
-               "Not valid until " + certificate.NotBefore.ToString("yyyy-MM-dd"),
-               "The certificate is not valid until " + certificate.NotBefore.ToString("yyyy-MM-dd")
-               + ". The server serves it (error 5991 in the application log) and clients refuse it until that "
-               + "date - check the certificate and this server's clock.");
+               F("Not valid until {0}", certificate.NotBefore.ToString("yyyy-MM-dd")),
+               F("The certificate is not valid until {0}. The server serves it (error 5991 in the application log) and clients refuse it until that date - check the certificate and this server's clock.", certificate.NotBefore.ToString("yyyy-MM-dd")));
          }
          else if (daysRemaining <= ExpiryWarningDays)
          {
             health.CertificateFile = new CertificateFinding(StatusLevel.Warning,
-               "Expires " + date + " (" + Days_(daysRemaining) + ")",
-               "The certificate expires on " + date + " - " + Days_(daysRemaining) + " from now. Renew it before "
-               + "then: once it expires the ports keep listening, but clients that check the date refuse to connect.");
+               F("Expires {0} ({1})", date, Days_(daysRemaining)),
+               F("The certificate expires on {0} - {1} from now. Renew it before then: once it expires the ports keep listening, but clients that check the date refuse to connect.", date, Days_(daysRemaining)));
          }
          else
          {
             health.CertificateFile = new CertificateFinding(StatusLevel.Good,
-               "Valid to " + date + " (" + Days_(daysRemaining) + ")",
-               "The certificate file parses correctly and is valid until " + date + ", "
-               + Days_(daysRemaining) + " from now.");
+               F("Valid to {0} ({1})", date, Days_(daysRemaining)),
+               F("The certificate file parses correctly and is valid until {0}, {1} from now.", date, Days_(daysRemaining)));
          }
 
          return certificate;
@@ -249,22 +241,21 @@ namespace hMailServer.ControlPanel.Services
       {
          if (string.IsNullOrWhiteSpace(path))
          {
-            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Critical, "No file set",
-               "No private key file is configured, so this certificate cannot be used by any TLS port.");
+            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Critical, L("No file set"),
+               L("No private key file is configured, so this certificate cannot be used by any TLS port."));
             return null;
          }
 
          if (!local)
          {
-            health.PrivateKeyFile = CannotCheckFromHere_("key file");
+            health.PrivateKeyFile = CannotCheckFromHere_("key");
             return null;
          }
 
          if (!File.Exists(path))
          {
-            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Critical, "File missing",
-               "The private key file does not exist on this machine (" + path + "). Every TLS port using this "
-               + "certificate will fail to start (the server logs error 5113) - mail on those ports stops.");
+            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Critical, L("File missing"),
+               F("The private key file does not exist on this machine ({0}). Every TLS port using this certificate will fail to start (the server logs error 5113) - mail on those ports stops.", path));
             return null;
          }
 
@@ -275,9 +266,8 @@ namespace hMailServer.ControlPanel.Services
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Information, "Cannot read",
-               "The key file exists but could not be read from this panel (" + ex.Message
-               + "), so whether it is encrypted is unknown.");
+            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Information, L("Cannot read"),
+               F("The key file exists but could not be read from this panel ({0}), so whether it is encrypted is unknown.", ex.Message));
             return null;
          }
 
@@ -288,14 +278,13 @@ namespace hMailServer.ControlPanel.Services
             // The level and the consequences depend on whether a passphrase is
             // stored, which is COM state the caller holds - this finding only
             // states the file fact.
-            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Information, "Encrypted key",
-               "The key file is passphrase-protected (an encrypted PEM). It only loads if the matching "
-               + "passphrase is stored on this certificate.");
+            health.PrivateKeyFile = new CertificateFinding(StatusLevel.Information, L("Encrypted key"),
+               L("The key file is passphrase-protected (an encrypted PEM). It only loads if the matching passphrase is stored on this certificate."));
             return null;
          }
 
-         health.PrivateKeyFile = new CertificateFinding(StatusLevel.Good, "Key file present",
-            "The key file exists and is a plain (unencrypted) PEM, so no passphrase is needed.");
+         health.PrivateKeyFile = new CertificateFinding(StatusLevel.Good, L("Key file present"),
+            L("The key file exists and is a plain (unencrypted) PEM, so no passphrase is needed."));
 
          try
          {
@@ -319,25 +308,23 @@ namespace hMailServer.ControlPanel.Services
 
          if (health.KeyIsEncrypted == true)
          {
-            health.Pair = new CertificateFinding(StatusLevel.Information, "Cannot check while encrypted",
-               "The key is encrypted and this panel deliberately does not decrypt it, so whether it matches "
-               + "the certificate is only proven when the server loads the pair.");
+            health.Pair = new CertificateFinding(StatusLevel.Information, L("Cannot check while encrypted"),
+               L("The key is encrypted and this panel deliberately does not decrypt it, so whether it matches the certificate is only proven when the server loads the pair."));
             return;
          }
 
          if (certificate == null || keyPem == null)
          {
-            health.Pair = new CertificateFinding(StatusLevel.Information, "Cannot check",
-               "The match cannot be checked until both files are present and readable.");
+            health.Pair = new CertificateFinding(StatusLevel.Information, L("Cannot check"),
+               L("The match cannot be checked until both files are present and readable."));
             return;
          }
 
          byte[] keyPublic = PublicKeyOfPrivateKey_(keyPem);
          if (keyPublic == null)
          {
-            health.Pair = new CertificateFinding(StatusLevel.Information, "Cannot check this key type",
-               "This panel can compare RSA and ECDSA keys; this key parses as neither, so whether it matches "
-               + "the certificate is only proven when the server loads the pair.");
+            health.Pair = new CertificateFinding(StatusLevel.Information, L("Cannot check this key type"),
+               L("This panel can compare RSA and ECDSA keys; this key parses as neither, so whether it matches the certificate is only proven when the server loads the pair."));
             return;
          }
 
@@ -348,18 +335,16 @@ namespace hMailServer.ControlPanel.Services
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            health.Pair = new CertificateFinding(StatusLevel.Information, "Cannot check",
-               "The certificate's public key could not be exported for comparison.");
+            health.Pair = new CertificateFinding(StatusLevel.Information, L("Cannot check"),
+               L("The certificate's public key could not be exported for comparison."));
             return;
          }
 
          health.Pair = keyPublic.AsSpan().SequenceEqual(certificatePublic)
-            ? new CertificateFinding(StatusLevel.Good, "Matches the certificate",
-               "The private key's public half is identical to the certificate's public key - the pair belongs together.")
-            : new CertificateFinding(StatusLevel.Critical, "Does not match the certificate",
-               "The private key does not belong to this certificate: their public keys differ. The pair will "
-               + "not load (server error 5113) and every TLS port using this certificate will fail to start. "
-               + "Point this entry at the key file that was generated with this certificate.");
+            ? new CertificateFinding(StatusLevel.Good, L("Matches the certificate"),
+               L("The private key's public half is identical to the certificate's public key - the pair belongs together."))
+            : new CertificateFinding(StatusLevel.Critical, L("Does not match the certificate"),
+               L("The private key does not belong to this certificate: their public keys differ. The pair will not load (server error 5113) and every TLS port using this certificate will fail to start. Point this entry at the key file that was generated with this certificate."));
       }
 
       /// <summary>
@@ -394,12 +379,14 @@ namespace hMailServer.ControlPanel.Services
 
       private static CertificateFinding CannotCheckFromHere_(string what)
       {
-         return new CertificateFinding(StatusLevel.Information, "Cannot be checked from here",
-            "This Control Panel is connected to a remote server, and the " + what + " is on that machine's "
-            + "disk - it cannot be read from this machine, so nothing about it is verified. This is \"unknown\", "
-            + "not \"OK\": check it on the server itself, or from its External setup page.");
+         string text = what == "files"
+            ? L("This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is \"unknown\", not \"OK\": check them on the server itself, or from its External setup page.")
+            : what == "key"
+               ? L("This Control Panel is connected to a remote server, and the key file is on that machine's disk - it cannot be read from this machine, so nothing about it is verified. This is \"unknown\", not \"OK\": check it on the server itself, or from its External setup page.")
+               : L("This Control Panel is connected to a remote server, and the certificate file is on that machine's disk - it cannot be read from this machine, so nothing about it is verified. This is \"unknown\", not \"OK\": check it on the server itself, or from its External setup page.");
+         return new CertificateFinding(StatusLevel.Information, L("Cannot be checked from here"), text);
       }
 
-      private static string Days_(int days) => days == 1 ? "1 day" : days + " days";
+      private static string Days_(int days) => days == 1 ? L("1 day") : F("{0} days", days);
    }
 }

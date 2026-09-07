@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -116,7 +117,7 @@ namespace hMailServer.ControlPanel.Services
       public const int MaxLabelLength = 64;
 
       /// <summary>hMailServer's system date format, which is what Expires holds.</summary>
-      public const string TimestampFormat = "yyyy-MM-dd HH:mm:ss";
+      public const string TimestampFormat = "yyyy-MM-dd HH:mm:ss"; // no-loc
 
       public const string ScopeFull = "full";
       public const string ScopeReadOnly = "readonly";
@@ -276,8 +277,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return new CreateResult
             {
-               Error = "hMailServer.INI was not found on this machine, so the key store's location is unknown. "
-                       + "API keys can only be managed from the server itself."
+               Error = L("hMailServer.INI was not found on this machine, so the key store's location is unknown. API keys can only be managed from the server itself.")
             };
          }
 
@@ -286,7 +286,7 @@ namespace hMailServer.ControlPanel.Services
             return new CreateResult { Error = error };
 
          if (expires <= DateTime.Now)
-            return new CreateResult { Error = "The expiry has to be in the future. A key that is already expired is refused on its first use." };
+            return new CreateResult { Error = L("The expiry has to be in the future. A key that is already expired is refused on its first use.") };
 
          string normalizedDomains = NormalizeDomains(domains, out error);
          if (error != null)
@@ -297,8 +297,7 @@ namespace hMailServer.ControlPanel.Services
          {
             return new CreateResult
             {
-               Error = "The source restriction has to be an address (10.0.0.5), a range (10.0.0.1-10.0.0.99) or "
-                       + "CIDR (10.0.0.0/24). Leave it empty to accept the key from any address."
+               Error = L("The source restriction has to be an address (10.0.0.5), a range (10.0.0.1-10.0.0.99) or CIDR (10.0.0.0/24). Leave it empty to accept the key from any address.")
             };
          }
 
@@ -351,8 +350,7 @@ namespace hMailServer.ControlPanel.Services
 
             return new CreateResult
             {
-               Error = "The key store could not be written, so no key was created: " + path
-                       + ". The Control Panel needs write access to that folder."
+               Error = F("The key store could not be written, so no key was created: {0}. The Control Panel needs write access to that folder.", path)
             };
          }
 
@@ -370,7 +368,7 @@ namespace hMailServer.ControlPanel.Services
          string path = StoreFile;
          if (path == null || !File.Exists(path))
          {
-            error = "The key store was not found, so there is nothing to revoke.";
+            error = L("The key store was not found, so there is nothing to revoke.");
             return false;
          }
 
@@ -378,8 +376,7 @@ namespace hMailServer.ControlPanel.Services
          // into naming another section.
          if (!IsLowerHex(id, IdBytes * 2))
          {
-            error = "That key's id is not in the form this store uses, so its section cannot be identified. "
-                    + "Remove it by hand from " + path + ".";
+            error = F("That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}.", path);
             return false;
          }
 
@@ -388,7 +385,7 @@ namespace hMailServer.ControlPanel.Services
 
          if (!deleted)
          {
-            error = "The key store could not be written, so the key was NOT revoked: " + path;
+            error = F("The key store could not be written, so the key was NOT revoked: {0}", path);
             return false;
          }
 
@@ -425,13 +422,13 @@ namespace hMailServer.ControlPanel.Services
          string value = (label ?? "").Trim();
 
          if (value.Length == 0)
-            return "A label is required. It is how this key is told apart from the others months from now.";
+            return L("A label is required. It is how this key is told apart from the others months from now.");
 
          if (value.Length > MaxLabelLength)
-            return "The label has to be " + MaxLabelLength + " characters or fewer.";
+            return F("The label has to be {0} characters or fewer.", MaxLabelLength);
 
          if (value.Any(c => c < 0x20 || c == 0x7F))
-            return "The label must not contain control characters.";
+            return L("The label must not contain control characters.");
 
          return null;
       }
@@ -457,8 +454,7 @@ namespace hMailServer.ControlPanel.Services
          {
             if (!IsValidDomainName(name))
             {
-               error = "'" + name + "' is not a domain name. Give a comma-separated list of domains, or leave the "
-                       + "box empty to let the key act on every domain.";
+               error = F("'{0}' is not a domain name. Give a comma-separated list of domains, or leave the box empty to let the key act on every domain.", name);
                return null;
             }
 
@@ -467,8 +463,7 @@ namespace hMailServer.ControlPanel.Services
 
          if (names.Count == 0)
          {
-            error = "The domain list contains no domain names. Leave the box empty to let the key act on every domain - "
-                    + "a list of separators would silently mean the same thing, which is not what you asked for.";
+            error = L("The domain list contains no domain names. Leave the box empty to let the key act on every domain - a list of separators would silently mean the same thing, which is not what you asked for.");
             return null;
          }
 
@@ -601,32 +596,32 @@ namespace hMailServer.ControlPanel.Services
       /// side reads the same.
       /// </summary>
       private const string Preamble =
-         "; hMailServer REST administration API keys.\r\n" +
-         ";\r\n" +
-         "; One section per key. Only the SHA-256 digest of a key is stored, so a\r\n" +
-         "; key cannot be recovered from this file: it is shown once, when it is\r\n" +
-         "; created, and never again.\r\n" +
-         ";\r\n" +
-         "; To revoke a key, either use the Control Panel's API keys page, send\r\n" +
-         "; DELETE /api/v1/apikeys/<id>, or delete its section below. All three take\r\n" +
-         "; effect on the next request - no restart and no rebuild. Deleting this\r\n" +
-         "; file revokes every key.\r\n" +
-         ";\r\n" +
-         "; Expires     YYYY-MM-DD HH:MM:SS, local time. Required. A key whose\r\n" +
-         ";             expiry is missing or unreadable counts as expired.\r\n" +
-         "; AllowedFrom Optional. An address, a 'lower-upper' range, or CIDR.\r\n" +
-         ";             Empty means any source address.\r\n" +
-         "; Scope       'full' or 'readonly'. Anything else - including a missing\r\n" +
-         ";             line - is readonly, so a typo cannot widen a key. A\r\n" +
-         ";             readonly key is refused every request that changes\r\n" +
-         ";             something.\r\n" +
-         "; Domains     Optional, comma-separated. Empty means every domain. A key\r\n" +
-         ";             with a list may only act on those domains, and is refused\r\n" +
-         ";             the delivery-queue endpoints outright because the queue is\r\n" +
-         ";             server-wide.\r\n" +
-         ";\r\n" +
-         "; No key of any scope can create or revoke keys: that needs the\r\n" +
-         "; administrator password.\r\n" +
-         "\r\n";
+         "; hMailServer REST administration API keys.\r\n" + // no-loc
+         ";\r\n" + // no-loc
+         "; One section per key. Only the SHA-256 digest of a key is stored, so a\r\n" + // no-loc
+         "; key cannot be recovered from this file: it is shown once, when it is\r\n" + // no-loc
+         "; created, and never again.\r\n" + // no-loc
+         ";\r\n" + // no-loc
+         "; To revoke a key, either use the Control Panel's API keys page, send\r\n" + // no-loc
+         "; DELETE /api/v1/apikeys/<id>, or delete its section below. All three take\r\n" + // no-loc
+         "; effect on the next request - no restart and no rebuild. Deleting this\r\n" + // no-loc
+         "; file revokes every key.\r\n" + // no-loc
+         ";\r\n" + // no-loc
+         "; Expires     YYYY-MM-DD HH:MM:SS, local time. Required. A key whose\r\n" + // no-loc
+         ";             expiry is missing or unreadable counts as expired.\r\n" + // no-loc
+         "; AllowedFrom Optional. An address, a 'lower-upper' range, or CIDR.\r\n" + // no-loc
+         ";             Empty means any source address.\r\n" + // no-loc
+         "; Scope       'full' or 'readonly'. Anything else - including a missing\r\n" + // no-loc
+         ";             line - is readonly, so a typo cannot widen a key. A\r\n" + // no-loc
+         ";             readonly key is refused every request that changes\r\n" + // no-loc
+         ";             something.\r\n" + // no-loc
+         "; Domains     Optional, comma-separated. Empty means every domain. A key\r\n" + // no-loc
+         ";             with a list may only act on those domains, and is refused\r\n" + // no-loc
+         ";             the delivery-queue endpoints outright because the queue is\r\n" + // no-loc
+         ";             server-wide.\r\n" + // no-loc
+         ";\r\n" + // no-loc
+         "; No key of any scope can create or revoke keys: that needs the\r\n" + // no-loc
+         "; administrator password.\r\n" + // no-loc
+         "\r\n"; // no-loc
    }
 }
