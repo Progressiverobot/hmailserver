@@ -1108,6 +1108,131 @@ namespace RegressionTests.API
          Assert.AreEqual(403, admin.status, "Body: " + admin.body);
       }
 
+      [Test]
+      [Description("q on a folder's listing finds the text in the subject, the sender or the body, whatever its case")]
+      public void AFolderIsSearchedBySubjectSenderAndBody()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Quarterly numbers", "The figures.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         SmtpClientSimulator.StaticSend("bob@example.com", Address, "Lunch", "The invoice is attached in spirit.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+         SmtpClientSimulator.StaticSend("carol@example.com", Address, "Other", "Nothing to see.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         string listPath = "/api/v1/me/folders/" + inboxId + "/messages";
+
+         (int status, string body) bySubject = Http("GET", listPath + "?q=numbers", UserHeader(UserPassword));
+         Assert.AreEqual(200, bySubject.status, "Body: " + bySubject.body);
+         StringAssert.Contains("\"query\":\"numbers\"", bySubject.body);
+         StringAssert.Contains("Quarterly numbers", bySubject.body);
+         Assert.IsFalse(bySubject.body.Contains("Lunch") || bySubject.body.Contains("Other"), "Only the match: " + bySubject.body);
+         StringAssert.Contains("\"scanned\":3,\"complete\":true", bySubject.body);
+
+         (int status, string body) byBody = Http("GET", listPath + "?q=INVOICE", UserHeader(UserPassword));
+         Assert.AreEqual(200, byBody.status, "Body: " + byBody.body);
+         StringAssert.Contains("Lunch", byBody.body);
+         Assert.IsFalse(byBody.body.Contains("Quarterly"), "The body match only: " + byBody.body);
+
+         (int status, string body) bySender = Http("GET", listPath + "?q=carol%40example", UserHeader(UserPassword));
+         Assert.AreEqual(200, bySender.status, "Body: " + bySender.body);
+         StringAssert.Contains("Other", bySender.body);
+         Assert.IsFalse(bySender.body.Contains("Lunch"), "The sender match only: " + bySender.body);
+
+         (int status, string body) nothing = Http("GET", listPath + "?q=zebra", UserHeader(UserPassword));
+         Assert.AreEqual(200, nothing.status, "Body: " + nothing.body);
+         StringAssert.Contains("\"messages\":[]", nothing.body);
+
+         (int status, string body) plain = Http("GET", listPath, UserHeader(UserPassword));
+         StringAssert.Contains("\"total\":3", plain.body);
+         StringAssert.Contains("\"query\":\"\"", plain.body);
+      }
+
+      [Test]
+      [Description("GET /api/v1/me/search looks through every folder of the account and names the folder of each hit")]
+      public void ASearchAcrossFoldersNamesTheFolder()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Budget draft", "Numbers inside.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Budget final", "Numbers agreed.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Projects"));
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         long projectsId = IdBefore(tree.body, "\"path\":\"Projects\"");
+         long draft = IdBefore(Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword)).body, "\"subject\":\"Budget draft\"");
+
+         (int status, string body) moved = Http("POST", "/api/v1/me/messages/" + draft + "/move", UserHeader(UserPassword), "{\"folder_id\":" + projectsId + "}");
+         Assert.AreEqual(200, moved.status, "Body: " + moved.body);
+
+         (int status, string body) found = Http("GET", "/api/v1/me/search?q=budget", UserHeader(UserPassword));
+         Assert.AreEqual(200, found.status, "Body: " + found.body);
+         StringAssert.Contains("\"folder\":\"Projects\"", found.body);
+         StringAssert.Contains("\"folder\":\"INBOX\"", found.body);
+         StringAssert.Contains("Budget draft", found.body);
+         StringAssert.Contains("Budget final", found.body);
+         StringAssert.Contains("\"complete\":true", found.body);
+
+         (int status, string body) one = Http("GET", "/api/v1/me/search?q=agreed", UserHeader(UserPassword));
+         StringAssert.Contains("Budget final", one.body);
+         Assert.IsFalse(one.body.Contains("Budget draft"), "Only the match: " + one.body);
+
+         (int status, string body) missing = Http("GET", "/api/v1/me/search", UserHeader(UserPassword));
+         Assert.AreEqual(400, missing.status, "Body: " + missing.body);
+
+         (int status, string body) admin = Http("GET", "/api/v1/me/search?q=budget", AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("Text that is not ASCII comes out of the mailbox routes and goes into the automatic reply as UTF-8")]
+      public void NonAsciiTextSurvivesBothWays()
+      {
+         string subject = "Résumé für Zoë";
+         string encodedSubject = "=?utf-8?B?" + Convert.ToBase64String(Encoding.UTF8.GetBytes(subject)) + "?=";
+         string raw =
+            "From: =?utf-8?B?" + Convert.ToBase64String(Encoding.UTF8.GetBytes("Ærø Sørensen")) + "?= <sender@example.com>\r\n" +
+            "To: " + Address + "\r\n" +
+            "Subject: " + encodedSubject + "\r\n" +
+            "MIME-Version: 1.0\r\n" +
+            "Content-Type: text/plain; charset=utf-8\r\n" +
+            "Content-Transfer-Encoding: 8bit\r\n" +
+            "\r\n" +
+            "Grüße aus Zürich.\r\n";
+
+         SmtpClientSimulator.StaticSendRaw("sender@example.com", Address, raw);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"" + subject + "\"", page.body);
+         StringAssert.Contains("Ærø Sørensen", page.body);
+
+         long messageId = IdBefore(page.body, "\"subject\":\"" + subject + "\"");
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         StringAssert.Contains("Grüße aus Zürich.", message.body);
+
+         (int status, string body) found = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("zürich"), UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"" + subject + "\"", found.body);
+
+         (int status, string body) vacation = Http("PUT", "/api/v1/me/vacation", UserHeader(UserPassword),
+            "{\"enabled\":true,\"subject\":\"Väck mig\",\"message\":\"Jag är på semester.\"}");
+         Assert.AreEqual(200, vacation.status, "Body: " + vacation.body);
+         Account reread = _domain.Accounts.ItemByAddress[Address];
+         Assert.AreEqual("Väck mig", reread.VacationSubject);
+         Assert.AreEqual("Jag är på semester.", reread.VacationMessage);
+
+         (int status, string body) me = Http("GET", "/api/v1/me", UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"Väck mig\"", me.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()

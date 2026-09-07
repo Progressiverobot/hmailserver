@@ -175,6 +175,7 @@ namespace HM
          RouteMeMessageDelete,
          RouteMeMessageSend,
          RouteMeMessageAttachment,
+         RouteMeSearch,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -295,6 +296,14 @@ namespace HM
       static HttpResponse HandleMeMessageSend_(const Caller &caller, const AnsiString &requestBody);
       static String JsonUtf8Value_(const AnsiString &json, const AnsiString &key);
       static HttpResponse HandleMeMessageAttachment_(const Caller &caller, __int64 messageId, int index);
+      static HttpResponse HandleMeSearch_(const Caller &caller, const AnsiString &query);
+      static void CollectReadableFolders_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders, const String &parentPath,
+                                          const String &delimiter, std::vector<std::pair<std::shared_ptr<IMAPFolder>, String>> &out, int depth);
+      // UTF-8 for the JSON: the plain String-to-AnsiString conversion is the
+      // system code page, which is not what a JSON reader expects.
+      static AnsiString Utf8_(const String &value);
+      static AnsiString Utf8_(const AnsiString &value) { return value; }
+      static AnsiString Utf8_(const char *value) { return AnsiString(value); }
       static bool DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);
