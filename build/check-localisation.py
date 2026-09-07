@@ -79,6 +79,8 @@ LOCALISED = {
    "Views/RulesView.xaml",
    "Views/RulesView.xaml.cs",
    "Views/ServerSettingsView.xaml",
+   "Views/ServerSettingsView.xaml.cs",
+   "Services/SettingClaims.cs",
    "Views/SslCertificatesView.xaml",
    "Views/SslCertificatesView.xaml.cs",
    "Views/StatusView.xaml",
@@ -197,7 +199,11 @@ def attr(text):
 
 
 def elem(text):
-   return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+   # a carriage return as a character reference: an XML parser normalises a
+   # literal CR LF in element text to LF, and a message box that says CR LF
+   # would come back one character shorter than its key
+   return (text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+           .replace("\r", "&#13;"))
 
 
 def write_resx(path, items, comment):
@@ -241,7 +247,7 @@ def is_caption(text):
 
 NON_UI_CALL = re.compile(
    r"\b(?:GetMetricHistory|TryGetProperty|GetProperty|ReadString|WriteString|ReadBool|WriteBool|ReadInt|WriteInt"
-   r"|GetValue|SetValue|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
+   r"|GetValue|SetValue|ReadFrom|WriteTo|OpenSubKey|CreateSubKey|SetResourceReference|SetAutomationId|Contains|StartsWith|EndsWith"
    r"|Split|Replace|IndexOf|TryParse|TryParseExact|ParseExact|GetFiles|Path\.Join|Path\.Combine|nameof|Debug\.Fail"
    r"|Debug\.Assert|LogException|RunUpdateAction_|NavigateTo|Slug|GetString|Equals|Compare|Regex|Match|\w+Exception)\s*\(")
 NON_UI_CONTEXT = re.compile(r"(?:\bcase\s|==|!=|\bis\s|\[|\bTag\s*=|\bKey\s*=|\bPath\s*=|\bconst\s)\s*$")
