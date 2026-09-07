@@ -14,6 +14,9 @@
 #include "Crypt.h"
 #include "Totp.h"
 #include "AccountLogon.h"
+#include "PasswordPolicy.h"
+#include "PasswordHistory.h"
+#include "../Cache/AccountSizeCache.h"
 #include "AcmeClient.h"
 #include "UpdateChecker.h"
 #include "UpdateDownloader.h"
@@ -702,6 +705,7 @@ namespace HM
       // early return below is therefore a refusal that grants nothing, and a
       // path that forgets to set the authority cannot accidentally widen one.
       Caller caller;
+      caller.peer = peer_address;
 
       AnsiString headerValue = GetAuthorizationHeader_(request);
       if (headerValue.IsEmpty())
@@ -735,6 +739,25 @@ namespace HM
       {
          AnsiString encodedCredentials = headerValue.Mid(6);
          encodedCredentials.Trim();
+
+         // Any Basic user name but the administrator's is an account. The two
+         // are told apart here, once, so that an account can never be tried
+         // against the administrator password and the administrator's name can
+         // never be tried against the accounts.
+         {
+            AnsiString decoded = Base64::Decode(encodedCredentials, encodedCredentials.GetLength());
+            int separatorPosition = decoded.Find(":");
+            if (separatorPosition > 0)
+            {
+               String basicUser = String(decoded.Mid(0, separatorPosition));
+               if (basicUser.CompareNoCase(_T("administrator")) != 0)
+               {
+                  if (!AuthenticateAccount_(basicUser, String(decoded.Mid(separatorPosition + 1)), peer_address, caller))
+                     RegisterAuthenticationFailure_(peer_address);
+                  return caller;
+               }
+            }
+         }
 
          const BasicResult basic = AuthenticateBasic_(encodedCredentials, request);
 
@@ -1186,6 +1209,14 @@ namespace HM
       if (method == "GET" && (path == "/" || path == "/index.html"))
          return HandleWebAdminPage_();
 
+      // The self-service page, likewise unauthenticated: it is a static sign-in
+      // form whose script presents the account's credentials to /api/v1/me.
+      if (method == "GET" && path == "/portal")
+         return HandlePortalPage_();
+
+      if (method == "GET" && path == "/portal.js")
+         return HandlePortalScript_();
+
       try
       {
          // Inside the try: authenticating a bearer token reads the key store and
@@ -1343,6 +1374,15 @@ namespace HM
             return HandleArchiveHold_(caller.domains, route.archive_id, true);
          case RouteArchiveRelease:
             return HandleArchiveHold_(caller.domains, route.archive_id, false);
+         case RouteMe:
+            return HandleMe_(caller);
+
+         case RouteMePassword:
+            return HandleMePassword_(caller, request);
+
+         case RouteMeVacation:
+            return HandleMeVacation_(caller, GetRequestBody_(request));
+
          case RouteOpenApi:
             return HandleOpenApi_();
 
@@ -1400,6 +1440,24 @@ namespace HM
             }
          }
 
+         return;
+      }
+
+      if (path == "/api/v1/me" && method == "GET")
+      {
+         route.kind = RouteMe;
+         return;
+      }
+
+      if (path == "/api/v1/me/password" && method == "POST")
+      {
+         route.kind = RouteMePassword;
+         return;
+      }
+
+      if (path == "/api/v1/me/vacation" && method == "PUT")
+      {
+         route.kind = RouteMeVacation;
          return;
       }
 
@@ -1773,6 +1831,8 @@ namespace HM
       case RouteUpdateCheck:
       case RouteUpdateDownload:
       case RouteUpdateInstall:
+      case RouteMePassword:
+      case RouteMeVacation:
          return true;
 
       default:
@@ -1806,6 +1866,27 @@ namespace HM
    RestApiServer::Authorize_(const Caller &caller, const Route &route, AnsiString &refusalReason)
    {
       refusalReason = "";
+
+      // The account's own endpoints, and the account's own credentials: each
+      // reaches the other and nothing else. The administrator password and an
+      // API key are refused there because neither is an account - there is no
+      // mailbox behind them whose quota or vacation message could be meant -
+      // and an account is refused everywhere else because the rest of the
+      // API administers the server.
+      if (IsSelfServiceRoute_(route.kind))
+      {
+         if (caller.result == AuthenticatedAsAccount)
+            return AuthorizationAllowed;
+
+         refusalReason = "this endpoint answers to an account's own credentials, not to the administrator password or an api key";
+         return AuthorizationForbidden;
+      }
+
+      if (caller.result == AuthenticatedAsAccount)
+      {
+         refusalReason = "an account's credentials reach only the account's own endpoints under /api/v1/me";
+         return AuthorizationForbidden;
+      }
 
       // The administrator password carries full authority and always has. This
       // is the one credential nothing below narrows.
@@ -3947,6 +4028,461 @@ namespace HM
       return BuildResponse_(200, hold ? "{\"hold\":true}" : "{\"hold\":false}");
    }
 
+   bool
+   RestApiServer::AuthenticateAccount_(const String &username, const String &password, const IPAddress &peer_address, Caller &caller)
+   {
+      // The same path IMAP and POP3 take, and for the same reason those two
+      // share it: every password scheme the server stores, directory-linked
+      // accounts, app passwords, the per-name lockout, the logon failure count
+      // that feeds the auto-ban and the last-logon stamp all live behind
+      // AccountLogon::Logon. A second implementation here would be a second
+      // place for them to drift apart.
+      bool disconnect = false;
+      std::shared_ptr<const Account> account = AccountLogon().Logon(peer_address, username, password, disconnect);
+
+      if (!account)
+      {
+         LOG_APPLICATION("REST API: account authentication failed for " + username + " from " + String(peer_address.ToString()) + ".");
+         return false;
+      }
+
+      if (!account->GetActive())
+      {
+         LOG_APPLICATION("REST API: account " + username + " authenticated but is inactive; refused.");
+         return false;
+      }
+
+      caller.result = AuthenticatedAsAccount;
+      caller.read_only = false;
+      caller.identity = AnsiString("account:") + AnsiString(account->GetAddress());
+      caller.account = account;
+
+      return true;
+   }
+
+   bool
+   RestApiServer::IsSelfServiceRoute_(RouteKind kind)
+   {
+      switch (kind)
+      {
+      case RouteMe:
+      case RouteMePassword:
+      case RouteMeVacation:
+         return true;
+
+      default:
+         break;
+      }
+
+      return false;
+   }
+
+   HttpResponse
+   RestApiServer::HandleMe_(const Caller &caller)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // Quota as the IMAP QUOTA extension reports it: the limit is stored in
+      // megabytes (0 = none) and the usage is the size cache's byte count.
+      __int64 usedBytes = AccountSizeCache::Instance()->GetSize(account->GetID());
+
+      AnsiString json;
+      json.Format(
+         "{\"address\":\"%hs\",\"domain\":\"%hs\",\"active\":%hs,"
+         "\"quota\":{\"limit_mb\":%d,\"used_bytes\":%I64d},"
+         "\"vacation\":{\"enabled\":%hs,\"active\":%hs,\"subject\":\"%hs\",\"message\":\"%hs\",\"expires\":%hs,\"expires_date\":\"%hs\"},"
+         "\"password_changed\":\"%hs\",\"second_factor\":%hs,\"directory_linked\":%hs}",
+         JsonEscape_(AnsiString(account->GetAddress())).c_str(),
+         JsonEscape_(AnsiString(StringParser::ExtractDomain(account->GetAddress()))).c_str(),
+         account->GetActive() ? "true" : "false",
+         (int) account->GetAccountMaxSize(),
+         usedBytes,
+         account->GetVacationMessageIsOn() ? "true" : "false",
+         PersistentAccount::GetIsVacationMessageOn(account) ? "true" : "false",
+         JsonEscape_(AnsiString(account->GetVacationSubject())).c_str(),
+         JsonEscape_(AnsiString(account->GetVacationMessage())).c_str(),
+         account->GetVacationExpires() ? "true" : "false",
+         // The store keeps a date-time ("2099-12-31 00:00:00"); the day is the
+         // part that was chosen, and the form the PUT accepts back.
+         JsonEscape_(AnsiString(account->GetVacationExpiresDate().Mid(0, 10))).c_str(),
+         JsonEscape_(AnsiString(account->GetPasswordChanged())).c_str(),
+         account->GetTotpSecret().IsEmpty() ? "false" : "true",
+         account->GetIsAD() ? "true" : "false");
+
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMePassword_(const Caller &caller, const AnsiString &request)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      AnsiString requestBody = GetRequestBody_(request);
+      String currentPassword = String(GetJsonStringValue_(requestBody, "current"));
+      String newPassword = String(GetJsonStringValue_(requestBody, "new"));
+
+      if (currentPassword.IsEmpty() || newPassword.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"current and new are required\"}");
+
+      // A directory-linked account has no password of its own here: the
+      // directory holds it, and this server only ever asks the directory
+      // whether one is right.
+      if (account->GetIsAD())
+         return BuildResponse_(409, "{\"error\":\"this account's password is managed by the directory it is linked to\"}");
+
+      // The password that was presented to log on may have been an app
+      // password, which is a mailbox credential and not a licence to replace
+      // the account's own. "current" therefore has to be the account password
+      // itself, checked here against the stored hash, whatever authenticated
+      // the request.
+      Crypt::EncryptionType currentType = (Crypt::EncryptionType) account->GetPasswordEncryption();
+      if (account->GetPassword().IsEmpty() ||
+          !Crypt::Instance()->Validate(currentPassword, account->GetPassword(), currentType))
+      {
+         LOG_APPLICATION("REST API: a password change for " + account->GetAddress() + " was refused - the current password did not match.");
+         RegisterAuthenticationFailure_(caller.peer);
+         return BuildResponse_(403, "{\"error\":\"the current password is not correct\"}");
+      }
+
+      // An account with a second factor proves it here the way the
+      // administrator does on every request: the code travels in
+      // X-hMailServer-OTP, and the 401 that asks for it names the header.
+      const String secret = account->GetTotpSecret();
+      if (!secret.IsEmpty())
+      {
+         const AnsiString code = GetHeader_(request, "x-hmailserver-otp");
+         if (code.IsEmpty() || !Totp::VerifyCode(AnsiString(secret), code))
+            return BuildUnauthorizedResponse_(true);
+      }
+
+      // The same rules the Control Panel and COM apply when an administrator
+      // sets a password, from the same two places, so a user cannot choose
+      // what an administrator could not.
+      String policyFailure;
+      if (!PasswordPolicy::IsAcceptable(account->GetAddress(), newPassword, policyFailure))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(policyFailure)).c_str());
+         return BuildResponse_(400, body);
+      }
+
+      if (PasswordHistory::IsReuse(account, newPassword))
+         return BuildResponse_(409, "{\"error\":\"this password has been used recently on this account; choose one that has not\"}");
+
+      std::shared_ptr<Account> mutableAccount = std::shared_ptr<Account>(new Account());
+      if (!PersistentAccount::ReadObject(mutableAccount, account->GetID()) || mutableAccount->GetID() == 0)
+         return BuildResponse_(500, "{\"error\":\"the account could not be read\"}");
+
+      PasswordHistory::Record(mutableAccount);
+
+      int preferredHashAlgorithm = IniFileSettings::Instance()->GetPreferredHashAlgorithm();
+      mutableAccount->SetPassword(Crypt::Instance()->EnCrypt(newPassword, (Crypt::EncryptionType) preferredHashAlgorithm));
+      mutableAccount->SetPasswordEncryption(preferredHashAlgorithm);
+      mutableAccount->SetPasswordChanged(Time::GetCurrentDateTime());
+
+      String saveError;
+      if (!PersistentAccount::SaveObject(mutableAccount, saveError, PersistenceModeNormal))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
+         return BuildResponse_(500, body);
+      }
+
+      LOG_APPLICATION("REST API: " + account->GetAddress() + " changed its own password from " + String(caller.peer.ToString()) + ".");
+
+      return BuildResponse_(200, "{\"changed\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeVacation_(const Caller &caller, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // The whole state at once - enabled, subject, message and the optional
+      // expiry - so that what the account has afterwards is exactly what the
+      // body said, and nothing is left over from before.
+      AnsiString enabledText = GetJsonStringValue_(requestBody, "enabled");
+      bool enabled = GetJsonBoolValue_(requestBody, "enabled", false);
+      String subject = String(GetJsonStringValue_(requestBody, "subject"));
+      String message = String(GetJsonStringValue_(requestBody, "message"));
+      bool expires = GetJsonBoolValue_(requestBody, "expires", false);
+      String expiresDate = String(GetJsonStringValue_(requestBody, "expires_date"));
+
+      if (requestBody.Find("\"enabled\"") < 0)
+         return BuildResponse_(400, "{\"error\":\"enabled is required\"}");
+
+      if (subject.GetLength() > 200 || message.GetLength() > 20000)
+         return BuildResponse_(400, "{\"error\":\"the subject may be 200 characters and the message 20000\"}");
+
+      if (expires)
+      {
+         // YYYY-MM-DD, the form the account stores and the deliverer compares.
+         bool wellFormed = expiresDate.GetLength() == 10 && expiresDate[4] == '-' && expiresDate[7] == '-';
+         for (int i = 0; wellFormed && i < 10; i++)
+         {
+            if (i == 4 || i == 7)
+               continue;
+            if (expiresDate[i] < '0' || expiresDate[i] > '9')
+               wellFormed = false;
+         }
+
+         if (!wellFormed)
+            return BuildResponse_(400, "{\"error\":\"expires_date must be YYYY-MM-DD when expires is true\"}");
+      }
+
+      std::shared_ptr<Account> mutableAccount = std::shared_ptr<Account>(new Account());
+      if (!PersistentAccount::ReadObject(mutableAccount, account->GetID()) || mutableAccount->GetID() == 0)
+         return BuildResponse_(500, "{\"error\":\"the account could not be read\"}");
+
+      mutableAccount->SetVacationSubject(subject);
+      mutableAccount->SetVacationMessage(message);
+      mutableAccount->SetVacationExpires(expires);
+      mutableAccount->SetVacationExpiresDate(expires ? expiresDate : String());
+      mutableAccount->SetVacationMessageIsOn(enabled);
+
+      String saveError;
+      if (!PersistentAccount::SaveObject(mutableAccount, saveError, PersistenceModeNormal))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(AnsiString(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
+         return BuildResponse_(500, body);
+      }
+
+      AnsiString json;
+      json.Format("{\"enabled\":%hs,\"subject\":\"%hs\",\"message\":\"%hs\",\"expires\":%hs,\"expires_date\":\"%hs\"}",
+         enabled ? "true" : "false",
+         JsonEscape_(AnsiString(subject)).c_str(),
+         JsonEscape_(AnsiString(message)).c_str(),
+         expires ? "true" : "false",
+         JsonEscape_(AnsiString(expires ? expiresDate : String())).c_str());
+
+      return BuildResponse_(200, json);
+   }
+
+   namespace
+   {
+      // The self-service page. Static: nothing in it comes from the server's
+      // data, so nothing is escaped into it - every value the user sees is
+      // fetched by the script as JSON and written into the page as text. The
+      // markup and the script are two responses so the page can carry a
+      // Content-Security-Policy that allows no inline script at all.
+      const char *PortalHtml =
+         "<!doctype html>\n"
+         "<html lang=\"en\">\n"
+         "<head>\n"
+         "<meta charset=\"utf-8\">\n"
+         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
+         "<title>hMailServer - my account</title>\n"
+         "<style>\n"
+         "body{font-family:system-ui,'Segoe UI',sans-serif;margin:0;background:#f4f5f7;color:#1c1e21}\n"
+         "main{max-width:36rem;margin:2rem auto;padding:0 1rem}\n"
+         "section{background:#fff;border:1px solid #d9dce1;border-radius:.5rem;padding:1rem 1.25rem;margin-bottom:1rem}\n"
+         "h1{font-size:1.4rem;margin:0 0 1rem}h2{font-size:1.05rem;margin:0 0 .75rem}\n"
+         "label{display:block;margin:.5rem 0 .25rem;font-size:.9rem}\n"
+         "input[type=text],input[type=password],input[type=date],textarea{width:100%;box-sizing:border-box;padding:.45rem;border:1px solid #b9bec7;border-radius:.3rem;font:inherit}\n"
+         "textarea{min-height:6rem}\n"
+         "button{margin-top:.75rem;padding:.45rem .9rem;border:0;border-radius:.3rem;background:#2f81f7;color:#fff;font:inherit;cursor:pointer}\n"
+         "button.secondary{background:#e4e6ea;color:#1c1e21}\n"
+         ".status{margin-top:.5rem;font-size:.9rem;min-height:1.2rem}.status.error{color:#b42318}.status.ok{color:#067647}\n"
+         ".meter{height:.5rem;background:#e4e6ea;border-radius:.25rem;overflow:hidden;margin:.4rem 0}.meter div{height:100%;background:#2f81f7}\n"
+         "[hidden]{display:none!important}\n"
+         "</style>\n"
+         "</head>\n"
+         "<body>\n"
+         "<main>\n"
+         "<h1>My account</h1>\n"
+         "<section id=\"signin\">\n"
+         "<h2>Sign in</h2>\n"
+         "<form id=\"signin-form\">\n"
+         "<label for=\"address\">E-mail address</label><input id=\"address\" type=\"text\" autocomplete=\"username\" required>\n"
+         "<label for=\"password\">Password</label><input id=\"password\" type=\"password\" autocomplete=\"current-password\" required>\n"
+         "<button type=\"submit\">Sign in</button>\n"
+         "<div id=\"signin-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
+         "</section>\n"
+         "<div id=\"account\" hidden>\n"
+         "<section>\n"
+         "<h2 id=\"who\"></h2>\n"
+         "<div id=\"quota\"></div>\n"
+         "<div class=\"meter\"><div id=\"quota-bar\" style=\"width:0\"></div></div>\n"
+         "<div id=\"password-changed\"></div>\n"
+         "<button id=\"signout\" class=\"secondary\" type=\"button\">Sign out</button>\n"
+         "</section>\n"
+         "<section>\n"
+         "<h2>Out of office</h2>\n"
+         "<form id=\"vacation-form\">\n"
+         "<label><input id=\"vacation-enabled\" type=\"checkbox\"> Send an automatic reply</label>\n"
+         "<label for=\"vacation-subject\">Subject</label><input id=\"vacation-subject\" type=\"text\" maxlength=\"200\">\n"
+         "<label for=\"vacation-message\">Message</label><textarea id=\"vacation-message\" maxlength=\"20000\"></textarea>\n"
+         "<label><input id=\"vacation-expires\" type=\"checkbox\"> Stop replying after</label>\n"
+         "<input id=\"vacation-expires-date\" type=\"date\">\n"
+         "<button type=\"submit\">Save</button>\n"
+         "<div id=\"vacation-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
+         "</section>\n"
+         "<section id=\"password-section\">\n"
+         "<h2>Change password</h2>\n"
+         "<form id=\"password-form\">\n"
+         "<label for=\"current\">Current password</label><input id=\"current\" type=\"password\" autocomplete=\"current-password\" required>\n"
+         "<label for=\"new\">New password</label><input id=\"new\" type=\"password\" autocomplete=\"new-password\" required>\n"
+         "<label for=\"confirm\">New password again</label><input id=\"confirm\" type=\"password\" autocomplete=\"new-password\" required>\n"
+         "<div id=\"otp-row\" hidden><label for=\"otp\">Code from your authenticator app</label><input id=\"otp\" type=\"text\" inputmode=\"numeric\" autocomplete=\"one-time-code\"></div>\n"
+         "<button type=\"submit\">Change password</button>\n"
+         "<div id=\"password-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
+         "</section>\n"
+         "</div>\n"
+         "</main>\n"
+         "<script src=\"/portal.js\"></script>\n"
+         "</body>\n"
+         "</html>\n";
+
+      const char *PortalScript =
+         "(function () {\n"
+         "  'use strict';\n"
+         "  var credentials = null;\n"
+         "  var el = function (id) { return document.getElementById(id); };\n"
+         "  var say = function (id, text, ok) { var s = el(id); s.textContent = text || ''; s.className = 'status' + (text ? (ok ? ' ok' : ' error') : ''); };\n"
+         "  var headers = function (extra) {\n"
+         "    var h = { 'Authorization': 'Basic ' + btoa(unescape(encodeURIComponent(credentials.address + ':' + credentials.password))) };\n"
+         "    if (extra) { for (var k in extra) { if (extra[k]) { h[k] = extra[k]; } } }\n"
+         "    return h;\n"
+         "  };\n"
+         "  var call = function (method, path, body, extra) {\n"
+         "    var options = { method: method, headers: headers(extra), cache: 'no-store' };\n"
+         "    if (body !== undefined) { options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body); }\n"
+         "    return fetch(path, options).then(function (response) {\n"
+         "      return response.text().then(function (text) {\n"
+         "        var data = null;\n"
+         "        try { data = text ? JSON.parse(text) : null; } catch (e) { data = null; }\n"
+         "        return { status: response.status, data: data, otp: response.headers.get('X-hMailServer-OTP') };\n"
+         "      });\n"
+         "    });\n"
+         "  };\n"
+         "  var describe = function (result, fallback) {\n"
+         "    if (result.data && result.data.error) { return result.data.error; }\n"
+         "    if (result.status === 401) { return 'The address or password is not right.'; }\n"
+         "    if (result.status === 429) { return 'Too many attempts; wait a minute and try again.'; }\n"
+         "    return fallback + ' (' + result.status + ')';\n"
+         "  };\n"
+         "  var format = function (bytes) {\n"
+         "    if (bytes >= 1073741824) { return (bytes / 1073741824).toFixed(1) + ' GB'; }\n"
+         "    if (bytes >= 1048576) { return (bytes / 1048576).toFixed(1) + ' MB'; }\n"
+         "    if (bytes >= 1024) { return (bytes / 1024).toFixed(0) + ' KB'; }\n"
+         "    return bytes + ' bytes';\n"
+         "  };\n"
+         "  var render = function (me) {\n"
+         "    el('who').textContent = me.address;\n"
+         "    var used = me.quota.used_bytes, limit = me.quota.limit_mb * 1048576;\n"
+         "    if (limit > 0) {\n"
+         "      el('quota').textContent = format(used) + ' of ' + me.quota.limit_mb + ' MB used';\n"
+         "      el('quota-bar').style.width = Math.min(100, Math.round(100 * used / limit)) + '%';\n"
+         "    } else {\n"
+         "      el('quota').textContent = format(used) + ' used, no limit';\n"
+         "      el('quota-bar').style.width = '0';\n"
+         "    }\n"
+         "    el('password-changed').textContent = me.password_changed ? 'Password last changed ' + me.password_changed : '';\n"
+         "    el('vacation-enabled').checked = !!me.vacation.enabled;\n"
+         "    el('vacation-subject').value = me.vacation.subject || '';\n"
+         "    el('vacation-message').value = me.vacation.message || '';\n"
+         "    el('vacation-expires').checked = !!me.vacation.expires;\n"
+         "    el('vacation-expires-date').value = me.vacation.expires_date || '';\n"
+         "    el('otp-row').hidden = !me.second_factor;\n"
+         "    el('password-section').hidden = !!me.directory_linked;\n"
+         "    el('signin').hidden = true;\n"
+         "    el('account').hidden = false;\n"
+         "  };\n"
+         "  var load = function () {\n"
+         "    return call('GET', '/api/v1/me').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { render(result.data); return true; }\n"
+         "      say('signin-status', describe(result, 'Could not sign in'), false);\n"
+         "      credentials = null;\n"
+         "      return false;\n"
+         "    });\n"
+         "  };\n"
+         "  el('signin-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    say('signin-status', '', true);\n"
+         "    credentials = { address: el('address').value.trim(), password: el('password').value };\n"
+         "    el('password').value = '';\n"
+         "    load();\n"
+         "  });\n"
+         "  el('signout').addEventListener('click', function () {\n"
+         "    credentials = null;\n"
+         "    el('account').hidden = true;\n"
+         "    el('signin').hidden = false;\n"
+         "    el('address').focus();\n"
+         "  });\n"
+         "  el('vacation-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    if (!credentials) { return; }\n"
+         "    var body = {\n"
+         "      enabled: el('vacation-enabled').checked,\n"
+         "      subject: el('vacation-subject').value,\n"
+         "      message: el('vacation-message').value,\n"
+         "      expires: el('vacation-expires').checked,\n"
+         "      expires_date: el('vacation-expires-date').value\n"
+         "    };\n"
+         "    call('PUT', '/api/v1/me/vacation', body).then(function (result) {\n"
+         "      say('vacation-status', result.status === 200 ? 'Saved.' : describe(result, 'Could not save'), result.status === 200);\n"
+         "    });\n"
+         "  });\n"
+         "  el('password-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    if (!credentials) { return; }\n"
+         "    var current = el('current').value, fresh = el('new').value, confirm = el('confirm').value;\n"
+         "    if (fresh !== confirm) { say('password-status', 'The two new passwords differ.', false); return; }\n"
+         "    call('POST', '/api/v1/me/password', { current: current, 'new': fresh }, { 'X-hMailServer-OTP': el('otp').value.trim() }).then(function (result) {\n"
+         "      if (result.status === 200) {\n"
+         "        credentials.password = fresh;\n"
+         "        el('current').value = ''; el('new').value = ''; el('confirm').value = ''; el('otp').value = '';\n"
+         "        say('password-status', 'Password changed.', true);\n"
+         "        load();\n"
+         "        return;\n"
+         "      }\n"
+         "      if (result.otp === 'required') { el('otp-row').hidden = false; say('password-status', 'Enter the code from your authenticator app.', false); return; }\n"
+         "      say('password-status', describe(result, 'Could not change the password'), false);\n"
+         "    });\n"
+         "  });\n"
+         "  el('address').focus();\n"
+         "})();\n";
+
+      // The page and its script share these. No inline script or style
+      // source is allowed except the page's own stylesheet element;
+      // connections go to this origin only; nothing may frame the page.
+      const char *PortalHeaders =
+         "Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; frame-ancestors 'none'; base-uri 'none'\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Referrer-Policy: no-referrer\r\n"
+         "Cache-Control: no-store\r\n";
+   }
+
+   HttpResponse
+   RestApiServer::HandlePortalPage_()
+   {
+      HttpResponse response;
+      response.content_type = "text/html; charset=utf-8";
+      response.body = PortalHtml;
+      response.extra_headers = PortalHeaders;
+      return response;
+   }
+
+   HttpResponse
+   RestApiServer::HandlePortalScript_()
+   {
+      HttpResponse response;
+      response.content_type = "text/javascript; charset=utf-8";
+      response.body = PortalScript;
+      response.extra_headers = PortalHeaders;
+      return response;
+   }
+
    HttpResponse
    RestApiServer::HandleOpenApi_()
    {
@@ -3959,9 +4495,12 @@ namespace HM
          "{"
          "\"openapi\":\"3.0.3\","
          "\"info\":{\"title\":\"hMailServer REST API\",\"version\":\"1\","
-         "\"description\":\"Administration API. Authenticate with the administrator password (HTTP Basic, user 'Administrator') or an API key (Bearer). API keys can be read-only or restricted to named domains; key management itself requires the administrator password.\"},"
+         "\"description\":\"Administration API. Authenticate with the administrator password (HTTP Basic, user 'Administrator') or an API key (Bearer). API keys can be read-only or restricted to named domains; key management itself requires the administrator password. The /api/v1/me endpoints are the exception: they answer to an account\'s own credentials (HTTP Basic, user = the mailbox address) and to nothing else, and /portal is a sign-in page for them.\"},"
          "\"paths\":{"
          "\"/api/v1/status\":{\"get\":{\"summary\":\"Server status\",\"responses\":{\"200\":{\"description\":\"Status, state and uptime\"}}}},"
+         "\"/api/v1/me\":{\"get\":{\"summary\":\"The signed-in account's own state\",\"description\":\"HTTP Basic with the account's address and password - the same credential and the same checks as an IMAP logon, including a per-name lockout and the auto-ban. Refused for the administrator password and for API keys.\",\"responses\":{\"200\":{\"description\":\"address, domain, active, quota (limit_mb, used_bytes), vacation (enabled, active, subject, message, expires, expires_date), password_changed, second_factor, directory_linked\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"The administrator password or an API key was presented\"}}}},"
+         "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
+         "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
          "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
