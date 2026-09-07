@@ -229,6 +229,8 @@ namespace RegressionTests.API
          StringAssert.StartsWith("text/html", page.Header("Content-Type"));
          StringAssert.Contains("script-src 'self'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-ancestors 'none'", page.Header("Content-Security-Policy"));
+         StringAssert.Contains("frame-src 'self'", page.Header("Content-Security-Policy"));
+         StringAssert.Contains("<iframe id=\"message-html\" sandbox=\"\"", page.Body);
          Assert.AreEqual("no-store", page.Header("Cache-Control"));
          Assert.AreEqual("nosniff", page.Header("X-Content-Type-Options"));
          StringAssert.Contains("<script src=\"/portal.js\"></script>", page.Body);
@@ -239,6 +241,8 @@ namespace RegressionTests.API
          StringAssert.StartsWith("text/javascript", script.Header("Content-Type"));
          StringAssert.Contains("/api/v1/me", script.Body);
          StringAssert.Contains("/api/v1/me/folders", script.Body);
+         StringAssert.Contains("srcdoc", script.Body);
+         StringAssert.Contains("img-src data:", script.Body);
       }
 
       [Test]
