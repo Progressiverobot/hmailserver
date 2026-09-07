@@ -38,7 +38,7 @@ namespace HM
 
       struct Snapshot
       {
-         Snapshot() : state(StateNotChecked), installer_size(0), integrated_time(0) {}
+         Snapshot() : state(StateNotChecked), installer_size(0), integrated_time(0), last_check_unix(0) {}
 
          State state;
          String available_version;     // "6.2.28"; empty unless a newer release is known
@@ -58,6 +58,7 @@ namespace HM
          String apply_version;         // the version that outcome was about
          String apply_detail;          // what the helper said
          String last_checked;          // local time; empty until a check has completed
+         __int64 last_check_unix;      // the same as Unix seconds; 0 until then
          String last_error;            // empty unless the last check failed
       };
 
@@ -109,6 +110,16 @@ namespace HM
       // beside the feed's own path, so a mirror or the tests' fake serves it too.
       static AnsiString ReleaseByTagUrl(const String &version);
       static bool FetchReleaseByTag(const String &version, ReleaseAssets &assets, String &error);
+
+      // UpdateCheckHours since the last check, or no check yet: the scheduled task
+      // runs every quarter hour and reads the feed only when this says so.
+      static bool CheckIsDue();
+      // Makes the next check due: called when the servers (re)start, so a changed
+      // UpdateChannel or UpdateFeedUrl is read at once rather than a day later.
+      static void ResetSchedule();
+      // UpdateWindow as configured: its normalised text, whether it is open now,
+      // and the parse error if it has one (text is then the setting as written).
+      static void WindowStatus(String &text, bool &open, String &error);
 
       // Unix seconds as ISO 8601 UTC.
       static String FormatUnixTime(__int64 seconds);

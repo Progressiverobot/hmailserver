@@ -57,6 +57,12 @@ namespace HM
       void SetStatus(const String &sStatus);
       String GetStatus();
 
+      // Whether a backup or restore is running now, and whether the last backup
+      // that finished succeeded: what an unattended update waits on before it
+      // hands the installer over.
+      static bool IsRunning();
+      bool LastBackupSucceeded() const { return last_backup_succeeded_; }
+
       void OnBackupCompleted();
       void OnBackupFailed(const String &sReason);
 
@@ -117,5 +123,6 @@ namespace HM
 
       boost::recursive_mutex mutex_;
       String log_;
+      bool last_backup_succeeded_ = false;
    };
 }

@@ -510,6 +510,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\UpdateDownloader.cpp" />
     <ClCompile Include="..\Common\Util\UpdateApplyToken.cpp" />
     <ClCompile Include="..\Common\Util\UpdateInstaller.cpp" />
+    <ClCompile Include="..\Common\Util\UpdateWindow.cpp" />
     <ClCompile Include="..\Common\Util\JwksKeySet.cpp" />
     <ClCompile Include="..\Common\Util\TokenIntrospection.cpp" />
     <ClCompile Include="..\Common\Util\SRS.cpp" />
@@ -1148,6 +1149,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\UpdateDownloader.h" />
     <ClInclude Include="..\Common\Util\UpdateApplyToken.h" />
     <ClInclude Include="..\Common\Util\UpdateInstaller.h" />
+    <ClInclude Include="..\Common\Util\UpdateWindow.h" />
     <ClInclude Include="..\Common\Util\JwksKeySet.h" />
     <ClInclude Include="..\Common\Util\TokenIntrospection.h" />
     <ClInclude Include="..\Common\Util\SRS.h" />

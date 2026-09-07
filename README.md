@@ -216,8 +216,18 @@ It is off until you opt in, because a server must not call out to anyone until i
 administrator says it may; when it is on, the request is a plain `GET` of the
 GitHub Releases API with nothing but the `User-Agent` the server always sends - no
 identifier, no configuration, no counts. `UpdateFeedUrl` points it at a mirror on a
-network without Internet access. Nothing is applied until you ask: an unattended
-window for applying is the last part of the roadmap's live-update row.
+network without Internet access.
+
+**Unattended.** `UpdateAutoDownload=1` fetches and verifies the installer as soon as
+the check finds a newer release, and `UpdateWindow` names when it may be applied
+without a click - `03:00` (every day, for an hour), `Sun 03:00`, `Sat,Sun
+02:00-05:00` - by the same helper, with the same rollback. With
+`UpdateBackupBeforeApply=1` (the default) the server backs up to the configured
+backup destination first and does not go ahead when there is no destination or the
+backup fails, because a rollback restores binaries, not the schema, and the backup
+is what would. The Control Panel's status page has *Check for updates*, *Download
+update* and *Install update* for doing any of it by hand, and shows the last
+update's outcome.
 
 Building hMailServer
 ====================
@@ -452,6 +462,11 @@ Administration and monitoring:
    UpdateRequireAuthenticode=0   ; 1: the installer must also carry an Authenticode signature Windows trusts
    UpdateServiceWaitSeconds=180  ; how long the update helper gives the service to come back after the
                                  ; installer has run before it reinstalls the previous version
+   UpdateAutoDownload=0          ; 1: fetch and verify a newer release's installer as soon as the check finds it
+   UpdateWindow=                 ; when a verified update may be applied without a click: empty = never;
+                                 ; "03:00" every day from 03:00 for an hour; "Sun 03:00"; "Sat,Sun 02:00-05:00"
+   UpdateBackupBeforeApply=1     ; an unattended apply runs a backup first (to the configured destination)
+                                 ; and does not go ahead if there is no destination or the backup fails
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
                                  ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read

@@ -501,6 +501,9 @@ namespace HM
       update_service_wait_seconds_ = ReadIniSettingInteger_("Settings", "UpdateServiceWaitSeconds", 180);
       if (update_service_wait_seconds_ < 5)
          update_service_wait_seconds_ = 5;
+      update_window_ = ReadIniSettingString_("Settings", "UpdateWindow", "");
+      update_auto_download_ = ReadIniSettingInteger_("Settings", "UpdateAutoDownload", 0) == 1;
+      update_backup_before_apply_ = ReadIniSettingInteger_("Settings", "UpdateBackupBeforeApply", 1) == 1;
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
       log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);

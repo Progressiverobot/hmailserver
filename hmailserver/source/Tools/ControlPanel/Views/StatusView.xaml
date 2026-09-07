@@ -19,6 +19,18 @@
                            Style="{StaticResource PageSubtitle}" />
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                <ui:Button x:Name="CheckUpdateButton" Content="Check for _updates" Click="CheckUpdate_Click" Margin="0,0,8,0"
+                           ToolTip="Reads the project's release feed now and says whether a newer release exists. Nothing is downloaded or installed by this.">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="Globe24" /></ui:Button.Icon>
+                </ui:Button>
+                <ui:Button x:Name="DownloadUpdateButton" Content="_Download update" Click="DownloadUpdate_Click" IsEnabled="False" Margin="0,0,8,0"
+                           ToolTip="Fetches the newer release's installer and verifies it against its Sigstore bundle before keeping it. The Control Panel waits while it does; an installer is tens of megabytes.">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
+                </ui:Button>
+                <ui:Button x:Name="InstallUpdateButton" Content="_Install update" Click="InstallUpdate_Click" IsEnabled="False" Margin="0,0,8,0"
+                           ToolTip="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back.">
+                    <ui:Button.Icon><ui:SymbolIcon Symbol="Server24" /></ui:Button.Icon>
+                </ui:Button>
                 <ui:Button x:Name="PauseButton" Content="_Pause" Click="PauseResume_Click" IsEnabled="False"
                            Margin="0,0,8,0"
                            ToolTip="Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed.">

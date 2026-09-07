@@ -9,6 +9,8 @@
 #include "Time.h"
 #include "Unicode.h"
 #include "FileUtilities.h"
+#include "UpdateWindow.h"
+#include <time.h>
 #include "../Application/IniFileSettings.h"
 #include "../Application/Version.h"
 
@@ -169,6 +171,7 @@ namespace HM
 
       Snapshot snapshot;
       snapshot.last_checked = Time::GetCurrentDateTime();
+      snapshot.last_check_unix = (__int64) time(nullptr);
 
       String message;
       if (!release.found)
@@ -319,6 +322,39 @@ namespace HM
       return true;
    }
 
+   bool
+   UpdateChecker::CheckIsDue()
+   {
+      Snapshot snapshot = Current();
+      if (snapshot.last_check_unix == 0)
+         return true;
+      __int64 interval = (__int64) IniFileSettings::Instance()->GetUpdateCheckHours() * 3600;
+      return (__int64) time(nullptr) - snapshot.last_check_unix >= interval;
+   }
+
+   void
+   UpdateChecker::ResetSchedule()
+   {
+      boost::lock_guard<boost::mutex> guard(mutex_);
+      snapshot_.last_check_unix = 0;
+   }
+
+   void
+   UpdateChecker::WindowStatus(String &text, bool &open, String &error)
+   {
+      String configured = IniFileSettings::Instance()->GetUpdateWindow();
+      UpdateWindow window;
+      open = false;
+      error.Empty();
+      if (!window.Parse(configured, error))
+      {
+         text = configured;
+         return;
+      }
+      text = window.Describe();
+      open = window.ContainsNow();
+   }
+
    String
    UpdateChecker::FormatUnixTime(__int64 seconds)
    {
@@ -342,6 +378,7 @@ namespace HM
       {
          boost::lock_guard<boost::mutex> guard(mutex_);
          snapshot_.last_checked = Time::GetCurrentDateTime();
+         snapshot_.last_check_unix = (__int64) time(nullptr);
       }
 
       LOG_APPLICATION(Formatter::Format(_T("Update check failed: {0}"), reason));
@@ -521,6 +558,18 @@ namespace HM
       body += ",\"version\":" + Quote_(snapshot.apply_version);
       body += ",\"detail\":" + Quote_(snapshot.apply_detail);
       body += "}";
+      {
+         String windowText, windowError;
+         bool open = false;
+         WindowStatus(windowText, open, windowError);
+         body += ",\"window\":{";
+         body += "\"text\":" + Quote_(windowText);
+         body += ",\"open\":" + AnsiString(open ? "true" : "false");
+         body += ",\"error\":" + Quote_(windowError);
+         body += "}";
+         body += ",\"autoDownload\":" + AnsiString(IniFileSettings::Instance()->GetUpdateAutoDownload() ? "true" : "false");
+         body += ",\"backupBeforeApply\":" + AnsiString(IniFileSettings::Instance()->GetUpdateBackupBeforeApply() ? "true" : "false");
+      }
       body += ",\"lastChecked\":" + Quote_(snapshot.last_checked);
       body += ",\"lastError\":" + Quote_(snapshot.last_error);
       body += "}";

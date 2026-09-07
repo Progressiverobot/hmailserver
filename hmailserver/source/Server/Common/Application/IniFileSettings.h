@@ -578,6 +578,12 @@ namespace HM
       // How long the update helper gives the service to come back after the installer
       // has run before it rolls back.
       int GetUpdateServiceWaitSeconds() const { return update_service_wait_seconds_; }
+      // The unattended part: when a verified update may be applied without a click
+      // (UpdateWindow, see Util/UpdateWindow.h), whether a newer release is fetched
+      // and verified as soon as the check finds it, and whether a backup comes first.
+      String GetUpdateWindow() const { return update_window_; }
+      bool GetUpdateAutoDownload() const { return update_auto_download_; }
+      bool GetUpdateBackupBeforeApply() const { return update_backup_before_apply_; }
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
@@ -1130,6 +1136,9 @@ namespace HM
       String update_source_repository_;
       bool update_require_authenticode_ = false;
       int update_service_wait_seconds_ = 180;
+      String update_window_;
+      bool update_auto_download_ = false;
+      bool update_backup_before_apply_ = true;
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;
