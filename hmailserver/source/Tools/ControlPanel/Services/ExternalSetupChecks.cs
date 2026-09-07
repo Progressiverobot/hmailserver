@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -157,10 +158,10 @@ namespace hMailServer.ControlPanel.Services
       {
          switch (state)
          {
-            case SetupItemState.Done: return "Done";
-            case SetupItemState.NotNeeded: return "Not needed";
-            case SetupItemState.ActionNeeded: return "Action needed";
-            default: return "Cannot tell";
+            case SetupItemState.Done: return L("Done");
+            case SetupItemState.NotNeeded: return L("Not needed");
+            case SetupItemState.ActionNeeded: return L("Action needed");
+            default: return L("Cannot tell");
          }
       }
 
@@ -334,7 +335,7 @@ namespace hMailServer.ControlPanel.Services
             string pem = File.ReadAllText(keyFile);
             using var rsa = RSA.Create();
             rsa.ImportFromPem(pem);
-            return "v=DKIM1; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo());
+            return "v=DKIM1; p=" + Convert.ToBase64String(rsa.ExportSubjectPublicKeyInfo()); // no-loc
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
@@ -360,9 +361,7 @@ namespace hMailServer.ControlPanel.Services
          if (result == null || result.Status == DnsTxtLookup.LookupStatus.Failed)
          {
             finding.State = SetupItemState.CannotTell;
-            finding.Text = probe.Label + ": the DNS lookup for " + probe.Host + " failed - "
-               + (result != null ? result.Error : "no result.")
-               + " This says nothing about whether the record exists; check this machine's DNS resolver and press Refresh.";
+            finding.Text = F("{0}: the DNS lookup for {1} failed - {2} This says nothing about whether the record exists; check this machine's DNS resolver and press Refresh.", probe.Label, probe.Host, (result != null ? result.Error : L("no result.")));
             return;
          }
 
@@ -374,26 +373,22 @@ namespace hMailServer.ControlPanel.Services
                if (result.Status == DnsTxtLookup.LookupStatus.NoRecord)
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": no TXT record was found at " + probe.Host
-                     + ", so receivers cannot verify this domain's signatures and may treat its mail as forged. "
-                     + "Publish the record at your DNS host - or, if you just did, wait for propagation and press Refresh.";
+                  finding.Text = F("{0}: no TXT record was found at {1}, so receivers cannot verify this domain's signatures and may treat its mail as forged. Publish the record at your DNS host - or, if you just did, wait for propagation and press Refresh.", probe.Label, probe.Host);
                }
                else if (probe.Expected == null)
                {
                   finding.State = SetupItemState.CannotTell;
-                  finding.Text = probe.Label + ": a TXT record exists at " + probe.Host
-                     + ", but whether it carries the right public key could not be verified - the private key file was not readable from this panel.";
+                  finding.Text = F("{0}: a TXT record exists at {1}, but whether it carries the right public key could not be verified - the private key file was not readable from this panel.", probe.Label, probe.Host);
                }
                else if (matches)
                {
                   finding.State = SetupItemState.Done;
-                  finding.Text = probe.Label + ": the TXT record at " + probe.Host + " is published and carries this key's public key.";
+                  finding.Text = F("{0}: the TXT record at {1} is published and carries this key's public key.", probe.Label, probe.Host);
                }
                else
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": TXT record(s) exist at " + probe.Host
-                     + " but none carries this key's public key, so signatures fail verification. Fix the record's value - waiting for propagation will not help.";
+                  finding.Text = F("{0}: TXT record(s) exist at {1} but none carries this key's public key, so signatures fail verification. Fix the record's value - waiting for propagation will not help.", probe.Label, probe.Host);
                }
                return;
 
@@ -401,26 +396,22 @@ namespace hMailServer.ControlPanel.Services
                if (result.Status == DnsTxtLookup.LookupStatus.NoRecord)
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": the secondary key is staged but no TXT record exists at " + probe.Host
-                     + " yet. Publish it and let it propagate BEFORE promoting the secondary key, or mail will sign with a key the world cannot look up.";
+                  finding.Text = F("{0}: the secondary key is staged but no TXT record exists at {1} yet. Publish it and let it propagate BEFORE promoting the secondary key, or mail will sign with a key the world cannot look up.", probe.Label, probe.Host);
                }
                else if (probe.Expected == null)
                {
                   finding.State = SetupItemState.CannotTell;
-                  finding.Text = probe.Label + ": a TXT record exists at " + probe.Host
-                     + ", but it could not be compared with the staged secondary key from this panel. Confirm the value before promoting.";
+                  finding.Text = F("{0}: a TXT record exists at {1}, but it could not be compared with the staged secondary key from this panel. Confirm the value before promoting.", probe.Label, probe.Host);
                }
                else if (matches)
                {
                   finding.State = SetupItemState.Done;
-                  finding.Text = probe.Label + ": the rotation record at " + probe.Host
-                     + " is published and matches the staged secondary key. Promote whenever it has propagated everywhere.";
+                  finding.Text = F("{0}: the rotation record at {1} is published and matches the staged secondary key. Promote whenever it has propagated everywhere.", probe.Label, probe.Host);
                }
                else
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": TXT record(s) exist at " + probe.Host
-                     + " but none matches the staged secondary key. Fix the value before promoting - waiting will not help.";
+                  finding.Text = F("{0}: TXT record(s) exist at {1} but none matches the staged secondary key. Fix the value before promoting - waiting will not help.", probe.Label, probe.Host);
                }
                return;
 
@@ -428,21 +419,17 @@ namespace hMailServer.ControlPanel.Services
                if (result.Status == DnsTxtLookup.LookupStatus.NoRecord)
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": no TXT record at " + probe.Host
-                     + ", so sending servers never discover the policy and the hosting does nothing for this domain. "
-                     + "Publish it (v=STSv1; id=...) - or, if you just did, wait for propagation and press Refresh.";
+                  finding.Text = F("{0}: no TXT record at {1}, so sending servers never discover the policy and the hosting does nothing for this domain. Publish it (v=STSv1; id=...) - or, if you just did, wait for propagation and press Refresh.", probe.Label, probe.Host);
                }
                else if (HasStsMarker(result.Records))
                {
                   finding.State = SetupItemState.Done;
-                  finding.Text = probe.Label + ": the " + probe.Host + " TXT record is published. Not checkable from here: "
-                     + "that mta-sts." + probe.Label + " resolves to this server, and that the certificate covers that name.";
+                  finding.Text = F("{0}: the {1} TXT record is published. Not checkable from here: that mta-sts.{2} resolves to this server, and that the certificate covers that name.", probe.Label, probe.Host, probe.Label);
                }
                else
                {
                   finding.State = SetupItemState.ActionNeeded;
-                  finding.Text = probe.Label + ": TXT record(s) exist at " + probe.Host
-                     + " but none begins with v=STSv1, so senders will not recognise a policy there. Fix the record's value.";
+                  finding.Text = F("{0}: TXT record(s) exist at {1} but none begins with v=STSv1, so senders will not recognise a policy there. Fix the record's value.", probe.Label, probe.Host);
                }
                return;
          }
@@ -460,9 +447,8 @@ namespace hMailServer.ControlPanel.Services
          IniFeatureStore ini = local ? new IniFeatureStore() : null;
          bool iniReadable = ini != null && ini.IsAvailable;
          string iniExcuse = local
-            ? "hMailServer.INI was not found on this machine, so its settings cannot be read from here."
-            : "the Control Panel is connected to '" + (ServerSession.Current != null ? ServerSession.Current.Host : "?")
-              + "'; hMailServer.INI and files on disk can only be inspected on the server machine itself.";
+            ? L("hMailServer.INI was not found on this machine, so its settings cannot be read from here.")
+            : F("the Control Panel is connected to '{0}'; hMailServer.INI and files on disk can only be inspected on the server machine itself.", (ServerSession.Current != null ? ServerSession.Current.Host : "?"));
 
          List<DomainDkim> domains = ReadDomains();
 
@@ -503,18 +489,15 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "Windows service account - a least-privilege account needs granting outside hMailServer",
-            Purpose = "By default the service runs as LocalSystem, the most privileged account on the machine, so anything reachable through SMTP, IMAP or POP3 is reachable with full control of the computer. A dedicated account contains that.",
-            Action = "Set an account on the Server limits & expert settings page - NT SERVICE\\hMailServer needs no password - then, from an elevated "
-                     + "Command Prompt, run hMailServer.exe /Register and restart the service. Grant that account \"Log on as a service\" "
-                     + "(secpol.msc > Local Policies > User Rights Assignment), read access to the program folder, and full control of the data, "
-                     + "log and database folders. An external database needs a login for it as well.",
+            Title = L("Windows service account - a least-privilege account needs granting outside hMailServer"),
+            Purpose = L("By default the service runs as LocalSystem, the most privileged account on the machine, so anything reachable through SMTP, IMAP or POP3 is reachable with full control of the computer. A dedicated account contains that."),
+            Action = L("Set an account on the Server limits & expert settings page - NT SERVICE\\hMailServer needs no password - then, from an elevated Command Prompt, run hMailServer.exe /Register and restart the service. Grant that account \"Log on as a service\" (secpol.msc > Local Policies > User Rights Assignment), read access to the program folder, and full control of the data, log and database folders. An external database needs a login for it as well."),
             Page = "hardening"
          };
 
          if (!local)
          {
-            item.Add(SetupItemState.CannotTell, "The service account cannot be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("The service account cannot be read: {0}", iniExcuse));
             item.AggregateFromFindings();
             return item;
          }
@@ -525,8 +508,8 @@ namespace hMailServer.ControlPanel.Services
          {
             item.Add(SetupItemState.CannotTell,
                service.Error != null
-                  ? "The Service Control Manager could not be queried, so the account the service runs as is unknown: " + service.Error
-                  : "Windows does not report an hMailServer service on this machine, so there is no service to re-register yet.");
+                  ? F("The Service Control Manager could not be queried, so the account the service runs as is unknown: {0}", service.Error)
+                  : L("Windows does not report an hMailServer service on this machine, so there is no service to re-register yet."));
             item.AggregateFromFindings();
             return item;
          }
@@ -541,8 +524,7 @@ namespace hMailServer.ControlPanel.Services
             // The SCM half is still knowable and is the half that matters, so this
             // degrades to a partial answer rather than to nothing at all.
             item.Add(runningAsLocalSystem ? SetupItemState.ActionNeeded : SetupItemState.Done,
-               "The service is running as " + WindowsServiceInfo.DescribeAccount(service.StartName)
-               + ". The requested account could not be read: " + iniExcuse);
+               F("The service is running as {0}. The requested account could not be read: {1}", WindowsServiceInfo.DescribeAccount(service.StartName), iniExcuse));
             item.AggregateFromFindings();
             return item;
          }
@@ -552,32 +534,23 @@ namespace hMailServer.ControlPanel.Services
             if (runningAsLocalSystem)
             {
                item.Add(SetupItemState.ActionNeeded,
-                  "The service is running as " + WindowsServiceInfo.DescribeAccount(service.StartName)
-                  + ", and no other account is requested. This is the default and it works; it is on this list because "
-                  + "moving to a dedicated account is the single largest reduction in what a compromise of the mail "
-                  + "server is worth, and it cannot be done from inside hMailServer.");
+                  F("The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer.", WindowsServiceInfo.DescribeAccount(service.StartName)));
             }
             else
             {
                item.Add(SetupItemState.Done,
-                  "The service is running as " + service.StartName + ", which is not LocalSystem, so it is already "
-                  + "contained. No account is requested in hMailServer.INI, so re-registering the service would leave "
-                  + "that unchanged.");
+                  F("The service is running as {0}, which is not LocalSystem, so it is already contained. No account is requested in hMailServer.INI, so re-registering the service would leave that unchanged.", service.StartName));
             }
          }
          else if (WindowsServiceInfo.SameAccount(configured, service.StartName, Environment.MachineName))
          {
             item.Add(SetupItemState.Done,
-               "The service is running as " + service.StartName + ", which is the account configured in "
-               + "hMailServer.INI. The registration step has been done.");
+               F("The service is running as {0}, which is the account configured in hMailServer.INI. The registration step has been done.", service.StartName));
          }
          else
          {
             item.Add(SetupItemState.ActionNeeded,
-               "Not applied. hMailServer.INI asks for " + configured + " but the service is running as "
-               + WindowsServiceInfo.DescribeAccount(service.StartName) + ". This setting is read only when the service "
-               + "is registered, so it will not take effect on a restart - run hMailServer.exe /Register from an "
-               + "elevated Command Prompt, then restart the service.");
+               F("Not applied. hMailServer.INI asks for {0} but the service is running as {1}. This setting is read only when the service is registered, so it will not take effect on a restart - run hMailServer.exe /Register from an elevated Command Prompt, then restart the service.", configured, WindowsServiceInfo.DescribeAccount(service.StartName)));
          }
 
          if (configured.Length > 0 && ini.Read("ServiceAccountPassword", "").Trim().Length > 0)
@@ -596,11 +569,7 @@ namespace hMailServer.ControlPanel.Services
             //
             // Only emptiness is tested; the value is never read into the UI.
             item.Add(SetupItemState.ActionNeeded,
-               "A service account password is stored in hMailServer.INI in plain text - the DPAPI setting does not "
-               + "cover it, because the registration step has nowhere else to read it from. Now that the service has "
-               + "been registered, Windows keeps its own copy, so clear the value on the Server limits & expert "
-               + "settings page. A virtual account (NT SERVICE\\hMailServer) or a group managed service account "
-               + "avoids the question entirely.");
+               L("A service account password is stored in hMailServer.INI in plain text - the DPAPI setting does not cover it, because the registration step has nowhere else to read it from. Now that the service has been registered, Windows keeps its own copy, so clear the value on the Server limits & expert settings page. A virtual account (NT SERVICE\\hMailServer) or a group managed service account avoids the question entirely."));
          }
 
          item.AggregateFromFindings();
@@ -619,11 +588,9 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "DKIM signing - publish each domain's public key in DNS",
-            Purpose = "Signs outgoing mail so receivers can verify it really came from your domain; without the DNS record every signature fails verification.",
-            Action = "At your DNS host, publish a TXT record named <selector>._domainkey.<domain> containing the public key "
-                     + "(v=DKIM1; k=rsa; p=...). This page looks the record up through the Windows resolver, and where the key file is "
-                     + "readable it also checks that the published key is the RIGHT key - a wrong value cannot be fixed by waiting.",
+            Title = L("DKIM signing - publish each domain's public key in DNS"),
+            Purpose = L("Signs outgoing mail so receivers can verify it really came from your domain; without the DNS record every signature fails verification."),
+            Action = L("At your DNS host, publish a TXT record named <selector>._domainkey.<domain> containing the public key (v=DKIM1; k=rsa; p=...). This page looks the record up through the Windows resolver, and where the key file is readable it also checks that the published key is the RIGHT key - a wrong value cannot be fixed by waiting."),
             Page = "domains"
          };
 
@@ -631,42 +598,41 @@ namespace hMailServer.ControlPanel.Services
 
          if (domains.Count == 0)
          {
-            item.Add(SetupItemState.NotNeeded, "No domains are configured, so there is nothing to sign and no record to publish.");
+            item.Add(SetupItemState.NotNeeded, L("No domains are configured, so there is nothing to sign and no record to publish."));
          }
          else if (signing.Count == 0)
          {
-            item.Add(SetupItemState.NotNeeded, "No domain has DKIM signing switched on, so no DNS record is required.");
+            item.Add(SetupItemState.NotNeeded, L("No domain has DKIM signing switched on, so no DNS record is required."));
          }
          else
          {
             foreach (DomainDkim domain in signing)
             {
-               string label = domain.Name + (domain.Active ? "" : " (domain is inactive)");
+               string label = domain.Name + (domain.Active ? "" : L(" (domain is inactive)"));
 
                if (domain.Selector.Length == 0 || domain.KeyFile.Length == 0)
                {
                   // Verified: DKIMSigner reports error 5305 and returns without
                   // signing, so mail leaves unsigned while the checkbox says on.
                   item.Add(SetupItemState.ActionNeeded,
-                     label + ": signing is on but the " + (domain.Selector.Length == 0 ? "selector" : "private key file")
-                     + " is not set, so every message goes out unsigned (server error 5305). Set both on the domain, then publish the DNS record.");
+                     domain.Selector.Length == 0
+                        ? F("{0}: signing is on but the selector is not set, so every message goes out unsigned (server error 5305). Set both on the domain, then publish the DNS record.", label)
+                        : F("{0}: signing is on but the private key file is not set, so every message goes out unsigned (server error 5305). Set both on the domain, then publish the DNS record.", label));
                }
                else if (local && !File.Exists(domain.KeyFile))
                {
                   item.Add(SetupItemState.ActionNeeded,
-                     label + ": the key file " + domain.KeyFile + " does not exist on this machine, so signing fails and mail goes out unsigned. "
-                     + "Restore the file or generate a new key, then publish the matching DNS record.");
+                     F("{0}: the key file {1} does not exist on this machine, so signing fails and mail goes out unsigned. Restore the file or generate a new key, then publish the matching DNS record.", label, domain.KeyFile));
                }
                else
                {
-                  string fileNote = local ? "The key file exists on disk." : "The key file could not be checked from this machine.";
+                  string fileNote = local ? L("The key file exists on disk.") : L("The key file could not be checked from this machine.");
                   string host = domain.Selector + "._domainkey." + domain.Name;
 
                   var finding = new SetupFinding
                   {
                      State = SetupItemState.CannotTell,
-                     Text = label + ": selector '" + domain.Selector + "' and key file are set. " + fileNote
-                            + " Checking DNS for the TXT record " + host + "…"
+                     Text = F("{0}: selector '{1}' and key file are set. {2} Checking DNS for the TXT record {3}…", label, domain.Selector, fileNote, host)
                   };
                   item.Findings.Add(finding);
 
@@ -690,7 +656,7 @@ namespace hMailServer.ControlPanel.Services
                   var finding = new SetupFinding
                   {
                      State = SetupItemState.CannotTell,
-                     Text = label + ": a secondary key is staged for rotation. Checking DNS for the TXT record " + host + "…"
+                     Text = F("{0}: a secondary key is staged for rotation. Checking DNS for the TXT record {1}…", label, host)
                   };
                   item.Findings.Add(finding);
 
@@ -732,11 +698,9 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "ARC inbound filtering - name the forwarders you trust",
-            Purpose = "Rescues legitimate forwarded mail from DMARC-failure penalties, but only for forwarders on your trusted-sealer list - "
-                      + "with the list empty the feature does nothing at all, even when enabled.",
-            Action = "On the Anti-spam settings page, list the sealing domains you trust (the mailing-list and forwarding services your users "
-                     + "rely on) and turn on the ARC offset. Naming who you trust is a judgement only you can make, which is why there is no default.",
+            Title = L("ARC inbound filtering - name the forwarders you trust"),
+            Purpose = L("Rescues legitimate forwarded mail from DMARC-failure penalties, but only for forwarders on your trusted-sealer list - with the list empty the feature does nothing at all, even when enabled."),
+            Action = L("On the Anti-spam settings page, list the sealing domains you trust (the mailing-list and forwarding services your users rely on) and turn on the ARC offset. Naming who you trust is a judgement only you can make, which is why there is no default."),
             Page = "antispam"
          };
 
@@ -779,29 +743,24 @@ namespace hMailServer.ControlPanel.Services
          if (failedReads_ != arcFailuresBefore)
          {
             item.Add(SetupItemState.CannotTell,
-               "The ARC filtering settings could not be read from the server, so this page cannot say whether the feature is configured.");
+               L("The ARC filtering settings could not be read from the server, so this page cannot say whether the feature is configured."));
          }
          else if (!arcEnabled)
          {
             item.Add(SetupItemState.NotNeeded,
-               "ARC filtering is off, so forwarded mail that fails DMARC is scored as it arrives. That is the default and it is a "
-               + "reasonable choice; turn it on only once you have forwarders whose seals you are willing to trust.");
+               L("ARC filtering is off, so forwarded mail that fails DMARC is scored as it arrives. That is the default and it is a reasonable choice; turn it on only once you have forwarders whose seals you are willing to trust."));
          }
          else if (string.IsNullOrWhiteSpace(arcSealers))
          {
             // The exact shape this whole page exists to catch: switched on, looks
             // configured, does nothing whatsoever.
             item.Add(SetupItemState.ActionNeeded,
-               "ARC filtering is ENABLED but the trusted-sealer list is EMPTY, so it does nothing at all. That is deliberate, not a bug: "
-               + "anyone can fabricate a whole ARC chain and seal it with a key they publish in their own DNS, and it will validate "
-               + "perfectly - so a passing chain proves nothing unless you already trust the sealer. The list is not an option of the "
-               + "feature, it is the feature.");
+               L("ARC filtering is ENABLED but the trusted-sealer list is EMPTY, so it does nothing at all. That is deliberate, not a bug: anyone can fabricate a whole ARC chain and seal it with a key they publish in their own DNS, and it will validate perfectly - so a passing chain proves nothing unless you already trust the sealer. The list is not an option of the feature, it is the feature."));
          }
          else
          {
             item.Add(SetupItemState.Done,
-               "ARC filtering is enabled and trusts: " + arcSealers.Trim() + ". Seals from any other domain are ignored, and matching is "
-               + "exact - a subdomain or a lookalike of a trusted name is not trusted.");
+               F("ARC filtering is enabled and trusts: {0}. Seals from any other domain are ignored, and matching is exact - a subdomain or a lookalike of a trusted name is not trusted.", arcSealers.Trim()));
          }
 
          // The one part that IS readable from here: ARC's score offset is defined
@@ -832,8 +791,7 @@ namespace hMailServer.ControlPanel.Services
          if (failedReads_ == failuresBefore && dmarcFailureScore <= 0)
          {
             item.Add(SetupItemState.ActionNeeded,
-               "The DMARC failure score is currently " + dmarcFailureScore + ". ARC works by offsetting that score, "
-               + "so at zero ARC filtering can do nothing even with trusted sealers listed. Set a positive DMARC failure score on the Anti-spam settings page first.");
+               F("The DMARC failure score is currently {0}. ARC works by offsetting that score, so at zero ARC filtering can do nothing even with trusted sealers listed. Set a positive DMARC failure score on the Anti-spam settings page first.", dmarcFailureScore));
          }
 
          item.AggregateFromFindings();
@@ -852,20 +810,19 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "ARC sealing of forwarded mail - needs a domain DKIM key",
-            Purpose = "Seals mail this server forwards so the next hop can still trust the original authentication results; the seal is made with a hosted domain's DKIM key.",
-            Action = "Give at least one active domain a DKIM selector and key file, and publish that domain's DKIM TXT record - "
-                     + "the receiving server verifies the seal against the same record DKIM signing uses.",
+            Title = L("ARC sealing of forwarded mail - needs a domain DKIM key"),
+            Purpose = L("Seals mail this server forwards so the next hop can still trust the original authentication results; the seal is made with a hosted domain's DKIM key."),
+            Action = L("Give at least one active domain a DKIM selector and key file, and publish that domain's DKIM TXT record - the receiving server verifies the seal against the same record DKIM signing uses."),
             Page = "security"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "ArcSealingEnabled could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("ArcSealingEnabled could not be read: {0}", iniExcuse));
          }
          else if (!ini.ReadBool("ArcSealingEnabled", false))
          {
-            item.Add(SetupItemState.NotNeeded, "ARC sealing is off (ArcSealingEnabled=0, the default), so nothing external is required.");
+            item.Add(SetupItemState.NotNeeded, L("ARC sealing is off (ArcSealingEnabled=0, the default), so nothing external is required."));
          }
          else
          {
@@ -873,14 +830,12 @@ namespace hMailServer.ControlPanel.Services
             if (anySealingIdentity)
             {
                item.Add(SetupItemState.Done,
-                  "ARC sealing is on and at least one active domain has a DKIM selector and key to seal with. "
-                  + "The DNS side is covered by the DKIM item above - the seal verifies against the same TXT record.");
+                  L("ARC sealing is on and at least one active domain has a DKIM selector and key to seal with. The DNS side is covered by the DKIM item above - the seal verifies against the same TXT record."));
             }
             else
             {
                item.Add(SetupItemState.ActionNeeded,
-                  "ARC sealing is on (ArcSealingEnabled=1) but no active domain has DKIM signing with a selector and key file configured, "
-                  + "so forwarded mail is silently not sealed at all.");
+                  L("ARC sealing is on (ArcSealingEnabled=1) but no active domain has DKIM signing with a selector and key file configured, so forwarded mail is silently not sealed at all."));
             }
          }
 
@@ -902,18 +857,15 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "MTA-STS policy hosting - HTTPS listener plus two DNS entries per domain",
-            Purpose = "Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS.",
-            Action = "Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers "
-                     + "mta-sts.<domain>, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.<domain> pointing at this server "
-                     + "and a TXT record at _mta-sts.<domain> (v=STSv1; id=...). This page checks the TXT record; the address record and the "
-                     + "certificate's name coverage cannot be checked from here.",
+            Title = L("MTA-STS policy hosting - HTTPS listener plus two DNS entries per domain"),
+            Purpose = L("Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS."),
+            Action = L("Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.<domain>, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.<domain> pointing at this server and a TXT record at _mta-sts.<domain> (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here."),
             Page = "webservices"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "The MTA-STS hosting settings could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("The MTA-STS hosting settings could not be read: {0}", iniExcuse));
             item.AggregateFromFindings();
             return item;
          }
@@ -927,25 +879,23 @@ namespace hMailServer.ControlPanel.Services
 
          if (!hosting)
          {
-            item.Add(SetupItemState.NotNeeded, "MTA-STS hosting is off (MtaStsHostingEnabled=0), so nothing needs serving and no record should be published.");
+            item.Add(SetupItemState.NotNeeded, L("MTA-STS hosting is off (MtaStsHostingEnabled=0), so nothing needs serving and no record should be published."));
          }
          else if (httpsPort <= 0)
          {
             item.Add(SetupItemState.ActionNeeded,
-               "MTA-STS hosting is enabled (MtaStsHostingEnabled=1, the shipped default) but WebServicesHttpsPort is 0, so the policy cannot be served at all - "
-               + "RFC 8461 only allows it over HTTPS. Set WebServicesHttpsPort if you want MTA-STS; if you do not, this row is safe to ignore, or set MtaStsHostingEnabled=0 to silence it.");
+               L("MTA-STS hosting is enabled (MtaStsHostingEnabled=1, the shipped default) but WebServicesHttpsPort is 0, so the policy cannot be served at all - RFC 8461 only allows it over HTTPS. Set WebServicesHttpsPort if you want MTA-STS; if you do not, this row is safe to ignore, or set MtaStsHostingEnabled=0 to silence it."));
          }
          else if (certFile.Length == 0 && !acme)
          {
             // Verified: with no certificate configured and ACME off, the HTTPS
             // listener logs "No TLS certificate available yet" and stays down.
             item.Add(SetupItemState.ActionNeeded,
-               "WebServicesHttpsPort is set, but no certificate is configured (WebServicesCertificateFile is empty and ACME is off), "
-               + "so the HTTPS listener does not start and the policy still cannot be fetched. Set WebServicesCertificateFile/WebServicesPrivateKeyFile or enable ACME.");
+               L("WebServicesHttpsPort is set, but no certificate is configured (WebServicesCertificateFile is empty and ACME is off), so the HTTPS listener does not start and the policy still cannot be fetched. Set WebServicesCertificateFile/WebServicesPrivateKeyFile or enable ACME."));
          }
          else
          {
-            item.Add(SetupItemState.Done, "The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists.");
+            item.Add(SetupItemState.Done, L("The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists."));
 
             foreach (DomainDkim domain in domains.Where(d => d.Active))
             {
@@ -954,7 +904,7 @@ namespace hMailServer.ControlPanel.Services
                var finding = new SetupFinding
                {
                   State = SetupItemState.CannotTell,
-                  Text = domain.Name + ": checking DNS for the " + host + " TXT record…"
+                  Text = F("{0}: checking DNS for the {1} TXT record…", domain.Name, host)
                };
                item.Findings.Add(finding);
 
@@ -985,16 +935,15 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "TLS reporting (TLS-RPT) - set a sender address to start sending",
-            Purpose = "Mails daily TLS-failure reports to domains that ask for them, so their operators learn when connections to them are being downgraded.",
-            Action = "Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. "
-                     + "Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent.",
+            Title = L("TLS reporting (TLS-RPT) - set a sender address to start sending"),
+            Purpose = L("Mails daily TLS-failure reports to domains that ask for them, so their operators learn when connections to them are being downgraded."),
+            Action = L("Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent."),
             Page = "security"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "TlsRptFromAddress could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("TlsRptFromAddress could not be read: {0}", iniExcuse));
          }
          else
          {
@@ -1002,13 +951,12 @@ namespace hMailServer.ControlPanel.Services
             if (from.Length > 0)
             {
                item.Add(SetupItemState.Done,
-                  "TlsRptFromAddress is set to " + from + ", so completed days of statistics are mailed to domains that request reports. Nothing external remains.");
+                  F("TlsRptFromAddress is set to {0}, so completed days of statistics are mailed to domains that request reports. Nothing external remains.", from));
             }
             else
             {
                item.Add(SetupItemState.ActionNeeded,
-                  "TlsRptFromAddress is empty (the default), so the server collects TLS statistics hourly and discards every completed day unsent. "
-                  + "Set an address if you want reports to go out; ignore this row if you deliberately do not.");
+                  L("TlsRptFromAddress is empty (the default), so the server collects TLS statistics hourly and discards every completed day unsent. Set an address if you want reports to go out; ignore this row if you deliberately do not."));
             }
          }
 
@@ -1028,16 +976,14 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "DANE for inbound mail - publish TLSA records for your MX hosts",
-            Purpose = "Lets sending servers pin your certificate through DNSSEC, so nobody can strip or spoof TLS on mail coming to you.",
-            Action = "In a DNSSEC-signed zone, publish a TLSA record (usually usage 3, selector 1, matching type 1 - '3 1 1' with the SHA-256 of your certificate's public key) "
-                     + "at _25._tcp.<mx-host> for each MX host. Verify with: nslookup -type=TLSA _25._tcp.<mx-host>. "
-                     + "hMailServer cannot publish DNS records or sign your zone, and this panel has no TLSA lookup to check them with.",
+            Title = L("DANE for inbound mail - publish TLSA records for your MX hosts"),
+            Purpose = L("Lets sending servers pin your certificate through DNSSEC, so nobody can strip or spoof TLS on mail coming to you."),
+            Action = L("In a DNSSEC-signed zone, publish a TLSA record (usually usage 3, selector 1, matching type 1 - '3 1 1' with the SHA-256 of your certificate's public key) at _25._tcp.<mx-host> for each MX host. Verify with: nslookup -type=TLSA _25._tcp.<mx-host>. hMailServer cannot publish DNS records or sign your zone, and this panel has no TLSA lookup to check them with."),
             Page = "security"
          };
 
          item.Add(SetupItemState.CannotTell,
-            "Whether TLSA records exist, and whether your zone is DNSSEC-signed, can only be seen in DNS. If you have never set up DNSSEC for the zone, no TLSA record will validate.");
+            L("Whether TLSA records exist, and whether your zone is DNSSEC-signed, can only be seen in DNS. If you have never set up DNSSEC for the zone, no TLSA record will validate."));
 
          if (iniReadable && ini.ReadBool("AcmeEnabled", false) && !ini.ReadBool("AcmeReuseKey", true))
          {
@@ -1045,8 +991,7 @@ namespace hMailServer.ControlPanel.Services
             // records survive renewals; with it off, every renewal generates a
             // new key and silently invalidates any published record.
             item.Add(SetupItemState.ActionNeeded,
-               "ACME is enabled with AcmeReuseKey=0, so every certificate renewal generates a new private key. "
-               + "If you publish '3 1 1' TLSA records they will break on the next renewal - set AcmeReuseKey=1 (the default), or update the TLSA record after every renewal.");
+               L("ACME is enabled with AcmeReuseKey=0, so every certificate renewal generates a new private key. If you publish '3 1 1' TLSA records they will break on the next renewal - set AcmeReuseKey=1 (the default), or update the TLSA record after every renewal."));
          }
 
          item.AggregateFromFindings();
@@ -1065,10 +1010,9 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "TLS private keys - a passphrase-protected key needs its passphrase configured",
-            Purpose = "Every listener with TLS loads a certificate and its private key at startup; an encrypted key without its passphrase does not load, and the listener never starts.",
-            Action = "For each certificate whose key file is an encrypted PEM, set the certificate's private key password on the SSL certificates page "
-                     + "(the passphrase was set by whoever created the key, so only you can supply it) - or replace the file with an unencrypted key.",
+            Title = L("TLS private keys - a passphrase-protected key needs its passphrase configured"),
+            Purpose = L("Every listener with TLS loads a certificate and its private key at startup; an encrypted key without its passphrase does not load, and the listener never starts."),
+            Action = L("For each certificate whose key file is an encrypted PEM, set the certificate's private key password on the SSL certificates page (the passphrase was set by whoever created the key, so only you can supply it) - or replace the file with an unencrypted key."),
             Page = "certs"
          };
 
@@ -1081,7 +1025,7 @@ namespace hMailServer.ControlPanel.Services
             int count = (int)certs.Count;
 
             if (count == 0)
-               item.Add(SetupItemState.NotNeeded, "No SSL certificates are configured, so there are no key files to check.");
+               item.Add(SetupItemState.NotNeeded, L("No SSL certificates are configured, so there are no key files to check."));
 
             for (int i = 0; i < count; i++)
             {
@@ -1090,25 +1034,25 @@ namespace hMailServer.ControlPanel.Services
                {
                   string name = ((string)cert.Name ?? "").Trim();
                   string keyFile = ((string)cert.PrivateKeyFile ?? "").Trim();
-                  string label = name.Length > 0 ? name : "certificate " + (i + 1);
+                  string label = name.Length > 0 ? name : F("certificate {0}", (i + 1));
 
                   if (keyFile.Length == 0)
                   {
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": no private key file is set, so this certificate cannot be used by any listener.");
+                        F("{0}: no private key file is set, so this certificate cannot be used by any listener.", label));
                      continue;
                   }
 
                   if (!local)
                   {
-                     item.Add(SetupItemState.CannotTell, label + ": the key file cannot be inspected because " + remoteExcuse);
+                     item.Add(SetupItemState.CannotTell, F("{0}: the key file cannot be inspected because {1}", label, remoteExcuse));
                      continue;
                   }
 
                   if (!File.Exists(keyFile))
                   {
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": the key file " + keyFile + " does not exist on this machine, so every port using this certificate will fail to start.");
+                        F("{0}: the key file {1} does not exist on this machine, so every port using this certificate will fail to start.", label, keyFile));
                      continue;
                   }
 
@@ -1121,13 +1065,13 @@ namespace hMailServer.ControlPanel.Services
                   {
                      // Readable by the service is what matters, but unreadable by
                      // this panel still means the state cannot be reported.
-                     item.Add(SetupItemState.CannotTell, label + ": the key file exists but could not be read from this panel, so whether it is encrypted is unknown.");
+                     item.Add(SetupItemState.CannotTell, F("{0}: the key file exists but could not be read from this panel, so whether it is encrypted is unknown.", label));
                      continue;
                   }
 
                   if (!encrypted)
                   {
-                     item.Add(SetupItemState.Done, label + ": the key file is not encrypted, so no passphrase is needed.");
+                     item.Add(SetupItemState.Done, F("{0}: the key file is not encrypted, so no passphrase is needed.", label));
                      continue;
                   }
 
@@ -1148,13 +1092,13 @@ namespace hMailServer.ControlPanel.Services
 
                   if (!passwordKnown)
                      item.Add(SetupItemState.CannotTell,
-                        label + ": the key file is encrypted, but whether a passphrase is configured could not be read (this requires the server-administrator account).");
+                        F("{0}: the key file is encrypted, but whether a passphrase is configured could not be read (this requires the server-administrator account).", label));
                   else if (passwordSet)
                      item.Add(SetupItemState.Done,
-                        label + ": the key file is encrypted and a passphrase is configured. Whether it is the RIGHT passphrase is only proven when the server loads the key - check the error log for error 6170 after a restart.");
+                        F("{0}: the key file is encrypted and a passphrase is configured. Whether it is the RIGHT passphrase is only proven when the server loads the key - check the error log for error 6170 after a restart.", label));
                   else
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": the key file is an encrypted PEM but no passphrase is configured, so the key will not load (server error 6170) and every port using this certificate will not start. Set the private key password on the certificate.");
+                        F("{0}: the key file is an encrypted PEM but no passphrase is configured, so the key will not load (server error 6170) and every port using this certificate will not start. Set the private key password on the certificate.", label));
                }
                finally
                {
@@ -1166,7 +1110,7 @@ namespace hMailServer.ControlPanel.Services
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
-            item.Add(SetupItemState.CannotTell, "The SSL certificate list could not be read - " + firstError_);
+            item.Add(SetupItemState.CannotTell, F("The SSL certificate list could not be read - {0}", firstError_));
          }
          finally
          {
@@ -1190,24 +1134,22 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "ACME certificates - the CA must reach this server from the internet",
-            Purpose = "Issues and renews certificates automatically, but only if the certificate authority can fetch the http-01 challenge from this server.",
-            Action = "Publish a public A/AAAA record for every name listed in AcmeDomains, and allow inbound TCP on the challenge port "
-                     + "from the internet (port-forward through any NAT). Reachability from outside cannot be probed from inside, "
-                     + "so test it from an external network or an online port checker.",
+            Title = L("ACME certificates - the CA must reach this server from the internet"),
+            Purpose = L("Issues and renews certificates automatically, but only if the certificate authority can fetch the http-01 challenge from this server."),
+            Action = L("Publish a public A/AAAA record for every name listed in AcmeDomains, and allow inbound TCP on the challenge port from the internet (port-forward through any NAT). Reachability from outside cannot be probed from inside, so test it from an external network or an online port checker."),
             Page = "acme"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "The ACME settings could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("The ACME settings could not be read: {0}", iniExcuse));
             item.AggregateFromFindings();
             return item;
          }
 
          if (!ini.ReadBool("AcmeEnabled", false))
          {
-            item.Add(SetupItemState.NotNeeded, "ACME is off (AcmeEnabled=0, the default), so nothing external is required.");
+            item.Add(SetupItemState.NotNeeded, L("ACME is off (AcmeEnabled=0, the default), so nothing external is required."));
             item.AggregateFromFindings();
             return item;
          }
@@ -1221,16 +1163,14 @@ namespace hMailServer.ControlPanel.Services
          {
             // Verified: RequestCertificate logs and returns before contacting the CA.
             item.Add(SetupItemState.ActionNeeded,
-               "ACME is enabled but AcmeDomains is empty, so no certificate is ever requested - the client logs 'No domains configured' and stops. "
-               + "List the host names the certificate should cover (for example mail.yourdomain.com, mta-sts.yourdomain.com).");
+               L("ACME is enabled but AcmeDomains is empty, so no certificate is ever requested - the client logs 'No domains configured' and stops. List the host names the certificate should cover (for example mail.yourdomain.com, mta-sts.yourdomain.com)."));
          }
          else
          {
             foreach (string name in names)
             {
                item.Add(SetupItemState.CannotTell,
-                  name + ": the CA must be able to fetch http://" + name + "/.well-known/acme-challenge/... on port " + challengePort
-                  + " from the internet. Confirm the public DNS record points here and the port is open end to end.");
+                  F("{0}: the CA must be able to fetch http://{1}/.well-known/acme-challenge/... on port {2} from the internet. Confirm the public DNS record points here and the port is open end to end.", name, name, challengePort));
             }
          }
 
@@ -1251,10 +1191,9 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "Inbound client certificates - the port needs a CA bundle, the clients need certificates",
-            Purpose = "Requires (or requests) a TLS client certificate from anyone connecting to a port, so only holders of a certificate from your chosen CA get in.",
-            Action = "Produce or obtain a CA (for example with OpenSSL or your PKI), save its certificate(s) as a PEM bundle on the server, point the port's CA file at it, "
-                     + "and issue a client certificate from that CA to every client that must connect. hMailServer verifies against the bundle but cannot create the CA or the client certificates.",
+            Title = L("Inbound client certificates - the port needs a CA bundle, the clients need certificates"),
+            Purpose = L("Requires (or requests) a TLS client certificate from anyone connecting to a port, so only holders of a certificate from your chosen CA get in."),
+            Action = L("Produce or obtain a CA (for example with OpenSSL or your PKI), save its certificate(s) as a PEM bundle on the server, point the port's CA file at it, and issue a client certificate from that CA to every client that must connect. hMailServer verifies against the bundle but cannot create the CA or the client certificates."),
             Page = "ports"
          };
 
@@ -1289,31 +1228,27 @@ namespace hMailServer.ControlPanel.Services
                      // the policy can never run; for Require the listener is not
                      // even started (error 6142).
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": the port has a client certificate policy but no SSL/TLS or STARTTLS, so no handshake ever happens"
-                        + (policy == 2 ? " and the listener is not started (server error 6142)." : " and the policy verifies nothing.")
-                        + " Enable connection security on the port, or set the policy to off.");
+                        F("{0}: the port has a client certificate policy but no SSL/TLS or STARTTLS, so no handshake ever happens{1} Enable connection security on the port, or set the policy to off.", label, (policy == 2 ? L(" and the listener is not started (server error 6142).") : L(" and the policy verifies nothing."))));
                      continue;
                   }
 
                   if (caFile.Length == 0)
                   {
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": no CA file is set, so there is no trust anchor to verify client certificates against"
-                        + (policy == 2 ? " and the listener will not start (server error 6140)." : "."));
+                        F("{0}: no CA file is set, so there is no trust anchor to verify client certificates against{1}", label, (policy == 2 ? L(" and the listener will not start (server error 6140).") : ".")));
                      continue;
                   }
 
                   if (!local)
                   {
-                     item.Add(SetupItemState.CannotTell, label + ": the CA file " + caFile + " cannot be inspected because " + remoteExcuse);
+                     item.Add(SetupItemState.CannotTell, F("{0}: the CA file {1} cannot be inspected because {2}", label, caFile, remoteExcuse));
                      continue;
                   }
 
                   if (!File.Exists(caFile))
                   {
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": the CA file " + caFile + " does not exist on this machine"
-                        + (policy == 2 ? ", so the listener will not start (server error 6140)." : ", so verification can never succeed."));
+                        F("{0}: the CA file {1} does not exist on this machine{2}", label, caFile, (policy == 2 ? L(", so the listener will not start (server error 6140).") : L(", so verification can never succeed."))));
                      continue;
                   }
 
@@ -1326,20 +1261,19 @@ namespace hMailServer.ControlPanel.Services
                   }
                   catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
                   {
-                     item.Add(SetupItemState.CannotTell, label + ": the CA file exists but could not be read from this panel.");
+                     item.Add(SetupItemState.CannotTell, F("{0}: the CA file exists but could not be read from this panel.", label));
                      continue;
                   }
 
                   if (!looksLikePem)
                   {
                      item.Add(SetupItemState.ActionNeeded,
-                        label + ": " + caFile + " contains no PEM certificate block, so it holds no usable CA certificate (server error 6140). "
-                        + "Export the CA certificate in PEM (Base64) format.");
+                        F("{0}: {1} contains no PEM certificate block, so it holds no usable CA certificate (server error 6140). Export the CA certificate in PEM (Base64) format.", label, caFile));
                   }
                   else
                   {
                      item.Add(SetupItemState.Done,
-                        label + ": the CA bundle exists and contains a PEM certificate. What remains is outside the server: issue certificates from that CA to the connecting clients.");
+                        F("{0}: the CA bundle exists and contains a PEM certificate. What remains is outside the server: issue certificates from that CA to the connecting clients.", label));
                   }
                }
                finally
@@ -1349,13 +1283,13 @@ namespace hMailServer.ControlPanel.Services
             }
 
             if (withPolicy == 0)
-               item.Add(SetupItemState.NotNeeded, "No port has a client certificate policy, so no CA bundle or client certificates are required.");
+               item.Add(SetupItemState.NotNeeded, L("No port has a client certificate policy, so no CA bundle or client certificates are required."));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
             failedReads_++;
             firstError_ ??= ServerSession.DescribeComError(ex);
-            item.Add(SetupItemState.CannotTell, "The TCP/IP port list could not be read - " + firstError_);
+            item.Add(SetupItemState.CannotTell, F("The TCP/IP port list could not be read - {0}", firstError_));
          }
          finally
          {
@@ -1380,24 +1314,22 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "OAuth2 / XOAUTH2 - the identity provider's key material must be installed",
-            Purpose = "Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install.",
-            Action = "Register this server as an application with the identity provider, download the provider's public signing key as a PEM file, "
-                     + "and point OAuth2PublicKeyFile in hMailServer.ini at it (or set OAuth2HmacSecret for HS256). "
-                     + "Set OAuth2Issuer and OAuth2Audience to the values the provider puts in its tokens, or validation will reject them.",
+            Title = L("OAuth2 / XOAUTH2 - the identity provider's key material must be installed"),
+            Purpose = L("Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install."),
+            Action = L("Register this server as an application with the identity provider, download the provider's public signing key as a PEM file, and point OAuth2PublicKeyFile in hMailServer.ini at it (or set OAuth2HmacSecret for HS256). Set OAuth2Issuer and OAuth2Audience to the values the provider puts in its tokens, or validation will reject them."),
             Page = "authentication"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "The OAuth2 settings could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("The OAuth2 settings could not be read: {0}", iniExcuse));
             item.AggregateFromFindings();
             return item;
          }
 
          if (!ini.ReadBool("OAuth2Enabled", false))
          {
-            item.Add(SetupItemState.NotNeeded, "OAuth2 is off (OAuth2Enabled=0, the default), so no identity provider or key material is required.");
+            item.Add(SetupItemState.NotNeeded, L("OAuth2 is off (OAuth2Enabled=0, the default), so no identity provider or key material is required."));
             item.AggregateFromFindings();
             return item;
          }
@@ -1418,14 +1350,13 @@ namespace hMailServer.ControlPanel.Services
             {
                anythingWrong = true;
                item.Add(SetupItemState.ActionNeeded,
-                  "OAuth2 is enabled and allows RS256, but OAuth2PublicKeyFile is empty - every RS256 token fails signature verification, so no client can log on with a token. "
-                  + "Install the identity provider's public key as a PEM file and point OAuth2PublicKeyFile at it.");
+                  L("OAuth2 is enabled and allows RS256, but OAuth2PublicKeyFile is empty - every RS256 token fails signature verification, so no client can log on with a token. Install the identity provider's public key as a PEM file and point OAuth2PublicKeyFile at it."));
             }
             else if (local && !File.Exists(publicKeyFile))
             {
                anythingWrong = true;
                item.Add(SetupItemState.ActionNeeded,
-                  "OAuth2PublicKeyFile points at " + publicKeyFile + ", which does not exist on this machine, so RS256 tokens cannot be verified.");
+                  F("OAuth2PublicKeyFile points at {0}, which does not exist on this machine, so RS256 tokens cannot be verified.", publicKeyFile));
             }
          }
 
@@ -1433,7 +1364,7 @@ namespace hMailServer.ControlPanel.Services
          {
             anythingWrong = true;
             item.Add(SetupItemState.ActionNeeded,
-               "HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list.");
+               L("HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list."));
          }
 
          // Blank is not "will be checked and might mismatch" - it is "not checked".
@@ -1450,23 +1381,18 @@ namespace hMailServer.ControlPanel.Services
             anythingWrong = true;
 
             string unchecked_ = noIssuer && noAudience
-               ? "Neither OAuth2Issuer nor OAuth2Audience is set, so neither is checked"
-               : noIssuer ? "OAuth2Issuer is not set, so the issuer is not checked"
-                          : "OAuth2Audience is not set, so the audience is not checked";
+               ? L("Neither OAuth2Issuer nor OAuth2Audience is set, so neither is checked")
+               : noIssuer ? L("OAuth2Issuer is not set, so the issuer is not checked")
+                          : L("OAuth2Audience is not set, so the audience is not checked");
 
             item.Add(SetupItemState.ActionNeeded,
-               unchecked_ + ". Any token the identity provider signs with this key is then accepted, including one "
-               + "it issued to a different application - which is enough to log in as whichever mailbox that token "
-               + "names. Set both to the exact values the provider puts in its tokens. The values come from the "
-               + "provider, which is why they are on this list.");
+               F("{0}. Any token the identity provider signs with this key is then accepted, including one it issued to a different application - which is enough to log in as whichever mailbox that token names. Set both to the exact values the provider puts in its tokens. The values come from the provider, which is why they are on this list.", unchecked_));
          }
 
          if (!anythingWrong)
          {
             item.Add(SetupItemState.Done,
-               "OAuth2 is enabled, the key material its allowed algorithms need is in place, and both the issuer "
-               + "and the audience are checked - so a token has to have been minted by your provider for this "
-               + "server specifically.");
+               L("OAuth2 is enabled, the key material its allowed algorithms need is in place, and both the issuer and the audience are checked - so a token has to have been minted by your provider for this server specifically."));
          }
 
          item.AggregateFromFindings();
@@ -1485,33 +1411,29 @@ namespace hMailServer.ControlPanel.Services
       {
          var item = new SetupItem
          {
-            Title = "Client autoconfiguration - a listener plus the DNS names clients probe",
-            Purpose = "Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs.",
-            Action = "Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.<domain> and "
-                     + "autodiscover.<domain> DNS records for each mail domain, pointing at this server. These are address records, and this page "
-                     + "checks TXT records only, so they cannot be confirmed from here.",
+            Title = L("Client autoconfiguration - a listener plus the DNS names clients probe"),
+            Purpose = L("Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs."),
+            Action = L("Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.<domain> and autodiscover.<domain> DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here."),
             Page = "webservices"
          };
 
          if (!iniReadable)
          {
-            item.Add(SetupItemState.CannotTell, "The web services settings could not be read: " + iniExcuse);
+            item.Add(SetupItemState.CannotTell, F("The web services settings could not be read: {0}", iniExcuse));
          }
          else if (!ini.ReadBool("AutoconfigEnabled", true))
          {
-            item.Add(SetupItemState.NotNeeded, "Autoconfiguration is off (AutoconfigEnabled=0), so no listener or DNS names are required.");
+            item.Add(SetupItemState.NotNeeded, L("Autoconfiguration is off (AutoconfigEnabled=0), so no listener or DNS names are required."));
          }
          else if (ReadIniInt(ini, "WebServicesHttpPort", 0) <= 0 && ReadIniInt(ini, "WebServicesHttpsPort", 0) <= 0)
          {
             item.Add(SetupItemState.ActionNeeded,
-               "Autoconfiguration is enabled (AutoconfigEnabled=1, the shipped default) but both WebServicesHttpPort and WebServicesHttpsPort are 0, "
-               + "so nothing answers the configuration URLs. Set a port if you want clients to self-configure; if you do not, this row is safe to ignore, or set AutoconfigEnabled=0 to silence it.");
+               L("Autoconfiguration is enabled (AutoconfigEnabled=1, the shipped default) but both WebServicesHttpPort and WebServicesHttpsPort are 0, so nothing answers the configuration URLs. Set a port if you want clients to self-configure; if you do not, this row is safe to ignore, or set AutoconfigEnabled=0 to silence it."));
          }
          else
          {
             item.Add(SetupItemState.CannotTell,
-               "The listener is configured. What remains is outside the server: publish autoconfig.<domain> and autodiscover.<domain> records for each mail domain, "
-               + "then test from a client machine.");
+               L("The listener is configured. What remains is outside the server: publish autoconfig.<domain> and autodiscover.<domain> records for each mail domain, then test from a client machine."));
          }
 
          item.AggregateFromFindings();
@@ -1530,7 +1452,7 @@ namespace hMailServer.ControlPanel.Services
             case ServerSession.SessionSmtp: return "SMTP";
             case ServerSession.SessionPop3: return "POP3";
             case ServerSession.SessionImap: return "IMAP";
-            default: return "Port";
+            default: return L("Port");
          }
       }
    }

@@ -7,6 +7,7 @@ using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -183,10 +184,10 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>The word shown beside the badge. Always present, never colour alone.</summary>
       public static string WordFor(ListenerState state) => state switch
       {
-         ListenerState.Listening => "Listening",
-         ListenerState.NotListening => "Not listening",
-         ListenerState.ProtocolDisabled => "Server off",
-         _ => "Unknown"
+         ListenerState.Listening => L("Listening"),
+         ListenerState.NotListening => L("Not listening"),
+         ListenerState.ProtocolDisabled => L("Server off"),
+         _ => L("Unknown")
       };
 
       public static StatusLevel LevelFor(ListenerState state) => state switch
@@ -204,9 +205,7 @@ namespace hMailServer.ControlPanel.Services
       public static string ExplainFor(ListenerState state, string protocol) => state switch
       {
          ListenerState.Listening =>
-            "Something on this machine is listening on that address and port. This check reads the operating "
-            + "system's list of open ports, so it cannot tell hMailServer's listener from another program's - if "
-            + "connections are being refused or answered by the wrong service, that is what to look for.",
+            L("Something on this machine is listening on that address and port. This check reads the operating system's list of open ports, so it cannot tell hMailServer's listener from another program's - if connections are being refused or answered by the wrong service, that is what to look for."),
 
          // The first cause listed used to be a port conflict, and the sentence sent
          // the reader to an error-log entry. Both were wrong for the commonest case
@@ -217,22 +216,13 @@ namespace hMailServer.ControlPanel.Services
          // an administrator creates here appeared at once as a yellow row blaming a
          // conflict that does not exist.
          ListenerState.NotListening =>
-            "The " + protocol + " server is switched on but nothing is listening here, so every connection to this "
-            + "port is refused. If you have just added or changed this port, that is the reason: the server reads "
-            + "its port list once when it starts, so a new row does nothing until the service is restarted. "
-            + "Otherwise the causes are another program already holding the port, an address that does not exist on "
-            + "this machine, or - on a TLS port - a certificate the server could not load; the server records which, "
-            + "once, in the error log at start-up.",
+            F("The {0} server is switched on but nothing is listening here, so every connection to this port is refused. If you have just added or changed this port, that is the reason: the server reads its port list once when it starts, so a new row does nothing until the service is restarted. Otherwise the causes are another program already holding the port, an address that does not exist on this machine, or - on a TLS port - a certificate the server could not load; the server records which, once, in the error log at start-up.", protocol),
 
          ListenerState.ProtocolDisabled =>
-            "The " + protocol + " server is switched off on the Protocols page, so this port is not listened on. "
-            + "The row is kept. Switching the protocol back on does not start the listener on its own - the port "
-            + "list and the enabled protocols are both read once, when the service starts - so restart the service "
-            + "after enabling it.",
+            F("The {0} server is switched off on the Protocols page, so this port is not listened on. The row is kept. Switching the protocol back on does not start the listener on its own - the port list and the enabled protocols are both read once, when the service starts - so restart the service after enabling it.", protocol),
 
          _ =>
-            "Whether this port is being listened on could not be determined from here. Open the Control Panel on "
-            + "the server itself to see it."
+            L("Whether this port is being listened on could not be determined from here. Open the Control Panel on the server itself to see it.")
       };
    }
 }

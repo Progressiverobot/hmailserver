@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -64,7 +65,7 @@ namespace hMailServer.ControlPanel.Services
 
       /// <summary>"On", "Off" or "On, but cannot run" - the word a reader gets when the colour is not available.</summary>
       public string StateText =>
-         !Enabled ? "Off" : Usable ? "On" : "On, but cannot run";
+         !Enabled ? L("Off") : Usable ? L("On") : L("On, but cannot run");
    }
 
    /// <summary>
@@ -193,15 +194,15 @@ namespace hMailServer.ControlPanel.Services
          //    the database folder to the executable on the command line.
          bool clamWinUsable = !IsBlank(config.ClamWinExecutable) && !IsBlank(config.ClamWinDatabaseFolder);
          scanners.Add(new VirusScannerEntry(
-            "clamwin", 1, "ClamWin (local executable)",
+            "clamwin", 1, L("ClamWin (local executable)"),
             config.ClamWinEnabled,
             config.ClamWinEnabled && clamWinUsable,
-            IsBlank(config.ClamWinExecutable) ? "No executable set" : config.ClamWinExecutable,
+            IsBlank(config.ClamWinExecutable) ? L("No executable set") : config.ClamWinExecutable,
             !config.ClamWinEnabled ? null
                : IsBlank(config.ClamWinExecutable) && IsBlank(config.ClamWinDatabaseFolder)
-                  ? "Neither the executable nor the signature database folder is set."
-                  : IsBlank(config.ClamWinExecutable) ? "No executable path is set."
-                  : IsBlank(config.ClamWinDatabaseFolder) ? "No signature database folder is set."
+                  ? L("Neither the executable nor the signature database folder is set.")
+                  : IsBlank(config.ClamWinExecutable) ? L("No executable path is set.")
+                  : IsBlank(config.ClamWinDatabaseFolder) ? L("No signature database folder is set.")
                   : null,
             "antivirus"));
 
@@ -209,14 +210,14 @@ namespace hMailServer.ControlPanel.Services
          //    that means "infected" is a number and 0 is a legitimate choice, so it
          //    is never treated as missing.
          scanners.Add(new VirusScannerEntry(
-            "custom", 2, "Custom scanner (external program)",
+            "custom", 2, L("Custom scanner (external program)"),
             config.CustomScannerEnabled,
             config.CustomScannerEnabled && !IsBlank(config.CustomScannerExecutable),
             IsBlank(config.CustomScannerExecutable)
-               ? "No executable set"
-               : config.CustomScannerExecutable + " — exit code " + config.CustomScannerVirusReturnValue + " means infected",
+               ? L("No executable set")
+               : F("{0} — exit code {1} means infected", config.CustomScannerExecutable, config.CustomScannerVirusReturnValue),
             config.CustomScannerEnabled && IsBlank(config.CustomScannerExecutable)
-               ? "No executable path is set."
+               ? L("No executable path is set.")
                : null,
             "antivirus"));
 
@@ -224,16 +225,16 @@ namespace hMailServer.ControlPanel.Services
          //    default, it is an address nothing listens on.
          bool clamAvUsable = !IsBlank(config.ClamAvHost) && config.ClamAvPort > 0 && config.ClamAvPort <= 65535;
          scanners.Add(new VirusScannerEntry(
-            "clamav", 3, "ClamAV (clamd, over TCP)",
+            "clamav", 3, L("ClamAV (clamd, over TCP)"),
             config.ClamAvEnabled,
             config.ClamAvEnabled && clamAvUsable,
             IsBlank(config.ClamAvHost)
-               ? "No host set"
+               ? L("No host set")
                : config.ClamAvHost + ":" + config.ClamAvPort,
             !config.ClamAvEnabled ? null
-               : IsBlank(config.ClamAvHost) ? "No host name or address is set."
-               : config.ClamAvPort <= 0 ? "The port is 0, which nothing can listen on."
-               : config.ClamAvPort > 65535 ? "The port is outside the range 1-65535."
+               : IsBlank(config.ClamAvHost) ? L("No host name or address is set.")
+               : config.ClamAvPort <= 0 ? L("The port is 0, which nothing can listen on.")
+               : config.ClamAvPort > 65535 ? L("The port is outside the range 1-65535.")
                : null,
             "antivirus"));
 
@@ -247,29 +248,26 @@ namespace hMailServer.ControlPanel.Services
       public static string Verdict(VirusPipelineConfig config)
       {
          if (config == null)
-            return "The anti-virus configuration could not be read.";
+            return L("The anti-virus configuration could not be read.");
 
          int usable = CountUsable(config);
 
          if (usable == 0)
          {
             return config.AttachmentBlockingEnabled && config.BlockedAttachmentPatterns > 0
-               ? "No message is scanned for viruses. Attachment blocking is still stripping "
-                 + Count(config.BlockedAttachmentPatterns, "file-name pattern", "file-name patterns")
-                 + ", but nothing examines the contents of a message."
-               : "No message is scanned for viruses, and no attachment is blocked. Everything is delivered as it arrives.";
+               ? F("No message is scanned for viruses. Attachment blocking is still stripping {0}, but nothing examines the contents of a message.", Count(config.BlockedAttachmentPatterns, L("file-name pattern"), L("file-name patterns")))
+               : L("No message is scanned for viruses, and no attachment is blocked. Everything is delivered as it arrives.");
          }
 
          string found = config.Action == VirusAction.DeleteMessage
-            ? "the whole message is deleted and never delivered"
-            : "the attachments are stripped and the message is still delivered";
+            ? L("the whole message is deleted and never delivered")
+            : L("the attachments are stripped and the message is still delivered");
 
          string scanned = config.MaxScanKilobytes > 0
-            ? "Messages up to " + Kilobytes(config.MaxScanKilobytes) + " are scanned by "
-              + Count(usable, "scanner", "scanners") + "; anything larger is delivered without being scanned at all"
-            : "Every message is scanned by " + Count(usable, "scanner", "scanners");
+            ? F("Messages up to {0} are scanned by {1}; anything larger is delivered without being scanned at all", Kilobytes(config.MaxScanKilobytes), Count(usable, L("scanner"), L("scanners")))
+            : F("Every message is scanned by {0}", Count(usable, L("scanner"), L("scanners")));
 
-         return scanned + ". If a virus is found, " + found + ".";
+         return F("{0}. If a virus is found, {1}.", scanned, found);
       }
 
       /// <summary>
@@ -285,20 +283,19 @@ namespace hMailServer.ControlPanel.Services
          {
             // Deliberately says what does NOT happen: this action is the one people
             // choose expecting the notifications below it to apply, and they do not.
-            return "The attachments are replaced and the message is delivered. Neither notification setting applies to this "
-                   + "action — the server only sends the \"message deleted\" notice when the action is to delete the message.";
+            return L("The attachments are replaced and the message is delivered. Neither notification setting applies to this action — the server only sends the \"message deleted\" notice when the action is to delete the message.");
          }
 
          if (!config.NotifySender && !config.NotifyRecipient)
-            return "The message is deleted and nobody is told. The deletion is recorded in the application log.";
+            return L("The message is deleted and nobody is told. The deletion is recorded in the application log.");
 
          var told = new List<string>();
          if (config.NotifyRecipient)
-            told.Add("every recipient");
+            told.Add(L("every recipient"));
          if (config.NotifySender)
-            told.Add("the envelope sender");
+            told.Add(L("the envelope sender"));
 
-         return "The message is deleted and a notice is sent to " + string.Join(" and ", told) + ".";
+         return F("The message is deleted and a notice is sent to {0}.", string.Join(" and ", told));
       }
 
       /// <summary>
@@ -320,22 +317,18 @@ namespace hMailServer.ControlPanel.Services
          foreach (VirusScannerEntry scanner in scanners.Where(s => s.Enabled && !s.Usable))
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Critical,
-               scanner.Name + " is switched on but cannot run. " + scanner.Problem
-               + " Every scan it is asked for fails, and a failed scan is not a failed message: the error is "
-               + "logged and the message is delivered as though it had been examined and found clean."));
+               F("{0} is switched on but cannot run. {1} Every scan it is asked for fails, and a failed scan is not a failed message: the error is logged and the message is delivered as though it had been examined and found clean.", scanner.Name, scanner.Problem)));
          }
 
          if (usable == 0 && !config.AttachmentBlockingEnabled)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Critical,
-               "Nothing examines incoming mail. No scanner can run and attachment blocking is off, so an infected "
-               + "message is delivered to the mailbox exactly as it arrived."));
+               L("Nothing examines incoming mail. No scanner can run and attachment blocking is off, so an infected message is delivered to the mailbox exactly as it arrived.")));
          }
          else if (usable == 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Critical,
-               "No virus scanner can run. Attachment blocking still strips the file-name patterns on its own page, "
-               + "but nothing looks inside a message or inside an archive."));
+               L("No virus scanner can run. Attachment blocking still strips the file-name patterns on its own page, but nothing looks inside a message or inside an archive.")));
          }
 
          // ---- works, but leaves a gap -----------------------------------------
@@ -343,44 +336,31 @@ namespace hMailServer.ControlPanel.Services
          if (usable > 0 && config.MaxScanKilobytes > 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Warning,
-               "Messages larger than " + Kilobytes(config.MaxScanKilobytes) + " are not scanned. They are delivered, "
-               + "not refused, and nothing is written to the log when it happens — so this limit is invisible in "
-               + "normal operation. 0 means \"no limit\" and is the setting that closes the gap."));
+               F("Messages larger than {0} are not scanned. They are delivered, not refused, and nothing is written to the log when it happens — so this limit is invisible in normal operation. 0 means \"no limit\" and is the setting that closes the gap.", Kilobytes(config.MaxScanKilobytes))));
          }
 
          if (usable > 0 && config.Action == VirusAction.StripAttachments)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Warning,
-               "Infected messages are delivered with their attachments stripped rather than deleted. The recipient "
-               + "still receives the message body, which for most malicious mail is the part carrying the "
-               + "instructions telling them what to do next."));
+               L("Infected messages are delivered with their attachments stripped rather than deleted. The recipient still receives the message body, which for most malicious mail is the part carrying the instructions telling them what to do next.")));
          }
 
          if (usable > 0 && config.Action == VirusAction.DeleteMessage && config.NotifySender)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Warning,
-               "A notice is sent to the envelope sender of every infected message. Virus senders forge that address "
-               + "almost without exception, so this mostly delivers mail to people who did not send anything — which "
-               + "is backscatter, and it is what gets a server onto a block list."));
+               L("A notice is sent to the envelope sender of every infected message. Virus senders forge that address almost without exception, so this mostly delivers mail to people who did not send anything — which is backscatter, and it is what gets a server onto a block list.")));
          }
 
          if (config.AttachmentBlockingEnabled && config.BlockedAttachmentPatterns == 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Warning,
-               "Attachment blocking is switched on with no patterns to block, so it does nothing at all."));
+               L("Attachment blocking is switched on with no patterns to block, so it does nothing at all.")));
          }
 
          if (config.FetchAccountsWithScanningOff > 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Warning,
-               (config.FetchAccountScanIncomplete ? "At least " : "")
-               + Count(config.FetchAccountsWithScanningOff, "external POP3 fetch account has", "external POP3 fetch accounts have")
-               + " anti-virus turned off, so mail collected by "
-               + (config.FetchAccountsWithScanningOff == 1 ? "it is" : "them is")
-               + " delivered unscanned no matter what is set here. The switch is on the fetch account, not on this page."
-               + (config.FetchAccountScanIncomplete
-                  ? " There are more accounts on this server than this page walks, so there may be others."
-                  : "")));
+               F("{0}{1} anti-virus turned off, so mail collected by {2} delivered unscanned no matter what is set here. The switch is on the fetch account, not on this page.{3}", (config.FetchAccountScanIncomplete ? L("At least ") : ""), Count(config.FetchAccountsWithScanningOff, L("external POP3 fetch account has"), L("external POP3 fetch accounts have")), (config.FetchAccountsWithScanningOff == 1 ? L("it is") : L("them is")), (config.FetchAccountScanIncomplete ? L(" There are more accounts on this server than this page walks, so there may be others.") : ""))));
          }
 
          // ---- worth knowing ----------------------------------------------------
@@ -388,31 +368,25 @@ namespace hMailServer.ControlPanel.Services
          if (!config.AttachmentBlockingEnabled && config.BlockedAttachmentPatterns > 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Information,
-               Count(config.BlockedAttachmentPatterns, "blocked-attachment pattern is", "blocked-attachment patterns are")
-               + " configured but attachment blocking is switched off, so none of them is applied."));
+               F("{0} configured but attachment blocking is switched off, so none of them is applied.", Count(config.BlockedAttachmentPatterns, L("blocked-attachment pattern is"), L("blocked-attachment patterns are")))));
          }
 
          if (usable > 1)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Information,
-               "Every message goes through " + Count(usable, "scanner", "scanners") + " in turn, and each is asked "
-               + "about the whole message and then about each attachment separately. That is thorough and it is not "
-               + "free: the scan happens while the sender is waiting for its \"250 OK\"."));
+               F("Every message goes through {0} in turn, and each is asked about the whole message and then about each attachment separately. That is thorough and it is not free: the scan happens while the sender is waiting for its \"250 OK\".", Count(usable, L("scanner"), L("scanners")))));
          }
 
          if (config.ClamWinEnabled && config.ClamAvEnabled)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Information,
-               "ClamWin and ClamAV both use the same signature database. Running both scans every message twice "
-               + "against the same definitions."));
+               L("ClamWin and ClamAV both use the same signature database. Running both scans every message twice against the same definitions.")));
          }
 
          if (usable > 0)
          {
             notes.Add(new VirusPipelineNote(StatusLevel.Information,
-               "At most " + MaxConcurrentScans + " scans run at once. Beyond that, delivery threads wait — and after "
-               + "60 seconds of waiting the server gives up waiting and scans anyway, so a slow scanner shows up as "
-               + "slow mail rather than as unscanned mail."));
+               F("At most {0} scans run at once. Beyond that, delivery threads wait — and after 60 seconds of waiting the server gives up waiting and scans anyway, so a slow scanner shows up as slow mail rather than as unscanned mail.", MaxConcurrentScans)));
          }
 
          return notes;
@@ -440,9 +414,9 @@ namespace hMailServer.ControlPanel.Services
       public static string Kilobytes(int kilobytes)
       {
          if (kilobytes >= 1024)
-            return kilobytes.ToString("N0") + " KB (" + Math.Round(kilobytes / 1024.0, 1) + " MB)";
+            return F("{0} KB ({1} MB)", kilobytes.ToString("N0"), Math.Round(kilobytes / 1024.0, 1));
 
-         return kilobytes.ToString("N0") + " KB";
+         return F("{0} KB", kilobytes.ToString("N0"));
       }
    }
 }

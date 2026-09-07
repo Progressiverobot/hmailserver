@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -251,67 +252,64 @@ namespace hMailServer.ControlPanel.Services
             // The blacklist is registered first in SpamTestRunner::LoadSpamTests
             // on purpose: it is the cheapest test, and with the default score a
             // match ends the run before any DNS lookup happens.
-            new SpamCheck("blockedsenders", 1, "Blocked senders", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("blockedsenders", 1, L("Blocked senders"), SpamCheckPhase.BeforeTheBody,
                config.BlockedSenderCount > 0, null,
-               config.BlockedSenderCount > 0 ? "per entry" : "-",
+               config.BlockedSenderCount > 0 ? L("per entry") : "-",
                config.BlockedSenderCount > 0
-                  ? string.Format("Matches the envelope sender against {0} blocked address(es) and domain(s); the score comes from the entry that matched.", config.BlockedSenderCount)
-                  : "No blocked senders are defined, so nothing is matched. The list has no on/off switch - an empty list is the off state.",
+                  ? F("Matches the envelope sender against {0} blocked address(es) and domain(s); the score comes from the entry that matched.", config.BlockedSenderCount)
+                  : L("No blocked senders are defined, so nothing is matched. The list has no on/off switch - an empty list is the off state."),
                "blockedsenders"),
 
-            new SpamCheck("dnsbl", 2, "DNS blacklists (DNSBL)", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("dnsbl", 2, L("DNS blacklists (DNSBL)"), SpamCheckPhase.BeforeTheBody,
                config.ActiveDnsBlackLists > 0, null,
-               config.ActiveDnsBlackLists > 0 ? "per list entry" : "-",
-               DescribeList("Looks up the connecting address on each active blacklist; the score comes from the entry that matched",
+               config.ActiveDnsBlackLists > 0 ? L("per list entry") : "-",
+               DescribeList(L("Looks up the connecting address on each active blacklist; the score comes from the entry that matched"),
                   config.ActiveDnsBlackLists, config.TotalDnsBlackLists),
                "dnsbl"),
 
-            new SpamCheck("helo", 3, "HELO host check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("helo", 3, L("HELO host check"), SpamCheckPhase.BeforeTheBody,
                config.CheckHeloHost, config.HeloHostScore, Score(config.HeloHostScore),
-               "Fails when the name the client gave in HELO/EHLO does not resolve to the address it is connecting from.",
+               L("Fails when the name the client gave in HELO/EHLO does not resolve to the address it is connecting from."),
                "antispam"),
 
-            new SpamCheck("ptr", 4, "PTR record check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("ptr", 4, L("PTR record check"), SpamCheckPhase.BeforeTheBody,
                config.CheckPtr, config.PtrScore, Score(config.PtrScore),
-               "Fails when the connecting address has no reverse DNS record.",
+               L("Fails when the connecting address has no reverse DNS record."),
                "antispam"),
 
-            new SpamCheck("mx", 5, "Sender MX check", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("mx", 5, L("Sender MX check"), SpamCheckPhase.BeforeTheBody,
                config.CheckSenderMx, config.SenderMxScore, Score(config.SenderMxScore),
-               "Fails when the envelope sender's domain publishes no MX record.",
+               L("Fails when the envelope sender's domain publishes no MX record."),
                "antispam"),
 
-            new SpamCheck("spf", 6, "SPF", SpamCheckPhase.BeforeTheBody,
+            new SpamCheck("spf", 6, L("SPF"), SpamCheckPhase.BeforeTheBody,
                config.CheckSpf, config.SpfScore, Score(config.SpfScore),
-               "Checks the sender's SPF policy against the connecting address. A pass can also bypass greylisting.",
+               L("Checks the sender's SPF policy against the connecting address. A pass can also bypass greylisting."),
                "antispam"),
 
             // 6-9: SpamTest::PostTransmission, run once the body has arrived.
-            new SpamCheck("surbl", 7, "SURBL servers", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("surbl", 7, L("SURBL servers"), SpamCheckPhase.AfterTheBody,
                config.ActiveSurblServers > 0, null,
-               config.ActiveSurblServers > 0 ? "per list entry" : "-",
-               DescribeList("Looks up the domains of links found in the body on each active SURBL server",
+               config.ActiveSurblServers > 0 ? L("per list entry") : "-",
+               DescribeList(L("Looks up the domains of links found in the body on each active SURBL server"),
                   config.ActiveSurblServers, config.TotalSurblServers),
                "surbl"),
 
-            new SpamCheck("dkim", 8, "DKIM verification", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("dkim", 8, L("DKIM verification"), SpamCheckPhase.AfterTheBody,
                config.VerifyDkim, config.DkimFailureScore, Score(config.DkimFailureScore),
-               "Scores only a permanent failure - a signature that is present and wrong. An unsigned message scores nothing.",
+               L("Scores only a permanent failure - a signature that is present and wrong. An unsigned message scores nothing."),
                "antispam"),
 
-            new SpamCheck("dmarc", 9, "DMARC", SpamCheckPhase.AfterTheBody,
+            new SpamCheck("dmarc", 9, L("DMARC"), SpamCheckPhase.AfterTheBody,
                config.EvaluateDmarc, config.DmarcFailureScore, Score(config.DmarcFailureScore),
-               "Evaluates the From: domain's DMARC policy, using its own SPF and DKIM results.",
+               L("Evaluates the From: domain's DMARC policy, using its own SPF and DKIM results."),
                "antispam"),
 
             new SpamCheck("spamassassin", 10, "SpamAssassin", SpamCheckPhase.AfterTheBody,
                config.SpamAssassinEnabled,
                config.SpamAssassinMergesScore ? (int?) null : config.SpamAssassinScore,
-               config.SpamAssassinMergesScore ? "SpamAssassin's own score" : Score(config.SpamAssassinScore),
-               "Scores only when SpamAssassin itself tags the message (X-Spam-Status: Yes). "
-               + (config.SpamAssassinMergesScore
-                  ? "Merging is on, so its own numeric score is added - which can be any size."
-                  : "Merging is off, so the fixed score is used however sure SpamAssassin was."),
+               config.SpamAssassinMergesScore ? L("SpamAssassin's own score") : Score(config.SpamAssassinScore),
+               F("Scores only when SpamAssassin itself tags the message (X-Spam-Status: Yes). {0}", (config.SpamAssassinMergesScore ? L("Merging is on, so its own numeric score is added - which can be any size.") : L("Merging is off, so the fixed score is used however sure SpamAssassin was."))),
                "antispam")
          };
 
@@ -332,18 +330,16 @@ namespace hMailServer.ControlPanel.Services
 
          if (marks && refuses)
          {
-            return "A message scoring " + config.MarkThreshold + " or more is marked as spam and delivered; "
-                   + config.DeleteThreshold + " or more is refused (550 before the body, 554 after it).";
+            return F("A message scoring {0} or more is marked as spam and delivered; {1} or more is refused (550 before the body, 554 after it).", config.MarkThreshold, config.DeleteThreshold);
          }
 
          if (marks)
-            return "A message scoring " + config.MarkThreshold + " or more is marked as spam and delivered. Nothing is refused on score.";
+            return F("A message scoring {0} or more is marked as spam and delivered. Nothing is refused on score.", config.MarkThreshold);
 
          if (refuses)
-            return "A message scoring " + config.DeleteThreshold + " or more is refused (550 before the body, 554 after it). Nothing is marked.";
+            return F("A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked.", config.DeleteThreshold);
 
-         return "Nothing at all happens on score: both thresholds are 0, and the server only marks or refuses when the "
-                + "threshold is above 0.";
+         return L("Nothing at all happens on score: both thresholds are 0, and the server only marks or refuses when the threshold is above 0.");
       }
 
       /// <summary>
@@ -392,27 +388,25 @@ namespace hMailServer.ControlPanel.Services
             return "";
 
          if (!config.GreylistingEnabled)
-            return "Off. No message is deferred on a first attempt.";
+            return L("Off. No message is deferred on a first attempt.");
 
          var bypasses = new List<string>();
          if (config.BypassGreylistingOnSpfPass)
-            bypasses.Add("the sender's SPF check passed");
+            bypasses.Add(L("the sender's SPF check passed"));
          if (config.BypassGreylistingOnSenderMx)
-            bypasses.Add("the connecting address is one of the sender domain's A or MX records");
+            bypasses.Add(L("the connecting address is one of the sender domain's A or MX records"));
          if (config.GreylistWhiteListEntries > 0)
-            bypasses.Add("the address is one of the " + config.GreylistWhiteListEntries + " on the greylisting white list");
+            bypasses.Add(F("the address is one of the {0} on the greylisting white list", config.GreylistWhiteListEntries));
 
-         string text = "On. A sender/recipient/address triplet that has not been seen before is answered "
-                       + "451 \"Please try again later.\" at RCPT TO, and accepted when it retries. It runs after the "
-                       + "connection checks above and adds no score.";
+         string text = L("On. A sender/recipient/address triplet that has not been seen before is answered 451 \"Please try again later.\" at RCPT TO, and accepted when it retries. It runs after the connection checks above and adds no score.");
 
          if (bypasses.Count > 0)
-            text += " Skipped when " + Join(bypasses) + ".";
+            text += F(" Skipped when {0}.", Join(bypasses));
 
          // A per-domain switch as well, which is on the domain and not on any of
          // the anti-spam pages - so an administrator whose greylisting "is not
          // working" for one domain has nowhere else to be told this.
-         text += " Also skipped for any recipient domain that has greylisting turned off in its own settings.";
+         text += L(" Also skipped for any recipient domain that has greylisting turned off in its own settings.");
 
          return text;
       }
@@ -439,31 +433,25 @@ namespace hMailServer.ControlPanel.Services
          if (!marks && !refuses)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Critical,
-               "Both thresholds are 0, so no score can mark or refuse anything - the server tests them with "
-               + "\"greater than 0\" before using them. It also stops testing as soon as the running total reaches the "
-               + "higher threshold, which is 0, so exactly one check runs in each phase and its result is discarded."));
+               L("Both thresholds are 0, so no score can mark or refuse anything - the server tests them with \"greater than 0\" before using them. It also stops testing as soon as the running total reaches the higher threshold, which is 0, so exactly one check runs in each phase and its result is discarded.")));
          }
          else if (!marks)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Warning,
-               "Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means \"never\" "
-               + "rather than \"always\". Messages reaching " + config.DeleteThreshold + " are still refused."));
+               F("Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means \"never\" rather than \"always\". Messages reaching {0} are still refused.", config.DeleteThreshold)));
          }
 
          if (marks && refuses && config.DeleteThreshold <= config.MarkThreshold)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Critical,
-               "The delete threshold (" + config.DeleteThreshold + ") is at or below the mark threshold ("
-               + config.MarkThreshold + ") and is tested first, so no message is ever marked and delivered - every "
-               + "message that would be marked is refused instead."));
+               F("The delete threshold ({0}) is at or below the mark threshold ({1}) and is tested first, so no message is ever marked and delivered - every message that would be marked is refused instead.", config.DeleteThreshold, config.MarkThreshold)));
          }
 
          int? ceiling = HighestReachableScore(config);
          if (marks && ceiling != null && ceiling.Value < config.MarkThreshold)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Critical,
-               "The enabled checks can add at most " + ceiling.Value + " between them, which is below the mark "
-               + "threshold of " + config.MarkThreshold + ": no message can reach either threshold, however bad it is."));
+               F("The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is.", ceiling.Value, config.MarkThreshold)));
          }
 
          // ---- runs and cannot change the outcome ------------------------------
@@ -475,30 +463,25 @@ namespace hMailServer.ControlPanel.Services
             .Where(c => c.Enabled && c.Score == 0 && c.Key != "spamassassin"))
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Warning,
-               check.Name + " is on but scores 0, so it costs a lookup on every message and can never change the "
-               + "outcome. Give it a score, or turn it off."));
+               F("{0} is on but scores 0, so it costs a lookup on every message and can never change the outcome. Give it a score, or turn it off.", check.Name)));
          }
 
          if (config.SpamAssassinEnabled && !config.SpamAssassinMergesScore && config.SpamAssassinScore <= 0)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Warning,
-               "SpamAssassin's verdict is thrown away: with merging off, a message it tags as spam is given the fixed "
-               + "score, which is " + config.SpamAssassinScore + "."));
+               F("SpamAssassin's verdict is thrown away: with merging off, a message it tags as spam is given the fixed score, which is {0}.", config.SpamAssassinScore)));
          }
 
          if (config.SpamAssassinEnabled && string.IsNullOrWhiteSpace(config.SpamAssassinHost))
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Warning,
-               "SpamAssassin is on with no host set, so every message is accepted without a verdict and the server "
-               + "reports HM5508 each time."));
+               L("SpamAssassin is on with no host set, so every message is accepted without a verdict and the server reports HM5508 each time.")));
          }
 
          if (marks && !config.AddSpamHeader && !config.AddReasonHeader && !config.PrependSubject)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Warning,
-               "A marked message is changed in no visible way: no X-hMailServer-Spam header, no reason header and no "
-               + "subject prefix, so a mail client has nothing to file on. The internal spam flag is still set, which "
-               + "suppresses auto-replies and forwarding for accounts configured that way."));
+               L("A marked message is changed in no visible way: no X-hMailServer-Spam header, no reason header and no subject prefix, so a mail client has nothing to file on. The internal spam flag is still set, which suppresses auto-replies and forwarding for accounts configured that way.")));
          }
 
          // ---- true, invisible, and worth knowing ------------------------------
@@ -518,10 +501,7 @@ namespace hMailServer.ControlPanel.Services
                      continue;
 
                   notes.Add(new SpamPipelineNote(StatusLevel.Information,
-                     enabled[i].Name + " scores " + enabled[i].Score.Value + " on its own, which reaches the "
-                     + stop + " at which the server stops testing - so "
-                     + Join(enabled.Skip(i + 1).Select(c => c.Name).ToList())
-                     + " will not run for a message it fails, and will not appear in the log."));
+                     F("{0} scores {1} on its own, which reaches the {2} at which the server stops testing - so {3} will not run for a message it fails, and will not appear in the log.", enabled[i].Name, enabled[i].Score.Value, stop, Join(enabled.Skip(i + 1).Select(c => c.Name).ToList()))));
                   break;
                }
             }
@@ -530,21 +510,16 @@ namespace hMailServer.ControlPanel.Services
          if (config.MaxScanKilobytes > 0)
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Information,
-               "Messages larger than " + config.MaxScanKilobytes + " KB skip every check that needs the body (SURBL, "
-               + "DKIM, DMARC and SpamAssassin). The connection checks still run, and the message is delivered."));
+               F("Messages larger than {0} KB skip every check that needs the body (SURBL, DKIM, DMARC and SpamAssassin). The connection checks still run, and the message is delivered.", config.MaxScanKilobytes)));
          }
          else
          {
             notes.Add(new SpamPipelineNote(StatusLevel.Information,
-               "There is no scan size limit, but messages over " + (ParserSizeLimitKilobytes / 1024)
-               + " MB still skip the body checks: the MIME parser cannot load them, and scanning without loading "
-               + "them would write an empty body over the message."));
+               F("There is no scan size limit, but messages over {0} MB still skip the body checks: the MIME parser cannot load them, and scanning without loading them would write an empty body over the message.", (ParserSizeLimitKilobytes / 1024))));
          }
 
          notes.Add(new SpamPipelineNote(StatusLevel.Information,
-            "None of this applies to an authenticated session - spam protection is skipped entirely for a client that "
-            + "logged on, for connections from an IP range with spam protection turned off, and for the "
-            + config.WhiteListEntries + " entries on the anti-spam white list."));
+            F("None of this applies to an authenticated session - spam protection is skipped entirely for a client that logged on, for connections from an IP range with spam protection turned off, and for the {0} entries on the anti-spam white list.", config.WhiteListEntries)));
 
          return notes;
       }
@@ -560,12 +535,12 @@ namespace hMailServer.ControlPanel.Services
       private static string DescribeList(string what, int active, int total)
       {
          if (total == 0)
-            return what + ". No entries are configured, so the check does not run.";
+            return F("{0}. No entries are configured, so the check does not run.", what);
 
          if (active == 0)
-            return what + ". " + total + " configured, none active, so the check does not run.";
+            return F("{0}. {1} configured, none active, so the check does not run.", what, total);
 
-         return what + ". " + active + " of " + total + " active.";
+         return F("{0}. {1} of {2} active.", what, active, total);
       }
 
       /// <summary>"a, b and c" - the notes are sentences, so they need the "and".</summary>
@@ -576,7 +551,7 @@ namespace hMailServer.ControlPanel.Services
          if (parts.Count == 1)
             return parts[0];
 
-         return string.Join(", ", parts.Take(parts.Count - 1)) + " and " + parts[parts.Count - 1];
+         return F("{0} and {1}", string.Join(", ", parts.Take(parts.Count - 1)), parts[parts.Count - 1]);
       }
    }
 }

@@ -4,6 +4,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -191,48 +192,41 @@ namespace hMailServer.ControlPanel.Services
          // That is a different failure from "unencrypted" and gets its own word.
          if (WantsTls(listener.Security) && string.IsNullOrWhiteSpace(listener.CertificateName))
          {
-            return new TlsListenerVerdict(listener, StatusLevel.Critical, "Will not start",
-               "TLS is configured with no certificate assigned, so this listener fails to start and nothing can "
-               + "connect to this port at all. The server log records this as error HM5113 on every start.");
+            return new TlsListenerVerdict(listener, StatusLevel.Critical, L("Will not start"),
+               L("TLS is configured with no certificate assigned, so this listener fails to start and nothing can connect to this port at all. The server log records this as error HM5113 on every start."));
          }
 
          // Every TLS listener shares one set of enabled protocol versions. With none
          // of them enabled the handshake has nothing to agree on.
          if (WantsTls(listener.Security) && !AnyVersionEnabled(config))
          {
-            return new TlsListenerVerdict(listener, StatusLevel.Critical, "Cannot negotiate",
-               "No TLS version is enabled anywhere on this server, so no handshake on this port can succeed.");
+            return new TlsListenerVerdict(listener, StatusLevel.Critical, L("Cannot negotiate"),
+               L("No TLS version is enabled anywhere on this server, so no handshake on this port can succeed."));
          }
 
          switch (listener.Security)
          {
             case TlsListenerSecurity.Implicit:
-               return new TlsListenerVerdict(listener, StatusLevel.Good, "Encrypted",
-                  "TLS from the first byte. Nothing on this port is ever sent unencrypted.");
+               return new TlsListenerVerdict(listener, StatusLevel.Good, L("Encrypted"),
+                  L("TLS from the first byte. Nothing on this port is ever sent unencrypted."));
 
             case TlsListenerSecurity.StartTlsRequired:
-               return new TlsListenerVerdict(listener, StatusLevel.Good, "Encrypted",
-                  "The session starts in the clear and nothing but STARTTLS is permitted until it has been used, "
-                  + "so no credential and no message body crosses unencrypted.");
+               return new TlsListenerVerdict(listener, StatusLevel.Good, L("Encrypted"),
+                  L("The session starts in the clear and nothing but STARTTLS is permitted until it has been used, so no credential and no message body crosses unencrypted."));
 
             case TlsListenerSecurity.StartTlsOptional:
                return IsClientPort(listener)
-                  ? new TlsListenerVerdict(listener, StatusLevel.Warning, "Opportunistic",
-                     "STARTTLS is offered but not required. A client that does not ask for it - or one talked out "
-                     + "of asking by something in the middle - authenticates in the clear, and neither end is told.")
-                  : new TlsListenerVerdict(listener, StatusLevel.Good, "Opportunistic",
-                     "STARTTLS is offered and not required, which is the correct arrangement for port 25: requiring "
-                     + "it would refuse mail from senders that cannot offer it.");
+                  ? new TlsListenerVerdict(listener, StatusLevel.Warning, L("Opportunistic"),
+                     L("STARTTLS is offered but not required. A client that does not ask for it - or one talked out of asking by something in the middle - authenticates in the clear, and neither end is told."))
+                  : new TlsListenerVerdict(listener, StatusLevel.Good, L("Opportunistic"),
+                     L("STARTTLS is offered and not required, which is the correct arrangement for port 25: requiring it would refuse mail from senders that cannot offer it."));
 
             default:
                return IsClientPort(listener)
-                  ? new TlsListenerVerdict(listener, StatusLevel.Critical, "In the clear",
-                     "No encryption is available on this port at all. Every password and every message on it crosses "
-                     + "the network readable by anything on the path.")
-                  : new TlsListenerVerdict(listener, StatusLevel.Warning, "In the clear",
-                     "No encryption is available on this port. Inbound mail from other servers is normally "
-                     + "unencrypted anyway, but this port also accepts AUTH, and a client using it sends its "
-                     + "password in the clear.");
+                  ? new TlsListenerVerdict(listener, StatusLevel.Critical, L("In the clear"),
+                     L("No encryption is available on this port at all. Every password and every message on it crosses the network readable by anything on the path."))
+                  : new TlsListenerVerdict(listener, StatusLevel.Warning, L("In the clear"),
+                     L("No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear."));
          }
       }
 
@@ -246,13 +240,13 @@ namespace hMailServer.ControlPanel.Services
             return "";
 
          var enabled = new List<string>();
-         if (config.Tls13Enabled) enabled.Add("TLS 1.3");
-         if (config.Tls12Enabled) enabled.Add("TLS 1.2");
-         if (config.Tls11Enabled) enabled.Add("TLS 1.1");
-         if (config.Tls10Enabled) enabled.Add("TLS 1.0");
+         if (config.Tls13Enabled) enabled.Add(L("TLS 1.3"));
+         if (config.Tls12Enabled) enabled.Add(L("TLS 1.2"));
+         if (config.Tls11Enabled) enabled.Add(L("TLS 1.1"));
+         if (config.Tls10Enabled) enabled.Add(L("TLS 1.0"));
 
          return enabled.Count == 0
-            ? "No TLS version is enabled."
+            ? L("No TLS version is enabled.")
             : string.Join(", ", enabled);
       }
 
@@ -260,12 +254,12 @@ namespace hMailServer.ControlPanel.Services
       public static string Verdict(TlsPostureConfig config)
       {
          if (config == null)
-            return "The transport security configuration could not be read.";
+            return L("The transport security configuration could not be read.");
 
          IReadOnlyList<TlsListenerVerdict> listeners = Listeners(config);
 
          if (listeners.Count == 0)
-            return "No listeners are configured, so nothing can connect to this server.";
+            return L("No listeners are configured, so nothing can connect to this server.");
 
          int broken = listeners.Count(v => v.Word == "Will not start" || v.Word == "Cannot negotiate");
          int exposed = listeners.Count(v => IsClientPort(v.Listener) && v.Listener.Security == TlsListenerSecurity.None);
@@ -273,25 +267,20 @@ namespace hMailServer.ControlPanel.Services
 
          if (broken > 0)
          {
-            return Count(broken, "listener is", "listeners are") + " configured for TLS but cannot serve it, so "
-                   + (broken == 1 ? "that port is not listening" : "those ports are not listening") + " at all.";
+            return F("{0} configured for TLS but cannot serve it, so {1} at all.", Count(broken, L("listener is"), L("listeners are")), (broken == 1 ? L("that port is not listening") : L("those ports are not listening")));
          }
 
          if (exposed > 0)
          {
-            return Count(exposed, "client listener has", "client listeners have")
-                   + " no encryption available, so passwords used on "
-                   + (exposed == 1 ? "it cross" : "them cross") + " the network in the clear.";
+            return F("{0} no encryption available, so passwords used on {1} the network in the clear.", Count(exposed, L("client listener has"), L("client listeners have")), (exposed == 1 ? L("it cross") : L("them cross")));
          }
 
          if (optional > 0)
          {
-            return Count(optional, "client listener offers", "client listeners offer")
-                   + " STARTTLS without requiring it, so a client that does not ask for encryption authenticates "
-                   + "without it and nothing reports that it happened.";
+            return F("{0} STARTTLS without requiring it, so a client that does not ask for encryption authenticates without it and nothing reports that it happened.", Count(optional, L("client listener offers"), L("client listeners offer")));
          }
 
-         return "Every listener that a mail client connects to requires encryption before it will accept a password.";
+         return L("Every listener that a mail client connects to requires encryption before it will accept a password.");
       }
 
       /// <summary>
@@ -312,38 +301,31 @@ namespace hMailServer.ControlPanel.Services
          if (!AnyVersionEnabled(config) && listeners.Any(v => WantsTls(v.Listener.Security)))
          {
             notes.Add(new TlsPostureNote(StatusLevel.Critical,
-               "No TLS version is enabled, and there are listeners configured to use TLS. Not one of their "
-               + "handshakes can succeed until at least TLS 1.2 is switched on."));
+               L("No TLS version is enabled, and there are listeners configured to use TLS. Not one of their handshakes can succeed until at least TLS 1.2 is switched on.")));
          }
 
          foreach (TlsListenerVerdict verdict in listeners.Where(v => v.Word == "Will not start"))
          {
             notes.Add(new TlsPostureNote(StatusLevel.Critical,
-               verdict.Listener.Protocol + " on port " + verdict.Listener.Port + " is set to use TLS with no "
-               + "certificate assigned, so that port does not come up. Anything expecting to reach this server on "
-               + "it gets a refused connection, not an unencrypted session."));
+               F("{0} on port {1} is set to use TLS with no certificate assigned, so that port does not come up. Anything expecting to reach this server on it gets a refused connection, not an unencrypted session.", verdict.Listener.Protocol, verdict.Listener.Port)));
          }
 
          foreach (TlsListenerVerdict verdict in listeners.Where(v =>
                      IsClientPort(v.Listener) && v.Listener.Security == TlsListenerSecurity.None))
          {
             notes.Add(new TlsPostureNote(StatusLevel.Critical,
-               verdict.Listener.Protocol + " on port " + verdict.Listener.Port + " has no encryption available. "
-               + "Mail clients authenticate on this port, so every password used on it is readable by anything "
-               + "between the client and this server."));
+               F("{0} on port {1} has no encryption available. Mail clients authenticate on this port, so every password used on it is readable by anything between the client and this server.", verdict.Listener.Protocol, verdict.Listener.Port)));
          }
 
          // ---- weak, rather than absent -----------------------------------------
 
          if (config.Tls10Enabled || config.Tls11Enabled)
          {
-            string which = config.Tls10Enabled && config.Tls11Enabled ? "TLS 1.0 and TLS 1.1 are"
-               : config.Tls10Enabled ? "TLS 1.0 is" : "TLS 1.1 is";
+            string which = config.Tls10Enabled && config.Tls11Enabled ? L("TLS 1.0 and TLS 1.1 are")
+               : config.Tls10Enabled ? L("TLS 1.0 is") : L("TLS 1.1 is");
 
             notes.Add(new TlsPostureNote(StatusLevel.Warning,
-               which + " enabled. Both are deprecated by RFC 8996 and are refused outright by current clients, so "
-               + "leaving them on rarely buys the compatibility they were kept for, and a client that does "
-               + "negotiate one gets materially weaker protection than the rest."));
+               F("{0} enabled. Both are deprecated by RFC 8996 and are refused outright by current clients, so leaving them on rarely buys the compatibility they were kept for, and a client that does negotiate one gets materially weaker protection than the rest.", which)));
          }
 
          if (IsAeadOnlyPreset(config.CipherList) && (config.Tls10Enabled || config.Tls11Enabled))
@@ -351,16 +333,13 @@ namespace hMailServer.ControlPanel.Services
             // From the cipher-list blurb on the SSL/TLS page, which says so in prose;
             // this is the same statement made about the configuration in front of you.
             notes.Add(new TlsPostureNote(StatusLevel.Warning,
-               "The cipher list is the AEAD-ONLY preset while TLS 1.0 or 1.1 is enabled. Those versions have no "
-               + "AEAD suite at all, so they are advertised and then cannot complete a handshake - which looks to "
-               + "the client like a broken server rather than a policy."));
+               L("The cipher list is the AEAD-ONLY preset while TLS 1.0 or 1.1 is enabled. Those versions have no AEAD suite at all, so they are advertised and then cannot complete a handshake - which looks to the client like a broken server rather than a policy.")));
          }
 
          if (!config.Tls13Enabled && config.Tls12Enabled)
          {
             notes.Add(new TlsPostureNote(StatusLevel.Information,
-               "TLS 1.3 is off. It is faster to negotiate than 1.2 and removes the older key exchanges "
-               + "outright; there is rarely a reason to leave it off."));
+               L("TLS 1.3 is off. It is faster to negotiate than 1.2 and removes the older key exchanges outright; there is rarely a reason to leave it off.")));
          }
 
          // ---- opportunistic where it should not be -----------------------------
@@ -372,19 +351,13 @@ namespace hMailServer.ControlPanel.Services
          if (optional.Count > 0)
          {
             notes.Add(new TlsPostureNote(StatusLevel.Warning,
-               "STARTTLS is optional on " + Ports(optional) + ". A client that never asks for it, or one whose "
-               + "STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. "
-               + (config.RangesRequiringTlsForAuth > 0
-                  ? "Requiring TLS for authentication on the IP ranges closes the credential half of this."
-                  : "No IP range requires TLS for authentication either, so nothing else is closing this.")));
+               F("STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}", Ports(optional), (config.RangesRequiringTlsForAuth > 0 ? L("Requiring TLS for authentication on the IP ranges closes the credential half of this.") : L("No IP range requires TLS for authentication either, so nothing else is closing this.")))));
          }
 
          if (config.RangesTotal > 0 && config.RangesRequiringTlsForAuth == 0 && optional.Count > 0)
          {
             notes.Add(new TlsPostureNote(StatusLevel.Warning,
-               "No IP range requires TLS before authentication. That setting lives on each IP range rather than "
-               + "with the rest of TLS, which is why it is easy to have never seen: it is the one control that "
-               + "refuses a plaintext password regardless of what the port allows."));
+               L("No IP range requires TLS before authentication. That setting lives on each IP range rather than with the rest of TLS, which is why it is easy to have never seen: it is the one control that refuses a plaintext password regardless of what the port allows.")));
          }
 
          // ---- certificates -----------------------------------------------------
@@ -394,8 +367,7 @@ namespace hMailServer.ControlPanel.Services
             if (certificate.Problem != null && certificate.InUse)
             {
                notes.Add(new TlsPostureNote(StatusLevel.Critical,
-                  "The certificate \"" + certificate.Name + "\" is in use by a listener and has a problem: "
-                  + certificate.Problem));
+                  F("The certificate \"{0}\" is in use by a listener and has a problem: {1}", certificate.Name, certificate.Problem)));
                continue;
             }
 
@@ -407,27 +379,19 @@ namespace hMailServer.ControlPanel.Services
             if (days < 0)
             {
                notes.Add(new TlsPostureNote(certificate.InUse ? StatusLevel.Critical : StatusLevel.Warning,
-                  "The certificate \"" + certificate.Name + "\" expired " + Math.Abs(days)
-                  + (Math.Abs(days) == 1 ? " day" : " days") + " ago"
-                  + (certificate.InUse
-                     ? " and is still assigned to a listener. Clients are refusing or warning about every connection to it."
-                     : ". It is not assigned to any listener.")));
+                  F("The certificate \"{0}\" expired {1}{2} ago{3}", certificate.Name, Math.Abs(days), (Math.Abs(days) == 1 ? L(" day") : L(" days")), (certificate.InUse ? L(" and is still assigned to a listener. Clients are refusing or warning about every connection to it.") : L(". It is not assigned to any listener.")))));
             }
             else if (days <= ExpiryWarningDays)
             {
                notes.Add(new TlsPostureNote(certificate.InUse ? StatusLevel.Warning : StatusLevel.Information,
-                  "The certificate \"" + certificate.Name + "\" expires in " + days
-                  + (days == 1 ? " day" : " days")
-                  + (certificate.InUse ? " and is in use by a listener." : ". It is not assigned to any listener.")));
+                  F("The certificate \"{0}\" expires in {1}{2}{3}", certificate.Name, days, (days == 1 ? L(" day") : L(" days")), (certificate.InUse ? L(" and is in use by a listener.") : L(". It is not assigned to any listener.")))));
             }
          }
 
          if (!config.CertificateFilesReadable)
          {
             notes.Add(new TlsPostureNote(StatusLevel.Information,
-               "The certificate files are on the server and this Control Panel is connected to it remotely, so "
-               + "expiry dates and file contents cannot be checked from here. Everything else on this page is read "
-               + "over COM and is accurate."));
+               L("The certificate files are on the server and this Control Panel is connected to it remotely, so expiry dates and file contents cannot be checked from here. Everything else on this page is read over COM and is accurate.")));
          }
 
          // ---- outbound ---------------------------------------------------------
@@ -435,11 +399,7 @@ namespace hMailServer.ControlPanel.Services
          if (!config.VerifyRemoteCertificates)
          {
             notes.Add(new TlsPostureNote(StatusLevel.Information,
-               "Certificates are not verified on the connections this server makes when delivering. That is the "
-               + "normal setting for mail between servers - most of the internet's SMTP certificates would fail "
-               + "verification and the mail would stop - but it does mean outbound TLS protects against a passive "
-               + "listener only, not against something in the path. DANE and MTA-STS are how a specific "
-               + "destination gets more than that."));
+               L("Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that.")));
          }
 
          return notes;
@@ -456,7 +416,7 @@ namespace hMailServer.ControlPanel.Services
       /// OpenSSL cipher string. Matched case-insensitively, as the server does.
       /// </summary>
       public static bool IsAeadOnlyPreset(string cipherList) =>
-         string.Equals((cipherList ?? "").Trim(), "AEAD-ONLY", StringComparison.OrdinalIgnoreCase);
+         string.Equals((cipherList ?? "").Trim(), "AEAD-ONLY", StringComparison.OrdinalIgnoreCase); // no-loc
 
       private static string Ports(IEnumerable<TlsListenerVerdict> verdicts) =>
          string.Join(", ", verdicts.Select(v => v.Listener.Protocol + " " + v.Listener.Port));
