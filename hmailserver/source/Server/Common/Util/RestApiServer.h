@@ -284,7 +284,9 @@ namespace HM
       static HttpResponse HandleMeFolders_(const Caller &caller);
       static HttpResponse HandleMeFolderMessages_(const Caller &caller, __int64 folderId, const AnsiString &query);
       static HttpResponse HandleMeMessage_(const Caller &caller, __int64 messageId);
-      static std::shared_ptr<IMAPFolder> FindOwnReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId);
+      static std::shared_ptr<IMAPFolder> FindReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId);
+      static bool RightOn_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder, int permission);
+      static String MessageFile_(std::shared_ptr<const Message> message);
       static void AppendFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders,
                                     const String &parentPath, const std::map<__int64, int> &designations,
                                     const String &delimiter, AnsiString &json, int depth);

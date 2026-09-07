@@ -1233,6 +1233,120 @@ namespace RegressionTests.API
          StringAssert.Contains("\"subject\":\"Väck mig\"", me.body);
       }
 
+      // RFC 4314 rights as stored in hm_acl.aclvalue.
+      private const int RightLookup = 1;
+      private const int RightRead = 2;
+
+      private static void GrantOnFolder(IMAPFolder folder, Account grantee, int rights)
+      {
+         SingletonProvider<TestSetup>.Instance.GetApp().Database.ExecuteSQL(
+            string.Format(
+               "insert into hm_acl (aclsharefolderid, aclpermissiontype, aclpermissiongroupid, aclpermissionaccountid, aclvalue) " +
+               "values ({0}, 0, 0, {1}, {2})",
+               folder.ID, grantee.ID, rights));
+      }
+
+      [Test]
+      [Description("A folder another account shared appears under its owner, with the rights the owner granted and no more")]
+      public void ASharedFolderAppearsUnderItsOwnerWithTheRightsGranted()
+      {
+         Account owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "owner@" + _domain.Name, UserPassword);
+         SmtpClientSimulator.StaticSend("alice@example.com", owner.Address, "Team plan", "The plan is simple.");
+         Pop3ClientSimulator.AssertMessageCount(owner.Address, UserPassword, 1);
+
+         IMAPFolder ownersInbox = CustomAsserts.AssertFolderExists(owner.IMAPFolders, "INBOX");
+         GrantOnFolder(ownersInbox, _account, RightLookup | RightRead);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         Assert.AreEqual(200, tree.status, "Body: " + tree.body);
+         StringAssert.Contains("\"owner\":\"" + owner.Address + "\"", tree.body);
+         string shared = FolderEntry(tree.body, "#Users." + owner.Address + ".INBOX");
+         StringAssert.Contains("\"account_id\":" + owner.ID + ",", shared);
+         StringAssert.Contains("\"writable\":false", shared);
+         StringAssert.Contains("\"messages\":1,\"unseen\":1", shared);
+         long sharedId = IdBefore(tree.body, "\"path\":\"#Users." + owner.Address + ".INBOX\"");
+         Assert.AreEqual(ownersInbox.ID, sharedId, "The shared folder is the owner's folder, under its own id.");
+
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + sharedId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, page.status, "Body: " + page.body);
+         StringAssert.Contains("Team plan", page.body);
+         long messageId = IdBefore(page.body, "\"subject\":\"Team plan\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("The plan is simple.", message.body);
+
+         (int status, string body) flag = Http("PUT", "/api/v1/me/messages/" + messageId + "/flags", UserHeader(UserPassword), "{\"seen\":true}");
+         Assert.AreEqual(403, flag.status, "Read is not write. Body: " + flag.body);
+
+         (int status, string body) delete = Http("DELETE", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(403, delete.status, "Body: " + delete.body);
+
+         (int status, string body) mine = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(mine.body, "\"path\":\"INBOX\"");
+         (int status, string body) move = Http("POST", "/api/v1/me/messages/" + messageId + "/move", UserHeader(UserPassword), "{\"folder_id\":" + inboxId + "}");
+         Assert.AreEqual(400, move.status, "A message never moves between mailboxes. Body: " + move.body);
+
+         Pop3ClientSimulator.AssertMessageCount(owner.Address, UserPassword, 1);
+
+         (int status, string body) third = Http("GET", "/api/v1/me/folders", BasicHeader(OtherAccount(), UserPassword));
+         Assert.IsFalse(third.body.Contains(owner.Address), "Nothing was shared with the third account: " + third.body);
+         (int status, string body) thirdPage = Http("GET", "/api/v1/me/folders/" + sharedId + "/messages", BasicHeader("other@" + _domain.Name, UserPassword));
+         Assert.AreEqual(404, thirdPage.status, "Body: " + thirdPage.body);
+      }
+
+      [Test]
+      [Description("A public folder appears under its namespace, and its messages - which belong to no account - are read from the public store")]
+      public void APublicFolderAppearsUnderItsNamespace()
+      {
+         Account owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "poster@" + _domain.Name, UserPassword);
+         SmtpClientSimulator.StaticSend("alice@example.com", owner.Address, "Notice one", "Read all about it.");
+         Pop3ClientSimulator.AssertMessageCount(owner.Address, UserPassword, 1);
+
+         IMAPFolder notices = _settings.PublicFolders.Add("Notices");
+         notices.Save();
+
+         IMAPFolderPermission posting = notices.Permissions.Add();
+         posting.PermissionAccountID = owner.ID;
+         posting.PermissionType = eACLPermissionType.ePermissionTypeUser;
+         posting.set_Permission(eACLPermission.ePermissionLookup, true);
+         posting.set_Permission(eACLPermission.ePermissionRead, true);
+         posting.set_Permission(eACLPermission.ePermissionInsert, true);
+         posting.Save();
+
+         IMAPFolderPermission reading = notices.Permissions.Add();
+         reading.PermissionAccountID = _account.ID;
+         reading.PermissionType = eACLPermissionType.ePermissionTypeUser;
+         reading.set_Permission(eACLPermission.ePermissionLookup, true);
+         reading.set_Permission(eACLPermission.ePermissionRead, true);
+         reading.Save();
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(owner.Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         Assert.IsTrue(imap.Copy(1, "#Public.Notices"));
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         Assert.AreEqual(200, tree.status, "Body: " + tree.body);
+         StringAssert.Contains("\"owner\":\"#Public\"", tree.body);
+         string entry = FolderEntry(tree.body, "#Public.Notices");
+         StringAssert.Contains("\"account_id\":0,", entry);
+         StringAssert.Contains("\"messages\":1,", entry);
+         long noticesId = IdBefore(tree.body, "\"path\":\"#Public.Notices\"");
+
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + noticesId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, page.status, "Body: " + page.body);
+         long messageId = IdBefore(page.body, "\"subject\":\"Notice one\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("Read all about it.", message.body);
+
+         (int status, string body) third = Http("GET", "/api/v1/me/folders/" + noticesId + "/messages", BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, third.status, "No right on the public folder: " + third.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()
