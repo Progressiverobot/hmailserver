@@ -6,6 +6,7 @@
 #include "UpdateCheckTask.h"
 #include "IniFileSettings.h"
 #include "../Util/UpdateChecker.h"
+#include "../Util/UpdateInstaller.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -25,6 +26,10 @@ namespace HM
    void
    UpdateCheckTask::DoWork()
    {
+      // Whether or not the check is on: an update the helper applied while the
+      // service was down is reported the first time the service is up again.
+      UpdateInstaller::ReportLastOutcome();
+
       if (!IniFileSettings::Instance()->GetUpdateCheckEnabled())
          return;
 

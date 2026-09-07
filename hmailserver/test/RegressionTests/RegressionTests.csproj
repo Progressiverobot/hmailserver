@@ -655,6 +655,7 @@
     <Compile Include="API\RestApiApiKeys.cs" />
     <Compile Include="API\UpdateCheck.cs" />
     <Compile Include="API\UpdateVerify.cs" />
+    <Compile Include="API\UpdateApply.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
     <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />

@@ -3,6 +3,7 @@
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.tlb"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 Source: "..\source\server\hMailServer\x64\Release\hMailServer.Minidump.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
+Source: "..\source\server\hMailServer\x64\Release\hMailServer.Updater.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
 ; Visual C++ runtime matching the build toolset (v145). Shipping an older
 ; app-local msvcp140 than the toolset the binaries were built with crashes
 ; the service on startup (e.g. constexpr std::mutex changes).

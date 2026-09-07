@@ -10,6 +10,7 @@
 #include "../Common/Util/ServerStatus.h"
 #include "../Common/Util/UpdateChecker.h"
 #include "../Common/Util/UpdateDownloader.h"
+#include "../Common/Util/UpdateInstaller.h"
 
 InterfaceStatus::InterfaceStatus() :
    status_(nullptr),
@@ -326,6 +327,50 @@ InterfaceStatus::get_UpdateSignerIdentity(BSTR *pVal)
          return GetAccessDenied();
 
       *pVal = HM::String(HM::UpdateChecker::Current().signer_identity).AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::InstallUpdate(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      // A refusal is recorded as the verdict, so UpdateLastError says why the
+      // helper was not started - there is no other channel for it over COM.
+      HM::String error;
+      bool started = HM::UpdateInstaller::Apply(error);
+      if (!started)
+         HM::UpdateChecker::RecordFailure(error);
+      *pVal = started ? VARIANT_TRUE : VARIANT_FALSE;
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateApplyOutcome(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      HM::UpdateChecker::Snapshot snapshot = HM::UpdateChecker::Current();
+      HM::String outcome;
+      if (!snapshot.apply_status.IsEmpty())
+         outcome = snapshot.apply_status + _T(" ") + snapshot.apply_version + _T(": ") + snapshot.apply_detail;
+      *pVal = outcome.AllocSysString();
       return S_OK;
    }
    catch (...)
