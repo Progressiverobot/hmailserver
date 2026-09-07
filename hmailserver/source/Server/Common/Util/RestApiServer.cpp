@@ -37,6 +37,8 @@
 #include "../../SMTP/RecipientParser.h"
 #include "../Persistence/PersistentMessageIndex.h"
 #include "../Cache/CacheContainer.h"
+#include "../Sieve/SieveStorage.h"
+#include "../Sieve/SieveScript.h"
 #include <iterator>
 #include <set>
 #include "../BO/MessageRecipients.h"
@@ -1485,6 +1487,18 @@ namespace HM
          case RouteMeSearch:
             return HandleMeSearch_(caller, route.query);
 
+         case RouteMeSettings:
+            return HandleMeSettings_(caller);
+
+         case RouteMeSettingsPut:
+            return HandleMeSettingsPut_(caller, GetRequestBody_(request));
+
+         case RouteMeFilters:
+            return HandleMeFilters_(caller);
+
+         case RouteMeFiltersPut:
+            return HandleMeFiltersPut_(caller, GetRequestBody_(request));
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1604,6 +1618,24 @@ namespace HM
                route.kind = RouteMeFolderMessages;
          }
 
+         return;
+      }
+
+      if (path == "/api/v1/me/settings")
+      {
+         if (method == "GET")
+            route.kind = RouteMeSettings;
+         else if (method == "PUT")
+            route.kind = RouteMeSettingsPut;
+         return;
+      }
+
+      if (path == "/api/v1/me/filters")
+      {
+         if (method == "GET")
+            route.kind = RouteMeFilters;
+         else if (method == "PUT")
+            route.kind = RouteMeFiltersPut;
          return;
       }
 
@@ -2068,6 +2100,8 @@ namespace HM
       case RouteMeMessageMove:
       case RouteMeMessageDelete:
       case RouteMeMessageSend:
+      case RouteMeSettingsPut:
+      case RouteMeFiltersPut:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4317,6 +4351,10 @@ namespace HM
       case RouteMeMessageSend:
       case RouteMeMessageAttachment:
       case RouteMeSearch:
+      case RouteMeSettings:
+      case RouteMeSettingsPut:
+      case RouteMeFilters:
+      case RouteMeFiltersPut:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -6227,6 +6265,221 @@ namespace HM
 
    namespace
    {
+      // The text of one object in a JSON body - for {"forwarding":{...}} the
+      // braces and what is between them - or empty when the key is absent.
+      // Keys inside two objects may repeat (enabled), so each object is read
+      // on its own.
+      AnsiString JsonObject(const AnsiString &json, const AnsiString &key)
+      {
+         AnsiString needle = "\"" + key + "\"";
+         int keyPosition = json.Find(needle);
+         if (keyPosition < 0)
+            return "";
+
+         int open = json.Find("{", keyPosition + needle.GetLength());
+         if (open < 0)
+            return "";
+
+         int depth = 0;
+         bool inString = false;
+         for (int i = open; i < json.GetLength(); i++)
+         {
+            char c = json[i];
+
+            if (inString)
+            {
+               if (c == '\\')
+               {
+                  i++;
+                  continue;
+               }
+
+               if (c == '\"')
+                  inString = false;
+
+               continue;
+            }
+
+            if (c == '\"')
+            {
+               inString = true;
+               continue;
+            }
+
+            if (c == '{')
+               depth++;
+            else if (c == '}')
+            {
+               depth--;
+               if (depth == 0)
+                  return json.Mid(open, i - open + 1);
+            }
+         }
+
+         return "";
+      }
+
+      const int MaxNameLength = 100;
+      const int MaxSignatureLength = 20000;
+      const int MaxScriptLength = 256 * 1024;
+   }
+
+   AnsiString
+   RestApiServer::SettingsJson_(std::shared_ptr<const Account> account)
+   {
+      AnsiString json;
+      json.Format("{\"name\":{\"first\":\"%hs\",\"last\":\"%hs\"},"
+                  "\"forwarding\":{\"enabled\":%hs,\"address\":\"%hs\",\"keep_original\":%hs},"
+                  "\"signature\":{\"enabled\":%hs,\"text\":\"%hs\",\"html\":\"%hs\"}}",
+         JsonEscape_(Utf8_(account->GetPersonFirstName())).c_str(),
+         JsonEscape_(Utf8_(account->GetPersonLastName())).c_str(),
+         account->GetForwardEnabled() ? "true" : "false",
+         JsonEscape_(Utf8_(account->GetForwardAddress())).c_str(),
+         account->GetForwardKeepOriginal() ? "true" : "false",
+         account->GetEnableSignature() ? "true" : "false",
+         JsonEscape_(Utf8_(account->GetSignaturePlainText())).c_str(),
+         JsonEscape_(Utf8_(account->GetSignatureHTML())).c_str());
+      return json;
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeSettings_(const Caller &caller)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      return BuildResponse_(200, SettingsJson_(account));
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeSettingsPut_(const Caller &caller, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // Each of the three objects the body names is applied whole; one it
+      // does not name is left as it is.
+      AnsiString nameObject = JsonObject(requestBody, "name");
+      AnsiString forwardingObject = JsonObject(requestBody, "forwarding");
+      AnsiString signatureObject = JsonObject(requestBody, "signature");
+
+      if (nameObject.IsEmpty() && forwardingObject.IsEmpty() && signatureObject.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"nothing to change: name, forwarding or signature\"}");
+
+      std::shared_ptr<Account> mutableAccount = std::shared_ptr<Account>(new Account());
+      if (!PersistentAccount::ReadObject(mutableAccount, account->GetID()) || mutableAccount->GetID() == 0)
+         return BuildResponse_(500, "{\"error\":\"the account could not be read\"}");
+
+      if (!nameObject.IsEmpty())
+      {
+         String first = JsonUtf8Value_(nameObject, "first");
+         String last = JsonUtf8Value_(nameObject, "last");
+         if (first.GetLength() > MaxNameLength || last.GetLength() > MaxNameLength)
+            return BuildResponse_(400, "{\"error\":\"a name is at most 100 characters\"}");
+
+         mutableAccount->SetPersonFirstName(first);
+         mutableAccount->SetPersonLastName(last);
+      }
+
+      if (!forwardingObject.IsEmpty())
+      {
+         bool enabled = GetJsonBoolValue_(forwardingObject, "enabled", false);
+         String address = JsonUtf8Value_(forwardingObject, "address");
+         bool keepOriginal = GetJsonBoolValue_(forwardingObject, "keep_original", true);
+         address.TrimLeft();
+         address.TrimRight();
+
+         if (enabled)
+         {
+            if (!StringParser::IsValidEmailAddress(address))
+               return BuildResponse_(400, "{\"error\":\"forwarding needs an e-mail address\"}");
+
+            if (address.CompareNoCase(account->GetAddress()) == 0)
+               return BuildResponse_(400, "{\"error\":\"forwarding to the account itself would loop\"}");
+         }
+
+         mutableAccount->SetForwardEnabled(enabled);
+         mutableAccount->SetForwardAddress(address);
+         mutableAccount->SetForwardKeepOriginal(keepOriginal);
+      }
+
+      if (!signatureObject.IsEmpty())
+      {
+         bool enabled = GetJsonBoolValue_(signatureObject, "enabled", false);
+         String text = JsonUtf8Value_(signatureObject, "text");
+         String html = JsonUtf8Value_(signatureObject, "html");
+         if (text.GetLength() > MaxSignatureLength || html.GetLength() > MaxSignatureLength)
+            return BuildResponse_(400, "{\"error\":\"a signature is at most 20000 characters\"}");
+
+         mutableAccount->SetEnableSignature(enabled);
+         mutableAccount->SetSignaturePlainText(text);
+         mutableAccount->SetSignatureHTML(html);
+      }
+
+      String saveError;
+      if (!PersistentAccount::SaveObject(mutableAccount, saveError, PersistenceModeNormal))
+      {
+         AnsiString body;
+         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError.IsEmpty() ? String(_T("the account could not be saved")) : saveError)).c_str());
+         return BuildResponse_(500, body);
+      }
+
+      return BuildResponse_(200, SettingsJson_(mutableAccount));
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeFilters_(const Caller &caller)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      AnsiString json;
+      json.Format("{\"active\":\"%hs\",\"name\":\"%hs\"}",
+         JsonEscape_(Utf8_(SieveStorage::GetActiveScript(account->GetAddress()))).c_str(),
+         JsonEscape_(Utf8_(SieveStorage::GetActiveScriptName(account->GetAddress()))).c_str());
+      return BuildResponse_(200, json);
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeFiltersPut_(const Caller &caller, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      if (requestBody.Find("\"script\"") < 0)
+         return BuildResponse_(400, "{\"error\":\"script is required; an empty script removes the filter\"}");
+
+      String script = JsonUtf8Value_(requestBody, "script");
+      if (script.GetLength() > MaxScriptLength)
+         return BuildResponse_(400, "{\"error\":\"a script is at most 256 KB\"}");
+
+      // The check ManageSieve's PUTSCRIPT and CHECKSCRIPT make, with the
+      // same wording; a script that does not parse is not stored.
+      if (!script.IsEmpty())
+      {
+         String syntaxError = SieveScript::CheckSyntax(script);
+         if (!syntaxError.IsEmpty())
+         {
+            AnsiString body;
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(syntaxError)).c_str());
+            return BuildResponse_(400, body);
+         }
+      }
+
+      if (!SieveStorage::SetActiveScript(account->GetAddress(), script))
+         return BuildResponse_(500, "{\"error\":\"the script could not be stored\"}");
+
+      AnsiString json;
+      json.Format("{\"active\":\"%hs\"}", JsonEscape_(Utf8_(script)).c_str());
+      return BuildResponse_(200, json);
+   }
+
+   namespace
+   {
       // The self-service page. Static: nothing in it comes from the server's
       // data, so nothing is escaped into it - every value the user sees is
       // fetched by the script as JSON and written into the page as text. The
@@ -6322,6 +6575,29 @@ namespace HM
          "<label for=\"compose-text\">Message</label><textarea id=\"compose-text\"></textarea>\n"
          "<button type=\"submit\">Send</button>\n"
          "<div id=\"compose-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
+         "</section>\n"
+         "<section id=\"settings-section\">\n"
+         "<h2>Settings</h2>\n"
+         "<form id=\"settings-form\">\n"
+         "<label for=\"name-first\">First name</label><input id=\"name-first\" type=\"text\" maxlength=\"100\">\n"
+         "<label for=\"name-last\">Last name</label><input id=\"name-last\" type=\"text\" maxlength=\"100\">\n"
+         "<label><input id=\"forward-enabled\" type=\"checkbox\"> Forward my mail</label>\n"
+         "<label for=\"forward-address\">Forward to</label><input id=\"forward-address\" type=\"text\" autocomplete=\"off\">\n"
+         "<label><input id=\"forward-keep\" type=\"checkbox\"> Keep a copy here</label>\n"
+         "<label><input id=\"signature-enabled\" type=\"checkbox\"> Add a signature to what I send</label>\n"
+         "<label for=\"signature-text\">Signature</label><textarea id=\"signature-text\" maxlength=\"20000\"></textarea>\n"
+         "<button type=\"submit\">Save</button>\n"
+         "<div id=\"settings-status\" class=\"status\" aria-live=\"polite\"></div>\n"
+         "</form>\n"
+         "</section>\n"
+         "<section id=\"filter-section\">\n"
+         "<h2>Filters</h2>\n"
+         "<p class=\"held-detail\">A Sieve script, run on every message as it arrives. It is checked before it is saved.</p>\n"
+         "<form id=\"filter-form\">\n"
+         "<label for=\"filter-script\">Script</label><textarea id=\"filter-script\" spellcheck=\"false\"></textarea>\n"
+         "<button type=\"submit\">Save</button>\n"
+         "<div id=\"filter-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</form>\n"
          "</section>\n"
          "<section id=\"password-section\">\n"
@@ -6581,7 +6857,7 @@ namespace HM
          "  };\n"
          "  var load = function (quiet) {\n"
          "    return call('GET', '/api/v1/me').then(function (result) {\n"
-         "      if (result.status === 200 && result.data) { render(result.data); loadQuarantine(); loadFolders(); return true; }\n"
+         "      if (result.status === 200 && result.data) { render(result.data); loadQuarantine(); loadFolders(); loadSettings(); return true; }\n"
          "      if (!quiet) { say('signin-status', describe(result, 'Could not sign in'), false); }\n"
          "      showSignIn();\n"
          "      return false;\n"
@@ -6672,6 +6948,43 @@ namespace HM
          "    showList();\n"
          "    loadMessages();\n"
          "  });\n"
+         "  // Settings and filters: read on sign-in, written whole on Save.\n"
+         "  var renderSettings = function (s) {\n"
+         "    el('name-first').value = s.name.first || '';\n"
+         "    el('name-last').value = s.name.last || '';\n"
+         "    el('forward-enabled').checked = !!s.forwarding.enabled;\n"
+         "    el('forward-address').value = s.forwarding.address || '';\n"
+         "    el('forward-keep').checked = !!s.forwarding.keep_original;\n"
+         "    el('signature-enabled').checked = !!s.signature.enabled;\n"
+         "    el('signature-text').value = s.signature.text || '';\n"
+         "  };\n"
+         "  var loadSettings = function () {\n"
+         "    call('GET', '/api/v1/me/settings').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderSettings(result.data); }\n"
+         "    });\n"
+         "    call('GET', '/api/v1/me/filters').then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { el('filter-script').value = result.data.active || ''; }\n"
+         "    });\n"
+         "  };\n"
+         "  el('settings-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    var body = {\n"
+         "      name: { first: el('name-first').value, last: el('name-last').value },\n"
+         "      forwarding: { enabled: el('forward-enabled').checked, address: el('forward-address').value, keep_original: el('forward-keep').checked },\n"
+         "      signature: { enabled: el('signature-enabled').checked, text: el('signature-text').value, html: '' }\n"
+         "    };\n"
+         "    call('PUT', '/api/v1/me/settings', body).then(function (result) {\n"
+         "      if (result.status === 200 && result.data) { renderSettings(result.data); say('settings-status', 'Saved.', true); return; }\n"
+         "      say('settings-status', describe(result, 'Could not save'), false);\n"
+         "    });\n"
+         "  });\n"
+         "  el('filter-form').addEventListener('submit', function (event) {\n"
+         "    event.preventDefault();\n"
+         "    call('PUT', '/api/v1/me/filters', { script: el('filter-script').value }).then(function (result) {\n"
+         "      if (result.status === 200) { say('filter-status', el('filter-script').value.trim() ? 'Saved. The filter runs on every message that arrives from now on.' : 'Removed.', true); return; }\n"
+         "      say('filter-status', describe(result, 'Could not save the filter'), false);\n"
+         "    });\n"
+         "  });\n"
          "  // A session from an earlier visit is still good until it has been idle\n"
          "  // too long: try it first, and only ask for the password when it is not.\n"
          "  load(true);\n"
@@ -6731,6 +7044,8 @@ namespace HM
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree. shared lists, under owner, the public folders (owner is the public namespace name) and the folders of each account that granted this one a right, named as IMAP names them; each entry carries account_id (0 for public). Every message route accepts a folder or message from those trees under the rights the owner granted.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders, shared\"}}}},"
          "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
+         "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text. Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
@@ -7216,6 +7531,8 @@ namespace HM
 
       valueStart++;
 
+      // RFC 8259 section 7: the two-character escapes, and \uXXXX with a
+      // surrogate pair for what is outside the BMP. The result stays UTF-8.
       AnsiString result;
       for (int i = valueStart; i < json.GetLength(); i++)
       {
@@ -7224,15 +7541,47 @@ namespace HM
          if (character == '\\' && i + 1 < json.GetLength())
          {
             char next = json[i + 1];
-            if (next == '\"' || next == '\\' || next == '/')
+            i++;
+
+            switch (next)
             {
+            case '\"': result += '\"'; continue;
+            case '\\': result += '\\'; continue;
+            case '/':  result += '/';  continue;
+            case 'n':  result += '\n'; continue;
+            case 'r':  result += '\r'; continue;
+            case 't':  result += '\t'; continue;
+            case 'b':  result += '\b'; continue;
+            case 'f':  result += '\f'; continue;
+            case 'u':
+               {
+                  unsigned int codePoint = 0;
+                  if (!ReadJsonHex4_(json, i + 1, codePoint))
+                  {
+                     result += "\\u";
+                     continue;
+                  }
+                  i += 4;
+
+                  if (codePoint >= 0xD800 && codePoint <= 0xDBFF && i + 6 < json.GetLength() &&
+                      json[i + 1] == '\\' && json[i + 2] == 'u')
+                  {
+                     unsigned int low = 0;
+                     if (ReadJsonHex4_(json, i + 3, low) && low >= 0xDC00 && low <= 0xDFFF)
+                     {
+                        codePoint = 0x10000 + ((codePoint - 0xD800) << 10) + (low - 0xDC00);
+                        i += 6;
+                     }
+                  }
+
+                  AppendUtf8_(result, codePoint);
+                  continue;
+               }
+            default:
+               result += character;
                result += next;
-               i++;
                continue;
             }
-
-            result += character;
-            continue;
          }
 
          if (character == '\"')
@@ -7242,6 +7591,59 @@ namespace HM
       }
 
       return result;
+   }
+
+   bool
+   RestApiServer::ReadJsonHex4_(const AnsiString &json, int at, unsigned int &value)
+   {
+      if (at + 4 > json.GetLength())
+         return false;
+
+      value = 0;
+      for (int i = 0; i < 4; i++)
+      {
+         char c = json[at + i];
+         unsigned int digit;
+         if (c >= '0' && c <= '9')
+            digit = c - '0';
+         else if (c >= 'a' && c <= 'f')
+            digit = 10 + c - 'a';
+         else if (c >= 'A' && c <= 'F')
+            digit = 10 + c - 'A';
+         else
+            return false;
+
+         value = (value << 4) | digit;
+      }
+
+      return true;
+   }
+
+   void
+   RestApiServer::AppendUtf8_(AnsiString &out, unsigned int codePoint)
+   {
+      if (codePoint < 0x80)
+      {
+         out += (char) codePoint;
+      }
+      else if (codePoint < 0x800)
+      {
+         out += (char) (0xC0 | (codePoint >> 6));
+         out += (char) (0x80 | (codePoint & 0x3F));
+      }
+      else if (codePoint < 0x10000)
+      {
+         out += (char) (0xE0 | (codePoint >> 12));
+         out += (char) (0x80 | ((codePoint >> 6) & 0x3F));
+         out += (char) (0x80 | (codePoint & 0x3F));
+      }
+      else
+      {
+         out += (char) (0xF0 | (codePoint >> 18));
+         out += (char) (0x80 | ((codePoint >> 12) & 0x3F));
+         out += (char) (0x80 | ((codePoint >> 6) & 0x3F));
+         out += (char) (0x80 | (codePoint & 0x3F));
+      }
    }
 
    HttpResponse
@@ -7304,9 +7706,28 @@ namespace HM
          case '\\':
             result += "\\\\";
             break;
+         case '\n':
+            result += "\\n";
+            break;
+         case '\r':
+            result += "\\r";
+            break;
+         case '\t':
+            result += "\\t";
+            break;
          default:
             if (static_cast<unsigned char>(character) >= 0x20)
+            {
                result += character;
+            }
+            else
+            {
+               // RFC 8259 section 7: a control character is written as \u00XX,
+               // not dropped - a signature or a script has to come back whole.
+               AnsiString escaped;
+               escaped.Format("\\u%04x", (unsigned int) (unsigned char) character);
+               result += escaped;
+            }
             break;
          }
       }
