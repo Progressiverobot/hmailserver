@@ -12,6 +12,7 @@ using Wpf.Ui.Appearance;
 using hMailServer.ControlPanel.Services;
 using hMailServer.ControlPanel.Views;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel
 {
@@ -203,7 +204,7 @@ namespace hMailServer.ControlPanel
       private static object BuildNavHeader_(NavNode node)
       {
          if (string.IsNullOrEmpty(node.Icon))
-            return node.Title;
+            return L(node.Title);
 
          if (!System.Enum.TryParse(node.Icon, out Wpf.Ui.Controls.SymbolRegular symbol))
          {
@@ -215,7 +216,7 @@ namespace hMailServer.ControlPanel
             System.Diagnostics.Debug.Fail(
                "Navigation icon \"" + node.Icon + "\" on \"" + node.Title +
                "\" is not a member of Wpf.Ui.Controls.SymbolRegular.");
-            return node.Title;
+            return L(node.Title);
          }
 
          // A Grid, not a horizontal StackPanel. A StackPanel measures its children
@@ -243,7 +244,7 @@ namespace hMailServer.ControlPanel
 
          var label = new TextBlock
          {
-            Text = node.Title,
+            Text = L(node.Title),
             VerticalAlignment = VerticalAlignment.Center,
             TextTrimming = TextTrimming.CharacterEllipsis
          };
@@ -267,15 +268,15 @@ namespace hMailServer.ControlPanel
             // label can be ellipsized when the pane is narrow, and a tool tip that
             // explains a name the reader cannot finish reading is answering the
             // wrong question.
-            item.ToolTip = node.Title + " - " + node.Purpose;
-            System.Windows.Automation.AutomationProperties.SetHelpText(item, node.Purpose);
+            item.ToolTip = L(node.Title) + " - " + L(node.Purpose);
+            System.Windows.Automation.AutomationProperties.SetHelpText(item, L(node.Purpose));
          }
          else
          {
-            item.ToolTip = node.Title;
+            item.ToolTip = L(node.Title);
          }
 
-         System.Windows.Automation.AutomationProperties.SetName(item, node.Title);
+         System.Windows.Automation.AutomationProperties.SetName(item, L(node.Title));
 
          if (node.IsPage)
          {
@@ -408,7 +409,7 @@ namespace hMailServer.ControlPanel
             {
                var here = new TextBlock
                {
-                  Text = node.Title,
+                  Text = L(node.Title),
                   FontSize = Typography.Label,
                   FontWeight = FontWeights.SemiBold,
                   VerticalAlignment = VerticalAlignment.Center
@@ -439,7 +440,7 @@ namespace hMailServer.ControlPanel
          {
             var caption = new TextBlock
             {
-               Text = "Related:",
+               Text = L("Related:"),
                FontSize = Typography.Caption,
                Margin = new Thickness(0, 0, 2, 0),
                VerticalAlignment = VerticalAlignment.Center
@@ -459,17 +460,17 @@ namespace hMailServer.ControlPanel
       {
          var button = new Wpf.Ui.Controls.Button
          {
-            Content = group.Title,
+            Content = L(group.Title),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
             FontSize = Typography.Label,
             Padding = new Thickness(4, 2, 4, 2),
             Cursor = System.Windows.Input.Cursors.Hand,
             ToolTip = string.IsNullOrEmpty(group.Purpose)
-               ? "Show " + group.Title + " in the navigation"
-               : group.Purpose
+               ? F("Show {0} in the navigation", L(group.Title))
+               : L(group.Purpose)
          };
          System.Windows.Automation.AutomationProperties.SetAutomationId(button, "breadcrumb-group-" + NavigationMap.Slug(group.Title));
-         System.Windows.Automation.AutomationProperties.SetName(button, "Show the group " + group.Title + " in the navigation");
+         System.Windows.Automation.AutomationProperties.SetName(button, F("Show the group {0} in the navigation", L(group.Title)));
          button.Click += (s, e) => RevealGroup(group.Title);
          return button;
       }
@@ -478,15 +479,15 @@ namespace hMailServer.ControlPanel
       {
          var button = new Wpf.Ui.Controls.Button
          {
-            Content = page.Title,
+            Content = L(page.Title),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
             FontSize = Typography.Caption,
             Padding = new Thickness(6, 2, 6, 2),
             Cursor = System.Windows.Input.Cursors.Hand,
-            ToolTip = page.Purpose
+            ToolTip = L(page.Purpose)
          };
          System.Windows.Automation.AutomationProperties.SetAutomationId(button, "breadcrumb-related-" + page.Key);
-         System.Windows.Automation.AutomationProperties.SetName(button, "Go to the related page " + page.Title);
+         System.Windows.Automation.AutomationProperties.SetName(button, F("Go to the related page {0}", L(page.Title)));
          button.Click += (s, e) => NavigateTo(page.Key);
          return button;
       }
@@ -515,12 +516,12 @@ namespace hMailServer.ControlPanel
          };
          marker.SetResourceReference(Border.BackgroundProperty, "SubtleFillColorSecondaryBrush");
 
-         var text = new TextBlock { Text = "Found by search", FontSize = Typography.Caption };
+         var text = new TextBlock { Text = L("Found by search"), FontSize = Typography.Caption };
          text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
          marker.Child = text;
 
          System.Windows.Automation.AutomationProperties.SetAutomationId(marker, "breadcrumb-from-search");
-         System.Windows.Automation.AutomationProperties.SetName(marker, "You arrived here from the search palette");
+         System.Windows.Automation.AutomationProperties.SetName(marker, L("You arrived here from the search palette"));
          return marker;
       }
 
@@ -636,7 +637,7 @@ namespace hMailServer.ControlPanel
          // green dot beside it, which is information conveyed by colour alone and
          // reaches a screen reader not at all - an Ellipse has no automation peer.
          System.Windows.Automation.AutomationProperties.SetName(ConnText,
-            "Connected to " + ServerSession.Current.Host + " as " + ServerSession.Current.UserName);
+            F("Connected to {0} as {1}", ServerSession.Current.Host, ServerSession.Current.UserName));
 
          try
          {
@@ -691,7 +692,7 @@ namespace hMailServer.ControlPanel
             if (!connected_)
                return;
 
-            Services.Toast.Info("Reconnected to " + session.Host + " after the service restarted.", "Connection restored");
+            Services.Toast.Info(F("Reconnected to {0} after the service restarted.", session.Host), L("Connection restored"));
             EnterPage(ContentHost.Content);
          }));
       }
@@ -710,7 +711,7 @@ namespace hMailServer.ControlPanel
             if (Totp.VerifyCode(TotpManager.ReadSecret(), prompt.Code))
                return true;
 
-            MessageBox.Show("The verification code is incorrect.", "Two-factor authentication");
+            MessageBox.Show(L("The verification code is incorrect."), L("Two-factor authentication"));
          }
 
          return false;
@@ -790,8 +791,8 @@ namespace hMailServer.ControlPanel
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            Services.Toast.Info("Could not load this page: " + ServerSession.DescribeComError(ex),
-               "Server unavailable");
+            Services.Toast.Info(F("Could not load this page: {0}", ServerSession.DescribeComError(ex)),
+               L("Server unavailable"));
          }
       }
 
@@ -953,13 +954,44 @@ namespace hMailServer.ControlPanel
             dark ? Wpf.Ui.Controls.SymbolRegular.WeatherSunny24
                  : Wpf.Ui.Controls.SymbolRegular.WeatherMoon24);
 
-         string action = dark ? "Switch to the light theme" : "Switch to the dark theme";
+         string action = dark ? L("Switch to the light theme") : L("Switch to the dark theme");
          ThemeButton.ToolTip = action;
          System.Windows.Automation.AutomationProperties.SetName(ThemeButton, action);
       }
 
       private void OnThemeChanged(ApplicationTheme theme, System.Windows.Media.Color accent)
          => UpdateThemeToggle_();
+
+      /// <summary>
+      /// The language menu: one entry per catalogue plus "whatever Windows shows",
+      /// the current one ticked. Choosing another restarts the Control Panel
+      /// (LanguageChoice says why); the same choice is offered on the sign-in
+      /// screen, which is where somebody who cannot read the current language
+      /// needs it most.
+      /// </summary>
+      private void Language_Click(object sender, RoutedEventArgs e)
+      {
+         var menu = new ContextMenu
+         {
+            PlacementTarget = LanguageButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Top
+         };
+
+         foreach (Loc.Language language in Loc.Languages)
+         {
+            var item = new MenuItem
+            {
+               Header = L(language.NativeName),
+               IsCheckable = true,
+               IsChecked = string.Equals(language.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase),
+               Tag = language.Tag
+            };
+            item.Click += (s, args) => LanguageChoice.Offer((string)((MenuItem)s).Tag);
+            menu.Items.Add(item);
+         }
+
+         menu.IsOpen = true;
+      }
 
       private void Theme_Click(object sender, RoutedEventArgs e)
       {

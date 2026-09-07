@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.QueueView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid Margin="26,20">
@@ -14,26 +15,26 @@
 
         <Grid>
             <StackPanel>
-                <TextBlock Text="Delivery queue" Style="{StaticResource PageTitle}" />
-                <TextBlock x:Name="SubtitleText" Text="Messages waiting for delivery."
+                <TextBlock Text="{loc:L 'Delivery queue'}" Style="{StaticResource PageTitle}" />
+                <TextBlock x:Name="SubtitleText" Text="{loc:L 'Messages waiting for delivery.'}"
                            Style="{StaticResource PageSubtitle}" />
-                <ui:TextBox x:Name="SearchBox" PlaceholderText="Search queue..." Width="300"
+                <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search queue...'}" Width="300"
                             HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                            AutomationProperties.Name="Search the delivery queue">
+                            AutomationProperties.Name="{loc:L 'Search the delivery queue'}">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
                 </ui:TextBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button Content="_View source" Click="View_Click" Margin="0,0,8,0">
+                <ui:Button Content="{loc:L '_View source'}" Click="View_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="_Deliver now" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
+                <ui:Button Content="{loc:L '_Deliver now'}" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="_Remove" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
+                <ui:Button Content="{loc:L '_Remove'}" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Delete24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="Re_fresh" Click="Refresh_Click">
+                <ui:Button Content="{loc:L 'Re_fresh'}" Click="Refresh_Click">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
                 </ui:Button>
             </StackPanel>
@@ -46,11 +47,11 @@
                       MouseDoubleClick="View_Click">
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
-                    <DataGridTextColumn Header="Created" Binding="{Binding Created}" Width="150" />
-                    <DataGridTextColumn Header="From" Binding="{Binding From}" Width="*" />
-                    <DataGridTextColumn Header="Recipients" Binding="{Binding Recipients}" Width="*" />
-                    <DataGridTextColumn Header="Next try" Binding="{Binding NextTry}" Width="150" />
-                    <DataGridTextColumn Header="Tries" Binding="{Binding Tries}" Width="60" />
+                    <DataGridTextColumn Header="{loc:L 'Created'}" Binding="{Binding Created}" Width="150" />
+                    <DataGridTextColumn Header="{loc:L 'From'}" Binding="{Binding From}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Recipients'}" Binding="{Binding Recipients}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Next try'}" Binding="{Binding NextTry}" Width="150" />
+                    <DataGridTextColumn Header="{loc:L 'Tries'}" Binding="{Binding Tries}" Width="60" />
                 </DataGrid.Columns>
             </DataGrid>
         </Border>

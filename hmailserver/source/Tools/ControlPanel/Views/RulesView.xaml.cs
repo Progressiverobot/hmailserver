@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -50,8 +51,8 @@ namespace hMailServer.ControlPanel.Views
          InitializeComponent();
 
          suppressMatchMode_ = true;
-         MatchMode.Items.Add("Match ALL criteria (AND)");
-         MatchMode.Items.Add("Match ANY criterion (OR)");
+         MatchMode.Items.Add(L("Match ALL criteria (AND)"));
+         MatchMode.Items.Add(L("Match ANY criterion (OR)"));
          MatchMode.SelectedIndex = 0;
          suppressMatchMode_ = false;
       }
@@ -77,7 +78,7 @@ namespace hMailServer.ControlPanel.Views
                   Id = (int)rule.ID,
                   Position = i + 1,
                   Name = (string)rule.Name,
-                  Enabled = (bool)rule.Active ? "Yes" : "No"
+                  Enabled = (bool)rule.Active ? L("Yes") : L("No")
                });
                ServerSession.Release(rule);
             }
@@ -90,8 +91,8 @@ namespace hMailServer.ControlPanel.Views
          RuleGrid.ItemsSource = rows;
          ListSearch.Apply(RuleGrid, SearchBox.Text);
          SubtitleText.Text = rows.Count == 0
-            ? "No rules defined yet - create one below."
-            : rows.Count + " rule(s), evaluated top to bottom.";
+            ? L("No rules defined yet - create one below.")
+            : F("{0} rule(s), evaluated top to bottom.", rows.Count);
 
          CriteriaGrid.ItemsSource = null;
          ActionsGrid.ItemsSource = null;
@@ -101,14 +102,14 @@ namespace hMailServer.ControlPanel.Views
          => ListSearch.Apply(RuleGrid, SearchBox.Text);
 
       private static readonly string[] FieldNames =
-         { "?", "From", "To", "CC", "Subject", "Body", "Message size", "Recipient list", "Delivery attempts" };
+         { "?", L("From"), L("To"), L("CC"), L("Subject"), L("Body"), L("Message size"), L("Recipient list"), L("Delivery attempts") };
 
       private static readonly string[] MatchNames =
-         { "?", "equals", "contains", "is less than", "is greater than", "matches regex", "does not contain", "does not equal", "matches wildcard" };
+         { "?", L("equals"), L("contains"), L("is less than"), L("is greater than"), L("matches regex"), L("does not contain"), L("does not equal"), L("matches wildcard") };
 
       private static readonly string[] ActionNames =
-         { "?", "Delete e-mail", "Forward e-mail", "Reply", "Move to IMAP folder", "Run script function",
-           "Stop rule processing", "Set header value", "Send using route", "Create copy", "Bind to address" };
+         { "?", L("Delete e-mail"), L("Forward e-mail"), L("Reply"), L("Move to IMAP folder"), L("Run script function"),
+           L("Stop rule processing"), L("Set header value"), L("Send using route"), L("Create copy"), L("Bind to address") };
 
       private static string Pick(string[] names, int index)
          => index >= 0 && index < names.Length ? names[index] : "#" + index;
@@ -152,7 +153,7 @@ namespace hMailServer.ControlPanel.Views
                dynamic c = criterias.Item[i];
                string field = (bool)c.UsePredefined
                   ? Pick(FieldNames, (int)c.PredefinedField)
-                  : "header '" + (string)c.HeaderField + "'";
+                  : F("header '{0}'", (string)c.HeaderField);
                criteria.Add(new DetailRow
                {
                   Id = (int)c.ID,
@@ -200,11 +201,11 @@ namespace hMailServer.ControlPanel.Views
             switch (type)
             {
                case 2: text += " -> " + (string)a.To; break;
-               case 3: text += " (subject '" + (string)a.Subject + "')"; break;
+               case 3: text += F(" (subject '{0}')", (string)a.Subject); break;
                case 4: text += " '" + (string)a.IMAPFolder + "'"; break;
                case 5: text += " " + (string)a.ScriptFunction; break;
                case 7: text += " " + (string)a.HeaderName + "=" + (string)a.Value; break;
-               case 8: text += " (route #" + (int)a.RouteID + ")"; break;
+               case 8: text += F(" (route #{0})", (int)a.RouteID); break;
                case 10: text += " " + (string)a.Value; break;
             }
          }
@@ -233,7 +234,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Rule operation failed: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Rule operation failed: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -261,7 +262,7 @@ namespace hMailServer.ControlPanel.Views
          if (RuleGrid.SelectedItem is not RuleRow row)
             return;
 
-         if (MessageBox.Show("Delete rule '" + row.Name + "'?", "Control Panel",
+         if (MessageBox.Show(F("Delete rule '{0}'?", row.Name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -273,7 +274,7 @@ namespace hMailServer.ControlPanel.Views
          string name = NewRuleName.Text.Trim();
          if (name.Length == 0)
          {
-            MessageBox.Show("Enter a name for the new rule.", "Control Panel");
+            MessageBox.Show(L("Enter a name for the new rule."), L("Control Panel"));
             return;
          }
 
@@ -288,7 +289,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the rule: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the rule: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -319,7 +320,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not change the match mode: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not change the match mode: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -331,7 +332,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void AddCriterion_Click(object sender, RoutedEventArgs e)
       {
-         if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
+         if (selectedRuleId_ == 0) { MessageBox.Show(L("Select a rule first."), L("Control Panel")); return; }
          new RuleCriteriaDialog(Window.GetWindow(this), selectedRuleId_, 0, rulesProvider_).ShowDialog();
          RefreshDetails();
       }
@@ -361,7 +362,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not remove the criterion: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not remove the criterion: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -375,7 +376,7 @@ namespace hMailServer.ControlPanel.Views
 
       private void AddAction_Click(object sender, RoutedEventArgs e)
       {
-         if (selectedRuleId_ == 0) { MessageBox.Show("Select a rule first.", "Control Panel"); return; }
+         if (selectedRuleId_ == 0) { MessageBox.Show(L("Select a rule first."), L("Control Panel")); return; }
          new RuleActionDialog(Window.GetWindow(this), selectedRuleId_, 0, rulesProvider_, serverLevel_).ShowDialog();
          RefreshDetails();
       }
@@ -405,7 +406,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not remove the action: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not remove the action: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -439,7 +440,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not move the action: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not move the action: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -52,9 +53,9 @@ namespace hMailServer.ControlPanel.Views
                   LowerIP = (string)range.LowerIP,
                   UpperIP = (string)range.UpperIP,
                   Priority = (int)range.Priority,
-                  Smtp = (bool)range.AllowSMTPConnections ? "Yes" : "No",
-                  Imap = (bool)range.AllowIMAPConnections ? "Yes" : "No",
-                  Pop3 = (bool)range.AllowPOP3Connections ? "Yes" : "No"
+                  Smtp = (bool)range.AllowSMTPConnections ? L("Yes") : L("No"),
+                  Imap = (bool)range.AllowIMAPConnections ? L("Yes") : L("No"),
+                  Pop3 = (bool)range.AllowPOP3Connections ? L("Yes") : L("No")
                });
                ServerSession.Release(range);
             }
@@ -66,7 +67,7 @@ namespace hMailServer.ControlPanel.Views
 
          RangeGrid.ItemsSource = rows;
          ListSearch.Apply(RangeGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, null, "No IP ranges defined yet.");
+         StatusText.Show(EmptyStatus, rows.Count, null, L("No IP ranges defined yet."));
       }
 
       private void Search_TextChanged(object sender, TextChangedEventArgs e)
@@ -76,7 +77,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (RangeGrid.SelectedItem is not RangeRow row)
          {
-            PermHeader.Text = "Permissions (select a range)";
+            PermHeader.Text = L("Permissions (select a range)");
             SavePermsButton.IsEnabled = false;
             return;
          }
@@ -88,7 +89,7 @@ namespace hMailServer.ControlPanel.Views
             if (range == null)
                return;
 
-            PermHeader.Text = "Permissions - " + row.Name;
+            PermHeader.Text = F("Permissions - {0}", row.Name);
             PermSmtp.IsChecked = (bool)range.AllowSMTPConnections;
             PermImap.IsChecked = (bool)range.AllowIMAPConnections;
             PermPop3.IsChecked = (bool)range.AllowPOP3Connections;
@@ -145,11 +146,11 @@ namespace hMailServer.ControlPanel.Views
             range.AllowDeliveryFromRemoteToRemote = PermRR.IsChecked is true;
             range.Save();
             ServerSession.Release(range);
-            PermHeader.Text = "Permissions - " + row.Name + " (saved)";
+            PermHeader.Text = F("Permissions - {0} (saved)", row.Name);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not save the permissions: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not save the permissions: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -163,7 +164,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (RangeGrid.SelectedItem is not RangeRow row)
          {
-            MessageBox.Show("Select a range first.", "Control Panel");
+            MessageBox.Show(L("Select a range first."), L("Control Panel"));
             return;
          }
 
@@ -179,7 +180,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (name.Length == 0 || lower.Length == 0 || upper.Length == 0)
          {
-            MessageBox.Show("Name, lower IP and upper IP are required.", "Control Panel");
+            MessageBox.Show(L("Name, lower IP and upper IP are required."), L("Control Panel"));
             return;
          }
 
@@ -202,7 +203,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the range: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the range: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -226,10 +227,8 @@ namespace hMailServer.ControlPanel.Views
       private void RestoreDefaults_Click(object sender, RoutedEventArgs e)
       {
          if (MessageBox.Show(
-                "Replace ALL IP ranges with the defaults?\n\nEvery custom range - including any auto-ban " +
-                "entries - will be removed and replaced with 'My computer' (127.0.0.1) and 'Internet' " +
-                "(everything else). This changes who may connect and relay, immediately.",
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                L("Replace ALL IP ranges with the defaults?\n\nEvery custom range - including any auto-ban entries - will be removed and replaced with 'My computer' (127.0.0.1) and 'Internet' (everything else). This changes who may connect and relay, immediately."),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
          dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
@@ -239,7 +238,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(ex.Message, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Error);
          }
          finally
          {
@@ -254,7 +253,7 @@ namespace hMailServer.ControlPanel.Views
          if (RangeGrid.SelectedItem is not RangeRow row)
             return;
 
-         if (MessageBox.Show("Delete IP range '" + row.Name + "'?", "Control Panel",
+         if (MessageBox.Show(F("Delete IP range '{0}'?", row.Name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -276,7 +275,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the range: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the range: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

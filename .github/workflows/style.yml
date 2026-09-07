@@ -71,6 +71,13 @@ jobs:
       - name: Every Control Panel caption carries an Alt-key mnemonic
         run: python3 build/check-mnemonics.py
 
+      # The Control Panel's translation catalogues: the English one is generated
+      # from the L(...) / {loc:L} marks in the source and must be committed up to
+      # date, every language keeps the placeholders and Alt keys of its English,
+      # and a file listed as localised carries no unmarked caption.
+      - name: The Control Panel's translation catalogues match the source
+        run: python3 build/check-localisation.py
+
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.
       - name: Every folder-access decision is ACLManager's

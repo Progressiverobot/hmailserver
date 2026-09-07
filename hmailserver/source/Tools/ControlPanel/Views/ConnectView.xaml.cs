@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -18,6 +19,7 @@ namespace hMailServer.ControlPanel.Views
       {
          InitializeComponent();
          onConnected_ = onConnected;
+         BuildLanguageBox_();
 
          Loaded += (s, e) => PasswordBox.Focus();
          KeyDown += (s, e) =>
@@ -38,7 +40,7 @@ namespace hMailServer.ControlPanel.Views
          string user = UserBox.Text.Trim();
          string password = PasswordBox.Password;
 
-         SetBusy_(true, "Contacting " + (host.Length == 0 ? "localhost" : host) + "…");
+         SetBusy_(true, F("Contacting {0}…", host.Length == 0 ? "localhost" : host));
 
          try
          {
@@ -56,7 +58,7 @@ namespace hMailServer.ControlPanel.Views
                return;
             }
 
-            BusyText.Text = "Signing in…";
+            BusyText.Text = L("Signing in…");
 
             // Back on the UI thread deliberately: the COM proxy belongs to the
             // apartment that creates it, and this is the apartment that has to
@@ -75,7 +77,7 @@ namespace hMailServer.ControlPanel.Views
             if (!session.Connect(host, user, password, out string error)
                 && (!session.SecondFactorRequired || !TryWithCode_(session, host, user, password, out error)))
             {
-               Fail_(error ?? "Connection failed.");
+               Fail_(error ?? L("Connection failed."));
                return;
             }
 
@@ -100,12 +102,60 @@ namespace hMailServer.ControlPanel.Views
 
          if (prompt.ShowDialog() != true)
          {
-            error = "Sign-in cancelled.";
+            error = L("Sign-in cancelled.");
             return false;
          }
 
-         BusyText.Text = "Signing in…";
+         BusyText.Text = L("Signing in…");
          return session.Connect(host, user, password, prompt.Code, out error);
+      }
+
+      private bool languageReady_;
+
+      private void BuildLanguageBox_()
+      {
+         foreach (Loc.Language language in Loc.Languages)
+         {
+            var item = new ComboBoxItem { Content = L(language.NativeName), Tag = language.Tag };
+            LanguageBox.Items.Add(item);
+            if (string.Equals(language.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase))
+               LanguageBox.SelectedItem = item;
+         }
+
+         if (LanguageBox.SelectedIndex < 0)
+            LanguageBox.SelectedIndex = 0;
+
+         languageReady_ = true;
+      }
+
+      // A choice made from the open list is applied when the list closes; one
+      // made with the arrow keys on the closed box is applied at once. Either
+      // way LanguageChoice asks first, because the answer restarts the program.
+      private void Language_SelectionChanged(object sender, SelectionChangedEventArgs e)
+      {
+         if (languageReady_ && !LanguageBox.IsDropDownOpen)
+            ApplyLanguage_();
+      }
+
+      private void Language_DropDownClosed(object sender, EventArgs e) => ApplyLanguage_();
+
+      private void ApplyLanguage_()
+      {
+         if (!languageReady_ || LanguageBox.SelectedItem is not ComboBoxItem item)
+            return;
+
+         string tag = (string)item.Tag;
+         if (string.Equals(tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase) || LanguageChoice.Offer(tag))
+            return;
+
+         // Declined: back to the language in force, without offering again.
+         languageReady_ = false;
+         foreach (ComboBoxItem candidate in LanguageBox.Items)
+         {
+            if (string.Equals((string)candidate.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase))
+               LanguageBox.SelectedItem = candidate;
+         }
+         languageReady_ = true;
       }
 
       private void Fail_(string message)
@@ -129,7 +179,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (busy)
          {
-            BusyText.Text = message ?? "Connecting…";
+            BusyText.Text = message ?? L("Connecting…");
             ErrorText.Visibility = Visibility.Collapsed;
          }
 

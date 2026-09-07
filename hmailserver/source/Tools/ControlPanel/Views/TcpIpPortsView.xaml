@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.TcpIpPortsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid Margin="26,20">
@@ -17,12 +18,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="TCP/IP ports" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for."
+            <TextBlock Text="{loc:L 'TCP/IP ports'}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{loc:L 'The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine\'s open ports, not from the configuration, so it shows what is actually happening rather than what was asked for.'}"
                        Style="{StaticResource PageSubtitle}" />
-            <ui:TextBox x:Name="SearchBox" PlaceholderText="Search ports..." Width="300"
+            <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search ports...'}" Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                        AutomationProperties.Name="Search ports">
+                        AutomationProperties.Name="{loc:L 'Search ports'}">
                 <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
             </ui:TextBox>
         </StackPanel>
@@ -34,9 +35,9 @@
                       Background="Transparent" BorderThickness="0" RowHeight="34"
                       SelectionMode="Single" MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Protocol" Binding="{Binding Protocol}" Width="120" />
-                    <DataGridTextColumn Header="Address" Binding="{Binding Address}" Width="170" />
-                    <DataGridTextColumn Header="Port" Binding="{Binding Port}" Width="90">
+                    <DataGridTextColumn Header="{loc:L 'Protocol'}" Binding="{Binding Protocol}" Width="120" />
+                    <DataGridTextColumn Header="{loc:L 'Address'}" Binding="{Binding Address}" Width="170" />
+                    <DataGridTextColumn Header="{loc:L 'Port'}" Binding="{Binding Port}" Width="90">
                         <DataGridTextColumn.ElementStyle>
                             <Style TargetType="TextBlock">
                                 <Setter Property="HorizontalAlignment" Value="Right" />
@@ -44,7 +45,7 @@
                             </Style>
                         </DataGridTextColumn.ElementStyle>
                     </DataGridTextColumn>
-                    <DataGridTextColumn Header="Security" Binding="{Binding Security}" Width="180" />
+                    <DataGridTextColumn Header="{loc:L 'Security'}" Binding="{Binding Security}" Width="180" />
                     <!-- A shape as well as a word, so the difference between a live
                          port and a dead one survives greyscale, colour blindness and
                          High Contrast. The mark itself is built in the code-behind by
@@ -52,7 +53,7 @@
                          straight to Fill would render a stroke-only mark as nothing
                          at all, which is precisely the silent failure that helper
                          exists to prevent. -->
-                    <DataGridTemplateColumn Header="Listening" Width="150" SortMemberPath="ListeningWord">
+                    <DataGridTemplateColumn Header="{loc:L 'Listening'}" Width="150" SortMemberPath="ListeningWord">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal" ToolTip="{Binding ListeningTip}">
@@ -64,7 +65,7 @@
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Certificate" Binding="{Binding Certificate}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Certificate'}" Binding="{Binding Certificate}" Width="*" />
                 </DataGrid.Columns>
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
@@ -81,7 +82,7 @@
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add port" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="{loc:L 'Add port'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -98,20 +99,20 @@
                         <ComboBoxItem Content="POP3" />
                         <ComboBoxItem Content="IMAP" />
                     </ComboBox>
-                    <ui:TextBox x:Name="NewAddress" Grid.Column="1" PlaceholderText="Bind address (0.0.0.0)" Text="0.0.0.0" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="Port" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewAddress" Grid.Column="1" PlaceholderText="{loc:L 'Bind address (0.0.0.0)'}" Text="0.0.0.0" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="{loc:L 'Port'}" Margin="0,0,8,0" />
                     <ComboBox x:Name="NewSecurity" Grid.Column="3" SelectedIndex="0" Margin="0,0,8,0">
-                        <ComboBoxItem Content="None" />
+                        <ComboBoxItem Content="{loc:L 'None'}" />
                         <ComboBoxItem Content="SSL/TLS" />
-                        <ComboBoxItem Content="STARTTLS (optional)" />
-                        <ComboBoxItem Content="STARTTLS (required)" />
+                        <ComboBoxItem Content="{loc:L 'STARTTLS (optional)'}" />
+                        <ComboBoxItem Content="{loc:L 'STARTTLS (required)'}" />
                     </ComboBox>
-                    <ui:Button Grid.Column="4" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="_Properties" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="6" Content="_Delete selected" Appearance="Secondary"
+                    <ui:Button Grid.Column="4" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="5" Content="{loc:L '_Properties'}" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="6" Content="{loc:L '_Delete selected'}" Appearance="Secondary"
                                Foreground="{DynamicResource AppDangerBrush}" Click="Delete_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="7" Content="_Restore defaults" Click="RestoreDefaults_Click"
-                               ToolTip="Replaces every port with the standard set: SMTP 25 and 587, POP3 110, IMAP 143, all without connection security." />
+                    <ui:Button Grid.Column="7" Content="{loc:L '_Restore defaults'}" Click="RestoreDefaults_Click"
+                               ToolTip="{loc:L 'Replaces every port with the standard set: SMTP 25 and 587, POP3 110, IMAP 143, all without connection security.'}" />
                 </Grid>
             </StackPanel>
         </Border>

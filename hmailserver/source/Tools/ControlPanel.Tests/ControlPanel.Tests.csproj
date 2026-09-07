@@ -42,8 +42,8 @@
          drive a sentence shown to an administrator, so both are worth testing
          without a WPF page around them. -->
     <Compile Include="..\ControlPanel\Services\WindowsServiceInfo.cs" />
-    <!-- The fatal-exception filter those linked files put on their catch clauses. -->
-    <Compile Include="..\ControlPanel\Services\ExceptionPolicy.cs" />
+    <!-- The fatal-exception filter those linked files put on their catch clauses
+         comes from ControlPanel.Core, which compiles it for Loc. -->
     <!-- The REST API key store. Every rule in it - the token's shape, the digest,
          what makes a label, a domain list or a source restriction acceptable - has
          to agree with RestApiServer, and a disagreement produces a key that is

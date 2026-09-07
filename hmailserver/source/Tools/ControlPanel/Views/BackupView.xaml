@@ -4,19 +4,20 @@
     x:Class="hMailServer.ControlPanel.Views.BackupView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:hMailServer.ControlPanel.Views">
 
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="26,20">
         <StackPanel>
-            <TextBlock Text="Backup &amp; restore" Style="{StaticResource PageTitle}" />
-            <TextBlock x:Name="SubtitleText" Text="Back up domains, messages and settings to a folder; restore from a previous backup."
+            <TextBlock Text="{loc:L 'Backup &amp; restore'}" Style="{StaticResource PageTitle}" />
+            <TextBlock x:Name="SubtitleText" Text="{loc:L 'Back up domains, messages and settings to a folder; restore from a previous backup.'}"
                        Style="{StaticResource PageSubtitle}" />
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="Backup" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,14" />
-                    <TextBlock Text="Destination _folder (on the server)" local:Mnemonic.Target="{Binding ElementName=DestinationBox}" FontSize="14" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Backup'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,14" />
+                    <TextBlock Text="{loc:L 'Destination _folder (on the server)'}" local:Mnemonic.Target="{Binding ElementName=DestinationBox}" FontSize="14" Margin="0,0,0,4" />
                     <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -24,32 +25,32 @@
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="DestinationBox" Grid.Column="0" />
                         <ui:Button x:Name="BrowseDestination" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
-                                   VerticalAlignment="Bottom" ToolTip="Browse for a folder" Click="BrowseDestination_Click" />
+                                   VerticalAlignment="Bottom" ToolTip="{loc:L 'Browse for a folder'}" Click="BrowseDestination_Click" />
                     </Grid>
-                    <CheckBox x:Name="CheckDomains" Content="Back up _domains (accounts, aliases, lists)" FontSize="14" Margin="0,0,0,12" />
-                    <CheckBox x:Name="CheckMessages" Content="Back up _messages" FontSize="14" Margin="0,0,0,8" />
-                    <CheckBox x:Name="CheckMessagesDbOnly" Content="Message metadata _only — do not copy the message files"
+                    <CheckBox x:Name="CheckDomains" Content="{loc:L 'Back up _domains (accounts, aliases, lists)'}" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckMessages" Content="{loc:L 'Back up _messages'}" FontSize="14" Margin="0,0,0,8" />
+                    <CheckBox x:Name="CheckMessagesDbOnly" Content="{loc:L 'Message metadata _only — do not copy the message files'}"
                               FontSize="14" Margin="22,0,0,4" />
                     <TextBlock x:Name="MessagesDbOnlyNote" MaxWidth="520" HorizontalAlignment="Left"
-                               Text="hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart."
+                               Text="{loc:L 'hMailServer.ini setting BackupMessagesDBOnly. The backup then records which messages exist but not their contents, and a restore expects the files to still be in the data folder. Applies to backup and restore, after a service restart.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
-                    <CheckBox x:Name="CheckVerifyRestore" Content="_Verify each backup by extracting its message store and reconciling it against the rows"
+                    <CheckBox x:Name="CheckVerifyRestore" Content="{loc:L '_Verify each backup by extracting its message store and reconciling it against the rows'}"
                               FontSize="14" Margin="22,0,0,4" />
                     <TextBlock x:Name="VerifyRestoreNote" MaxWidth="520" HorizontalAlignment="Left"
-                               Text="hMailServer.ini setting BackupVerifyRestore, on by default. After the archive is written its message store is extracted to the temp folder through the same code a restore uses, held to exactly the files the backup staged, and every message row is checked for its file; the result is in the backup log. The store exists twice while it runs, so turn it off for a store the temp volume cannot hold. Applies after a service restart."
+                               Text="{loc:L 'hMailServer.ini setting BackupVerifyRestore, on by default. After the archive is written its message store is extracted to the temp folder through the same code a restore uses, held to exactly the files the backup staged, and every message row is checked for its file; the result is in the backup log. The store exists twice while it runs, so turn it off for a store the temp volume cannot hold. Applies after a service restart.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="22,0,0,12" />
-                    <CheckBox x:Name="CheckSettings" Content="Back up _settings" FontSize="14" Margin="0,0,0,12" />
-                    <CheckBox x:Name="CheckCompress" Content="_Compress destination files (zip)" FontSize="14" Margin="0,0,0,14" />
+                    <CheckBox x:Name="CheckSettings" Content="{loc:L 'Back up _settings'}" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="CheckCompress" Content="{loc:L '_Compress destination files (zip)'}" FontSize="14" Margin="0,0,0,14" />
                     <StackPanel Orientation="Horizontal">
-                        <ui:Button Content="Save s_ettings" Click="SaveSettings_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Start _backup now" Appearance="Primary" Click="StartBackup_Click" />
+                        <ui:Button Content="{loc:L 'Save s_ettings'}" Click="SaveSettings_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="{loc:L 'Start _backup now'}" Appearance="Primary" Click="StartBackup_Click" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,12">
                 <StackPanel>
-                    <TextBlock Text="Scheduled backups" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+                    <TextBlock Text="{loc:L 'Scheduled backups'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
 
                     <!-- State first: whether a schedule exists and how old the newest archive is.
                          Colour, shape AND word (StatusSemantics), so no channel is load-bearing alone. -->
@@ -70,51 +71,51 @@
                         <TextBlock x:Name="LastBackupStatusText" AutomationProperties.LiveSetting="Polite" Grid.Column="1" FontSize="14" TextWrapping="Wrap" />
                     </Grid>
 
-                    <TextBlock Text="Daily backup t_ime (24-hour HH:MM, empty = off)" local:Mnemonic.Target="{Binding ElementName=ScheduleTimeBox}" FontSize="14" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Daily backup t_ime (24-hour HH:MM, empty = off)'}" local:Mnemonic.Target="{Binding ElementName=ScheduleTimeBox}" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="ScheduleTimeBox" Width="200" HorizontalAlignment="Left"
-                                AutomationProperties.Name="Daily backup time (24-hour HH:MM, empty = off)" />
+                                AutomationProperties.Name="{loc:L 'Daily backup time (24-hour HH:MM, empty = off)'}" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
-                               Text="At most one backup per calendar day, taken at the first check at or after this time (the server's local time). If an interval is also set below, the daily time wins."
+                               Text="{loc:L 'At most one backup per calendar day, taken at the first check at or after this time (the server\'s local time). If an interval is also set below, the daily time wins.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
 
-                    <TextBlock Text="Backup interva_l in minutes (0 = off)" local:Mnemonic.Target="{Binding ElementName=IntervalBox}" FontSize="14" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Backup interva_l in minutes (0 = off)'}" local:Mnemonic.Target="{Binding ElementName=IntervalBox}" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="IntervalBox" Width="200" HorizontalAlignment="Left"
-                                AutomationProperties.Name="Backup interval in minutes (0 = off)" />
+                                AutomationProperties.Name="{loc:L 'Backup interval in minutes (0 = off)'}" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
-                               Text="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts."
+                               Text="{loc:L 'Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,4,0,12" />
 
-                    <TextBlock Text="Retention" FontSize="14" FontWeight="SemiBold" Margin="0,2,0,8" />
-                    <TextBlock Text="Archives to kee_p (0 = keep all)" local:Mnemonic.Target="{Binding ElementName=KeepCountBox}" FontSize="14" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Retention'}" FontSize="14" FontWeight="SemiBold" Margin="0,2,0,8" />
+                    <TextBlock Text="{loc:L 'Archives to kee_p (0 = keep all)'}" local:Mnemonic.Target="{Binding ElementName=KeepCountBox}" FontSize="14" Margin="0,0,0,4" />
                     <ui:TextBox x:Name="KeepCountBox" Width="200" HorizontalAlignment="Left"
-                                AutomationProperties.Name="Archives to keep (0 = keep all)" />
-                    <TextBlock Text="Delete archives older tha_n this many days (0 = keep all)" local:Mnemonic.Target="{Binding ElementName=MaxAgeBox}" FontSize="14" Margin="0,8,0,4" />
+                                AutomationProperties.Name="{loc:L 'Archives to keep (0 = keep all)'}" />
+                    <TextBlock Text="{loc:L 'Delete archives older tha_n this many days (0 = keep all)'}" local:Mnemonic.Target="{Binding ElementName=MaxAgeBox}" FontSize="14" Margin="0,8,0,4" />
                     <ui:TextBox x:Name="MaxAgeBox" Width="200" HorizontalAlignment="Left"
-                                AutomationProperties.Name="Delete archives older than this many days (0 = keep all)" />
+                                AutomationProperties.Name="{loc:L 'Delete archives older than this many days (0 = keep all)'}" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
-                               Text="0 means archives are never deleted. Retention runs on the server after every backup into this folder - scheduled or started by hand with Start backup now - and only once the new archive has been written and verified readable, so a failed backup never deletes anything. The newest archive is never deleted, the age limit always leaves the two newest alone, and only this server's own HMBackup archives are counted - other files in the folder are never touched."
+                               Text="{loc:L '0 means archives are never deleted. Retention runs on the server after every backup into this folder - scheduled or started by hand with Start backup now - and only once the new archive has been written and verified readable, so a failed backup never deletes anything. The newest archive is never deleted, the age limit always leaves the two newest alone, and only this server\'s own HMBackup archives are counted - other files in the folder are never touched.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,6,0,8" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
-                               Text="Keeping several generations of messages needs compression: without 'Compress destination files (zip)' every backup writes its message files into the same DataBackup folder, overwriting the previous run's, so retention can only keep generations of the small settings-and-domains archives."
+                               Text="{loc:L 'Keeping several generations of messages needs compression: without \'Compress destination files (zip)\' every backup writes its message files into the same DataBackup folder, overwriting the previous run\'s, so retention can only keep generations of the small settings-and-domains archives.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,8" />
                     <TextBlock MaxWidth="520" HorizontalAlignment="Left"
-                               Text="Stored in hMailServer.ini as ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays. The service reads them when it starts, so changes here apply after a service restart."
+                               Text="{loc:L 'Stored in hMailServer.ini as ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays. The service reads them when it starts, so changes here apply after a service restart.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,12" />
 
                     <StackPanel Orientation="Horizontal">
-                        <ui:Button x:Name="SaveScheduleButton" Content="Save sc_hedule" Click="SaveSchedule_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="Re-chec_k status" Click="RefreshScheduleStatus_Click"
-                                   ToolTip="Re-read the schedule from hMailServer.ini and look at the destination folder again" />
+                        <ui:Button x:Name="SaveScheduleButton" Content="{loc:L 'Save sc_hedule'}" Click="SaveSchedule_Click" Margin="0,0,8,0" />
+                        <ui:Button Content="{loc:L 'Re-chec_k status'}" Click="RefreshScheduleStatus_Click"
+                                   ToolTip="{loc:L 'Re-read the schedule from hMailServer.ini and look at the destination folder again'}" />
                     </StackPanel>
                 </StackPanel>
             </Border>
 
             <Border Style="{StaticResource Card}" Margin="0,0,12,0">
                 <StackPanel>
-                    <TextBlock Text="Restore" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4" />
-                    <TextBlock Text="Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories."
+                    <TextBlock Text="{loc:L 'Restore'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Select the backup XML file created by a previous backup (in the destination folder). The contents replace the current data for the selected categories.'}"
                                FontSize="12" Opacity="0.65" TextWrapping="Wrap" Margin="0,0,0,14" />
-                    <TextBlock Text="Back_up file (HMBackup*.xml on the server)" local:Mnemonic.Target="{Binding ElementName=BackupFileBox}" FontSize="14" Margin="0,0,0,4" />
+                    <TextBlock Text="{loc:L 'Back_up file (HMBackup*.xml on the server)'}" local:Mnemonic.Target="{Binding ElementName=BackupFileBox}" FontSize="14" Margin="0,0,0,4" />
                     <Grid Width="520" HorizontalAlignment="Left" Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -122,12 +123,12 @@
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="BackupFileBox" Grid.Column="0" />
                         <ui:Button x:Name="BrowseBackupFile" Grid.Column="1" Content="…" MinWidth="40" Margin="8,0,0,0"
-                                   VerticalAlignment="Bottom" ToolTip="Browse for a file" Click="BrowseBackupFile_Click" />
+                                   VerticalAlignment="Bottom" ToolTip="{loc:L 'Browse for a file'}" Click="BrowseBackupFile_Click" />
                     </Grid>
-                    <CheckBox x:Name="RestoreDomains" Content="Restore dom_ains" FontSize="14" Margin="0,0,0,12" />
-                    <CheckBox x:Name="RestoreMessages" Content="Restore messa_ges" FontSize="14" Margin="0,0,0,12" />
-                    <CheckBox x:Name="RestoreSettings" Content="Res_tore settings" FontSize="14" Margin="0,0,0,14" />
-                    <ui:Button Content="Start _restore" Appearance="Danger" Click="StartRestore_Click" HorizontalAlignment="Left" />
+                    <CheckBox x:Name="RestoreDomains" Content="{loc:L 'Restore dom_ains'}" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreMessages" Content="{loc:L 'Restore messa_ges'}" FontSize="14" Margin="0,0,0,12" />
+                    <CheckBox x:Name="RestoreSettings" Content="{loc:L 'Res_tore settings'}" FontSize="14" Margin="0,0,0,14" />
+                    <ui:Button Content="{loc:L 'Start _restore'}" Appearance="Danger" Click="StartRestore_Click" HorizontalAlignment="Left" />
                 </StackPanel>
             </Border>
         </StackPanel>

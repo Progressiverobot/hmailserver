@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -62,7 +63,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (folder == null || !Directory.Exists(folder))
          {
-            SubtitleText.Text = "Log folder not found on this machine (live logs need a local server).";
+            SubtitleText.Text = L("Log folder not found on this machine (live logs need a local server).");
             return;
          }
 
@@ -72,13 +73,13 @@ namespace hMailServer.ControlPanel.Views
 
          if (newest == null)
          {
-            SubtitleText.Text = "No log files in " + folder + " yet. Enable logging in the server settings.";
+            SubtitleText.Text = F("No log files in {0} yet. Enable logging in the server settings.", folder);
             return;
          }
 
          logFile_ = newest.FullName;
          position_ = Math.Max(0, newest.Length - 64 * 1024); // start with the last 64 KB
-         SubtitleText.Text = "Streaming " + newest.Name;
+         SubtitleText.Text = F("Streaming {0}", newest.Name);
 
          Poll();
          timer_.Start();
@@ -144,7 +145,7 @@ namespace hMailServer.ControlPanel.Views
       private void Pause_Click(object sender, RoutedEventArgs e)
       {
          paused_ = !paused_;
-         PauseButton.Content = paused_ ? "_Resume" : "_Pause";
+         PauseButton.Content = paused_ ? L("_Resume") : L("_Pause");
          PauseButtonIcon.Symbol = paused_ ? Wpf.Ui.Controls.SymbolRegular.Play24 : Wpf.Ui.Controls.SymbolRegular.Pause24;
       }
 

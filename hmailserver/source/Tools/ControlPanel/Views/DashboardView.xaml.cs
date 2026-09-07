@@ -11,6 +11,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -64,7 +65,7 @@ namespace hMailServer.ControlPanel.Views
 
          throughputCard_ = new AccessibleChartCard(ChartCatalog.DashboardThroughput, HistoryLength)
          {
-            EmptyText = "No delivery activity yet",
+            EmptyText = L("No delivery activity yet"),
             // Taller than the 300 the bare chart used: the card now carries a
             // legend and a summary line under the plot, and squeezing the plot to
             // keep the old height is how you end up with a chart too short to read.
@@ -74,7 +75,7 @@ namespace hMailServer.ControlPanel.Views
 
          sessionsCard_ = new AccessibleChartCard(ChartCatalog.DashboardSessions, HistoryLength)
          {
-            EmptyText = "No active sessions",
+            EmptyText = L("No active sessions"),
             Height = 340
          };
 
@@ -93,13 +94,13 @@ namespace hMailServer.ControlPanel.Views
       {
          rangeBar_.Children.Add(new TextBlock
          {
-            Text = "Show",
+            Text = L("Show"),
             FontSize = Typography.Body,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0)
          });
 
-         foreach ((string key, string label) in new[] { ("live", "Live"), ("24h", "24 hours"), ("7d", "7 days"), ("30d", "30 days") })
+         foreach ((string key, string label) in new[] { ("live", L("Live")), ("24h", L("24 hours")), ("7d", L("7 days")), ("30d", L("30 days")) })
          {
             var button = new Wpf.Ui.Controls.Button
             {
@@ -108,7 +109,7 @@ namespace hMailServer.ControlPanel.Views
                Margin = new Thickness(0, 0, 6, 0),
                Tag = key
             };
-            AutomationProperties.SetName(button, "Show " + label);
+            AutomationProperties.SetName(button, F("Show {0}", label));
             button.Click += (s, e) => ShowRange_(key);
             rangeBar_.Children.Add(button);
          }
@@ -156,7 +157,7 @@ namespace hMailServer.ControlPanel.Views
 
             if (!enabled)
             {
-               rangeNote_.Text = "The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service.";
+               rangeNote_.Text = L("The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service.");
                ChartsGrid.Children.Add(throughputCard_);
                ChartsGrid.Children.Add(sessionsCard_);
                return;
@@ -164,7 +165,7 @@ namespace hMailServer.ControlPanel.Views
 
             historyThroughput_ = new AccessibleChartCard(ChartCatalog.DashboardThroughput, Math.Max(2, processed.Count))
             {
-               EmptyText = "No samples in this range yet",
+               EmptyText = L("No samples in this range yet"),
                Height = 340,
                Margin = new Thickness(0, 0, 12, 0)
             };
@@ -182,7 +183,7 @@ namespace hMailServer.ControlPanel.Views
 
             historySessions_ = new AccessibleChartCard(ChartCatalog.DashboardSessions, Math.Max(2, times.Count))
             {
-               EmptyText = "No samples in this range yet",
+               EmptyText = L("No samples in this range yet"),
                Height = 340
             };
 
@@ -199,14 +200,14 @@ namespace hMailServer.ControlPanel.Views
             ChartsGrid.Children.Add(historyThroughput_);
             ChartsGrid.Children.Add(historySessions_);
 
-            string per = bucket == 1 ? "minute" : bucket == 10 ? "ten minutes" : "hour";
+            string per = bucket == 1 ? L("minute") : bucket == 10 ? L("ten minutes") : L("hour");
             rangeNote_.Text = processed.Count == 0
-               ? "No samples in this range yet: the server records one a minute and keeps " + retention + " days."
-               : "One point per " + per + ", from the " + retention + "-day history the server keeps. Throughput is the change in the processed-messages total per minute.";
+               ? F("No samples in this range yet: the server records one a minute and keeps {0} days.", retention)
+               : F("One point per {0}, from the {1}-day history the server keeps. Throughput is the change in the processed-messages total per minute.", per, retention);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            rangeNote_.Text = "Could not load the history: " + ex.Message;
+            rangeNote_.Text = F("Could not load the history: {0}", ex.Message);
             ChartsGrid.Children.Add(throughputCard_);
             ChartsGrid.Children.Add(sessionsCard_);
          }
@@ -269,10 +270,10 @@ namespace hMailServer.ControlPanel.Views
          {
             var snap = session.ReadStatus();
 
-            SetKpi_(KpiProcessed, "Messages processed", snap.ProcessedMessages.ToString("N0"));
-            SetKpi_(KpiSpam, "Spam blocked", snap.SpamBlocked.ToString("N0"));
-            SetKpi_(KpiViruses, "Viruses removed", snap.VirusesRemoved.ToString("N0"));
-            SetKpi_(KpiUptime, "Uptime", FormatUptime(snap.StartTime));
+            SetKpi_(KpiProcessed, L("Messages processed"), snap.ProcessedMessages.ToString("N0"));
+            SetKpi_(KpiSpam, L("Spam blocked"), snap.SpamBlocked.ToString("N0"));
+            SetKpi_(KpiViruses, L("Viruses removed"), snap.VirusesRemoved.ToString("N0"));
+            SetKpi_(KpiUptime, L("Uptime"), FormatUptime(snap.StartTime));
             ShowQueue_(snap.QueueLength);
 
             // Two clocks on purpose. The table's Time column has to be local time
@@ -298,11 +299,11 @@ namespace hMailServer.ControlPanel.Views
             lastProcessed_ = snap.ProcessedMessages;
             lastSampleUtc_ = nowUtc;
 
-            SubtitleText.Text = "Live server statistics - last update " + nowLocal.ToLongTimeString();
+            SubtitleText.Text = F("Live server statistics - last update {0}", nowLocal.ToLongTimeString());
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SubtitleText.Text = "Connection to the server lost.";
+            SubtitleText.Text = L("Connection to the server lost.");
             timer_.Stop();
          }
       }
@@ -348,19 +349,18 @@ namespace hMailServer.ControlPanel.Views
             // staring at it. Reserving the space costs nineteen pixels of empty card in
             // the normal case and buys a dashboard that does not move under the reader.
             KpiQueueBadge.Visibility = Visibility.Hidden;
-            AutomationProperties.SetName(KpiQueue, "In queue, " + text);
+            AutomationProperties.SetName(KpiQueue, F("In queue, {0}", text));
             return;
          }
 
          ShapeMarkVisuals.ApplyMark(KpiQueueShape, status.Shape, status.BrushKey);
-         KpiQueueBadgeText.Text = "Backlog";
+         KpiQueueBadgeText.Text = L("Backlog");
          KpiQueueBadgeText.SetResourceReference(TextBlock.ForegroundProperty, status.BrushKey);
          KpiQueueBadge.Visibility = Visibility.Visible;
-         KpiQueueBadge.ToolTip = "More than " + StatusSemantics.QueueBacklogThreshold.ToString("N0")
-            + " messages are waiting to be delivered.";
+         KpiQueueBadge.ToolTip = F("More than {0} messages are waiting to be delivered.", StatusSemantics.QueueBacklogThreshold.ToString("N0"));
 
          AutomationProperties.SetName(KpiQueue,
-            "In queue, " + text + ". " + status.SeverityWord + ": backlog.");
+            F("In queue, {0}. {1}: backlog.", text, status.SeverityWord));
       }
 
       // ---- the "needs attention" setup summary ---------------------------------
@@ -395,7 +395,7 @@ namespace hMailServer.ControlPanel.Views
             var session = ServerSession.Current;
             if (session == null || !session.IsConnected)
             {
-               ShowSetupUncheckable_("The external setup could not be checked - not connected to the server.");
+               ShowSetupUncheckable_(L("The external setup could not be checked - not connected to the server."));
                return;
             }
 
@@ -409,7 +409,7 @@ namespace hMailServer.ControlPanel.Views
                // Run() degrades per-item rather than throwing, so this is belt
                // and braces - but a dashboard that dies building a summary card
                // would be strictly worse than a dashboard without one.
-               ShowSetupUncheckable_("The external setup could not be checked - " + ServerSession.DescribeComError(ex));
+               ShowSetupUncheckable_(F("The external setup could not be checked - {0}", ServerSession.DescribeComError(ex)));
                return;
             }
 
@@ -440,7 +440,7 @@ namespace hMailServer.ControlPanel.Views
       {
          AttentionMark.Visibility = Visibility.Collapsed;
          AttentionStateWord.Visibility = Visibility.Collapsed;
-         AttentionSummary.Text = "Checking what this server still needs done outside it…";
+         AttentionSummary.Text = L("Checking what this server still needs done outside it…");
          AutomationProperties.SetName(AttentionSummary, AttentionSummary.Text);
          AttentionItems.Children.Clear();
          AttentionNote.Visibility = Visibility.Collapsed;
@@ -491,11 +491,12 @@ namespace hMailServer.ControlPanel.Views
 
          string note = "";
          if (pendingDnsLookups > 0)
-            note = (pendingDnsLookups == 1 ? "1 DNS record is" : pendingDnsLookups + " DNS records are")
-               + " still being checked in the background; this summary will update.";
+            note = pendingDnsLookups == 1
+               ? L("1 DNS record is still being checked in the background; this summary will update.")
+               : F("{0} DNS records are still being checked in the background; this summary will update.", pendingDnsLookups);
          if (checks.FailedReads > 0)
             note += (note.Length > 0 ? " " : "")
-               + checks.FailedReads + " value(s) could not be read from the server, so this summary may be incomplete.";
+               + F("{0} value(s) could not be read from the server, so this summary may be incomplete.", checks.FailedReads);
 
          AttentionNote.Text = note;
          AttentionNote.Visibility = note.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
@@ -520,17 +521,17 @@ namespace hMailServer.ControlPanel.Views
       {
          if (action > 0)
          {
-            string text = action == 1 ? "1 thing needs attention" : action + " things need attention";
+            string text = action == 1 ? L("1 thing needs attention") : F("{0} things need attention", action);
             if (unknown > 0)
-               text += ", " + (unknown == 1 ? "1 item cannot be checked from here" : unknown + " items cannot be checked from here");
+               text += ", " + (unknown == 1 ? L("1 item cannot be checked from here") : F("{0} items cannot be checked from here", unknown));
             return text + ".";
          }
 
          if (unknown > 0)
-            return "Nothing needs action, but "
-               + (unknown == 1 ? "1 item cannot be checked from here." : unknown + " items cannot be checked from here.");
+            return L("Nothing needs action, but ")
+               + (unknown == 1 ? L("1 item cannot be checked from here.") : F("{0} items cannot be checked from here.", unknown));
 
-         return "Nothing needs attention - all " + total + " external setup checks are done or not needed.";
+         return F("Nothing needs attention - all {0} external setup checks are done or not needed.", total);
       }
 
       /// <summary>
@@ -572,9 +573,9 @@ namespace hMailServer.ControlPanel.Views
             HorizontalAlignment = HorizontalAlignment.Left,
             Cursor = System.Windows.Input.Cursors.Hand,
             Content = new TextBlock { Text = item.Title, TextWrapping = TextWrapping.Wrap },
-            ToolTip = "Open " + pageTitle + ", which owns the settings for: " + item.Title
+            ToolTip = F("Open {0}, which owns the settings for: {1}", pageTitle, item.Title)
          };
-         AutomationProperties.SetName(link, "Action needed: " + item.Title + ". Opens " + pageTitle + ".");
+         AutomationProperties.SetName(link, F("Action needed: {0}. Opens {1}.", item.Title, pageTitle));
          AutomationProperties.SetAutomationId(link, "dashboard-attention-" + index);
          link.Click += (s, e) => (Application.Current?.MainWindow as MainWindow)?.NavigateTo(page);
          Grid.SetColumn(link, 1);

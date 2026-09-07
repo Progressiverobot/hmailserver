@@ -11,6 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The translation lookup. Pure: the English text is the key, the catalogue is
+         injected, and the navigation map below marks its titles with Loc.N. It puts
+         the fatal-exception filter on its one catch clause, so that filter is here
+         too (and only here: the test project reaches it through this reference). -->
+    <Compile Include="..\ControlPanel\Services\Loc.cs" />
+    <Compile Include="..\ControlPanel\Services\ExceptionPolicy.cs" />
     <Compile Include="..\ControlPanel\Services\PasswordStrength.cs" />
     <Compile Include="..\ControlPanel\Services\NumericField.cs" />
     <Compile Include="..\ControlPanel\Services\PasswordGenerator.cs" />

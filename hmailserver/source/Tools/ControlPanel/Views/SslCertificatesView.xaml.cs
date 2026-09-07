@@ -22,6 +22,7 @@ using Typography = hMailServer.ControlPanel.Services.Typography;
 // System.IO.Path. The alias picks the drawing one.
 using Path = System.Windows.Shapes.Path;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -138,7 +139,7 @@ namespace hMailServer.ControlPanel.Views
 
          CertGrid.ItemsSource = rows;
          ListSearch.Apply(CertGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, error, "No certificates available yet.");
+         StatusText.Show(EmptyStatus, rows.Count, error, L("No certificates available yet."));
 
          if (reselectId != 0)
          {
@@ -233,44 +234,36 @@ namespace hMailServer.ControlPanel.Views
             case StoredPassphrase.Set:
                if (keyIsEncrypted == false)
                {
-                  return new CertificateFinding(StatusLevel.Information, "Passphrase stored, key not encrypted",
-                     "A passphrase is stored, but the key file is not encrypted, so it is never used. "
-                     + "Harmless - it simply does nothing.");
+                  return new CertificateFinding(StatusLevel.Information, L("Passphrase stored, key not encrypted"),
+                     L("A passphrase is stored, but the key file is not encrypted, so it is never used. Harmless - it simply does nothing."));
                }
-               return new CertificateFinding(StatusLevel.Good, "Passphrase stored",
-                  "A passphrase is stored for this certificate. It is never displayed here - saving a new one "
-                  + "replaces it. Whether it is the RIGHT passphrase is only proven when the server loads the "
-                  + "key: after the next restart, check the application error log.");
+               return new CertificateFinding(StatusLevel.Good, L("Passphrase stored"),
+                  L("A passphrase is stored for this certificate. It is never displayed here - saving a new one replaces it. Whether it is the RIGHT passphrase is only proven when the server loads the key: after the next restart, check the application error log."));
 
             case StoredPassphrase.NotSet:
                if (keyIsEncrypted == true)
                {
-                  return new CertificateFinding(StatusLevel.Critical, "Encrypted key, no passphrase",
-                     "The key file is encrypted and no passphrase is stored, so the key will not load (server "
-                     + "error 6170) and every TLS port using this certificate will not start - inbound mail on "
-                     + "those ports stops. Enter the passphrase below, or replace the file with an unencrypted key.");
+                  return new CertificateFinding(StatusLevel.Critical, L("Encrypted key, no passphrase"),
+                     L("The key file is encrypted and no passphrase is stored, so the key will not load (server error 6170) and every TLS port using this certificate will not start - inbound mail on those ports stops. Enter the passphrase below, or replace the file with an unencrypted key."));
                }
                if (keyIsEncrypted == false)
                {
-                  return new CertificateFinding(StatusLevel.Normal, "No passphrase needed",
-                     "The key file is not encrypted, so no passphrase is needed and none is stored.");
+                  return new CertificateFinding(StatusLevel.Normal, L("No passphrase needed"),
+                     L("The key file is not encrypted, so no passphrase is needed and none is stored."));
                }
-               return new CertificateFinding(StatusLevel.Information, "No passphrase stored",
-                  "Whether the key file needs one cannot be checked from here. If it is encrypted, it will not "
-                  + "load without a passphrase (server error 6170) and the TLS ports using this certificate "
-                  + "will not start.");
+               return new CertificateFinding(StatusLevel.Information, L("No passphrase stored"),
+                  L("Whether the key file needs one cannot be checked from here. If it is encrypted, it will not load without a passphrase (server error 6170) and the TLS ports using this certificate will not start."));
 
             default:
-               return new CertificateFinding(StatusLevel.Information, "Passphrase state unknown",
-                  "Whether a passphrase is stored could not be read - reading it requires the "
-                  + "server-administrator account. Saving a new one from here still works.");
+               return new CertificateFinding(StatusLevel.Information, L("Passphrase state unknown"),
+                  L("Whether a passphrase is stored could not be read - reading it requires the server-administrator account. Saving a new one from here still works."));
          }
       }
 
       private static CertificateFinding WorstOf(params CertificateFinding[] findings)
       {
          CertificateFinding worst = findings.Where(f => f != null).MaxBy(f => f.Level);
-         return worst ?? new CertificateFinding(StatusLevel.Information, "Not checked", "This entry was not checked.");
+         return worst ?? new CertificateFinding(StatusLevel.Information, L("Not checked"), L("This entry was not checked."));
       }
 
       // ---- rendering ------------------------------------------------------------
@@ -370,13 +363,13 @@ namespace hMailServer.ControlPanel.Views
 
          CertificateHealth health = row.Health ?? new CertificateHealth();
          if (health.CertificateFile != null)
-            DetailsLines.Children.Add(DetailLine("Certificate file", health.CertificateFile));
+            DetailsLines.Children.Add(DetailLine(L("Certificate file"), health.CertificateFile));
          if (health.PrivateKeyFile != null)
-            DetailsLines.Children.Add(DetailLine("Private key file", health.PrivateKeyFile));
+            DetailsLines.Children.Add(DetailLine(L("Private key file"), health.PrivateKeyFile));
          if (health.Pair != null)
-            DetailsLines.Children.Add(DetailLine("Key matches certificate", health.Pair));
+            DetailsLines.Children.Add(DetailLine(L("Key matches certificate"), health.Pair));
          if (row.PassphraseLine != null)
-            DetailsLines.Children.Add(DetailLine("Passphrase", row.PassphraseLine));
+            DetailsLines.Children.Add(DetailLine(L("Passphrase"), row.PassphraseLine));
       }
 
       // ---- the passphrase editor -------------------------------------------------
@@ -389,14 +382,13 @@ namespace hMailServer.ControlPanel.Views
          string passphrase = PassphraseBox.Password;
          if (string.IsNullOrEmpty(passphrase))
          {
-            MessageBox.Show("Type the new passphrase first. To remove the stored one, use \"Remove stored passphrase\".",
-               "Control Panel");
+            MessageBox.Show(L("Type the new passphrase first. To remove the stored one, use \"Remove stored passphrase\"."),
+               L("Control Panel"));
             return;
          }
 
          if (row.Passphrase == StoredPassphrase.Set &&
-             MessageBox.Show("A passphrase is already stored for '" + row.Name + "'. Saving replaces it - the old one "
-                + "cannot be recovered from here. Replace it?", "Control Panel",
+             MessageBox.Show(F("A passphrase is already stored for '{0}'. Saving replaces it - the old one cannot be recovered from here. Replace it?", row.Name), L("Control Panel"),
                 MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
          {
             return;
@@ -409,7 +401,7 @@ namespace hMailServer.ControlPanel.Views
          }
          else
          {
-            MessageBox.Show("Could not save the passphrase: " + error, "Control Panel");
+            MessageBox.Show(F("Could not save the passphrase: {0}", error), L("Control Panel"));
          }
       }
 
@@ -418,9 +410,7 @@ namespace hMailServer.ControlPanel.Views
          if (CertGrid.SelectedItem is not CertRow row)
             return;
 
-         if (MessageBox.Show("Remove the stored passphrase for '" + row.Name + "'? If the key file is encrypted, "
-               + "the key will stop loading at the next restart (server error 6170) and the TLS ports using this "
-               + "certificate will not start.", "Control Panel",
+         if (MessageBox.Show(F("Remove the stored passphrase for '{0}'? If the key file is encrypted, the key will stop loading at the next restart (server error 6170) and the TLS ports using this certificate will not start.", row.Name), L("Control Panel"),
                MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
          {
             return;
@@ -429,7 +419,7 @@ namespace hMailServer.ControlPanel.Views
          if (WritePassphrase(row, "", out string error))
             Reload(row.Id);
          else
-            MessageBox.Show("Could not remove the passphrase: " + error, "Control Panel");
+            MessageBox.Show(F("Could not remove the passphrase: {0}", error), L("Control Panel"));
       }
 
       /// <summary>
@@ -463,7 +453,7 @@ namespace hMailServer.ControlPanel.Views
                }
             }
 
-            error = "the certificate no longer exists - reload the page.";
+            error = L("the certificate no longer exists - reload the page.");
             return false;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
@@ -486,7 +476,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var dialog = new Microsoft.Win32.OpenFileDialog
          {
-            Filter = "PEM files (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|All files (*.*)|*.*"
+            Filter = L("PEM files (*.pem;*.crt;*.key)|*.pem;*.crt;*.key|All files (*.*)|*.*")
          };
          return dialog.ShowDialog() == true ? dialog.FileName : null;
       }
@@ -527,9 +517,7 @@ namespace hMailServer.ControlPanel.Views
          if (encrypted == true)
          {
             ShowAddHint(StatusLevel.Warning,
-               "This key file is encrypted (passphrase-protected). Enter its passphrase in the box below before "
-               + "adding, or the key will not load (server error 6170) and the TLS ports using this certificate "
-               + "will not start.");
+               L("This key file is encrypted (passphrase-protected). Enter its passphrase in the box below before adding, or the key will not load (server error 6170) and the TLS ports using this certificate will not start."));
          }
          else
          {
@@ -563,7 +551,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (name.Length == 0 || certFile.Length == 0 || keyFile.Length == 0)
          {
-            MessageBox.Show("Name, certificate file and private key file are required.", "Control Panel");
+            MessageBox.Show(L("Name, certificate file and private key file are required."), L("Control Panel"));
             return;
          }
 
@@ -585,10 +573,8 @@ namespace hMailServer.ControlPanel.Views
             });
 
             if (encrypted == true &&
-                MessageBox.Show("The private key file is encrypted (passphrase-protected) and no passphrase was "
-                   + "entered. The certificate will be added, but its key will not load (server error 6170) and "
-                   + "the TLS ports using it will not start until the passphrase is saved.\n\nAdd it anyway?",
-                   "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                MessageBox.Show(L("The private key file is encrypted (passphrase-protected) and no passphrase was entered. The certificate will be added, but its key will not load (server error 6170) and the TLS ports using it will not start until the passphrase is saved.\n\nAdd it anyway?"),
+                   L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             {
                return;
             }
@@ -616,7 +602,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the certificate: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the certificate: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -635,7 +621,7 @@ namespace hMailServer.ControlPanel.Views
          if (CertGrid.SelectedItem is not CertRow row)
             return;
 
-         if (MessageBox.Show("Delete certificate '" + row.Name + "'?", "Control Panel",
+         if (MessageBox.Show(F("Delete certificate '{0}'?", row.Name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -657,7 +643,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the certificate: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the certificate: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

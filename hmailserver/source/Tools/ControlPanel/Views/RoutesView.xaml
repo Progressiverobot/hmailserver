@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.RoutesView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid Margin="26,20">
@@ -14,12 +15,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="Routes" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Deliver mail for specific domains through a designated SMTP host instead of MX lookup."
+            <TextBlock Text="{loc:L 'Routes'}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{loc:L 'Deliver mail for specific domains through a designated SMTP host instead of MX lookup.'}"
                        Style="{StaticResource PageSubtitle}" />
-            <ui:TextBox x:Name="SearchBox" PlaceholderText="Search routes..." Width="300"
+            <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search routes...'}" Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                        AutomationProperties.Name="Search routes">
+                        AutomationProperties.Name="{loc:L 'Search routes'}">
                 <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
             </ui:TextBox>
         </StackPanel>
@@ -31,11 +32,11 @@
                       Background="Transparent" BorderThickness="0" RowHeight="34"
                       SelectionMode="Single" MouseDoubleClick="Edit_Click">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Domain" Binding="{Binding DomainName}" Width="*" />
-                    <DataGridTextColumn Header="Target host" Binding="{Binding TargetHost}" Width="*" />
-                    <DataGridTextColumn Header="Port" Binding="{Binding TargetPort}" Width="80" />
-                    <DataGridTextColumn Header="Retries" Binding="{Binding Retries}" Width="80" />
-                    <DataGridTextColumn Header="Auth" Binding="{Binding Auth}" Width="80" />
+                    <DataGridTextColumn Header="{loc:L 'Domain'}" Binding="{Binding DomainName}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Target host'}" Binding="{Binding TargetHost}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Port'}" Binding="{Binding TargetPort}" Width="80" />
+                    <DataGridTextColumn Header="{loc:L 'Retries'}" Binding="{Binding Retries}" Width="80" />
+                    <DataGridTextColumn Header="{loc:L 'Auth'}" Binding="{Binding Auth}" Width="80" />
                 </DataGrid.Columns>
             </DataGrid>
             <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
@@ -47,7 +48,7 @@
 
         <Border Grid.Row="2" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add route" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="{loc:L 'Add route'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="2*" />
@@ -57,12 +58,12 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="NewDomain" PlaceholderText="Domain (e.g. partner.com)" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewHost" Grid.Column="1" PlaceholderText="Target SMTP host" Margin="0,0,8,0" />
-                    <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="Port" Text="25" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="3" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="4" Content="_Properties" Click="Edit_Click" Margin="0,0,8,0" />
-                    <ui:Button Grid.Column="5" Content="_Delete selected" Appearance="Danger" Click="Delete_Click" />
+                    <ui:TextBox x:Name="NewDomain" PlaceholderText="{loc:L 'Domain (e.g. partner.com)'}" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewHost" Grid.Column="1" PlaceholderText="{loc:L 'Target SMTP host'}" Margin="0,0,8,0" />
+                    <ui:TextBox x:Name="NewPort" Grid.Column="2" PlaceholderText="{loc:L 'Port'}" Text="25" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="3" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="4" Content="{loc:L '_Properties'}" Click="Edit_Click" Margin="0,0,8,0" />
+                    <ui:Button Grid.Column="5" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click" />
                 </Grid>
             </StackPanel>
         </Border>

@@ -1,4 +1,4 @@
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+﻿# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Regenerates the Control Panel's settings search index.
@@ -78,6 +78,16 @@ function Remove-Mnemonic([string] $text) {
    return $text.Replace([string] $literal, '_')
 }
 
+# A caption marked for translation is written {loc:L 'Daily backup t_ime'} (see
+# Services/Loc.cs); the index holds the English text inside, which is both the
+# catalogue key and what an English-language palette shows. A single quote
+# inside the text is escaped \' by the markup-extension syntax.
+function Remove-LocWrapper([string] $text) {
+   $m = [regex]::Match($text, "^\{loc:L\s+'((?:[^'\\]|\\.)*)'\s*\}$")
+   if (-not $m.Success) { return $text }
+   return [regex]::Replace($m.Groups[1].Value, '\\(.)', '$1')
+}
+
 function Get-XamlLabels($xamlText) {
    $labels = @{}
    $pending = $null
@@ -95,7 +105,7 @@ function Get-XamlLabels($xamlText) {
       # blocks are explanatory notes and bindings are not captions.
       if ($tag -like '*TextBlock') {
          if ($textMatch.Success) {
-            $caption = Remove-Mnemonic ([System.Net.WebUtility]::HtmlDecode($textMatch.Groups[1].Value).Trim())
+            $caption = Remove-Mnemonic (Remove-LocWrapper ([System.Net.WebUtility]::HtmlDecode($textMatch.Groups[1].Value).Trim()))
             if ($caption.Length -gt 0 -and $caption.Length -le 60 -and -not $caption.StartsWith('{')) {
                $pending = $caption
             }
@@ -106,8 +116,9 @@ function Get-XamlLabels($xamlText) {
       if (-not $nameMatch.Success) { continue }
       $name = $nameMatch.Groups[1].Value
 
-      if ($contentMatch.Success -and -not $contentMatch.Groups[1].Value.StartsWith('{')) {
-         $labels[$name] = Remove-Mnemonic ([System.Net.WebUtility]::HtmlDecode($contentMatch.Groups[1].Value).Trim())
+      $content = Remove-LocWrapper ([System.Net.WebUtility]::HtmlDecode($contentMatch.Groups[1].Value).Trim())
+      if ($contentMatch.Success -and -not $content.StartsWith('{')) {
+         $labels[$name] = Remove-Mnemonic $content
       }
       elseif ($pending -and $tag -match '(TextBox|PasswordBox|ComboBox|NumberBox)$' -and $attrs -notmatch 'PlaceholderText=') {
          # A placeholder means the box is a "create a new one" field on a list

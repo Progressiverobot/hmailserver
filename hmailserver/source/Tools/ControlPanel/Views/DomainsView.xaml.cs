@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -33,7 +34,7 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Name { get; set; }
          public bool Active { get; set; }
-         public override string ToString() => Active ? Name : Name + " (inactive)";
+         public override string ToString() => Active ? Name : F("{0} (inactive)", Name);
       }
 
       /// <summary>Same shape for the account list.</summary>
@@ -41,7 +42,7 @@ namespace hMailServer.ControlPanel.Views
       {
          public string Address { get; set; }
          public bool Active { get; set; }
-         public override string ToString() => Active ? Address : Address + " (inactive)";
+         public override string ToString() => Active ? Address : F("{0} (inactive)", Address);
       }
 
       private string SelectedDomainName() => (DomainList.SelectedItem as DomainRow)?.Name;
@@ -148,8 +149,8 @@ namespace hMailServer.ControlPanel.Views
          }
          AliasList.ItemsSource = rows;
          SetListStatus(AliasStatus, rows.Count, error,
-            DomainList.SelectedItem == null ? "Select a domain to see its aliases." : "No aliases for this domain.",
-            "Couldn't load aliases: ");
+            DomainList.SelectedItem == null ? L("Select a domain to see its aliases.") : L("No aliases for this domain."),
+            L("Couldn't load aliases: "));
       }
 
       private void ReloadDistLists()
@@ -184,8 +185,8 @@ namespace hMailServer.ControlPanel.Views
          }
          DistList.ItemsSource = rows;
          SetListStatus(DistStatus, rows.Count, error,
-            DomainList.SelectedItem == null ? "Select a domain to see its distribution lists." : "No distribution lists for this domain.",
-            "Couldn't load distribution lists: ");
+            DomainList.SelectedItem == null ? L("Select a domain to see its distribution lists.") : L("No distribution lists for this domain."),
+            L("Couldn't load distribution lists: "));
       }
 
       // Shows a centered empty/error placeholder over a list when it has no rows.
@@ -215,7 +216,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the alias: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the alias: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -233,7 +234,7 @@ namespace hMailServer.ControlPanel.Views
          if (name == null || DomainList.SelectedItem == null)
             return;
 
-         if (MessageBox.Show("Delete the alias " + name + "?", "Control Panel",
+         if (MessageBox.Show(F("Delete the alias {0}?", name), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -259,7 +260,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the alias: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the alias: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -290,7 +291,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the list: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the list: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -329,7 +330,7 @@ namespace hMailServer.ControlPanel.Views
          if (address == null || DomainList.SelectedItem == null)
             return;
 
-         if (MessageBox.Show("Delete the distribution list " + address + "?", "Control Panel",
+         if (MessageBox.Show(F("Delete the distribution list {0}?", address), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -355,7 +356,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the list: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the list: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -370,12 +371,12 @@ namespace hMailServer.ControlPanel.Views
          string domainName = SelectedDomainName();
          if (domainName == null)
          {
-            AccountsHeader.Text = "Select a domain";
+            AccountsHeader.Text = L("Select a domain");
             AccountList.ItemsSource = null;
             return;
          }
 
-         AccountsHeader.Text = domainName + " - accounts";
+         AccountsHeader.Text = F("{0} - accounts", domainName);
          NewAccountBox.Text = "user@" + domainName;
 
          var rows = new List<AccountRow>();
@@ -443,20 +444,18 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(domain);
             }
 
-            string counted = accountCount == 1 ? "its 1 account" : "its " + accountCount + " accounts";
+            string counted = accountCount == 1 ? L("its 1 account") : F("its {0} accounts", accountCount);
 
             if (MessageBox.Show(
-                   "Delete the domain " + name + "?\n\nThis permanently removes " + counted + ", every " +
-                   "message stored in them, and all of the domain's aliases and distribution lists. " +
-                   "There is no undo.",
-                   "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                   F("Delete the domain {0}?\n\nThis permanently removes {1}, every message stored in them, and all of the domain's aliases and distribution lists. There is no undo.", name, counted),
+                   L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
                return;
 
             domains.DeleteByDBID(domainId);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the domain: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the domain: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -471,7 +470,7 @@ namespace hMailServer.ControlPanel.Views
          string name = NewDomainBox.Text.Trim();
          if (name.Length == 0 || !name.Contains('.'))
          {
-            MessageBox.Show("Enter a valid domain name.", "Control Panel");
+            MessageBox.Show(L("Enter a valid domain name."), L("Control Panel"));
             return;
          }
 
@@ -488,7 +487,7 @@ namespace hMailServer.ControlPanel.Views
          {
             // Without this, a duplicate name - the likeliest failure - took the
             // whole window down instead of saying so.
-            MessageBox.Show("Could not create the domain: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the domain: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -505,7 +504,7 @@ namespace hMailServer.ControlPanel.Views
          string pw = Services.PasswordGenerator.Generate(16);
          NewAccountPassword.Password = pw;
          try { Clipboard.SetText(pw); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
-         Services.Toast.Info("Generated password copied to clipboard \u2014 reveal it with the eye icon.", "Password");
+         Services.Toast.Info(L("Generated password copied to clipboard \u2014 reveal it with the eye icon."), L("Password"));
       }
 
       private void AddAccount_Click(object sender, RoutedEventArgs e)
@@ -516,7 +515,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (domainName == null || address.Length == 0 || password.Length == 0)
          {
-            MessageBox.Show("Address and password are required.", "Control Panel");
+            MessageBox.Show(L("Address and password are required."), L("Control Panel"));
             return;
          }
 
@@ -536,7 +535,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not create the account: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not create the account: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -566,7 +565,7 @@ namespace hMailServer.ControlPanel.Views
          if (address == null || domainName == null)
             return;
 
-         if (MessageBox.Show("Delete " + address + "?", "Control Panel",
+         if (MessageBox.Show(F("Delete {0}?", address), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -583,7 +582,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the account: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the account: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {

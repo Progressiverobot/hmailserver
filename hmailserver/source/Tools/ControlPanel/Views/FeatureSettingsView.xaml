@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.FeatureSettingsView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
     <Grid Margin="26,20">
@@ -26,8 +27,8 @@
             <TextBlock x:Name="StatusText" AutomationProperties.LiveSetting="Polite" VerticalAlignment="Center"
                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <ui:Button Content="_Reload" Margin="0,0,8,0" Click="Reload_Click" />
-                <ui:Button x:Name="SaveButton" Content="_Save changes" Appearance="Primary" Click="Save_Click" />
+                <ui:Button Content="{loc:L '_Reload'}" Margin="0,0,8,0" Click="Reload_Click" />
+                <ui:Button x:Name="SaveButton" Content="{loc:L '_Save changes'}" Appearance="Primary" Click="Save_Click" />
             </StackPanel>
         </Grid>
     </Grid>

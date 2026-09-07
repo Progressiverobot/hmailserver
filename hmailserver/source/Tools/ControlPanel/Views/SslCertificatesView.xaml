@@ -4,6 +4,7 @@
     x:Class="hMailServer.ControlPanel.Views.SslCertificatesView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:hMailServer.ControlPanel.Views">
 
@@ -16,12 +17,12 @@
         </Grid.RowDefinitions>
 
         <StackPanel>
-            <TextBlock Text="SSL certificates" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let's Encrypt certificates appear here automatically."
+            <TextBlock Text="{loc:L 'SSL certificates'}" Style="{StaticResource PageTitle}" />
+            <TextBlock Text="{loc:L 'Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let\'s Encrypt certificates appear here automatically.'}"
                        Style="{StaticResource PageSubtitle}" />
-            <ui:TextBox x:Name="SearchBox" PlaceholderText="Search certificates..." Width="300"
+            <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search certificates...'}" Width="300"
                         HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                        AutomationProperties.Name="Search certificates">
+                        AutomationProperties.Name="{loc:L 'Search certificates'}">
                 <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
             </ui:TextBox>
         </StackPanel>
@@ -38,19 +39,19 @@
                       Background="Transparent" BorderThickness="0"
                       EnableRowVirtualization="False"
                       SelectionMode="Single" SelectionChanged="CertGrid_SelectionChanged"
-                      AutomationProperties.Name="SSL certificates">
+                      AutomationProperties.Name="{loc:L 'SSL certificates'}">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="170" />
-                    <DataGridTextColumn Header="Certificate file" Binding="{Binding CertificateFile}" Width="*" />
-                    <DataGridTextColumn Header="Private key file" Binding="{Binding PrivateKeyFile}" Width="*" />
-                    <DataGridTemplateColumn Header="Certificate" Width="210" SortMemberPath="CertificateState">
+                    <DataGridTextColumn Header="{loc:L 'Name'}" Binding="{Binding Name}" Width="170" />
+                    <DataGridTextColumn Header="{loc:L 'Certificate file'}" Binding="{Binding CertificateFile}" Width="*" />
+                    <DataGridTextColumn Header="{loc:L 'Private key file'}" Binding="{Binding PrivateKeyFile}" Width="*" />
+                    <DataGridTemplateColumn Header="{loc:L 'Certificate'}" Width="210" SortMemberPath="CertificateState">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <ContentControl Loaded="CertificateBadge_Loaded" IsTabStop="False" Focusable="False" />
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="Private key" Width="210" SortMemberPath="PrivateKeyState">
+                    <DataGridTemplateColumn Header="{loc:L 'Private key'}" Width="210" SortMemberPath="PrivateKeyState">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <ContentControl Loaded="KeyBadge_Loaded" IsTabStop="False" Focusable="False" />
@@ -74,23 +75,23 @@
                 <TextBlock x:Name="DetailsTitle" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
                 <StackPanel x:Name="DetailsLines" />
 
-                <TextBlock Text="Private _key passphrase" local:Mnemonic.Target="{Binding ElementName=PassphraseBox}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
+                <TextBlock Text="{loc:L 'Private _key passphrase'}" local:Mnemonic.Target="{Binding ElementName=PassphraseBox}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
                 <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
-                           Text="Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before." />
+                           Text="{loc:L 'Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before.'}" />
                 <StackPanel Orientation="Horizontal">
-                    <ui:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="New passphrase"
-                                    AutomationProperties.Name="New private key passphrase for the selected certificate" />
-                    <ui:Button Content="Save _passphrase" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
-                               AutomationProperties.Name="Save the private key passphrase for the selected certificate" />
-                    <ui:Button Content="_Remove stored passphrase" Margin="8,0,0,0" Click="ClearPassphrase_Click"
-                               AutomationProperties.Name="Remove the stored private key passphrase from the selected certificate" />
+                    <ui:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="{loc:L 'New passphrase'}"
+                                    AutomationProperties.Name="{loc:L 'New private key passphrase for the selected certificate'}" />
+                    <ui:Button Content="{loc:L 'Save _passphrase'}" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
+                               AutomationProperties.Name="{loc:L 'Save the private key passphrase for the selected certificate'}" />
+                    <ui:Button Content="{loc:L '_Remove stored passphrase'}" Margin="8,0,0,0" Click="ClearPassphrase_Click"
+                               AutomationProperties.Name="{loc:L 'Remove the stored private key passphrase from the selected certificate'}" />
                 </StackPanel>
             </StackPanel>
         </Border>
 
         <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="Add certificate" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
+                <TextBlock Text="{loc:L 'Add certificate'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
@@ -101,25 +102,25 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="NewCertName" PlaceholderText="Name" Margin="0,0,8,0"
-                                AutomationProperties.Name="Name for the new certificate" />
-                    <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="Certificate file (PEM)" Margin="0,0,4,0"
-                                AutomationProperties.Name="Certificate file for the new certificate" />
+                    <ui:TextBox x:Name="NewCertName" PlaceholderText="{loc:L 'Name'}" Margin="0,0,8,0"
+                                AutomationProperties.Name="{loc:L 'Name for the new certificate'}" />
+                    <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="{loc:L 'Certificate file (PEM)'}" Margin="0,0,4,0"
+                                AutomationProperties.Name="{loc:L 'Certificate file for the new certificate'}" />
                     <ui:Button Grid.Column="2" Content="…" Click="BrowseCert_Click" Margin="0,0,8,0"
-                               AutomationProperties.Name="Browse for the certificate file" />
-                    <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="Private key file (PEM)" Margin="0,0,4,0"
-                                AutomationProperties.Name="Private key file for the new certificate" />
+                               AutomationProperties.Name="{loc:L 'Browse for the certificate file'}" />
+                    <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="{loc:L 'Private key file (PEM)'}" Margin="0,0,4,0"
+                                AutomationProperties.Name="{loc:L 'Private key file for the new certificate'}" />
                     <ui:Button Grid.Column="4" Content="…" Click="BrowseKey_Click" Margin="0,0,8,0"
-                               AutomationProperties.Name="Browse for the private key file" />
-                    <ui:Button Grid.Column="5" Content="_Add" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
-                               AutomationProperties.Name="Add the certificate" />
-                    <ui:Button Grid.Column="6" Content="_Delete selected" Appearance="Danger" Click="Delete_Click"
-                               AutomationProperties.Name="Delete the selected certificate" />
+                               AutomationProperties.Name="{loc:L 'Browse for the private key file'}" />
+                    <ui:Button Grid.Column="5" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
+                               AutomationProperties.Name="{loc:L 'Add the certificate'}" />
+                    <ui:Button Grid.Column="6" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click"
+                               AutomationProperties.Name="{loc:L 'Delete the selected certificate'}" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <ui:PasswordBox x:Name="NewKeyPassphrase" Width="280"
-                                    PlaceholderText="Key passphrase (only for an encrypted key)"
-                                    AutomationProperties.Name="Private key passphrase for the certificate being added" />
+                                    PlaceholderText="{loc:L 'Key passphrase (only for an encrypted key)'}"
+                                    AutomationProperties.Name="{loc:L 'Private key passphrase for the certificate being added'}" />
                 </StackPanel>
                 <!-- Filled in by code when the picked key file turns out to be
                      encrypted: that is knowable from the file itself, and saying

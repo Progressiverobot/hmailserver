@@ -10,6 +10,7 @@ using System.Windows.Media;
 using System.Windows.Shapes;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -52,11 +53,8 @@ namespace hMailServer.ControlPanel.Views
             return;
 
          if (action == "install" && MessageBox.Show(
-                "Install the update now?\n\nThe verified installer is handed to the update helper: the " +
-                "service stops, the new version is installed, and the service starts again. If it does " +
-                "not come back, the previous version is reinstalled. This Control Panel loses its " +
-                "connection while that happens; reconnect afterwards to see the outcome here.",
-                "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                L("Install the update now?\n\nThe verified installer is handed to the update helper: the service stops, the new version is installed, and the service starts again. If it does not come back, the previous version is reinstalled. This Control Panel loses its connection while that happens; reconnect afterwards to see the outcome here."),
+                L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
          Mouse.OverrideCursor = Cursors.Wait;
@@ -69,11 +67,11 @@ namespace hMailServer.ControlPanel.Views
             string error = (string)status.UpdateLastError;
             ServerSession.Release(status);
             if (!done && !string.IsNullOrEmpty(error))
-               MessageBox.Show(error, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Warning);
+               MessageBox.Show(error, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("The update step could not be run: " + ex.Message, "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(F("The update step could not be run: {0}", ex.Message), L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Error);
          }
          finally
          {
@@ -103,10 +101,8 @@ namespace hMailServer.ControlPanel.Views
             if (state == ServerStateRunning_)
             {
                if (MessageBox.Show(
-                      "Pause the mail server?\n\nNo new connections will be accepted and no mail will be " +
-                      "delivered until it is resumed. The Windows service keeps running, so this Control " +
-                      "Panel stays connected.",
-                      "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                      L("Pause the mail server?\n\nNo new connections will be accepted and no mail will be delivered until it is resumed. The Windows service keeps running, so this Control Panel stays connected."),
+                      L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                   return;
 
                app.Stop();
@@ -120,8 +116,8 @@ namespace hMailServer.ControlPanel.Views
          {
             // The likeliest failure is rights: pausing requires an administrator-level
             // COM session. Said outright rather than as a raw HRESULT.
-            MessageBox.Show("The server state could not be changed: " + ex.Message,
-               "Control Panel", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(F("The server state could not be changed: {0}", ex.Message),
+               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Error);
          }
 
          Reload();
@@ -135,14 +131,14 @@ namespace hMailServer.ControlPanel.Views
          switch (state)
          {
             case ServerStateRunning_:
-               PauseButton.Content = "_Pause";
+               PauseButton.Content = L("_Pause");
                PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Pause24;
                PauseButton.IsEnabled = true;
                break;
             case ServerStateStopped_:
                // The glyph swaps with the verb - a "Resume" button wearing a
                // pause icon says two things at once, and one of them is wrong.
-               PauseButton.Content = "_Resume";
+               PauseButton.Content = L("_Resume");
                PauseButtonIcon.Symbol = Wpf.Ui.Controls.SymbolRegular.Play24;
                PauseButton.IsEnabled = true;
                break;
@@ -152,25 +148,25 @@ namespace hMailServer.ControlPanel.Views
                break;
          }
 
-         AutomationProperties.SetName(PauseButton, MnemonicText.Strip((string)PauseButton.Content) + " the mail server engine");
+         AutomationProperties.SetName(PauseButton, F("{0} the mail server engine", MnemonicText.Strip((string)PauseButton.Content)));
       }
 
       private static string DatabaseTypeName(int type) => type switch
       {
-         1 => "MySQL / MariaDB",
-         2 => "Microsoft SQL Server",
-         3 => "PostgreSQL",
-         4 => "Built-in (SQL Server Compact)",
-         _ => "Unknown"
+         1 => "MySQL / MariaDB",   // no-loc: product names
+         2 => "Microsoft SQL Server",   // no-loc
+         3 => "PostgreSQL",   // no-loc
+         4 => L("Built-in (SQL Server Compact)"),
+         _ => L("Unknown")
       };
 
       private static string ServerStateName(int state) => state switch
       {
-         1 => "Stopped",
-         2 => "Starting",
-         3 => "Running",
-         4 => "Stopping",
-         _ => "Unknown"
+         1 => L("Stopped"),
+         2 => L("Starting"),
+         3 => L("Running"),
+         4 => L("Stopping"),
+         _ => L("Unknown")
       };
 
       private void Reload()
@@ -182,10 +178,10 @@ namespace hMailServer.ControlPanel.Views
          // Server + database
          try
          {
-            SetValue_(VersionValue, "Version",
+            SetValue_(VersionValue, L("Version"),
                (string)app.Version + " (" + (string)app.VersionArchitecture + ")");
          }
-         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(VersionValue, "Version", "-"); }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { SetValue_(VersionValue, L("Version"), "-"); }
 
          // The update check's verdict, kept by the server; the row says what the
          // scheduled check (UpdateCheckEnabled) or an on-demand one last found.
@@ -195,7 +191,7 @@ namespace hMailServer.ControlPanel.Views
             int updateState = (int)status.UpdateState;
             string availableVersion = (string)status.AvailableVersion;
             string applyOutcome = (string)status.UpdateApplyOutcome;
-            SetValue_(UpdateValue, "Update", UpdateText_(updateState, availableVersion,
+            SetValue_(UpdateValue, L("Update"), UpdateText_(updateState, availableVersion,
                (string)status.AvailableVersionPublished, (string)status.UpdateLastChecked, (string)status.UpdateLastError, applyOutcome));
             ServerSession.Release(status);
             // Download once a newer release is known (a failed download can be retried);
@@ -205,7 +201,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SetValue_(UpdateValue, "Update", "-");
+            SetValue_(UpdateValue, L("Update"), "-");
             DownloadUpdateButton.IsEnabled = false;
             InstallUpdateButton.IsEnabled = false;
          }
@@ -213,55 +209,55 @@ namespace hMailServer.ControlPanel.Views
          try
          {
             int state = (int)app.ServerState;
-            SetValue_(StateValue, "State", ServerStateName(state));
+            SetValue_(StateValue, L("State"), ServerStateName(state));
             UpdatePauseButton_(state);
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SetValue_(StateValue, "State", "-");
+            SetValue_(StateValue, L("State"), "-");
             PauseButton.IsEnabled = false;
          }
 
          try
          {
             dynamic db = app.Database;
-            SetValue_(DbTypeValue, "Database type", DatabaseTypeName((int)db.DatabaseType));
+            SetValue_(DbTypeValue, L("Database type"), DatabaseTypeName((int)db.DatabaseType));
             string host = (string)db.ServerName;
-            SetValue_(DbHostValue, "Database host", string.IsNullOrEmpty(host) ? "-" : host);
+            SetValue_(DbHostValue, L("Database host"), string.IsNullOrEmpty(host) ? "-" : host);
             string name = (string)db.DatabaseName;
-            SetValue_(DbNameValue, "Database name", string.IsNullOrEmpty(name) ? "-" : name);
-            SetValue_(DbVersionValue, "Database schema version", ((int)db.CurrentVersion).ToString());
+            SetValue_(DbNameValue, L("Database name"), string.IsNullOrEmpty(name) ? "-" : name);
+            SetValue_(DbVersionValue, L("Database schema version"), ((int)db.CurrentVersion).ToString());
             ServerSession.Release(db);
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SetValue_(DbTypeValue, "Database type", "-");
-            SetValue_(DbHostValue, "Database host", "-");
-            SetValue_(DbNameValue, "Database name", "-");
-            SetValue_(DbVersionValue, "Database schema version", "-");
+            SetValue_(DbTypeValue, L("Database type"), "-");
+            SetValue_(DbHostValue, L("Database host"), "-");
+            SetValue_(DbNameValue, L("Database name"), "-");
+            SetValue_(DbVersionValue, L("Database schema version"), "-");
          }
 
          // Statistics + uptime
          try
          {
             var snap = ServerSession.Current.ReadStatus();
-            SetValue_(ProcessedValue, "Processed messages", snap.ProcessedMessages.ToString("N0"));
-            SetValue_(SpamValue, "Spam removed", snap.SpamBlocked.ToString("N0"));
-            SetValue_(VirusValue, "Viruses removed", snap.VirusesRemoved.ToString("N0"));
-            SetValue_(SmtpValue, "SMTP sessions", snap.SmtpSessions.ToString());
-            SetValue_(ImapValue, "IMAP sessions", snap.ImapSessions.ToString());
-            SetValue_(Pop3Value, "POP3 sessions", snap.Pop3Sessions.ToString());
-            SetValue_(StartedValue, "Started", string.IsNullOrEmpty(snap.StartTime) ? "-" : snap.StartTime);
-            SetValue_(UptimeValue, "Uptime", FormatUptime(snap.StartTime));
+            SetValue_(ProcessedValue, L("Processed messages"), snap.ProcessedMessages.ToString("N0"));
+            SetValue_(SpamValue, L("Spam removed"), snap.SpamBlocked.ToString("N0"));
+            SetValue_(VirusValue, L("Viruses removed"), snap.VirusesRemoved.ToString("N0"));
+            SetValue_(SmtpValue, L("SMTP sessions"), snap.SmtpSessions.ToString());
+            SetValue_(ImapValue, L("IMAP sessions"), snap.ImapSessions.ToString());
+            SetValue_(Pop3Value, L("POP3 sessions"), snap.Pop3Sessions.ToString());
+            SetValue_(StartedValue, L("Started"), string.IsNullOrEmpty(snap.StartTime) ? "-" : snap.StartTime);
+            SetValue_(UptimeValue, L("Uptime"), FormatUptime(snap.StartTime));
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SetValue_(ProcessedValue, "Processed messages", "-");
-            SetValue_(SpamValue, "Spam removed", "-");
-            SetValue_(VirusValue, "Viruses removed", "-");
-            SetValue_(SmtpValue, "SMTP sessions", "-");
-            SetValue_(ImapValue, "IMAP sessions", "-");
-            SetValue_(Pop3Value, "POP3 sessions", "-");
+            SetValue_(ProcessedValue, L("Processed messages"), "-");
+            SetValue_(SpamValue, L("Spam removed"), "-");
+            SetValue_(VirusValue, L("Viruses removed"), "-");
+            SetValue_(SmtpValue, L("SMTP sessions"), "-");
+            SetValue_(ImapValue, L("IMAP sessions"), "-");
+            SetValue_(Pop3Value, L("POP3 sessions"), "-");
          }
 
          LoadWarnings(app);
@@ -288,16 +284,16 @@ namespace hMailServer.ControlPanel.Views
       // there is one: it is what the administrator who clicked Install is waiting for.
       internal static string UpdateText_(int state, string version, string published, string checkedAt, string error, string applyOutcome = null)
       {
-         string when = string.IsNullOrEmpty(published) ? "" : " (published " + published + ")";
-         string outcome = string.IsNullOrEmpty(applyOutcome) ? "" : "Last update: " + applyOutcome + ". ";
+         string when = string.IsNullOrEmpty(published) ? "" : F(" (published {0})", published);
+         string outcome = string.IsNullOrEmpty(applyOutcome) ? "" : F("Last update: {0}. ", applyOutcome);
          switch (state)
          {
-            case 1: return outcome + "This is the latest release" + (string.IsNullOrEmpty(checkedAt) ? "" : ", checked " + checkedAt);
-            case 2: return outcome + version + " is available" + when;
-            case 3: return outcome + version + " is downloaded and verified" + when + "; Install update applies it";
-            case 4: return outcome + "Installing " + version + ": the service will stop and start";
-            case 5: return outcome + "The last update step failed: " + error;
-            default: return outcome + "Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)";
+            case 1: return outcome + L("This is the latest release") + (string.IsNullOrEmpty(checkedAt) ? "" : F(", checked {0}", checkedAt));
+            case 2: return outcome + F("{0} is available", version) + when;
+            case 3: return outcome + F("{0} is downloaded and verified", version) + when + L("; Install update applies it");
+            case 4: return outcome + F("Installing {0}: the service will stop and start", version);
+            case 5: return outcome + F("The last update step failed: {0}", error);
+            default: return outcome + L("Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)");
          }
       }
 
@@ -318,10 +314,10 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                if (((string)settings.HostName).Length == 0)
-                  count += AddWarning("High", "No public host name is configured in the SMTP settings.");
+                  count += AddWarning(L("High"), L("No public host name is configured in the SMTP settings."));
 
                if ((bool)settings.DenyMailFromNull)
-                  count += AddWarning("High", "Mail from an empty sender address is denied. Many servers send bounces from <>, which will be rejected.");
+                  count += AddWarning(L("High"), L("Mail from an empty sender address is denied. Many servers send bounces from <>, which will be rejected."));
 
                dynamic ranges = settings.SecurityRanges;
                int autoban = 0;
@@ -332,10 +328,10 @@ namespace hMailServer.ControlPanel.Views
                   try
                   {
                      if ((bool)range.AllowDeliveryFromRemoteToRemote && !(bool)range.RequireSMTPAuthExternalToExternal)
-                        count += AddWarning("Critical", "IP range '" + (string)range.Name + "' allows external-to-external delivery without authentication (open relay risk).");
+                        count += AddWarning(L("Critical"), F("IP range '{0}' allows external-to-external delivery without authentication (open relay risk).", (string)range.Name));
 
                      if ((string)range.LowerIP == "127.0.0.1" && (string)range.UpperIP == "127.0.0.1" && (bool)range.Expires)
-                        count += AddWarning("High", "Localhost is currently banned in the IP ranges.");
+                        count += AddWarning(L("High"), L("Localhost is currently banned in the IP ranges."));
 
                      if ((bool)range.Expires)
                         autoban++;
@@ -348,7 +344,7 @@ namespace hMailServer.ControlPanel.Views
                ServerSession.Release(ranges);
 
                if (autoban > 0)
-                  count += AddWarning("Medium", "There is a total of " + autoban + " auto-ban IP range(s).");
+                  count += AddWarning(L("Medium"), F("There is a total of {0} auto-ban IP range(s).", autoban));
             }
             finally
             {
@@ -357,7 +353,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            AddWarning("Info", "Could not evaluate all warnings: " + ex.Message);
+            AddWarning(L("Info"), F("Could not evaluate all warnings: {0}", ex.Message));
             return;
          }
 
@@ -365,7 +361,7 @@ namespace hMailServer.ControlPanel.Views
          {
             var ok = new TextBlock
             {
-               Text = "No configuration warnings.",
+               Text = L("No configuration warnings."),
                FontSize = Typography.Body,
                Margin = new Thickness(0, 2, 0, 2)
             };
