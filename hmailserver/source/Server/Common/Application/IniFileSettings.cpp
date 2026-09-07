@@ -492,6 +492,12 @@ namespace HM
       update_check_hours_ = ReadIniSettingInteger_("Settings", "UpdateCheckHours", 24);
       if (update_check_hours_ < 1)
          update_check_hours_ = 1;
+      update_trust_roots_file_ = ReadIniSettingString_("Settings", "UpdateTrustRootsFile", "");
+      update_log_public_key_file_ = ReadIniSettingString_("Settings", "UpdateLogPublicKeyFile", "");
+      update_signing_identity_ = ReadIniSettingString_("Settings", "UpdateSigningIdentity", "");
+      update_signing_issuer_ = ReadIniSettingString_("Settings", "UpdateSigningIssuer", "");
+      update_source_repository_ = ReadIniSettingString_("Settings", "UpdateSourceRepository", "");
+      update_require_authenticode_ = ReadIniSettingInteger_("Settings", "UpdateRequireAuthenticode", 0) == 1;
       json_logging_ = ReadIniSettingInteger_("Settings", "JsonLogging", 0) == 1;
       log_delete_days_ = ReadIniSettingInteger_("Settings", "LogDeleteDays", 0);
       shutdown_drain_seconds_ = ReadIniSettingInteger_("Settings", "ShutdownDrainSeconds", 0);

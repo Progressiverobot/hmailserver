@@ -544,6 +544,9 @@ interface IInterfaceStatus : IDispatch {
    [propget, id(12), helpstring("When the release feed was last read, local time; empty until it has been.")] HRESULT UpdateLastChecked([out, retval] BSTR *pVal);
    [propget, id(13), helpstring("Why the last check failed; empty when it did not.")] HRESULT UpdateLastError([out, retval] BSTR *pVal);
    [id(14), helpstring("Reads the release feed now, whether or not the scheduled check (UpdateCheckEnabled) is on, and returns whether it could be read. The properties above then say what it said.")] HRESULT CheckForUpdate([out, retval] VARIANT_BOOL *pVal);
+   [id(15), helpstring("Downloads the installer of the newer release the last check found, with its Sigstore bundle, into the data directory's Updates folder, and verifies it against the bundle: the file's digest, the signing certificate's chain to the Fulcio authority at the time the transparency log recorded the signature, the certificate's identity (this repository's release workflow, issued on a GitHub token), the signature, and the log's own signature. Returns whether the installer is in place and verified; when it is not, the files are deleted and UpdateLastError says why. Nothing is run.")] HRESULT DownloadUpdate([out, retval] VARIANT_BOOL *pVal);
+   [propget, id(16), helpstring("Where the verified installer is, once UpdateState is 3 or later; otherwise empty.")] HRESULT UpdateInstallerPath([out, retval] BSTR *pVal);
+   [propget, id(17), helpstring("The identity the verified installer's signing certificate names: the release workflow and the ref it ran from.")] HRESULT UpdateSignerIdentity([out, retval] BSTR *pVal);
 };
 
 [

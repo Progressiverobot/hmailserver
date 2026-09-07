@@ -59,6 +59,9 @@ public:
    STDMETHOD(get_UpdateLastChecked)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(get_UpdateLastError)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(CheckForUpdate)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(DownloadUpdate)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(get_UpdateInstallerPath)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(get_UpdateSignerIdentity)(/*[out, retval]*/ BSTR *pVal);
 
 private:
 

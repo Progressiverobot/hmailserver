@@ -9,6 +9,7 @@
 
 #include "../Common/Util/ServerStatus.h"
 #include "../Common/Util/UpdateChecker.h"
+#include "../Common/Util/UpdateDownloader.h"
 
 InterfaceStatus::InterfaceStatus() :
    status_(nullptr),
@@ -271,6 +272,60 @@ InterfaceStatus::CheckForUpdate(VARIANT_BOOL *pVal)
       // a COM error: the caller asked a question and this is the answer to it.
       HM::String error;
       *pVal = HM::UpdateChecker::CheckNow(error) ? VARIANT_TRUE : VARIANT_FALSE;
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::DownloadUpdate(VARIANT_BOOL *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      // On the caller's thread, as CheckForUpdate is: an installer is tens of
+      // megabytes, and the caller asked to wait for the answer.
+      HM::String error;
+      *pVal = HM::UpdateDownloader::DownloadAndVerify(error) ? VARIANT_TRUE : VARIANT_FALSE;
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateInstallerPath(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::UpdateChecker::Current().installer_path.AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
+InterfaceStatus::get_UpdateSignerIdentity(BSTR *pVal)
+{
+   try
+   {
+      if (!status_)
+         return GetAccessDenied();
+
+      *pVal = HM::String(HM::UpdateChecker::Current().signer_identity).AllocSysString();
       return S_OK;
    }
    catch (...)

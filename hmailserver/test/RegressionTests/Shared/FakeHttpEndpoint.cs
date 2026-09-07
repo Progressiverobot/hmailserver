@@ -33,6 +33,15 @@ namespace RegressionTests.Shared
       private int _statusCode;
       private string _body;
       private string _contentType;
+      private readonly Dictionary<string, Route> _routes = new Dictionary<string, Route>(StringComparer.Ordinal);
+
+      private sealed class Route
+      {
+         public int Status;
+         public byte[] Body;
+         public string ContentType;
+         public string Location;
+      }
 
       public FakeHttpEndpoint(int statusCode, string body, string contentType = "application/json")
       {
@@ -60,6 +69,30 @@ namespace RegressionTests.Shared
             lock (_lock)
                return new List<string>(_requests);
          }
+      }
+
+      /// <summary>
+      ///    What requests for one exact path are answered with, in bytes: a release's
+      ///    installer and its bundle live at different paths on the same host. Paths
+      ///    without a route get the default response.
+      /// </summary>
+      public void SetResponse(string path, int statusCode, byte[] body, string contentType = "application/octet-stream")
+      {
+         lock (_lock)
+            _routes[path] = new Route {Status = statusCode, Body = body, ContentType = contentType};
+      }
+
+      /// <summary>A 302 from one path to a location, as a release asset download is.</summary>
+      public void SetRedirect(string path, string location)
+      {
+         lock (_lock)
+            _routes[path] = new Route {Status = 302, Body = new byte[0], ContentType = "text/plain", Location = location};
+      }
+
+      public void ClearRoutes()
+      {
+         lock (_lock)
+            _routes.Clear();
       }
 
       /// <summary>What the next requests are answered with.</summary>
@@ -144,24 +177,48 @@ namespace RegressionTests.Shared
          var text = request.ToString();
 
          int status;
-         string body;
+         byte[] bodyBytes;
          string contentType;
+         string location = null;
+         string requestPath = RequestPath(text);
          lock (_lock)
          {
             _requests.Add(text);
-            status = _statusCode;
-            body = _body;
-            contentType = _contentType;
+            Route route;
+            if (requestPath != null && _routes.TryGetValue(requestPath, out route))
+            {
+               status = route.Status;
+               bodyBytes = route.Body;
+               contentType = route.ContentType;
+               location = route.Location;
+            }
+            else
+            {
+               status = _statusCode;
+               bodyBytes = Encoding.UTF8.GetBytes(_body ?? "");
+               contentType = _contentType;
+            }
          }
 
-         var bodyBytes = Encoding.UTF8.GetBytes(body ?? "");
-         var reason = status == 200 ? "OK" : status == 401 ? "Unauthorized" : status == 404 ? "Not Found" : "Error";
+         var reason = status == 200 ? "OK" : status == 302 ? "Found" : status == 401 ? "Unauthorized" : status == 404 ? "Not Found" : "Error";
          var head = "HTTP/1.0 " + status + " " + reason + "\r\nContent-Type: " + contentType +
+                    (location == null ? "" : "\r\nLocation: " + location) +
                     "\r\nContent-Length: " + bodyBytes.Length + "\r\nConnection: close\r\n\r\n";
          var headBytes = Encoding.ASCII.GetBytes(head);
          stream.Write(headBytes, 0, headBytes.Length);
          stream.Write(bodyBytes, 0, bodyBytes.Length);
          stream.Flush();
+      }
+
+      // The path of the request line, without any query.
+      private static string RequestPath(string request)
+      {
+         int lineEnd = request.IndexOf("\r\n", StringComparison.Ordinal);
+         string[] parts = (lineEnd < 0 ? request : request.Substring(0, lineEnd)).Split(' ');
+         if (parts.Length < 2)
+            return null;
+         int query = parts[1].IndexOf('?');
+         return query < 0 ? parts[1] : parts[1].Substring(0, query);
       }
    }
 }

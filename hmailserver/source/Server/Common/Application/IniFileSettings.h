@@ -567,6 +567,14 @@ namespace HM
       String GetUpdateChannel() const { return update_channel_; }
       String GetUpdateFeedUrl() const { return update_feed_url_; }
       int GetUpdateCheckHours() const { return update_check_hours_; }
+      // The verify: what the installer's Sigstore bundle is checked against. Empty
+      // means the public Sigstore instance and this repository's release workflow.
+      String GetUpdateTrustRootsFile() const { return update_trust_roots_file_; }
+      String GetUpdateLogPublicKeyFile() const { return update_log_public_key_file_; }
+      String GetUpdateSigningIdentity() const { return update_signing_identity_; }
+      String GetUpdateSigningIssuer() const { return update_signing_issuer_; }
+      String GetUpdateSourceRepository() const { return update_source_repository_; }
+      bool GetUpdateRequireAuthenticode() const { return update_require_authenticode_; }
       bool GetJsonLogging() const { return json_logging_; }
       int GetLogDeleteDays() const { return log_delete_days_; }
       int GetShutdownDrainSeconds() const { return shutdown_drain_seconds_; }
@@ -1112,6 +1120,12 @@ namespace HM
       String update_channel_;
       String update_feed_url_;
       int update_check_hours_ = 24;
+      String update_trust_roots_file_;
+      String update_log_public_key_file_;
+      String update_signing_identity_;
+      String update_signing_issuer_;
+      String update_source_repository_;
+      bool update_require_authenticode_ = false;
       bool json_logging_ = false;
       int log_delete_days_ = 0;
       int shutdown_drain_seconds_ = 0;

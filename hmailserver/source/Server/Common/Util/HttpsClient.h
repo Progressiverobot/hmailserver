@@ -44,6 +44,14 @@ namespace HM
                           const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
                           int timeout_seconds = 20, size_t max_response_bytes = 1024 * 1024);
 
+      // GET url to a file, following up to five redirects (to https, or to plain http
+      // on a loopback address, as Request accepts), the body streamed to the file
+      // rather than held. True when a 200 response was written to path in full and
+      // within max_bytes; otherwise false with error set and nothing left at path.
+      // status_code is the last response's, or 0 when no response was obtained.
+      static bool Download(const AnsiString &url, const String &path, size_t max_bytes, int &status_code, String &error,
+                           int timeout_seconds = 60);
+
       // http(s)://host[:port]/path -> parts. Port defaults to 443 or 80; path to "/".
       static bool ParseUrl(const AnsiString &url, bool &https, AnsiString &host, AnsiString &port, AnsiString &path);
 

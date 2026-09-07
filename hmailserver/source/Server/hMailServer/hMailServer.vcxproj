@@ -506,6 +506,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\HttpsClient.cpp" />
     <ClCompile Include="..\Common\Util\JsonDocument.cpp" />
     <ClCompile Include="..\Common\Util\UpdateChecker.cpp" />
+    <ClCompile Include="..\Common\Util\SigstoreVerifier.cpp" />
+    <ClCompile Include="..\Common\Util\UpdateDownloader.cpp" />
     <ClCompile Include="..\Common\Util\JwksKeySet.cpp" />
     <ClCompile Include="..\Common\Util\TokenIntrospection.cpp" />
     <ClCompile Include="..\Common\Util\SRS.cpp" />
@@ -1140,6 +1142,8 @@ EXIT 0
     <ClInclude Include="..\Common\Util\HttpsClient.h" />
     <ClInclude Include="..\Common\Util\JsonDocument.h" />
     <ClInclude Include="..\Common\Util\UpdateChecker.h" />
+    <ClInclude Include="..\Common\Util\SigstoreVerifier.h" />
+    <ClInclude Include="..\Common\Util\UpdateDownloader.h" />
     <ClInclude Include="..\Common\Util\JwksKeySet.h" />
     <ClInclude Include="..\Common\Util\TokenIntrospection.h" />
     <ClInclude Include="..\Common\Util\SRS.h" />

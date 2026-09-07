@@ -121,6 +121,7 @@ namespace HM
          RouteMetricsHistory,
          RouteUpdateGet,
          RouteUpdateCheck,
+         RouteUpdateDownload,
          RouteQuarantineList,
          RouteQuarantineRelease,
          RouteQuarantineDelete,
@@ -312,6 +313,7 @@ namespace HM
       // The update check's verdict, and a check run now. Both server-wide.
       static AnsiString HandleUpdateGet_();
       static AnsiString HandleUpdateCheck_();
+      static AnsiString HandleUpdateDownload_();
       static AnsiString QueryParameter_(const AnsiString &query, const AnsiString &name);
 
       AnsiString HandleListQuarantine_();

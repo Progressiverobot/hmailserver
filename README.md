@@ -181,13 +181,26 @@ release page. `UpdateChannel=prerelease` includes pre-releases; the default,
 `stable`, does not. `Status.CheckForUpdate` and `POST /api/v1/update/check` run a
 check on demand whether or not the scheduled one is on.
 
+**The download is verified before it is kept.** `Status.DownloadUpdate` or
+`POST /api/v1/update/download` fetches the newer release's installer and its
+Sigstore bundle into `Data\Updates` and checks the installer against the bundle
+without cosign and without the network: the file's SHA-256 is the one signed and
+the one the transparency log recorded; the signing certificate chains to Sigstore's
+Fulcio authority at the moment the log recorded the signature (the only moment a
+ten-minute certificate is valid); the certificate names this repository's
+`sign-release` workflow, issued on a GitHub token, for this repository; the
+signature verifies under the certificate's key; and the log vouches for the entry
+under its own key. A file that fails any of that is deleted and the reason is in
+`Status.UpdateLastError` and the log. `UpdateRequireAuthenticode=1` adds a Windows
+Authenticode check on top. Nothing is run: applying the installer is the next part.
+
 It is off until you opt in, because a server must not call out to anyone until its
 administrator says it may; when it is on, the request is a plain `GET` of the
 GitHub Releases API with nothing but the `User-Agent` the server always sends - no
 identifier, no configuration, no counts. `UpdateFeedUrl` points it at a mirror on a
-network without Internet access. It downloads and installs nothing: verifying the
-installer against the release's Sigstore bundle and applying it are the next parts
-of the roadmap's live-update row.
+network without Internet access. It installs nothing: applying the verified
+installer, with a rollback if the service does not come back, is the next part of
+the roadmap's live-update row.
 
 Building hMailServer
 ====================
@@ -413,6 +426,13 @@ Administration and monitoring:
    UpdateChannel=stable          ; prerelease to be told about pre-releases as well
    UpdateCheckHours=24
    UpdateFeedUrl=                ; a feed other than the GitHub Releases API (a mirror; the tests' fake)
+   UpdateTrustRootsFile=         ; PEM certificates trusted to have issued the release's signing certificate
+                                 ; (empty = Sigstore's public Fulcio root and intermediate, embedded)
+   UpdateLogPublicKeyFile=       ; the transparency log's public key (empty = Sigstore's public Rekor, embedded)
+   UpdateSigningIdentity=        ; the workflow the signing certificate must name (empty = this repository's
+                                 ; sign-release workflow); UpdateSigningIssuer= the OIDC issuer (empty = GitHub's);
+                                 ; UpdateSourceRepository= the repository it must record (empty = this one, - = any)
+   UpdateRequireAuthenticode=0   ; 1: the installer must also carry an Authenticode signature Windows trusts
    MetricsServerPort=0           ; Prometheus metrics endpoint (/metrics) + health probes
    MetricsHistoryDays=7          ; keep one sample per metric per minute in hm_metricsamples for N days: what the
                                  ; dashboard's 24 h / 7 d / 30 d views and GET /api/v1/metrics/history read
@@ -581,7 +601,7 @@ Administration and monitoring:
 
    The metrics listener also serves Kubernetes-style health probes: `/livez` (process liveness), `/readyz` (200 only when `StateRunning` and the database has answered a real round trip within the last 20 seconds, else 503 — and 503 while the server is draining/stopping) and `/healthz` (JSON: status, server state, database, uptime). `/metrics` exposes counters and gauges for processed/spam/virus messages, TLS handshakes (success/failure), authentication (success/failure), sessions per protocol, the start time (`hmailserver_start_time_seconds`), database connectivity (`hmailserver_database_connected`, proved by a round trip, plus pool gauges), the SMTP delivery-queue depth and oldest-message age, certificate expiry, work-queue depth, delivery outcomes (`hmailserver_messages_delivered_total`/`_deferred_total`/`_bounced_total`), the message-store consistency result (`hmailserver_messagestore_missing_files`), and per-command and per-query latency histograms (`hmailserver_command_processing_seconds`, `hmailserver_db_query_seconds`).
 
-   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/update` (GET, the update check's verdict: state, the newer release's version, date, page and installer asset) and `/api/v1/update/check` (POST, read the release feed now), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
+   REST endpoints: `/api/v1/status`, `/api/v1/domains`, `/api/v1/domains/<name>/accounts` (GET/POST), `/api/v1/accounts/<address>` (DELETE), `/api/v1/queue` (GET), `/api/v1/queue/<id>/retry` (POST), `/api/v1/queue/<id>` (DELETE), `/api/v1/apikeys` (GET/POST, administrator password only), `/api/v1/apikeys/<id>` (DELETE), `/api/v1/tlsa` (GET, publish-ready DANE TLSA records), `/api/v1/srv` (GET, client-discovery SRV records), `/api/v1/domains/<name>/aliases` (GET), `/api/v1/quarantine` (GET), `/api/v1/quarantine/<id>/release` (POST), `/api/v1/quarantine/<id>` (DELETE), `/api/v1/ipranges` (GET/POST) and `/api/v1/ipranges/<id>` (DELETE), `/api/v1/domains/<name>/lists` (GET/POST, with members) and `/api/v1/lists/<address>` (DELETE), `/api/v1/certificates` (GET, never a key password), `/api/v1/domains/<name>/dkim` (GET), `/api/v1/rules` (GET, the global rules with criteria and actions), `/api/v1/logs` (GET) and `/api/v1/logs/<name>?lines=N` (GET, the tail of one log file), `/api/v1/backup` (GET status, POST start), `/api/v1/settings` (GET, a read-only snapshot with no secrets), `/api/v1/update` (GET, the update check's verdict: state, the newer release's version, date, page and installer asset) and `/api/v1/update/check` (POST, read the release feed now), `/api/v1/update/download` (POST, fetch and verify the newer release's installer), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/archive` (GET, search the archive index by domain, mailbox, sender, recipient, subject and time), `/api/v1/archive/<id>` (GET) and `/api/v1/archive/<id>/hold` (POST places a legal hold, DELETE lifts it), `/api/v1/metrics/history` (GET), and `/api/v1/openapi.json` (GET) - the OpenAPI 3.0.3 description of all of them. Server-wide resources are refused for domain-restricted keys and every creating or deleting route for read-only ones.
 
 Secret protection and least-privilege:
 
