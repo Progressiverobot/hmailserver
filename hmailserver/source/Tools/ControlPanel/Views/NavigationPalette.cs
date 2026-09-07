@@ -9,6 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -82,7 +83,7 @@ namespace hMailServer.ControlPanel.Views
          WindowStartupLocation = WindowStartupLocation.Manual;
          Left = owner.Left + (owner.Width - Width) / 2;
          Top = owner.Top + 80;
-         AutomationProperties.SetName(this, "Search pages, settings and tasks");
+         AutomationProperties.SetName(this, L("Search pages, settings and tasks"));
 
          var root = new Border
          {
@@ -102,14 +103,14 @@ namespace hMailServer.ControlPanel.Views
          {
             FontSize = Typography.SectionHeading,
             Padding = new Thickness(8),
-            PlaceholderText = "Search, or say what you want to do - \"stop spam\", \"block an IP\"",
+            PlaceholderText = L("Search, or say what you want to do - \"stop spam\", \"block an IP\""),
             BorderThickness = new Thickness(0, 0, 0, 1),
             Background = Brushes.Transparent
          };
          searchBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          searchBox_.SetResourceReference(Control.BorderBrushProperty, "ControlElevationBorderBrush");
          searchBox_.TextChanged += (s, e) => Filter();
-         AutomationProperties.SetName(searchBox_, "Search pages, settings and tasks");
+         AutomationProperties.SetName(searchBox_, L("Search pages, settings and tasks"));
          AutomationProperties.SetAutomationId(searchBox_, "palette-search");
          panel.Children.Add(searchBox_);
 
@@ -126,7 +127,7 @@ namespace hMailServer.ControlPanel.Views
          };
          resultsList_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          resultsList_.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
-         AutomationProperties.SetName(resultsList_, "Search results");
+         AutomationProperties.SetName(resultsList_, L("Search results"));
          AutomationProperties.SetAutomationId(resultsList_, "palette-results");
          Grid.SetRow(resultsList_, 1);
          panel.Children.Add(resultsList_);
@@ -147,7 +148,7 @@ namespace hMailServer.ControlPanel.Views
          // drive it from the keyboard cannot use it at all.
          var footer = new TextBlock
          {
-            Text = "↑↓ move    Enter open    Esc close",
+            Text = L("↑↓ move    Enter open    Esc close"),
             FontSize = Typography.Caption,
             Margin = new Thickness(4, 8, 4, 2)
          };
@@ -186,8 +187,7 @@ namespace hMailServer.ControlPanel.Views
          bool anything = first >= 0;
          resultsList_.Visibility = anything ? Visibility.Visible : Visibility.Collapsed;
          emptyHint_.Visibility = anything ? Visibility.Collapsed : Visibility.Visible;
-         emptyHint_.Text = "Nothing matched \"" + searchBox_.Text.Trim() + "\". Try what you are trying to achieve " +
-            "(\"stop spam\", \"let a device send mail\"), a page name, or an hMailServer.INI key.";
+         emptyHint_.Text = F("Nothing matched \"{0}\". Try what you are trying to achieve (\"stop spam\", \"let a device send mail\"), a page name, or an hMailServer.INI key.", searchBox_.Text.Trim());
       }
 
       /// <summary>
@@ -272,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
             case PaletteRowKind.Task:
                // Naming the destination page is the point of a task row: the
                // phrase is ours, the page is what the user has to remember.
-               location = location.Length > 0 ? "Opens " + location : "";
+               location = location.Length > 0 ? F("Opens {0}", location) : "";
                break;
 
             case PaletteRowKind.Page:

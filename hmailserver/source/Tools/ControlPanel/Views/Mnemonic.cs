@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -32,13 +33,13 @@ namespace hMailServer.ControlPanel.Views
    public static class Mnemonic
    {
       public static readonly DependencyProperty TargetProperty = DependencyProperty.RegisterAttached(
-         "Target", typeof(FrameworkElement), typeof(Mnemonic), new PropertyMetadata(null, OnTargetChanged));
+         "Target", typeof(FrameworkElement), typeof(Mnemonic), new PropertyMetadata(null, OnTargetChanged)); // no-loc
 
       // The caption as written, kept so a second Apply on the same block (a
       // re-bound target, a rebuilt page) starts from the marker and not from the
       // already-rendered text.
       private static readonly DependencyProperty CaptionProperty = DependencyProperty.RegisterAttached(
-         "Caption", typeof(string), typeof(Mnemonic), new PropertyMetadata(null));
+         "Caption", typeof(string), typeof(Mnemonic), new PropertyMetadata(null)); // no-loc
 
       public static FrameworkElement GetTarget(DependencyObject element) => (FrameworkElement)element.GetValue(TargetProperty);
 
@@ -78,14 +79,14 @@ namespace hMailServer.ControlPanel.Views
 
          string key = char.ToUpperInvariant(text[keyIndex]).ToString();
          Register(key, target);
-         AutomationProperties.SetAccessKey(target, "Alt+" + key);
+         AutomationProperties.SetAccessKey(target, "Alt+" + key); // no-loc
          return block;
       }
 
       // Set on an editor once it answers the access-key manager, so a second Apply
       // on a rebuilt caption does not stack handlers.
       private static readonly DependencyProperty AnswersProperty = DependencyProperty.RegisterAttached(
-         "Answers", typeof(bool), typeof(Mnemonic), new PropertyMetadata(false));
+         "Answers", typeof(bool), typeof(Mnemonic), new PropertyMetadata(false)); // no-loc
 
       private static void Register(string key, FrameworkElement target)
       {

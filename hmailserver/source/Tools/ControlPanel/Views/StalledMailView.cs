@@ -8,6 +8,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -39,14 +40,13 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = "Diagnosing stalled mail" };
+         var title = new TextBlock { Text = L("Diagnosing stalled mail") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          panel.Children.Add(title);
 
          var subtitle = new TextBlock
          {
-            Text = "Mail is not moving, the service is running, nothing has crashed and the log seems to stop mid-transaction. " +
-                   "The server is not silent about this any more: the answer is usually in one line of the log, and this page says which."
+            Text = L("Mail is not moving, the service is running, nothing has crashed and the log seems to stop mid-transaction. The server is not silent about this any more: the answer is usually in one line of the log, and this page says which.")
          };
          subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
          panel.Children.Add(subtitle);
@@ -75,22 +75,20 @@ namespace hMailServer.ControlPanel.Views
 
       private Border WhichHalf()
       {
-         var card = Card("First: which half is stuck?",
-            "The two halves fail differently and have different causes. Work out which one you have before anything else.");
+         var card = Card(L("First: which half is stuck?"),
+            L("The two halves fail differently and have different causes. Work out which one you have before anything else."));
          var columns = new UniformGrid { Columns = 2 };
 
          var accepting = new StackPanel { Margin = new Thickness(0, 0, 12, 0) };
-         accepting.Children.Add(Heading("Accepting"));
-         accepting.Children.Add(Body("The sending server connects, sends the message, and then waits. From its side you see a timeout " +
-            "after the message body was transmitted - Postfix reports \"timed out while sending end of data\". " +
-            "The message never appears in your queue."));
-         accepting.Children.Add(Link("Open the live logs", "logs"));
+         accepting.Children.Add(Heading(L("Accepting")));
+         accepting.Children.Add(Body(L("The sending server connects, sends the message, and then waits. From its side you see a timeout after the message body was transmitted - Postfix reports \"timed out while sending end of data\". The message never appears in your queue.")));
+         accepting.Children.Add(Link(L("Open the live logs"), "logs"));
          columns.Children.Add(accepting);
 
          var delivering = new StackPanel();
-         delivering.Children.Add(Heading("Delivering"));
-         delivering.Children.Add(Body("The message is accepted - the sender got a 250 - is visible in the delivery queue, and never leaves."));
-         delivering.Children.Add(Link("Open the delivery queue", "queue"));
+         delivering.Children.Add(Heading(L("Delivering")));
+         delivering.Children.Add(Body(L("The message is accepted - the sender got a 250 - is visible in the delivery queue, and never leaves.")));
+         delivering.Children.Add(Link(L("Open the delivery queue"), "queue"));
          columns.Children.Add(delivering);
 
          ((StackPanel)card.Child).Children.Add(columns);
@@ -99,29 +97,27 @@ namespace hMailServer.ControlPanel.Views
 
       private Border DebugLogging()
       {
-         var card = Card("Turn on debug logging first",
-            "The lines this page refers to are written at debug level; the slow ones are also written at application level, " +
-            "so with application logging alone you still see the important ones. Reproduce the problem once, then read the log. " +
-            "Remember to turn debug logging off afterwards on a busy server.");
+         var card = Card(L("Turn on debug logging first"),
+            L("The lines this page refers to are written at debug level; the slow ones are also written at application level, so with application logging alone you still see the important ones. Reproduce the problem once, then read the log. Remember to turn debug logging off afterwards on a busy server."));
          var content = (StackPanel)card.Child;
 
          var row = new StackPanel { Orientation = Orientation.Horizontal };
          var enable = new Wpf.Ui.Controls.Button
          {
-            Content = "_Turn on debug logging now",
+            Content = L("_Turn on debug logging now"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 4, 8, 0)
          };
-         AutomationProperties.SetName(enable, "Turn on debug logging now");
+         AutomationProperties.SetName(enable, L("Turn on debug logging now"));
          enable.Click += (s, e) => SetDebugLogging(true);
          row.Children.Add(enable);
 
-         var disable = new Wpf.Ui.Controls.Button { Content = "Turn it _off again", Margin = new Thickness(0, 4, 8, 0) };
-         AutomationProperties.SetName(disable, "Turn debug logging off again");
+         var disable = new Wpf.Ui.Controls.Button { Content = L("Turn it _off again"), Margin = new Thickness(0, 4, 8, 0) };
+         AutomationProperties.SetName(disable, L("Turn debug logging off again"));
          disable.Click += (s, e) => SetDebugLogging(false);
          row.Children.Add(disable);
 
-         row.Children.Add(Link("Open Logging settings", "logging"));
+         row.Children.Add(Link(L("Open Logging settings"), "logging"));
          content.Children.Add(row);
          content.Children.Add(loggingStatus_);
          return card;
@@ -129,113 +125,94 @@ namespace hMailServer.ControlPanel.Views
 
       private Border Accepting()
       {
-         var card = Card("Accepting: the sender times out after sending the message",
-            "Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, " +
-            "the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. " +
-            "The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one " +
-            "after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications " +
-            "do not, so a stall there shows as \"done spam-protection\" followed by silence. A stage taking ten seconds or more is " +
-            "logged at application level even without debug logging.");
+         var card = Card(L("Accepting: the sender times out after sending the message"),
+            L("Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as \"done spam-protection\" followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging."));
          var content = (StackPanel)card.Child;
 
          content.Children.Add(Table(new[]
          {
-            ("SpamTestSpamAssassin with a large Time:", "spamd is unreachable, overloaded, or accepting connections without answering."),
-            ("SpamTestDNSBlackLists, SpamTestSURBL or SpamTestSPF slow", "The resolver is not answering: look in the TCP/IP log for \"DNS - Query timed out\". Do not reach for DNSServer as the fix - leave it empty unless you need a specific resolver."),
-            ("\"done spam-protection\", then silence", "Message modifications: the spam headers, the signature, the List-* headers, or the write of the modified message back to disk."),
-            ("script/save slow", "An OnAcceptMessage event script, or the database."),
-            ("Nothing between 354 and silence", "A version older than 6.2.17; upgrade, because that is the version that added these lines."),
-            ("451 4.3.1 replies", "Acceptance exceeded FinalizationTimeout (240 s by default): the sender retries rather than waiting for ever, the error entry names the deadline, and the stage timings above it name what consumed the time."),
+            (L("SpamTestSpamAssassin with a large Time:"), L("spamd is unreachable, overloaded, or accepting connections without answering.")),
+            (L("SpamTestDNSBlackLists, SpamTestSURBL or SpamTestSPF slow"), L("The resolver is not answering: look in the TCP/IP log for \"DNS - Query timed out\". Do not reach for DNSServer as the fix - leave it empty unless you need a specific resolver.")),
+            (L("\"done spam-protection\", then silence"), L("Message modifications: the spam headers, the signature, the List-* headers, or the write of the modified message back to disk.")),
+            (L("script/save slow"), L("An OnAcceptMessage event script, or the database.")),
+            (L("Nothing between 354 and silence"), L("A version older than 6.2.17; upgrade, because that is the version that added these lines.")),
+            (L("451 4.3.1 replies"), L("Acceptance exceeded FinalizationTimeout (240 s by default): the sender retries rather than waiting for ever, the error entry names the deadline, and the stage timings above it name what consumed the time.")),
          }));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-         links.Children.Add(Link("Open the live logs", "logs"));
-         links.Children.Add(Link("Anti-spam settings (SpamAssassin)", "antispam"));
-         links.Children.Add(Link("Test SpamAssassin and ClamAV", "diagnostics"));
+         links.Children.Add(Link(L("Open the live logs"), "logs"));
+         links.Children.Add(Link(L("Anti-spam settings (SpamAssassin)"), "antispam"));
+         links.Children.Add(Link(L("Test SpamAssassin and ClamAV"), "diagnostics"));
          content.Children.Add(links);
          return card;
       }
 
       private Border EveryMessage()
       {
-         var card = Card("If every message stalls, not just one",
-            "Look for \"Task SMTP-accept session=42 ip=... waited 8 seconds for a thread in work queue Asynchronous task queue\" and, when it " +
-            "is severe, \"All 15 threads in work queue Asynchronous task queue have been busy for at least 120 seconds, so no further task " +
-            "on this queue can start\". That means every worker is occupied and messages are queuing behind them: one slow dependency does " +
-            "this to the whole server, which is why a single wedged scanner used to look like the server had stopped responding. The task " +
-            "names say which sessions are stuck; the stage timings say what they are stuck on.");
+         var card = Card(L("If every message stalls, not just one"),
+            L("Look for \"Task SMTP-accept session=42 ip=... waited 8 seconds for a thread in work queue Asynchronous task queue\" and, when it is severe, \"All 15 threads in work queue Asynchronous task queue have been busy for at least 120 seconds, so no further task on this queue can start\". That means every worker is occupied and messages are queuing behind them: one slow dependency does this to the whole server, which is why a single wedged scanner used to look like the server had stopped responding. The task names say which sessions are stuck; the stage timings say what they are stuck on."));
          var content = (StackPanel)card.Child;
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
-         links.Children.Add(Link("Server status (who is connected)", "status"));
-         links.Children.Add(Link("Threads and the stall threshold", "hardening"));
+         links.Children.Add(Link(L("Server status (who is connected)"), "status"));
+         links.Children.Add(Link(L("Threads and the stall threshold"), "hardening"));
          content.Children.Add(links);
          return card;
       }
 
       private Border Delivering()
       {
-         var card = Card("Delivering: the message is accepted but never leaves",
-            "Delivery runs on a separate, smaller pool. The usual causes, in the order they occur:");
+         var card = Card(L("Delivering: the message is accepted but never leaves"),
+            L("Delivery runs on a separate, smaller pool. The usual causes, in the order they occur:"));
          var content = (StackPanel)card.Child;
 
-         content.Children.Add(Bullet("A virus scanner that stops responding. ClamAV is contacted after the message is accepted, so a wedged " +
-            "clamd shows up as accepted-but-never-delivered. Each socket operation is bounded by ClamMinTimeout / ClamMaxTimeout - a deadline " +
-            "on one read or write, armed afresh each time, so a large message streamed in chunks can take longer than ClamMaxTimeout in total."));
-         content.Children.Add(Bullet("A remote server that answers extremely slowly. The idle timeout is re-armed on every byte, so a host " +
-            "that sends one byte occasionally used to hold a delivery thread indefinitely; ClientSessionCeiling (30 minutes by default) is the " +
-            "absolute ceiling, armed once and never re-armed."));
-         content.Children.Add(Bullet("A custom virus scanner or external tool that hangs - bounded by ExternalProcessTimeout."));
-         content.Children.Add(Bullet("The database: check for errors mentioning the connection pool. When the pool deadline expires a recipient " +
-            "lookup answers 451 4.3.2 rather than 550, so a database locked by a backup defers mail instead of bouncing it."));
+         content.Children.Add(Bullet(L("A virus scanner that stops responding. ClamAV is contacted after the message is accepted, so a wedged clamd shows up as accepted-but-never-delivered. Each socket operation is bounded by ClamMinTimeout / ClamMaxTimeout - a deadline on one read or write, armed afresh each time, so a large message streamed in chunks can take longer than ClamMaxTimeout in total.")));
+         content.Children.Add(Bullet(L("A remote server that answers extremely slowly. The idle timeout is re-armed on every byte, so a host that sends one byte occasionally used to hold a delivery thread indefinitely; ClientSessionCeiling (30 minutes by default) is the absolute ceiling, armed once and never re-armed.")));
+         content.Children.Add(Bullet(L("A custom virus scanner or external tool that hangs - bounded by ExternalProcessTimeout.")));
+         content.Children.Add(Bullet(L("The database: check for errors mentioning the connection pool. When the pool deadline expires a recipient lookup answers 451 4.3.2 rather than 550, so a database locked by a backup defers mail instead of bouncing it.")));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-         links.Children.Add(Link("Open the delivery queue", "queue"));
-         links.Children.Add(Link("Trace one message", "messagetrace"));
-         links.Children.Add(Link("Anti-virus settings (ClamAV timeouts)", "antivirus"));
+         links.Children.Add(Link(L("Open the delivery queue"), "queue"));
+         links.Children.Add(Link(L("Trace one message"), "messagetrace"));
+         links.Children.Add(Link(L("Anti-virus settings (ClamAV timeouts)"), "antivirus"));
          content.Children.Add(links);
          return card;
       }
 
       private Border Bounds()
       {
-         var card = Card("The settings that bound each stage",
-            "All in hMailServer.ini under [Settings], all in seconds, with defaults chosen to sit well inside a typical sending server's " +
-            "timeout. Two exceptions matter: SAMaxTimeout and ClamMaxTimeout go through TimeoutCalculator, which returns the minimum whenever " +
-            "the maximum is lower than it - so 0 gives a shorter bound, not an absent one. To lengthen either a long way, raise the matching " +
-            "...MinTimeout too.");
+         var card = Card(L("The settings that bound each stage"),
+            L("All in hMailServer.ini under [Settings], all in seconds, with defaults chosen to sit well inside a typical sending server's timeout. Two exceptions matter: SAMaxTimeout and ClamMaxTimeout go through TimeoutCalculator, which returns the minimum whenever the maximum is lower than it - so 0 gives a shorter bound, not an absent one. To lengthen either a long way, raise the matching ...MinTimeout too."));
          var content = (StackPanel)card.Child;
 
          content.Children.Add(Table(new[]
          {
-            ("FinalizationTimeout (240)", "The whole accept pipeline; then the sender gets a 451. 0 = no bound."),
-            ("SAMaxTimeout (90)", "SpamAssassin: idle timeout, and a session ceiling of this plus 30 s. 0 is NOT no bound."),
-            ("ClamMaxTimeout (90)", "ClamAV: idle timeout per socket operation. 0 is NOT no bound."),
-            ("DNSQueryTimeout (10)", "A single DNS query. 0 = no bound."),
-            ("ScriptTimeout (60)", "One event script invocation. 0 = no bound."),
-            ("ExternalProcessTimeout (300)", "An external scanner process. 0 = no bound."),
-            ("ClientSessionCeiling (1800)", "An entire outbound delivery session. 0 = no bound."),
-            ("AsyncQueueStallThreshold (120)", "How long every worker may be busy before the saturation report. 0 = reporting off."),
-            ("DBConnectionAcquireTimeout (60)", "Waiting for a pooled database connection. 0 = no bound."),
+            (L("FinalizationTimeout (240)"), L("The whole accept pipeline; then the sender gets a 451. 0 = no bound.")),
+            (L("SAMaxTimeout (90)"), L("SpamAssassin: idle timeout, and a session ceiling of this plus 30 s. 0 is NOT no bound.")),
+            (L("ClamMaxTimeout (90)"), L("ClamAV: idle timeout per socket operation. 0 is NOT no bound.")),
+            (L("DNSQueryTimeout (10)"), L("A single DNS query. 0 = no bound.")),
+            (L("ScriptTimeout (60)"), L("One event script invocation. 0 = no bound.")),
+            (L("ExternalProcessTimeout (300)"), L("An external scanner process. 0 = no bound.")),
+            (L("ClientSessionCeiling (1800)"), L("An entire outbound delivery session. 0 = no bound.")),
+            (L("AsyncQueueStallThreshold (120)"), L("How long every worker may be busy before the saturation report. 0 = reporting off.")),
+            (L("DBConnectionAcquireTimeout (60)"), L("Waiting for a pooled database connection. 0 = no bound.")),
          }));
 
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 0) };
-         links.Children.Add(Link("Server limits & expert settings (the timeouts)", "hardening"));
-         links.Children.Add(Link("Anti-spam (SAMaxTimeout)", "antispam"));
-         links.Children.Add(Link("Anti-virus (ClamMaxTimeout)", "antivirus"));
+         links.Children.Add(Link(L("Server limits & expert settings (the timeouts)"), "hardening"));
+         links.Children.Add(Link(L("Anti-spam (SAMaxTimeout)"), "antispam"));
+         links.Children.Add(Link(L("Anti-virus (ClamMaxTimeout)"), "antivirus"));
          content.Children.Add(links);
          return card;
       }
 
       private Border Report()
       {
-         var card = Card("If none of that identifies it",
-            "Open an issue with: the log from the 354 (or from the delivery attempt) onwards, including the stage timing lines; the " +
-            "ERROR_hmailserver_<date>.log for the same window; which scanners and event scripts are enabled; and whether the message " +
-            "eventually arrives, arrives twice, or never arrives.");
+         var card = Card(L("If none of that identifies it"),
+            L("Open an issue with: the log from the 354 (or from the delivery attempt) onwards, including the stage timing lines; the ERROR_hmailserver_<date>.log for the same window; which scanners and event scripts are enabled; and whether the message eventually arrives, arrives twice, or never arrives."));
          var content = (StackPanel)card.Child;
 
-         var open = new Wpf.Ui.Controls.Button { Content = "Open the full _guide (DiagnosingStalledMail.md)", Margin = new Thickness(0, 6, 8, 0) };
-         AutomationProperties.SetName(open, "Open the full guide on GitHub");
+         var open = new Wpf.Ui.Controls.Button { Content = L("Open the full _guide (DiagnosingStalledMail.md)"), Margin = new Thickness(0, 6, 8, 0) };
+         AutomationProperties.SetName(open, L("Open the full guide on GitHub"));
          open.Click += (s, e) => OpenGuide();
          content.Children.Add(open);
          return card;
@@ -255,7 +232,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            loggingStatus_.Text = "Could not change logging: " + ex.Message;
+            loggingStatus_.Text = F("Could not change logging: {0}", ex.Message);
          }
       }
 
@@ -267,14 +244,14 @@ namespace hMailServer.ControlPanel.Views
             bool enabled = (bool)logging.Enabled;
             bool debug = (bool)logging.LogDebug;
             loggingStatus_.Text = !enabled
-               ? "Logging is off altogether, so nothing below will be written until it is on."
+               ? L("Logging is off altogether, so nothing below will be written until it is on.")
                : debug
-                  ? "Debug logging is ON. The stage timings and the DNS lines are being written; turn it off again when you have what you need."
-                  : "Debug logging is off. Application logging still records any stage that takes ten seconds or more.";
+                  ? L("Debug logging is ON. The stage timings and the DNS lines are being written; turn it off again when you have what you need.")
+                  : L("Debug logging is off. Application logging still records any stage that takes ten seconds or more.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            loggingStatus_.Text = "Could not read the logging state: " + ex.Message;
+            loggingStatus_.Text = F("Could not read the logging state: {0}", ex.Message);
          }
       }
 
@@ -286,7 +263,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            Dialogs.Show("Could not open a browser: " + ex.Message + "\n\n" + GuideUrl, "Diagnosing stalled mail");
+            Dialogs.Show(F("Could not open a browser: {0}\n\n{1}", ex.Message, GuideUrl), L("Diagnosing stalled mail"));
          }
       }
 

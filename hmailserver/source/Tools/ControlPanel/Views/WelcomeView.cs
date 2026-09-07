@@ -5,6 +5,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -17,7 +18,7 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = "Welcome" };
+         var title = new TextBlock { Text = L("Welcome") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          panel.Children.Add(title);
 
@@ -26,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
 
          panel.Children.Add(new TextBlock
          {
-            Text = "Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting.",
+            Text = L("Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting."),
             FontSize = Typography.Body,
             Opacity = 0.8,
             TextWrapping = TextWrapping.Wrap,
@@ -39,7 +40,7 @@ namespace hMailServer.ControlPanel.Views
          // WelcomeIntents so a test can hold every entry to a page that exists.
          panel.Children.Add(new TextBlock
          {
-            Text = "What do you want to do?",
+            Text = L("What do you want to do?"),
             FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 0, 8)
@@ -52,25 +53,25 @@ namespace hMailServer.ControlPanel.Views
 
          panel.Children.Add(new TextBlock
          {
-            Text = "Or browse by area",
+            Text = L("Or browse by area"),
             FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 6, 0, 8)
          });
 
          var tiles = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Globe24, "Domains & accounts",
-            "Add domains, accounts, aliases and distribution lists.", "domains"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Server24, "Server settings",
-            "Protocols, delivery, anti-spam, anti-virus and advanced options.", "protocols"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DataUsage24, "Dashboard",
-            "Live processed-mail, spam and virus counters with charts.", "dashboard"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DocumentText24, "Live logs",
-            "Stream the server log in real time.", "logs"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Key24, "Transport security",
-            "DANE, MTA-STS, ARC and TLS reporting.", "security"));
-         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.ArrowSync24, "Backup & restore",
-            "Back up or restore your configuration and data.", "backup"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Globe24, L("Domains & accounts"),
+            L("Add domains, accounts, aliases and distribution lists."), "domains"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Server24, L("Server settings"),
+            L("Protocols, delivery, anti-spam, anti-virus and advanced options."), "protocols"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DataUsage24, L("Dashboard"),
+            L("Live processed-mail, spam and virus counters with charts."), "dashboard"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.DocumentText24, L("Live logs"),
+            L("Stream the server log in real time."), "logs"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Key24, L("Transport security"),
+            L("DANE, MTA-STS, ARC and TLS reporting."), "security"));
+         tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.ArrowSync24, L("Backup & restore"),
+            L("Back up or restore your configuration and data."), "backup"));
          panel.Children.Add(tiles);
 
          Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
@@ -174,8 +175,7 @@ namespace hMailServer.ControlPanel.Views
       {
          try
          {
-            serverLine_.Text = "Connected to hMailServer " +
-               (string)ServerSession.Current.Application.Version + " on " + ServerSession.Current.Host + ".";
+            serverLine_.Text = F("Connected to hMailServer {0} on {1}.", (string)ServerSession.Current.Application.Version, ServerSession.Current.Host);
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {

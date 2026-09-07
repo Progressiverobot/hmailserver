@@ -9,6 +9,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -16,9 +17,9 @@ namespace hMailServer.ControlPanel.Views
    public class IncomingRelaysView : UserControl, IPageLifecycle
    {
       private readonly ListView list_ = new() { BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent };
-      private readonly Wpf.Ui.Controls.TextBox name_ = new() { PlaceholderText = "Name", Margin = new Thickness(0, 0, 8, 0) };
-      private readonly Wpf.Ui.Controls.TextBox lower_ = new() { PlaceholderText = "Lower IP", Margin = new Thickness(0, 0, 8, 0) };
-      private readonly Wpf.Ui.Controls.TextBox upper_ = new() { PlaceholderText = "Upper IP", Margin = new Thickness(0, 0, 8, 0) };
+      private readonly Wpf.Ui.Controls.TextBox name_ = new() { PlaceholderText = L("Name"), Margin = new Thickness(0, 0, 8, 0) };
+      private readonly Wpf.Ui.Controls.TextBox lower_ = new() { PlaceholderText = L("Lower IP"), Margin = new Thickness(0, 0, 8, 0) };
+      private readonly Wpf.Ui.Controls.TextBox upper_ = new() { PlaceholderText = L("Upper IP"), Margin = new Thickness(0, 0, 8, 0) };
 
       public IncomingRelaysView()
       {
@@ -28,10 +29,10 @@ namespace hMailServer.ControlPanel.Views
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var header = new StackPanel();
-         var title = new TextBlock { Text = "Incoming relays" };
+         var title = new TextBlock { Text = L("Incoming relays") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
-         var sub = new TextBlock { Text = "Upstream gateways (spam filters, load balancers) whose IP addresses should not count as the connecting client in anti-spam host checks." };
+         var sub = new TextBlock { Text = L("Upstream gateways (spam filters, load balancers) whose IP addresses should not count as the connecting client in anti-spam host checks.") };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
          grid.Children.Add(header);
@@ -45,7 +46,7 @@ namespace hMailServer.ControlPanel.Views
          var addCard = new Border { Margin = new Thickness(0, 12, 0, 0) };
          addCard.SetResourceReference(StyleProperty, "Card");
          var addPanel = new StackPanel();
-         addPanel.Children.Add(new TextBlock { Text = "Add relay", FontSize = Typography.SectionHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
+         addPanel.Children.Add(new TextBlock { Text = L("Add relay"), FontSize = Typography.SectionHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
 
          var row = new Grid();
          for (int i = 0; i < 3; i++)
@@ -59,12 +60,12 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(upper_, 2);
          row.Children.Add(upper_);
 
-         var add = new Wpf.Ui.Controls.Button { Content = "_Add", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         var add = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
          add.Click += (s, e) => Add();
          Grid.SetColumn(add, 3);
          row.Children.Add(add);
 
-         var del = new Wpf.Ui.Controls.Button { Content = "_Delete selected", Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
+         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete selected"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
          del.Click += (s, e) => DeleteSelected();
          Grid.SetColumn(del, 4);
          row.Children.Add(del);
@@ -109,7 +110,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (name_.Text.Trim().Length == 0 || lower_.Text.Trim().Length == 0 || upper_.Text.Trim().Length == 0)
          {
-            MessageBox.Show("Name, lower IP and upper IP are required.", "Control Panel");
+            MessageBox.Show(L("Name, lower IP and upper IP are required."), L("Control Panel"));
             return;
          }
 
@@ -125,7 +126,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not add the relay: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not add the relay: {0}", ex.Message), L("Control Panel"));
             return;
          }
          finally
@@ -145,7 +146,7 @@ namespace hMailServer.ControlPanel.Views
 
          string relayName = selected.Split("   (")[0];
 
-         if (MessageBox.Show("Delete the incoming relay " + relayName + "?", "Control Panel",
+         if (MessageBox.Show(F("Delete the incoming relay {0}?", relayName), L("Control Panel"),
              MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
             return;
 
@@ -167,7 +168,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Could not delete the relay: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Could not delete the relay: {0}", ex.Message), L("Control Panel"));
          }
          finally
          {
@@ -181,7 +182,7 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>MX query utility (same as the classic Utilities > MX-query).</summary>
    public class MxQueryView : UserControl, IPageLifecycle
    {
-      private readonly Wpf.Ui.Controls.TextBox domain_ = new() { PlaceholderText = "Domain (e.g. gmail.com)", Margin = new Thickness(0, 0, 8, 0) };
+      private readonly Wpf.Ui.Controls.TextBox domain_ = new() { PlaceholderText = L("Domain (e.g. gmail.com)"), Margin = new Thickness(0, 0, 8, 0) };
       private readonly TextBox output_ = new()
       {
          IsReadOnly = true,
@@ -201,10 +202,10 @@ namespace hMailServer.ControlPanel.Views
          grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
          var header = new StackPanel();
-         var title = new TextBlock { Text = "MX query" };
+         var title = new TextBlock { Text = L("MX query") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
-         var sub = new TextBlock { Text = "Look up the mail exchanger records for a domain - where e-mail to that domain is delivered." };
+         var sub = new TextBlock { Text = L("Look up the mail exchanger records for a domain - where e-mail to that domain is delivered.") };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
          grid.Children.Add(header);
@@ -214,10 +215,10 @@ namespace hMailServer.ControlPanel.Views
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          inputRow.Children.Add(domain_);
          var actions = new StackPanel { Orientation = Orientation.Horizontal };
-         var run = new Wpf.Ui.Controls.Button { Content = "_Query", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         var run = new Wpf.Ui.Controls.Button { Content = L("_Query"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await RunQuery();
          actions.Children.Add(run);
-         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 1);
@@ -240,7 +241,7 @@ namespace hMailServer.ControlPanel.Views
          if (domain.Length == 0)
             return;
 
-         output_.Text = "Querying MX records for " + domain + "...";
+         output_.Text = F("Querying MX records for {0}...", domain);
 
          try
          {
@@ -268,15 +269,12 @@ namespace hMailServer.ControlPanel.Views
 
             if (string.IsNullOrEmpty(result))
             {
-               output_.Text = "The server found no mail servers for " + domain + ".\r\n\r\n"
-                  + "This is the server's own resolver answering - the same one SMTP delivery uses, including any "
-                  + "custom DNSServer configured in hMailServer.INI - so mail sent to this domain from this server "
-                  + "would not be deliverable right now.";
+               output_.Text = F("The server found no mail servers for {0}.\r\n\r\nThis is the server's own resolver answering - the same one SMTP delivery uses, including any custom DNSServer configured in hMailServer.INI - so mail sent to this domain from this server would not be deliverable right now.", domain);
                return;
             }
 
             var report = new System.Text.StringBuilder();
-            report.AppendLine("Mail servers for " + domain + ", in the order this server would try them:");
+            report.AppendLine(F("Mail servers for {0}, in the order this server would try them:", domain));
             report.AppendLine();
 
             foreach (string line in result.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries))
@@ -289,14 +287,13 @@ namespace hMailServer.ControlPanel.Views
             }
 
             report.AppendLine();
-            report.Append("Resolved by the server itself, so a custom DNSServer in hMailServer.INI is honoured - "
-               + "this is where mail actually goes, which an nslookup from this workstation cannot promise.");
+            report.Append(L("Resolved by the server itself, so a custom DNSServer in hMailServer.INI is honoured - this is where mail actually goes, which an nslookup from this workstation cannot promise."));
 
             output_.Text = report.ToString();
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            output_.Text = "Query failed: " + ServerSession.DescribeComError(ex);
+            output_.Text = F("Query failed: {0}", ServerSession.DescribeComError(ex));
          }
       }
 
@@ -314,8 +311,8 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly Wpf.Ui.Controls.TextBox wildcard_ = new() { Text = "*" };
       private readonly Wpf.Ui.Controls.TextBox fromAddress_ = new() { PlaceholderText = "postmaster@yourdomain.com" };
-      private readonly Wpf.Ui.Controls.TextBox fromName_ = new() { PlaceholderText = "Administrator" };
-      private readonly Wpf.Ui.Controls.TextBox subject_ = new() { PlaceholderText = "Subject" };
+      private readonly Wpf.Ui.Controls.TextBox fromName_ = new() { PlaceholderText = L("Administrator") };
+      private readonly Wpf.Ui.Controls.TextBox subject_ = new() { PlaceholderText = L("Subject") };
       private readonly TextBox body_ = new()
       {
          AcceptsReturn = true,
@@ -331,10 +328,10 @@ namespace hMailServer.ControlPanel.Views
       {
          var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 680, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = "Server sendout" };
+         var title = new TextBlock { Text = L("Server sendout") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          panel.Children.Add(title);
-         var sub = new TextBlock { Text = "Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." };
+         var sub = new TextBlock { Text = L("Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements.") };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          panel.Children.Add(sub);
 
@@ -342,22 +339,22 @@ namespace hMailServer.ControlPanel.Views
          card.SetResourceReference(StyleProperty, "Card");
          var form = new StackPanel();
 
-         form.Children.Add(Label("Recipient wildcard (* = everyone)"));
+         form.Children.Add(Label(L("Recipient wildcard (* = everyone)")));
          form.Children.Add(Spaced(wildcard_));
-         form.Children.Add(Label("From address"));
+         form.Children.Add(Label(L("From address")));
          form.Children.Add(Spaced(fromAddress_));
-         form.Children.Add(Label("From name"));
+         form.Children.Add(Label(L("From name")));
          form.Children.Add(Spaced(fromName_));
-         form.Children.Add(Label("Subject"));
+         form.Children.Add(Label(L("Subject")));
          form.Children.Add(Spaced(subject_));
-         form.Children.Add(Label("Message"));
+         form.Children.Add(Label(L("Message")));
          body_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          body_.Background = System.Windows.Media.Brushes.Transparent;
          form.Children.Add(body_);
 
          var send = new Wpf.Ui.Controls.Button
          {
-            Content = "_Send to all matching accounts",
+            Content = L("_Send to all matching accounts"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
             Margin = new Thickness(0, 14, 0, 0)
          };
@@ -382,12 +379,12 @@ namespace hMailServer.ControlPanel.Views
       {
          if (fromAddress_.Text.Trim().Length == 0 || subject_.Text.Trim().Length == 0)
          {
-            MessageBox.Show("From address and subject are required.", "Control Panel");
+            MessageBox.Show(L("From address and subject are required."), L("Control Panel"));
             return;
          }
 
-         if (MessageBox.Show("Send this message to all accounts matching '" + wildcard_.Text + "'?",
-             "Control Panel", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+         if (MessageBox.Show(F("Send this message to all accounts matching '{0}'?", wildcard_.Text),
+             L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
          try
@@ -399,12 +396,12 @@ namespace hMailServer.ControlPanel.Views
             // The server reports failure through the return value rather than an
             // error, so don't claim success when it declined the sendout.
             status_.Text = queued
-               ? "Sendout queued " + DateTime.Now.ToLongTimeString() + "."
-               : "The server did not queue the sendout. Check the address wildcard and the hMailServer error log.";
+               ? F("Sendout queued {0}.", DateTime.Now.ToLongTimeString())
+               : L("The server did not queue the sendout. Check the address wildcard and the hMailServer error log.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show("Sendout failed: " + ex.Message, "Control Panel");
+            MessageBox.Show(F("Sendout failed: {0}", ex.Message), L("Control Panel"));
          }
       }
 
@@ -420,7 +417,7 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>Server diagnostics (classic Utilities > Diagnostics).</summary>
    public class DiagnosticsView : UserControl, IPageLifecycle
    {
-      private readonly Wpf.Ui.Controls.TextBox localDomain_ = new() { PlaceholderText = "A domain hosted on this server" };
+      private readonly Wpf.Ui.Controls.TextBox localDomain_ = new() { PlaceholderText = L("A domain hosted on this server") };
       private readonly Wpf.Ui.Controls.TextBox testDomain_ = new() { Text = "gmail.com" };
       private readonly TextBox output_ = new()
       {
@@ -452,10 +449,10 @@ namespace hMailServer.ControlPanel.Views
          MaxHeight = 260,
          Visibility = Visibility.Collapsed
       };
-      private readonly Wpf.Ui.Controls.Button consistencyRefresh_ = new() { Content = "Re_fresh" };
+      private readonly Wpf.Ui.Controls.Button consistencyRefresh_ = new() { Content = L("Re_fresh") };
       private readonly Wpf.Ui.Controls.Button consistencyOpen_ = new()
       {
-         Content = "_Open report",
+         Content = L("_Open report"),
          Margin = new Thickness(8, 0, 0, 0),
          IsEnabled = false
       };
@@ -473,13 +470,12 @@ namespace hMailServer.ControlPanel.Views
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
          var header = new StackPanel();
-         var title = new TextBlock { Text = "Diagnostics" };
+         var title = new TextBlock { Text = L("Diagnostics") };
          title.SetResourceReference(StyleProperty, "PageTitle");
          header.Children.Add(title);
          var sub = new TextBlock
          {
-            Text = "Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). " +
-            "The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report."
+            Text = L("Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report.")
          };
          sub.SetResourceReference(StyleProperty, "PageSubtitle");
          header.Children.Add(sub);
@@ -495,10 +491,10 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(testDomain_, 1);
          inputRow.Children.Add(testDomain_);
          var actions = new StackPanel { Orientation = Orientation.Horizontal };
-         var run = new Wpf.Ui.Controls.Button { Content = "_Run diagnostics", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         var run = new Wpf.Ui.Controls.Button { Content = L("_Run diagnostics"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await Run();
          actions.Children.Add(run);
-         var copy = new Wpf.Ui.Controls.Button { Content = "_Copy", Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(8, 0, 0, 0) };
          copy.Click += (s, e) => { try { if (output_.Text.Length > 0) Clipboard.SetText(output_.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ } };
          actions.Children.Add(copy);
          Grid.SetColumn(actions, 2);
@@ -533,7 +529,7 @@ namespace hMailServer.ControlPanel.Views
          titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          titleRow.Children.Add(new TextBlock
          {
-            Text = "Message-store consistency",
+            Text = L("Message-store consistency"),
             FontSize = Typography.SectionHeading,
             FontWeight = FontWeights.SemiBold,
             VerticalAlignment = VerticalAlignment.Center
@@ -554,19 +550,19 @@ namespace hMailServer.ControlPanel.Views
          var columns = new GridView();
          columns.Columns.Add(new GridViewColumn
          {
-            Header = "Message ID",
+            Header = L("Message ID"),
             DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.MessageId)),
             Width = 110
          });
          columns.Columns.Add(new GridViewColumn
          {
-            Header = "Account",
+            Header = L("Account"),
             DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.Account)),
             Width = 220
          });
          columns.Columns.Add(new GridViewColumn
          {
-            Header = "Expected file",
+            Header = L("Expected file"),
             DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.ExpectedPath)),
             Width = 480
          });
@@ -609,7 +605,7 @@ namespace hMailServer.ControlPanel.Views
 
       private async Task Run()
       {
-         output_.Text = "Running diagnostics...";
+         output_.Text = L("Running diagnostics...");
 
          string report = await Task.Run(() =>
          {
@@ -632,7 +628,7 @@ namespace hMailServer.ControlPanel.Views
                   try { success = (bool)result.Result; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
                   try { details = (string)result.ExecutionDetails; } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
 
-                  string state = success == null ? "[ ?? ]   " : success.Value ? "[ OK ]   " : "[FAIL]   ";
+                  string state = success == null ? "[ ?? ]   " : success.Value ? "[ OK ]   " : "[FAIL]   "; // no-loc
                   text.AppendLine(state + name);
                   if (!string.IsNullOrWhiteSpace(details))
                      text.AppendLine("         " + details.Replace("\r\n", "\r\n         "));
@@ -642,11 +638,11 @@ namespace hMailServer.ControlPanel.Views
 
                ServerSession.Release(results);
                ServerSession.Release(diagnostics);
-               return text.Length > 0 ? text.ToString() : "No diagnostic results returned.";
+               return text.Length > 0 ? text.ToString() : L("No diagnostic results returned.");
             }
             catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
-               return "Diagnostics failed: " + ex.Message;
+               return F("Diagnostics failed: {0}", ex.Message);
             }
          });
 
@@ -687,7 +683,7 @@ namespace hMailServer.ControlPanel.Views
          consistencyList_.ItemsSource = null;
          consistencyList_.Visibility = Visibility.Collapsed;
          consistencyStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-         consistencyStatus_.Text = "Reading the recovery report...";
+         consistencyStatus_.Text = L("Reading the recovery report...");
          reportPath_ = null;
 
          try
@@ -719,7 +715,7 @@ namespace hMailServer.ControlPanel.Views
          {
             // Nothing awaits the load started from OnEnter, so report the failure
             // on the page rather than losing it in an unobserved task.
-            consistencyStatus_.Text = "Could not read the consistency report: " + ex.Message;
+            consistencyStatus_.Text = F("Could not read the consistency report: {0}", ex.Message);
             consistencyStatus_.Foreground = Services.ThemeTokens.Danger;
          }
          finally
@@ -738,8 +734,7 @@ namespace hMailServer.ControlPanel.Views
             return new ConsistencyResult
             {
                Level = Severity.Neutral,
-               Message = "The scan result is only readable on the server machine - hMailServer.INI was not found here. " +
-                         "The server publishes the same number as the hmailserver_messagestore_missing_files metric."
+               Message = L("The scan result is only readable on the server machine - hMailServer.INI was not found here. The server publishes the same number as the hmailserver_messagestore_missing_files metric.")
             };
          }
 
@@ -751,7 +746,7 @@ namespace hMailServer.ControlPanel.Views
             return new ConsistencyResult
             {
                Level = Severity.Neutral,
-               Message = "No log folder is configured in hMailServer.INI, so the server has nowhere to write the recovery report."
+               Message = L("No log folder is configured in hMailServer.INI, so the server has nowhere to write the recovery report.")
             };
          }
 
@@ -760,8 +755,7 @@ namespace hMailServer.ControlPanel.Views
             ? ""
             // Asked for by nav key rather than spelled out, so that renaming the
             // page cannot leave this pointing at a page title that no longer exists.
-            : " The periodic check is currently switched off (MessageStoreConsistencyCheck on the "
-              + Services.NavigationMap.TitleOf("hardening") + " page), so this will not be refreshed.";
+            : F(" The periodic check is currently switched off (MessageStoreConsistencyCheck on the {0} page), so this will not be refreshed.", L(Services.NavigationMap.TitleOf("hardening")));
 
          string text;
          try
@@ -772,10 +766,8 @@ namespace hMailServer.ControlPanel.Views
                {
                   Level = Severity.Neutral,
                   Message = enabled
-                     ? "The consistency check is enabled but has not written a report yet. The server scans at start-up and then hourly, and writes " + path + "."
-                     : "The consistency check is switched off, so no scan has run. Enable MessageStoreConsistencyCheck on the "
-                       + Services.NavigationMap.TitleOf("hardening") + " page; " +
-                       "the server then scans at start-up and hourly and writes " + path + "."
+                     ? F("The consistency check is enabled but has not written a report yet. The server scans at start-up and then hourly, and writes {0}.", path)
+                     : F("The consistency check is switched off, so no scan has run. Enable MessageStoreConsistencyCheck on the {0} page; the server then scans at start-up and hourly and writes {1}.", L(Services.NavigationMap.TitleOf("hardening")), path)
                };
             }
 
@@ -790,16 +782,15 @@ namespace hMailServer.ControlPanel.Views
             {
                Level = Severity.Neutral,
                ReportPath = path,
-               Message = "Could not read " + path + ": " + ex.Message
+               Message = F("Could not read {0}: {1}", path, ex.Message)
             };
          }
 
          Services.MessageStoreConsistencyReport report = Services.MessageStoreConsistencyReport.Parse(text);
-         string when = string.IsNullOrEmpty(report.Generated) ? "" : " Last scan: " + report.Generated + ".";
+         string when = string.IsNullOrEmpty(report.Generated) ? "" : F(" Last scan: {0}.", report.Generated);
          int? reportedMissing = report.ReportedMissingCount;
          string truncated = report.IsTruncated && reportedMissing.HasValue
-            ? " The report header says " + reportedMissing.Value + " but lists " + report.Entries.Count +
-              " - it was probably read while the server was rewriting it, so refresh."
+            ? F(" The report header says {0} but lists {1} - it was probably read while the server was rewriting it, so refresh.", reportedMissing.Value, report.Entries.Count)
             : "";
 
          if (report.MissingCount == 0)
@@ -808,7 +799,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Level = Severity.Good,
                ReportPath = path,
-               Message = "No problems found - every message row has its file on disk." + when + truncated + enabledNote
+               Message = L("No problems found - every message row has its file on disk.") + when + truncated + enabledNote
             };
          }
 
@@ -817,9 +808,11 @@ namespace hMailServer.ControlPanel.Views
             Level = Severity.Bad,
             ReportPath = path,
             Entries = report.Entries,
-            Message = report.MissingCount + (report.MissingCount == 1 ? " message references a file" : " messages reference a file") +
-                      " that is missing on disk." + when + truncated + enabledNote +
-                      " The check is read-only: the server does not delete or repair anything."
+            Message = (report.MissingCount == 1
+                          ? F("{0} message references a file that is missing on disk.", report.MissingCount)
+                          : F("{0} messages reference a file that is missing on disk.", report.MissingCount))
+                      + when + truncated + enabledNote
+                      + L(" The check is read-only: the server does not delete or repair anything.")
          };
       }
 
@@ -843,7 +836,7 @@ namespace hMailServer.ControlPanel.Views
             }
             catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
             {
-               MessageBox.Show("Could not open " + reportPath_ + ": " + ex.Message, "Control Panel");
+               MessageBox.Show(F("Could not open {0}: {1}", reportPath_, ex.Message), L("Control Panel"));
             }
          }
       }

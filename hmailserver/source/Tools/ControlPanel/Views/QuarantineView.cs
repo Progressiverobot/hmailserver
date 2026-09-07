@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
@@ -126,7 +127,7 @@ namespace hMailServer.ControlPanel.Views
                         Recipients = (string)item.Recipients,
                         Score = (int)item.Score,
                         Subject = string.IsNullOrEmpty((string)item.Subject)
-                           ? "(no subject)" : (string)item.Subject,
+                           ? L("(no subject)") : (string)item.Subject,
                         Reason = (string)item.Reason,
                         Id = (int)item.ID
                      });
@@ -143,19 +144,15 @@ namespace hMailServer.ControlPanel.Views
 
                if (total == 0)
                {
-                  status_.Text = "Nothing is held. Quarantining is off unless QuarantineEnabled is set in "
-                               + "hMailServer.ini - until then, spam over the delete threshold is refused during "
-                               + "the SMTP conversation rather than stored.";
+                  status_.Text = L("Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored.");
                }
                else if (listed < total)
                {
-                  status_.Text = string.Format(
-                     "{0} held, showing the {1} most recent. The rest are still there - work through these, or "
-                     + "let the retention sweep age them out.", total, listed);
+                  status_.Text = F("{0} held, showing the {1} most recent. The rest are still there - work through these, or let the retention sweep age them out.", total, listed);
                }
                else
                {
-                  status_.Text = total == 1 ? "1 message held." : total + " messages held.";
+                  status_.Text = total == 1 ? L("1 message held.") : F("{0} messages held.", total);
                }
             }
             finally
@@ -183,7 +180,7 @@ namespace hMailServer.ControlPanel.Views
          public string Reason { get; init; }
          public int Id { get; init; }
 
-         public string HeldBecause => "Held because: " + Reason;
+         public string HeldBecause => F("Held because: {0}", Reason);
       }
 
       /// <summary>
@@ -199,7 +196,7 @@ namespace hMailServer.ControlPanel.Views
       {
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Held",
+            Header = L("Held"),
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.CreatedTime)),
             // Auto, not SizeToCells. SizeToCells measures the CELLS only, so on an
             // empty grid the column collapses to zero and its header disappears
@@ -212,21 +209,21 @@ namespace hMailServer.ControlPanel.Views
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Sender",
+            Header = L("Sender"),
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.Sender)),
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Recipients",
+            Header = L("Recipients"),
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.Recipients)),
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
 
          var score = new DataGridTextColumn
          {
-            Header = "Score",
+            Header = L("Score"),
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.Score)),
             Width = DataGridLength.Auto
          };
@@ -243,7 +240,7 @@ namespace hMailServer.ControlPanel.Views
 
          list_.Columns.Add(new DataGridTextColumn
          {
-            Header = "Subject",
+            Header = L("Subject"),
             Binding = new System.Windows.Data.Binding(nameof(HeldRow.Subject)),
             Width = new DataGridLength(2, DataGridLengthUnitType.Star)
          });
@@ -276,7 +273,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (id == 0)
          {
-            status_.Text = "Select a message first.";
+            status_.Text = L("Select a message first.");
             return;
          }
 
@@ -286,7 +283,7 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                quarantine.ReleaseByDBID(id);
-               status_.Text = "Released. It has been delivered to the recipients it was addressed to.";
+               status_.Text = L("Released. It has been delivered to the recipients it was addressed to.");
             }
             finally
             {
@@ -307,7 +304,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (id == 0)
          {
-            status_.Text = "Select a message first.";
+            status_.Text = L("Select a message first.");
             return;
          }
 
@@ -317,9 +314,8 @@ namespace hMailServer.ControlPanel.Views
          // empty mailbox), and No takes Enter: for an action with no undo and no
          // other copy, the keyboard default declines.
          if (MessageBox.Show(
-               "Delete this message permanently?\n\nThe sender was told it was accepted, so nothing will "
-               + "retry and there is no other copy.",
-               "Delete quarantined message", MessageBoxButton.YesNo, MessageBoxImage.Warning,
+               L("Delete this message permanently?\n\nThe sender was told it was accepted, so nothing will retry and there is no other copy."),
+               L("Delete quarantined message"), MessageBoxButton.YesNo, MessageBoxImage.Warning,
                MessageBoxResult.No)
              != MessageBoxResult.Yes)
          {
@@ -357,9 +353,8 @@ namespace hMailServer.ControlPanel.Views
                int removed = (int)quarantine.DeleteExpired();
 
                status_.Text = removed == 0
-                  ? "Nothing was old enough to remove. The window is QuarantineRetentionDays in hMailServer.ini, "
-                    + "and 0 means never."
-                  : removed + " message(s) past the retention window were removed.";
+                  ? L("Nothing was old enough to remove. The window is QuarantineRetentionDays in hMailServer.ini, and 0 means never.")
+                  : F("{0} message(s) past the retention window were removed.", removed);
             }
             finally
             {
@@ -381,15 +376,13 @@ namespace hMailServer.ControlPanel.Views
          // which is exactly how a design system erodes: newest pages first.
          var root = new StackPanel { Margin = new Thickness(26, 20, 26, 20) };
 
-         var title = new TextBlock { Text = "Quarantine" };
+         var title = new TextBlock { Text = L("Quarantine") };
          title.SetResourceReference(FrameworkElement.StyleProperty, "PageTitle");
          root.Children.Add(title);
 
          var hint = new TextBlock
          {
-            Text = "Messages the server would otherwise have refused, held so somebody can look. "
-                 + "The sender was told each of these was accepted, so nothing will arrive again on its own: "
-                 + "releasing one delivers it, and deleting one is final.",
+            Text = L("Messages the server would otherwise have refused, held so somebody can look. The sender was told each of these was accepted, so nothing will arrive again on its own: releasing one delivers it, and deleting one is final."),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 14)
          };
@@ -397,10 +390,10 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(hint);
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-         toolbar.Children.Add(MakeButton("_Release", Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected()));
-         toolbar.Children.Add(MakeButton("_Delete", Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected()));
-         toolbar.Children.Add(MakeButton("Remove _expired", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
-         toolbar.Children.Add(MakeButton("Re_fresh", Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         toolbar.Children.Add(MakeButton(L("_Release"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected()));
+         toolbar.Children.Add(MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected()));
+         toolbar.Children.Add(MakeButton(L("Remove _expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
+         toolbar.Children.Add(MakeButton(L("Re_fresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 
          var card = new Border { Padding = new Thickness(8) };
