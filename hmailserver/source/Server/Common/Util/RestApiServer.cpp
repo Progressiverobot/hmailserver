@@ -36,6 +36,7 @@
 #include "../../IMAP/MessagesContainer.h"
 #include "../../SMTP/RecipientParser.h"
 #include "../Persistence/PersistentMessageIndex.h"
+#include "../Cache/CacheContainer.h"
 #include <iterator>
 #include <set>
 #include "../BO/MessageRecipients.h"
@@ -5002,30 +5003,81 @@ namespace HM
       }
    }
 
-   // The folder the id names, if it is in the signed-in account's own tree
-   // and the account may read it. Ownership is what the id is checked
-   // against first; the ACL is asked afterwards, through the one choke point
-   // every IMAP folder decision goes through, so a folder the owner has
-   // shared away from themselves - rare, but expressible - is refused too.
-   std::shared_ptr<IMAPFolder>
-   RestApiServer::FindOwnReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId)
+   // The right an account has on a folder, asked the way IMAP asks it: on the
+   // account's own tree and the public tree it is CheckPermission (everything
+   // allowed when enforcement is off); on another account's folder it is a
+   // right that account granted, and with enforcement off nothing is granted.
+   bool
+   RestApiServer::RightOn_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder, int permission)
    {
-      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
-      if (!folders)
-         return std::shared_ptr<IMAPFolder>();
+      if (!folder)
+         return false;
 
-      std::shared_ptr<IMAPFolder> folder = folders->GetItemByDBIDRecursive(folderId);
-      if (!folder || folder->GetAccountID() != account->GetID())
-         return std::shared_ptr<IMAPFolder>();
+      if (folder->GetAccountID() != 0 && folder->GetAccountID() != account->GetID())
+         return ACLManager::CheckDelegatedRight(account->GetID(), folder, permission);
 
-      bool readAccess = false;
-      bool writeAccess = false;
-      ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
+      return ACLManager::CheckPermission(account->GetID(), folder, permission);
+   }
 
-      if (!readAccess)
-         return std::shared_ptr<IMAPFolder>();
+   // The folder the id names, if the account may read it: in its own tree,
+   // in the public tree, or in the tree of an owner who has shared with it -
+   // the three places IMAP LIST looks, under the same rights.
+   std::shared_ptr<IMAPFolder>
+   RestApiServer::FindReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId)
+   {
+      std::vector<std::shared_ptr<IMAPFolders>> trees;
 
-      return folder;
+      trees.push_back(IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID()));
+      trees.push_back(IMAPFolderContainer::Instance()->GetPublicFolders());
+
+      if (ACLManager::GetOtherUsersNamespaceEnabled())
+      {
+         ACLManager aclManager;
+         std::vector<__int64> owners = aclManager.GetAccountsWithFolderShares();
+         for (size_t i = 0; i < owners.size(); i++)
+         {
+            if (owners[i] != account->GetID())
+               trees.push_back(IMAPFolderContainer::Instance()->GetFoldersForAccount(owners[i]));
+         }
+      }
+
+      for (size_t i = 0; i < trees.size(); i++)
+      {
+         if (!trees[i])
+            continue;
+
+         std::shared_ptr<IMAPFolder> folder = trees[i]->GetItemByDBIDRecursive(folderId);
+         if (!folder)
+            continue;
+
+         if (!RightOn_(account, folder, ACLPermission::PermissionLookup))
+            return std::shared_ptr<IMAPFolder>();
+
+         bool readAccess = false;
+         bool writeAccess = false;
+         ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
+
+         return readAccess ? folder : std::shared_ptr<IMAPFolder>();
+      }
+
+      return std::shared_ptr<IMAPFolder>();
+   }
+
+   // Where a message's bytes are: under the account that owns it, or in the
+   // public folder store when no account does. Never under the caller.
+   String
+   RestApiServer::MessageFile_(std::shared_ptr<const Message> message)
+   {
+      if (message->GetAccountID() > 0)
+      {
+         std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(message->GetAccountID());
+         if (!owner)
+            return String();
+
+         return PersistentMessage::GetFileName(owner, message);
+      }
+
+      return PersistentMessage::GetFileName(message);
    }
 
    void
@@ -5045,8 +5097,11 @@ namespace HM
          if (!folder)
             continue;
 
-         // A folder the ACL keeps from the account is left out with its
+         // A folder the account may not look up or read is left out with its
          // subtree, exactly as LIST leaves it out.
+         if (!RightOn_(account, folder, ACLPermission::PermissionLookup))
+            continue;
+
          bool readAccess = false;
          bool writeAccess = false;
          ACLManager::GetReadWriteAccess(account->GetID(), folder, readAccess, writeAccess);
@@ -5066,8 +5121,9 @@ namespace HM
             json += ",";
 
          AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
+         entry.Format("{\"id\":%I64d,\"account_id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
             folder->GetID(),
+            folder->GetAccountID(),
             JsonEscape_(Utf8_(folder->GetFolderName())).c_str(),
             JsonEscape_(Utf8_(path)).c_str(),
             folder->GetParentFolderID(),
@@ -5093,17 +5149,83 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
+      String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
+
       std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
 
       std::map<__int64, int> designations;
       if (folders)
          IMAPSpecialUse::Resolve(folders, designations);
 
-      String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
-
       AnsiString json;
       json.Format("{\"delimiter\":\"%hs\",\"folders\":[", JsonEscape_(Utf8_(delimiter)).c_str());
       AppendFolderJson_(account, folders, String(), designations, delimiter, json, 0);
+      json += "],\"shared\":[";
+
+      // What LIST shows beyond the account's own tree, named as LIST names
+      // it: the public folders under their namespace, then the folders of
+      // each owner who has granted this account a right, under "#Users" and
+      // the owner's address. An owner who granted nothing this account may
+      // read produces no entry, and so no trace.
+      int shares = 0;
+
+      std::shared_ptr<IMAPFolders> publicFolders = IMAPFolderContainer::Instance()->GetPublicFolders();
+      if (publicFolders)
+      {
+         String publicName = Configuration::Instance()->GetIMAPConfiguration()->GetIMAPPublicFolderName();
+
+         AnsiString tree;
+         std::map<__int64, int> none;
+         AppendFolderJson_(account, publicFolders, publicName, none, delimiter, tree, 0);
+
+         if (!tree.IsEmpty())
+         {
+            AnsiString entry;
+            entry.Format("{\"owner\":\"%hs\",\"folders\":[", JsonEscape_(Utf8_(publicName)).c_str());
+            json += entry + tree + "]}";
+            shares++;
+         }
+      }
+
+      if (ACLManager::GetOtherUsersNamespaceEnabled())
+      {
+         String otherUsersName = ACLManager::GetOtherUsersFolderName();
+
+         ACLManager aclManager;
+         std::vector<__int64> owners = aclManager.GetAccountsWithFolderShares();
+
+         for (size_t i = 0; i < owners.size(); i++)
+         {
+            if (owners[i] == account->GetID())
+               continue;
+
+            std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(owners[i]);
+            if (!owner)
+               continue;
+
+            std::shared_ptr<IMAPFolders> ownerFolders = IMAPFolderContainer::Instance()->GetFoldersForAccount(owners[i]);
+            if (!ownerFolders)
+               continue;
+
+            std::map<__int64, int> ownerDesignations;
+            IMAPSpecialUse::Resolve(ownerFolders, ownerDesignations);
+
+            AnsiString tree;
+            AppendFolderJson_(account, ownerFolders, otherUsersName + delimiter + owner->GetAddress(), ownerDesignations, delimiter, tree, 0);
+
+            if (tree.IsEmpty())
+               continue;
+
+            if (shares > 0)
+               json += ",";
+
+            AnsiString entry;
+            entry.Format("{\"owner\":\"%hs\",\"folders\":[", JsonEscape_(Utf8_(owner->GetAddress())).c_str());
+            json += entry + tree + "]}";
+            shares++;
+         }
+      }
+
       json += "]}";
 
       return BuildResponse_(200, json);
@@ -5116,7 +5238,7 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
-      std::shared_ptr<IMAPFolder> folder = FindOwnReadableFolder_(account, folderId);
+      std::shared_ptr<IMAPFolder> folder = FindReadableFolder_(account, folderId);
       if (!folder)
          return BuildResponse_(404, "{\"error\":\"folder not found\"}");
 
@@ -5182,7 +5304,7 @@ namespace HM
             break;
          }
 
-         const String fileName = PersistentMessage::GetFileName(account, message);
+         const String fileName = MessageFile_(message);
 
          if (searching)
          {
@@ -5320,7 +5442,7 @@ namespace HM
 
             scanned++;
 
-            if (!MessageMatches(PersistentMessage::GetFileName(account, message), message, needleLower, prune))
+            if (!MessageMatches(MessageFile_(message), message, needleLower, prune))
                continue;
 
             Hit hit;
@@ -5347,7 +5469,7 @@ namespace HM
          std::shared_ptr<Message> message = hits[i].message;
 
          AnsiString subject, from, date;
-         DescribeHeader(PersistentMessage::GetFileName(account, message), subject, from, date);
+         DescribeHeader(MessageFile_(message), subject, from, date);
 
          if (i > 0)
             json += ",";
@@ -5383,15 +5505,14 @@ namespace HM
       // in a folder the ACL keeps from this account, is "not found": the id
       // space is shared, and a refusal that differed would say it exists.
       std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
-      if (!PersistentMessage::ReadObject(message, messageId) || message->GetID() == 0 ||
-          message->GetAccountID() != account->GetID())
+      if (!PersistentMessage::ReadObject(message, messageId) || message->GetID() == 0)
          return BuildResponse_(404, "{\"error\":\"message not found\"}");
 
-      std::shared_ptr<IMAPFolder> folder = FindOwnReadableFolder_(account, message->GetFolderID());
-      if (!folder)
+      std::shared_ptr<IMAPFolder> folder = FindReadableFolder_(account, message->GetFolderID());
+      if (!folder || folder->GetAccountID() != message->GetAccountID())
          return BuildResponse_(404, "{\"error\":\"message not found\"}");
 
-      String fileName = PersistentMessage::GetFileName(account, message);
+      String fileName = MessageFile_(message);
       if (!FileUtilities::Exists(fileName))
          return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
 
@@ -5422,7 +5543,7 @@ namespace HM
       bool bodyTooLarge = message->GetSize() > MaxMessageBodyBytes;
 
       MessageData messageData;
-      if (!messageData.LoadFromMessage(account, message))
+      if (!messageData.LoadFromMessage(MessageFile_(message), message))
          return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
 
       AnsiString attachments = "[";
@@ -5494,10 +5615,10 @@ namespace HM
       // Every IMAP session on the folder is told, the way STORE, MOVE and
       // EXPUNGE tell them: by message id, which each turns into its own
       // sequence numbers.
-      void NotifyFolder(std::shared_ptr<const Account> account, __int64 folderId, ChangeNotification::NotificationType type, const std::vector<__int64> &messageIds)
+      void NotifyFolder(std::shared_ptr<IMAPFolder> folder, ChangeNotification::NotificationType type, const std::vector<__int64> &messageIds)
       {
          std::shared_ptr<ChangeNotification> notification =
-            std::shared_ptr<ChangeNotification>(new ChangeNotification(account->GetID(), folderId, type, messageIds));
+            std::shared_ptr<ChangeNotification>(new ChangeNotification(folder->GetAccountID(), folder->GetID(), type, messageIds));
 
          Application::Instance()->GetNotificationServer()->SendNotification(notification);
       }
@@ -5510,11 +5631,14 @@ namespace HM
    RestApiServer::FindOwnMessage_(std::shared_ptr<const Account> account, __int64 messageId, std::shared_ptr<IMAPFolder> &folder)
    {
       std::shared_ptr<Message> row = std::shared_ptr<Message>(new Message());
-      if (!PersistentMessage::ReadObject(row, messageId) || row->GetID() == 0 || row->GetAccountID() != account->GetID())
+      if (!PersistentMessage::ReadObject(row, messageId) || row->GetID() == 0)
          return std::shared_ptr<Message>();
 
-      folder = FindOwnReadableFolder_(account, row->GetFolderID());
-      if (!folder)
+      // The folder decides: the account's own, or one it may read under a
+      // right the owner granted - and the row must belong to that folder's
+      // owner, so a folder id cannot be used to reach another store's row.
+      folder = FindReadableFolder_(account, row->GetFolderID());
+      if (!folder || folder->GetAccountID() != row->GetAccountID())
          return std::shared_ptr<Message>();
 
       std::shared_ptr<Messages> messages = folder->GetMessages();
@@ -5555,7 +5679,7 @@ namespace HM
    bool
    RestApiServer::DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder)
    {
-      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(account->GetID(), folder->GetID());
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
       if (!messages)
          return false;
 
@@ -5566,7 +5690,7 @@ namespace HM
       if (deleted.empty())
          return false;
 
-      NotifyFolder(account, folder->GetID(), ChangeNotification::NotificationMessageDeleted, deleted);
+      NotifyFolder(folder, ChangeNotification::NotificationMessageDeleted, deleted);
       return true;
    }
 
@@ -5606,13 +5730,13 @@ namespace HM
       // The rights STORE asks for. RFC 4314 makes \Seen, \Deleted and the
       // other flags three separate permissions, and they are asked for
       // separately here too.
-      if (named[0] && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteSeen))
+      if (named[0] && !RightOn_(account, folder, ACLPermission::PermissionWriteSeen))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change the seen flag\"}");
 
-      if (named[4] && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteDeleted))
+      if (named[4] && !RightOn_(account, folder, ACLPermission::PermissionWriteDeleted))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change the deleted flag\"}");
 
-      if ((named[1] || named[2] || named[3]) && !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteOthers))
+      if ((named[1] || named[2] || named[3]) && !RightOn_(account, folder, ACLPermission::PermissionWriteOthers))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change flags\"}");
 
       if (named[0])
@@ -5628,12 +5752,12 @@ namespace HM
 
       // The path STORE takes: the flags are written with the folder's next
       // mod-sequence, so CONDSTORE and QRESYNC clients see the change.
-      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) account->GetID(), (int) folder->GetID(), message->GetID(), message->GetFlags()))
+      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) folder->GetAccountID(), (int) folder->GetID(), message->GetID(), message->GetFlags()))
          return BuildResponse_(500, "{\"error\":\"the flags could not be stored\"}");
 
       std::vector<__int64> changed;
       changed.push_back(message->GetID());
-      NotifyFolder(account, folder->GetID(), ChangeNotification::NotificationMessageFlagsChanged, changed);
+      NotifyFolder(folder, ChangeNotification::NotificationMessageFlagsChanged, changed);
 
       AnsiString json;
       json.Format("{\"id\":%I64d,\"folder_id\":%I64d,\"flags\":%hs}", message->GetID(), folder->GetID(), FlagsJson(message).c_str());
@@ -5658,19 +5782,22 @@ namespace HM
 
       // The destination goes through the same test as any folder id: the
       // account's own tree, readable. Another account's folder is 404.
-      std::shared_ptr<IMAPFolder> destination = FindOwnReadableFolder_(account, folderId);
+      std::shared_ptr<IMAPFolder> destination = FindReadableFolder_(account, folderId);
       if (!destination)
          return BuildResponse_(404, "{\"error\":\"folder not found\"}");
 
       if (destination->GetID() == source->GetID())
          return BuildResponse_(400, "{\"error\":\"the message is already in that folder\"}");
 
+      if (destination->GetAccountID() != source->GetAccountID())
+         return BuildResponse_(400, "{\"error\":\"a message moves within its own mailbox; copy it by other means\"}");
+
       // The rights MOVE asks for: insert there, mark deleted and expunge here.
-      if (!ACLManager::CheckPermission(account->GetID(), destination, ACLPermission::PermissionInsert))
+      if (!RightOn_(account, destination, ACLPermission::PermissionInsert))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to add messages\"}");
 
-      if (!ACLManager::CheckPermission(account->GetID(), source, ACLPermission::PermissionWriteDeleted) ||
-          !ACLManager::CheckPermission(account->GetID(), source, ACLPermission::PermissionExpunge))
+      if (!RightOn_(account, source, ACLPermission::PermissionWriteDeleted) ||
+          !RightOn_(account, source, ACLPermission::PermissionExpunge))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to remove messages\"}");
 
       // Copy, then expunge: the shape MOVE has, so the moved message is a
@@ -5702,8 +5829,8 @@ namespace HM
          return BuildResponse_(404, "{\"error\":\"message not found\"}");
 
       // The rights EXPUNGE asks for, since that is what this is.
-      if (!ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionWriteDeleted) ||
-          !ACLManager::CheckPermission(account->GetID(), folder, ACLPermission::PermissionExpunge))
+      if (!RightOn_(account, folder, ACLPermission::PermissionWriteDeleted) ||
+          !RightOn_(account, folder, ACLPermission::PermissionExpunge))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to delete messages\"}");
 
       AnsiString permanentText = QueryParameter_(query, "permanent");
@@ -5712,12 +5839,12 @@ namespace HM
       // Deleting is moving to the folder designated \Trash when the account
       // has one and the message is not in it already - what a mail client
       // does - and final otherwise, or when the caller says permanent.
-      if (!permanent)
+      if (!permanent && folder->GetAccountID() == account->GetID())
       {
          std::shared_ptr<IMAPFolder> trash = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationTrash);
          if (trash && trash->GetID() != folder->GetID())
          {
-            if (!ACLManager::CheckPermission(account->GetID(), trash, ACLPermission::PermissionInsert))
+            if (!RightOn_(account, trash, ACLPermission::PermissionInsert))
                return BuildResponse_(403, "{\"error\":\"the trash folder does not allow this account to add messages\"}");
 
             __int64 newMessageId = 0;
@@ -5944,7 +6071,7 @@ namespace HM
          __int64 used = AccountSizeCache::Instance()->GetSize(account->GetID());
          bool fits = maxBytes <= 0 || used + message->GetSize() <= maxBytes;
 
-         if (fits && ACLManager::CheckPermission(account->GetID(), sent, ACLPermission::PermissionInsert))
+         if (fits && RightOn_(account, sent, ACLPermission::PermissionInsert))
          {
             std::shared_ptr<Message> copy = PersistentMessage::CopyToIMAPFolder(message, sent);
             if (copy)
@@ -6062,12 +6189,12 @@ namespace HM
       if (message->GetSize() > MaxMessageParseBytes)
          return BuildResponse_(413, "{\"error\":\"the message is too large to read here\"}");
 
-      String fileName = PersistentMessage::GetFileName(account, message);
+      String fileName = MessageFile_(message);
       if (!FileUtilities::Exists(fileName))
          return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
 
       MessageData messageData;
-      if (!messageData.LoadFromMessage(account, message))
+      if (!messageData.LoadFromMessage(MessageFile_(message), message))
          return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
 
       std::shared_ptr<Attachments> attachments = messageData.GetAttachments();
@@ -6367,6 +6494,7 @@ namespace HM
          "    var chosen = select.value;\n"
          "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
          "    var folders = flatten(tree.folders, []);\n"
+         "    (tree.shared || []).forEach(function (share) { flatten(share.folders, folders); });\n"
          "    allFolders = folders;\n"
          "    folders.forEach(function (f) {\n"
          "      var option = node('option', f.path + (f.unseen ? ' (' + f.unseen + ')' : ''));\n"
@@ -6395,8 +6523,9 @@ namespace HM
          "    el('message-flag').textContent = current.flags.flagged ? 'Remove flag' : 'Flag';\n"
          "    var select = el('message-move');\n"
          "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
+         "    var home = allFolders.filter(function (f) { return f.id === current.folder_id; })[0];\n"
          "    allFolders.forEach(function (f) {\n"
-         "      if (f.id === current.folder_id || !f.writable) { return; }\n"
+         "      if (f.id === current.folder_id || !f.writable || (home && f.account_id !== home.account_id)) { return; }\n"
          "      var option = node('option', f.path); option.value = f.id; select.appendChild(option);\n"
          "    });\n"
          "  };\n"
@@ -6600,7 +6729,7 @@ namespace HM
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
-         "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"}}}},"
+         "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree. shared lists, under owner, the public folders (owner is the public namespace name) and the folders of each account that granted this one a right, named as IMAP names them; each entry carries account_id (0 for public). Every message route accepts a folder or message from those trees under the rights the owner granted.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders, shared\"}}}},"
          "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text. Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
