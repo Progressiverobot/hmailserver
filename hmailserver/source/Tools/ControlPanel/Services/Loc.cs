@@ -55,6 +55,14 @@ namespace hMailServer.ControlPanel.Services
       {
          new Language("", N("Windows display language")),
          new Language("en", "English"),   // no-loc: a language is named in itself
+         new Language("de", "Deutsch"),   // no-loc
+         new Language("es", "Español"),   // no-loc
+         new Language("fr", "Français"),   // no-loc
+         new Language("it", "Italiano"),   // no-loc
+         new Language("nl", "Nederlands"),   // no-loc
+         new Language("pl", "Polski"),   // no-loc
+         new Language("pt-BR", "Português (Brasil)"),   // no-loc
+         new Language("ru", "Русский"),   // no-loc
          new Language("sv", "Svenska"),   // no-loc
       };
 
