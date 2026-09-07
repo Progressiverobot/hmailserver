@@ -1918,6 +1918,33 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
+                  // The four parts of the live update (UpdateChecker, UpdateDownloader,
+                  // UpdateInstaller, UpdateCheckTask) read exactly these keys; the
+                  // Status page has the buttons. Everything is off until the check is
+                  // turned on, and the check sends nothing but the request.
+                  Title = L("Updates"),
+                  Blurb = L("The server can notice a new release, verify it against the release's own Sigstore signature, and apply it - by a click on the Status page, or on its own inside a window you set. Off until you turn the check on; the check sends nothing but the request. Every setting here is in hMailServer.ini and applies after a service restart."),
+                  Settings =
+                  {
+                     new BoolSetting { Key = "UpdateCheckEnabled", Default = false, Label = L("Check for a new release once a day (UpdateCheckEnabled)") },
+                     new TextSetting { Key = "UpdateCheckHours", Default = "24", Label = L("Hours between checks (1 to 168)"), Placeholder = "24" },
+                     new TextSetting { Key = "UpdateChannel", Default = "stable", Label = L("Channel: stable, or prerelease to run ahead on a test machine"), Placeholder = "stable" },
+                     new TextSetting { Key = "UpdateFeedUrl", Label = L("Feed URL (empty = this project's GitHub releases; set for a mirror)"), Placeholder = "https://api.github.com/repos/Progressiverobot/hmailserver/releases" },
+                     new BoolSetting { Key = "UpdateAutoDownload", Default = false, Label = L("Download and verify the installer as soon as a release is found") },
+                     new TextSetting
+                     {
+                        Key = "UpdateWindow",
+                        Label = L("Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)"),
+                        Placeholder = "Sun 03:00", // no-loc
+                        Blurb = L("Inside the window the scheduled task applies a verified installer without a click: the service stops, files and schema upgrade, the service starts, and the outcome goes to the log, the Windows event log and the Status page. A service that does not come back is rolled back to the previous installer.")
+                     },
+                     new BoolSetting { Key = "UpdateBackupBeforeApply", Default = true, Label = L("Back up to the configured destination before an unattended apply (no destination or a failed backup means no apply)") },
+                     new BoolSetting { Key = "UpdateRequireAuthenticode", Default = false, Label = L("Also require a valid Authenticode signature on the installer") },
+                     new TextSetting { Key = "UpdateServiceWaitSeconds", Default = "180", Label = L("Seconds to wait for the service after an apply before rolling back"), Placeholder = "180" }
+                  }
+               });
+               cards_.Add(new CardDef
+               {
                   // Verified in WindowsEventLog.cpp: the sink hooks ErrorManager, not
                   // the Logger, so it fires independently of the log mask - which is
                   // the whole case for shipping it on. A healthy server writes zero
