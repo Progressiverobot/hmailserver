@@ -345,6 +345,195 @@ namespace RegressionTests.API
          Assert.AreEqual(200, newAccepted.status, newAccepted.body);
       }
 
+      // ---------------------------------------------------------- quarantine ---
+
+      private const string SurblTestPoint = "surbl-org-permanent-test-point.com.multi.surbl.org";
+      private const string SpamBody =
+         "This is a test message with a SURBL url: -> http://surbl-org-permanent-test-point.com/ <-";
+
+      [OneTimeSetUp]
+      public void ServeTheSurblTestPoint()
+      {
+         SuiteDns.Zone.WithA(SurblTestPoint, "127.0.0.2");
+      }
+
+      [OneTimeTearDown]
+      public void RestoreTheSuiteDns()
+      {
+         SuiteDns.Reset();
+      }
+
+      // The recipe AntiSpam.Quarantine uses: the SURBL test point scores 10,
+      // the delete threshold is 5, and with QuarantineEnabled the message is
+      // held instead of refused.
+      private void EnableQuarantine()
+      {
+         var antiSpam = _application.Settings.AntiSpam;
+         antiSpam.SpamMarkThreshold = 1;
+         antiSpam.SpamDeleteThreshold = 5;
+
+         var surbl = antiSpam.SURBLServers[0];
+         surbl.Active = true;
+         surbl.Score = 10;
+         surbl.Save();
+
+         EmptyTheQuarantine();
+
+         ServerIniFile.SetSetting("QuarantineEnabled", "1");
+         _application.Reinitialize();
+      }
+
+      private void DisableQuarantine()
+      {
+         EmptyTheQuarantine();
+         ServerIniFile.SetSetting("QuarantineEnabled", null);
+         _application.Reinitialize();
+
+         var surbl = _application.Settings.AntiSpam.SURBLServers[0];
+         surbl.Active = false;
+         surbl.Save();
+      }
+
+      private void EmptyTheQuarantine()
+      {
+         var quarantine = _application.Settings.AntiSpam.Quarantine;
+         quarantine.Refresh();
+         while (quarantine.Count > 0)
+         {
+            quarantine.DeleteByDBID(quarantine[0].ID);
+            quarantine.Refresh();
+         }
+      }
+
+      private static void SendSpam(string subject, params string[] recipients)
+      {
+         var socket = new TcpConnection();
+         Assert.IsTrue(socket.Connect(25), "Could not connect to SMTP.");
+         socket.ReadUntil("220");
+         socket.Send("HELO test\r\n");
+         socket.ReadUntil("250");
+         socket.Send("MAIL FROM:<outsider@example.com>\r\n");
+         socket.ReadUntil("\r\n");
+         foreach (string recipient in recipients)
+         {
+            socket.Send("RCPT TO:<" + recipient + ">\r\n");
+            socket.ReadUntil("\r\n");
+         }
+         socket.Send("DATA\r\n");
+         socket.ReadUntil("\r\n");
+         socket.Send("From: outsider@example.com\r\n" +
+                     "To: " + string.Join(", ", recipients) + "\r\n" +
+                     "Subject: " + subject + "\r\n" +
+                     "\r\n" +
+                     SpamBody + "\r\n" +
+                     ".\r\n");
+         string reply = socket.ReadUntil("\r\n");
+         socket.Send("QUIT\r\n");
+         socket.Disconnect();
+         StringAssert.StartsWith("250", reply, "A quarantined message is accepted, not refused.");
+      }
+
+      private static long FirstHeldId(string listBody)
+      {
+         int at = listBody.IndexOf("\"id\":", StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "No held message in: " + listBody);
+         int start = at + 5;
+         int end = start;
+         while (end < listBody.Length && char.IsDigit(listBody[end]))
+            end++;
+         return long.Parse(listBody.Substring(start, end - start));
+      }
+
+      [Test]
+      [Description("A held message is listed for its recipient only, and releasing it delivers it to that recipient")]
+      public void HeldMessagesAreListedAndReleasedForTheirRecipientOnly()
+      {
+         const string otherPassword = "Other-Passw0rd!";
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, otherPassword);
+
+         EnableQuarantine();
+         try
+         {
+            SendSpam("Held for self", Address);
+
+            (int status, string body) mine = Http("GET", "/api/v1/me/quarantine", UserHeader(UserPassword));
+            Assert.AreEqual(200, mine.status, mine.body);
+            StringAssert.Contains("\"enabled\":true", mine.body);
+            StringAssert.Contains("\"subject\":\"Held for self\"", mine.body);
+            StringAssert.DoesNotContain("recipients", mine.body);
+            long id = FirstHeldId(mine.body);
+
+            (int status, string body) theirs = Http("GET", "/api/v1/me/quarantine", BasicHeader(other, otherPassword));
+            Assert.AreEqual(200, theirs.status, theirs.body);
+            StringAssert.Contains("\"messages\":[]", theirs.body);
+
+            (int status, string body) theirRelease = Http("POST", "/api/v1/me/quarantine/" + id + "/release", BasicHeader(other, otherPassword));
+            Assert.AreEqual(404, theirRelease.status, "Somebody else's held message must look like no message at all. " + theirRelease.body);
+
+            (int status, string body) release = Http("POST", "/api/v1/me/quarantine/" + id + "/release", UserHeader(UserPassword));
+            Assert.AreEqual(200, release.status, release.body);
+
+            Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+            (int status, string body) after = Http("GET", "/api/v1/me/quarantine", UserHeader(UserPassword));
+            StringAssert.Contains("\"messages\":[]", after.body);
+
+            (int status, string body) gone = Http("POST", "/api/v1/me/quarantine/" + id + "/release", UserHeader(UserPassword));
+            Assert.AreEqual(404, gone.status, gone.body);
+         }
+         finally
+         {
+            DisableQuarantine();
+         }
+      }
+
+      [Test]
+      [Description("A message held for two recipients is released or discarded for one of them without touching the other's copy")]
+      public void OneRecipientsActionLeavesTheOthersCopy()
+      {
+         const string otherPassword = "Other-Passw0rd!";
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, otherPassword);
+
+         EnableQuarantine();
+         try
+         {
+            SendSpam("Held for both", Address, other);
+
+            (int status, string body) mine = Http("GET", "/api/v1/me/quarantine", UserHeader(UserPassword));
+            long id = FirstHeldId(mine.body);
+
+            (int status, string body) theirs = Http("GET", "/api/v1/me/quarantine", BasicHeader(other, otherPassword));
+            StringAssert.Contains("\"subject\":\"Held for both\"", theirs.body);
+
+            // I give mine up: nothing is delivered to me, and theirs is still held.
+            (int status, string body) discard = Http("DELETE", "/api/v1/me/quarantine/" + id, UserHeader(UserPassword));
+            Assert.AreEqual(200, discard.status, discard.body);
+
+            (int status, string body) mineAfter = Http("GET", "/api/v1/me/quarantine", UserHeader(UserPassword));
+            StringAssert.Contains("\"messages\":[]", mineAfter.body);
+
+            (int status, string body) theirsAfter = Http("GET", "/api/v1/me/quarantine", BasicHeader(other, otherPassword));
+            StringAssert.Contains("\"subject\":\"Held for both\"", theirsAfter.body);
+
+            // They release theirs: delivered to them only, and the entry is gone.
+            (int status, string body) release = Http("POST", "/api/v1/me/quarantine/" + id + "/release", BasicHeader(other, otherPassword));
+            Assert.AreEqual(200, release.status, release.body);
+
+            Pop3ClientSimulator.AssertMessageCount(other, otherPassword, 1);
+            Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 0);
+
+            var quarantine = _application.Settings.AntiSpam.Quarantine;
+            quarantine.Refresh();
+            Assert.AreEqual(0, quarantine.Count, "The entry goes with its last recipient.");
+         }
+         finally
+         {
+            DisableQuarantine();
+         }
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()

@@ -79,6 +79,19 @@ namespace HM
       // would simply quarantine it again.
       static bool Release(__int64 id, String &out_error);
 
+      // True when the address is one of the message's recorded recipients,
+      // whole and case-insensitively.
+      static bool IsRecipient(const QuarantinedMessage &message, const String &address);
+
+      // Release for one recipient only: delivered to that address, which then
+      // leaves the entry; the entry stays for the other recipients and goes
+      // when it was the last.
+      static bool ReleaseTo(__int64 id, const String &recipient, String &out_error);
+
+      // One recipient gives up its copy: the address leaves the entry, which
+      // goes when it was the last. Nothing is delivered.
+      static bool DiscardFor(__int64 id, const String &recipient);
+
       static bool Delete(__int64 id);
 
       // Removes everything older than QuarantineRetentionDays. Returns the number
@@ -94,5 +107,6 @@ namespace HM
    private:
       static String BuildRelativePath_();
       static bool ReadRow_(std::shared_ptr<DALRecordset> recordset, QuarantinedMessage &out_message);
+      static bool RemoveRecipient_(__int64 id, const QuarantinedMessage &quarantined, const String &recipient);
    };
 }

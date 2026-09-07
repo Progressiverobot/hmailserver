@@ -160,6 +160,9 @@ namespace HM
          RouteMe,
          RouteMePassword,
          RouteMeVacation,
+         RouteMeQuarantineList,
+         RouteMeQuarantineRelease,
+         RouteMeQuarantineDelete,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -260,6 +263,9 @@ namespace HM
       static HttpResponse HandleMePassword_(const Caller &caller, const AnsiString &request);
       static HttpResponse HandleMeVacation_(const Caller &caller, const AnsiString &requestBody);
       static HttpResponse HandlePortalPage_();
+      static HttpResponse HandleMeQuarantineList_(const Caller &caller);
+      static HttpResponse HandleMeQuarantineRelease_(const Caller &caller, __int64 id);
+      static HttpResponse HandleMeQuarantineDelete_(const Caller &caller, __int64 id);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);
       HttpResponse HandleSessionDelete_(const Caller &caller);

@@ -403,4 +403,144 @@ namespace HM
 
       return deleted;
    }
+   bool
+   QuarantineStore::IsRecipient(const QuarantinedMessage &message, const String &address)
+   {
+      // The recorded list is the envelope recipients as accepted, comma
+      // separated. An address matches whole and case-insensitively; a prefix
+      // or a substring does not, so bob@ cannot see bobby@'s mail.
+      std::vector<String> recipients = StringParser::SplitString(message.recipients, ",");
+
+      for (size_t i = 0; i < recipients.size(); i++)
+      {
+         String candidate = recipients[i];
+         candidate.Trim();
+
+         if (candidate.CompareNoCase(address) == 0)
+            return true;
+      }
+
+      return false;
+   }
+
+   bool
+   QuarantineStore::ReleaseTo(__int64 id, const String &recipient, String &out_error)
+   {
+      // Release for one recipient of a message that may have several. The
+      // delivery is the administrator's release confined to that address; the
+      // entry then loses that address and stays for the others, or goes when
+      // it was the last. A user releasing their own copy must not deliver
+      // somebody else's, and must not take somebody else's chance to.
+      QuarantinedMessage quarantined;
+      if (!GetById(id, quarantined))
+      {
+         out_error = "No quarantined message with that id.";
+         return false;
+      }
+
+      if (!IsRecipient(quarantined, recipient))
+      {
+         out_error = "That address is not a recipient of the quarantined message.";
+         return false;
+      }
+
+      String sourceFile = GetQuarantineDirectory() + "\\" + quarantined.file_name;
+      if (!FileUtilities::Exists(sourceFile))
+      {
+         out_error = "The quarantined message file is missing, so there is nothing to release. "
+                     "Delete the entry to clear it.";
+         return false;
+      }
+
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+      message->SetState(Message::Delivering);
+      message->SetFromAddress(quarantined.sender);
+
+      const String targetFile = PersistentMessage::GetFileName(message);
+      if (!FileUtilities::Copy(sourceFile, targetFile, true))
+      {
+         out_error = "The quarantined message could not be copied into the delivery queue.";
+         return false;
+      }
+
+      message->SetSize(FileUtilities::FileSize(targetFile));
+
+      RecipientParser recipientParser;
+      bool recipientOk = false;
+      recipientParser.CreateMessageRecipientList(recipient, message->GetRecipients(), recipientOk);
+
+      if (message->GetRecipients()->GetCount() == 0)
+      {
+         FileUtilities::DeleteFile(targetFile);
+         out_error = "The recipient could not be resolved, so the message was not released.";
+         return false;
+      }
+
+      if (!PersistentMessage::SaveObject(message))
+      {
+         FileUtilities::DeleteFile(targetFile);
+         out_error = "The released message could not be saved to the delivery queue.";
+         return false;
+      }
+
+      Application::Instance()->SubmitPendingEmail();
+
+      RemoveRecipient_(id, quarantined, recipient);
+
+      LOG_APPLICATION(Formatter::Format("Quarantine: released message {0} from {1} to {2}, at that recipient's request.",
+         id, quarantined.sender, recipient));
+
+      return true;
+   }
+
+   bool
+   QuarantineStore::DiscardFor(__int64 id, const String &recipient)
+   {
+      // The recipient's own copy is given up: their address leaves the entry,
+      // and the entry and its file go only when no recipient is left.
+      QuarantinedMessage quarantined;
+      if (!GetById(id, quarantined))
+         return false;
+
+      if (!IsRecipient(quarantined, recipient))
+         return false;
+
+      return RemoveRecipient_(id, quarantined, recipient);
+   }
+
+   bool
+   QuarantineStore::RemoveRecipient_(__int64 id, const QuarantinedMessage &quarantined, const String &recipient)
+   {
+      std::vector<String> recipients = StringParser::SplitString(quarantined.recipients, ",");
+      String remaining;
+
+      for (size_t i = 0; i < recipients.size(); i++)
+      {
+         String candidate = recipients[i];
+         candidate.Trim();
+
+         if (candidate.IsEmpty() || candidate.CompareNoCase(recipient) == 0)
+            continue;
+
+         if (!remaining.IsEmpty())
+            remaining += ",";
+         remaining += candidate;
+      }
+
+      if (remaining.IsEmpty())
+         return Delete(id);
+
+      SQLCommand command("update hm_quarantine set quarantinerecipients = @RECIPIENTS where quarantineid = @ID");
+      command.AddParameter("@RECIPIENTS", remaining);
+      command.AddParameter("@ID", id);
+
+      if (!Application::Instance()->GetDBManager()->Execute(command))
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5795, "QuarantineStore::RemoveRecipient_",
+            Formatter::Format("The recipient list of quarantined message {0} could not be updated after {1} acted on it, so that address still sees the message.", id, recipient));
+         return false;
+      }
+
+      return true;
+   }
 }
