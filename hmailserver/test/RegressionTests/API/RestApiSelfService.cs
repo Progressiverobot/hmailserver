@@ -727,6 +727,186 @@ namespace RegressionTests.API
          Assert.AreEqual(403, admin.status, "Body: " + admin.body);
       }
 
+      [Test]
+      [Description("PUT /api/v1/me/messages/{id}/flags changes the named flags and no other, and IMAP sees them")]
+      public void FlagsAreChangedAndSeenOverImap()
+      {
+         Deliver(Address, "Numbers", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Numbers\"");
+         string flagsPath = "/api/v1/me/messages/" + messageId + "/flags";
+
+         (int status, string body) nothing = Http("PUT", flagsPath, UserHeader(UserPassword), "{\"colour\":\"red\"}");
+         Assert.AreEqual(400, nothing.status, "Body: " + nothing.body);
+
+         (int status, string body) set = Http("PUT", flagsPath, UserHeader(UserPassword), "{\"seen\":true,\"flagged\":true}");
+         Assert.AreEqual(200, set.status, "Body: " + set.body);
+         StringAssert.Contains("\"seen\":true,\"flagged\":true", set.body);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         string flags = imap.GetFlags(1);
+         StringAssert.Contains("\\Seen", flags);
+         StringAssert.Contains("\\Flagged", flags);
+         imap.Disconnect();
+
+         (int status, string body) unseen = Http("PUT", flagsPath, UserHeader(UserPassword), "{\"seen\":false}");
+         Assert.AreEqual(200, unseen.status, "Body: " + unseen.body);
+         StringAssert.Contains("\"seen\":false,\"flagged\":true", unseen.body);
+
+         imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         flags = imap.GetFlags(1);
+         Assert.IsFalse(flags.Contains("\\Seen"), "Only the named flag changed: " + flags);
+         StringAssert.Contains("\\Flagged", flags);
+         imap.Disconnect();
+
+         (int status, string body) counts = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":1,\"unseen\":1", FolderEntry(counts.body, "INBOX"));
+
+         (int status, string body) others = Http("PUT", flagsPath, BasicHeader(OtherAccount(), UserPassword), "{\"seen\":true}");
+         Assert.AreEqual(404, others.status, "Another account's message is not found, not forbidden. Body: " + others.body);
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/messages/{id}/move puts the message in another of the account's folders, as a new message, and only there")]
+      public void AMessageIsMovedToAnotherFolderOfTheAccount()
+      {
+         Deliver(Address, "Numbers", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Projects"));
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         long projectsId = IdBefore(tree.body, "\"path\":\"Projects\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Numbers\"");
+         string movePath = "/api/v1/me/messages/" + messageId + "/move";
+
+         (int status, string body) missing = Http("POST", movePath, UserHeader(UserPassword), "{}");
+         Assert.AreEqual(400, missing.status, "Body: " + missing.body);
+
+         (int status, string body) unknown = Http("POST", movePath, UserHeader(UserPassword), "{\"folder_id\":987654321}");
+         Assert.AreEqual(404, unknown.status, "Body: " + unknown.body);
+
+         (int status, string body) same = Http("POST", movePath, UserHeader(UserPassword), "{\"folder_id\":" + inboxId + "}");
+         Assert.AreEqual(400, same.status, "Body: " + same.body);
+
+         string other = OtherAccount();
+         Deliver(other, "Theirs", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+         (int status, string body) othersTree = Http("GET", "/api/v1/me/folders", BasicHeader(other, UserPassword));
+         long othersInbox = IdBefore(othersTree.body, "\"path\":\"INBOX\"");
+
+         (int status, string body) intoTheirs = Http("POST", movePath, UserHeader(UserPassword), "{\"folder_id\":" + othersInbox + "}");
+         Assert.AreEqual(404, intoTheirs.status, "Another account's folder is not found, not forbidden. Body: " + intoTheirs.body);
+
+         (int status, string body) moved = Http("POST", movePath, UserHeader(UserPassword), "{\"folder_id\":" + projectsId + "}");
+         Assert.AreEqual(200, moved.status, "Body: " + moved.body);
+         StringAssert.Contains("\"folder_id\":" + projectsId, moved.body);
+         long newId = long.Parse(Between(moved.body, "\"id\":", ","));
+         Assert.AreNotEqual(messageId, newId, "A moved message is a new row.");
+
+         (int status, string body) inbox = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"total\":0", inbox.body);
+         (int status, string body) projects = Http("GET", "/api/v1/me/folders/" + projectsId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"total\":1", projects.body);
+         StringAssert.Contains("\"id\":" + newId + ",", projects.body);
+
+         (int status, string body) old = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(404, old.status, "The old id is gone. Body: " + old.body);
+         (int status, string body) fresh = Http("GET", "/api/v1/me/messages/" + newId, UserHeader(UserPassword));
+         Assert.AreEqual(200, fresh.status, "Body: " + fresh.body);
+         StringAssert.Contains("One.", fresh.body);
+
+         imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.AreEqual(0, imap.GetMessageCount("INBOX"));
+         Assert.AreEqual(1, imap.GetMessageCount("Projects"));
+         imap.Disconnect();
+
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+      }
+
+      [Test]
+      [Description("DELETE /api/v1/me/messages/{id} moves to the Trash folder when the account has one, and is final otherwise or on request")]
+      public void DeleteGoesToTheTrashWhenThereIsOne()
+      {
+         Deliver(Address, "First", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         string listPath = "/api/v1/me/folders/" + inboxId + "/messages";
+         long first = IdBefore(Http("GET", listPath, UserHeader(UserPassword)).body, "\"subject\":\"First\"");
+
+         (int status, string body) gone = Http("DELETE", "/api/v1/me/messages/" + first, UserHeader(UserPassword));
+         Assert.AreEqual(200, gone.status, "Body: " + gone.body);
+         StringAssert.Contains("\"deleted\":true", gone.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 0);
+
+         (int status, string body) again = Http("DELETE", "/api/v1/me/messages/" + first, UserHeader(UserPassword));
+         Assert.AreEqual(404, again.status, "Body: " + again.body);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Trash"));
+         imap.Disconnect();
+
+         Deliver(Address, "Second", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long trashId = IdBefore(tree.body, "\"path\":\"Trash\"");
+         StringAssert.Contains("\"special_use\":\"\\\\Trash\"", FolderEntry(tree.body, "Trash"));
+         long second = IdBefore(Http("GET", listPath, UserHeader(UserPassword)).body, "\"subject\":\"Second\"");
+
+         (int status, string body) trashed = Http("DELETE", "/api/v1/me/messages/" + second, UserHeader(UserPassword));
+         Assert.AreEqual(200, trashed.status, "Body: " + trashed.body);
+         StringAssert.Contains("\"deleted\":false,\"moved_to\":" + trashId, trashed.body);
+         long inTrash = long.Parse(Between(trashed.body, "\"id\":", "}"));
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 0);
+
+         imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.AreEqual(1, imap.GetMessageCount("Trash"));
+         imap.Disconnect();
+
+         (int status, string body) emptied = Http("DELETE", "/api/v1/me/messages/" + inTrash, UserHeader(UserPassword));
+         Assert.AreEqual(200, emptied.status, "Body: " + emptied.body);
+         StringAssert.Contains("\"deleted\":true", emptied.body);
+
+         Deliver(Address, "Third", "Three.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         long third = IdBefore(Http("GET", listPath, UserHeader(UserPassword)).body, "\"subject\":\"Third\"");
+
+         (int status, string body) others = Http("DELETE", "/api/v1/me/messages/" + third, BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, others.status, "Another account's message is not found, not forbidden. Body: " + others.body);
+
+         (int status, string body) admin = Http("DELETE", "/api/v1/me/messages/" + third, AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+
+         (int status, string body) final = Http("DELETE", "/api/v1/me/messages/" + third + "?permanent=1", UserHeader(UserPassword));
+         Assert.AreEqual(200, final.status, "Body: " + final.body);
+         StringAssert.Contains("\"deleted\":true", final.body);
+
+         imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.AreEqual(0, imap.GetMessageCount("INBOX"));
+         Assert.AreEqual(0, imap.GetMessageCount("Trash"));
+         imap.Disconnect();
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()

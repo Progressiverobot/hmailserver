@@ -33,6 +33,7 @@ namespace HM
       static String GetSendersIP(std::shared_ptr<Message> pMessage);
 
       static bool CopyToIMAPFolder(std::shared_ptr<Message> pMessage, int iDestinationFolderID);
+      static bool CopyToIMAPFolder(std::shared_ptr<Message> pMessage, int iDestinationFolderID, __int64 &newMessageId);
 
       // Whether a folder named the way a rule or Sieve script names it exists and
       // can be delivered into by this account. Kept HERE, beside MoveToIMAPFolder,

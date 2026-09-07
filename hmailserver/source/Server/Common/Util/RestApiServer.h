@@ -71,6 +71,7 @@ namespace HM
    class Account;
    class IMAPFolder;
    class IMAPFolders;
+   class Message;
 
    class RestApiServer
    {
@@ -169,6 +170,9 @@ namespace HM
          RouteMeFolders,
          RouteMeFolderMessages,
          RouteMeMessage,
+         RouteMeMessageFlags,
+         RouteMeMessageMove,
+         RouteMeMessageDelete,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -280,6 +284,12 @@ namespace HM
       static void AppendFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders,
                                     const String &parentPath, const std::map<__int64, int> &designations,
                                     const String &delimiter, AnsiString &json, int depth);
+      static HttpResponse HandleMeMessageFlags_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
+      static HttpResponse HandleMeMessageMove_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
+      static HttpResponse HandleMeMessageDelete_(const Caller &caller, __int64 messageId, const AnsiString &query);
+      static std::shared_ptr<Message> FindOwnMessage_(std::shared_ptr<const Account> account, __int64 messageId, std::shared_ptr<IMAPFolder> &folder);
+      static std::shared_ptr<IMAPFolder> FindTrashFolder_(std::shared_ptr<const Account> account);
+      static bool DeleteOwnMessage_(std::shared_ptr<const Account> account, std::shared_ptr<Message> message, std::shared_ptr<IMAPFolder> folder);
       static bool AuthenticateSession_(const AnsiString &request, const IPAddress &peer_address, Caller &caller);
       HttpResponse HandleSessionCreate_(const Caller &caller);
       HttpResponse HandleSessionDelete_(const Caller &caller);

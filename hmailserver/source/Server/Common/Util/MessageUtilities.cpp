@@ -207,6 +207,13 @@ namespace HM
    bool 
    MessageUtilities::CopyToIMAPFolder(std::shared_ptr<Message> pMessage, int iDestinationFolderID)
    {
+      __int64 newMessageId = 0;
+      return CopyToIMAPFolder(pMessage, iDestinationFolderID, newMessageId);
+   }
+
+   bool
+   MessageUtilities::CopyToIMAPFolder(std::shared_ptr<Message> pMessage, int iDestinationFolderID, __int64 &newMessageId)
+   {
       // Check if the destination folder exists
       std::shared_ptr<IMAPFolders> pFolders = HM::IMAPFolderContainer::Instance()->GetFoldersForAccount(pMessage->GetAccountID());
       std::shared_ptr<IMAPFolder> pFolder = pFolders->GetItemByDBIDRecursive(iDestinationFolderID);
@@ -252,6 +259,8 @@ namespace HM
 
          return false;
       }
+
+      newMessageId = pNewMessage->GetID();
 
       pFolder->GetMessages()->Refresh(false);
 
