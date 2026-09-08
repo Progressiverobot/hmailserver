@@ -65,7 +65,7 @@ fix is `git commit --amend -s` and a push.
 - Control Panel changes are held to five more checks in the same job: every static
   caption carries an Alt-key mnemonic (`build/check-mnemonics.py`); folder-access
   decisions stay in `ACLManager` (`build/check-authz-choke-point.py`); and, in the
-  tree after 6.2.27, a new caption is marked for translation (`L("_Save changes")`
+  tree, a new caption is marked for translation (`L("_Save changes")`
   in C#, `{loc:L '_Save changes'}` in XAML), the English catalogue is regenerated
   with `python3 build/check-localisation.py --write`, and all 17 complete languages
   get a translation - an unmarked or untranslated caption fails CI

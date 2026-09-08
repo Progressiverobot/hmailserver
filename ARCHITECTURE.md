@@ -43,10 +43,8 @@ Server/
   hMailServer/       Windows service shell (WinMain, service control)
   hMailServer.Minidump/  Crash-dump helper
   hMailServer.Updater/   The live-update apply helper: runs a verified installer,
-                     waits for the service, rolls back (in the tree after 6.2.27,
-                     not yet in a published release)
-  zlib/              Vendored zlib 1.3.1 for IMAP COMPRESS=DEFLATE (in the tree
-                     after 6.2.27, not yet in a published release)
+                     waits for the service, rolls back (new in 6.2.28)
+  zlib/              Vendored zlib 1.3.1 for IMAP COMPRESS=DEFLATE (new in 6.2.28)
   IMAP/              IMAP
   POP3/              POP3
   SMTP/              SMTP, delivery queue, outbound transport security
@@ -72,7 +70,7 @@ Server/
 | `TCPIP/` | Boost.Asio networking, TLS, DNS. Also `DnssecResolver` (validating stub resolver) and `DaneVerifier` (TLSA matching) |
 | `Threading/` | Thread pools and task queues |
 | `Tracking/` | Publish/subscribe bus between components |
-| `Util/` | Utilities, plus the optional listeners: `MetricsServer`, `RestApiServer`, `WebServicesServer` (the last two on `HttpServer`, the shared Boost.Asio HTTP/1.1 listener), `AcmeClient`, `TlsRptStore`, `HttpsClient` and the OTLP exporters (`Otel*`), and the live update (`UpdateChecker`, `SigstoreVerifier`, `UpdateDownloader`, `UpdateInstaller`, `UpdateWindow`, `UpdateApplyToken`). `HttpServer` and the `Update*` files are in the tree after 6.2.27, not yet in a published release; `Application/` holds their tasks `UpdateCheckTask` and `MetricsHistoryTask` |
+| `Util/` | Utilities, plus the optional listeners: `MetricsServer`, `RestApiServer`, `WebServicesServer` (the last two on `HttpServer`, the shared Boost.Asio HTTP/1.1 listener), `AcmeClient`, `TlsRptStore`, `HttpsClient` and the OTLP exporters (`Otel*`), and the live update (`UpdateChecker`, `SigstoreVerifier`, `UpdateDownloader`, `UpdateInstaller`, `UpdateWindow`, `UpdateApplyToken`). `HttpServer` and the `Update*` files are new in 6.2.28; `Application/` holds their tasks `UpdateCheckTask` and `MetricsHistoryTask` |
 
 ### `Server/SMTP/`
 
@@ -131,9 +129,8 @@ instead.
 Boost.Asio with its own `io_context` (separate from the mail listeners', so a request
 storm cannot starve SMTP accept), a bounded worker pool (4 threads), a connection cap
 (64) and absolute per-request (30 s) and per-connection (300 s) deadlines; a handler
-runs on a worker and may block. This is in the tree after 6.2.27, not yet in a
-published release; before it, both were raw sockets and `std::thread` like the other
-two. `MetricsServer` and `ManageSieveServer` remain raw sockets and `std::thread`,
+runs on a worker and may block. This is new in 6.2.28; before it, both were raw
+sockets and `std::thread` like the other two. `MetricsServer` and `ManageSieveServer` remain raw sockets and `std::thread`,
 outside the `TCPIP/` stack. All four are started from `Application::StartServers`
 only when their port is non-zero. Two things to know, both of which have bitten the
 raw-socket pair:
@@ -159,9 +156,8 @@ ranges, every minute), `TlsRptReporterTask` and `DmarcRptReporterTask` (hourly; 
 sends only when its `*RptFromAddress` is set), `LogRetentionTask` (at start, then every
 6 h), `ArchiveRetentionTask` (start + 12 h), `MailboxRetentionTask` (start + 6 h;
 message retention, 6.2.25), `MetricsHistoryTask` (start + every minute; 6.2.25),
-`UpdateCheckTask` (start + every 15 min; a no-op until `UpdateCheckEnabled=1` — in the
-tree after 6.2.27, not yet in a published release), `IMAPExpungeRetentionTask` (start +
-12 h), `MessageStoreConsistencyTask` (start + hourly), `DiskSpaceMonitorTask` (start +
+`UpdateCheckTask` (start + every 15 min; a no-op until `UpdateCheckEnabled=1` — new in 6.2.28),
+`IMAPExpungeRetentionTask` (start + 12 h), `MessageStoreConsistencyTask` (start + hourly), `DiskSpaceMonitorTask` (start +
 hourly), `WorkQueueHealthTask` (every minute), `BackupScheduleTask` (a one-minute tick
 against the wall clock, only when a schedule is set), `DirectorySyncScheduleTask` (only
 when `[LDAP] SyncScheduleMinutes` is set) and `AcmeRenewalTask` (start + hourly, only
@@ -262,7 +258,7 @@ Where to start
 | A per-account or per-domain setting | `Common/BO/`, `Common/Persistence/`, the COM interface, the schema, and the upgrade chain |
 | A new anti-spam test | `Common/AntiSpam/` and the score pipeline |
 | Something exposed to scripts | `Common/Scripting/` and the COM layer |
-| A new REST route or portal page | `Common/Util/RestApiServer.cpp` (dispatch, authorisation through `ACLManager`, the served `openapi.json`); the transport is `Common/Util/HttpServer` — in the tree after 6.2.27, not yet in a published release |
+| A new REST route or portal page | `Common/Util/RestApiServer.cpp` (dispatch, authorisation through `ACLManager`, the served `openapi.json`); the transport is `Common/Util/HttpServer` — new in 6.2.28 |
 | A new periodic sweep | a `ScheduledTask` subclass registered in `Application::CreateScheduledTasks_`, startup-plus-periodic |
 
 If a change spans more than about three of those rows, it is worth discussing in an

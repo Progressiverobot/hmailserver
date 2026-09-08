@@ -48,7 +48,7 @@ it is the model the rest of this list should be judged against.
 One native dependency is in the tree by design: zlib 1.3.1 is vendored as source
 under `hmailserver/source/Server/zlib` (its own LICENSE beside it, the text also
 under `docs/Licenses/`) and compiled straight into `hMailServer.exe` for IMAP
-COMPRESS=DEFLATE - in the tree after 6.2.27, not yet in a published release.
+COMPRESS=DEFLATE - new in 6.2.28.
 Source, not a binary, so it is outside this inventory; it is not yet listed by
 `build/native-dependencies.ps1`, so the SBOM does not name it either.
 
