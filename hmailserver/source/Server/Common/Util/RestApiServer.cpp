@@ -1499,6 +1499,9 @@ namespace HM
          case RouteMeFiltersPut:
             return HandleMeFiltersPut_(caller, GetRequestBody_(request));
 
+         case RouteMeDraftSave:
+            return HandleMeDraftSave_(caller, GetRequestBody_(request));
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1618,6 +1621,12 @@ namespace HM
                route.kind = RouteMeFolderMessages;
          }
 
+         return;
+      }
+
+      if (path == "/api/v1/me/drafts" && method == "POST")
+      {
+         route.kind = RouteMeDraftSave;
          return;
       }
 
@@ -2102,6 +2111,7 @@ namespace HM
       case RouteMeMessageSend:
       case RouteMeSettingsPut:
       case RouteMeFiltersPut:
+      case RouteMeDraftSave:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4355,6 +4365,7 @@ namespace HM
       case RouteMeSettingsPut:
       case RouteMeFilters:
       case RouteMeFiltersPut:
+      case RouteMeDraftSave:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -5366,7 +5377,7 @@ namespace HM
             json += ",";
 
          AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs}",
+         entry.Format("{\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs}",
             message->GetID(),
             message->GetUID(),
             message->GetSize(),
@@ -5374,7 +5385,8 @@ namespace HM
             JsonEscape_(subject).c_str(),
             JsonEscape_(from).c_str(),
             JsonEscape_(date).c_str(),
-            FlagsJson(message).c_str());
+            FlagsJson(message).c_str(),
+            ThreadFieldsJson_(MessageFile_(message)).c_str());
          json += entry;
          written++;
          lastUid = message->GetUID();
@@ -5513,7 +5525,7 @@ namespace HM
             json += ",";
 
          AnsiString entry;
-         entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs}",
+         entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs}",
             hits[i].folder->GetID(),
             JsonEscape_(Utf8_(hits[i].path)).c_str(),
             message->GetID(),
@@ -5523,7 +5535,8 @@ namespace HM
             JsonEscape_(subject).c_str(),
             JsonEscape_(from).c_str(),
             JsonEscape_(date).c_str(),
-            FlagsJson(message).c_str());
+            FlagsJson(message).c_str(),
+            ThreadFieldsJson_(MessageFile_(message)).c_str());
          json += entry;
       }
 
@@ -5568,6 +5581,7 @@ namespace HM
          JsonEscape_(subject).c_str(),
          JsonEscape_(from).c_str(),
          JsonEscape_(date).c_str());
+      json += ThreadFieldsJson_(fileName) + ",";
 
       if (message->GetSize() > MaxMessageParseBytes)
       {
@@ -6046,23 +6060,7 @@ namespace HM
       // The message: the account's name and address, the lists as written,
       // a Date and a Message-ID, the text as UTF-8. Bcc goes to the envelope
       // and nowhere else.
-      String fromHeader = from;
-      String name = account->GetPersonFirstName();
-      String lastName = account->GetPersonLastName();
-      if (!lastName.IsEmpty())
-      {
-         if (!name.IsEmpty())
-            name += _T(" ");
-         name += lastName;
-      }
-      if (!name.IsEmpty())
-      {
-         fromHeader = _T("\"");
-         fromHeader += name;
-         fromHeader += _T("\" <");
-         fromHeader += from;
-         fromHeader += _T(">");
-      }
+      String fromHeader = FromHeader_(account);
 
       const String fileName = PersistentMessage::GetFileName(message);
 
@@ -6077,6 +6075,14 @@ namespace HM
       messageData.SetBody(JsonUtf8Value_(requestBody, "text"));
       messageData.SetSentTime(Time::GetCurrentMimeDate());
       messageData.GenerateMessageID();
+
+      // A reply names what it answers, so the recipient's client threads it.
+      String inReplyTo = JsonUtf8Value_(requestBody, "in_reply_to");
+      String references = JsonUtf8Value_(requestBody, "references");
+      if (!inReplyTo.IsEmpty())
+         messageData.SetFieldValue(_T("In-Reply-To"), inReplyTo);
+      if (!references.IsEmpty())
+         messageData.SetFieldValue(_T("References"), references);
 
       if (!messageData.Write(fileName))
          return BuildResponse_(500, "{\"error\":\"the message could not be written\"}");
@@ -6134,6 +6140,25 @@ namespace HM
       }
 
       Application::Instance()->SubmitPendingEmail();
+
+      // The message this answers, when the caller names it, gets \Answered -
+      // what a mail client does on send, under the right STORE would ask for.
+      __int64 answeredId = 0;
+      if (JsonNumber(requestBody, "answered_id", answeredId) && answeredId > 0)
+      {
+         std::shared_ptr<IMAPFolder> answeredFolder;
+         std::shared_ptr<Message> answered = FindOwnMessage_(account, answeredId, answeredFolder);
+         if (answered && !answered->GetFlagAnswered() && RightOn_(account, answeredFolder, ACLPermission::PermissionWriteOthers))
+         {
+            answered->SetFlagAnswered(true);
+            if (Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) answeredFolder->GetAccountID(), (int) answeredFolder->GetID(), answered->GetID(), answered->GetFlags()))
+            {
+               std::vector<__int64> changed;
+               changed.push_back(answered->GetID());
+               NotifyFolder(answeredFolder, ChangeNotification::NotificationMessageFlagsChanged, changed);
+            }
+         }
+      }
 
       AnsiString json;
       json.Format("{\"queued\":true,\"recipients\":%d,\"sent_id\":%I64d}", message->GetRecipients()->GetCount(), sentId);
@@ -6478,6 +6503,161 @@ namespace HM
       return BuildResponse_(200, json);
    }
 
+   // The three headers a thread is built from, read from the head of the
+   // file the way the listing reads Subject and From.
+   AnsiString
+   RestApiServer::ThreadFieldsJson_(const String &fileName)
+   {
+      AnsiString messageId, inReplyTo, references;
+
+      AnsiString header = PersistentMessage::LoadHeader(fileName, false);
+      if (!header.IsEmpty())
+      {
+         MimeHeader mimeHeader;
+         mimeHeader.Load(header.c_str(), header.GetLength(), true);
+
+         const char *value = mimeHeader.GetRawFieldValue("Message-ID");
+         messageId = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("In-Reply-To");
+         inReplyTo = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("References");
+         references = value ? value : "";
+
+         messageId.TrimLeft();
+         messageId.TrimRight();
+         inReplyTo.TrimLeft();
+         inReplyTo.TrimRight();
+         references.TrimLeft();
+         references.TrimRight();
+      }
+
+      AnsiString json;
+      json.Format("\"message_id\":\"%hs\",\"in_reply_to\":\"%hs\",\"references\":\"%hs\"",
+         JsonEscape_(messageId).c_str(), JsonEscape_(inReplyTo).c_str(), JsonEscape_(references).c_str());
+      return json;
+   }
+
+   // "First Last" <address>, or the bare address when the account has no name.
+   String
+   RestApiServer::FromHeader_(std::shared_ptr<const Account> account)
+   {
+      String name = account->GetPersonFirstName();
+      String lastName = account->GetPersonLastName();
+      if (!lastName.IsEmpty())
+      {
+         if (!name.IsEmpty())
+            name += _T(" ");
+         name += lastName;
+      }
+
+      if (name.IsEmpty())
+         return account->GetAddress();
+
+      String header = _T("\"");
+      header += name;
+      header += _T("\" <");
+      header += account->GetAddress();
+      header += _T(">");
+      return header;
+   }
+
+   HttpResponse
+   RestApiServer::HandleMeDraftSave_(const Caller &caller, const AnsiString &requestBody)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // The folder designated \Drafts, made as "Drafts" when the account has
+      // none - what a mail client does the first time it saves one.
+      std::shared_ptr<IMAPFolder> drafts = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationDrafts);
+      if (!drafts)
+      {
+         std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+         if (!folders)
+            return BuildResponse_(500, "{\"error\":\"the folders could not be read\"}");
+
+         std::vector<String> path;
+         path.push_back(_T("Drafts"));
+         folders->CreatePath(folders, path, true);
+
+         drafts = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationDrafts);
+         if (!drafts)
+            return BuildResponse_(500, "{\"error\":\"the Drafts folder could not be created\"}");
+      }
+
+      if (!RightOn_(account, drafts, ACLPermission::PermissionInsert))
+         return BuildResponse_(403, "{\"error\":\"the Drafts folder does not allow this account to add messages\"}");
+
+      // Written as the send route writes a message, and kept instead of
+      // queued: Bcc stays in the draft, since nothing is sent.
+      std::shared_ptr<Message> draft = std::shared_ptr<Message>(new Message());
+      draft->SetAccountID(drafts->GetAccountID());
+      draft->SetFolderID(drafts->GetID());
+
+      const String fileName = PersistentMessage::GetFileName(account, draft);
+
+      MessageData messageData;
+      messageData.LoadFromMessage(fileName, draft);
+      messageData.SetCharset(_T("utf-8"));
+      messageData.SetFrom(FromHeader_(account));
+      messageData.SetTo(JsonUtf8Value_(requestBody, "to"));
+      String cc = JsonUtf8Value_(requestBody, "cc");
+      if (!cc.IsEmpty())
+         messageData.SetCC(cc);
+      String bcc = JsonUtf8Value_(requestBody, "bcc");
+      if (!bcc.IsEmpty())
+         messageData.SetBCC(bcc);
+      messageData.SetSubject(JsonUtf8Value_(requestBody, "subject"));
+      messageData.SetBody(JsonUtf8Value_(requestBody, "text"));
+      messageData.SetSentTime(Time::GetCurrentMimeDate());
+      messageData.GenerateMessageID();
+
+      if (!messageData.Write(fileName))
+         return BuildResponse_(500, "{\"error\":\"the draft could not be written\"}");
+
+      draft->SetSize((int) FileUtilities::FileSize(fileName));
+
+      if (!account->SpaceAvailable(draft->GetSize()))
+      {
+         FileUtilities::DeleteFile(fileName);
+         return BuildResponse_(413, "{\"error\":\"the mailbox is full\"}");
+      }
+
+      draft->SetState(Message::Delivered);
+      draft->SetFlagDraft(true);
+      draft->SetFlagSeen(true);
+
+      if (!PersistentMessage::SaveObject(draft))
+      {
+         FileUtilities::DeleteFile(fileName);
+         return BuildResponse_(500, "{\"error\":\"the draft could not be saved\"}");
+      }
+
+      MessagesContainer::Instance()->SetFolderNeedsRefresh(drafts->GetID());
+
+      std::shared_ptr<ChangeNotification> notification =
+         std::shared_ptr<ChangeNotification>(new ChangeNotification(drafts->GetAccountID(), drafts->GetID(), ChangeNotification::NotificationMessageAdded));
+      Application::Instance()->GetNotificationServer()->SendNotification(notification);
+
+      // The draft this one replaces goes once the new one is safe - a new UID
+      // for new content, as IMAP requires, and the old one expunged.
+      __int64 replaceId = 0;
+      if (JsonNumber(requestBody, "replace_id", replaceId) && replaceId > 0)
+      {
+         std::shared_ptr<IMAPFolder> oldFolder;
+         std::shared_ptr<Message> old = FindOwnMessage_(account, replaceId, oldFolder);
+         if (old && old->GetFlagDraft() &&
+             RightOn_(account, oldFolder, ACLPermission::PermissionWriteDeleted) &&
+             RightOn_(account, oldFolder, ACLPermission::PermissionExpunge))
+            DeleteOwnMessage_(account, old, oldFolder);
+      }
+
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"folder_id\":%I64d}", draft->GetID(), drafts->GetID());
+      return BuildResponse_(201, json);
+   }
+
    namespace
    {
       // The self-service page. Static: nothing in it comes from the server's
@@ -6506,7 +6686,7 @@ namespace HM
          ".meter{height:.5rem;background:#e4e6ea;border-radius:.25rem;overflow:hidden;margin:.4rem 0}.meter div{height:100%;background:#2f81f7}\n"
          ".held{border-top:1px solid #e4e6ea;padding:.6rem 0}.held-subject{font-weight:600}.held-detail{font-size:.85rem;color:#4b5563;margin:.2rem 0 .4rem}.held button{margin:0 .5rem 0 0}\n"
          "select{width:100%;box-sizing:border-box;padding:.45rem;border:1px solid #b9bec7;border-radius:.3rem;font:inherit;background:#fff}\n"
-         ".msg{border-top:1px solid #e4e6ea;padding:.5rem 0;cursor:pointer}.msg.unseen .msg-subject{font-weight:600}.msg-detail{font-size:.85rem;color:#4b5563}\n"
+         ".msg{border-top:1px solid #e4e6ea;padding:.5rem 0;cursor:pointer}.msg.unseen .msg-subject{font-weight:600}.msg-detail{font-size:.85rem;color:#4b5563}.msg-reply{margin-left:1.25rem;border-left:2px solid #e4e6ea;padding-left:.5rem}\n"
          "pre{white-space:pre-wrap;word-break:break-word;font:inherit;background:#f4f5f7;padding:.75rem;border-radius:.3rem;max-height:30rem;overflow:auto}\n"
          "iframe{width:100%;min-height:24rem;border:1px solid #d9dce1;border-radius:.3rem;background:#fff}\n"
          "#message-actions{margin:.5rem 0}#message-actions button{margin:0 .5rem .5rem 0}#message-actions select{width:auto;display:inline-block;margin-right:.5rem}\n"
@@ -6561,7 +6741,7 @@ namespace HM
          "<button id=\"message-back\" class=\"secondary\" type=\"button\">Back to the list</button>\n"
          "<div id=\"message-subject\" class=\"held-subject\"></div>\n"
          "<div id=\"message-meta\" class=\"held-detail\"></div>\n"
-         "<div id=\"message-actions\"><button id=\"message-reply\" class=\"secondary\" type=\"button\">Reply</button><button id=\"message-forward\" class=\"secondary\" type=\"button\">Forward</button><button id=\"message-html-toggle\" class=\"secondary\" type=\"button\" hidden>Show as sent</button><button id=\"message-unread\" class=\"secondary\" type=\"button\">Mark as unread</button><button id=\"message-flag\" class=\"secondary\" type=\"button\">Flag</button><button id=\"message-delete\" class=\"secondary\" type=\"button\">Delete</button><select id=\"message-move\" aria-label=\"Move to\"></select><button id=\"message-move-go\" class=\"secondary\" type=\"button\">Move</button></div>\n"
+         "<div id=\"message-actions\"><button id=\"message-edit\" class=\"secondary\" type=\"button\" hidden>Edit draft</button><button id=\"message-reply\" class=\"secondary\" type=\"button\">Reply</button><button id=\"message-forward\" class=\"secondary\" type=\"button\">Forward</button><button id=\"message-html-toggle\" class=\"secondary\" type=\"button\" hidden>Show as sent</button><button id=\"message-unread\" class=\"secondary\" type=\"button\">Mark as unread</button><button id=\"message-flag\" class=\"secondary\" type=\"button\">Flag</button><button id=\"message-delete\" class=\"secondary\" type=\"button\">Delete</button><select id=\"message-move\" aria-label=\"Move to\"></select><button id=\"message-move-go\" class=\"secondary\" type=\"button\">Move</button></div>\n"
          "<pre id=\"message-text\"></pre>\n"
          "<iframe id=\"message-html\" sandbox=\"\" referrerpolicy=\"no-referrer\" title=\"The message as it was sent\" hidden></iframe>\n"
          "<div id=\"message-attachments\" class=\"held-detail\"></div>\n"
@@ -6575,7 +6755,7 @@ namespace HM
          "<label for=\"compose-cc\">Cc</label><input id=\"compose-cc\" type=\"text\">\n"
          "<label for=\"compose-subject\">Subject</label><input id=\"compose-subject\" type=\"text\" maxlength=\"500\">\n"
          "<label for=\"compose-text\">Message</label><textarea id=\"compose-text\"></textarea>\n"
-         "<button type=\"submit\">Send</button>\n"
+         "<button type=\"submit\">Send</button><button id=\"compose-save\" type=\"button\" class=\"secondary\">Save draft</button>\n"
          "<div id=\"compose-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</form>\n"
          "</section>\n"
@@ -6744,8 +6924,12 @@ namespace HM
          "    var list = el('message-list');\n"
          "    while (list.firstChild) { list.removeChild(list.firstChild); }\n"
          "    if (!page.messages.length) { list.appendChild(node('div', page.query ? 'Nothing matched.' : 'This folder is empty.', 'msg-detail')); renderSearchNote(list, page); return; }\n"
+         "    var seenRoots = {};\n"
          "    page.messages.forEach(function (m) {\n"
-         "      var row = node('div', undefined, m.flags.seen ? 'msg' : 'msg unseen');\n"
+         "      var root = ((m.references || '').trim().split(/\\s+/)[0]) || m.in_reply_to || m.message_id;\n"
+         "      var inThread = root && seenRoots[root];\n"
+         "      if (root) { seenRoots[root] = true; }\n"
+         "      var row = node('div', undefined, (m.flags.seen ? 'msg' : 'msg unseen') + (inThread ? ' msg-reply' : ''));\n"
          "      row.appendChild(node('div', m.subject || '(no subject)', 'msg-subject'));\n"
          "      row.appendChild(node('div', (m.from || '?') + ' - ' + (m.date || m.received) + ' - ' + format(m.size) + (m.folder ? ' - in ' + m.folder : ''), 'msg-detail'));\n"
          "      row.addEventListener('click', function () { openMessage(m.id); });\n"
@@ -6796,11 +6980,13 @@ namespace HM
          "  // Each is one call, and the folder counts are re-read afterwards.\n"
          "  var current = null;\n"
          "  var allFolders = [];\n"
+         "  var replyTo = null;\n"
          "  var showList = function () { el('message-view').hidden = true; el('message-list').hidden = false; };\n"
          "  var renderActions = function () {\n"
          "    if (!current) { return; }\n"
          "    el('message-unread').textContent = current.flags.seen ? 'Mark as unread' : 'Mark as read';\n"
          "    el('message-flag').textContent = current.flags.flagged ? 'Remove flag' : 'Flag';\n"
+         "    el('message-edit').hidden = !current.flags.draft;\n"
          "    var select = el('message-move');\n"
          "    while (select.firstChild) { select.removeChild(select.firstChild); }\n"
          "    var home = allFolders.filter(function (f) { return f.id === current.folder_id; })[0];\n"
@@ -6912,11 +7098,13 @@ namespace HM
          "  el('compose-form').addEventListener('submit', function (event) {\n"
          "    event.preventDefault();\n"
          "    say('compose-status', '', true);\n"
-         "    var body = { to: el('compose-to').value, cc: el('compose-cc').value, subject: el('compose-subject').value, text: el('compose-text').value };\n"
+         "    var body = composeBody();\n"
          "    call('POST', '/api/v1/me/messages', body).then(function (result) {\n"
          "      if (result.status === 201) {\n"
          "        el('compose-to').value = ''; el('compose-cc').value = ''; el('compose-subject').value = ''; el('compose-text').value = '';\n"
          "        say('compose-status', 'Sent.', true);\n"
+         "        replyTo = null;\n"
+         "        if (draftId) { var gone = draftId; draftId = 0; call('DELETE', '/api/v1/me/messages/' + gone + '?permanent=1').then(function () { loadFolders(); }); return; }\n"
          "        loadFolders();\n"
          "        return;\n"
          "      }\n"
@@ -7029,13 +7217,39 @@ namespace HM
          "    if (!current) { return; }\n"
          "    var subject = current.subject || '';\n"
          "    if (!/^re:/i.test(subject)) { subject = 'Re: ' + subject; }\n"
+         "    replyTo = current.message_id ? { message_id: current.message_id, references: ((current.references || '') + ' ' + current.message_id).trim(), id: current.id } : null;\n"
+         "    draftId = 0;\n"
          "    prefill(addressOf(current.from), subject, '\\n\\nOn ' + (current.date || current.received) + ', ' + (current.from || '') + ' wrote:\\n' + quoted());\n"
          "  });\n"
          "  el('message-forward').addEventListener('click', function () {\n"
          "    if (!current) { return; }\n"
          "    var subject = current.subject || '';\n"
          "    if (!/^fwd?:/i.test(subject)) { subject = 'Fwd: ' + subject; }\n"
+         "    replyTo = null;\n"
+         "    draftId = 0;\n"
          "    prefill('', subject, '\\n\\n---------- Forwarded message ----------\\nFrom: ' + (current.from || '') + '\\nDate: ' + (current.date || current.received) + '\\nSubject: ' + (current.subject || '') + '\\nTo: ' + (current.to || '') + '\\n\\n' + (current.text || quoted()));\n"
+         "  });\n"
+         "  // Drafts: saved into the Drafts folder, edited from it, gone on send.\n"
+         "  var draftId = 0;\n"
+         "  var composeBody = function () {\n"
+         "    var body = { to: el('compose-to').value, cc: el('compose-cc').value, subject: el('compose-subject').value, text: el('compose-text').value };\n"
+         "    if (replyTo) { body.in_reply_to = replyTo.message_id; body.references = replyTo.references; body.answered_id = replyTo.id; }\n"
+         "    return body;\n"
+         "  };\n"
+         "  el('compose-save').addEventListener('click', function () {\n"
+         "    var body = composeBody();\n"
+         "    if (draftId) { body.replace_id = draftId; }\n"
+         "    call('POST', '/api/v1/me/drafts', body).then(function (result) {\n"
+         "      if (result.status === 201 && result.data) { draftId = result.data.id; say('compose-status', 'Draft saved.', true); loadFolders(); return; }\n"
+         "      say('compose-status', describe(result, 'Could not save the draft'), false);\n"
+         "    });\n"
+         "  });\n"
+         "  el('message-edit').addEventListener('click', function () {\n"
+         "    if (!current) { return; }\n"
+         "    draftId = current.id;\n"
+         "    replyTo = null;\n"
+         "    prefill(current.to || '', current.subject || '', current.text || '');\n"
+         "    el('compose-cc').value = current.cc || '';\n"
          "  });\n"
          "  // A session from an earlier visit is still good until it has been idle\n"
          "  // too long: try it first, and only ask for the password when it is not.\n"
@@ -7095,11 +7309,12 @@ namespace HM
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree. shared lists, under owner, the public folders (owner is the public namespace name) and the folders of each account that granted this one a right, named as IMAP names them; each entry carries account_id (0 for public). Every message route accepts a folder or message from those trees under the rights the owner granted.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders, shared\"}}}},"
-         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted). total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted), message_id, in_reply_to, references. total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
-         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text. Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
+         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
