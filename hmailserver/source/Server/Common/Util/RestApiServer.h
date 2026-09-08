@@ -72,6 +72,7 @@ namespace HM
    class IMAPFolder;
    class IMAPFolders;
    class Message;
+   class MessageData;
 
    class RestApiServer
    {
@@ -312,6 +313,8 @@ namespace HM
       static HttpResponse HandleMeDraftSave_(const Caller &caller, const AnsiString &requestBody);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
+      static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
+      static bool IsLargeRequest_(const AnsiString &method, const AnsiString &target);
       static bool ReadJsonHex4_(const AnsiString &json, int at, unsigned int &value);
       static void AppendUtf8_(AnsiString &out, unsigned int codePoint);
       static void CollectReadableFolders_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders, const String &parentPath,

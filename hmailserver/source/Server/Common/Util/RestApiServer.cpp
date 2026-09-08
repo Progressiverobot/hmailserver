@@ -39,6 +39,7 @@
 #include "../Cache/CacheContainer.h"
 #include "../Sieve/SieveStorage.h"
 #include "../Sieve/SieveScript.h"
+#include "GUIDCreator.h"
 #include <iterator>
 #include <set>
 #include "../BO/MessageRecipients.h"
@@ -125,6 +126,11 @@ namespace HM
       // The ceilings HttpServer enforces for this listener. Every one is
       // absolute - see HttpServer.cpp for why an idle timeout is not enough.
       const size_t MaxRequestSize = 64 * 1024;
+
+      // The two routes that carry attachments: sixteen megabytes on the
+      // wire, and five minutes for them to arrive.
+      const size_t MaxLargeRequestSize = 16 * 1024 * 1024;
+      const unsigned LargeRequestSeconds = 300;
       const unsigned RequestSeconds = 30;
       const unsigned ConnectionSeconds = 300;
       const unsigned MaxConnections = 64;
@@ -640,6 +646,8 @@ namespace HM
 
       HttpLimits limits;
       limits.max_request_bytes = MaxRequestSize;
+      limits.max_request_bytes_large = MaxLargeRequestSize;
+      limits.request_seconds_large = LargeRequestSeconds;
       limits.request_seconds = RequestSeconds;
       limits.connection_seconds = ConnectionSeconds;
       limits.max_connections = MaxConnections;
@@ -676,6 +684,8 @@ namespace HM
             body.Format("{\"error\":\"%hs\"}", JsonEscape_(message).c_str());
             return BuildResponse_(status, body);
          }));
+
+      server->SetLargeRequestFilter(&RestApiServer::IsLargeRequest_);
 
       if (!server->Listen(bind_address, port, use_tls_ ? tls_context_owner : std::shared_ptr<boost::asio::ssl::context>()))
       {
@@ -6084,6 +6094,11 @@ namespace HM
       if (!references.IsEmpty())
          messageData.SetFieldValue(_T("References"), references);
 
+      AnsiString attachmentError;
+      int attachmentStatus = AddAttachmentsFromJson_(messageData, requestBody, attachmentError);
+      if (attachmentStatus != 0)
+         return BuildResponse_(attachmentStatus, attachmentError);
+
       if (!messageData.Write(fileName))
          return BuildResponse_(500, "{\"error\":\"the message could not be written\"}");
 
@@ -6613,6 +6628,11 @@ namespace HM
       messageData.SetSentTime(Time::GetCurrentMimeDate());
       messageData.GenerateMessageID();
 
+      AnsiString attachmentError;
+      int attachmentStatus = AddAttachmentsFromJson_(messageData, requestBody, attachmentError);
+      if (attachmentStatus != 0)
+         return BuildResponse_(attachmentStatus, attachmentError);
+
       if (!messageData.Write(fileName))
          return BuildResponse_(500, "{\"error\":\"the draft could not be written\"}");
 
@@ -6656,6 +6676,183 @@ namespace HM
       AnsiString json;
       json.Format("{\"id\":%I64d,\"folder_id\":%I64d}", draft->GetID(), drafts->GetID());
       return BuildResponse_(201, json);
+   }
+
+   namespace
+   {
+      // What one message may carry from the portal. The request cap for the
+      // two routes that take attachments is sixteen megabytes on the wire;
+      // base64 adds a third, so twelve megabytes of files is what fits.
+      const int MaxAttachmentsPerMessage = 20;
+      const __int64 MaxAttachmentBytesPerMessage = 12 * 1024 * 1024;
+
+      // The text of the n-th object in the "attachments" array of a JSON
+      // body, by brace matching - or empty when there is none.
+      AnsiString JsonArrayObject(const AnsiString &json, const AnsiString &key, int index)
+      {
+         AnsiString needle = "\"" + key + "\"";
+         int keyPosition = json.Find(needle);
+         if (keyPosition < 0)
+            return "";
+
+         int bracket = json.Find("[", keyPosition + needle.GetLength());
+         if (bracket < 0)
+            return "";
+
+         int depth = 0;
+         bool inString = false;
+         int objectStart = -1;
+         int found = 0;
+         for (int i = bracket + 1; i < json.GetLength(); i++)
+         {
+            char c = json[i];
+
+            if (inString)
+            {
+               if (c == '\\')
+               {
+                  i++;
+                  continue;
+               }
+
+               if (c == '\"')
+                  inString = false;
+
+               continue;
+            }
+
+            if (c == '\"')
+            {
+               inString = true;
+               continue;
+            }
+
+            if (c == '{')
+            {
+               if (depth == 0)
+                  objectStart = i;
+               depth++;
+            }
+            else if (c == '}')
+            {
+               depth--;
+               if (depth == 0)
+               {
+                  if (found == index)
+                     return json.Mid(objectStart, i - objectStart + 1);
+                  found++;
+               }
+            }
+            else if (c == ']' && depth == 0)
+            {
+               break;
+            }
+         }
+
+         return "";
+      }
+
+      // A file name for the temporary file the MIME library reads: the name
+      // the sender gave, minus anything a path or a header could not carry.
+      String SafeAttachmentName(const String &name)
+      {
+         String safe;
+         for (int i = 0; i < name.GetLength(); i++)
+         {
+            wchar_t c = name.c_str()[i];
+            bool bad = c < 0x20 || c == '\\' || c == '/' || c == ':' || c == '*' || c == '?' || c == '\"' || c == '<' || c == '>' || c == '|';
+            safe += bad ? L'_' : c;
+         }
+         safe.TrimLeft();
+         safe.TrimRight();
+         if (safe.IsEmpty() || safe == _T(".") || safe == _T(".."))
+            safe = _T("attachment");
+         if (safe.GetLength() > 200)
+            safe = safe.Mid(0, 200);
+         return safe;
+      }
+   }
+
+   // The attachments a body names - name, type, data (base64) - added to the
+   // message the way COM's Attachments.Add adds a file: each is written under
+   // its own name in a directory of its own in the temp folder, read from
+   // there, and the directory removed. Returns 0, or the status to answer.
+   int
+   RestApiServer::AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error)
+   {
+      if (requestBody.Find("\"attachments\"") < 0)
+         return 0;
+
+      __int64 totalBytes = 0;
+
+      for (int index = 0; index < MaxAttachmentsPerMessage + 1; index++)
+      {
+         AnsiString object = JsonArrayObject(requestBody, "attachments", index);
+         if (object.IsEmpty())
+            break;
+
+         if (index >= MaxAttachmentsPerMessage)
+         {
+            error.Format("{\"error\":\"at most %d attachments\"}", MaxAttachmentsPerMessage);
+            return 400;
+         }
+
+         String name = SafeAttachmentName(JsonUtf8Value_(object, "name"));
+         String type = JsonUtf8Value_(object, "type");
+         AnsiString encoded = GetJsonStringValue_(object, "data");
+
+         AnsiString bytes = Base64::Decode(encoded.c_str(), encoded.GetLength());
+         totalBytes += bytes.GetLength();
+         if (totalBytes > MaxAttachmentBytesPerMessage)
+         {
+            error = "{\"error\":\"the attachments are larger than twelve megabytes together\"}";
+            return 413;
+         }
+
+         type.TrimLeft();
+         type.TrimRight();
+         if (type.IsEmpty() || type.Find(_T("/")) < 0 || type.Find(_T("\r")) >= 0 || type.Find(_T("\n")) >= 0 || type.GetLength() > 100)
+            type = _T("application/octet-stream");
+
+         String directory = IniFileSettings::Instance()->GetTempDirectory() + _T("\\") + GUIDCreator::GetGUID();
+         if (!FileUtilities::CreateDirectory(directory))
+         {
+            error = "{\"error\":\"the attachment could not be written\"}";
+            return 500;
+         }
+
+         String path = directory + _T("\\") + name;
+         bool added = FileUtilities::WriteToFile(path, bytes) && messageData.GetAttachments()->Add(path, type);
+
+         FileUtilities::DeleteDirectory(directory, true);
+
+         if (!added)
+         {
+            error = "{\"error\":\"the attachment could not be added\"}";
+            return 500;
+         }
+
+         std::shared_ptr<Attachments> attachments = messageData.GetAttachments();
+         std::shared_ptr<Attachment> last = attachments->GetItem((unsigned int) attachments->GetCount() - 1);
+         if (last)
+            last->SetFileName(name);
+      }
+
+      return 0;
+   }
+
+   bool
+   RestApiServer::IsLargeRequest_(const AnsiString &method, const AnsiString &target)
+   {
+      if (method != "POST")
+         return false;
+
+      AnsiString path = target;
+      int query = path.Find("?");
+      if (query >= 0)
+         path = path.Mid(0, query);
+
+      return path == "/api/v1/me/messages" || path == "/api/v1/me/drafts";
    }
 
    namespace
@@ -6759,6 +6956,7 @@ namespace HM
          "<label for=\"compose-cc\">Cc</label><input id=\"compose-cc\" type=\"text\">\n"
          "<label for=\"compose-subject\">Subject</label><input id=\"compose-subject\" type=\"text\" maxlength=\"500\">\n"
          "<label for=\"compose-text\">Message</label><textarea id=\"compose-text\"></textarea>\n"
+         "<label for=\"compose-files\">Files</label><input id=\"compose-files\" type=\"file\" multiple><div id=\"compose-files-note\" class=\"held-detail\"></div>\n"
          "<button type=\"submit\">Send</button><button id=\"compose-save\" type=\"button\" class=\"secondary\">Save draft</button>\n"
          "<div id=\"compose-status\" class=\"status\" aria-live=\"polite\"></div>\n"
          "</form>\n"
@@ -7111,9 +7309,13 @@ namespace HM
          "    event.preventDefault();\n"
          "    say('compose-status', '', true);\n"
          "    var body = composeBody();\n"
-         "    call('POST', '/api/v1/me/messages', body).then(function (result) {\n"
+         "    readFiles().then(function (files) {\n"
+         "    if (files.length) { body.attachments = files; }\n"
+         "    return call('POST', '/api/v1/me/messages', body); }, function (why) { say('compose-status', why, false); return null; }).then(function (result) {\n"
+         "      if (!result) { return; }\n"
          "      if (result.status === 201) {\n"
          "        el('compose-to').value = ''; el('compose-cc').value = ''; el('compose-subject').value = ''; el('compose-text').value = '';\n"
+         "        el('compose-files').value = ''; el('compose-files-note').textContent = '';\n"
          "        say('compose-status', 'Sent.', true);\n"
          "        replyTo = null;\n"
          "        if (draftId) { var gone = draftId; draftId = 0; call('DELETE', '/api/v1/me/messages/' + gone + '?permanent=1').then(function () { loadFolders(); }); return; }\n"
@@ -7315,6 +7517,26 @@ namespace HM
          "    else if (event.key === 'Enter' && cursor >= 0) { openMessage(listRows[cursor].id); event.preventDefault(); }\n"
          "    else if (event.key === 'x' && cursor >= 0) { var r = listRows[cursor]; r.box.checked = !r.box.checked; selected[r.id] = r.box.checked; renderBulk(); event.preventDefault(); }\n"
          "  });\n"
+         "  // Files: read in the browser and sent as base64 in the same call,\n"
+         "  // twelve megabytes together at most.\n"
+         "  var readFiles = function () {\n"
+         "    var files = Array.prototype.slice.call(el('compose-files').files || []);\n"
+         "    var total = files.reduce(function (n, f) { return n + f.size; }, 0);\n"
+         "    if (files.length > 20) { return Promise.reject('At most 20 files.'); }\n"
+         "    if (total > 12 * 1024 * 1024) { return Promise.reject('The files are larger than 12 MB together.'); }\n"
+         "    return Promise.all(files.map(function (file) {\n"
+         "      return new Promise(function (resolve, reject) {\n"
+         "        var reader = new FileReader();\n"
+         "        reader.onload = function () { resolve({ name: file.name, type: file.type || 'application/octet-stream', data: String(reader.result).split(',')[1] || '' }); };\n"
+         "        reader.onerror = function () { reject('Could not read ' + file.name); };\n"
+         "        reader.readAsDataURL(file);\n"
+         "      });\n"
+         "    }));\n"
+         "  };\n"
+         "  el('compose-files').addEventListener('change', function () {\n"
+         "    var files = Array.prototype.slice.call(el('compose-files').files || []);\n"
+         "    el('compose-files-note').textContent = files.length ? files.map(function (f) { return f.name + ' (' + format(f.size) + ')'; }).join(', ') : '';\n"
+         "  });\n"
          "  // A session from an earlier visit is still good until it has been idle\n"
          "  // too long: try it first, and only ask for the password when it is not.\n"
          "  load(true);\n"
@@ -7378,7 +7600,7 @@ namespace HM
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
-         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. Text only; the request has to fit the listener's request limit.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
+         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"

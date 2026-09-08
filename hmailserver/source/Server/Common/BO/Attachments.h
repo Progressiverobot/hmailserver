@@ -18,6 +18,7 @@ namespace HM
       virtual ~Attachments();
 
       bool Add(const String &sFilename);
+      bool Add(const String &sFilename, const String &contentType);
       bool Add(std::shared_ptr<Attachment> pAttachment);
       
       std::shared_ptr<Attachment> GetItem(unsigned int index) const;

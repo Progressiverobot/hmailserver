@@ -621,11 +621,16 @@ namespace HM
       // should have been removed from the message already.
       //
       std::shared_ptr<MimeBody> part = mime_mail_->FindFirstPart();
-      std::set<std::shared_ptr<MimeBody> > setAttachments;
+      // In the order they appear in the message, and a part created here is
+      // appended after them. Held in a set until 2026-09-08, which ordered
+      // them by pointer address: the message was rebuilt on every call, so
+      // adding a second attachment could reorder the first one, and which
+      // attachment answered to index 0 was decided by the heap.
+      std::vector<std::shared_ptr<MimeBody> > setAttachments;
       while (part)
       {
          if (part->IsAttachment())
-            setAttachments.insert(part);
+            setAttachments.push_back(part);
 
          part = mime_mail_->FindNextPart();
       }
@@ -691,7 +696,7 @@ namespace HM
       {
          // create a new item. treat as an attachment.
          retValue = std::shared_ptr<MimeBody>(new MimeBody);
-         setAttachments.insert(retValue);
+         setAttachments.push_back(retValue);
       }
 
       AnsiString mainBodyType;
