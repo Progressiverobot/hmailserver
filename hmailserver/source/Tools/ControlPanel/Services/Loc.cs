@@ -55,15 +55,21 @@ namespace hMailServer.ControlPanel.Services
       {
          new Language("", N("Windows display language")),
          new Language("en", "English"),   // no-loc: a language is named in itself
+         new Language("cs", "Čeština"),   // no-loc
+         new Language("da", "Dansk"),   // no-loc
          new Language("de", "Deutsch"),   // no-loc
          new Language("es", "Español"),   // no-loc
+         new Language("fi", "Suomi"),   // no-loc
          new Language("fr", "Français"),   // no-loc
          new Language("it", "Italiano"),   // no-loc
+         new Language("nb", "Norsk bokmål"),   // no-loc
          new Language("nl", "Nederlands"),   // no-loc
          new Language("pl", "Polski"),   // no-loc
          new Language("pt-BR", "Português (Brasil)"),   // no-loc
          new Language("ru", "Русский"),   // no-loc
          new Language("sv", "Svenska"),   // no-loc
+         new Language("tr", "Türkçe"),   // no-loc
+         new Language("uk", "Українська"),   // no-loc
       };
 
       private static Func<string, CultureInfo, string> lookup_;
