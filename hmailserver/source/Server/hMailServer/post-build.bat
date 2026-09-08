@@ -37,5 +37,12 @@ if not "%INT_DIR%"=="" (
    if errorlevel 1 exit /b 1
 )
 
+rem The Control Deck is served from {program}\WebAdmin\index.html. The installer
+rem ships it there; build.ps1 copies it too, because it runs with the post-build
+rem events off. This copy serves builds made from the IDE.
+if not exist "%OUT_DIR%WebAdmin\" mkdir "%OUT_DIR%WebAdmin"
+xcopy /F /Y "%SCRIPT_DIR%..\..\..\installation\WebAdmin\index.html" "%OUT_DIR%WebAdmin\"
+if errorlevel 1 exit /b 1
+
 "%TARGET%" /Register
 if errorlevel 1 exit /b 1

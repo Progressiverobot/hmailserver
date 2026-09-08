@@ -2979,11 +2979,18 @@ namespace HM
       String pagePath = FileUtilities::Combine(
          IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin\\index.html"));
 
+      // Read as the bytes on disk. The page is UTF-8 and carries characters
+      // outside the system code page in its own markup (the navigation glyphs);
+      // a round trip through String and back would have put them through the
+      // ANSI code page and served question marks.
       AnsiString body;
       if (FileUtilities::Exists(pagePath))
       {
-         String content = FileUtilities::ReadCompleteTextFile(pagePath);
-         body = content;
+         std::ifstream stream(pagePath.c_str(), std::ios::binary);
+         std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+         body = bytes.c_str();
+         if (body.GetLength() != bytes.size())
+            body = AnsiString(bytes);
       }
       else
       {
@@ -2995,7 +3002,15 @@ namespace HM
       HttpResponse response;
       response.content_type = "text/html; charset=utf-8";
       response.body = body;
-      response.extra_headers = "Cache-Control: no-store\r\n";
+      // The same discipline the portal gets. This page has inline script and
+      // style of its own, so those are allowed for it; what is refused is
+      // anything from anywhere else, any frame, any form posted off this
+      // origin, and a base tag that would redirect its relative calls.
+      response.extra_headers =
+         "Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Referrer-Policy: no-referrer\r\n"
+         "Cache-Control: no-store\r\n";
 
       return response;
    }

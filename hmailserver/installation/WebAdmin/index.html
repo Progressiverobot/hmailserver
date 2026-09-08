@@ -152,6 +152,10 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="domains"><span class="ico">⌂</span>Domains</button>
       <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
+      <button data-view="settings"><span class="ico">⚙</span>Settings</button>
+      <button data-view="logs"><span class="ico">≡</span>Logs</button>
+      <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
+      <button data-view="rules"><span class="ico">⚖</span>Rules</button>
     </nav>
     <div class="foot">
       <div class="pill"><span class="dot"></span><span id="connState">Connected</span></div>
@@ -243,7 +247,7 @@ $("#nav").addEventListener("click",e=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   view=b.dataset.view;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA"};
+const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",logs:"Logs",certs:"Certificates",rules:"Rules"};
 
 async function render(silent){
   $("#viewTitle").textContent=titles[view];
@@ -252,6 +256,10 @@ async function render(silent){
     else if(view==="domains")await renderDomains();
     else if(view==="queue")await renderQueue();
     else if(view==="tlsa")await renderTlsa();
+    else if(view==="settings")await renderSettings();
+    else if(view==="logs")await renderLogs();
+    else if(view==="certs")await renderCerts();
+    else if(view==="rules")await renderRules();
     $("#connState").textContent="Connected";
   }catch(err){
     if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return;}
@@ -273,6 +281,7 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="del")delAccount(d.address,d.domain);
   else if(d.act==="retry")retryMsg(d.id);
   else if(d.act==="delmsg")delMsg(d.id);
+  else if(d.act==="log")showLog(d.name,d.lines);
   else if(d.act==="copy")navigator.clipboard.writeText($("#tlsaPre").textContent).then(()=>toast("Copied to clipboard"));
 });
 
@@ -390,6 +399,67 @@ async function renderTlsa(){
       <pre id="tlsaPre">${escHtml(recs||"No TLSA records available — assign an SSL certificate first.")}</pre>
       <div style="margin-top:12px"><button class="btn ghost sm" data-act="copy">Copy all</button></div>
     </div></div>`;
+}
+
+/* ---------- Read-only views over routes that already existed ----------
+   Settings, logs, certificates and rules: everything here is GET, so a key
+   that is read-only sees all of it, and nothing on these views changes the
+   server. Every value goes through escHtml; a log line is exactly the kind
+   of text an attacker can put a tag into, by sending the mail that gets
+   logged. */
+function asList(x,key){return Array.isArray(x)?x:((x&&x[key])||[]);}
+
+async function renderSettings(){
+  const s=await api("/api/v1/settings");
+  const labels={host_name:"Host name (HELO/EHLO)",default_domain:"Default domain",max_message_size_kb:"Max message size (KB, 0 = unlimited)",
+    max_smtp_connections:"Max SMTP connections",max_imap_connections:"Max IMAP connections",smtp_relayer:"SMTP relayer (smart host)",
+    smtp_relayer_port:"Relayer port",log_smtp_conversations:"Log SMTP conversations",log_imap_conversations:"Log IMAP conversations"};
+  const rows=Object.keys(labels).map(k=>`<tr><td>${escHtml(labels[k])}</td><td><code>${escHtml(s[k]===undefined||s[k]===null?"—":String(s[k]))}</code></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The server-wide settings the API exposes, as the server holds them now. Editing them is not part of this page yet: change them in the Control Panel.</p>
+    <table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+async function renderLogs(){
+  const files=asList(await api("/api/v1/logs"),"files");
+  const rows=files.map(f=>`
+    <tr><td>${escHtml(f.name)}</td><td>${escHtml(fmtBytes(f.size))}</td><td>${escHtml(f.created||"—")}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="200">Last 200</button>
+        <button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="2000">Last 2000</button></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <table><thead><tr><th>Log file</th><th>Size</th><th>Created</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="empty">No log files. Logging may be off, or the folder is empty.</td></tr>'}</tbody></table>
+    <pre id="logPre" style="margin-top:14px;max-height:60vh;overflow:auto;white-space:pre-wrap" hidden></pre></div>`;
+}
+function fmtBytes(n){n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(1)+" MB";if(n>=1024)return (n/1024).toFixed(1)+" KB";return n+" B";}
+async function showLog(name,lines){
+  try{
+    const t=await api("/api/v1/logs/"+encodeURIComponent(name)+"?lines="+encodeURIComponent(lines||200));
+    const pre=$("#logPre");if(!pre)return;
+    pre.hidden=false;
+    pre.textContent=(t.lines||[]).join("\n")||"(empty)";
+    pre.scrollTop=pre.scrollHeight;
+  }catch(e){toast("Could not read "+name+": "+e.message);}
+}
+
+async function renderCerts(){
+  const certs=asList(await api("/api/v1/certificates"),"certificates");
+  const rows=certs.map(c=>`<tr><td>${escHtml(c.name)}</td><td><code>${escHtml(c.certificate_file||"—")}</code></td><td><code>${escHtml(c.private_key_file||"—")}</code></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The certificates the server knows by name and file. A private key's password is never listed. Adding, replacing or binding one to a port is done in the Control Panel.</p>
+    <table><thead><tr><th>Name</th><th>Certificate file</th><th>Private key file</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="3" class="empty">No certificates are configured.</td></tr>'}</tbody></table></div>`;
+}
+
+async function renderRules(){
+  const rules=asList(await api("/api/v1/rules"),"rules");
+  const crit=r=>(r.criteria||[]).map(c=>`${escHtml(c.field)}${c.header?" "+escHtml(c.header):""} ${escHtml(c.match)} “${escHtml(c.value)}”`).join(r.all_criteria?" AND ":" OR ")||"—";
+  const acts=r=>(r.actions||[]).map(a=>`${escHtml(a.type)}${a.value?" → "+escHtml(a.value):""}`).join("; ")||"—";
+  const rows=rules.map(r=>`<tr><td>${escHtml(r.name)}</td><td>${r.active?"on":"off"}</td><td>${crit(r)}</td><td>${acts(r)}</td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The global rules, in the order the server evaluates them. Per-account rules and editing are in the Control Panel.</p>
+    <table><thead><tr><th>Rule</th><th>Active</th><th>When</th><th>Then</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="empty">No global rules are defined.</td></tr>'}</tbody></table></div>`;
 }
 
 /* ---------- Boot ---------- */

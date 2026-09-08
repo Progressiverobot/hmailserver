@@ -80,3 +80,14 @@ if ($exitCode -ne 0) {
 
 Write-Host "Build succeeded. Build log: $msbuildLog"
 
+# The Control Deck is served from {program}\WebAdmin\index.html. The installer
+# ships it there; this build runs with post-build events off, so it puts the
+# page beside the built server itself - otherwise the server the regression
+# suite runs against serves its "not installed" placeholder and no test can see
+# the page.
+$webAdminSource = Join-Path $scriptRoot '..\hmailserver\installation\WebAdmin\index.html'
+$webAdminDir = Join-Path $scriptRoot "..\hmailserver\source\Server\hMailServer\x64\$Configuration\WebAdmin"
+New-Item -ItemType Directory -Force -Path $webAdminDir | Out-Null
+Copy-Item -Force -Path $webAdminSource -Destination $webAdminDir
+Write-Host "Control Deck page copied to $webAdminDir"
+
