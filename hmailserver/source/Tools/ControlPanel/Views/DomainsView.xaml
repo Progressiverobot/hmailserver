@@ -174,7 +174,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="NewAccountBox" PlaceholderText="user@domain" Margin="0,0,8,0" />
-                        <local:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="{loc:L 'Password'}" Margin="0,0,8,0" />
+                        <local:PasswordField x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="{loc:L 'Password'}" Margin="0,0,8,0" />
                         <ui:Button Grid.Column="2" Content="{loc:L '_Generate'}" Margin="0,0,8,0" Click="GenerateAccountPassword_Click"
                                    ToolTip="{loc:L 'Generate a strong password (copied to clipboard)'}" />
                         <ui:Button Grid.Column="3" Content="{loc:L '_Create account'}" Appearance="Primary" Click="AddAccount_Click" />

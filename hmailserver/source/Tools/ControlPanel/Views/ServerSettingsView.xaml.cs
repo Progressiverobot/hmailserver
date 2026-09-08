@@ -640,14 +640,14 @@ namespace hMailServer.ControlPanel.Views
       private class ComPassword : ComSetting
       {
          public string MethodName;   // e.g. SetSMTPRelayerPassword
-         private hMailServer.ControlPanel.Views.PasswordBox box_;
+         private hMailServer.ControlPanel.Views.PasswordField box_;
          public override bool WantsInitialValue => false;
 
          public override FrameworkElement CreateEditor(object value)
          {
             var panel = new StackPanel();
             panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-            box_ = new hMailServer.ControlPanel.Views.PasswordBox
+            box_ = new hMailServer.ControlPanel.Views.PasswordField
             {
                FontSize = Typography.Body,
                MinWidth = 320,
