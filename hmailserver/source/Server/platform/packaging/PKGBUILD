@@ -1,0 +1,128 @@
+# Maintainer: Christopher Holloway <christopher.j.holloway@outlook.com>
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The Arch package. SUSE and the RPM distributions consume the .rpm CPack builds;
+# Arch has no equivalent of that, so it gets a PKGBUILD that builds from the
+# repository with the same CMakeLists.txt the .deb and .rpm are built from.
+#
+# Build it with:  makepkg -si
+#
+# WHAT IS DIFFERENT FROM THE .deb AND .rpm, and it is worth knowing before
+# reading further: this package installs no maintainer scripts. Arch stopped
+# wanting them for this job. The system user is declared in a sysusers.d file,
+# the directories in a tmpfiles.d file, and pacman's own hooks - the ones the
+# systemd package ships in /usr/share/libalpm/hooks - run systemd-sysusers,
+# systemd-tmpfiles and daemon-reload when it sees those files and the unit go in.
+# That is the standard install hook on this distribution now; a .install script
+# would be a second copy of the same logic for the packager to keep in step, and
+# it would run whether or not the hooks had already done the work.
+#
+# The unit is NOT enabled by this package. Arch packages do not enable services -
+# the distribution is explicit about that - and in this case the reason is the
+# same one the Debian and RPM scripts give for not STARTING it: nothing here can
+# know the database credentials, and a server that cannot reach a database is a
+# server writing to the log once a second.
+
+pkgname=hmailserver
+pkgver=6.2.28
+pkgrel=1
+pkgdesc="A mail server for SMTP, IMAP and POP3"
+arch=('x86_64' 'aarch64')
+url="https://github.com/Progressiverobot/hmailserver"
+license=('AGPL-3.0-or-later')
+
+# Matched to what hmailserver/source/Server/CMakeLists.txt actually links:
+# Threads, OpenSSL 3.0 or newer, zlib, libpq, Boost (thread, filesystem, regex,
+# headers) and Iconv. Iconv has no package here because glibc carries it -
+# find_package(Iconv) finds nothing to link on this libc and that is correct.
+depends=('boost-libs' 'openssl' 'zlib' 'postgresql-libs')
+
+# clang is not a matter of taste. Common/Util/StdString.h calls members of its own
+# dependent base without this->, which only MSVC and clang's
+# -fdelayed-template-parsing accept; the CMakeLists prints a warning and the build
+# then fails in that header under GCC. Making that header conforming is its own
+# roadmap row, and until it lands this package is a clang build.
+#
+# boost is here as well as boost-libs because the headers are in the split
+# package; postgresql-libs carries libpq-fe.h itself, so it needs no -dev twin.
+makedepends=('cmake' 'ninja' 'clang' 'boost' 'git')
+
+optdepends=(
+   'mariadb-libs: MySQL and MariaDB backend - libmariadb.so.3, which the server
+    opens with dlopen at run time rather than linking, so nothing pulls it in
+    automatically'
+   'logrotate: rotation for /var/log/hmailserver, using the rule this package
+    installs'
+   'clamav: virus scanning, reached over TCP with clamd INSTREAM'
+   'spamassassin: spam scoring, reached over TCP with spamd'
+)
+
+# pacman keeps an edited configuration and leaves the package's version beside it
+# as a .pacnew. This is the Arch equivalent of a Debian conffile, and it is why
+# an upgrade here does not overwrite database credentials.
+backup=('etc/hmailserver/hMailServer.ini')
+
+source=("git+${url}.git#tag=v${pkgver}")
+sha256sums=('SKIP')
+
+build() {
+   # See the note on makedepends: clang, and not because the project prefers it.
+   export CC=clang
+   export CXX=clang++
+
+   # -DCMAKE_INSTALL_PREFIX=/usr is what makes GNUInstallDirs answer /etc and
+   # /var for sysconfdir and localstatedir rather than /usr/etc and /usr/var. The
+   # install rules in the CMakeLists depend on that: the configuration goes to
+   # ${CMAKE_INSTALL_SYSCONFDIR}/hmailserver and the logrotate rule to
+   # ${CMAKE_INSTALL_SYSCONFDIR}/logrotate.d.
+   cmake -S "${srcdir}/${pkgname}/hmailserver/source/Server" -B build -G Ninja \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+      -DCMAKE_INSTALL_LIBDIR=lib
+
+   cmake --build build
+}
+
+package() {
+   DESTDIR="${pkgdir}" cmake --install build
+
+   # /usr/bin/hmailserver, /usr/share/hmailserver/DBScripts, the unit, the
+   # configuration and the logrotate rule all come from the install rules above.
+   # What follows is the part CMake does not describe, because it is about the
+   # running system rather than about files.
+
+   # The system user. systemd-sysusers creates it when pacman's hook fires, and
+   # creates nothing if it is already there. The home directory is the mail store
+   # and the shell is one that cannot log in.
+   install -d "${pkgdir}/usr/lib/sysusers.d"
+   cat > "${pkgdir}/usr/lib/sysusers.d/hmailserver.conf" <<'SYSUSERS'
+# SPDX-License-Identifier: AGPL-3.0-or-later
+u hmailserver - "hMailServer mail server" /var/lib/hmailserver /usr/bin/nologin
+SYSUSERS
+
+   # The directories, their modes and their ownership. 0750 throughout: this is
+   # other people's mail, and logs that name who sent it to whom. The two "z"
+   # lines adjust what the package itself installed - the configuration carries
+   # the administrator password and the database password, and is readable by the
+   # service without being writable by it.
+   install -d "${pkgdir}/usr/lib/tmpfiles.d"
+   cat > "${pkgdir}/usr/lib/tmpfiles.d/hmailserver.conf" <<'TMPFILES'
+# SPDX-License-Identifier: AGPL-3.0-or-later
+d /var/lib/hmailserver          0750 hmailserver hmailserver -
+d /var/lib/hmailserver/temp     0750 hmailserver hmailserver -
+d /var/lib/hmailserver/events   0750 hmailserver hmailserver -
+d /var/lib/hmailserver/database 0750 hmailserver hmailserver -
+d /var/log/hmailserver          0750 hmailserver hmailserver -
+z /etc/hmailserver              0750 root       hmailserver -
+z /etc/hmailserver/hMailServer.ini 0640 root    hmailserver -
+TMPFILES
+
+   install -Dm644 "${srcdir}/${pkgname}/LICENSE" \
+      "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+
+   install -Dm644 \
+      "${srcdir}/${pkgname}/hmailserver/source/Server/platform/packaging/README.md" \
+      "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}

@@ -1,0 +1,38 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The Debian pre-removal script.
+#
+# It has one job: stop the server before its binary is taken away. An upgrade is
+# NOT a removal and is deliberately left alone here - the new binary is unpacked
+# under the running process and postinst restarts it afterwards, so stopping here
+# would turn every upgrade into an outage twice as long as it needs to be.
+
+set -e
+
+case "$1" in
+   remove)
+      # A mail server stopped this way finishes what it is holding first: systemd
+      # sends SIGTERM, main.cpp comes out of its wait loop, and StopServers waits
+      # ShutdownDrainSeconds for the sessions in flight. The unit's
+      # TimeoutStopSec is the ceiling on that.
+      if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+         systemctl stop hmailserver.service >/dev/null 2>&1 || true
+      fi
+      ;;
+
+   upgrade|deconfigure|failed-upgrade)
+      # Nothing. See above for upgrade; deconfigure and failed-upgrade are dpkg
+      # rearranging dependencies and unwinding, neither of which is a reason to
+      # interrupt mail flow.
+      ;;
+
+   *)
+      echo "prerm called with unknown argument '$1'" >&2
+      exit 1
+      ;;
+esac
+
+exit 0

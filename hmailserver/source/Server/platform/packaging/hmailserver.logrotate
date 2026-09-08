@@ -1,0 +1,68 @@
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Installed as /etc/logrotate.d/hmailserver.
+#
+# WHY copytruncate AND NOT A SIGNAL, which is the whole decision this file makes.
+#
+# Logger.cpp was read rather than assumed. Two things it does decide the rule:
+#
+#   * By default the server does not hold a log file open at all. WriteData_
+#     opens the file in append mode, writes the line and closes it again; the
+#     handle is kept only when the KeepFilesOpen bit is set in the log mask, and
+#     then only for the four protocol logs.
+#
+#   * When it does hold one open, the only thing that makes it reopen is the file
+#     being GONE - GetCurrentLogFile_ samples FileUtilities::Exists before the
+#     open and closes the handle when the name no longer exists. logrotate's
+#     "create" defeats exactly that check: the moment a fresh file appears under
+#     the old name, the server sees a file that exists, keeps its old handle and
+#     goes on writing into the rotated inode.
+#
+# So there is no rename-and-create arrangement that is safe in both modes, and
+# there is no signal to send either: the one signal this process has is SIGHUP,
+# and SIGHUP is Application::Reinitialize, which stops and restarts every
+# listener inside the process. Rotating a log file is not worth dropping the
+# sessions in flight.
+#
+# copytruncate is safe in both modes. The file is never replaced, so a held
+# handle stays valid, and the handle is an O_APPEND one, so the next write after
+# the truncation lands at offset zero rather than leaving a sparse hole. The
+# narrow cost is the lines written between the copy and the truncate, which are
+# lost - the standard copytruncate trade, and cheap next to silently writing a
+# day of mail log into a file nothing will ever read.
+#
+# "create" is therefore deliberately absent: logrotate ignores it under
+# copytruncate anyway, and it would be misleading to write it. The file's owner
+# and mode survive rotation untouched because the file itself survives, and a log
+# the server has to make for itself is made under the unit's UMask=0027.
+#
+# The "su" line below is what makes logrotate run as the service user. It is
+# required, not decorative: /var/log/hmailserver is owned by hmailserver and is
+# not world-writable, and logrotate refuses to rotate inside a directory it does
+# not own unless it is told whose it is.
+#
+# Note on the glob. The server already starts a new file each day -
+# hmailserver_<date>.log and ERROR_hmailserver_<date>.log - so what this rule
+# mostly does is compress and expire them; hmailserver_awstats.log,
+# hmailserver_backup.log and hmailserver_events.log are the ones that grow
+# without bound and are the real reason it exists. Until the roadmap row "Paths
+# and case" lands, the path join in GetCurrentLogFileName is still a literal
+# backslash, so on this platform the files can be created beside the directory
+# rather than inside it; when that row lands the glob below is already right.
+#
+# LogDeleteDays in hMailServer.ini prunes the same date-stamped files from inside
+# the server. Use one mechanism or the other, never both - see the comment on
+# that key.
+
+/var/log/hmailserver/*.log {
+    su hmailserver hmailserver
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

@@ -311,7 +311,10 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly Wpf.Ui.Controls.TextBox wildcard_ = new() { Text = "*" };
       private readonly Wpf.Ui.Controls.TextBox fromAddress_ = new() { PlaceholderText = "postmaster@yourdomain.com" };
-      private readonly Wpf.Ui.Controls.TextBox fromName_ = new() { PlaceholderText = L("Administrator") };
+      // The display name recipients see, not an account name - the hint used to
+      // be "Administrator", which read as though the account name were a word
+      // that translates. It is not: see the comment in ConnectView.xaml.
+      private readonly Wpf.Ui.Controls.TextBox fromName_ = new() { PlaceholderText = L("Sender name, as recipients see it") };
       private readonly Wpf.Ui.Controls.TextBox subject_ = new() { PlaceholderText = L("Subject") };
       private readonly TextBox body_ = new()
       {

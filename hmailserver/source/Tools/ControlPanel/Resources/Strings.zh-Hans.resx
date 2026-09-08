@@ -935,9 +935,6 @@
   <data name="Administrative access" xml:space="preserve">
     <value>管理访问权限</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>管理员</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>管理员界面语言（仅限第三方 COM 工具）</value>
   </data>
@@ -6524,6 +6521,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>发件人身份验证</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>收件人看到的发件人名称</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>完全绕过垃圾邮件防护的发件人和 IP 范围。</value>

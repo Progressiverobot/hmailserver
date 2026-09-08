@@ -1,0 +1,179 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The Debian post-installation script, named by CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA.
+#
+# It creates the identity the mail store belongs to, the directories it lives in,
+# and the systemd enablement - and then stops, deliberately, without starting
+# anything. The database is not configured at this point and cannot be: nothing
+# in a package knows which backend the administrator has, or its credentials. A
+# server started here would fail to reach a database it has never been told
+# about, and would say so in the log once a second until somebody noticed.
+#
+# POSIX sh, because a maintainer script must run on a machine where /bin/sh is
+# dash. Every step is written to be safe to run twice: dpkg runs this on every
+# upgrade as well as on the first install.
+
+set -e
+
+HM_USER=hmailserver
+HM_GROUP=hmailserver
+HM_CONFIG_DIR=/etc/hmailserver
+HM_CONFIG_FILE=/etc/hmailserver/hMailServer.ini
+HM_DATA_DIR=/var/lib/hmailserver
+HM_LOG_DIR=/var/log/hmailserver
+
+create_account()
+{
+   # adduser is present on every Debian and Ubuntu system and is what policy
+   # asks packages to use; useradd is the fallback for a derivative that has
+   # trimmed it. Either way the account is a system account with no password, no
+   # shell to log in with and no home directory of its own - its home is the mail
+   # store, which is created below rather than by adduser, because adduser would
+   # give it 0755 and populate it from /etc/skel.
+   if ! getent group "$HM_GROUP" >/dev/null 2>&1; then
+      if command -v addgroup >/dev/null 2>&1; then
+         addgroup --system "$HM_GROUP"
+      else
+         groupadd --system "$HM_GROUP"
+      fi
+   fi
+
+   if ! getent passwd "$HM_USER" >/dev/null 2>&1; then
+      if command -v adduser >/dev/null 2>&1; then
+         adduser --system --ingroup "$HM_GROUP" --no-create-home \
+                 --home "$HM_DATA_DIR" --shell /usr/sbin/nologin \
+                 --gecos "hMailServer mail server" "$HM_USER"
+      else
+         useradd --system --gid "$HM_GROUP" --no-create-home \
+                 --home-dir "$HM_DATA_DIR" --shell /usr/sbin/nologin \
+                 --comment "hMailServer mail server" "$HM_USER"
+      fi
+   fi
+}
+
+create_directories()
+{
+   # 0750 throughout. These directories hold other people's mail and the logs
+   # that name who sent it to whom; there is no reason for anything outside the
+   # service group to read either. "install -d" sets the mode and the ownership
+   # on a directory that already exists, which is what makes this safe to repeat
+   # on an upgrade.
+   #
+   # Only the directories themselves are touched. The store underneath is NOT
+   # walked and NOT chowned: on a large installation that is a multi-hour pass
+   # over millions of files, and on any installation it would quietly undo a
+   # deliberate ownership choice.
+   install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR"
+   install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/temp"
+   install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/events"
+   install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/database"
+   install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_LOG_DIR"
+
+   # The configuration belongs to root and is readable by the service, not
+   # writable by it: it carries the administrator password and the database
+   # password, and the only code that rewrites this file is the COM
+   # administration API, which is not part of a Linux build. The systemd unit
+   # mounts /etc read-only for the service in any case.
+   install -d -o root -g "$HM_GROUP" -m 0750 "$HM_CONFIG_DIR"
+
+   if [ -f "$HM_CONFIG_FILE" ]; then
+      chown root:"$HM_GROUP" "$HM_CONFIG_FILE"
+      chmod 0640 "$HM_CONFIG_FILE"
+   fi
+}
+
+register_unit()
+{
+   # daemon-reload only where systemd is actually running. In a chroot or an
+   # image build there is no /run/systemd/system and systemctl would fail, which
+   # under "set -e" would fail the whole installation.
+   if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+      systemctl daemon-reload >/dev/null 2>&1 || true
+   fi
+
+   # Enabled, so that the server comes up on the next boot once it has been
+   # configured, and NOT started. deb-systemd-helper is the Debian way to do this
+   # - it records the enablement so that a later purge can undo exactly what was
+   # done here, and it works with no systemd running - and systemctl is the
+   # fallback for a system that does not have it.
+   if command -v deb-systemd-helper >/dev/null 2>&1; then
+      deb-systemd-helper enable hmailserver.service >/dev/null 2>&1 || true
+   elif command -v systemctl >/dev/null 2>&1; then
+      systemctl enable hmailserver.service >/dev/null 2>&1 || true
+   fi
+}
+
+restart_if_it_was_already_running()
+{
+   # An upgrade only. $2 is the previously configured version, so it is empty on
+   # a first install and set on an upgrade.
+   #
+   # try-restart restarts the service if it is running and does nothing at all if
+   # it is not, which is exactly the distinction that matters here: an
+   # installation that was configured and running should end an upgrade running
+   # the new binary, and one that has never been configured must stay stopped.
+   [ -n "$2" ] || return 0
+
+   if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+      systemctl try-restart hmailserver.service >/dev/null 2>&1 || true
+   fi
+}
+
+what_to_do_next()
+{
+   # Printed on a first install only. On an upgrade the administrator has done
+   # all of this already and does not need to read it again.
+   [ -z "$1" ] || return 0
+
+   cat <<'MESSAGE'
+
+hMailServer is installed but not yet configured, and has deliberately not been
+started. Three things are needed before it can run:
+
+  1. Choose a database backend and give it credentials, in the [Database]
+     section of /etc/hmailserver/hMailServer.ini. PostgreSQL and MySQL/MariaDB
+     are the two this build supports.
+
+  2. Create the schema. The scripts are in /usr/share/hmailserver/DBScripts;
+     CreateTablesPGSQL.sql and CreateTablesMySQL.sql are the ones to run.
+
+  3. Set AdministratorPassword in the [Security] section of the same file.
+
+Then check the file before starting anything:
+
+    sudo -u hmailserver hmailserver --check-config
+
+and, when it reads back what you meant:
+
+    sudo systemctl start hmailserver
+
+/usr/share/doc/hmailserver has the long form of all of this.
+
+MESSAGE
+}
+
+case "$1" in
+   configure)
+      create_account
+      create_directories
+      register_unit
+      restart_if_it_was_already_running "$@"
+      what_to_do_next "$2"
+      ;;
+
+   abort-upgrade|abort-remove|abort-deconfigure)
+      # dpkg is unwinding a failed operation. The package's files are in place
+      # but nothing about the machine has changed, so there is nothing to undo
+      # and nothing to say.
+      ;;
+
+   *)
+      echo "postinst called with unknown argument '$1'" >&2
+      exit 1
+      ;;
+esac
+
+exit 0

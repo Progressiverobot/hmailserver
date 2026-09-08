@@ -935,9 +935,6 @@ Il Control Panel può leggere i file dei messaggi solo quando è in esecuzione s
   <data name="Administrative access" xml:space="preserve">
     <value>Accesso amministrativo</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Amministratore</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Lingua dell'interfaccia amministratore (solo strumenti COM di terze parti)</value>
   </data>
@@ -6524,6 +6521,9 @@ Continuare?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Autenticazione del mittente</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Nome del mittente, come lo vedono i destinatari</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Mittenti e intervalli IP che saltano completamente la protezione antispam.</value>

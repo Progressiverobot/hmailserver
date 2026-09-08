@@ -935,9 +935,6 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   <data name="Administrative access" xml:space="preserve">
     <value>Beheerderstoegang</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Beheerder</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>UI-taal van de beheerder (alleen COM-hulpmiddelen van derden)</value>
   </data>
@@ -6524,6 +6521,9 @@ Doorgaan?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Afzenderauthenticatie</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Afzendernaam, zoals ontvangers die zien</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Afzenders en IP-bereiken die spambescherming volledig omzeilen.</value>

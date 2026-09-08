@@ -1,0 +1,112 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The RPM %post scriptlet, named by CPACK_RPM_POST_INSTALL_SCRIPT_FILE. CPack
+# copies the contents of this file into the spec it generates, so what is written
+# here IS the body of %post - the shebang above is a comment as far as rpm is
+# concerned, which runs scriptlets with /bin/sh regardless.
+#
+# It does the same work as debian/postinst and stops in the same place: enabled,
+# not started, because the database is not configured yet and a server that
+# cannot reach one only fills the log.
+#
+# THE ARGUMENT MEANS SOMETHING ELSE HERE. dpkg passes an action name; rpm passes
+# the number of copies of the package that will be installed when the transaction
+# finishes. In %post that is 1 for a first install and 2 for an upgrade - so the
+# test below is a count, not a verb, and it is the single most common way an rpm
+# scriptlet is got wrong by somebody carrying one over from Debian.
+#
+# Every command that may reasonably fail is guarded, because rpm treats a failing
+# scriptlet as a failing transaction and a machine that cannot install a package
+# because logrotate is missing is worse than one whose service is not enabled.
+
+set -e
+
+HM_USER=hmailserver
+HM_GROUP=hmailserver
+HM_CONFIG_DIR=/etc/hmailserver
+HM_CONFIG_FILE=/etc/hmailserver/hMailServer.ini
+HM_DATA_DIR=/var/lib/hmailserver
+HM_LOG_DIR=/var/log/hmailserver
+
+# The shell a system account is given so that it cannot be used to log in. The
+# path differs between distributions - Fedora and RHEL put it in /sbin, SUSE and
+# Debian in /usr/sbin - so it is looked for rather than assumed.
+HM_SHELL=/sbin/nologin
+[ -x "$HM_SHELL" ] || HM_SHELL=/usr/sbin/nologin
+[ -x "$HM_SHELL" ] || HM_SHELL=/bin/false
+
+# The account the mail store belongs to. --system keeps the id out of the range
+# reserved for people, and the home directory is the store rather than anything
+# under /home - created below with the mode it needs, not by useradd.
+getent group "$HM_GROUP" >/dev/null 2>&1 || groupadd --system "$HM_GROUP"
+getent passwd "$HM_USER" >/dev/null 2>&1 || \
+   useradd --system --gid "$HM_GROUP" --no-create-home \
+           --home-dir "$HM_DATA_DIR" --shell "$HM_SHELL" \
+           --comment "hMailServer mail server" "$HM_USER"
+
+# 0750 throughout: mail, and logs that name who sent it to whom. "install -d"
+# also fixes the mode and owner of a directory that is already there, which is
+# what makes this safe on the upgrade path. The store underneath is deliberately
+# not walked - see debian/postinst for the argument.
+install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR"
+install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/temp"
+install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/events"
+install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_DATA_DIR/database"
+install -d -o "$HM_USER" -g "$HM_GROUP" -m 0750 "$HM_LOG_DIR"
+
+# root owns the configuration and the service only reads it. It carries the
+# administrator password and the database password, and nothing in a Linux build
+# rewrites this file.
+install -d -o root -g "$HM_GROUP" -m 0750 "$HM_CONFIG_DIR"
+if [ -f "$HM_CONFIG_FILE" ]; then
+   chown root:"$HM_GROUP" "$HM_CONFIG_FILE"
+   chmod 0640 "$HM_CONFIG_FILE"
+fi
+
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+   systemctl daemon-reload >/dev/null 2>&1 || :
+fi
+
+if [ "$1" -eq 1 ]; then
+   # First install. Enable for the next boot; do not start.
+   if command -v systemctl >/dev/null 2>&1; then
+      systemctl enable hmailserver.service >/dev/null 2>&1 || :
+   fi
+
+   cat <<'MESSAGE'
+
+hMailServer is installed but not yet configured, and has deliberately not been
+started. Three things are needed before it can run:
+
+  1. Choose a database backend and give it credentials, in the [Database]
+     section of /etc/hmailserver/hMailServer.ini. PostgreSQL and MySQL/MariaDB
+     are the two this build supports.
+
+  2. Create the schema. The scripts are in /usr/share/hmailserver/DBScripts;
+     CreateTablesPGSQL.sql and CreateTablesMySQL.sql are the ones to run.
+
+  3. Set AdministratorPassword in the [Security] section of the same file.
+
+Then check the file before starting anything:
+
+    sudo -u hmailserver hmailserver --check-config
+
+and, when it reads back what you meant:
+
+    sudo systemctl start hmailserver
+
+MESSAGE
+else
+   # An upgrade. try-restart puts the new binary into service if the old one was
+   # running and does nothing at all if it was not - so an installation that was
+   # never configured stays stopped, and one that was configured does not silently
+   # keep running the version that has just been replaced.
+   if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+      systemctl try-restart hmailserver.service >/dev/null 2>&1 || :
+   fi
+fi
+
+exit 0

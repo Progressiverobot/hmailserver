@@ -935,9 +935,6 @@ O Control Panel só consegue ler arquivos de mensagens quando roda na mesma máq
   <data name="Administrative access" xml:space="preserve">
     <value>Acesso administrativo</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrador</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Idioma da interface do administrador (apenas ferramentas COM de terceiros)</value>
   </data>
@@ -6524,6 +6521,9 @@ Continuar?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Autenticação do remetente</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Nome do remetente, como os destinatários o veem</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Remetentes e faixas de IP que ignoram completamente a proteção contra spam.</value>

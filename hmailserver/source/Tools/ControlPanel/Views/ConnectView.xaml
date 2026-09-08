@@ -27,7 +27,13 @@
                 <ui:TextBox x:Name="HostBox" PlaceholderText="{loc:L 'Server (localhost)'}" Margin="0,0,0,10" Text="localhost">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Server24" /></ui:TextBox.Icon>
                 </ui:TextBox>
-                <ui:TextBox x:Name="UserBox" PlaceholderText="{loc:L 'User name'}" Margin="0,0,0,10" Text="{loc:L 'Administrator'}">
+                <!-- The user name is NOT translated. It is the account the server
+                     authenticates, and hMailServer's is called Administrator in
+                     every language; a translated word here is a name no account
+                     has, and the sign-in fails with "check the user name and
+                     password" (issue #156). The label and the placeholder beside
+                     it are captions and are translated. -->
+                <ui:TextBox x:Name="UserBox" PlaceholderText="{loc:L 'User name'}" Margin="0,0,0,10" Text="Administrator"> <!-- no-loc -->
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Person24" /></ui:TextBox.Icon>
                 </ui:TextBox>
                 <local:PasswordField x:Name="PasswordBox" PlaceholderText="{loc:L 'Password'}" Margin="0,0,0,18">

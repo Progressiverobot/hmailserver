@@ -1,0 +1,50 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The RPM %preun scriptlet, named by CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE. CPack
+# copies its contents into the generated spec, so this file is the body of %preun.
+#
+# THE ARGUMENT AGAIN MEANS A COUNT, and in %preun it counts what will remain
+# AFTER this transaction: 0 is the last copy going away - a real uninstall - and
+# 1 is an upgrade, where a newer copy is about to take this one's place. So the
+# service is stopped and disabled only at 0. Stopping it at 1 would turn every
+# upgrade into an outage, and %post's try-restart already puts the new binary
+# into service.
+#
+# This is what the %systemd_preun macro does on a distribution that has it. It is
+# written out longhand because CPack generates the spec and does not expand
+# distribution macros for us.
+
+set -e
+
+if [ "$1" -eq 0 ]; then
+   if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+      # Stopped, not killed: SIGTERM brings main.cpp out of its wait loop and the
+      # server drains for ShutdownDrainSeconds before exiting.
+      systemctl --no-reload disable hmailserver.service >/dev/null 2>&1 || :
+      systemctl stop hmailserver.service >/dev/null 2>&1 || :
+   fi
+
+   cat <<'MESSAGE'
+
+hMailServer has been removed. Deliberately left in place:
+
+    /etc/hmailserver        the configuration, with your database credentials
+    /var/lib/hmailserver    the mail store - every message on this server
+    /var/log/hmailserver    the logs, which record who was sent what
+
+None of it is reconstructible and none of it is the package manager's to decide
+about. The database is untouched for the same reason. The hmailserver user and
+group are kept as well, so that what is left keeps an owner with a name.
+
+Remove them by hand when you are certain:
+
+    rm -rf /etc/hmailserver /var/lib/hmailserver /var/log/hmailserver
+    userdel hmailserver
+
+MESSAGE
+fi
+
+exit 0

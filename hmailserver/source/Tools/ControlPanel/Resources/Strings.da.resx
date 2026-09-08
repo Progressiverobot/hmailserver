@@ -935,9 +935,6 @@ Control Panel kan kun læse meddelelsesfiler, når det kører på samme maskine 
   <data name="Administrative access" xml:space="preserve">
     <value>Administrativ adgang</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrator</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Sprog i administratorens brugerflade (kun COM-værktøjer fra tredjepart)</value>
   </data>
@@ -6524,6 +6521,9 @@ Vil du fortsætte?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Afsendergodkendelse</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Afsendernavn, som modtagerne ser det</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Afsendere og IP-intervaller, der helt går uden om spambeskyttelsen.</value>

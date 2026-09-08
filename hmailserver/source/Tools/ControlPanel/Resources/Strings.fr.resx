@@ -935,9 +935,6 @@ Le Control Panel ne peut lire les fichiers de messages que lorsqu'il s'exécute 
   <data name="Administrative access" xml:space="preserve">
     <value>Accès administratif</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrateur</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Langue de l'interface administrateur (outils COM tiers seulement)</value>
   </data>
@@ -6524,6 +6521,9 @@ Continuer ?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Authentification de l'expéditeur</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Nom de l'expéditeur, tel que le voient les destinataires</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Expéditeurs et plages IP qui contournent entièrement la protection anti-spam.</value>

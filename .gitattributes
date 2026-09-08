@@ -13,6 +13,22 @@
 ###############################################################################
 * text=auto eol=crlf
 
+###############################################################################
+# The exception: everything a POSIX machine EXECUTES.
+#
+# The rule above is right for a Windows-only project and wrong for the moment
+# one of its files is run by /bin/sh. A maintainer script checked out with CRLF
+# fails as "bad interpreter: /bin/sh^M" when the package is installed, and the
+# failure is at the user's machine rather than here. The systemd unit, the
+# logrotate rule and the packaged configuration are read by parsers that are
+# equally unforgiving, and the AppImage and PKGBUILD are shell.
+#
+# These are checked out LF on every platform, including Windows, where nothing
+# reads them but an editor.
+###############################################################################
+hmailserver/source/Server/platform/packaging/** text eol=lf
+build/*.sh text eol=lf
+
 # Explicitly binary
 *.exe binary
 *.dll binary
