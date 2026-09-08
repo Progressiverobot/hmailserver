@@ -1055,8 +1055,8 @@ Control Panel voi lukea viestitiedostoja vain, kun se on käynnissä samalla kon
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Koko lähtevä toimitusistunto. 0 = ei rajaa.</value>
   </data>
-  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
-    <value>Tapahtumakomentosarja ajetaan palvelimen sisällä palvelutilin oikeuksilla, joten se, minkä objektien ilmentymiä se saa luoda, on turvallisuuspäätös eikä mukavuuskysymys. Tyhjä on turvallinen oletus: komentosarja yltää hMailServerin omiin objekteihin eikä mihinkään muuhun. Ohjelmatunnisteen nimeäminen tässä - komentosarjojen tiedostojärjestelmäobjekti, HTTP-asiakas - myöntää sen jokaiselle komentosarjalle, jonka palvelin ajaa, joten nimeä vain se, mitä oma komentosarjasi todella tarvitsee. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. As shipped this is *, which allows any object, so that upgrading never breaks a script an installation already runs - it is the setting to narrow, not the safe state. Name only what a script of yours actually needs - a scripting file system object, an HTTP client - and everything else is refused with the object's name in the error log; empty refuses everything beyond hMailServer's own objects. Applies after a service restart." xml:space="preserve">
+    <value>Tapahtumakomentosarja ajetaan palvelimen sisällä palvelutilin oikeuksilla, joten se, minkä objektien ilmentymiä se saa luoda, on turvallisuuspäätös eikä mukavuuskysymys. Toimitettuna tässä on *, joka sallii minkä tahansa objektin, jotta päivitys ei koskaan riko komentosarjaa, jota asennus jo ajaa - tämä on asetus, jota kuuluu kaventaa, ei turvallinen tila. Nimeä vain se, mitä oma komentosarjasi todella tarvitsee - komentosarjojen tiedostojärjestelmäobjekti, HTTP-asiakas - niin kaikki muu torjutaan ja objektin nimi kirjataan virhelokiin; tyhjä torjuu kaiken hMailServerin omia objekteja lukuun ottamatta. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
   </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Ulkoinen tarkistinprosessi. 0 = ei rajaa.</value>
@@ -1452,8 +1452,8 @@ Käynnistetäänkö Control Panel nyt uudelleen? Valitse Ei, jos haluat yrittä�
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
-  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
-    <value>COM-objektit, joita komentosarja saa luoda (pilkuin eroteltuina; tyhjä = vain hMailServerin omat)</value>
+  <data name="COM objects a script may create (* = any, as shipped; empty = none beyond hMailServer's own; ProgIDs or CLSIDs, comma separated)" xml:space="preserve">
+    <value>COM-objektit, joita komentosarja saa luoda (* = mikä tahansa, kuten toimitettu; tyhjä = ei mitään hMailServerin omien lisäksi; ProgIDs tai CLSIDs, pilkuin eroteltuina)</value>
   </data>
   <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
     <value>COMPRESS=DEFLATE (RFC 4978)</value>
@@ -3720,8 +3720,8 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Säilyttää kopion jokaisesta SMTP:n yli vastaanotetusta viestistä kansiopuussa sen lisäksi, että toimittaa sen normaalisti - se ei ohjaa postia muualle eikä pidätä sitä. Paikallisen lähettäjän posti arkistoidaan polkuun &lt;domain&gt;\&lt;mailbox&gt;, muualta tuleva posti kansioon Inbound ja viestit ilman kuoren lähettäjää (palautukset ja toimitusraportit) kansioon Error, sekä kopio jokaisen paikallisen vastaanottajan kansioon.</value>
   </data>
-  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
-    <value>Avaintenvaihtoryhmät (tyhjä = OpenSSL:n oletusluettelo)</value>
+  <data name="Key exchange groups, in order of preference (empty = the classical fallback secp384r1:x25519:secp256r1)" xml:space="preserve">
+    <value>Avaintenvaihtoryhmät, halutuin ensin (tyhjä = klassinen varavaihtoehto secp384r1:x25519:secp256r1)</value>
   </data>
   <data name="Key file present" xml:space="preserve">
     <value>Avaintiedosto olemassa</value>
@@ -7426,9 +7426,6 @@ Valitse yllä oleva avain ja kopioi se käsin - sitä ei näytetä uudelleen.</v
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Todellinen aikakatkaisu liikkuu näiden arvojen välillä palvelimen kuorman mukaan.</value>
   </data>
-  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
-    <value>Elliptiset käyrät ja äärellisen kunnan ryhmät, joilla tämä palvelin suostuu sopimaan avaimen, halutuin ensin - OpenSSL:n ryhmäluettelo, esimerkiksi x25519:secp256r1. Tyhjä tarkoittaa, että OpenSSL valitsee, mikä on oikea vastaus, ellei sinulla ole vaatimustenmukaisuussäännöstöä, joka nimeää ryhmät. Luettelo, joka ei nimeä mitään asiakkaan tukemaa, päättää kättelyn, joten muuta sitä skannauksen perusteella äläkä sokkona. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
-  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>Käytössä olevat tarkistukset voivat yhteensä lisätä enintään {0}, mikä on alle merkintäkynnyksen {1}: yksikään viesti ei voi saavuttaa kumpaakaan kynnystä, olipa se kuinka huono tahansa.</value>
   </data>
@@ -7472,6 +7469,9 @@ ei voitu ladata. Viesti on todennäköisesti toimitettu eikä ole enää jonossa
   </data>
   <data name="The group members could not be read: " xml:space="preserve">
     <value>Ryhmän jäseniä ei voitu lukea:</value>
+  </data>
+  <data name="The groups this server will agree a TLS key with, in OpenSSL's list form. As shipped it offers the two post-quantum hybrids first and falls back to X25519 and the NIST curves for a peer that has neither, so nothing changes for an older client. An empty list, or one OpenSSL rejects or that would leave no group enabled, is not applied: the server logs it and uses the classical fallback, so a mistake here cannot take TLS down - but it does silently give up the hybrids, which is why the shipped list is shown rather than a blank. Change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>Ryhmät, joilla tämä palvelin suostuu sopimaan TLS-avaimen, OpenSSL:n luettelomuodossa. Toimitettuna se tarjoaa ensin kaksi postkvanttihybridiä ja palaa X25519:ään ja NIST-käyriin sellaisen vastapuolen kanssa, jolla ei ole kumpaakaan, joten vanhemmalle asiakkaalle mikään ei muutu. Tyhjää luetteloa, tai sellaista, jonka OpenSSL hylkää tai joka ei jättäisi yhtään ryhmää käyttöön, ei oteta käyttöön: palvelin kirjaa sen lokiin ja käyttää klassista varavaihtoehtoa, joten virhe tässä ei voi kaataa TLS:ää - mutta se luopuu hybrideistä hiljaa, ja siksi näytetään toimitettu luettelo eikä tyhjää kenttää. Muuta sitä skannauksen perusteella äläkä sokkona. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
   </data>
   <data name="The guided path: which half, which log lines, and the setting that bounds each stage." xml:space="preserve">
     <value>Opastettu polku: kumpi puolisko, mitkä lokirivit ja mikä asetus rajaa kunkin vaiheen.</value>

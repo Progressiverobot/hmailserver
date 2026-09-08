@@ -1055,8 +1055,8 @@
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>整个出站投递会话。0 = 不限制。</value>
   </data>
-  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
-    <value>事件脚本在服务器内部以服务账户的权限运行，因此它可以实例化什么是一项安全决定，而不是一件图方便的事。留空是安全的默认值：脚本只能访问 hMailServer 自己的对象，此外别无他物。在此处写下一个程序标识符 - 一个脚本文件系统对象、一个 HTTP 客户端 - 就等于把它授予了服务器运行的每一个脚本，因此只写下您的脚本确实需要的东西。在重启服务后生效。</value>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. As shipped this is *, which allows any object, so that upgrading never breaks a script an installation already runs - it is the setting to narrow, not the safe state. Name only what a script of yours actually needs - a scripting file system object, an HTTP client - and everything else is refused with the object's name in the error log; empty refuses everything beyond hMailServer's own objects. Applies after a service restart." xml:space="preserve">
+    <value>事件脚本在服务器内部以服务账户的权限运行，因此它可以实例化什么是一项安全决定，而不是一件图方便的事。出厂设置为 *，即允许任何对象，这样升级永远不会弄坏某个安装环境已经在运行的脚本 - 这是一个应当收窄的设置，而不是安全状态。只写下您的脚本确实需要的东西 - 一个脚本文件系统对象、一个 HTTP 客户端 - 其余一切都会被拒绝，并把对象的名称记入错误日志；留空则拒绝 hMailServer 自己的对象以外的一切。在重启服务后生效。</value>
   </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>一个外部扫描器进程。0 = 不限制。</value>
@@ -1452,8 +1452,8 @@
   <data name="CC" xml:space="preserve">
     <value>抄送</value>
   </data>
-  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
-    <value>脚本可以创建的 COM 对象（以逗号分隔；留空 = 仅 hMailServer 自己的）</value>
+  <data name="COM objects a script may create (* = any, as shipped; empty = none beyond hMailServer's own; ProgIDs or CLSIDs, comma separated)" xml:space="preserve">
+    <value>脚本可以创建的 COM 对象（* = 任意，即出厂设置；留空 = 除 hMailServer 自己的以外一概不允许；ProgIDs 或 CLSIDs，以逗号分隔）</value>
   </data>
   <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
     <value>COMPRESS=DEFLATE (RFC 4978)</value>
@@ -3720,8 +3720,8 @@
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>除了正常投递之外，还会在一个文件夹树中保留通过 SMTP 收到的每封邮件的副本 - 它不会转移或扣留邮件。来自本地发件人的邮件归档到 &lt;domain&gt;\&lt;mailbox&gt; 下，来自其他地方的邮件归档到 Inbound 下，没有信封发件人的邮件（退信和投递报告）归档到 Error 下，此外还会在每个本地收件人的文件夹中保留一份副本。</value>
   </data>
-  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
-    <value>密钥交换组（留空 = OpenSSL 的默认列表）</value>
+  <data name="Key exchange groups, in order of preference (empty = the classical fallback secp384r1:x25519:secp256r1)" xml:space="preserve">
+    <value>密钥交换组，按优先顺序排列（留空 = 经典回退列表 secp384r1:x25519:secp256r1）</value>
   </data>
   <data name="Key file present" xml:space="preserve">
     <value>密钥文件存在</value>
@@ -7426,9 +7426,6 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>实际超时会随服务器负载在这些值之间变化。</value>
   </data>
-  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
-    <value>本服务器愿意用来协商密钥的椭圆曲线和有限域群组，按优先顺序排列 - 也就是 OpenSSL 的群组列表，例如 x25519:secp256r1。留空表示由 OpenSSL 选择，而这正是正确答案，除非您有一套点名了这些群组的合规规定。如果列表中列出的东西客户端一个都不支持，握手就会终止，因此请对照一次扫描的结果来更改它，而不是在两眼一抹黑的情况下更改。在重启服务后生效。</value>
-  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>已启用的检查合计最多只能加 {0}，低于标记阈值 {1}: 无论邮件多糟糕，都无法达到任何一个阈值。</value>
   </data>
@@ -7472,6 +7469,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="The group members could not be read: " xml:space="preserve">
     <value>无法读取组成员:</value>
+  </data>
+  <data name="The groups this server will agree a TLS key with, in OpenSSL's list form. As shipped it offers the two post-quantum hybrids first and falls back to X25519 and the NIST curves for a peer that has neither, so nothing changes for an older client. An empty list, or one OpenSSL rejects or that would leave no group enabled, is not applied: the server logs it and uses the classical fallback, so a mistake here cannot take TLS down - but it does silently give up the hybrids, which is why the shipped list is shown rather than a blank. Change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>本服务器愿意用来协商 TLS 密钥的群组，采用 OpenSSL 的列表格式。出厂设置会先提供两个后量子混合群组，对于两者都不支持的对端则回退到 X25519 和 NIST 曲线，因此对较旧的客户端来说没有任何变化。空列表、OpenSSL 拒绝的列表，或者会导致没有任何群组可用的列表都不会被应用：服务器会将其记入日志并使用经典回退列表，因此这里的错误不会让 TLS 瘫痪 - 但它会悄悄放弃混合群组，这正是此处显示出厂列表而不是空白的原因。请对照一次扫描的结果来更改它，而不是在两眼一抹黑的情况下更改。在重启服务后生效。</value>
   </data>
   <data name="The guided path: which half, which log lines, and the setting that bounds each stage." xml:space="preserve">
     <value>引导式路径: 是哪一半、哪些日志行，以及限制每个阶段的设置。</value>
