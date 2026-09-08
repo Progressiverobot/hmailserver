@@ -260,7 +260,11 @@ if (Test-Path $serverIni) {
 #     flagged.
 $dataFolder = 'C:\HMTest\Data'
 if (Test-Path $dataFolder) {
-    $reserved = @('Quarantine', 'Sieve', 'Temp', 'Events')
+    # 'Updates' is the live update's own directory - the downloaded installer,
+    # its rollback image and the apply token live there. It appeared in 6.2.28
+    # and is not a domain; without this line a bench that has ever run an update
+    # test fails pre-flight, and -Clean would delete a verified download.
+    $reserved = @('Quarantine', 'Sieve', 'Temp', 'Events', 'Updates')
 
     $liveDomains = @()
     try {

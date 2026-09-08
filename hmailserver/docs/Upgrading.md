@@ -178,7 +178,7 @@ authenticator fails with an exit code instead of prompting. So:
 * administrator password set → pass `/adminpassword=<password>`; without it the database
   upgrade fails and the installer reports the non-zero exit code rather than waiting.
 
-*(In the tree after 6.2.27, not yet in a published release: the live update's helper
+*(New in 6.2.28: the live update's helper
 passes a single-use `/upgradetoken=<hex>` in place of the password, so an unattended
 update never handles the administrator password at all.)*
 

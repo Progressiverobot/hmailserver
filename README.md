@@ -446,7 +446,7 @@ Administration and monitoring:
 
    <pre>
    RestApiPort=0                 ; REST admin API (Bearer API keys, or HTTP Basic with the administrator password);
-                                 ; in the tree after 6.2.27, not yet released: also the self-service portal at /portal
+                                 ; new in 6.2.28: also the self-service portal at /portal
    RestApiBindAddress=127.0.0.1  ; TLS is required unless bound to 127.0.0.1, localhost or ::1
    RestApiCertificateFile=       ; PEM; falls back to the ACME certificate
    RestApiPrivateKeyFile=

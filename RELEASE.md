@@ -29,8 +29,11 @@ already cost a release cycle or nearly shipped a defect.
    reconciles every tick box in `Roadmap.md` against the per-section counts
    and the contents table, because three hand-edited restatements of the same
    750 numbers drift — nine sections had drifted when the check was written.
-6. **Check the database scripts build a database**: `build\check-db-scripts.ps1`.
-   It creates a throwaway SQL CE database from `CreateTablesMSSQL.sql` using the
+6. **Check the database scripts build a database**: `build\check-db-scripts.ps1`,
+   run with `powershell.exe` and not `pwsh` - SQL Server Compact's managed
+   provider cannot load its native components under .NET on PowerShell 7, which
+   fails as "Unable to load the native components ... of version 8876" and says
+   nothing about the scripts. It creates a throwaway SQL CE database from `CreateTablesMSSQL.sql` using the
    same splitting rules the server uses, because nothing else here does - the
    regression bench's database is upgraded out of band, so no local test takes
    the CREATE path a fresh install takes. 6.2.22-pre4 shipped an installer whose

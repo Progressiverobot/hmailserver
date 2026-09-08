@@ -274,8 +274,7 @@ binary is inventoried with a SHA-256 and its provenance, and an unlisted or
 changed binary fails the build — closing the "a DLL appeared and nobody
 noticed" gap that a diff review cannot catch.
 
-In the tree after 6.2.27, not yet in a published release: the server's own update
-path applies the same verification. `UpdateChecker` reads the release feed and
+New in 6.2.28, the server's own update path applies the same verification. `UpdateChecker` reads the release feed and
 `SigstoreVerifier` checks the installer against its `.cosign.bundle` in-process -
 the file's SHA-256 is the one signed and the one Rekor recorded, the certificate
 chains to the embedded Sigstore trust root, and its identity must be this

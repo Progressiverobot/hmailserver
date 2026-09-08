@@ -73,10 +73,10 @@ namespace HM
       static AnsiString FeedUrl();
       static bool IsPreReleaseChannel();
 
-      // The version this binary is, "6.2.27": HMAILSERVER_VERSION without the build.
+      // The version this binary is, "6.2.28": HMAILSERVER_VERSION without the build.
       static String RunningVersion();
 
-      // Numeric, component by component: "6.10.0" is newer than "6.2.27", a leading
+      // Numeric, component by component: "6.10.0" is newer than "6.2.28", a leading
       // "v" and anything from the first character that is neither a digit nor a dot
       // ("-B37") are ignored, and missing components are zero. <0, 0 or >0.
       static int CompareVersions(const String &left, const String &right);
