@@ -39,7 +39,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox spamDelete_ = NewInput();
       private readonly TextBox firstName_ = NewInput();
       private readonly TextBox lastName_ = NewInput();
-      private readonly hMailServer.ControlPanel.Views.PasswordBox password_ = new();
+      private readonly hMailServer.ControlPanel.Views.PasswordField password_ = new();
       private readonly Wpf.Ui.Controls.TextBox generatedShow_ = new();
       private readonly TextBlock pwStrength_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 12), TextWrapping = TextWrapping.Wrap };
       private readonly TextBlock lastLogon_ = new() { FontSize = Typography.Label, Margin = new Thickness(0, 0, 0, 8) };

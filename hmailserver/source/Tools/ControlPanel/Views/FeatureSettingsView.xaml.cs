@@ -378,7 +378,7 @@ namespace hMailServer.ControlPanel.Views
          /// </summary>
          public bool OfferGenerate;
 
-         private hMailServer.ControlPanel.Views.PasswordBox box_;
+         private hMailServer.ControlPanel.Views.PasswordField box_;
          private bool hasStored_;
 
          /// <summary>
@@ -405,7 +405,7 @@ namespace hMailServer.ControlPanel.Views
                ? L("A secret is configured — leave blank to keep it")
                : (string.IsNullOrEmpty(Hint) ? L("Enter a secret") : Hint);
 
-            box_ = new hMailServer.ControlPanel.Views.PasswordBox
+            box_ = new hMailServer.ControlPanel.Views.PasswordField
             {
                PlaceholderText = placeholder,
                FontSize = Typography.Body,

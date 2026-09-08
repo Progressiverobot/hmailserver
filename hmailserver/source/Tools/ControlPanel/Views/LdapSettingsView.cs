@@ -77,7 +77,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox userSearchFilter_ = new();
       private readonly Wpf.Ui.Controls.TextBox userDnTemplate_ = new();
       private readonly Wpf.Ui.Controls.TextBox serviceUsername_ = new();
-      private readonly hMailServer.ControlPanel.Views.PasswordBox servicePassword_ = new();
+      private readonly hMailServer.ControlPanel.Views.PasswordField servicePassword_ = new();
       private readonly CheckBox clearServicePassword_ = new();
       private readonly TextBlock serviceDomainNote_ = new();
       private readonly CheckBox fallback_ = new();
@@ -92,7 +92,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly Wpf.Ui.Controls.TextBox testUsername_ = new();
       private readonly Wpf.Ui.Controls.TextBox testDomain_ = new();
-      private readonly hMailServer.ControlPanel.Views.PasswordBox testPassword_ = new();
+      private readonly hMailServer.ControlPanel.Views.PasswordField testPassword_ = new();
       private Wpf.Ui.Controls.Button testButton_;
       private readonly Path testMark_ = new();
       private readonly TextBlock testText_ = new();

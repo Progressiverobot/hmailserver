@@ -75,7 +75,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox relayPort_ = NewInput();
       private readonly CheckBox relayAuthOn_ = new() { Content = L("The relay requires _authentication"), FontSize = Typography.Body };
       private readonly TextBox relayUser_ = NewInput();
-      private readonly PasswordBox relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly hMailServer.ControlPanel.Views.PasswordField relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
       private readonly ComboBox relaySecurity_ = new();
 
       // DKIM

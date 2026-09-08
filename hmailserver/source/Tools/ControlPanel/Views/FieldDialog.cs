@@ -161,7 +161,7 @@ namespace hMailServer.ControlPanel.Views
             case CollectionEditorView.FieldKind.Password:
                {
                   host.Children.Add(Label(f.Label));
-                  var box = new hMailServer.ControlPanel.Views.PasswordBox
+                  var box = new hMailServer.ControlPanel.Views.PasswordField
                   {
                      Password = Convert.ToString(current) ?? "",
                      FontSize = Typography.Body,

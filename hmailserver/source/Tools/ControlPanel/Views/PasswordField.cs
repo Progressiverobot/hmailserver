@@ -6,7 +6,7 @@ using System.Windows.Controls;
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>
-   /// The password box every page uses, and the fix for issue #156.
+   /// The password box every page uses (a PasswordField, so that the name is not the base class's), and the fix for issue #156.
    ///
    /// WPF-UI's PasswordBox is a TextBox that shows mask characters and keeps the
    /// real text in Password. On every change it rebuilds the masked text and then
@@ -27,7 +27,7 @@ namespace hMailServer.ControlPanel.Views
    /// OnTextChanged when it writes the mask text, and that inner change is a
    /// whole-text replacement that says nothing about where the user typed.
    /// </summary>
-   public class PasswordBox : Wpf.Ui.Controls.PasswordBox
+   public class PasswordField : Wpf.Ui.Controls.PasswordBox
    {
       private int depth_;
 
@@ -52,6 +52,8 @@ namespace hMailServer.ControlPanel.Views
          TextChange last = null;
          foreach (TextChange change in e.Changes)
             last = change;
+         if (last == null)
+            return;
 
          int caret = last.Offset + last.AddedLength;
          if (caret < 0)
