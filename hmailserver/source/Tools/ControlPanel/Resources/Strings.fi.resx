@@ -1059,7 +1059,7 @@ Control Panel voi lukea viestitiedostoja vain, kun se on käynnissä samalla kon
     <value>Vanhempi ja heikompi vaihtoehto: kertakäyttökoodi, joka kysytään salasanan jälkeen kirjauduttaessa TÄHÄN Control Paneliin ja jonka työkalu itse tarkistaa vasta sen jälkeen kun palvelin on jo hyväksynyt salasanan. Salaisuus tallennetaan konekohtaisesti HKLM:n alle, joten sen käyttöönotto tai käytöstä poisto vaatii paikallisen järjestelmänvalvojan oikeudet, eikä se tee mitään REST API:lle eikä COM API:a käyttäville komentosarjoille. Suosi yllä olevaa palvelimen pakottamaa tekijää; tämä on jäljellä olemassa olevia asennuksia varten.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Ohitus korvaa kyseisen osoitteen yleiset ylärajat; 0:0 vapauttaa sen kokonaan. Ilman valinnaista :tunnit-osaa ohitus käyttää yleistä jaksoa. Virheellinen rivi ohitetaan lokimerkinnän kera ja yleinen raja koskee yhä kyseistä tiliä. Tämän INI-osion kommenttirivejä ei näytetä tässä, ja ne katoavat jos lista tallennetaan.</value>
+    <value>Ohitus korvaa kyseisen osoitteen yleiset ylärajat; 0:0 vapauttaa sen kokonaan. Ilman valinnaista :hours-osaa ohitus käyttää yleistä jaksoa. Virheellinen rivi ohitetaan lokimerkinnän kera ja yleinen raja koskee yhä kyseistä tiliä. Tämän INI-osion kommenttirivejä ei näytetä tässä, ja ne katoavat jos lista tallennetaan.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Tapahtui odottamaton virhe:
@@ -9473,7 +9473,7 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
     <value>tarkistinta</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/save slow</value>
+    <value>script/save hidas</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (muistiraskas, RFC 7914)</value>

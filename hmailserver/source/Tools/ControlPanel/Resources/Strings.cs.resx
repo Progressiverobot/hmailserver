@@ -1261,7 +1261,7 @@ Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</v
     <value>Automatické certifikáty (ACME)</value>
   </data>
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
-    <value>Automatické uzamčení adresy, které se opakovaně nedaří přihlásit. Samotný ban je IP rozsah s vypršením platnosti, takže je uveden na stránce IP rozsahy.</value>
+    <value>Automatické uzamčení adresy, které se opakovaně nedaří přihlásit. Samotný ban je IP rozsah s vypršením platnosti, takže je uveden na stránce Rozsahy IP.</value>
   </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV je zapnuto, ale není nastaven žádný tajný klíč, takže odchozí odesílatelé nejsou označováni a vracející se nedoručenky se neověřují – přepínač hlásí, že je zapnuto, přitom nedělá nic. Vygenerujte nebo zadejte tajný klíč.</value>
@@ -1351,7 +1351,7 @@ Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</v
     <value>Než budete kopírovat —</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
-    <value>Mezi odpovědí 354 a odpovědí 250 server provádí přijímací řetězec – antispamové testy, úpravy zprávy, archivaci, skript OnAcceptMessage a uložení do databáze – na omezeném fondu vláken a odpovídá teprve tehdy, až skončí. Log měří čas každé fáze. Čtěte jej jako posloupnost a hledejte poslední zapsaný řádek: zaseknutá fáze je ta následující. Dvě fáze se ohlašují úvodním řádkem (antispamová ochrana a skript/uložení); úpravy zprávy nikoli, takže zaseknutí v nich vypadá jako „done spam-protection“, po kterém následuje ticho. Fáze trvající deset a více sekund se zapisuje na úrovni aplikace i bez ladicího logování.</value>
+    <value>Mezi odpovědí 354 a odpovědí 250 server provádí přijímací řetězec – antispamové testy, úpravy zprávy, archivaci, skript OnAcceptMessage a uložení do databáze – na omezeném fondu vláken a odpovídá teprve tehdy, až skončí. Log měří čas každé fáze. Čtěte jej jako posloupnost a hledejte poslední zapsaný řádek: zaseknutá fáze je ta následující. Dvě fáze se ohlašují úvodním řádkem (spam-protection a script/save); úpravy zprávy nikoli, takže zaseknutí v nich vypadá jako „done spam-protection“, po kterém následuje ticho. Fáze trvající deset a více sekund se zapisuje na úrovni aplikace i bez ladicího logování.</value>
   </data>
   <data name="Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the refusal is temporary and a sending server retries for days, while a volume that reaches zero costs a database that will not open and a service that will not start." xml:space="preserve">
     <value>Záměrně nastaveno spíše vysoko: odmítnout brzy stojí jen zpoždění doručení a nic víc, protože odmítnutí je dočasné a odesílající server to zkouší znovu celé dny, kdežto svazek, jehož volné místo klesne na nulu, stojí databázi, která se neotevře, a službu, která se nespustí.</value>
@@ -2186,7 +2186,7 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
     <value>Nepodařilo se načíst distribuční seznamy:</value>
   </data>
   <data name="Counted logon failures cleared. Addresses already banned stay banned until their &quot;Auto-ban:&quot; range expires - delete it on the IP ranges page to release one now." xml:space="preserve">
-    <value>Započítaná neúspěšná přihlášení byla vymazána. Adresy, které už jsou zablokované, zůstanou zablokované, dokud jejich rozsah „Auto-ban:“ nevyprší – chcete-li některou uvolnit hned, smažte jej na stránce IP rozsahy.</value>
+    <value>Započítaná neúspěšná přihlášení byla vymazána. Adresy, které už jsou zablokované, zůstanou zablokované, dokud jejich rozsah „Auto-ban:“ nevyprší – chcete-li některou uvolnit hned, smažte jej na stránce Rozsahy IP.</value>
   </data>
   <data name="Counted per account from the last login that was allowed, so a refused attempt does not push the next one further away. It is advertised only while it is set, because announcing a limit that is not enforced is worse than announcing nothing." xml:space="preserve">
     <value>Počítá se pro každý účet od posledního povoleného přihlášení, takže odmítnutý pokus další přihlášení dál neodsune. Oznamuje se jen tehdy, dokud je nastaveno, protože ohlašovat limit, který se nevynucuje, je horší než neohlašovat nic.</value>
@@ -3667,7 +3667,7 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
     <value>Už vypršel, takže ho nic úspěšně nepoužívá; odvolání ho odstraní z tohoto seznamu.</value>
   </data>
   <data name="It is bound to {0}, so those passwords cross the network. Either assign a certificate to a TLS-capable mailbox port on the TCP/IP ports page, bind this listener to 127.0.0.1, or put it behind a TLS terminator." xml:space="preserve">
-    <value>Je navázán na {0}, takže tato hesla procházejí sítí. Buď přiřaďte certifikát některému portu poštovní schránky s podporou TLS na stránce TCP/IP porty, navažte tento listener na 127.0.0.1, nebo jej postavte za TLS terminátor.</value>
+    <value>Je navázán na {0}, takže tato hesla procházejí sítí. Buď přiřaďte certifikát některému portu poštovní schránky s podporou TLS na stránce Porty TCP/IP, navažte tento listener na 127.0.0.1, nebo jej postavte za TLS terminátor.</value>
   </data>
   <data name="It is bound to {0}, which keeps it on this machine - that is the supported way to run it without TLS. Assign a certificate to a mailbox port to offer STARTTLS." xml:space="preserve">
     <value>Je navázán na {0}, což jej drží na tomto počítači – to je podporovaný způsob, jak jej provozovat bez TLS. Přiřaďte certifikát některému portu poštovní schránky, aby se nabízel STARTTLS.</value>
@@ -6520,7 +6520,7 @@ Pokračovat?</value>
     <value>Nezávisle na tom tento server odesílá vlastní hlášení jiným doménám jen tehdy, když je TlsRptFromAddress nastaveno v hMailServer.INI na serveru – ten z tohoto počítače přečíst nelze.</value>
   </data>
   <data name="Separately, this server's own SENDING of such reports to other domains is inert: TlsRptFromAddress is empty in hMailServer.INI (the default), so it collects statistics and discards every completed day unsent. Set it on the Transport security page if you want to send reports too." xml:space="preserve">
-    <value>Nezávisle na tom je vlastní ODESÍLÁNÍ takových hlášení jiným doménám nečinné: TlsRptFromAddress je v hMailServer.INI prázdné (výchozí stav), takže server statistiky sbírá a každý dokončený den zahodí, aniž by cokoli odeslal. Chcete-li hlášení také odesílat, nastavte ji na stránce Zabezpečení přenosu.</value>
+    <value>Nezávisle na tom je vlastní ODESÍLÁNÍ takových hlášení jiným doménám nečinné: TlsRptFromAddress je v hMailServer.INI prázdné (výchozí stav), takže server statistiky sbírá a každý dokončený den zahodí, aniž by cokoli odeslal. Chcete-li hlášení také odesílat, nastavte ji na stránce Transportní zabezpečení.</value>
   </data>
   <data name="Serve MTA-STS policies for local domains" xml:space="preserve">
     <value>Poskytovat politiky MTA-STS pro místní domény</value>
@@ -7928,7 +7928,7 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
     <value>Prahy a akce</value>
   </data>
   <data name="Throttle abusive senders submitting to this server. Limits are per minute; 0 disables the limit. (Throttling your own outbound rate to a destination is on the Delivery of e-mail page.)" xml:space="preserve">
-    <value>Přiškrťte zneužívající odesílatele, kteří na tento server odesílají. Limity jsou za minutu; 0 limit vypne. (Přiškrcení vlastní odchozí rychlosti k cíli je na stránce Doručování pošty.)</value>
+    <value>Přiškrťte zneužívající odesílatele, kteří na tento server odesílají. Limity jsou za minutu; 0 limit vypne. (Přiškrcení vlastní odchozí rychlosti k cíli je na stránce Doručování e-mailů.)</value>
   </data>
   <data name="Throttling your own outbound rate to a domain that rate-limits you. Deferred messages consume the retry budget above." xml:space="preserve">
     <value>Přiškrcení vlastní odchozí rychlosti k doméně, která vás omezuje. Odložené zprávy spotřebovávají rozpočet opakování výše.</value>
@@ -9473,7 +9473,7 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
     <value>skenery</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>skript/uložení pomalé</value>
+    <value>script/save pomalé</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (paměťově náročný, RFC 7914)</value>

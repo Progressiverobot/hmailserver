@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Deutsch: the Deutsch catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Deutsch and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ Das Control Panel kann Nachrichtendateien nur lesen, wenn es auf demselben Rechn
     <value>Eine ältere, schwächere Option: ein Einmalcode, der nach dem Passwort beim Anmelden an DIESEM Control Panel verlangt und vom Werkzeug selbst geprüft wird, nachdem der Server das Passwort bereits akzeptiert hat. Das Geheimnis wird pro Rechner unter HKLM gespeichert, das Ein- oder Ausschalten braucht also lokale Administratorrechte, und für die REST-API oder Skripte über die COM-API tut es nichts. Bevorzugen Sie den vom Server erzwungenen Faktor oben; dieser bleibt für bestehende Einrichtungen.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Eine Ausnahme ersetzt die globalen Obergrenzen für diese Adresse; 0:0 nimmt sie ganz aus. Ohne das optionale :Stunden verwendet die Ausnahme den globalen Zeitraum. Eine fehlerhafte Zeile wird mit einem Protokolleintrag ignoriert und die globale Grenze gilt weiter für dieses Konto. Kommentarzeilen in diesem INI-Abschnitt werden hier nicht angezeigt und beim Speichern der Liste verworfen.</value>
+    <value>Eine Ausnahme ersetzt die globalen Obergrenzen für diese Adresse; 0:0 nimmt sie ganz aus. Ohne das optionale :hours verwendet die Ausnahme den globalen Zeitraum. Eine fehlerhafte Zeile wird mit einem Protokolleintrag ignoriert und die globale Grenze gilt weiter für dieses Konto. Kommentarzeilen in diesem INI-Abschnitt werden hier nicht angezeigt und beim Speichern der Liste verworfen.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Ein unerwarteter Fehler ist aufgetreten:
@@ -3497,7 +3497,7 @@ Keine Mail wird angerührt - der Index ist daraus abgeleitet - aber bis der Neua
     <value>IMAP</value>
   </data>
   <data name="IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0" xml:space="preserve">
-    <value>IMAP - der Posteingang, einmal per UID abgeholt; bleibt auf dem Server, außer Tage behalten ist 0</value>
+    <value>IMAP - INBOX, einmal per UID abgeholt; bleibt auf dem Server, außer Tage behalten ist 0</value>
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP-Dialoge</value>

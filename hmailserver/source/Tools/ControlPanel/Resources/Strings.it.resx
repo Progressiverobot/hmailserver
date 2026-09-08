@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Italiano: the Italiano catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Italiano and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ Il Control Panel può leggere i file dei messaggi solo quando è in esecuzione s
     <value>Un'opzione più vecchia e più debole: un codice monouso chiesto dopo la password all'accesso a QUESTO Control Panel, verificato dallo strumento stesso dopo che il server ha già accettato la password. Il segreto è memorizzato per macchina sotto HKLM, quindi attivarlo o disattivarlo richiede diritti di amministratore locale, e non fa nulla per l'API REST o per gli script che usano l'API COM. Preferisci il fattore imposto dal server qui sopra; questo resta per le configurazioni esistenti.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Un'eccezione sostituisce i limiti globali per quell'indirizzo; 0:0 lo esenta del tutto. Senza il :ore facoltativo l'eccezione usa il periodo globale. Una riga malformata viene ignorata con una voce nel registro e il limite globale continua ad applicarsi a quell'account. Le righe di commento in questa sezione INI non sono mostrate qui e vengono perse se l'elenco viene salvato.</value>
+    <value>Un'eccezione sostituisce i limiti globali per quell'indirizzo; 0:0 lo esenta del tutto. Senza il :hours facoltativo l'eccezione usa il periodo globale. Una riga malformata viene ignorata con una voce nel registro e il limite globale continua ad applicarsi a quell'account. Le righe di commento in questa sezione INI non sono mostrate qui e vengono perse se l'elenco viene salvato.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Si è verificato un errore imprevisto:
@@ -1351,7 +1351,7 @@ Riavviare il Control Panel adesso? Scegli No per provare a continuare a lavorare
     <value>Prima di copiare — </value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
-    <value>Tra il 354 e il 250 il server esegue la pipeline di accettazione - test antispam, modifiche al messaggio, archiviazione, lo script OnAcceptMessage e il salvataggio nel database - su un pool limitato di thread, e risponde solo quando ha finito. Il registro cronometra ogni fase. Leggilo come una sequenza e cerca l'ultima riga scritta: la fase bloccata è quella successiva. Due fasi si annunciano con una riga di inizio (spam-protection e script/salvataggio); le modifiche al messaggio no, quindi un blocco lì appare come "done spam-protection" seguito dal silenzio. Una fase che richiede dieci secondi o più viene registrata a livello applicazione anche senza la registrazione di debug.</value>
+    <value>Tra il 354 e il 250 il server esegue la pipeline di accettazione - test antispam, modifiche al messaggio, archiviazione, lo script OnAcceptMessage e il salvataggio nel database - su un pool limitato di thread, e risponde solo quando ha finito. Il registro cronometra ogni fase. Leggilo come una sequenza e cerca l'ultima riga scritta: la fase bloccata è quella successiva. Due fasi si annunciano con una riga di inizio (spam-protection e script/save); le modifiche al messaggio no, quindi un blocco lì appare come "done spam-protection" seguito dal silenzio. Una fase che richiede dieci secondi o più viene registrata a livello applicazione anche senza la registrazione di debug.</value>
   </data>
   <data name="Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the refusal is temporary and a sending server retries for days, while a volume that reaches zero costs a database that will not open and a service that will not start." xml:space="preserve">
     <value>Sbilanciato verso l'alto di proposito: rifiutare presto costa latenza di consegna e nient'altro, perché il rifiuto è temporaneo e un server mittente riprova per giorni, mentre un volume che arriva a zero costa un database che non si apre e un servizio che non si avvia.</value>
@@ -2636,7 +2636,7 @@ Nessuna posta viene toccata - l'indice ne è derivato - ma finché la ricostruzi
     <value>Disconnetti i client che inviano troppi comandi non validi</value>
   </data>
   <data name="Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). To publish a policy for your own domains, see the Web services &amp; autoconfiguration page." xml:space="preserve">
-    <value>Individua e applica i criteri MTA-STS dei destinatari prima di consegnare su TLS (RFC 8461). Per pubblicare un criterio per i tuoi domini, vedi la pagina Servizi web e autoconfigurazione.</value>
+    <value>Individua e applica i criteri MTA-STS dei destinatari prima di consegnare su TLS (RFC 8461). Per pubblicare un criterio per i tuoi domini, vedi la pagina Servizi web e configurazione automatica.</value>
   </data>
   <data name="Disk space" xml:space="preserve">
     <value>Spazio su disco</value>
@@ -3284,7 +3284,7 @@ Nessuna posta viene toccata - l'indice ne è derivato - ma finché la ricostruzi
     <value>Vai alla pagina correlata {0}</value>
   </data>
   <data name="Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)" xml:space="preserve">
-    <value>Comportamento di arresto ordinato per il funzionamento non presidiato o in cluster. (La conservazione dei registri si trova nella pagina Registri.)</value>
+    <value>Comportamento di arresto ordinato per il funzionamento non presidiato o in cluster. (La conservazione dei registri si trova nella pagina Registrazione.)</value>
   </data>
   <data name="Greylisting" xml:space="preserve">
     <value>Greylisting</value>
@@ -5196,7 +5196,7 @@ Non verrà accettata alcuna nuova connessione e non verrà consegnata alcuna pos
     <value>Limiti di invio per singolo account</value>
   </data>
   <data name="Per-address overrides, one per line: address=messages:recipients[:hours]" xml:space="preserve">
-    <value>Eccezioni per singolo indirizzo, una per riga: indirizzo=messaggi:destinatari[:ore]</value>
+    <value>Eccezioni per singolo indirizzo, una per riga: address=messages:recipients[:hours]</value>
   </data>
   <data name="Per-name lockout" xml:space="preserve">
     <value>Blocco per nome</value>
@@ -5467,7 +5467,7 @@ Lascia pubblicato il VECCHIO record DNS ({2}) per almeno qualche giorno. La post
     <value>API REST di amministrazione + Web Control Deck</value>
   </data>
   <data name="REST administration API, Prometheus metrics and remote script management. The public web services listener (autoconfiguration, MTA-STS hosting) is on the Web services &amp; autoconfiguration page; OAuth2 token authentication is on the Authentication page." xml:space="preserve">
-    <value>API REST di amministrazione, metriche Prometheus e gestione remota degli script. Il listener pubblico dei servizi web (autoconfigurazione, hosting MTA-STS) si trova nella pagina Servizi web e autoconfigurazione; l'autenticazione con token OAuth2 si trova nella pagina Autenticazione.</value>
+    <value>API REST di amministrazione, metriche Prometheus e gestione remota degli script. Il listener pubblico dei servizi web (autoconfigurazione, hosting MTA-STS) si trova nella pagina Servizi web e configurazione automatica; l'autenticazione con token OAuth2 si trova nella pagina Autenticazione.</value>
   </data>
   <data name="REST listener settings…" xml:space="preserve">
     <value>Impostazioni del listener REST…</value>
@@ -9473,7 +9473,7 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
     <value>scanner</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/salvataggio lento</value>
+    <value>script/save lento</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (a uso intensivo di memoria, RFC 7914)</value>
