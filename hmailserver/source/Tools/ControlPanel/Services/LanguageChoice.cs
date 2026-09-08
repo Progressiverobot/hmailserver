@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Linq;
 using System.Globalization;
 using System.Resources;
 using System.Windows;
@@ -82,11 +83,8 @@ namespace hMailServer.ControlPanel.Services
             return false;
 
          string name = null;
-         foreach (Language language in Languages)
-         {
-            if (string.Equals(language.Tag, tag, StringComparison.OrdinalIgnoreCase))
-               name = L(language.NativeName);
-         }
+         foreach (Language language in Languages.Where(language => string.Equals(language.Tag, tag, StringComparison.OrdinalIgnoreCase)))
+            name = L(language.NativeName);
 
          if (name == null)
             return false;

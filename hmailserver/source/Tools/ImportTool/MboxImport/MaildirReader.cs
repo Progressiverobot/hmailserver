@@ -73,9 +73,8 @@ namespace ImportTool.MboxImport
       /// <summary>The messages of one folder: <c>new</c> first, then <c>cur</c>, each in file-name order (which is arrival order, since the name starts with a timestamp).</summary>
       public static IEnumerable<MaildirMessage> Messages(string folderName, string folderDirectory)
       {
-         foreach (var subdirectory in new[] { "new", "cur" })
+         foreach (var path in new[] { "new", "cur" }.Select(subdirectory => System.IO.Path.Join(folderDirectory, subdirectory)))
          {
-            var path = System.IO.Path.Join(folderDirectory, subdirectory);
             if (!Directory.Exists(path))
                continue;
 

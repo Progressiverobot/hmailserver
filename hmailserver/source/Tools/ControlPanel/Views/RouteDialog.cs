@@ -33,7 +33,7 @@ namespace hMailServer.ControlPanel.Views
 
       private readonly CheckBox requiresAuth_ = new() { Content = L("Target server requires _authentication"), FontSize = Typography.Body };
       private readonly Wpf.Ui.Controls.TextBox authUser_ = new();
-      private readonly Wpf.Ui.Controls.PasswordBox authPassword_ = new();
+      private readonly hMailServer.ControlPanel.Views.PasswordBox authPassword_ = new();
 
       private readonly TextBlock status_ = new()
       {

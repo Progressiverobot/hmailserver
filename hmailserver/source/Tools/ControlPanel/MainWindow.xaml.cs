@@ -977,15 +977,14 @@ namespace hMailServer.ControlPanel
             Placement = System.Windows.Controls.Primitives.PlacementMode.Top
          };
 
-         foreach (Loc.Language language in Loc.Languages)
+         foreach (MenuItem item in Loc.Languages.Select(language => new MenuItem
          {
-            var item = new MenuItem
-            {
-               Header = L(language.NativeName),
-               IsCheckable = true,
-               IsChecked = string.Equals(language.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase),
-               Tag = language.Tag
-            };
+            Header = L(language.NativeName),
+            IsCheckable = true,
+            IsChecked = string.Equals(language.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase),
+            Tag = language.Tag
+         }))
+         {
             item.Click += (s, args) => LanguageChoice.Offer((string)((MenuItem)s).Tag);
             menu.Items.Add(item);
          }
