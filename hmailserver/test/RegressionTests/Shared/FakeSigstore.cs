@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -51,7 +52,8 @@ namespace RegressionTests.Shared
          _intermediate = intermediateRequest.Create(_root.SubjectName, X509SignatureGenerator.CreateForECDsa(_rootKey),
             DateTimeOffset.UtcNow.AddMonths(-6), DateTimeOffset.UtcNow.AddYears(4), Serial());
 
-         LogId = SHA256.Create().ComputeHash(SubjectPublicKeyInfoP256(_logKey));
+         using (var sha = SHA256.Create())
+            LogId = sha.ComputeHash(SubjectPublicKeyInfoP256(_logKey));
       }
 
       /// <summary>SHA-256 of the log key's DER SubjectPublicKeyInfo, which is how Rekor names itself.</summary>
@@ -120,7 +122,9 @@ namespace RegressionTests.Shared
       {
          options = options ?? new Options();
          byte[] signed = options.SignOtherContent ?? content;
-         byte[] digest = SHA256.Create().ComputeHash(signed);
+         byte[] digest;
+         using (var sha = SHA256.Create())
+            digest = sha.ComputeHash(signed);
 
          using (var leafKey = ECDsa.Create(ECCurve.NamedCurves.nistP256))
          {
@@ -222,8 +226,13 @@ namespace RegressionTests.Shared
             {
                File.Delete(file);
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+               // The server reads the trust roots and the log key while a check is
+               // running, and a fixture disposes this the moment its test is done, so a
+               // file still open here is that race and not a fault. It stays in the
+               // temporary directory under a name no other run reuses.
+               Trace.WriteLine("FakeSigstore: " + file + " could not be deleted: " + ex.Message);
             }
          }
       }
@@ -232,12 +241,14 @@ namespace RegressionTests.Shared
 
       public static byte[] LeafHash(byte[] data)
       {
-         return SHA256.Create().ComputeHash(new byte[] {0x00}.Concat(data).ToArray());
+         using (var sha = SHA256.Create())
+            return sha.ComputeHash(new byte[] {0x00}.Concat(data).ToArray());
       }
 
       private static byte[] NodeHash(byte[] left, byte[] right)
       {
-         return SHA256.Create().ComputeHash(new byte[] {0x01}.Concat(left).Concat(right).ToArray());
+         using (var sha = SHA256.Create())
+            return sha.ComputeHash(new byte[] {0x01}.Concat(left).Concat(right).ToArray());
       }
 
       private static int LargestPowerOfTwoBelow(int n)
@@ -351,7 +362,9 @@ namespace RegressionTests.Shared
 
       private string WriteTemp(string stem, string contents)
       {
-         string path = Path.Combine(Path.GetTempPath(), "hm-" + stem + "-" + Guid.NewGuid().ToString("N") + ".pem");
+         // The stem is one of this class's own words - "roots", "rekor" - and the rest
+         // is a bare hex guid, so the second part is a file name and never a path.
+         string path = Paths.Combine(Path.GetTempPath(), "hm-" + stem + "-" + Guid.NewGuid().ToString("N") + ".pem");
          File.WriteAllText(path, contents, new UTF8Encoding(false));
          _files.Add(path);
          return path;

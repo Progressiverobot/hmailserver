@@ -4,8 +4,10 @@
 
 using System;
 using System.CodeDom.Compiler;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -51,7 +53,9 @@ namespace RegressionTests.API
          _sigstore = new FakeSigstore();
          _updatesDirectory = Paths.Combine(_settings.Directories.DataDirectory, "Updates");
          CleanUpdates();
-         _backupDirectory = Path.Combine(Path.GetTempPath(), "hm-update-backup-" + Guid.NewGuid().ToString("N"));
+         // A directory of the fixture's own for each test: the second part is this
+         // prefix and a bare hex guid, so it can never be a rooted path.
+         _backupDirectory = Paths.Combine(Path.GetTempPath(), "hm-update-backup-" + Guid.NewGuid().ToString("N"));
          _previousBackupDestination = _settings.Backup.Destination;
 
          _feed = new FakeHttpEndpoint(200, "{}");
@@ -234,14 +238,14 @@ namespace RegressionTests.API
       {
          if (_quiet != null)
             return;
-         string directory = Path.Combine(Path.GetTempPath(), "hm-fake-installers");
+         string directory = Paths.Combine(Path.GetTempPath(), "hm-fake-installers");
          Directory.CreateDirectory(directory);
-         _marker = Path.Combine(directory, "ran-schedule.log");
+         _marker = Paths.Combine(directory, "ran-schedule.log");
          string source =
             "using System;\nusing System.IO;\nclass FakeInstaller\n{\n   static int Main(string[] args)\n   {\n" +
             "      File.AppendAllText(@\"" + _marker + "\", \"quiet \" + string.Join(\" \", args) + Environment.NewLine);\n" +
             "      return 0;\n   }\n}\n";
-         string path = Path.Combine(directory, "quiet-schedule.exe");
+         string path = Paths.Combine(directory, "quiet-schedule.exe");
          using (CodeDomProvider provider = CodeDomProvider.CreateProvider("CSharp"))
          {
             var parameters = new CompilerParameters {GenerateExecutable = true, OutputAssembly = path, GenerateInMemory = false};
@@ -311,7 +315,9 @@ namespace RegressionTests.API
       private string Release(string version, string name, byte[] installer)
       {
          string download = _feed.UrlFor("/download/");
-         string digest = "sha256:" + FakeSigstore.Hex(SHA256.Create().ComputeHash(installer));
+         string digest;
+         using (var sha = SHA256.Create())
+            digest = "sha256:" + FakeSigstore.Hex(sha.ComputeHash(installer));
          return "{\"html_url\":\"https://github.com/Progressiverobot/hmailserver/releases/tag/v" + version + "\"," +
                 "\"tag_name\":\"v" + version + "\",\"name\":\"hMailServer " + version + "\",\"draft\":false,\"prerelease\":false," +
                 "\"published_at\":\"2026-09-12T10:00:00Z\",\"assets\":[" +
@@ -322,11 +328,7 @@ namespace RegressionTests.API
 
       private int CountRequests(string fragment)
       {
-         int count = 0;
-         foreach (string request in _feed.Requests)
-            if (request.Contains(fragment))
-               count++;
-         return count;
+         return _feed.Requests.Count(request => request.Contains(fragment));
       }
 
       private static string WaitForOutcome(string path, int seconds)
@@ -357,14 +359,19 @@ namespace RegressionTests.API
             {
                File.Delete(file);
             }
-            catch (IOException)
+            catch (IOException ex)
             {
+               // A file the server still has open - the installer it is downloading or
+               // applying. The next run's clean-up gets it, and a leftover under Updates
+               // costs the following fixture nothing, so it is traced and not failed on.
+               Trace.WriteLine("UpdateSchedule: " + file + " could not be deleted: " + ex.Message);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
                // apply-token carries a DACL naming SYSTEM, Administrators and the
                // service account only; the suite is none of those. The server
                // revokes it after an apply, and one never redeemed expires.
+               Trace.WriteLine("UpdateSchedule: " + file + " is not the suite's to delete: " + ex.Message);
             }
          }
       }

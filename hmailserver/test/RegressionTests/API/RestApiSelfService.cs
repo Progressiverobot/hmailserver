@@ -1610,11 +1610,11 @@ namespace RegressionTests.API
          Assert.AreEqual(200, file.Status, file.Body);
          Assert.AreEqual(numbers, file.BodyBytes);
 
-         string tooMany = "{\"to\":\"" + other + "\",\"text\":\"x\",\"attachments\":[";
+         StringBuilder tooMany = new StringBuilder("{\"to\":\"" + other + "\",\"text\":\"x\",\"attachments\":[");
          for (int i = 0; i < 21; i++)
-            tooMany += (i > 0 ? "," : "") + "{\"name\":\"f" + i + ".txt\",\"type\":\"text/plain\",\"data\":\"aGk=\"}";
-         tooMany += "]}";
-         (int status, string body) refused = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword), tooMany);
+            tooMany.Append(i > 0 ? "," : "").Append("{\"name\":\"f" + i + ".txt\",\"type\":\"text/plain\",\"data\":\"aGk=\"}");
+         tooMany.Append("]}");
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword), tooMany.ToString());
          Assert.AreEqual(400, refused.status, "Body: " + refused.body);
          Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 0);
       }

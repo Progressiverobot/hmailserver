@@ -296,9 +296,9 @@ namespace RegressionTests.API
          if (_quiet != null)
             return;
 
-         string directory = Path.Combine(Path.GetTempPath(), "hm-fake-installers");
+         string directory = Paths.Combine(Path.GetTempPath(), "hm-fake-installers");
          Directory.CreateDirectory(directory);
-         _marker = Path.Combine(directory, "ran.log");
+         _marker = Paths.Combine(directory, "ran.log");
 
          _quiet = Compile(directory, "quiet", "", 0);
          _stopper = Compile(directory, "stopper",
@@ -327,7 +327,10 @@ namespace RegressionTests.API
             "      return " + exitCode + ";\n" +
             "   }\n}\n";
 
-         string path = Path.Combine(directory, name + ".exe");
+         // The name is one of the five words CompileFakeInstallers passes - "quiet",
+         // "stopper", "starter", "failing", "ager" - so what is appended here is a file
+         // name, never a rooted path that would displace the directory.
+         string path = Paths.Combine(directory, name + ".exe");
          using (CodeDomProvider provider = CodeDomProvider.CreateProvider("CSharp"))
          {
             var parameters = new CompilerParameters {GenerateExecutable = true, OutputAssembly = path, GenerateInMemory = false};
@@ -404,7 +407,9 @@ namespace RegressionTests.API
       private string Release(string version, string name, byte[] installer)
       {
          string download = _feed.UrlFor("/download/");
-         string digest = "sha256:" + FakeSigstore.Hex(SHA256.Create().ComputeHash(installer));
+         string digest;
+         using (var sha = SHA256.Create())
+            digest = "sha256:" + FakeSigstore.Hex(sha.ComputeHash(installer));
          return "{\"html_url\":\"https://github.com/Progressiverobot/hmailserver/releases/tag/v" + version + "\"," +
                 "\"tag_name\":\"v" + version + "\",\"name\":\"hMailServer " + version + "\",\"draft\":false,\"prerelease\":false," +
                 "\"published_at\":\"2026-09-12T10:00:00Z\",\"assets\":[" +

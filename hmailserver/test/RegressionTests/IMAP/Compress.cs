@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Sockets;
@@ -264,11 +265,27 @@ namespace RegressionTests.IMAP
                         _rawCompressed.Add(buffer[i]);
                }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (RecordUnlessClosed(ex))
             {
-               if (!_closed)
-                  _readerError = ex;
+               // Every exception, deliberately: nothing may leave a background thread,
+               // where an unhandled one ends the whole run instead of one test. The
+               // filter takes all of them and does the deciding, so that _closed is read
+               // exactly once - two clauses, one filtered on the flag and one on its
+               // negation, would read it twice, and Dispose setting it between those two
+               // reads would leave the exception unhandled here.
+               Trace.WriteLine("DeflateImapClient: the reader stopped on " + ex.GetType().Name + ": " + ex.Message);
             }
+         }
+
+         // The reader's catch filter, true for every exception. The single read of _closed
+         // is what says which kind this is: after Dispose it is the socket closed under the
+         // read this thread was blocked in, which is how the reader is meant to end; before
+         // it, it is a real failure, and ReadUntil fails the test with it.
+         private bool RecordUnlessClosed(Exception ex)
+         {
+            if (!_closed)
+               _readerError = ex;
+            return true;
          }
 
          // The whole compressed run inflated from the start, as an ISO-8859-1 string.
@@ -386,8 +403,12 @@ namespace RegressionTests.IMAP
             {
                _client.Close();
             }
-            catch (Exception)
+            catch (Exception ex) when (ex is IOException || ex is SocketException || ex is ObjectDisposedException)
             {
+               // The reader thread is blocked in a read on this socket, and closing it is
+               // how that read is ended; a close that throws is that race, not a failure
+               // of the test. The Join below still waits for the reader to leave.
+               Trace.WriteLine("DeflateImapClient: closing the socket threw " + ex.GetType().Name + ": " + ex.Message);
             }
             if (_readerThread != null)
                _readerThread.Join(2000);

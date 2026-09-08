@@ -117,10 +117,11 @@ namespace hMailServer.ControlPanel.Tests.Services
          if (resources == null)
             return;   // sources not available (a packaged drop)
 
-         foreach (Loc.Language language in Loc.Languages)
+         // The empty tag is "follow Windows" and English needs no catalogue of its own,
+         // so neither is asked for a .resx. The order of the two tests matters: the tag
+         // has to be non-empty before GetCultureInfo is handed it.
+         foreach (Loc.Language language in Loc.Languages.Where(l => l.Tag.Length != 0 && !Loc.IsEnglish(CultureInfo.GetCultureInfo(l.Tag))))
          {
-            if (language.Tag.Length == 0 || Loc.IsEnglish(CultureInfo.GetCultureInfo(language.Tag)))
-               continue;
             Assert.True(File.Exists(Path.Join(resources, "Strings." + language.Tag + ".resx")),
                "The language picker offers '" + language.NativeName + "' and no Strings." + language.Tag + ".resx exists.");
          }
