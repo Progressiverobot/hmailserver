@@ -8333,7 +8333,7 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
     <value>Hva serveren gjør etter hvert som meldingslagervolumet fylles. Begge verdiene er absolutte megabyte, ikke prosenter, fordi det som avgjør om neste melding får plass, er hvor mange byte som er igjen, ikke hvilken brøkdel av volumet de utgjør. Gjelder etter omstart av tjenesten.</value>
   </data>
   <data name="What the server writes to its log files (viewable on the Live logs page)." xml:space="preserve">
-    <value>Hva serveren skriver til loggfilene sine (kan ses på siden Levende logger).</value>
+    <value>Hva serveren skriver til loggfilene sine (kan ses på siden Direktelogger).</value>
   </data>
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>Hva denne nøkkelen er til, f.eks. "Grafana probe"</value>
@@ -9473,7 +9473,7 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
     <value>skannere</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>skript/lagring tregt</value>
+    <value>script/save tregt</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (minnekrevende, RFC 7914)</value>

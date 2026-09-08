@@ -603,7 +603,7 @@ Bu zayıf parola yine de kaydedilsin mi?</value>
     <value>ACME kapalı (AcmeEnabled=0, varsayılan); bu nedenle dışarıdan hiçbir şey gerekmez.</value>
   </data>
   <data name="ACME is switched on but no certificate has been issued yet - fullchain.pem and privkey.pem are not both in {0}. Issue happens on the server's own schedule, so this is normal for a few minutes after enabling it; if it persists, the CA could not reach this server, and the External setup page checks exactly that." xml:space="preserve">
-    <value>ACME açık ama henüz sertifika verilmemiş - fullchain.pem ve privkey.pem dosyalarının ikisi birden {0} içinde değil. Sertifika verme işlemi sunucunun kendi zamanlamasına göre olur; bu yüzden özelliği açtıktan sonraki birkaç dakika boyunca bu normaldir. Sürerse, CA bu sunucuya ulaşamamış demektir ve Harici kurulum sayfası tam olarak bunu denetler.</value>
+    <value>ACME açık ama henüz sertifika verilmemiş - fullchain.pem ve privkey.pem dosyalarının ikisi birden {0} içinde değil. Sertifika verme işlemi sunucunun kendi zamanlamasına göre olur; bu yüzden özelliği açtıktan sonraki birkaç dakika boyunca bu normaldir. Sürerse, CA bu sunucuya ulaşamamış demektir ve Dış kurulum sayfası tam olarak bunu denetler.</value>
   </data>
   <data name="AD do_main of that user" xml:space="preserve">
     <value>Bu kullanıcının AD etki ala_nı</value>
@@ -1059,7 +1059,7 @@ Denetim Masası, ileti dosyalarını yalnızca sunucuyla aynı makinede ve yeter
     <value>Daha eski ve daha zayıf bir seçenek: BU Denetim Masası'nda oturum açarken paroladan sonra istenen ve sunucu parolayı kabul ettikten sonra aracın kendisi tarafından denetlenen tek kullanımlık kod. Gizli anahtar makine başına HKLM altında saklanır; bu nedenle açmak veya kapatmak yerel yönetici hakları gerektirir ve bu seçenek REST API için ya da COM API'sini kullanan betikler için hiçbir şey yapmaz. Yukarıdaki, sunucunun zorunlu kıldığı faktörü tercih edin; bu seçenek mevcut kurulumlar için duruyor.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Bir geçersiz kılma, o adres için genel üst sınırların yerine geçer; 0:0 adresi tamamen muaf tutar. İsteğe bağlı :saat kısmı olmadan geçersiz kılma genel dönemi kullanır. Bozuk bir satır, bir günlük girdisiyle yoksayılır ve o hesap için genel sınır geçerli olmayı sürdürür. Bu INI bölümündeki açıklama satırları burada gösterilmez ve liste kaydedilirse atılır.</value>
+    <value>Bir geçersiz kılma, o adres için genel üst sınırların yerine geçer; 0:0 adresi tamamen muaf tutar. İsteğe bağlı :hours kısmı olmadan geçersiz kılma genel dönemi kullanır. Bozuk bir satır, bir günlük girdisiyle yoksayılır ve o hesap için genel sınır geçerli olmayı sürdürür. Bu INI bölümündeki açıklama satırları burada gösterilmez ve liste kaydedilirse atılır.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Beklenmeyen bir hata oluştu:
@@ -9473,7 +9473,7 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
     <value>tarayıcı</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>betik/kaydetme yavaş</value>
+    <value>script/save yavaş</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (bellek yoğun, RFC 7914)</value>

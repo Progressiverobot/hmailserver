@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Français: the Français catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Français and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ Le Control Panel ne peut lire les fichiers de messages que lorsqu'il s'exécute 
     <value>Une option plus ancienne et plus faible : un code à usage unique demandé après le mot de passe à la connexion à CE Control Panel, vérifié par l'outil lui-même après que le serveur a déjà accepté le mot de passe. Le secret est stocké par machine sous HKLM, l'activer ou le désactiver exige donc des droits d'administrateur local, et cela ne fait rien pour l'API REST ni pour les scripts utilisant l'API COM. Préférez le facteur imposé par le serveur ci-dessus ; celui-ci reste pour les installations existantes.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Une dérogation remplace les plafonds globaux pour cette adresse ; 0:0 l'exempte entièrement. Sans le :heures facultatif, la dérogation utilise la période globale. Une ligne mal formée est ignorée avec une entrée de journal et la limite globale s'applique toujours à ce compte. Les lignes de commentaire de cette section INI ne sont pas affichées ici et sont perdues si la liste est enregistrée.</value>
+    <value>Une dérogation remplace les plafonds globaux pour cette adresse ; 0:0 l'exempte entièrement. Sans le :hours facultatif, la dérogation utilise la période globale. Une ligne mal formée est ignorée avec une entrée de journal et la limite globale s'applique toujours à ce compte. Les lignes de commentaire de cette section INI ne sont pas affichées ici et sont perdues si la liste est enregistrée.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Une erreur inattendue s'est produite :
@@ -1351,7 +1351,7 @@ Redémarrer le Control Panel maintenant ? Choisissez Non pour essayer de continu
     <value>Avant de copier —</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
-    <value>Entre le 354 et le 250, le serveur exécute le pipeline d'acceptation - tests anti-spam, modifications du message, archivage, script OnAcceptMessage et enregistrement en base - sur un pool de threads borné, et ne répond qu'une fois terminé. Le journal chronomètre chaque étape. Lisez-le comme une séquence et cherchez la dernière ligne écrite : l'étape bloquée est celle qui suit. Deux étapes s'annoncent par une ligne de début (protection anti-spam et script/enregistrement) ; les modifications du message non, un blocage à cet endroit apparaît donc comme « done spam-protection » suivi de silence. Une étape qui prend dix secondes ou plus est journalisée au niveau application même sans journalisation de débogage.</value>
+    <value>Entre le 354 et le 250, le serveur exécute le pipeline d'acceptation - tests anti-spam, modifications du message, archivage, script OnAcceptMessage et enregistrement en base - sur un pool de threads borné, et ne répond qu'une fois terminé. Le journal chronomètre chaque étape. Lisez-le comme une séquence et cherchez la dernière ligne écrite : l'étape bloquée est celle qui suit. Deux étapes s'annoncent par une ligne de début (spam-protection et script/save) ; les modifications du message non, un blocage à cet endroit apparaît donc comme « done spam-protection » suivi de silence. Une étape qui prend dix secondes ou plus est journalisée au niveau application même sans journalisation de débogage.</value>
   </data>
   <data name="Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the refusal is temporary and a sending server retries for days, while a volume that reaches zero costs a database that will not open and a service that will not start." xml:space="preserve">
     <value>Volontairement biaisé vers le haut : refuser tôt coûte de la latence de livraison et rien d'autre, parce que le refus est temporaire et qu'un serveur expéditeur réessaie pendant des jours, tandis qu'un volume qui atteint zéro coûte une base de données qui ne s'ouvre plus et un service qui ne démarre plus.</value>
@@ -3497,7 +3497,7 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
     <value>IMAP</value>
   </data>
   <data name="IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0" xml:space="preserve">
-    <value>IMAP - la boîte de réception, relevée une fois par UID ; gardée sur le serveur sauf si Jours à conserver est 0</value>
+    <value>IMAP - INBOX, relevée une fois par UID ; gardée sur le serveur sauf si Jours à conserver est 0</value>
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>Conversations IMAP</value>
@@ -5044,7 +5044,7 @@ L'installateur vérifié est remis à l'assistant de mise à jour : le service s
     <value>Sécurité de la livraison sortante (après la recherche MX)</value>
   </data>
   <data name="Outbound delivery, retries and throttling. Keeping forwarded mail SPF-aligned (SRS) and bounce tagging (BATV) are on the Transport security page." xml:space="preserve">
-    <value>Livraison sortante, nouvelles tentatives et limitation de débit. Garder le courrier transféré aligné avec SPF (SRS) et le marquage des rebonds (BATV) sont sur la page Sécurité du transport.</value>
+    <value>Livraison sortante, nouvelles tentatives et limitation de débit. Garder le courrier transféré aligné avec SPF (SRS) et le marquage des rebonds (BATV) sont sur la page Sécurité de transport.</value>
   </data>
   <data name="Outbound mail authentication and encryption policies (hMailServer.INI). Changes take effect after a service restart." xml:space="preserve">
     <value>Politiques d'authentification et de chiffrement du courrier sortant (hMailServer.INI). Les changements prennent effet après un redémarrage du service.</value>
@@ -5196,7 +5196,7 @@ Aucune nouvelle connexion ne sera acceptée et aucun courrier ne sera livré jus
     <value>Limites d'envoi par compte</value>
   </data>
   <data name="Per-address overrides, one per line: address=messages:recipients[:hours]" xml:space="preserve">
-    <value>Surcharges par adresse, une par ligne : adresse=messages:destinataires[:heures]</value>
+    <value>Surcharges par adresse, une par ligne : address=messages:recipients[:hours]</value>
   </data>
   <data name="Per-name lockout" xml:space="preserve">
     <value>Verrouillage par nom</value>
@@ -5422,7 +5422,7 @@ Laissez l'ANCIEN enregistrement DNS ({2}) publié pendant au moins quelques jour
     <value>Publié, plus strict que le point de départ</value>
   </data>
   <data name="Publishes https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt so other servers require TLS when they deliver to you. Honouring other domains' policies is on the Transport security page." xml:space="preserve">
-    <value>Publie https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt pour que les autres serveurs exigent TLS quand ils vous livrent. Le respect des politiques des autres domaines est sur la page Sécurité du transport.</value>
+    <value>Publie https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt pour que les autres serveurs exigent TLS quand ils vous livrent. Le respect des politiques des autres domaines est sur la page Sécurité de transport.</value>
   </data>
   <data name="Publishing this record asks every server that delivers to {0} to e-mail you a daily report when TLS to you fails or is downgraded. The reports go to the rua= mailbox, which must exist and accept mail from strangers. This works regardless of any hMailServer setting - the senders do the reporting." xml:space="preserve">
     <value>Publier cet enregistrement demande à chaque serveur qui livre à {0} de vous envoyer par e-mail un rapport quotidien quand le TLS vers vous échoue ou est rétrogradé. Les rapports vont à la boîte rua=, qui doit exister et accepter le courrier d'inconnus. Cela fonctionne quel que soit le réglage de hMailServer - ce sont les expéditeurs qui rapportent.</value>
@@ -6520,7 +6520,7 @@ Continuer ?</value>
     <value>Par ailleurs, ce serveur n'envoie ses propres rapports à d'autres domaines que si TlsRptFromAddress est défini dans hMailServer.INI sur le serveur - non lisible depuis cette machine.</value>
   </data>
   <data name="Separately, this server's own SENDING of such reports to other domains is inert: TlsRptFromAddress is empty in hMailServer.INI (the default), so it collects statistics and discards every completed day unsent. Set it on the Transport security page if you want to send reports too." xml:space="preserve">
-    <value>Par ailleurs, l'ENVOI par ce serveur de tels rapports à d'autres domaines est inerte : TlsRptFromAddress est vide dans hMailServer.INI (la valeur par défaut), il collecte donc des statistiques et jette chaque journée terminée sans l'envoyer. Définissez-le sur la page Sécurité du transport si vous voulez envoyer des rapports vous aussi.</value>
+    <value>Par ailleurs, l'ENVOI par ce serveur de tels rapports à d'autres domaines est inerte : TlsRptFromAddress est vide dans hMailServer.INI (la valeur par défaut), il collecte donc des statistiques et jette chaque journée terminée sans l'envoyer. Définissez-le sur la page Sécurité de transport si vous voulez envoyer des rapports vous aussi.</value>
   </data>
   <data name="Serve MTA-STS policies for local domains" xml:space="preserve">
     <value>Servir les politiques MTA-STS pour les domaines locaux</value>
@@ -9473,7 +9473,7 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
     <value>analyseurs</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/enregistrement lent</value>
+    <value>script/save lent</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (coûteux en mémoire, RFC 7914)</value>

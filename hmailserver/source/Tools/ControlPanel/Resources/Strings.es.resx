@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Español: the Español catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Español and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1351,7 +1351,7 @@ Los detalles completos se escribieron en:
     <value>Antes de copiar —</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
-    <value>Entre el 354 y el 250 el servidor ejecuta la cadena de aceptación - pruebas de spam, modificaciones del mensaje, archivado, el script OnAcceptMessage y el guardado en la base de datos - en un grupo acotado de hilos, y solo responde cuando termina. El registro cronometra cada etapa. Léalo como una secuencia y busque la última línea escrita: la etapa atascada es la siguiente. Dos etapas se anuncian con una línea de inicio (protección antispam y script/guardado); las modificaciones del mensaje no, así que un atasco ahí se ve como "done spam-protection" seguido de silencio. Una etapa que tarda diez segundos o más se registra a nivel de aplicación aunque no haya registro de depuración.</value>
+    <value>Entre el 354 y el 250 el servidor ejecuta la cadena de aceptación - pruebas de spam, modificaciones del mensaje, archivado, el script OnAcceptMessage y el guardado en la base de datos - en un grupo acotado de hilos, y solo responde cuando termina. El registro cronometra cada etapa. Léalo como una secuencia y busque la última línea escrita: la etapa atascada es la siguiente. Dos etapas se anuncian con una línea de inicio (spam-protection y script/save); las modificaciones del mensaje no, así que un atasco ahí se ve como "done spam-protection" seguido de silencio. Una etapa que tarda diez segundos o más se registra a nivel de aplicación aunque no haya registro de depuración.</value>
   </data>
   <data name="Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the refusal is temporary and a sending server retries for days, while a volume that reaches zero costs a database that will not open and a service that will not start." xml:space="preserve">
     <value>Sesgado hacia arriba a propósito: rechazar pronto cuesta latencia de entrega y nada más, porque el rechazo es temporal y un servidor emisor reintenta durante días, mientras que un volumen que llega a cero cuesta una base de datos que no abre y un servicio que no arranca.</value>
@@ -3497,7 +3497,7 @@ No se toca ningún correo - el índice se deriva de él - pero hasta que la reco
     <value>IMAP</value>
   </data>
   <data name="IMAP - the INBOX, collected once by UID; kept on the server unless Days to keep is 0" xml:space="preserve">
-    <value>IMAP - la bandeja de entrada, recogida una vez por UID; se conserva en el servidor a menos que Días que conservar sea 0</value>
+    <value>IMAP - INBOX, recogida una vez por UID; se conserva en el servidor a menos que Días que conservar sea 0</value>
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>Conversaciones IMAP</value>
@@ -9473,7 +9473,7 @@ No se borra ningún mensaje ni se elimina ninguna cuenta. ¿Continuar?</value>
     <value>analizadores</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/guardado lento</value>
+    <value>script/save lento</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (intensivo en memoria, RFC 7914)</value>

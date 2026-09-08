@@ -1059,7 +1059,7 @@ Kontrollpanelen kan bara läsa meddelandefiler när den körs på samma dator so
     <value>Ett äldre, svagare alternativ: en engångskod som efterfrågas efter lösenordet vid inloggning i DEN HÄR Kontrollpanelen, kontrollerad av verktyget självt efter att servern redan har godtagit lösenordet. Hemligheten lagras per dator under HKLM, så att aktivera eller inaktivera den kräver lokala administratörsrättigheter, och den gör inget för REST API:et eller för skript som använder COM API:et. Föredra den serverkontrollerade faktorn ovan; den här finns kvar för befintliga installationer.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>En åsidosättning ersätter de globala taken för den adressen; 0:0 undantar den helt. Utan det valfria :timmar använder åsidosättningen den globala perioden. En felformad rad ignoreras med en loggpost och den globala gränsen gäller fortfarande för det kontot. Kommentarsrader i den här INI-sektionen visas inte här och tas bort om listan sparas.</value>
+    <value>En åsidosättning ersätter de globala taken för den adressen; 0:0 undantar den helt. Utan det valfria :hours använder åsidosättningen den globala perioden. En felformad rad ignoreras med en loggpost och den globala gränsen gäller fortfarande för det kontot. Kommentarsrader i den här INI-sektionen visas inte här och tas bort om listan sparas.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Ett oväntat fel inträffade:
@@ -1201,7 +1201,7 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
     <value>Högst {0} skanningar körs samtidigt. Utöver det väntar leveranstrådarna — och efter 60 sekunders väntan ger servern upp väntandet och skannar ändå, så en långsam skanner visar sig som långsam post snarare än som oskannad post.</value>
   </data>
   <data name="At your DNS host, publish a TXT record named &lt;selector&gt;._domainkey.&lt;domain&gt; containing the public key (v=DKIM1; k=rsa; p=...). This page looks the record up through the Windows resolver, and where the key file is readable it also checks that the published key is the RIGHT key - a wrong value cannot be fixed by waiting." xml:space="preserve">
-    <value>Publicera hos din DNS-leverantör en TXT-post med namnet &lt;selektor&gt;._domainkey.&lt;domän&gt; som innehåller den publika nyckeln (v=DKIM1; k=rsa; p=...). Den här sidan slår upp posten genom Windows-resolvern, och där nyckelfilen är läsbar kontrollerar den också att den publicerade nyckeln är RÄTT nyckel - ett felaktigt värde kan inte åtgärdas genom att vänta.</value>
+    <value>Publicera hos din DNS-leverantör en TXT-post med namnet &lt;selector&gt;._domainkey.&lt;domain&gt; som innehåller den publika nyckeln (v=DKIM1; k=rsa; p=...). Den här sidan slår upp posten genom Windows-resolvern, och där nyckelfilen är läsbar kontrollerar den också att den publicerade nyckeln är RÄTT nyckel - ett felaktigt värde kan inte åtgärdas genom att vänta.</value>
   </data>
   <data name="Attachment blocking is switched on with no patterns to block, so it does nothing at all." xml:space="preserve">
     <value>Bilageblockering är påslagen utan några mönster att blockera, så den gör ingenting alls.</value>
@@ -1399,7 +1399,7 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
     <value>Båda trösklarna är 0, så ingen poäng kan markera eller avvisa något - servern testar dem med "större än 0" innan den använder dem. Den slutar också testa så snart den löpande summan når den högre tröskeln, som är 0, så exakt en kontroll körs i varje fas och dess resultat kastas.</value>
   </data>
   <data name="Bounces and virus notifications are sent from mailer-daemon@&lt;domain&gt;. This overrides the &lt;domain&gt; part. Left empty, the server uses its own host name, then the local domain the message involves, then this computer's name. It is not a delivery setting and does not change where mail is routed." xml:space="preserve">
-    <value>Studsar och virusaviseringar skickas från mailer-daemon@&lt;domän&gt;. Detta åsidosätter delen &lt;domän&gt;. Lämnat tomt använder servern sitt eget värdnamn, sedan den lokala domän meddelandet gäller, sedan den här datorns namn. Det är inte en leveransinställning och ändrar inte vart post dirigeras.</value>
+    <value>Studsar och virusaviseringar skickas från mailer-daemon@&lt;domain&gt;. Detta åsidosätter delen &lt;domain&gt;. Lämnat tomt använder servern sitt eget värdnamn, sedan den lokala domän meddelandet gäller, sedan den här datorns namn. Det är inte en leveransinställning och ändrar inte vart post dirigeras.</value>
   </data>
   <data name="Browse Active Directory" xml:space="preserve">
     <value>Bläddra i Active Directory</value>
@@ -2192,7 +2192,7 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
     <value>Räknas per konto från den senaste inloggning som tilläts, så ett avvisat försök skjuter inte nästa längre bort. Den annonseras bara medan den är satt, eftersom att annonsera en gräns som inte upprätthålls är värre än att inte annonsera något.</value>
   </data>
   <data name="Counted per connecting IP address across every protocol that authenticates - SMTP AUTH, POP3, IMAP, ManageSieve and the REST API all feed the same counter. On reaching the limit the server clears that address's counted failures and creates an IP range named &quot;Auto-ban: &lt;user&gt;&quot; at priority 100 covering that one address, which expires on its own." xml:space="preserve">
-    <value>Räknas per anslutande IP-adress över varje protokoll som autentiserar - SMTP AUTH, POP3, IMAP, ManageSieve och REST API:et matar alla samma räknare. När gränsen nås nollställer servern adressens räknade misslyckanden och skapar ett IP-intervall med namnet "Auto-ban: &lt;användare&gt;" med prioritet 100 som täcker just den adressen, och som går ut av sig självt.</value>
+    <value>Räknas per anslutande IP-adress över varje protokoll som autentiserar - SMTP AUTH, POP3, IMAP, ManageSieve och REST API:et matar alla samma räknare. När gränsen nås nollställer servern adressens räknade misslyckanden och skapar ett IP-intervall med namnet "Auto-ban: &lt;user&gt;" med prioritet 100 som täcker just den adressen, och som går ut av sig självt.</value>
   </data>
   <data name="Counted per user name rather than per address, across every protocol that authenticates, so a botnet spreading its guesses over thousands of addresses still locks the mailbox it is guessing at. A locked name is refused with the ordinary invalid-credentials reply and cannot be unlocked by typing the right password - the lock is checked first - so the ceiling is worth setting with the cost in mind. Failures against a name that does not exist lock that name too, deliberately: doing otherwise would let an attacker use the lockout to discover which accounts are real." xml:space="preserve">
     <value>Räknas per användarnamn snarare än per adress, över varje protokoll som autentiserar, så ett botnät som sprider sina gissningar över tusentals adresser låser ändå den brevlåda det gissar på. Ett låst namn avvisas med det vanliga svaret för ogiltiga uppgifter och kan inte låsas upp genom att skriva rätt lösenord - låset kontrolleras först - så taket är värt att sätta med kostnaden i åtanke. Misslyckanden mot ett namn som inte finns låser det namnet också, med avsikt: annars kunde en angripare använda utestängningen för att ta reda på vilka konton som är riktiga.</value>
@@ -3338,7 +3338,7 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
     <value>Lämnar varje godtaget meddelande till en motor över HTTP och använder poängen den returnerar. Meddelandet är begärans kropp och kuvertet, den anslutande adressen och HELO reser som begäranrubriker, vilket är vad rspamds egen kontrollslutpunkt redan förväntar sig - så att peka detta på rspamd kräver ingen adapter, och att peka det på något du skrivit själv kräver bara ett program som svarar med JSON.</value>
   </data>
   <data name="Hands mail clients the right host names, ports and security settings automatically: Thunderbird-style autoconfig and Outlook autodiscover, for every local domain. Point autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; at this server in DNS." xml:space="preserve">
-    <value>Ger e-postklienter rätt värdnamn, portar och säkerhetsinställningar automatiskt: autoconfig i Thunderbirds stil och Outlooks autodiscover, för varje lokal domän. Peka autoconfig.&lt;domän&gt; och autodiscover.&lt;domän&gt; på den här servern i DNS.</value>
+    <value>Ger e-postklienter rätt värdnamn, portar och säkerhetsinställningar automatiskt: autoconfig i Thunderbirds stil och Outlooks autodiscover, för varje lokal domän. Peka autoconfig.&lt;domain&gt; och autodiscover.&lt;domain&gt; på den här servern i DNS.</value>
   </data>
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Lämnar över det verifierade installationsprogrammet till uppdateringshjälpen. Tjänsten stoppas och startas; om den inte kommer tillbaka installeras den tidigare versionen om. Resultatet rapporteras här när tjänsten är tillbaka.</value>
@@ -3563,7 +3563,7 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
     <value>Ignoreras av servern - den sparade digesten är inte ett användbart SHA-256-värde, så den här sektionen autentiserar ingenting. Återkalla den och skapa en ersättning.</value>
   </data>
   <data name="In a DNSSEC-signed zone, publish a TLSA record (usually usage 3, selector 1, matching type 1 - '3 1 1' with the SHA-256 of your certificate's public key) at _25._tcp.&lt;mx-host&gt; for each MX host. Verify with: nslookup -type=TLSA _25._tcp.&lt;mx-host&gt;. hMailServer cannot publish DNS records or sign your zone, and this panel has no TLSA lookup to check them with." xml:space="preserve">
-    <value>Publicera i en DNSSEC-signerad zon en TLSA-post (vanligen usage 3, selector 1, matching type 1 - '3 1 1' med SHA-256 av ditt certifikats publika nyckel) på _25._tcp.&lt;mx-värd&gt; för varje MX-värd. Verifiera med: nslookup -type=TLSA _25._tcp.&lt;mx-värd&gt;. hMailServer kan inte publicera DNS-poster eller signera din zon, och den här panelen har ingen TLSA-uppslagning att kontrollera dem med.</value>
+    <value>Publicera i en DNSSEC-signerad zon en TLSA-post (vanligen usage 3, selector 1, matching type 1 - '3 1 1' med SHA-256 av ditt certifikats publika nyckel) på _25._tcp.&lt;mx-host&gt; för varje MX-värd. Verifiera med: nslookup -type=TLSA _25._tcp.&lt;mx-host&gt;. hMailServer kan inte publicera DNS-poster eller signera din zon, och den här panelen har ingen TLSA-uppslagning att kontrollera dem med.</value>
   </data>
   <data name="In queue" xml:space="preserve">
     <value>I kö</value>
@@ -3697,7 +3697,7 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
     <value>Att behålla flera generationer av meddelanden kräver komprimering: utan 'Komprimera målfilerna (zip)' skriver varje säkerhetskopiering sina meddelandefiler till samma DataBackup-mapp och skriver över den förra körningens, så gallringen kan bara behålla generationer av de små arkiven med inställningar och domäner.</value>
   </data>
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
-    <value>Behåller en kopia av varje meddelande som tas emot över SMTP i ett mappträd, utöver att leverera det som vanligt - det avleder eller håller inte tillbaka post. Post från en lokal avsändare arkiveras under &lt;domän&gt;\&lt;brevlåda&gt;, post från annat håll under Inbound, och meddelanden utan kuvertavsändare (studsar och leveransrapporter) under Error, plus en kopia i mappen för varje lokal mottagare.</value>
+    <value>Behåller en kopia av varje meddelande som tas emot över SMTP i ett mappträd, utöver att leverera det som vanligt - det avleder eller håller inte tillbaka post. Post från en lokal avsändare arkiveras under &lt;domain&gt;\&lt;mailbox&gt;, post från annat håll under Inbound, och meddelanden utan kuvertavsändare (studsar och leveransrapporter) under Error, plus en kopia i mappen för varje lokal mottagare.</value>
   </data>
   <data name="Key file present" xml:space="preserve">
     <value>Nyckelfil finns</value>
@@ -4948,7 +4948,7 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
     <value>Öppna TCP/IP-portar, som äger säkerhetsinställningen per lyssnare</value>
   </data>
   <data name="Open an issue with: the log from the 354 (or from the delivery attempt) onwards, including the stage timing lines; the ERROR_hmailserver_&lt;date&gt;.log for the same window; which scanners and event scripts are enabled; and whether the message eventually arrives, arrives twice, or never arrives." xml:space="preserve">
-    <value>Öppna ett ärende med: loggen från 354 (eller från leveransförsöket) och framåt, inklusive stegtidsraderna; ERROR_hmailserver_&lt;datum&gt;.log för samma fönster; vilka skannrar och händelseskript som är aktiverade; och om meddelandet till slut kommer fram, kommer fram två gånger, eller aldrig kommer fram.</value>
+    <value>Öppna ett ärende med: loggen från 354 (eller från leveransförsöket) och framåt, inklusive stegtidsraderna; ERROR_hmailserver_&lt;date&gt;.log för samma fönster; vilka skannrar och händelseskript som är aktiverade; och om meddelandet till slut kommer fram, kommer fram två gånger, eller aldrig kommer fram.</value>
   </data>
   <data name="Open log folder" xml:space="preserve">
     <value>Öppna loggmappen</value>
@@ -5196,7 +5196,7 @@ Inga nya anslutningar tas emot och ingen post levereras förrän den återupptas
     <value>Sändgränser per konto</value>
   </data>
   <data name="Per-address overrides, one per line: address=messages:recipients[:hours]" xml:space="preserve">
-    <value>Åsidosättningar per adress, en per rad: adress=meddelanden:mottagare[:timmar]</value>
+    <value>Åsidosättningar per adress, en per rad: adress=meddelanden:mottagare[:hours]</value>
   </data>
   <data name="Per-name lockout" xml:space="preserve">
     <value>Utestängning per namn</value>
@@ -5422,7 +5422,7 @@ Låt den GAMLA DNS-posten ({2}) vara publicerad i minst några dagar. Post signe
     <value>Publicerad, strängare än utgångspunkten</value>
   </data>
   <data name="Publishes https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt so other servers require TLS when they deliver to you. Honouring other domains' policies is on the Transport security page." xml:space="preserve">
-    <value>Publicerar https://mta-sts.&lt;domän&gt;/.well-known/mta-sts.txt så att andra servrar kräver TLS när de levererar till dig. Att respektera andra domäners policyer finns på sidan Transportsäkerhet.</value>
+    <value>Publicerar https://mta-sts.&lt;domain&gt;/.well-known/mta-sts.txt så att andra servrar kräver TLS när de levererar till dig. Att respektera andra domäners policyer finns på sidan Transportsäkerhet.</value>
   </data>
   <data name="Publishing this record asks every server that delivers to {0} to e-mail you a daily report when TLS to you fails or is downgraded. The reports go to the rua= mailbox, which must exist and accept mail from strangers. This works regardless of any hMailServer setting - the senders do the reporting." xml:space="preserve">
     <value>Att publicera den här posten ber varje server som levererar till {0} att e-posta dig en daglig rapport när TLS till dig misslyckas eller nedgraderas. Rapporterna går till rua=-brevlådan, som måste finnas och ta emot post från främlingar. Detta fungerar oavsett hMailServer-inställningar - avsändarna sköter rapporteringen.</value>
@@ -6643,10 +6643,10 @@ Fortsätt?</value>
     <value>Sätt TlsRptFromAddress i sektionen [Settings] i hMailServer.ini till en brevlåda rapporter ska skickas från. Att lämna den tom är ett giltigt val - det betyder bara att den insamlade statistiken kastas och inga rapporter någonsin skickas.</value>
   </data>
   <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Sätt WebServicesHttpPort och/eller WebServicesHttpsPort i hMailServer.ini så att URL:erna svarar, och publicera sedan DNS-posterna autoconfig.&lt;domän&gt; och autodiscover.&lt;domän&gt; för varje e-postdomän, pekande på den här servern. Det är adressposter, och den här sidan kontrollerar bara TXT-poster, så de kan inte bekräftas härifrån.</value>
+    <value>Sätt WebServicesHttpPort och/eller WebServicesHttpsPort i hMailServer.ini så att URL:erna svarar, och publicera sedan DNS-posterna autoconfig.&lt;domain&gt; och autodiscover.&lt;domain&gt; för varje e-postdomän, pekande på den här servern. Det är adressposter, och den här sidan kontrollerar bara TXT-poster, så de kan inte bekräftas härifrån.</value>
   </data>
   <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Sätt WebServicesHttpsPort i hMailServer.ini (RFC 8461 kräver policyn över HTTPS), ge lyssnaren ett certifikat som täcker mta-sts.&lt;domän&gt;, och publicera sedan för varje domän en A-/AAAA-post (eller CNAME) för mta-sts.&lt;domän&gt; som pekar på den här servern och en TXT-post på _mta-sts.&lt;domän&gt; (v=STSv1; id=...). Den här sidan kontrollerar TXT-posten; adressposten och certifikatets namntäckning kan inte kontrolleras härifrån.</value>
+    <value>Sätt WebServicesHttpsPort i hMailServer.ini (RFC 8461 kräver policyn över HTTPS), ge lyssnaren ett certifikat som täcker mta-sts.&lt;domain&gt;, och publicera sedan för varje domän en A-/AAAA-post (eller CNAME) för mta-sts.&lt;domain&gt; som pekar på den här servern och en TXT-post på _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Den här sidan kontrollerar TXT-posten; adressposten och certifikatets namntäckning kan inte kontrolleras härifrån.</value>
   </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Sätt ett nytt administrationslösenord för servern.</value>
@@ -7504,7 +7504,7 @@ kunde inte läsas in. Meddelandet har troligen levererats och finns inte längre
     <value>Raderna den här sidan hänvisar till skrivs på felsökningsnivå; de långsamma skrivs också på programnivå, så med enbart programloggning ser du ändå de viktiga. Återskapa problemet en gång, läs sedan loggen. Kom ihåg att stänga av felsökningsloggningen efteråt på en upptagen server.</value>
   </data>
   <data name="The listener is configured. What remains is outside the server: publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; records for each mail domain, then test from a client machine." xml:space="preserve">
-    <value>Lyssnaren är konfigurerad. Det som återstår finns utanför servern: publicera posterna autoconfig.&lt;domän&gt; och autodiscover.&lt;domän&gt; för varje e-postdomän, och testa sedan från en klientdator.</value>
+    <value>Lyssnaren är konfigurerad. Det som återstår finns utanför servern: publicera posterna autoconfig.&lt;domain&gt; och autodiscover.&lt;domain&gt; för varje e-postdomän, och testa sedan från en klientdator.</value>
   </data>
   <data name="The lists behind the checks" xml:space="preserve">
     <value>Listorna bakom kontrollerna</value>

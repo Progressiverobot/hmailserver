@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Português (Brasil): the Português (Brasil) catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Português (Brasil) and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ O Control Panel só consegue ler arquivos de mensagens quando roda na mesma máq
     <value>Uma opção mais antiga e mais fraca: um código de uso único pedido após a senha ao entrar NESTE Control Panel, verificado pela própria ferramenta depois que o servidor já aceitou a senha. O segredo é armazenado por máquina em HKLM, então ativar ou desativar exige direitos de administrador local, e não faz nada pela API REST ou por scripts que usam a API COM. Prefira o fator imposto pelo servidor acima; este permanece para instalações existentes.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Uma exceção substitui os tetos globais para aquele endereço; 0:0 o isenta por completo. Sem o :horas opcional, a exceção usa o período global. Uma linha malformada é ignorada com uma entrada de log e o limite global continua valendo para aquela conta. Linhas de comentário nesta seção INI não são mostradas aqui e são descartadas se a lista for salva.</value>
+    <value>Uma exceção substitui os tetos globais para aquele endereço; 0:0 o isenta por completo. Sem o :hours opcional, a exceção usa o período global. Uma linha malformada é ignorada com uma entrada de log e o limite global continua valendo para aquela conta. Linhas de comentário nesta seção INI não são mostradas aqui e são descartadas se a lista for salva.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Ocorreu um erro inesperado:
@@ -3284,7 +3284,7 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
     <value>Ir para a página relacionada {0}</value>
   </data>
   <data name="Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)" xml:space="preserve">
-    <value>Comportamento de desligamento gracioso para operação não assistida / em cluster. (A retenção de logs fica na página Logs.)</value>
+    <value>Comportamento de desligamento gracioso para operação não assistida / em cluster. (A retenção de logs fica na página Registro em log.)</value>
   </data>
   <data name="Greylisting" xml:space="preserve">
     <value>Greylisting</value>
@@ -5196,7 +5196,7 @@ Nenhuma conexão nova será aceita e nenhum e-mail será entregue até que ele s
     <value>Limites de envio por conta</value>
   </data>
   <data name="Per-address overrides, one per line: address=messages:recipients[:hours]" xml:space="preserve">
-    <value>Substituições por endereço, uma por linha: endereço=mensagens:destinatários[:horas]</value>
+    <value>Substituições por endereço, uma por linha: address=messages:recipients[:hours]</value>
   </data>
   <data name="Per-name lockout" xml:space="preserve">
     <value>Bloqueio por nome</value>
@@ -5340,7 +5340,7 @@ Nenhuma conexão nova será aceita e nenhum e-mail será entregue até que ele s
     <value>A Progressive Robot Ltd é uma empresa de engenharia de software que constrói e moderniza software de produção — pega sistemas maduros, do mundo real, e os traz aos padrões atuais de segurança, confiabilidade e ferramental.</value>
   </data>
   <data name="Prometheus metrics (/metrics), OpenTelemetry export of traces, metrics and logs (one endpoint per signal, each off until set), a slow-query log, and JSON-structured log output for log aggregators (on the Logging page)." xml:space="preserve">
-    <value>Métricas do Prometheus (/metrics), exportação de rastreamentos, métricas e logs pelo OpenTelemetry (um endpoint por sinal, cada um desligado até ser definido), um log de consultas lentas e saída de log estruturada em JSON para agregadores de logs (na página Logs).</value>
+    <value>Métricas do Prometheus (/metrics), exportação de rastreamentos, métricas e logs pelo OpenTelemetry (um endpoint por sinal, cada um desligado até ser definido), um log de consultas lentas e saída de log estruturada em JSON para agregadores de logs (na página Registro em log).</value>
   </data>
   <data name="Prometheus metrics, health endpoints and the REST API are enabled here." xml:space="preserve">
     <value>As métricas do Prometheus, os endpoints de saúde e a API REST são ativados aqui.</value>
@@ -5959,7 +5959,7 @@ Continuar?</value>
     <value>Execute uma prévia primeiro: as opções mudaram desde a última, então ela não descreve mais o que isto faria.</value>
   </data>
   <data name="Run an external command; a configured return value indicates an infected message. Use %FILE% where the file to scan should be passed on the command line. For engines without a CLI (HTTP/API, DLP, SIEM), use an OnAcceptMessage handler on the Event scripts page instead." xml:space="preserve">
-    <value>Execute um comando externo; um valor de retorno configurado indica uma mensagem infectada. Use %FILE% onde o arquivo a verificar deve ser passado na linha de comando. Para mecanismos sem CLI (HTTP/API, DLP, SIEM), use em vez disso um manipulador OnAcceptMessage na página Scripts de evento.</value>
+    <value>Execute um comando externo; um valor de retorno configurado indica uma mensagem infectada. Use %FILE% onde o arquivo a verificar deve ser passado na linha de comando. Para mecanismos sem CLI (HTTP/API, DLP, SIEM), use em vez disso um manipulador OnAcceptMessage na página Scripts de eventos.</value>
   </data>
   <data name="Run anti-spam on downloaded mail" xml:space="preserve">
     <value>Executar o anti-spam nos e-mails baixados</value>
@@ -5986,7 +5986,7 @@ Continuar?</value>
     <value>Executando os diagnósticos...</value>
   </data>
   <data name="Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder; the script itself is edited on the Event scripts page. The engine reloads when you save." xml:space="preserve">
-    <value>Executa scripts de evento (OnAcceptMessage, OnDeliveryStart...) da pasta Events; o próprio script é editado na página Scripts de evento. O mecanismo recarrega quando você salva.</value>
+    <value>Executa scripts de evento (OnAcceptMessage, OnDeliveryStart...) da pasta Events; o próprio script é editado na página Scripts de eventos. O mecanismo recarrega quando você salva.</value>
   </data>
   <data name="Runs the same steps the server runs, in the same order, using the values in the editors above as they stand: connect, protect the transport, bind the service credential, search for the user - and, only if a password is typed below, bind as that user to prove it. The password is used once and never stored, and the test refuses to run any configuration that would put a password on the network unprotected. One honest caveat: the test runs from this computer, so a firewall that treats this machine and the hMailServer service differently can make the two disagree." xml:space="preserve">
     <value>Executa os mesmos passos que o servidor executa, na mesma ordem, usando os valores dos editores acima como estão: conectar, proteger o transporte, fazer o bind com a credencial de serviço, buscar o usuário - e, somente se uma senha for digitada abaixo, fazer o bind como esse usuário para prová-lo. A senha é usada uma vez e nunca armazenada, e o teste se recusa a executar qualquer configuração que colocaria uma senha desprotegida na rede. Uma ressalva honesta: o teste roda a partir deste computador, então um firewall que trate esta máquina e o serviço hMailServer de forma diferente pode fazer os dois discordarem.</value>
@@ -9473,7 +9473,7 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
     <value>verificadores</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/salvamento lento</value>
+    <value>script/save lento</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (exigente em memória, RFC 7914)</value>

@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Русский: the Русский catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Русский and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ Control Panel может читать файлы сообщений только
     <value>Более старый и более слабый вариант: одноразовый код, запрашиваемый после пароля при входе именно в ЭТОТ Control Panel и проверяемый самим приложением уже после того, как сервер принял пароль. Секрет хранится отдельно на каждом компьютере в HKLM, поэтому его включение и отключение требуют прав локального администратора, а для REST API и для сценариев на COM API он не даёт ничего. Предпочитайте фактор, обеспечиваемый сервером, выше; этот остаётся ради существующих установок.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Переопределение заменяет глобальные пределы для этого адреса; 0:0 полностью освобождает его от них. Без необязательной части :часы переопределение использует глобальный период. Строка с ошибкой формата игнорируется с записью в журнал, и к этой учётной записи по-прежнему применяется глобальное ограничение. Строки комментариев в этом разделе INI здесь не показываются и теряются при сохранении списка.</value>
+    <value>Переопределение заменяет глобальные пределы для этого адреса; 0:0 полностью освобождает его от них. Без необязательной части :hours переопределение использует глобальный период. Строка с ошибкой формата игнорируется с записью в журнал, и к этой учётной записи по-прежнему применяется глобальное ограничение. Строки комментариев в этом разделе INI здесь не показываются и теряются при сохранении списка.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Произошла непредвиденная ошибка:
@@ -1351,7 +1351,7 @@ Control Panel может читать файлы сообщений только
     <value>Прежде чем копировать — </value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
-    <value>Между ответами 354 и 250 сервер выполняет конвейер приёма — проверки на спам, изменения сообщения, архивирование, сценарий OnAcceptMessage и сохранение в базу данных — на ограниченном пуле потоков и отвечает лишь после того, как закончит. Журнал отмечает время каждого этапа. Читайте его как последовательность и смотрите на последнюю записанную строку: застрял тот этап, который идёт после неё. Два этапа объявляют о себе строкой начала (защита от спама и сценарий/сохранение), а изменения сообщения — нет, поэтому затор на них выглядит как «done spam-protection», за которым следует тишина. Этап, занявший десять секунд или больше, записывается на уровне журнала приложения даже без отладочного журналирования.</value>
+    <value>Между ответами 354 и 250 сервер выполняет конвейер приёма — проверки на спам, изменения сообщения, архивирование, сценарий OnAcceptMessage и сохранение в базу данных — на ограниченном пуле потоков и отвечает лишь после того, как закончит. Журнал отмечает время каждого этапа. Читайте его как последовательность и смотрите на последнюю записанную строку: застрял тот этап, который идёт после неё. Два этапа объявляют о себе строкой начала (spam-protection и script/save), а изменения сообщения — нет, поэтому затор на них выглядит как «done spam-protection», за которым следует тишина. Этап, занявший десять секунд или больше, записывается на уровне журнала приложения даже без отладочного журналирования.</value>
   </data>
   <data name="Biased upwards on purpose: refusing early costs delivery latency and nothing else, because the refusal is temporary and a sending server retries for days, while a volume that reaches zero costs a database that will not open and a service that will not start." xml:space="preserve">
     <value>Значение намеренно смещено в большую сторону: ранний отказ стоит только задержки доставки и ничего больше, потому что отказ временный, а отправляющий сервер повторяет попытки сутками; том же, свободное место на котором дошло до нуля, стоит базы данных, которая не откроется, и службы, которая не запустится.</value>
@@ -2636,7 +2636,7 @@ Control Panel может читать файлы сообщений только
     <value>Отключать клиентов, отправляющих слишком много недопустимых команд</value>
   </data>
   <data name="Discovers and enforces recipient MTA-STS policies before delivering over TLS (RFC 8461). To publish a policy for your own domains, see the Web services &amp; autoconfiguration page." xml:space="preserve">
-    <value>Обнаруживает и применяет политики MTA-STS получателя перед доставкой по TLS (RFC 8461). Чтобы опубликовать политику для своих доменов, откройте страницу «Веб-службы и автонастройка».</value>
+    <value>Обнаруживает и применяет политики MTA-STS получателя перед доставкой по TLS (RFC 8461). Чтобы опубликовать политику для своих доменов, откройте страницу «Веб-службы и автоконфигурация».</value>
   </data>
   <data name="Disk space" xml:space="preserve">
     <value>Дисковое пространство</value>
@@ -3284,7 +3284,7 @@ Control Panel может читать файлы сообщений только
     <value>Перейти на связанную страницу {0}</value>
   </data>
   <data name="Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)" xml:space="preserve">
-    <value>Поведение при корректном завершении работы для необслуживаемой / кластерной эксплуатации. (Срок хранения журналов задаётся на странице «Журналы».)</value>
+    <value>Поведение при корректном завершении работы для необслуживаемой / кластерной эксплуатации. (Срок хранения журналов задаётся на странице «Журналирование».)</value>
   </data>
   <data name="Greylisting" xml:space="preserve">
     <value>Серые списки</value>
@@ -5467,7 +5467,7 @@ Control Panel может читать файлы сообщений только
     <value>REST API администрирования + Web Control Deck</value>
   </data>
   <data name="REST administration API, Prometheus metrics and remote script management. The public web services listener (autoconfiguration, MTA-STS hosting) is on the Web services &amp; autoconfiguration page; OAuth2 token authentication is on the Authentication page." xml:space="preserve">
-    <value>REST API администрирования, метрики Prometheus и удалённое управление сценариями. Общедоступный прослушиватель веб-служб (автонастройка, размещение MTA-STS) находится на странице «Веб-службы и автонастройка»; аутентификация по токенам OAuth2 — на странице «Аутентификация».</value>
+    <value>REST API администрирования, метрики Prometheus и удалённое управление сценариями. Общедоступный прослушиватель веб-служб (автонастройка, размещение MTA-STS) находится на странице «Веб-службы и автоконфигурация»; аутентификация по токенам OAuth2 — на странице «Аутентификация».</value>
   </data>
   <data name="REST listener settings…" xml:space="preserve">
     <value>Параметры прослушивателя REST…</value>
@@ -8333,7 +8333,7 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
     <value>Что делает сервер по мере заполнения тома хранилища сообщений. Оба значения - абсолютные мегабайты, а не проценты, потому что вместится ли следующее сообщение, решает число оставшихся байтов, а не их доля от тома. Применяется после перезапуска службы.</value>
   </data>
   <data name="What the server writes to its log files (viewable on the Live logs page)." xml:space="preserve">
-    <value>Что сервер пишет в файлы журналов (смотреть на странице «Живые журналы»).</value>
+    <value>Что сервер пишет в файлы журналов (смотреть на странице «Журналы в реальном времени»).</value>
   </data>
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>Для чего этот ключ, например «Grafana probe»</value>
@@ -9473,7 +9473,7 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
     <value>сканеров</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>медленно работают сценарии и сохранение</value>
+    <value>этап script/save выполняется медленно</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (требователен к памяти, RFC 7914)</value>

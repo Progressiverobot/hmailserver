@@ -2,7 +2,7 @@
 <!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
      SPDX-License-Identifier: AGPL-3.0-or-later -->
 <root>
-  <!-- X: the X catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for X and checked by build/check-mnemonics.py. -->
+  <!-- Nederlands: the Nederlands catalogue. Keys are the English text; values are the translation. Each caption's Alt key (the letter after _) is chosen for Nederlands and checked by build/check-mnemonics.py. -->
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -1059,7 +1059,7 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
     <value>Een oudere, zwakkere optie: een eenmalige code die na het wachtwoord wordt gevraagd bij het aanmelden bij DIT Control Panel, gecontroleerd door het hulpmiddel zelf nadat de server het wachtwoord al heeft geaccepteerd. Het geheim wordt per machine onder HKLM opgeslagen, dus in- of uitschakelen vereist lokale beheerdersrechten, en het doet niets voor de REST-API of voor scripts die de COM-API gebruiken. Geef de voorkeur aan de door de server afgedwongen factor hierboven; deze blijft voor bestaande installaties.</value>
   </data>
   <data name="An override replaces the global ceilings for that address; 0:0 exempts it entirely. Without the optional :hours the override uses the global period. A malformed line is ignored with a log entry and the global limit still applies to that account. Comment lines in this INI section are not shown here and are dropped if the list is saved." xml:space="preserve">
-    <value>Een uitzondering vervangt de globale plafonds voor dat adres; 0:0 stelt het volledig vrij. Zonder de optionele :uren gebruikt de uitzondering de globale periode. Een verkeerd gevormde regel wordt genegeerd met een logvermelding en de globale limiet blijft voor dat account gelden. Commentaarregels in deze INI-sectie worden hier niet getoond en vallen weg als de lijst wordt opgeslagen.</value>
+    <value>Een uitzondering vervangt de globale plafonds voor dat adres; 0:0 stelt het volledig vrij. Zonder de optionele :hours gebruikt de uitzondering de globale periode. Een verkeerd gevormde regel wordt genegeerd met een logvermelding en de globale limiet blijft voor dat account gelden. Commentaarregels in deze INI-sectie worden hier niet getoond en vallen weg als de lijst wordt opgeslagen.</value>
   </data>
   <data name="An unexpected error occurred:&#10;&#10;{0}&#10;&#10;The full details were written to:&#10;{1}&#10;&#10;Restart the Control Panel now? Choose No to try to keep working." xml:space="preserve">
     <value>Er is een onverwachte fout opgetreden:
@@ -3284,7 +3284,7 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
     <value>Ga naar de bijbehorende pagina {0}</value>
   </data>
   <data name="Graceful shutdown behaviour for unattended / clustered operation. (Log retention is on the Logging page.)" xml:space="preserve">
-    <value>Gedrag bij netjes afsluiten voor onbeheerd of geclusterd bedrijf. (Het bewaren van logboeken staat op de pagina Logboeken.)</value>
+    <value>Gedrag bij netjes afsluiten voor onbeheerd of geclusterd bedrijf. (Het bewaren van logboeken staat op de pagina Logboekregistratie.)</value>
   </data>
   <data name="Greylisting" xml:space="preserve">
     <value>Greylisting</value>
@@ -5196,7 +5196,7 @@ Er worden geen nieuwe verbindingen geaccepteerd en er wordt geen mail bezorgd to
     <value>Verzendlimieten per account</value>
   </data>
   <data name="Per-address overrides, one per line: address=messages:recipients[:hours]" xml:space="preserve">
-    <value>Uitzonderingen per adres, één per regel: adres=berichten:ontvangers[:uren]</value>
+    <value>Uitzonderingen per adres, één per regel: address=messages:recipients[:hours]</value>
   </data>
   <data name="Per-name lockout" xml:space="preserve">
     <value>Vergrendeling per naam</value>
@@ -5340,7 +5340,7 @@ Er worden geen nieuwe verbindingen geaccepteerd en er wordt geen mail bezorgd to
     <value>Progressive Robot Ltd is een software-engineeringbedrijf dat productiesoftware bouwt en moderniseert — het neemt volgroeide systemen uit de praktijk en brengt ze op het huidige niveau van beveiliging, betrouwbaarheid en gereedschap.</value>
   </data>
   <data name="Prometheus metrics (/metrics), OpenTelemetry export of traces, metrics and logs (one endpoint per signal, each off until set), a slow-query log, and JSON-structured log output for log aggregators (on the Logging page)." xml:space="preserve">
-    <value>Prometheus-metrics (/metrics), OpenTelemetry-export van traces, metrics en logboeken (één eindpunt per signaal, elk uit totdat het is ingesteld), een logboek van trage query's, en JSON-gestructureerde loguitvoer voor logaggregators (op de pagina Logboekinstellingen).</value>
+    <value>Prometheus-metrics (/metrics), OpenTelemetry-export van traces, metrics en logboeken (één eindpunt per signaal, elk uit totdat het is ingesteld), een logboek van trage query's, en JSON-gestructureerde loguitvoer voor logaggregators (op de pagina Logboekregistratie).</value>
   </data>
   <data name="Prometheus metrics, health endpoints and the REST API are enabled here." xml:space="preserve">
     <value>Prometheus-metrics, gezondheidseindpunten en de REST-API worden hier ingeschakeld.</value>
@@ -9473,7 +9473,7 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
     <value>scanners</value>
   </data>
   <data name="script/save slow" xml:space="preserve">
-    <value>script/opslaan traag</value>
+    <value>script/save traag</value>
   </data>
   <data name="scrypt (memory-hard, RFC 7914)" xml:space="preserve">
     <value>scrypt (geheugenintensief, RFC 7914)</value>

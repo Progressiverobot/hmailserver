@@ -78,6 +78,14 @@ jobs:
       - name: The Control Panel's translation catalogues match the source
         run: python3 build/check-localisation.py
 
+      # What a per-string check cannot see: the English a caption must keep
+      # because the server writes it that way (its own log stage names, INI and
+      # setting names, INBOX, the syntax a user types back), a page named in
+      # prose by something other than that page's own translated title, and a
+      # number the translation dropped.
+      - name: The catalogues keep the server's own words, the numbers and the page names
+        run: python3 build/check-catalogues.py
+
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.
       - name: Every folder-access decision is ACLManager's
