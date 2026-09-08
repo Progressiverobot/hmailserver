@@ -132,6 +132,33 @@ jobs:
           echo "Assets to sign:"
           ls -la assets
 
+      # The update checker in the server finds the installer by name: it builds
+      # hMailServer-<tag without the v>-x64.exe and matches an asset on exact
+      # equality, then looks for that name plus .cosign.bundle. A release whose
+      # installer is named anything else tells every running server that a new
+      # version exists and then that there is nothing to download - which is worse
+      # than saying nothing, because the administrator is now waiting for an
+      # update that will never arrive. The naming has already been broken once, at
+      # v6.2.22-pre3, where the installer was hMailServer-6.2.22-x64.exe under a
+      # tag of v6.2.22-pre3. Nothing checked it then; this checks it now, before
+      # the signing that publishes the release for good.
+      - name: The installer is named the way the update checker looks for it
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          installer="hMailServer-${version}-x64.exe"
+          if [ ! -f "assets/${installer}" ]; then
+            echo "::error::This release has no asset named ${installer}."
+            echo "The server's update checker builds that name from the tag and matches it exactly,"
+            echo "so a release named anything else is undownloadable by every server in the field."
+            echo "Assets present:"
+            ls -1 assets
+            exit 1
+          fi
+          echo "Found ${installer}; its .cosign.bundle is produced by the signing step below."
+
       - name: Sign each asset
         env:
           TAG: ${{ steps.tag.outputs.tag }}

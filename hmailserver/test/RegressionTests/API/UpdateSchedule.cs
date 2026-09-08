@@ -360,6 +360,12 @@ namespace RegressionTests.API
             catch (IOException)
             {
             }
+            catch (UnauthorizedAccessException)
+            {
+               // apply-token carries a DACL naming SYSTEM, Administrators and the
+               // service account only; the suite is none of those. The server
+               // revokes it after an apply, and one never redeemed expires.
+            }
          }
       }
 

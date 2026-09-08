@@ -1106,6 +1106,14 @@ namespace hMailServer.ControlPanel.Views
          imap.Settings.Add(new ComBool { Path = "IMAPQuotaEnabled", Label = L("QUOTA") });
          imap.Settings.Add(new ComBool { Path = "IMAPSortEnabled", Label = L("SORT") });
          imap.Settings.Add(new ComBool { Path = "IMAPACLEnabled", Label = L("ACL (shared folder permissions)") });
+         imap.Settings.Add(new IniBool
+         {
+            Path = "IMAPCompressionEnabled",
+            Label = L("COMPRESS=DEFLATE (RFC 4978)"),
+            Default = true,
+            Blurb = L("Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart."),
+            IniStore = iniStore_
+         });
          imap.Settings.Add(new ComBool { Path = "CreateDefaultSpecialUseFoldersEnabled", Label = L("Create Drafts, Sent, Trash and Junk for new accounts") });
          imap.Settings.Add(new ComBool { Path = "IMAPSASLPlainEnabled", Label = L("Allow SASL PLAIN authentication") });
          imap.Settings.Add(new ComBool { Path = "IMAPSASLInitialResponseEnabled", Label = L("Allow SASL initial client response") });
@@ -1217,6 +1225,30 @@ namespace hMailServer.ControlPanel.Views
          del.Settings.Add(new ComText { Path = "SMTPNoOfTries", Label = L("Number of delivery retries"), Numeric = true });
          del.Settings.Add(new ComText { Path = "SMTPMinutesBetweenTry", Label = L("Minutes between retries"), Numeric = true });
          del.Settings.Add(new ComText { Path = "MaxNumberOfMXHosts", Label = L("Max MX hosts to try (0 = all)"), Numeric = true });
+         del.Settings.Add(new IniBool
+         {
+            Path = "OutboundPipelining",
+            Label = L("Use PIPELINING when the receiving server offers it"),
+            Default = true,
+            Blurb = L("Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart."),
+            IniStore = iniStore_
+         });
+         del.Settings.Add(new IniBool
+         {
+            Path = "OutboundChunking",
+            Label = L("Use CHUNKING (BDAT) when the receiving server offers it"),
+            Default = true,
+            Blurb = L("Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart."),
+            IniStore = iniStore_
+         });
+         del.Settings.Add(new IniBool
+         {
+            Path = "DeliveryHardLinks",
+            Label = L("Hard link each local recipient's copy instead of copying the file"),
+            Default = false,
+            Blurb = L("A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart."),
+            IniStore = iniStore_
+         });
          // Directly modifies the retry count three rows up, and only makes sense
          // read together with the MX host limit immediately above it, so it moved
          // here from the catch-all INI page.
@@ -1523,6 +1555,14 @@ namespace hMailServer.ControlPanel.Views
             Blurb = L("Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead."),
             IniStore = iniStore_
          });
+         sa.Settings.Add(new IniBool
+         {
+            Path = "SpamAssassinLearnOnMove",
+            Label = L("Teach SpamAssassin when a user files a message as spam or takes it back out"),
+            Default = false,
+            Blurb = L("Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart."),
+            IniStore = iniStore_
+         });
          Tab(L("SpamAssassin")).Cards.Add(sa);
 
          var hook = Card(L("External filtering engine (rspamd and anything else that speaks HTTP)"),
@@ -1693,6 +1733,13 @@ namespace hMailServer.ControlPanel.Views
          Tab(L("Protocol versions")).Cards.Add(ver);
 
          var ciph = Card(L("Ciphers & verification"));
+         ciph.Settings.Add(new IniText
+         {
+            Path = "TlsKeyExchangeGroups",
+            Label = L("Key exchange groups (empty = OpenSSL's default list)"),
+            Blurb = L("The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart."),
+            IniStore = iniStore_
+         });
          var preferServer = new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = L("Prefer server cipher order") };
          var chacha = new ComBool { Path = "TlsOptionPrioritizeChaChaEnabled", Label = L("Prioritize ChaCha20-Poly1305 when the client prefers it (needs TLS 1.2 or 1.3)") };
          // Labelled "TLS 1.2 and below" rather than just "Cipher list", because that is
@@ -2383,6 +2430,13 @@ namespace hMailServer.ControlPanel.Views
          var script = Card(L("Scripting engine"), L("Runs event scripts (OnAcceptMessage, OnDeliveryStart...) from the Events folder; the script itself is edited on the Event scripts page. The engine reloads when you save."));
          script.Settings.Add(new ComBool { Path = "Scripting.Enabled", Label = L("Enable server-side event scripts") });
          script.Settings.Add(new ComText { Path = "Scripting.Language", Label = L("Language (VBScript or JScript)") });
+         script.Settings.Add(new IniText
+         {
+            Path = "ScriptAllowedObjects",
+            Label = L("COM objects a script may create (comma separated; empty = only hMailServer's own)"),
+            Blurb = L("An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart."),
+            IniStore = iniStore_
+         });
          Tab(L("Scripting")).Cards.Add(script);
       }
 

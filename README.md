@@ -462,7 +462,9 @@ Administration and monitoring:
    UpdateSigningIdentity=        ; the workflow the signing certificate must name (empty = this repository's
                                  ; sign-release workflow); UpdateSigningIssuer= the OIDC issuer (empty = GitHub's);
                                  ; UpdateSourceRepository= the repository it must record (empty = this one, - = any)
-   UpdateRequireAuthenticode=0   ; 1: the installer must also carry an Authenticode signature Windows trusts
+   UpdateRequireAuthenticode=0   ; 1: the installer must also carry an Authenticode signature Windows trusts.
+                              ; Leave it off. No release of this project is Authenticode-signed yet, so 1
+                              ; refuses every release there is and no update can be applied at all.
    UpdateServiceWaitSeconds=180  ; how long the update helper gives the service to come back after the
                                  ; installer has run before it reinstalls the previous version
    UpdateAutoDownload=0          ; 1: fetch and verify a newer release's installer as soon as the check finds it

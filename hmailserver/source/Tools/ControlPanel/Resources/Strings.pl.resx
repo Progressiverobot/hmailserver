@@ -464,6 +464,9 @@ Czy mimo to zapisać to słabe hasło?</value>
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>Wiadomość z punktacją {0} lub wyższą jest odrzucana (550 przed treścią, 554 po niej). Nic nie jest oznaczane.</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>Wiadomość do dziesięciu lokalnych skrzynek pocztowych jest zapisywana raz i dowiązywana dziesięć razy, zamiast być kopiowana dziesięć razy, co przy dużej wiadomości do listy dystrybucyjnej jest różnicą między jednym zapisem na dysk a dziesięcioma. Wymaga folderu danych na NTFS; tam, gdzie dowiązania nie da się utworzyć, serwer kopiuje plik i informuje o tym w dzienniku SMTP. Obowiązuje po ponownym uruchomieniu usługi.</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>Nowoczesna aplikacja administracyjna dla hMailServer: pulpit na żywo, domeny i konta, kolejka dostarczania, strumieniowanie dzienników, pełne ustawienia serwera oraz funkcje bezpieczeństwa transportu z serii 6.x (DANE, MTA-STS, ARC, TLS-RPT, ACME).</value>
   </data>
@@ -1052,6 +1055,9 @@ Control Panel może czytać pliki wiadomości tylko wtedy, gdy działa na tym sa
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Cała sesja dostarczania wychodzącego. 0 = brak ograniczenia.</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>Skrypt zdarzenia działa wewnątrz serwera z uprawnieniami konta usługi, więc to, co wolno mu utworzyć, jest decyzją dotyczącą bezpieczeństwa, a nie kwestią wygody. Puste jest bezpieczną wartością domyślną: skrypt sięga po własne obiekty hMailServer i po nic więcej. Wpisanie tutaj identyfikatora programu - obiektu systemu plików dla skryptów, klienta HTTP - udostępnia go każdemu skryptowi uruchamianemu przez serwer, więc należy wymieniać wyłącznie to, czego własny skrypt naprawdę potrzebuje. Obowiązuje po ponownym uruchomieniu usługi.</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Zewnętrzny proces skanera. 0 = brak ograniczenia.</value>
   </data>
@@ -1446,6 +1452,12 @@ Uruchomić teraz ponownie aplikację Control Panel? Wybierz Nie, aby spróbować
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>Obiekty COM, które skrypt może tworzyć (rozdzielone przecinkami; puste = wyłącznie własne obiekty hMailServer)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>Pakiet _certyfikatów CA (PEM), do którego muszą prowadzić certyfikaty klienta</value>
   </data>
@@ -1525,6 +1537,9 @@ Przygotowany selektor „{0}” zostaje usunięty z konfiguracji serwera; podpis
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>Aby udostępniać HTTPS, muszą być ustawione OBA: certyfikat i klucz; przy tylko jednym z nich TLS NIE jest włączane, a serwer odnotowuje to w dzienniku. W odróżnieniu od nasłuchu REST API nie ma tu awaryjnego sięgnięcia po certyfikat ACME. Jeśli TLS jest skonfigurowane, ale nie da się go przygotować (nieczytelny plik, klucz, który nie pasuje), sondy kondycji pozostają na zwykłym HTTP, a /metrics odpowiada kodem 503, zamiast udostępniać dane jawnym tekstem.</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>Plik urzędu certyfikacji dla prywatnego Sigstore (PEM; puste = publiczne certyfikaty główne Fulcio)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>Plik certyfikatu</value>
@@ -3343,6 +3358,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Przekazuje zweryfikowany instalator pomocnikowi aktualizacji. Usługa zostaje zatrzymana i uruchomiona ponownie; jeśli nie wróci, instalowana jest z powrotem poprzednia wersja. Wynik jest pokazywany tutaj, gdy usługa znów działa.</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>Twórz twarde dowiązanie do kopii każdego lokalnego odbiorcy zamiast kopiować plik</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>Twórz twarde dowiązanie do kopii każdego odbiorcy zamiast ją kopiować</value>
   </data>
@@ -3541,6 +3559,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="I_P address" xml:space="preserve">
     <value>Adres I_P</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>Dostawca tożsamości, który wystawił certyfikat podpisujący (puste = dostawca GitHub)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>Tożsamość, pod którą zapisywane są wyniki (puste = nazwa tego komputera)</value>
   </data>
@@ -3699,6 +3720,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Zachowuje kopię każdej wiadomości odebranej przez SMTP w drzewie folderów, obok zwykłego dostarczenia - niczego nie odchyla ani nie wstrzymuje. Poczta od nadawcy lokalnego trafia do &lt;domain&gt;\&lt;mailbox&gt;, poczta z zewnątrz do Inbound, a wiadomości bez nadawcy koperty (odbicia i raporty o dostarczeniu) do Error, wraz z kopią w folderze każdego lokalnego odbiorcy.</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>Grupy wymiany kluczy (puste = domyślna lista OpenSSL)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>Plik klucza obecny</value>
   </data>
@@ -3765,6 +3789,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>Puste pole hosta oznacza, że domena nie ma w tej sprawie zdania: obowiązuje przekaźnik SMTP całego serwera, dokładnie tak jak przed wprowadzeniem tego ustawienia. Trasa nadal wygrywa z obydwoma, ponieważ trasa jest stwierdzeniem dotyczącym miejsca docelowego.</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>Tę opcję należy pozostawić wyłączoną, o ile nie buduje się i nie podpisuje własnych instalatorów. Wydania tego projektu nie są jeszcze podpisane Authenticode, więc jej włączenie powoduje odrzucenie każdego istniejącego wydania: pobieranie zatrzymuje się z komunikatem „the installer carries no Authenticode signature” i żadnej aktualizacji nie da się już nigdy zainstalować. Podpis Sigstore, który każde wydanie faktycznie ma, jest sprawdzany tak czy inaczej i nie jest opcjonalny.</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>Pozostawione puste, każe serwerowi użyć filtra dostarczonego z programem, pokazanego na szaro - najpierw objectCategory, ponieważ jest indeksowany w Active Directory, a następnie sAMAccountName, ponieważ to właśnie przechowuje karta Katalog konta. %u to nazwa użytkownika konta w Active Directory, %d jego domena AD, %m jego pełny adres pocztowy; wszystkie trzy są zabezpieczane znakami ucieczki przed podstawieniem, więc wroga nazwa logowania nie może przepisać filtra. Filtr, który pasuje do więcej niż jednego wpisu, celowo nie uwierzytelnia nikogo.</value>
   </data>
@@ -3776,6 +3803,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Pozwala programom Outlook, Thunderbird i klientom mobilnym skonfigurować się na podstawie samego adresu e-mail, przez pobranie adresów URL konfiguracji tego serwera.</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>Pozwala klientowi poprosić o skompresowanie reszty sesji, co daje najwięcej na łączu wolnym lub rozliczanym za transfer, gdzie obszerne wypisanie zawartości skrzynki pocztowej to w większości powtarzający się tekst. Domyślnie włączone; klienta, który o to nie prosi, nie dotyczy. Obowiązuje po ponownym uruchomieniu usługi.</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>Pozwala klientom logować się tokenami bearer od dostawcy tożsamości zamiast hasłami; tokeny są przyjmowane tylko wtedy, gdy ich podpis weryfikuje się względem zainstalowanego materiału kluczy.</value>
@@ -4316,6 +4346,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>Przenieś do folderu IMAP</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>Przeniesienie wiadomości do folderu oznaczonego jako Junk zgłasza ją do sa-learn jako spam, a przeniesienie jej z powrotem zgłasza ją jako ham, dzięki czemu filtr uczy się z tego, co ludzie i tak robią, a nie z osobnego rytuału, którego nikt nie wykonuje. Domyślnie wyłączone: przy każdym przeniesieniu uruchamiane jest sa-learn, a użytkownik, który odkłada newslettery do folderu Junk, uczy filtr, że newslettery są spamem dla wszystkich, których skaner obsługuje. Obowiązuje po ponownym uruchomieniu usługi.</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>Musi być bezwzględnym adresem URL, tak jak powyżej.</value>
@@ -5783,6 +5816,9 @@ SMTP 25 i 587, POP3 110, IMAP 143 - bez zabezpieczenia połączenia. Porty TLS i
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>Zgłaszaj asynchroniczną kolejkę zadań jako zablokowaną po (sekundach)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>Repozytorium, które musi być podane w certyfikacie podpisującym (puste = ten projekt; - = nie sprawdzaj)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>Żądaj (weryfikuj i zapisuj w dzienniku, nigdy nie odrzucaj)</value>
   </data>
@@ -6504,8 +6540,14 @@ Kontynuować?</value>
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>Wysyła do domen odbiorców codzienne raporty zbiorcze o niepowodzeniach połączeń TLS (RFC 8460).</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>Wysyła polecenia transakcji bez czekania na każdą odpowiedź, co usuwa jedną wymianę tam i z powrotem na każdego odbiorcę - różnica jest największa na wolnym łączu albo wobec odległego serwera. Używane wyłącznie z serwerem, który to ogłasza. Obowiązuje po ponownym uruchomieniu usługi.</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>Wysyła codzienne raporty zbiorcze, o które domeny proszą znacznikiem rua= w swoim rekordzie DMARC (RFC 7489) - kto wysyłał pocztę, podając się za nie, i czy przeszła ona kontrole. Raport trafia na adres spoza domeny objętej polityką tylko wtedy, gdy DNS tego adresu sam potwierdzi, że go chce, więc domena nie może użyć swojego rekordu DMARC do skierowania raportów tego serwera na kogoś innego.</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>Wysyła wiadomość jako porcje o podanej długości zamiast polecenia DATA z wstawianiem kropek. To także sposób na przekazanie dalej wiadomości binarnej bez przepisywania jej: wiadomość przyjęta jako BINARYMIME może zostać przekazana w postaci, w jakiej dotarła, wyłącznie do serwera, który oferuje zarówno to, jak i BINARYMIME. Obowiązuje po ponownym uruchomieniu usługi.</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>Wysyła adres odbiorcy jako nagłówek User:, dzięki czemu spamd stosuje własne preferencje tej skrzynki pocztowej - w postaci, jakiej oczekuje spamd z użytkownikami wirtualnymi (--virtual-config-dir z %u lub %d). Skanowanie odbywa się raz na wiadomość, a nie raz na odbiorcę, więc wiadomości skierowanej do kilku osób nie da się przeskanować według preferencji którejkolwiek z nich i używa ona profilu powyżej.</value>
@@ -6778,6 +6820,9 @@ Uruchomić ją teraz ponownie?</value>
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>Alg_orytm podpisywania</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>Tożsamość podpisująca, od której musi się zaczynać certyfikat (puste = przepływ pracy wydania tego projektu)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>Logowanie…</value>
@@ -7118,6 +7163,9 @@ Uruchomić ją teraz ponownie?</value>
   <data name="Tasks" xml:space="preserve">
     <value>Zadania</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>Ucz SpamAssassin, gdy użytkownik odkłada wiadomość jako spam albo zabiera ją z powrotem</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Informuje serwery wysyłające, że przy dostarczaniu do Twoich domen muszą używać TLS, zamykając lukę degradacji obecną w oportunistycznym TLS.</value>
   </data>
@@ -7378,6 +7426,9 @@ Należy zaznaczyć klucz powyżej i skopiować go ręcznie - nie zostanie pokaza
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Obowiązujący limit czasu przesuwa się między tymi wartościami wraz z obciążeniem serwera.</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>Krzywe eliptyczne i grupy nad ciałami skończonymi, z użyciem których ten serwer uzgodni klucz, w kolejności preferencji - lista grup OpenSSL, na przykład x25519:secp256r1. Puste oznacza, że wybiera OpenSSL, i jest to właściwa odpowiedź, o ile nie obowiązują wymogi zgodności wskazujące konkretne grupy. Lista, która nie wymienia niczego, co obsługuje klient, przerywa uzgadnianie, więc zmieniać ją należy w oparciu o wynik skanowania, a nie po omacku. Obowiązuje po ponownym uruchomieniu usługi.</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>Włączone kontrole mogą dać w sumie najwyżej {0}, czyli mniej niż próg oznaczania wynoszący {1}: żadna wiadomość nie może osiągnąć któregokolwiek z progów, choćby była nie wiadomo jak zła.</value>
   </data>
@@ -7496,6 +7547,9 @@ Wiadomość została prawdopodobnie dostarczona i nie ma jej już w kolejce.</va
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>Nie udało się zapisać języka: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>Pięć ostatnich ustawień na tej karcie jest przeznaczonych dla instalacji, która buduje własne wydania i podpisuje je własnym Sigstore, albo która jest kopią lustrzaną wydań tego projektu. Gdy wszystkie pozostaną puste, serwer ufa dokładnie jednej rzeczy: instalatorowi podpisanemu przez własny przepływ pracy wydania tego projektu i odnotowanemu w publicznym dzienniku przejrzystości. Ustawienie któregokolwiek z nich zawęża to zaufanie albo je zastępuje, a pomyłka w którymkolwiek oznacza albo odrzucanie prawdziwych wydań, albo zaufanie cudzym.</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>Ostatni krok aktualizacji nie powiódł się: {0}</value>
@@ -7990,6 +8044,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>Tylko ślady. Skonfigurowany tu kolektor otrzymuje spany i nic więcej - metryki i dzienniki mają własne punkty końcowe poniżej, każdy wyłączony, dopóki nie zostanie ustawiony. Metryki Prometheus to port powyżej i są to te same liczniki, które wypycha punkt końcowy metryk, a nie drugie liczenie.</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>Klucz publiczny dziennika przejrzystości dla prywatnego Sigstore (PEM; puste = publiczny klucz Rekor)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>Przegląd szyfrowania transportu</value>
   </data>
@@ -8142,6 +8199,12 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>Używaj wyników ARC od zaufanych przekazujących, aby zrównoważyć niepowodzenie DMARC</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>Używaj CHUNKING (BDAT), gdy serwer odbierający to oferuje</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>Używaj PIPELINING, gdy serwer odbierający to oferuje</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>Używaj SpamAssassin</value>

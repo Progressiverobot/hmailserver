@@ -68,6 +68,7 @@
 #include "MailboxRetentionTask.h"
 #include "MetricsHistoryTask.h"
 #include "UpdateCheckTask.h"
+#include "../Util/UpdateApplyToken.h"
 #include "../Util/UpdateChecker.h"
 #include "IMAPExpungeRetentionTask.h"
 #include "MessageStoreConsistencyTask.h"
@@ -697,6 +698,14 @@ namespace HM
       // read every UpdateCheckHours, but an UpdateWindow an hour long must not be
       // missed, and it is the task that notices the window is open.
       UpdateChecker::ResetSchedule();
+
+      // A token that is still here at start belongs to no apply. The helper stops
+      // the service, runs the installer - which is where DBUpdater redeems the
+      // token - and starts the service again, so a redeemed token is gone before
+      // this line runs and an unredeemed one is from an apply that never happened.
+      // It is the administrator password for an hour, so it is not left lying.
+      UpdateApplyToken::Revoke();
+
       std::shared_ptr<UpdateCheckTask> updateCheckStartupTask = std::shared_ptr<UpdateCheckTask>(new UpdateCheckTask);
       updateCheckStartupTask->SetReoccurance(ScheduledTask::RunOnce);
       scheduler_->ScheduleTask(updateCheckStartupTask);

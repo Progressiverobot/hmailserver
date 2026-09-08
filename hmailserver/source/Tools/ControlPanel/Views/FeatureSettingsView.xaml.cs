@@ -1918,10 +1918,13 @@ namespace hMailServer.ControlPanel.Views
                });
                cards_.Add(new CardDef
                {
-                  // The four parts of the live update (UpdateChecker, UpdateDownloader,
-                  // UpdateInstaller, UpdateCheckTask) read exactly these keys; the
-                  // Status page has the buttons. Everything is off until the check is
-                  // turned on, and the check sends nothing but the request.
+                  // Every key the live update reads is on this card. That is checked
+                  // rather than maintained by hand: build/check-ini-coverage.py fails
+                  // when a setting the server reads has no editor anywhere in the
+                  // Control Panel, which is how the five trust settings below were
+                  // found missing after the feature had shipped. The Status page has
+                  // the buttons. Everything is off until the check is turned on, and
+                  // the check sends nothing but the request.
                   Title = L("Updates"),
                   Blurb = L("The server can notice a new release, verify it against the release's own Sigstore signature, and apply it - by a click on the Status page, or on its own inside a window you set. Off until you turn the check on; the check sends nothing but the request. Every setting here is in hMailServer.ini and applies after a service restart."),
                   Settings =
@@ -1939,8 +1942,45 @@ namespace hMailServer.ControlPanel.Views
                         Blurb = L("Inside the window the scheduled task applies a verified installer without a click: the service stops, files and schema upgrade, the service starts, and the outcome goes to the log, the Windows event log and the Status page. A service that does not come back is rolled back to the previous installer.")
                      },
                      new BoolSetting { Key = "UpdateBackupBeforeApply", Default = true, Label = L("Back up to the configured destination before an unattended apply (no destination or a failed backup means no apply)") },
-                     new BoolSetting { Key = "UpdateRequireAuthenticode", Default = false, Label = L("Also require a valid Authenticode signature on the installer") },
-                     new TextSetting { Key = "UpdateServiceWaitSeconds", Default = "180", Label = L("Seconds to wait for the service after an apply before rolling back"), Placeholder = "180" }
+                     new BoolSetting
+                     {
+                        Key = "UpdateRequireAuthenticode",
+                        Default = false,
+                        Label = L("Also require a valid Authenticode signature on the installer"),
+                        Blurb = L("Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with \"the installer carries no Authenticode signature\" and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional.")
+                     },
+                     new TextSetting { Key = "UpdateServiceWaitSeconds", Default = "180", Label = L("Seconds to wait for the service after an apply before rolling back"), Placeholder = "180" },
+                     new TextSetting
+                     {
+                        Key = "UpdateSourceRepository",
+                        Label = L("Repository the signing certificate must name (empty = this project; - = do not check)"),
+                        Placeholder = "Progressiverobot/hmailserver", // no-loc
+                        Blurb = L("The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's.")
+                     },
+                     new TextSetting
+                     {
+                        Key = "UpdateSigningIdentity",
+                        Label = L("Signing identity the certificate must begin with (empty = this project's release workflow)"),
+                        Placeholder = "https://github.com/Progressiverobot/hmailserver/.github/workflows/sign-release.yml" // no-loc
+                     },
+                     new TextSetting
+                     {
+                        Key = "UpdateSigningIssuer",
+                        Label = L("Identity provider that issued the signing certificate (empty = GitHub's)"),
+                        Placeholder = "https://token.actions.githubusercontent.com" // no-loc
+                     },
+                     new TextSetting
+                     {
+                        Key = "UpdateTrustRootsFile",
+                        Label = L("Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)"),
+                        Placeholder = "C:\\hMailServer\\Data\\fulcio-roots.pem" // no-loc
+                     },
+                     new TextSetting
+                     {
+                        Key = "UpdateLogPublicKeyFile",
+                        Label = L("Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)"),
+                        Placeholder = "C:\\hMailServer\\Data\\rekor.pub" // no-loc
+                     }
                   }
                });
                cards_.Add(new CardDef

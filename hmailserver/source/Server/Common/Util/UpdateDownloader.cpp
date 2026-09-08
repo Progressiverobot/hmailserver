@@ -209,6 +209,20 @@ namespace HM
          return false;
       }
 
+      // The name came from the feed. UpdateChecker refuses a tag that is not a
+      // version number, so this cannot normally be anything but a file name - and
+      // this is the line that would be exploited if that ever stopped being true,
+      // so it does not take the checker's word for it.
+      if (snapshot.installer_name.Find(_T("\\")) >= 0 || snapshot.installer_name.Find(_T("/")) >= 0 ||
+          snapshot.installer_name.Find(_T(":")) >= 0 || snapshot.installer_name.Find(_T("..")) >= 0 ||
+          snapshot.installer_name.IsEmpty())
+      {
+         error = _T("The release names its installer with a file name this server will not write. Nothing was downloaded.");
+         UpdateChecker::RecordFailure(error);
+         LOG_APPLICATION(Formatter::Format(_T("Update download refused: {0}"), error));
+         return false;
+      }
+
       String installerPath = directory + _T("\\") + snapshot.installer_name;
       SigstoreVerdict verdict;
       String why;

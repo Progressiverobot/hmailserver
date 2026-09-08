@@ -464,6 +464,9 @@
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>スコアが {0} 以上のメッセージは拒否されます (本文の受信前は 550、受信後は 554)。マークされるものはありません。</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>10 個のローカル メールボックス宛てのメッセージは、10 回コピーされるのではなく、1 回だけ書き込まれて 10 回リンクされます。配布リスト宛ての大きなメッセージでは、これがディスクへの書き込み 1 回と 10 回の違いになります。データ ディレクトリが NTFS 上にある必要があります。リンクを作成できない場合、サーバーはファイルをコピーし、その旨を SMTP ログに記録します。サービスの再起動後に適用されます。</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>hMailServer 向けの最新の管理アプリケーションです。リアルタイムのダッシュボード、ドメインとアカウント、配信キュー、ログのストリーミング、サーバー設定のすべて、そして 6.x の転送セキュリティ機能 (DANE、MTA-STS、ARC、TLS-RPT、ACME) を備えています。</value>
   </data>
@@ -1052,6 +1055,9 @@
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>送信配信のセッション全体に対する制限です。0 = 制限なし。</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>イベント スクリプトはサーバーの内部で、サービス アカウントの権限で実行されます。そのため、スクリプトが何をインスタンス化してよいかは、利便性の問題ではなくセキュリティ上の決定です。空が安全な既定値です。スクリプトは hMailServer 自身のオブジェクトにだけ到達でき、それ以外には何も到達できません。ここにプログラム識別子 (スクリプト用のファイル システム オブジェクト、HTTP クライアントなど) を指定すると、サーバーが実行するすべてのスクリプトにそれが与えられます。ですから、自分のスクリプトが実際に必要とするものだけを指定してください。サービスの再起動後に適用されます。</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>外部スキャナーのプロセスに対する制限です。0 = 制限なし。</value>
   </data>
@@ -1446,6 +1452,12 @@
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>スクリプトが作成できる COM オブジェクト (コンマ区切り、空 = hMailServer 自身のもののみ)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>クライアント証明書のチェーン先となる CA 証明書バンドル (PEM)(_A)</value>
   </data>
@@ -1525,6 +1537,9 @@
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>HTTPS を提供するには証明書と鍵の両方を設定する必要があります。片方だけでは TLS は有効にならず、サーバーはその旨をログに記録します。REST API リスナーとは異なり、ここでは ACME 証明書へのフォールバックはありません。TLS が設定されていても準備できない場合 (読み取れないファイル、一致しない鍵)、ヘルス プローブは平文の HTTP のままとなり、/metrics は平文でエクスポジションを返す代わりに 503 を返します。</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>プライベート Sigstore 用の認証局ファイル (PEM、空 = 公開の Fulcio ルート)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>証明書ファイル</value>
@@ -3343,6 +3358,9 @@
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>検証済みのインストーラーを更新ヘルパーに渡します。サービスは停止して起動します。戻ってこない場合は以前のバージョンが再インストールされます。結果はサービスが復帰したときにここに報告されます。</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>ファイルをコピーする代わりに、ローカル受信者ごとのコピーをハード リンクにする</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>各受信者のコピーをコピーする代わりにハード リンクする</value>
   </data>
@@ -3541,6 +3559,9 @@
   <data name="I_P address" xml:space="preserve">
     <value>IP アドレス(_P)</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>署名証明書を発行した ID プロバイダー (空 = GitHub のもの)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>結果を書き込む際の ID (空 = このコンピューターの名前)</value>
   </data>
@@ -3699,6 +3720,9 @@
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>SMTP で受信したすべてのメッセージのコピーを、通常どおり配信するのに加えてフォルダー ツリーに保持します。メールを迂回させたり保留したりはしません。ローカルの送信者からのメールは &lt;domain&gt;\&lt;mailbox&gt; の下に、それ以外からのメールは Inbound の下に、エンベロープ送信者のないメッセージ (バウンスと配信レポート) は Error の下にファイルされ、さらにローカルの各受信者のフォルダーにもコピーが置かれます。</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>鍵交換グループ (空 = OpenSSL の既定のリスト)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>鍵ファイルあり</value>
   </data>
@@ -3765,6 +3789,9 @@
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>ホストを空のままにすると、ドメインは何も指定しません: この設定が存在する前とまったく同じように、サーバー全体の SMTP リレーが適用されます。ルートは依然としてどちらにも優先します。ルートは宛先についての宣言だからです。</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>自分でインストーラーをビルドして署名しているのでない限り、これはオフのままにしてください。このプロジェクトのリリースはまだ Authenticode 署名されていないため、オンにすると存在するすべてのリリースが拒否されます。ダウンロードは「インストーラーに Authenticode 署名がありません」で止まり、更新を適用することは二度とできなくなります。すべてのリリースが実際に備えている Sigstore 署名は、どちらの場合でも検証され、省略はできません。</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>空のままにすると、サーバーは灰色で表示されている出荷時のフィルターを使います。objectCategory が先なのは Active Directory でインデックス化されているためで、sAMAccountName はアカウントのディレクトリ タブが保存しているものだからです。%u はアカウントの Active Directory ユーザー名、%d はその AD ドメイン、%m は完全なメール アドレスです。3 つとも置換前にエスケープされるため、悪意のあるログオン名でフィルターを書き換えることはできません。複数のエントリに一致するフィルターは、意図的に誰も認証しません。</value>
   </data>
@@ -3776,6 +3803,9 @@
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Outlook、Thunderbird、モバイル クライアントが、このサーバーの設定 URL を取得することで、メール アドレスだけで自分自身を設定できるようにします。</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>セッションの残りを圧縮するようクライアントが要求できるようにします。大きなメールボックスの一覧はほとんどが繰り返しのテキストなので、低速な回線や従量制の回線で最も効果があります。既定ではオンです。要求しないクライアントは影響を受けません。サービスの再起動後に適用されます。</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>クライアントがパスワードの代わりに ID プロバイダーのベアラー トークンでログオンできるようにします。トークンは、インストールした鍵素材で署名が検証できる場合にのみ受け入れられます。</value>
@@ -4316,6 +4346,9 @@
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>IMAP フォルダーに移動</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>メッセージを Junk として指定されたフォルダーへ移動すると、sa-learn にスパムとして報告され、そこから戻すとハム (非スパム) として報告されます。こうしてフィルターは、誰も実行しない別立ての儀式からではなく、人々がすでに行っている操作から学習します。既定ではオフです。移動のたびに sa-learn が実行されますし、ニュースレターを Junk に振り分けるユーザーは、そのスキャナーが対象とするすべての人にとってニュースレターはスパムだと、フィルターに教えていることになるからです。サービスの再起動後に適用されます。</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>上と同様に、絶対 URL でなければなりません。</value>
@@ -5783,6 +5816,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>非同期ワーク キューを停滞と報告するまでの時間 (秒)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>署名証明書が示していなければならないリポジトリ (空 = このプロジェクト、- = 確認しない)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>リクエスト (検証してログに記録し、拒否はしない)</value>
   </data>
@@ -6504,8 +6540,14 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>TLS 接続の失敗に関する日次集約レポートを受信者ドメインに送信します (RFC 8460)。</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>トランザクションのコマンドを、応答をそれぞれ待たずに送信します。これにより受信者ごとに 1 往復が省かれ、低速な回線や遠くのサーバーが相手のときに差が最も大きくなります。これをアドバタイズするサーバーが相手のときにだけ使われます。サービスの再起動後に適用されます。</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>ドメインが DMARC レコードの rua= タグで要求する日次集約レポートを送信します (RFC 7489)。誰がそのドメインを名乗ってメールを送り、それが合格したかどうかです。レポートは、ポリシー ドメイン外のアドレスにはそのアドレス自身の DNS が受け取ると表明している場合にのみ送られるため、ドメインが DMARC レコードを使ってこのサーバーのレポートを他人に向けることはできません。</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>メッセージを、ドット スタッフィングされた DATA ではなく、バイト数を数えたチャンクとして送信します。バイナリのメッセージを書き換えずにそのまま先へ運ぶのもこれです。BINARYMIME として受け入れたメッセージを到着したままの形で中継できるのは、これと BINARYMIME の両方を提供するサーバーに対してだけです。サービスの再起動後に適用されます。</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>受信者のアドレスを User: ヘッダーとして送信し、spamd がそのメールボックス固有の設定を適用するようにします。仮想ユーザー spamd (--virtual-config-dir と %u または %d) が期待する形式です。スキャンは受信者ごとではなくメッセージごとに 1 回実行されるため、複数人宛てのメッセージは誰か 1 人の設定ではスキャンできず、代わりに上のプロファイルを使います。</value>
@@ -6778,6 +6820,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>署名アルゴリズム(_A)</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>証明書が先頭に持っていなければならない署名 ID (空 = このプロジェクトのリリース ワークフロー)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>サインイン中…</value>
@@ -7118,6 +7163,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Tasks" xml:space="preserve">
     <value>タスク</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>ユーザーがメッセージをスパムに振り分けたとき、またはそこから戻したときに SpamAssassin に学習させる</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>送信側サーバーに、あなたのドメインへの配信時には TLS を使わなければならないと伝え、日和見的 TLS のダウングレードの穴を塞ぎます。</value>
   </data>
@@ -7378,6 +7426,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>実効タイムアウトは、サーバーの負荷に応じてこれらの値の間で変動します。</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>このサーバーが鍵の合意に使う楕円曲線と有限体グループを、優先度の高い順に指定します。OpenSSL のグループ リストの形式で、たとえば x25519:secp256r1 のように書きます。空にすると OpenSSL が選択します。グループを名指しするコンプライアンス上の要件がない限り、それが正しい答えです。クライアントがサポートするものを 1 つも含まないリストはハンドシェイクを終わらせてしまうため、手探りで変更するのではなく、スキャンの結果に照らして変更してください。サービスの再起動後に適用されます。</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>有効なチェックを合計しても最大 {0} にしかならず、マークしきい値の {1} を下回っています。どれほど悪質なメッセージでも、どちらのしきい値にも達することはできません。</value>
   </data>
@@ -7496,6 +7547,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>言語を保存できませんでした: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>このカードの最後の 5 つの設定は、自分でリリースをビルドして自分の Sigstore で署名しているサイト、またはこのプロジェクトのリリースをミラーしているサイトのためのものです。これらをすべて空のままにすると、サーバーが信頼するのはただ 1 つ、このプロジェクト自身のリリース ワークフローによって署名され、公開の透明性ログに記録されたインストーラーだけです。いずれかを設定すると、その信頼はより狭くなるか、別のものに置き換わります。1 つでも間違えると、正規のリリースを拒否するか、誰か別の人のリリースを信頼するかのどちらかになります。</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>最後の更新ステップが失敗しました: {0}</value>
@@ -7990,6 +8044,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>トレースのみ。ここで設定されたコレクターはスパンを受け取り、それ以外は受け取りません。メトリクスとログには下にそれぞれのエンドポイントがあり、設定されるまでオフです。Prometheus メトリクスは上のポートで、メトリクス エンドポイントがプッシュするのと同じカウンターであり、別の集計ではありません。</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>プライベート Sigstore 用の透明性ログの公開鍵 (PEM、空 = 公開の Rekor 鍵)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>トランスポート暗号化の概要</value>
   </data>
@@ -8142,6 +8199,12 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>信頼された転送元の ARC 結果を使って DMARC 失敗を相殺する</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>受信側サーバーが提供している場合は CHUNKING (BDAT) を使用する</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>受信側サーバーが提供している場合は PIPELINING を使用する</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>SpamAssassin を使う</value>

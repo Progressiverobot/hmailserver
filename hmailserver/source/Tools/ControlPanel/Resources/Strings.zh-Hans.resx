@@ -464,6 +464,9 @@
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>分数达到 {0} 或以上的邮件会被拒收（正文之前为 550，之后为 554）。不会标记任何邮件。</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>发给十个本地邮箱的邮件只写入一次并建立十个链接，而不是复制十份；对于发往分发列表的大邮件来说，这就是一次磁盘写入与十次磁盘写入的区别。需要数据目录位于 NTFS 上；在无法建立链接的地方，服务器会复制文件并在 SMTP 日志中说明。在重启服务后生效。</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>面向 hMailServer 的现代管理应用：实时仪表板、域与账户、投递队列、日志流、完整的服务器设置，以及 6.x 的传输安全功能（DANE、MTA-STS、ARC、TLS-RPT、ACME）。</value>
   </data>
@@ -1052,6 +1055,9 @@
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>整个出站投递会话。0 = 不限制。</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>事件脚本在服务器内部以服务账户的权限运行，因此它可以实例化什么是一项安全决定，而不是一件图方便的事。留空是安全的默认值：脚本只能访问 hMailServer 自己的对象，此外别无他物。在此处写下一个程序标识符 - 一个脚本文件系统对象、一个 HTTP 客户端 - 就等于把它授予了服务器运行的每一个脚本，因此只写下您的脚本确实需要的东西。在重启服务后生效。</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>一个外部扫描器进程。0 = 不限制。</value>
   </data>
@@ -1446,6 +1452,12 @@
   <data name="CC" xml:space="preserve">
     <value>抄送</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>脚本可以创建的 COM 对象（以逗号分隔；留空 = 仅 hMailServer 自己的）</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>客户端证书必须链接到的 CA 证书包(_A)（PEM）</value>
   </data>
@@ -1525,6 +1537,9 @@
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>要提供 HTTPS，证书和密钥必须同时设置；只设置其中之一时不会启用 TLS，服务器会记录这一点。与 REST API 监听器不同，此处不会回退到 ACME 证书。如果配置了 TLS 但无法准备就绪（文件不可读、密钥不匹配），健康探测将保持在纯 HTTP 上，而 /metrics 会应答 503，而不是以明文提供指标输出。</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>私有 Sigstore 的证书颁发机构文件（PEM；留空 = 公共 Fulcio 根证书）</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>证书文件</value>
@@ -3343,6 +3358,9 @@
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>把已验证的安装程序交给更新助手。服务会停止并重新启动；如果它没有恢复，则重新安装先前的版本。服务恢复后会在此处报告结果。</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>为每个本地收件人的副本创建硬链接，而不是复制文件</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>为每个收件人的副本创建硬链接，而不是复制</value>
   </data>
@@ -3541,6 +3559,9 @@
   <data name="I_P address" xml:space="preserve">
     <value>IP 地址(_P)</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>颁发签名证书的身份提供方（留空 = GitHub 的）</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>写入结果时所用的身份（留空 = 本计算机的名称）</value>
   </data>
@@ -3699,6 +3720,9 @@
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>除了正常投递之外，还会在一个文件夹树中保留通过 SMTP 收到的每封邮件的副本 - 它不会转移或扣留邮件。来自本地发件人的邮件归档到 &lt;domain&gt;\&lt;mailbox&gt; 下，来自其他地方的邮件归档到 Inbound 下，没有信封发件人的邮件（退信和投递报告）归档到 Error 下，此外还会在每个本地收件人的文件夹中保留一份副本。</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>密钥交换组（留空 = OpenSSL 的默认列表）</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>密钥文件存在</value>
   </data>
@@ -3765,6 +3789,9 @@
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>主机留空则该域不表态：应用服务器范围的 SMTP 中继服务器，与此设置出现之前完全一样。路由仍然优先于两者，因为路由是关于目标的声明。</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>除非您自己构建安装程序并为其签名，否则请让此项保持关闭。本项目的发行版尚未经过 Authenticode 签名，因此打开它会拒绝现有的每一个发行版：下载会以“the installer carries no Authenticode signature”停止，而且再也无法安装任何更新。而每个发行版确实都带有的 Sigstore 签名，无论如何都会被检查，并且不是可选的。</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>留空时，服务器使用灰色显示的出厂过滤器 - 先用 objectCategory，因为它在 Active Directory 中有索引；再用 sAMAccountName，因为账户的“目录”选项卡存储的正是它。%u 是账户的 Active Directory 用户名，%d 是其 AD 域，%m 是其完整邮件地址；三者在替换前都会被转义，因此恶意的登录名无法改写过滤器。匹配到多个条目的过滤器不会验证任何人，这是有意为之。</value>
   </data>
@@ -3776,6 +3803,9 @@
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>让 Outlook、Thunderbird 和移动客户端仅凭电子邮件地址就能自行设置，方法是获取本服务器的配置 URL。</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>让客户端可以要求把会话的其余部分压缩，这在缓慢或按流量计费的链路上最有价值，因为大邮箱的列表大多是重复的文本。默认打开；不提出要求的客户端不受影响。在重启服务后生效。</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>让客户端用来自身份提供方的持有者令牌而不是密码登录；只有当令牌的签名能通过您安装的密钥材料验证时才会被接受。</value>
@@ -4316,6 +4346,9 @@
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>移动到 IMAP 文件夹</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>把邮件移入指定为 Junk 的文件夹，会向 sa-learn 报告它是垃圾邮件；把邮件再移出来，则报告它是正常邮件。这样过滤器就能从人们本来就在做的事情中学习，而不是从一套没人会执行的单独仪式中学习。默认关闭：它每移动一次就运行一次 sa-learn，而一个把新闻邮件归入 Junk 的用户，是在教过滤器：对该扫描器所服务的所有人来说，新闻邮件都是垃圾邮件。在重启服务后生效。</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>必须是绝对 URL，同上。</value>
@@ -5783,6 +5816,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>在多长时间后把异步工作队列报告为已停滞（秒）</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>签名证书必须指明的仓库（留空 = 本项目；- = 不检查）</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>请求（验证并记录，绝不拒绝）</value>
   </data>
@@ -6504,8 +6540,14 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>向收件人域发送关于 TLS 连接失败的每日汇总报告 (RFC 8460)。</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>发送一次事务的各条命令而不等待每一个应答，这样每个收件人就少一次往返 - 在缓慢的链路上或发往远处的服务器时差别最大。只对通告了它的服务器使用。在重启服务后生效。</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>发送各域通过其 DMARC 记录中的 rua= 标签请求的每日汇总报告 (RFC 7489) - 谁声称是它们在发送邮件，以及是否通过。只有当策略域之外的地址自身的 DNS 表示希望接收时，报告才会发往该地址，因此一个域无法利用其 DMARC 记录把本服务器的报告引向别人。</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>把邮件作为计数的分块发送，而不是使用经过点填充的 DATA。它也正是在不重写邮件的情况下把二进制邮件继续送出去的手段：以 BINARYMIME 接受的邮件，只能按其到达时的原样中继给同时提供本项和 BINARYMIME 的服务器。在重启服务后生效。</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>将收件人的地址作为 User: 标头发送，这样 spamd 就会应用该邮箱自己的偏好设置 - 这是虚拟用户 spamd (带 %u 或 %d 的 --virtual-config-dir) 所期望的形式。扫描按每封邮件运行一次，而不是按每个收件人一次，因此发给多人的邮件无法按其中任何一人的偏好扫描，而是改用上面的配置文件。</value>
@@ -6778,6 +6820,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>签名算法(_A)</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>证书必须以其开头的签名身份（留空 = 本项目的发布工作流）</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>正在登录…</value>
@@ -7118,6 +7163,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Tasks" xml:space="preserve">
     <value>任务</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>当用户把邮件归入垃圾邮件或又将其移出时训练 SpamAssassin</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>告诉发送服务器投递到您的域时必须使用 TLS，堵上机会性 TLS 中的降级漏洞。</value>
   </data>
@@ -7378,6 +7426,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>实际超时会随服务器负载在这些值之间变化。</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>本服务器愿意用来协商密钥的椭圆曲线和有限域群组，按优先顺序排列 - 也就是 OpenSSL 的群组列表，例如 x25519:secp256r1。留空表示由 OpenSSL 选择，而这正是正确答案，除非您有一套点名了这些群组的合规规定。如果列表中列出的东西客户端一个都不支持，握手就会终止，因此请对照一次扫描的结果来更改它，而不是在两眼一抹黑的情况下更改。在重启服务后生效。</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>已启用的检查合计最多只能加 {0}，低于标记阈值 {1}: 无论邮件多糟糕，都无法达到任何一个阈值。</value>
   </data>
@@ -7496,6 +7547,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>无法保存语言: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>本卡片上最后五项设置是为这样的站点准备的：它自己构建发行版并用自己的 Sigstore 为其签名，或者它镜像了本项目的发行版。把它们全部留空，服务器就只信任一样东西：由本项目自己的发布工作流签名、并记录在公共透明日志中的安装程序。设置其中任何一项都会收窄或取代这一点，而弄错其中一项就意味着要么拒绝真正的发行版，要么信任别人的发行版。</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>上一个更新步骤失败: {0}</value>
@@ -7990,6 +8044,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>仅跟踪。此处配置的收集器只接收跨度，不接收其他任何内容 - 指标和日志在下面有各自的端点，在设置之前各自都是关闭的。Prometheus 指标是上面的端口，与指标端点推送的是同一组计数器，而不是第二套统计。</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>私有 Sigstore 的透明日志公钥（PEM；留空 = 公共 Rekor 密钥）</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>传输加密概览</value>
   </data>
@@ -8142,6 +8199,12 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>使用受信任转发者的 ARC 结果来抵消 DMARC 失败</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>当接收服务器提供 CHUNKING (BDAT) 时使用它</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>当接收服务器提供 PIPELINING 时使用它</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>使用 SpamAssassin</value>
