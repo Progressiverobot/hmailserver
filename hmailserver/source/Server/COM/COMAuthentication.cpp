@@ -132,6 +132,16 @@ namespace HM
       // somebody who holds the password. That is exactly when the administrator
       // needs to be told, and never in response to a guess.
       const String secret = HM::IniFileSettings::Instance()->GetAdministratorTotpSecret();
+      if (HM::IniFileSettings::Instance()->IsAdministratorTotpEnrolled() && secret.IsEmpty())
+      {
+         // Enrolled, and the secret cannot be opened - a configuration moved to a
+         // machine without its key, or a store that has failed. Refusing is the
+         // only safe answer: accepting would turn a lost key into a switched-off
+         // second factor without anyone choosing that.
+         HM::ErrorManager::Instance()->ReportError(HM::ErrorManager::High, 6417, "COMAuthentication",
+            "Administrator logon refused: a second factor is enrolled but its secret cannot be opened on this machine (see the preceding secret-store error). Restore the key the secret was protected with, or clear AdministratorTotpSecret in hMailServer.ini and enrol again.");
+         return;
+      }
 
       if (!secret.IsEmpty())
       {

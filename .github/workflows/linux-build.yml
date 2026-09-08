@@ -86,7 +86,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build clang \
-            libssl-dev zlib1g-dev libpq-dev \
+            libssl-dev zlib1g-dev libpq-dev libldap-dev \
             libboost-thread-dev libboost-chrono-dev libboost-system-dev libboost-filesystem-dev libboost-regex-dev \
             file rpm
 
@@ -151,9 +151,15 @@ jobs:
         working-directory: build/linux
         run: |
           sudo apt-get install -y ./hmailserver_*.deb
+          # What the package put where, so a failing check below is diagnosed from the log.
+          dpkg -L hmailserver | grep -E 'etc/|systemd|bin/hmailserver|DBScripts/Create' || true
           /usr/bin/hmailserver --version
-          test -f /etc/hmailserver/hMailServer.ini
-          test -f /usr/lib/systemd/system/hmailserver.service
+          # As root, because the package makes /etc/hmailserver 0750 root:hmailserver on
+          # purpose (the configuration holds credentials) and the runner's own account
+          # cannot see into it: the first three runs of this step ended here, on a file
+          # that was there, with a bare exit code.
+          sudo test -f /etc/hmailserver/hMailServer.ini
+          sudo test -f /usr/lib/systemd/system/hmailserver.service
           systemctl is-enabled hmailserver || true
           sudo apt-get remove -y hmailserver
 
@@ -187,7 +193,7 @@ jobs:
           # four and every one of the 496 files failed on the first header it
           # could not find, which the census then reported as 496 failures.
           sudo apt-get install -y --no-install-recommends \
-            clang g++-aarch64-linux-gnu libboost-dev libssl-dev zlib1g-dev libpq-dev
+            clang g++-aarch64-linux-gnu libboost-dev libssl-dev zlib1g-dev libpq-dev libldap-dev
 
       - name: Count the translation units that compile for AArch64
         run: |

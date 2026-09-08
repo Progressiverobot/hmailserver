@@ -6,6 +6,7 @@
 #include "stdafx.h"
 
 #include "PersistentMessage.h"
+#include "../Util/StorePath.h"
 #include "../Application/IniFileSettings.h"
 #include "../Util/Strings/Formatter.h"
 #include "PersistentDomain.h"
@@ -1587,11 +1588,13 @@ namespace HM
       {
       case AccountFolder:
          {
-            // Message is placed in an account folder.
-            String domainName = StringParser::ExtractDomain(accountAddress);
+            // Message is placed in an account folder. The two components are
+            // named by the store's case policy (StorePath.h): as written on
+            // Windows, lower-cased on a case-sensitive filesystem.
+            String domainName = StoreDirectoryName(StringParser::ExtractDomain(accountAddress));
             String domainFolder = FileUtilities::Combine(dataDirectory, domainName);
 
-            String accountFolderName = StringParser::ExtractAddress(accountAddress);
+            String accountFolderName = StoreDirectoryName(StringParser::ExtractAddress(accountAddress));
             String accountFolder = FileUtilities::Combine(domainFolder, accountFolderName);
 
             // The message is placed in a folder containing the two first characters of the guid file name.

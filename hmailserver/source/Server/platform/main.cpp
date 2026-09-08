@@ -49,6 +49,7 @@
 #include "../Common/SQL/SQLStatement.h"
 #include "../Common/SQL/SQLCommand.h"
 #include "../Common/SQL/SQLScriptRunner.h"
+#include "../Common/Util/CrashOracle.h"
 #include <dirent.h>
 
 namespace
@@ -551,6 +552,12 @@ int main(int argc, char *argv[])
       return 0;
    }
 
+   // The crash oracle first, before the application touches the heap in anger:
+   // a fault during start-up is exactly the kind that otherwise disappears. It
+   // installs signal handlers for the memory-safety signals and SIGABRT, and
+   // says where its records go once the log is up (below).
+   HM::CrashOracle::Install();
+
    if (!HM::Application::Instance()->InitInstance(error))
    {
       // Nothing is listening and nothing has been accepted, so this is the one
@@ -568,6 +575,7 @@ int main(int argc, char *argv[])
       return 1;
    }
 
+   HM::CrashOracle::LogInstallationStatus();
    HM::Logger::Instance()->LogApplication(HM::String(_T("hMailServer ")) + HMAILSERVER_VERSION + _T(" is running. Send SIGTERM to stop it."));
 
    // The wait loop. The application's work happens on its own threads; this
@@ -597,6 +605,9 @@ int main(int argc, char *argv[])
    // The same order the Windows service uses, and for the same reason: stop
    // accepting first so nothing new arrives, then let the application finish what
    // it holds. ShutdownDrainSeconds decides how long that is allowed to take.
+   // A fault from here on is recorded as one during shutdown, which is a
+   // different finding from one in service.
+   HM::CrashOracle::NotifyShutdownStarted();
    HM::Application::Instance()->StopServers();
    HM::Application::Instance()->ExitInstance();
 

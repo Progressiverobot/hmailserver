@@ -96,8 +96,10 @@ already cost a release cycle or nearly shipped a defect.
    legitimately. The workflow log records the versions it built with, and the
    release notes say "reproducible on the runner image of the day" and give
    the binary's SHA-256 from that log, rather than claiming what the MSVC line
-   above can claim. The package containers are not compared at all yet; the
-   roadmap's CI row says so.
+   above can claim. Measured on 9 September 2026: commit 8926f5c3f built twice on
+   the hosted runners, hours apart, and every job's binary hashed the same both
+   times (x86-64 clang, x86-64 GCC, AArch64 clang). The package containers are
+   not compared; the binaries inside them are what the hashes above cover.
 
 8b. **Full regression suite on the assertion build, first.** Build with
    `build\build.ps1 -Configuration Release -Asserts` - the same source, with

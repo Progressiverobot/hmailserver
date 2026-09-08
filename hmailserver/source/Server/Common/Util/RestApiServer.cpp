@@ -921,6 +921,15 @@ namespace HM
       // COMAuthentication uses, for the same reason: what is said about the code
       // is said only to somebody who holds the password.
       const String secret = IniFileSettings::Instance()->GetAdministratorTotpSecret();
+      if (IniFileSettings::Instance()->IsAdministratorTotpEnrolled() && secret.IsEmpty())
+      {
+         // Enrolled but unopenable: refused, as COMAuthentication refuses, and
+         // for the same reason - a lost key must not read as a second factor
+         // switched off.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6417, "RestApiServer::AuthenticateBasic_",
+            "Administrator logon refused: a second factor is enrolled but its secret cannot be opened on this machine (see the preceding secret-store error). Restore the key the secret was protected with, or clear AdministratorTotpSecret in hMailServer.ini and enrol again.");
+         return BasicRefused;
+      }
       if (secret.IsEmpty())
          return BasicAccepted;
 
@@ -1385,6 +1394,15 @@ namespace HM
          case RouteDomainList:
             return HandleListDomains_(caller.domains);
 
+         case RouteDomainCreate:
+            return HandleCreateDomain_(GetRequestBody_(request));
+
+         case RouteDomainUpdate:
+            return HandleUpdateDomain_(String(route.identifier), GetRequestBody_(request));
+
+         case RouteDomainDelete:
+            return HandleDeleteDomain_(String(route.identifier));
+
          case RouteAccountList:
             return HandleListAccounts_(String(route.identifier));
 
@@ -1768,8 +1786,30 @@ namespace HM
          return;
       }
 
+      if (method == "POST" && path == "/api/v1/domains")
+      {
+         route.kind = RouteDomainCreate;
+         return;
+      }
+
       // /api/v1/domains/<name>/accounts
       const AnsiString domainsPrefix = "/api/v1/domains/";
+
+      // /api/v1/domains/<name> - the domain itself. The remainder has no slash
+      // in it, which is what keeps this apart from every
+      // /api/v1/domains/<name>/<resource> route below: those all end in a
+      // resource segment and this one ends in the name.
+      if ((method == "PUT" || method == "DELETE") && path.StartsWith(domainsPrefix))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength());
+
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            route.kind = method == "PUT" ? RouteDomainUpdate : RouteDomainDelete;
+            route.identifier = domainName;
+            return;
+         }
+      }
 
       if (path.StartsWith(domainsPrefix) && path.EndsWith("/accounts"))
       {
@@ -2109,6 +2149,9 @@ namespace HM
       case RouteApiKeyRevoke:
       case RouteAccountCreate:
       case RouteAccountDelete:
+      case RouteDomainCreate:
+      case RouteDomainUpdate:
+      case RouteDomainDelete:
       case RouteQueueRetry:
       case RouteQueueDelete:
       case RouteQuarantineRelease:
@@ -2240,6 +2283,14 @@ namespace HM
       }
       switch (route.kind)
       {
+      // The set of domains is the server's. A key issued for named domains
+      // administers what is inside them; it does not decide which domains
+      // exist, so creating one - or deleting one, with every mailbox in it -
+      // needs a credential that was never narrowed to domains. Changing a
+      // domain's active flag is scoped to that domain further down, as the
+      // account routes are.
+      case RouteDomainCreate:
+      case RouteDomainDelete:
       case RouteIpRangeList:
       case RouteIpRangeCreate:
       case RouteIpRangeDelete:
@@ -2270,6 +2321,7 @@ namespace HM
       {
       case RouteAccountList:
       case RouteAccountCreate:
+      case RouteDomainUpdate:
       case RouteAliasList:
       case RouteListList:
       case RouteListCreate:
@@ -3099,18 +3151,159 @@ namespace HM
          if (count > 0)
             body += ",";
 
-         AnsiString entry;
-         entry.Format("{\"name\":\"%hs\",\"active\":%hs}",
-            JsonEscape_(Utf8_(domain->GetName())).c_str(),
-            domain->GetIsActive() ? "true" : "false");
-
-         body += entry;
+         body += DomainEntryJson_(domain);
          count++;
       }
 
       body += "]";
 
       return BuildResponse_(200, body);
+   }
+
+   AnsiString
+   RestApiServer::DomainEntryJson_(const std::shared_ptr<Domain> &domain)
+   {
+      AnsiString entry;
+      entry.Format("{\"name\":\"%hs\",\"active\":%hs,\"postmaster\":\"%hs\"}",
+         JsonEscape_(Utf8_(domain->GetName())).c_str(),
+         domain->GetIsActive() ? "true" : "false",
+         JsonEscape_(Utf8_(domain->GetPostmaster())).c_str());
+
+      return entry;
+   }
+
+   HttpResponse
+   RestApiServer::HandleCreateDomain_(const AnsiString &requestBody)
+   {
+      // Trimmed as InterfaceDomain::put_Name trims, and nothing else done to
+      // it here. The name is judged by PreSaveLimitationsCheck inside
+      // PersistentDomain::SaveObject, exactly as a domain saved from the
+      // Control Panel or over COM is judged: the same IsValidDomainName, the
+      // same refusal of a name a domain alias already answers to.
+      String name = JsonUtf8Value_(requestBody, "name");
+      name.Trim();
+
+      if (name.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"name is required\"}");
+
+      // A duplicate is refused before the save rather than by it, so that it
+      // is a 409 and not a 400 carrying the limitation check's sentence: to a
+      // caller the two are different answers, and one of them means "already
+      // done".
+      Domains domains;
+      domains.Refresh();
+
+      if (domains.GetItemByName(name))
+         return BuildResponse_(409, "{\"error\":\"domain already exists\"}");
+
+      // A fresh Domain, as InterfaceDomains::Add makes one, so that every
+      // default the Control Panel would leave in place - the plus-addressing
+      // character, the signature settings, the limits switched off - is the
+      // same here.
+      std::shared_ptr<Domain> domain = std::shared_ptr<Domain>(new Domain());
+      domain->SetName(name);
+      domain->SetIsActive(GetJsonBoolValue_(requestBody, "active", true));
+      domain->SetPostmaster(JsonUtf8Value_(requestBody, "postmaster"));
+
+      String saveError;
+
+      if (!PersistentDomain::SaveObject(domain, saveError, PersistenceModeNormal))
+      {
+         // As for an account: a message is the limitation check explaining the
+         // caller's own mistake - a name that is not a domain name, a name a
+         // domain alias already has - in fixed sentences written for an
+         // administrator, which is what makes passing them through safe. No
+         // message is a failed INSERT, and that one is ours.
+         if (!saveError.IsEmpty())
+         {
+            LOG_APPLICATION("RestApi: Refused to create domain " + name + ": " + saveError);
+
+            AnsiString body;
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError)).c_str());
+
+            return BuildResponse_(400, body);
+         }
+
+         return BuildResponse_(500, "{\"error\":\"failed to save domain\"}");
+      }
+
+      // SaveObject has already dropped the name from the domain cache, so the
+      // next lookup - a listing, or SMTP deciding whether a recipient is
+      // local - reads the row that was just written.
+      LOG_APPLICATION("RestApi: Domain " + name + " created.");
+
+      return BuildResponse_(201, DomainEntryJson_(domain));
+   }
+
+   HttpResponse
+   RestApiServer::HandleUpdateDomain_(const String &domainName, const AnsiString &requestBody)
+   {
+      // active is what the route is for and has to be named, as enabled has
+      // to be for the automatic reply; postmaster changes only when the body
+      // names it, so a client that sends {"active":false} to switch a domain
+      // off does not also blank its postmaster. The name is not changed here:
+      // renaming a domain renames every address in it, and stays with COM.
+      if (requestBody.Find("\"active\"") < 0)
+         return BuildResponse_(400, "{\"error\":\"active is required\"}");
+
+      Domains domains;
+      domains.Refresh();
+
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      domain->SetIsActive(GetJsonBoolValue_(requestBody, "active", domain->GetIsActive()));
+
+      if (requestBody.Find("\"postmaster\"") >= 0)
+         domain->SetPostmaster(JsonUtf8Value_(requestBody, "postmaster"));
+
+      String saveError;
+
+      if (!PersistentDomain::SaveObject(domain, saveError, PersistenceModeNormal))
+      {
+         if (!saveError.IsEmpty())
+         {
+            LOG_APPLICATION("RestApi: Refused to update domain " + domain->GetName() + ": " + saveError);
+
+            AnsiString body;
+            body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError)).c_str());
+
+            return BuildResponse_(400, body);
+         }
+
+         return BuildResponse_(500, "{\"error\":\"failed to save domain\"}");
+      }
+
+      LOG_APPLICATION("RestApi: Domain " + domain->GetName() + " updated, active: " +
+         String(domain->GetIsActive() ? _T("true") : _T("false")) + ".");
+
+      return BuildResponse_(200, DomainEntryJson_(domain));
+   }
+
+   HttpResponse
+   RestApiServer::HandleDeleteDomain_(const String &domainName)
+   {
+      Domains domains;
+      domains.Refresh();
+
+      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      // Through the collection, as InterfaceDomain::Delete goes through its
+      // parent collection. Collection::DeleteItemByDBID calls
+      // PersistentDomain::DeleteObject, which deletes the accounts with their
+      // messages, the aliases, the distribution lists and the domain aliases,
+      // rewrites whatever another domain pointed at any of those names, drops
+      // the domain from the cache and removes its data and Sieve directories -
+      // and reports a refused delete instead of dropping the object anyway.
+      if (!domains.DeleteItemByDBID(domain->GetID()))
+         return BuildResponse_(500, "{\"error\":\"failed to delete domain\"}");
+
+      LOG_APPLICATION("RestApi: Domain " + domain->GetName() + " deleted.");
+
+      return BuildResponse_(200, "{\"deleted\":true}");
    }
 
    HttpResponse
@@ -4098,12 +4291,12 @@ namespace HM
          size_t offset = start == 0 ? 2 : 0;
          if (chunk.size() > offset)
          {
-            // Copied rather than reinterpreted: the chunk is a byte buffer at whatever
-            // alignment the read left it, and a wchar_t view of such a buffer is what
-            // the string-type-conversion check rightly refuses.
-            std::wstring wide((chunk.size() - offset) / 2, L'\0');
-            if (!wide.empty())
-               memcpy(&wide[0], chunk.data() + offset, wide.size() * sizeof(wchar_t));
+            // Decoded rather than reinterpreted: the file is UTF-16LE on disk on
+            // every platform, and a wchar_t is four bytes on Linux, so a copy of the
+            // bytes would read every other character as a surrogate. The codec is
+            // the one File::Write and ReadCompleteTextFile use.
+            std::wstring wide = Unicode::FromUtf16Le(
+               reinterpret_cast<const unsigned char *>(chunk.data()) + offset, chunk.size() - offset);
             AnsiString narrow(String(wide.c_str()));
             text = narrow.c_str();
          }
@@ -7727,7 +7920,12 @@ namespace HM
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
          "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under its own media type, except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
-         "\"/api/v1/domains\":{\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}}},"
+         "\"/api/v1/domains\":{"
+         "\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}},"
+         "\"post\":{\"summary\":\"Create a domain\",\"description\":\"Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: name, active, postmaster\"},\"400\":{\"description\":\"name missing, not a domain name, or taken by a domain alias (the reason is in error)\"},\"409\":{\"description\":\"A domain with that name exists\"}}}},"
+         "\"/api/v1/domains/{domain}\":{"
+         "\"put\":{\"summary\":\"Switch a domain on or off, and set its postmaster\",\"description\":\"Body: active (required) and postmaster (changed only when named). The name cannot be changed here.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"active\"],\"properties\":{\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The domain as saved: name, active, postmaster\"},\"400\":{\"description\":\"active missing, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"delete\":{\"summary\":\"Delete a domain with everything in it\",\"description\":\"The accounts and their messages, the aliases, the distribution lists, the domain aliases and the domain's directories go with it, exactly as when the Control Panel deletes a domain. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
          "\"post\":{\"summary\":\"Create an account\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\",\"password\"],\"properties\":{\"address\":{\"type\":\"string\"},\"password\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"maxSizeMB\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Malformed request\"},\"404\":{\"description\":\"Unknown domain\"}}}},"

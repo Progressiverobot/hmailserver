@@ -157,7 +157,7 @@ function Get-SchemaModel
    }
 
    $createText = @{}
-   foreach ($pair in @{ MSSQL = 'CreateTablesMSSQL.sql'; MySQL = 'CreateTablesMYSQL.sql'; PGSQL = 'CreateTablesPGSQL.sql' }.GetEnumerator())
+   foreach ($pair in @{ MSSQL = 'CreateTablesMSSQL.sql'; MySQL = 'CreateTablesMySQL.sql'; PGSQL = 'CreateTablesPGSQL.sql' }.GetEnumerator())
    {
       $path = Join-Path $scriptDir $pair.Value
       $createText[$pair.Key] = if (Test-Path -LiteralPath $path) { Get-Content -Raw -LiteralPath $path } else { '' }

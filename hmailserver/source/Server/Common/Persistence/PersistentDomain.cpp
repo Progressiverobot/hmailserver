@@ -6,6 +6,7 @@
 #include "stdafx.h"
 
 #include "PersistentDomain.h"
+#include "../Util/StorePath.h"
 #include "PersistentAccount.h"
 #include "PersistentMessage.h"
 #include "PersistentAlias.h"
@@ -372,7 +373,7 @@ namespace HM
          // Delete folder from data directory
          if (!pDomain->GetName().IsEmpty())
          {
-            String sDomainFolder = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), pDomain->GetName());
+            String sDomainFolder = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), StoreDirectoryName(pDomain->GetName()));
             FileUtilities::DeleteDirectory(sDomainFolder, false);
 
             // The domain's Sieve tree lives outside that directory, so it survived

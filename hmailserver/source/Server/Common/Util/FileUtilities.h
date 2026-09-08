@@ -109,5 +109,10 @@ namespace HM
       // editing ClassTester::DoTests to reach it. They are the layer this class is
       // built on, so their coverage lives here.
       void TestByteBuffer_();
+
+      // The on-disk UTF-16LE format: the codec in Unicode, and File::Write /
+      // ReadCompleteTextFile on either side of it, against the bytes a Windows
+      // server writes. Here for the same reason as TestByteBuffer_.
+      void TestUtf16Files_();
    };
 }

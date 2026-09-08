@@ -85,10 +85,14 @@ started. Three things are needed before it can run:
      section of /etc/hmailserver/hMailServer.ini. PostgreSQL and MySQL/MariaDB
      are the two this build supports.
 
-  2. Create the schema. The scripts are in /usr/share/hmailserver/DBScripts;
-     CreateTablesPGSQL.sql and CreateTablesMySQL.sql are the ones to run.
+  2. Set the administrator password, hashed the way the Control Panel hashes it:
 
-  3. Set AdministratorPassword in the [Security] section of the same file.
+         sudo hmailserver --set-admin-password
+
+  3. Create the schema. The server does this itself, in the backend's dialect,
+     from the scripts in /usr/share/hmailserver/DBScripts:
+
+         sudo -u hmailserver hmailserver --create-database
 
 Then check the file before starting anything:
 

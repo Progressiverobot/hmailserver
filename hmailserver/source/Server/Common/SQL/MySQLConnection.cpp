@@ -360,7 +360,11 @@ namespace HM
             return DALConnection::DALSuccess;
 
          const char *pError = MySQLInterface::Instance()->p_mysql_error(pSQL);
-         if (!pError[0] != '\0')
+         // An empty error string means the last call succeeded. This used to read
+         // "!pError[0] != '\0'", which by precedence compares the negation
+         // with zero and happened to say the same thing; GCC's warning was right
+         // that nobody could tell.
+         if (pError[0] == '\0')
             return DALConnection::DALSuccess;
 
 

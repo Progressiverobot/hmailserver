@@ -69,6 +69,7 @@ namespace HM
 {
    class IPAddress;
    class Account;
+   class Domain;
    class IMAPFolder;
    class IMAPFolders;
    class Message;
@@ -122,6 +123,13 @@ namespace HM
          RouteApiKeyRevoke,
          RouteStatus,
          RouteDomainList,
+         // The domain's own writes. Create and delete are server-wide - the set
+         // of domains is the server's, not any one domain's - and are refused
+         // for a domain-restricted key in Authorize_; the update is scoped to
+         // the domain it names, as the account routes are.
+         RouteDomainCreate,
+         RouteDomainUpdate,
+         RouteDomainDelete,
          RouteAccountList,
          RouteAccountCreate,
          RouteAccountDelete,
@@ -397,6 +405,13 @@ namespace HM
       // filtered to those, so a key issued for one customer is not handed the
       // names of all the others.
       static HttpResponse HandleListDomains_(const std::vector<String> &allowedDomains);
+
+      // One domain as the listing renders it, so that what a create or an
+      // update answers is exactly what the next listing will show.
+      static AnsiString DomainEntryJson_(const std::shared_ptr<Domain> &domain);
+      static HttpResponse HandleCreateDomain_(const AnsiString &requestBody);
+      static HttpResponse HandleUpdateDomain_(const String &domainName, const AnsiString &requestBody);
+      static HttpResponse HandleDeleteDomain_(const String &domainName);
       static HttpResponse HandleListAccounts_(const String &domainName);
       static HttpResponse HandleCreateAccount_(const String &domainName, const AnsiString &requestBody);
       static HttpResponse HandleDeleteAccount_(const String &address);

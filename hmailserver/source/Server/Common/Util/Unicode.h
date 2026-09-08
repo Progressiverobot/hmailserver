@@ -19,6 +19,27 @@ namespace HM
 
       static unsigned char* CharMoveNext(unsigned char*, bool utf8);
 
+      // The on-disk form of a String, and the way back.
+      //
+      // Every text file this server writes with a byte order mark - the backup
+      // and event logs, the backup index, a Sieve script, the rate-limiter state
+      // - is UTF-16LE, because on Windows that is what a String's own bytes are
+      // and File::Write used to write those bytes as they lay. On Linux a
+      // wchar_t is four bytes, so the same code wrote UTF-32 and read UTF-16 as
+      // UTF-32, and a file written by either could not be read by the other.
+      // These two are the conversion that both platforms now go through: the
+      // bytes are UTF-16LE on either, without a mark, and a String read from
+      // them holds the same characters on either.
+      //
+      // Where wchar_t is two bytes the conversion is a copy, so a file written
+      // on Windows is byte for byte the file it was before. Where it is four, a
+      // character above U+FFFF becomes a surrogate pair on the way out and a
+      // pair becomes one character on the way in. An unpaired surrogate is kept
+      // as the unit it is in both directions, so a file this program did not
+      // write survives a read and a write unchanged.
+      static std::string ToUtf16Le(const std::wstring &text);
+      static std::wstring FromUtf16Le(const unsigned char *bytes, size_t byteCount);
+
 #ifdef HM_PLATFORM_POSIX
       // The two conversions Windows spells MultiByteToWideChar and
       // WideCharToMultiByte, over iconv - which is what a POSIX system has for the

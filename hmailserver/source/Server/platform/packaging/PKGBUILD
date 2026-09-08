@@ -34,10 +34,12 @@ url="https://github.com/Progressiverobot/hmailserver"
 license=('AGPL-3.0-or-later')
 
 # Matched to what hmailserver/source/Server/CMakeLists.txt actually links:
-# Threads, OpenSSL 3.0 or newer, zlib, libpq, Boost (thread, filesystem, regex,
-# headers) and Iconv. Iconv has no package here because glibc carries it -
-# find_package(Iconv) finds nothing to link on this libc and that is correct.
-depends=('boost-libs' 'openssl' 'zlib' 'postgresql-libs')
+# Threads, OpenSSL 3.0 or newer, zlib, libpq, OpenLDAP (libldap and liblber, one
+# package here), Boost (thread, filesystem, regex, headers) and Iconv. Iconv has
+# no package here because glibc carries it - find_package(Iconv) finds nothing
+# to link on this libc and that is correct. libldap carries ldap.h itself, so it
+# needs no -dev twin in makedepends.
+depends=('boost-libs' 'openssl' 'zlib' 'postgresql-libs' 'libldap')
 
 # clang is not a matter of taste. Common/Util/StdString.h calls members of its own
 # dependent base without this->, which only MSVC and clang's

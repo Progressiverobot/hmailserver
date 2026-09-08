@@ -217,9 +217,17 @@ namespace HM
                   Formatter::Format("LDAP authentication is enabled against {0} with no transport protection "
                      "(hMailServer.ini [LDAP] Security=0) and a bind method that transmits the password "
                      "(BindMethod=0). The password has NOT been sent and the logon has been refused. Fix this by "
-                     "setting Security=2 (LDAPS, recommended) or Security=1 (StartTLS); or BindMethod=1, which "
+                     "setting Security=2 (LDAPS, recommended) or Security=1 (StartTLS)"
+#ifdef HM_PLATFORM_POSIX
+                     // BindMethod=1 is Windows SSPI; on this platform it is refused (HM6420),
+                     // so it is not offered as a way out.
+                     ". "
+#else
+                     "; or BindMethod=1, which "
                      "authenticates over SSPI without ever transmitting the password and satisfies a domain "
-                     "controller that refuses unprotected simple binds. Setting AllowUnprotectedPassword=1 will "
+                     "controller that refuses unprotected simple binds. "
+#endif
+                     "Setting AllowUnprotectedPassword=1 will "
                      "send the password in the clear instead, and should only ever be done on a network you "
                      "control end to end. Further occurrences are suppressed for one minute.",
                      DescribeTarget_(configuration)));
