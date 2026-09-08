@@ -231,6 +231,7 @@ namespace RegressionTests.API
          StringAssert.Contains("frame-ancestors 'none'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-src 'self'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("<iframe id=\"message-html\" sandbox=\"\"", page.Body);
+         StringAssert.Contains("<div id=\"bulk-bar\" hidden>", page.Body);
          Assert.AreEqual("no-store", page.Header("Cache-Control"));
          Assert.AreEqual("nosniff", page.Header("X-Content-Type-Options"));
          StringAssert.Contains("<script src=\"/portal.js\"></script>", page.Body);
