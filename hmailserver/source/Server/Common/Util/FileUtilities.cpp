@@ -323,9 +323,16 @@ namespace HM
          }
       case UTF16:
          {
-            size_t iChars = pBuffer->GetSize() / sizeof(TCHAR);
-            String sRetVal((const wchar_t*) pBuffer->GetCharBuffer() +1, iChars -1);
-            return sRetVal;
+            // Decoded, not cast. The bytes after the mark are UTF-16LE code units
+            // - two bytes each - and a String holds wchar_t, which is two bytes on
+            // Windows and four on Linux. Casting the buffer to wchar_t* read the
+            // file correctly on exactly one of the two, and on the other turned
+            // every pair of characters into one nonsense character. The decoder
+            // is a copy where the sizes agree, so what Windows reads is what it
+            // read before. The mark itself is the two bytes skipped here.
+            const size_t markBytes = 2;
+
+            return String(Unicode::FromUtf16Le(unsigned_char_buffer + markBytes, pBuffer->GetSize() - markBytes));
          }
       default:
          throw std::logic_error(Formatter::FormatAsAnsi("Unsupported encoding type: {0}", file_encoding));
@@ -888,6 +895,7 @@ namespace HM
       TestFileSize_();
       TestReadFileToBuf_();
       TestByteBuffer_();
+      TestUtf16Files_();
    }
 
    void
@@ -1026,5 +1034,119 @@ namespace HM
       // Against the unfixed code this line propagates a filesystem_error.
       File unopened;
       Assert::IsTrue(unopened.GetSize() == 0);
+   }
+
+   void
+   FileUtilitiesTester::TestUtf16Files_()
+   {
+      // Every text is spelled with universal-character escapes so that nothing
+      // here depends on the encoding of this source file. The emoji is the one
+      // that matters: U+1F600 is above the Basic Multilingual Plane, so on Windows
+      // the literal is two wchar_t (a surrogate pair) and on Linux it is one, and
+      // the whole point of the codec is that the file is the same either way.
+      const String ascii = _T("Hello, world");
+      const String latin1 = _T("caf\u00E9 na\u00EFve");
+      const String cjk = _T("\u65E5\u672C\u8A9E");
+      const String emoji = _T("\U0001F600");
+
+      // In memory and back, on this platform's own representation.
+      Assert::AreEqual(ascii, String(Unicode::FromUtf16Le((const unsigned char *) Unicode::ToUtf16Le(ascii).data(), Unicode::ToUtf16Le(ascii).size())));
+      Assert::AreEqual(latin1, String(Unicode::FromUtf16Le((const unsigned char *) Unicode::ToUtf16Le(latin1).data(), Unicode::ToUtf16Le(latin1).size())));
+      Assert::AreEqual(cjk, String(Unicode::FromUtf16Le((const unsigned char *) Unicode::ToUtf16Le(cjk).data(), Unicode::ToUtf16Le(cjk).size())));
+      Assert::AreEqual(emoji, String(Unicode::FromUtf16Le((const unsigned char *) Unicode::ToUtf16Le(emoji).data(), Unicode::ToUtf16Le(emoji).size())));
+
+      // ASCII is one code unit per character, low byte first, on either platform.
+      const std::string asciiBytes = Unicode::ToUtf16Le(ascii);
+      Assert::IsTrue(asciiBytes.size() == (size_t) ascii.GetLength() * 2);
+      Assert::IsTrue(asciiBytes[0] == 'H' && asciiBytes[1] == 0 && asciiBytes[2] == 'e' && asciiBytes[3] == 0);
+
+      // The emoji is the surrogate pair D83D DE00, as four bytes, whether the
+      // String held it as one character or as two.
+      const std::string emojiBytes = Unicode::ToUtf16Le(emoji);
+      Assert::IsTrue(emojiBytes.size() == 4);
+      Assert::IsTrue((unsigned char) emojiBytes[0] == 0x3D && (unsigned char) emojiBytes[1] == 0xD8 &&
+                     (unsigned char) emojiBytes[2] == 0x00 && (unsigned char) emojiBytes[3] == 0xDE);
+
+      // The bytes of a file a Windows server wrote through WriteToFile(..., true):
+      // the byte order mark, then "Hi ", e-acute, the CJK character for "day",
+      // the emoji, and CRLF - as they lie on a Windows disk. Reading them must
+      // give the String below on every platform, and writing that String must
+      // give these bytes back on every platform; the second half is what a
+      // Windows server needs from a file a Linux one wrote.
+      const unsigned char windowsFile[] =
+      {
+         0xFF, 0xFE,
+         'H', 0x00, 'i', 0x00, ' ', 0x00,
+         0xE9, 0x00,
+         0xE5, 0x65,
+         0x3D, 0xD8, 0x00, 0xDE,
+         0x0D, 0x00, 0x0A, 0x00
+      };
+      const String windowsText = _T("Hi \u00E9\u65E5\U0001F600\r\n");
+
+      String path = FileUtilities::GetTempFileName();
+
+      {
+         File file;
+         Assert::IsTrue(file.Open(path, File::OTCreate));
+         Assert::IsTrue(file.Write(windowsFile, sizeof(windowsFile)));
+         file.Close();
+      }
+
+      Assert::AreEqual(windowsText, FileUtilities::ReadCompleteTextFile(path));
+
+      Assert::IsTrue(FileUtilities::WriteToFile(path, windowsText, true));
+
+      {
+         File file;
+         Assert::IsTrue(file.Open(path, File::OTReadOnly));
+         std::shared_ptr<ByteBuffer> written = file.ReadFile();
+         file.Close();
+
+         Assert::IsTrue(written->GetSize() == sizeof(windowsFile));
+         Assert::IsTrue(memcmp(written->GetBuffer(), windowsFile, sizeof(windowsFile)) == 0);
+      }
+
+      FileUtilities::DeleteFile(path);
+
+      // An unpaired surrogate - a high half followed by an ordinary character -
+      // is not a character, but it is somebody's file, and it goes back out as
+      // it came in rather than being dropped or replaced.
+      const unsigned char unpaired[] = { 0x00, 0xD8, 'A', 0x00 };
+      const std::wstring unpairedText = Unicode::FromUtf16Le(unpaired, sizeof(unpaired));
+      Assert::IsTrue(unpairedText.size() == 2);
+      Assert::IsTrue(unpairedText[0] == (wchar_t) 0xD800 && unpairedText[1] == L'A');
+
+      const std::string unpairedBytes = Unicode::ToUtf16Le(unpairedText);
+      Assert::IsTrue(unpairedBytes.size() == sizeof(unpaired));
+      Assert::IsTrue(memcmp(unpairedBytes.data(), unpaired, sizeof(unpaired)) == 0);
+
+      // Nothing after the mark is an empty text, and a single stray byte after
+      // it is not a code unit; neither reads past the buffer. The decoder is
+      // only ever handed the bytes AFTER the mark, so these are its inputs for a
+      // two-byte and a three-byte file - and then the same two files for real,
+      // through ReadCompleteTextFile, whose old arithmetic on Linux made three
+      // bytes into a character count of (0 / 4) - 1.
+      Assert::IsTrue(Unicode::FromUtf16Le(windowsFile + 2, 0).empty());
+      Assert::IsTrue(Unicode::FromUtf16Le(windowsFile + 2, 1).empty());
+      Assert::IsTrue(Unicode::FromUtf16Le(0, 0).empty());
+
+      {
+         File file;
+         Assert::IsTrue(file.Open(path, File::OTCreate));
+         Assert::IsTrue(file.Write(windowsFile, 2));
+         file.Close();
+      }
+      Assert::AreEqual(_T(""), FileUtilities::ReadCompleteTextFile(path));
+
+      {
+         File file;
+         Assert::IsTrue(file.Open(path, File::OTCreate));
+         Assert::IsTrue(file.Write(windowsFile, 3));
+         file.Close();
+      }
+      Assert::AreEqual(_T(""), FileUtilities::ReadCompleteTextFile(path));
+
+      FileUtilities::DeleteFile(path);
    }
 }

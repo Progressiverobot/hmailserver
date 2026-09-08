@@ -93,6 +93,7 @@
 #include <unistd.h>
 
 #include "../Application/ErrorManager.h"
+#include "Unicode.h"
 
 namespace
 {
@@ -131,9 +132,13 @@ namespace
    // ------------------------------------------------------------- transcoding
    //
    // wchar_t is 32 bits here and 16 bits on Windows, so a UTF-16 file has to be
-   // decoded into code points rather than copied. These four functions are the
-   // whole of that; they are local because the tree's own converters are
-   // private members of classes that this file must not depend on.
+   // decoded into code points rather than copied. That decoding, and the
+   // encoding back, is Unicode::FromUtf16Le and Unicode::ToUtf16Le - the same
+   // pair File and FileUtilities use for every other file with a byte order
+   // mark, so that a language file and a Sieve script are read by one reader.
+   // The UTF-8 and Latin-1 functions below are the rest of this file's
+   // transcoding; they are local because nothing else in the tree reads a
+   // file that might be either.
    void AppendUtf8(std::string &out, unsigned int codePoint)
    {
       if (codePoint < 0x80)
@@ -243,70 +248,6 @@ namespace
       }
 
       return true;
-   }
-
-   std::wstring DecodeUtf16Le(const std::string &bytes, size_t from)
-   {
-      std::wstring text;
-      text.reserve((bytes.size() - from) / 2);
-
-      size_t index = from;
-
-      while (index + 1 < bytes.size())
-      {
-         unsigned int unit = (unsigned int) (unsigned char) bytes[index] |
-                             ((unsigned int) (unsigned char) bytes[index + 1] << 8);
-         index += 2;
-
-         // A high surrogate followed by a low one is one code point. An
-         // unpaired surrogate is passed through rather than dropped, so that a
-         // file this program did not write survives a read and a write.
-         if (unit >= 0xD800 && unit <= 0xDBFF && index + 1 < bytes.size())
-         {
-            const unsigned int low = (unsigned int) (unsigned char) bytes[index] |
-                                     ((unsigned int) (unsigned char) bytes[index + 1] << 8);
-
-            if (low >= 0xDC00 && low <= 0xDFFF)
-            {
-               unit = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00);
-               index += 2;
-            }
-         }
-
-         text.push_back((wchar_t) unit);
-      }
-
-      return text;
-   }
-
-   std::string EncodeUtf16Le(const std::wstring &text)
-   {
-      std::string bytes;
-      bytes.reserve(text.size() * 2);
-
-      for (size_t index = 0; index < text.size(); index++)
-      {
-         unsigned int codePoint = (unsigned int) text[index];
-
-         if (codePoint >= 0x10000 && codePoint <= 0x10FFFF)
-         {
-            codePoint -= 0x10000;
-            const unsigned int high = 0xD800 + (codePoint >> 10);
-            const unsigned int low = 0xDC00 + (codePoint & 0x3FF);
-
-            bytes.push_back((char) (high & 0xFF));
-            bytes.push_back((char) ((high >> 8) & 0xFF));
-            bytes.push_back((char) (low & 0xFF));
-            bytes.push_back((char) ((low >> 8) & 0xFF));
-         }
-         else
-         {
-            bytes.push_back((char) (codePoint & 0xFF));
-            bytes.push_back((char) ((codePoint >> 8) & 0xFF));
-         }
-      }
-
-      return bytes;
    }
 
    std::wstring DecodeLatin1(const std::string &bytes, size_t from)
@@ -459,7 +400,7 @@ namespace
           (unsigned char) bytes[0] == 0xFF && (unsigned char) bytes[1] == 0xFE)
       {
          file.encoding = EncodingUtf16Le;
-         text = DecodeUtf16Le(bytes, 2);
+         text = HM::Unicode::FromUtf16Le((const unsigned char *) bytes.data() + 2, bytes.size() - 2);
       }
       else if (bytes.size() >= 3 &&
                (unsigned char) bytes[0] == 0xEF && (unsigned char) bytes[1] == 0xBB &&
@@ -593,7 +534,7 @@ namespace
       {
       case EncodingUtf16Le:
          bytes = "\xFF\xFE";
-         bytes += EncodeUtf16Le(text);
+         bytes += HM::Unicode::ToUtf16Le(text);
          break;
 
       case EncodingUtf8WithMark:

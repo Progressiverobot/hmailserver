@@ -6,10 +6,12 @@
 
 #include "LdapSettings.h"
 
-// The wldap32 session handle, forward-declared so that <winldap.h> stays inside
-// LdapClient.cpp. winldap.h drags in a large amount of the Windows security surface
-// and defines names (ldap_*, LDAP_*) that would then be visible to every translation
-// unit that touched authentication.
+// The session handle, forward-declared so that <winldap.h> and <ldap.h> stay inside
+// LdapClient.cpp. Both libraries name it `struct ldap` - OpenLDAP's LDAP is a
+// typedef of it - so one declaration serves both. winldap.h drags in a large amount
+// of the Windows security surface, and each header defines names (ldap_*, LDAP_*)
+// that would then be visible to every translation unit that touched
+// authentication.
 struct ldap;
 
 namespace HM
@@ -120,9 +122,15 @@ namespace HM
       }
    };
 
-   // A single LDAP session, over the Windows LDAP API (wldap32). One instance owns at
-   // most one connection and closes it in the destructor, so an early return on any
-   // path cannot leak a session or leave a socket to the directory open.
+   // A single LDAP session, over the Windows LDAP API (wldap32) there and over
+   // OpenLDAP (libldap) on POSIX. One instance owns at most one connection and
+   // closes it in the destructor, so an early return on any path cannot leak a
+   // session or leave a socket to the directory open.
+   //
+   // BindNegotiate exists only on Windows - it is an SSPI exchange - and on POSIX it
+   // reports once and answers OutcomeUnavailable; the result codes it and every other
+   // operation record are the winldap.h numbers on both platforms, so a caller's
+   // classification of them is the same code and the same decision everywhere.
    //
    // Not thread safe, and not meant to be: an instance belongs to the connection
    // thread that is authenticating one user.

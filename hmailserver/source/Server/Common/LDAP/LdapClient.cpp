@@ -6,46 +6,113 @@
 #include "LdapClient.h"
 #ifdef HM_PLATFORM_POSIX
 
-// OpenLDAP is installed on this platform, and this file is deliberately NOT built
-// against it. The two libraries share the ldap_* names and share very little else
-// that matters here: winldap takes and returns wide strings where OpenLDAP takes
-// UTF-8, the session handle has a different lifetime, ldap_bind_sW's Negotiate path
-// has no counterpart at all, and paged results are reached through a different pair
-// of calls. A file compiled against both would be two implementations wearing one
-// set of names, and the second of them would be untested against a real directory.
-// Writing it properly is the roadmap row "Directory authentication without
-// LogonUser", and it is that row's work rather than a compilation fix.
+// OpenLDAP. This arm and the wldap32 one below share their function NAMES -
+// ldap_search_ext_s, ldap_parse_result, ldap_first_entry - and very little else
+// that matters here: OpenLDAP takes and returns UTF-8 where wldap32 takes wide
+// strings, a session is opened by ldap_initialize from a URI rather than by
+// ldap_init from a host and a port, a paged reply is read back through
+// ldap_parse_pageresponse_control, and a Negotiate bind does not exist at all. So
+// the two arms share the value mapping, the escaping and the template expansion -
+// the parts that carry the security consequences and the tests - and nothing that
+// touches a handle. Needs libldap and liblber on the link line; the CMakeLists
+// finds both.
+#include <ldap.h>
+#include <lber.h>
+
+// explicit_bzero, which is what SecureZeroMemory is on this platform.
+#include <string.h>
+
+// Unicode::WideToMultiByte and MultiByteToWide, the UTF-8 conversions between
+// the server's wide String and the char* OpenLDAP takes and returns. The Windows
+// arm needs no conversion at all - wldap32 has a wide entry point for everything
+// it calls - which is why this include is here and not above the #ifdef.
+#include "../Util/Unicode.h"
+
+// The client-side result codes, and the one deliberate renumbering in this file.
 //
-// So every entry point that would talk to a directory reports and fails below. What
-// stays compiled is the part that is pure value-mapping and pure string handling:
-// which result code means "wrong password" as against "this directory cannot
-// answer", the text each code is given, the RFC 4515 and RFC 4514 escaping, and the
-// template expansion. Those are the parts carrying the security consequences and the
-// tests, and guarding them out would leave them unbuilt here for no reason at all.
+// Every code the PROTOCOL defines - RFC 4511 appendix A, 0 to 0x50 - has the same
+// value in winldap.h and in ldap.h, so LDAP_INVALID_CREDENTIALS is 0x31 on both
+// platforms and the classification below needs no help with it. The codes a
+// LIBRARY adds for a failure that never reached a server - the socket could not
+// be opened, the reply did not arrive, the filter did not parse - are numbered by
+// each library for itself: winldap.h counts them upwards from 0x51, ldap.h counts
+// them downwards from -1, and by no coincidence in the same order.
 //
-// The result codes below are the numbers winldap.h gives, so that the classification
-// in this file reaches the same conclusion on both platforms. The first group is the
-// protocol's own (RFC 4511 appendix A), which every LDAP library agrees on; the
-// second is the set of client-side codes Windows adds above 0x50, which is exactly
-// where the two libraries' numbering parts company - one more reason not to mix
-// them.
+// last_error_ is shown to administrators, keyed into the report throttle, and
+// compared by IsCredentialRejection, IsTransportFailure_ and DescribeLastError,
+// and the promise this file makes is that the same failure produces the same
+// number on both platforms. So the macros ldap.h defines for these codes are
+// captured under their own names, taken off, and re-declared below with the
+// winldap values; TranslateNative_ turns what OpenLDAP returns into that
+// numbering, ToNative_ turns it back for ldap_err2string, and every result code
+// this arm receives from the library goes through the first before anything
+// looks at it.
+namespace OpenLdapNative
+{
+   enum
+   {
+      ServerDown            = LDAP_SERVER_DOWN,
+      LocalError            = LDAP_LOCAL_ERROR,
+      EncodingError         = LDAP_ENCODING_ERROR,
+      DecodingError         = LDAP_DECODING_ERROR,
+      Timeout               = LDAP_TIMEOUT,
+      AuthUnknown           = LDAP_AUTH_UNKNOWN,
+      FilterError           = LDAP_FILTER_ERROR,
+      UserCancelled         = LDAP_USER_CANCELLED,
+      ParamError            = LDAP_PARAM_ERROR,
+      NoMemory              = LDAP_NO_MEMORY,
+      ConnectError          = LDAP_CONNECT_ERROR,
+      NotSupported          = LDAP_NOT_SUPPORTED,
+      ControlNotFound       = LDAP_CONTROL_NOT_FOUND,
+      NoResultsReturned     = LDAP_NO_RESULTS_RETURNED,
+      MoreResultsToReturn   = LDAP_MORE_RESULTS_TO_RETURN,
+      ClientLoop            = LDAP_CLIENT_LOOP,
+      ReferralLimitExceeded = LDAP_REFERRAL_LIMIT_EXCEEDED
+   };
+}
+
+#undef LDAP_SERVER_DOWN
+#undef LDAP_LOCAL_ERROR
+#undef LDAP_ENCODING_ERROR
+#undef LDAP_DECODING_ERROR
+#undef LDAP_TIMEOUT
+#undef LDAP_AUTH_UNKNOWN
+#undef LDAP_FILTER_ERROR
+#undef LDAP_USER_CANCELLED
+#undef LDAP_PARAM_ERROR
+#undef LDAP_NO_MEMORY
+#undef LDAP_CONNECT_ERROR
+#undef LDAP_NOT_SUPPORTED
+#undef LDAP_CONTROL_NOT_FOUND
+#undef LDAP_NO_RESULTS_RETURNED
+#undef LDAP_MORE_RESULTS_TO_RETURN
+#undef LDAP_CLIENT_LOOP
+#undef LDAP_REFERRAL_LIMIT_EXCEEDED
+
 enum
 {
-   LDAP_SUCCESS              = 0x00,
-   LDAP_STRONG_AUTH_REQUIRED = 0x08,
-   LDAP_NO_SUCH_OBJECT       = 0x20,
-   LDAP_INAPPROPRIATE_AUTH   = 0x30,
-   LDAP_INVALID_CREDENTIALS  = 0x31,
-   LDAP_INSUFFICIENT_RIGHTS  = 0x32,
-   LDAP_BUSY                 = 0x33,
-   LDAP_UNAVAILABLE          = 0x34,
-   LDAP_UNWILLING_TO_PERFORM = 0x35,
+   // Result code 0x32, which ldap.h spells LDAP_INSUFFICIENT_ACCESS and winldap.h
+   // and the shared code below spell LDAP_INSUFFICIENT_RIGHTS.
+   LDAP_INSUFFICIENT_RIGHTS     = LDAP_INSUFFICIENT_ACCESS,
 
-   LDAP_SERVER_DOWN          = 0x51,
-   LDAP_LOCAL_ERROR          = 0x52,
-   LDAP_TIMEOUT              = 0x55,
-   LDAP_FILTER_ERROR         = 0x57,
-   LDAP_CONNECT_ERROR        = 0x5b
+   // The winldap.h numbering of the client-side codes; see above.
+   LDAP_SERVER_DOWN             = 0x51,
+   LDAP_LOCAL_ERROR             = 0x52,
+   LDAP_ENCODING_ERROR          = 0x53,
+   LDAP_DECODING_ERROR          = 0x54,
+   LDAP_TIMEOUT                 = 0x55,
+   LDAP_AUTH_UNKNOWN            = 0x56,
+   LDAP_FILTER_ERROR            = 0x57,
+   LDAP_USER_CANCELLED          = 0x58,
+   LDAP_PARAM_ERROR             = 0x59,
+   LDAP_NO_MEMORY               = 0x5a,
+   LDAP_CONNECT_ERROR           = 0x5b,
+   LDAP_NOT_SUPPORTED           = 0x5c,
+   LDAP_CONTROL_NOT_FOUND       = 0x5d,
+   LDAP_NO_RESULTS_RETURNED     = 0x5e,
+   LDAP_MORE_RESULTS_TO_RETURN  = 0x5f,
+   LDAP_CLIENT_LOOP             = 0x60,
+   LDAP_REFERRAL_LIMIT_EXCEEDED = 0x61
 };
 
 #else
@@ -82,24 +149,147 @@ namespace HM
 
    namespace
    {
-      // Where every directory operation lands here. It reports rather than merely
-      // failing, because the caller's only other clue would be an OutcomeUnavailable
-      // that looks exactly like a domain controller being down - and an administrator
-      // sent to check a directory that is working perfectly is a worse outcome than a
-      // blunt line saying this build cannot talk to one.
-      //
-      // Named for the operation rather than reported once per class, because which
-      // operation was refused is the part that tells an administrator what stopped:
-      // a refused Connect and a refused SearchEntries reach the log from different
-      // features.
-      void ReportLdapUnavailable_(const String &operation)
+      // OpenLDAP's own number for a result, as the winldap number the rest of this
+      // file is written in. Case by case rather than the arithmetic the two tables
+      // happen to share (-n on one side is 0x50 + n on the other), so that each line
+      // can be checked against both headers by eye, and so that a code one library
+      // defines and the other does not cannot be invented by a subtraction.
+      unsigned long TranslateNative_(int nativeCode)
       {
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 6405, "LdapClient",
-            Formatter::Format(_T("LDAP is not available in this build: {0} was not attempted. The ")
-               _T("directory client this file is written against is the Windows one (wldap32) and ")
-               _T("this platform has none; the OpenLDAP library installed here is a different API ")
-               _T("and nothing has been ported to it. See the roadmap row 'Directory ")
-               _T("authentication without LogonUser'."), operation));
+         switch (nativeCode)
+         {
+            case OpenLdapNative::ServerDown:            return LDAP_SERVER_DOWN;
+            case OpenLdapNative::LocalError:            return LDAP_LOCAL_ERROR;
+            case OpenLdapNative::EncodingError:         return LDAP_ENCODING_ERROR;
+            case OpenLdapNative::DecodingError:         return LDAP_DECODING_ERROR;
+            case OpenLdapNative::Timeout:               return LDAP_TIMEOUT;
+            case OpenLdapNative::AuthUnknown:           return LDAP_AUTH_UNKNOWN;
+            case OpenLdapNative::FilterError:           return LDAP_FILTER_ERROR;
+            case OpenLdapNative::UserCancelled:         return LDAP_USER_CANCELLED;
+            case OpenLdapNative::ParamError:            return LDAP_PARAM_ERROR;
+            case OpenLdapNative::NoMemory:              return LDAP_NO_MEMORY;
+            case OpenLdapNative::ConnectError:          return LDAP_CONNECT_ERROR;
+            case OpenLdapNative::NotSupported:          return LDAP_NOT_SUPPORTED;
+            case OpenLdapNative::ControlNotFound:       return LDAP_CONTROL_NOT_FOUND;
+            case OpenLdapNative::NoResultsReturned:     return LDAP_NO_RESULTS_RETURNED;
+            case OpenLdapNative::MoreResultsToReturn:   return LDAP_MORE_RESULTS_TO_RETURN;
+            case OpenLdapNative::ClientLoop:            return LDAP_CLIENT_LOOP;
+            case OpenLdapNative::ReferralLimitExceeded: return LDAP_REFERRAL_LIMIT_EXCEEDED;
+            default:
+               break;
+         }
+
+         // A negative code ldap.h did not define when this was written. It came from
+         // the library and not from a server, so it is a local failure and never a
+         // credential rejection, and LDAP_LOCAL_ERROR is the honest name for it.
+         if (nativeCode < 0)
+            return LDAP_LOCAL_ERROR;
+
+         // A protocol code, identical on both platforms.
+         return (unsigned long) nativeCode;
+      }
+
+      // The inverse, and the one place the arithmetic IS used: it feeds
+      // ldap_err2string and nothing else, so a wrong answer costs a wrong sentence
+      // rather than a wrong decision.
+      int ToNative_(unsigned long code)
+      {
+         if (code >= LDAP_SERVER_DOWN && code <= LDAP_REFERRAL_LIMIT_EXCEEDED)
+            return -(int) (code - 0x50);
+
+         return (int) code;
+      }
+
+      // UTF-8, which is what OpenLDAP speaks, from the wide String the rest of the
+      // server speaks. False when the value cannot be encoded - a lone surrogate, a
+      // code point past U+10FFFF - which is not a question the directory can be
+      // asked, so every caller treats such a value as one it will not send.
+      bool ToUtf8_(const String &value, AnsiString &utf8)
+      {
+         if (value.IsEmpty())
+         {
+            utf8.Empty();
+            return true;
+         }
+
+         return Unicode::WideToMultiByte(value, utf8);
+      }
+
+      // A NUL-terminated, writable UTF-8 copy of a String, for the entry points that
+      // take char* rather than const char*. OpenLDAP does not write through them; the
+      // copy is so that no pointer into a String's own storage is handed out, which
+      // is the same rule the Windows arm's ToMutable_ keeps.
+      bool ToMutableUtf8_(const String &value, std::vector<char> &buffer)
+      {
+         AnsiString utf8;
+
+         if (!ToUtf8_(value, utf8))
+            return false;
+
+         buffer.assign(utf8.begin(), utf8.end());
+         buffer.push_back('\0');
+
+         return true;
+      }
+
+      // The other direction, for what the directory sends back. A null pointer -
+      // which is what ldap_get_dn answers for an entry with no DN - is an empty
+      // string, and so are bytes that are not valid UTF-8, which RFC 4511 forbids a
+      // server to send: empty rather than a guess, because a guessed DN is one that
+      // can be bound as.
+      String FromUtf8_(const char *value, size_t length)
+      {
+         String result;
+
+         if (value == nullptr || length == 0)
+            return result;
+
+         if (!Unicode::MultiByteToWide(AnsiString(std::string(value, length)), result))
+            result.Empty();
+
+         return result;
+      }
+
+      String FromUtf8_(const char *value)
+      {
+         return FromUtf8_(value, value != nullptr ? strlen(value) : 0);
+      }
+
+      // The server's diagnosticMessage for the last operation, for the entry points
+      // that hand back no result message - ldap_connect, ldap_start_tls_s - and so
+      // cannot be parsed for one. The library keeps it on the handle.
+      String ReadDiagnostic_(LDAP *session)
+      {
+         char *text = nullptr;
+
+         if (ldap_get_option(session, LDAP_OPT_DIAGNOSTIC_MESSAGE, &text) != LDAP_OPT_SUCCESS || text == nullptr)
+            return String();
+
+         String diagnostic = FromUtf8_(text);
+         ldap_memfree(text);
+
+         return diagnostic;
+      }
+
+      struct timeval SecondsAsTimeval_(int seconds)
+      {
+         struct timeval timeout;
+         timeout.tv_sec = seconds;
+         timeout.tv_usec = 0;
+
+         return timeout;
+      }
+
+      // Frees the paging cookie ldap_parse_pageresponse_control allocates, and leaves
+      // the berval empty so that it reads as "first page" if it reaches
+      // ldap_create_page_control again.
+      void ReleaseCookie_(struct berval &cookie)
+      {
+         if (cookie.bv_val != nullptr)
+            ber_memfree(cookie.bv_val);
+
+         cookie.bv_val = nullptr;
+         cookie.bv_len = 0;
       }
    }
 
@@ -139,9 +329,17 @@ namespace HM
          // be a double free.
          return TRUE;
       }
+   }
 
-      // Windows LDAP has no single "the server did not answer" code, so this is the
-      // set that all mean the same thing to an administrator.
+#endif
+
+   namespace
+   {
+      // Neither library has a single "the server did not answer" code, so this is
+      // the set that all mean the same thing to an administrator. Shared by both
+      // arms, and it can be because the numbers are: the client-side codes on this
+      // list are the winldap ones on both platforms, by the translation at the top
+      // of the file.
       bool IsTransportFailure_(unsigned long ldapError)
       {
          switch (ldapError)
@@ -159,7 +357,6 @@ namespace HM
       }
    }
 
-#endif
    LdapClient::LdapClient()
    {
       last_error_ = LDAP_SUCCESS;
@@ -180,10 +377,11 @@ namespace HM
 
 #ifdef HM_PLATFORM_POSIX
 
-      // Unreachable as this file stands - nothing here ever opens a session, so
-      // session_ never becomes non-null and the return above always fires. The handle
-      // is dropped rather than the whole body being guarded away, so that the day a
-      // POSIX Connect does set it, closing is what happens and not nothing.
+      // ldap_unbind_ext_s sends the unbind and frees the session, so the handle must
+      // not be touched afterwards - the same call as the wldap32 ldap_unbind_s on the
+      // other side of this #ifdef, under the name OpenLDAP has not deprecated.
+      ldap_unbind_ext_s(session_, nullptr, nullptr);
+
       session_ = nullptr;
       transport_protected_ = false;
 
@@ -204,8 +402,11 @@ namespace HM
          return;
 #ifdef HM_PLATFORM_POSIX
 
-      // See Disconnect: unreachable here, and dropping the handle rather than doing
-      // nothing is what keeps it unreachable safely.
+      // ldap_unbind_ext_s is still the right call - it is what frees the session - but
+      // the name is misleading here: what matters is that the socket is closed and the
+      // handle dropped, because the state of this connection is no longer known.
+      ldap_unbind_ext_s(session_, nullptr, nullptr);
+
       session_ = nullptr;
       transport_protected_ = false;
 
@@ -274,11 +475,14 @@ namespace HM
       switch (last_error_)
       {
 #ifdef HM_PLATFORM_POSIX
-         case LDAP_UNAVAILABLE:
-            // The one code this build sets on its own: it is what every refused
-            // operation records. Named here so that a caller which logs this text gets
-            // the reason rather than a number nothing on the machine can explain.
-            return _T("LDAP is not available in this build");
+         case LDAP_AUTH_UNKNOWN:
+            // What BindNegotiate records on this platform. Named here, and not left
+            // to ldap_err2string's "Unknown authentication method", because this text
+            // reaches the administrator inside the authenticator's HM5920 report every
+            // minute the configuration stays as it is, and it is the one line there
+            // that can say what to change.
+            return _T("BindMethod=1 (Negotiate) is Windows SSPI and does not exist on this platform. ")
+                   _T("Use BindMethod=0 (simple bind) with Security=2 (LDAPS) or Security=1 (StartTLS)");
 #endif
          case LDAP_SUCCESS:
             return _T("no error");
@@ -290,7 +494,14 @@ namespace HM
             // the single most likely first failure of a new LDAP configuration.
             return _T("the directory refuses simple binds on an unprotected connection ")
                    _T("(strongAuthRequired). Use Security=2 (LDAPS) or Security=1 (StartTLS), ")
+#ifdef HM_PLATFORM_POSIX
+                   // No third option here: Negotiate is Windows SSPI, and naming it
+                   // would send an administrator to a setting that BindNegotiate
+                   // refuses on this platform.
+                   _T("which protect the connection before the password is sent");
+#else
                    _T("or BindMethod=1 (Negotiate), which satisfies the requirement without TLS");
+#endif
 
          case LDAP_SERVER_DOWN:
          case LDAP_CONNECT_ERROR:
@@ -325,11 +536,15 @@ namespace HM
 
 #ifdef HM_PLATFORM_POSIX
 
-      // ldap_err2stringW is a wldap32 entry point and there is no library here to ask.
-      // Every code this build can produce for itself is named in the switch above, so
-      // reaching this line means the code came from somewhere unexpected - and the
-      // number is then the only honest thing that can be said about it.
-      return Formatter::Format(_T("LDAP result code {0}"), (int) last_error_);
+      // ldap_err2string wants the library's own numbering, so a client-side code goes
+      // back through the translation. It returns a pointer into static storage,
+      // which must not be freed.
+      const char *text = ldap_err2string(ToNative_(last_error_));
+
+      if (text == nullptr)
+         return _T("an unrecognised LDAP error");
+
+      return FromUtf8_(text);
 
 #else
       // ldap_err2stringW returns a pointer into library-owned storage; it must not be
@@ -508,13 +723,159 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      ReportLdapUnavailable_(_T("Connect"));
+      Disconnect();
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      last_diagnostic_.Empty();
+      timeout_seconds_ = configuration.timeout_seconds;
+      unprotected_password_allowed_ = configuration.allow_unprotected_password;
+
+      const int port = configuration.EffectivePort();
+      const bool useLdaps = configuration.security == LdapTransportSecurity::TransportLdaps;
+
+      // ldap_initialize takes a URI where ldap_init took a host and a port, and the
+      // scheme is how LDAPS is asked for - there is no LDAP_OPT_SSL here. An IPv6
+      // literal has to be bracketed so that its colons are not read as the port
+      // separator; a name or an IPv4 address goes in as it is.
+      String host = configuration.server;
+      host.Trim();
+
+      if (host.Find(_T(":")) >= 0 && host.Find(_T("[")) != 0)
+      {
+         String bracketed = _T("[");
+         bracketed += host;
+         bracketed += _T("]");
+         host = bracketed;
+      }
+
+      AnsiString uri;
+
+      if (!ToUtf8_(Formatter::Format("{0}://{1}:{2}", String(useLdaps ? _T("ldaps") : _T("ldap")), host, port), uri))
+         return Record_(LDAP_PARAM_ERROR);
+
+      // ldap_initialize only allocates; nothing touches the network until the
+      // ldap_connect below. That ordering is what makes every option between the two
+      // reach the library before the first byte is sent.
+      LDAP *session = nullptr;
+      int status = ldap_initialize(&session, uri.c_str());
+
+      if (status != LDAP_SUCCESS || session == nullptr)
+         return Record_(status != LDAP_SUCCESS ? TranslateNative_(status) : LDAP_LOCAL_ERROR);
+
+      session_ = session;
+
+      // LDAPv3, and not optional here either: OpenLDAP's compiled-in default is also
+      // version 2 unless ldap.conf says otherwise, and StartTLS does not exist in
+      // version 2.
+      int version = LDAP_VERSION3;
+      ldap_set_option(session_, LDAP_OPT_PROTOCOL_VERSION, &version);
+
+      // Referral chasing off, for the reason the Windows arm gives: with it on, a
+      // bind can be replayed - with the user's password - against a host chosen by
+      // whatever answered on the configured address.
+      ldap_set_option(session_, LDAP_OPT_REFERRALS, LDAP_OPT_OFF);
+
+      // The server-side bound on a search, as on Windows.
+      int timeLimit = timeout_seconds_;
+      ldap_set_option(session_, LDAP_OPT_TIMELIMIT, &timeLimit);
+
+      // Two client-side bounds, because OpenLDAP keeps two. NETWORK_TIMEOUT is how
+      // long connect() may take, which is what ldap_connect below is bounded by.
+      // TIMEOUT is how long a synchronous call waits for its reply when given no
+      // timeout of its own, which is ldap_start_tls_s here; the searches and the
+      // binds pass theirs explicitly. Without the first, a server that drops packets
+      // holds a connection thread for the kernel's own connect timeout, which is
+      // minutes.
+      struct timeval timeout = SecondsAsTimeval_(timeout_seconds_);
+      ldap_set_option(session_, LDAP_OPT_NETWORK_TIMEOUT, &timeout);
+      ldap_set_option(session_, LDAP_OPT_TIMEOUT, &timeout);
+
+      if (configuration.security != LdapTransportSecurity::TransportPlain)
+      {
+         // Whether the server's certificate has to chain to a trusted root. DEMAND is
+         // what the Windows arm gets for nothing from the machine store; ALLOW is
+         // what its accept-anything callback amounts to - the certificate is still
+         // requested, so it is in a packet capture, and it is then not checked. The
+         // trust store is the system's own, which is where OpenLDAP looks (TLS_CACERT
+         // in ldap.conf; /etc/ssl/certs on Debian and Ubuntu). There is no setting
+         // for a private one, and that is deliberate: an issuer the machine does not
+         // trust should be fixed at the machine, where every other TLS client on it
+         // will meet the same issuer.
+         int requireCertificate = configuration.verify_certificate
+            ? LDAP_OPT_X_TLS_DEMAND
+            : LDAP_OPT_X_TLS_ALLOW;
+
+         ldap_set_option(session_, LDAP_OPT_X_TLS_REQUIRE_CERT, &requireCertificate);
+
+         // The option above is recorded on the handle and takes effect only when a
+         // TLS context is built from it. NEWCTX builds one now, for this handle, from
+         // this handle's settings. Without it the library uses the process-wide
+         // context made from ldap.conf, and the setting above changes nothing - the
+         // kind of silence that makes VerifyCertificate=0 look broken and
+         // VerifyCertificate=1 look as though it had never been on.
+         int isServer = 0;
+         ldap_set_option(session_, LDAP_OPT_X_TLS_NEWCTX, &isServer);
+
+         if (!configuration.verify_certificate)
+         {
+            // Said out loud, but once per process rather than per connection, for
+            // the reasons the Windows arm gives beside its own copy of this line.
+            static std::atomic<bool> alreadyWarned(false);
+
+            if (!alreadyWarned.exchange(true))
+            {
+               LOG_APPLICATION(Formatter::Format("LDAP - certificate validation is DISABLED for {0}:{1} "
+                  "(hMailServer.ini [LDAP] VerifyCertificate=0). The encrypted connection no longer "
+                  "authenticates the directory, so an attacker able to intercept it can present any "
+                  "certificate and collect the credentials sent over it. Logged once per service start.",
+                  configuration.server, port));
+            }
+         }
+      }
+
+      // Connects now rather than leaving it to the first bind, for the reason the
+      // Windows arm calls ldap_connect: so that "the server could not be contacted"
+      // is Connect's answer and is reported at the connecting stage, and so that for
+      // LDAPS the handshake - and with it the certificate check - has happened before
+      // Connect says success. Added to OpenLDAP in 2.5; nothing older is supported.
+      status = ldap_connect(session_);
+
+      if (status != LDAP_SUCCESS)
+      {
+         // Read before the handle goes. A refused certificate comes back from the
+         // library as LDAP_SERVER_DOWN, and the diagnostic is the only place the
+         // word "certificate" appears.
+         last_diagnostic_ = ReadDiagnostic_(session_);
+         Abandon_();
+
+         return Record_(TranslateNative_(status));
+      }
+
+      if (useLdaps)
+      {
+         // The handshake happened inside ldap_connect, so by here the transport is
+         // encrypted and - unless the administrator turned validation off - the server
+         // has been authenticated.
+         transport_protected_ = true;
+      }
+      else if (configuration.security == LdapTransportSecurity::TransportStartTls)
+      {
+         status = ldap_start_tls_s(session_, nullptr, nullptr);
+
+         if (status != LDAP_SUCCESS)
+         {
+            // Dropped rather than continued in the clear, as on Windows: carrying on
+            // would send the password over exactly the unprotected connection the
+            // administrator asked to have upgraded, and would do it silently.
+            last_diagnostic_ = ReadDiagnostic_(session_);
+            Abandon_();
+
+            return Record_(TranslateNative_(status));
+         }
+
+         transport_protected_ = true;
+      }
+
+      return Record_(LDAP_SUCCESS);
 
 #else
       Disconnect();
@@ -644,13 +1005,60 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      ReportLdapUnavailable_(_T("AwaitResult_"));
+      struct timeval timeout = SecondsAsTimeval_(timeout_seconds_);
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      LDAPMessage *result = nullptr;
+
+      const int resultType = ldap_result(session_, (int) messageId, LDAP_MSG_ALL, &timeout, &result);
+
+      if (resultType == 0)
+      {
+         // Timed out. The same two steps as on Windows, for the same reason: the
+         // server is told to stop, and then the session is dropped, because a bind
+         // whose reply never arrived leaves nobody knowing which identity the
+         // connection carries.
+         ldap_abandon_ext(session_, (int) messageId, nullptr, nullptr);
+         Abandon_();
+
+         return Record_(LDAP_TIMEOUT);
+      }
+
+      if (resultType < 0)
+      {
+         // The library's own failure - typically the connection went away underneath
+         // the wait. Its code and its diagnostic are on the handle, and both are read
+         // before the handle goes.
+         int sessionError = LDAP_SUCCESS;
+         ldap_get_option(session_, LDAP_OPT_RESULT_CODE, &sessionError);
+
+         last_diagnostic_ = ReadDiagnostic_(session_);
+         Abandon_();
+
+         return Record_(sessionError != LDAP_SUCCESS ? TranslateNative_(sessionError) : LDAP_LOCAL_ERROR);
+      }
+
+      int returnCode = LDAP_SUCCESS;
+      char *diagnostic = nullptr;
+
+      // freeit is 1, so ldap_parse_result releases the result message itself. The
+      // diagnostic string is separately owned and is released with ldap_memfree; only
+      // that one is asked for, because the matched DN and the referral list add
+      // nothing an administrator can act on.
+      const int parseResult = ldap_parse_result(session_, result, &returnCode, nullptr,
+         &diagnostic, nullptr, nullptr, 1);
+
+      last_diagnostic_.Empty();
+
+      if (diagnostic != nullptr)
+      {
+         last_diagnostic_ = FromUtf8_(diagnostic);
+         ldap_memfree(diagnostic);
+      }
+
+      if (parseResult != LDAP_SUCCESS)
+         return Record_(TranslateNative_(parseResult));
+
+      return Record_(TranslateNative_(returnCode));
 
 #else
       LDAP_TIMEVAL timeout;
@@ -711,13 +1119,34 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      ReportLdapUnavailable_(_T("BindAnonymous"));
+      if (session_ == nullptr)
+         return Record_(LDAP_LOCAL_ERROR);
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      // An anonymous bind is a simple bind with an empty name and an EMPTY
+      // credential - an octet string of length zero, which is what RFC 4513 section
+      // 5.1.1 says an anonymous simple bind carries. It must be an empty berval and
+      // not a null pointer: ldap_sasl_bind encodes a null credential as no
+      // authentication choice at all, the request is then malformed, and slapd
+      // answers it with protocolError (2) and closes the connection - which was
+      // measured, and looked like a broken directory rather than a broken bind.
+      //
+      // Only ever used to READ the directory when no service credential is
+      // configured; never to authenticate anybody - the distinction BindSimple's
+      // empty-password guard exists to keep.
+      char nothing[] = "";
+
+      struct berval credentials;
+      credentials.bv_val = nothing;
+      credentials.bv_len = 0;
+
+      int messageId = -1;
+
+      const int status = ldap_sasl_bind(session_, "", LDAP_SASL_SIMPLE, &credentials, nullptr, nullptr, &messageId);
+
+      if (status != LDAP_SUCCESS)
+         return Record_(TranslateNative_(status));
+
+      return AwaitResult_((unsigned long) messageId);
 
 #else
       if (session_ == nullptr)
@@ -741,13 +1170,61 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      ReportLdapUnavailable_(_T("BindSimple"));
+      if (session_ == nullptr)
+         return Record_(LDAP_LOCAL_ERROR);
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      if (dn.IsEmpty())
+         return Record_(LDAP_INVALID_CREDENTIALS);
+
+      // The unauthenticated-bind guard, kept here as on Windows and for the reason
+      // given there: a name with an empty password is RFC 4513's unauthenticated
+      // bind, which many directories answer with success, so an empty password is a
+      // bypass and not an argument error.
+      if (password.IsEmpty())
+         return Record_(LDAP_INVALID_CREDENTIALS);
+
+      if (!transport_protected_ && !unprotected_password_allowed_)
+      {
+         // Enforced here as well as in the authenticator. See the comment on
+         // unprotected_password_allowed_ for why the duplication is deliberate.
+         Abandon_();
+         return Record_(LDAP_STRONG_AUTH_REQUIRED);
+      }
+
+      AnsiString dnUtf8;
+      AnsiString passwordUtf8;
+
+      if (!ToUtf8_(dn, dnUtf8) || !ToUtf8_(password, passwordUtf8))
+      {
+         // A credential that cannot be written in the directory's own encoding is
+         // not one the directory can hold, so this is a rejection and not a local
+         // fault. It must not be a fault: a fault is reported as an outage, and this
+         // value came from a logon prompt.
+         if (!passwordUtf8.empty())
+            ::explicit_bzero(&passwordUtf8[0], passwordUtf8.size());
+
+         return Record_(LDAP_INVALID_CREDENTIALS);
+      }
+
+      struct berval credentials;
+      credentials.bv_val = &passwordUtf8[0];
+      credentials.bv_len = (ber_len_t) passwordUtf8.size();
+
+      int messageId = -1;
+
+      const int status = ldap_sasl_bind(session_, dnUtf8.c_str(), LDAP_SASL_SIMPLE, &credentials,
+         nullptr, nullptr, &messageId);
+
+      // Overwritten before the string goes out of scope, for the reason the Windows
+      // arm gives beside its SecureZeroMemory: one cleartext password fewer in a heap
+      // block about to be recycled. explicit_bzero because a memset over storage
+      // nothing reads afterwards is one the compiler is entitled to delete.
+      ::explicit_bzero(&passwordUtf8[0], passwordUtf8.size());
+
+      if (status != LDAP_SUCCESS)
+         return Record_(TranslateNative_(status));
+
+      return AwaitResult_((unsigned long) messageId);
 
 #else
       if (session_ == nullptr)
@@ -804,13 +1281,43 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      ReportLdapUnavailable_(_T("BindNegotiate"));
+      // Not available, and said once. A Negotiate bind is an SSPI exchange - Kerberos,
+      // then NTLM - that wldap32 drives from inside ldap_bind_s, and nothing on this
+      // platform stands in for it: OpenLDAP's SASL binds go through Cyrus SASL and a
+      // GSSAPI mechanism, which needs a keytab and a realm configured on the host and
+      // is a different feature with different settings, not this one under another
+      // name.
+      //
+      // Recorded as LDAP_AUTH_UNKNOWN, which IsCredentialRejection classifies as
+      // unavailable, and that classification is the point. LdapDirectoryAuthenticator
+      // maps every non-success that is not a rejection to ResultUnavailable, which
+      // PasswordValidator refuses WITHOUT falling through to LogonUser and without
+      // telling the user the password was wrong; and because it is not a rejection,
+      // a configuration mistake does not feed the failed-logon counters. The
+      // authenticator reports it as HM5920, throttled, carrying DescribeLastError's
+      // text for this code, which names the setting to change; this report says it
+      // once, in full, for whoever reads the log from the top.
+      //
+      // The password is not touched. It has not been sent, and it will not be.
+      (void) username;
+      (void) domain;
+      (void) password;
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      static std::once_flag reported;
+
+      std::call_once(reported, []()
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6420, "LdapClient::BindNegotiate",
+            _T("hMailServer.ini [LDAP] BindMethod=1 (Negotiate) is configured, but a Negotiate bind is Windows ")
+            _T("SSPI and this platform has none. No password has been sent, and every logon that reaches this ")
+            _T("bind is refused as a directory failure rather than as a wrong password. Set BindMethod=0 (simple ")
+            _T("bind) with Security=2 (LDAPS) or Security=1 (StartTLS), so that the password is proved over a ")
+            _T("protected connection instead. Reported once per run."));
+      });
+
+      last_diagnostic_.Empty();
+
+      return Record_(LDAP_AUTH_UNKNOWN);
 
 #else
       if (session_ == nullptr)
@@ -922,18 +1429,233 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      // The out parameters are cleared first, so that a caller which reads them
-      // after a failure sees nothing rather than whatever it passed in.
       entries.clear();
       truncated = false;
 
-      ReportLdapUnavailable_(_T("SearchEntries"));
+      if (session_ == nullptr)
+         return Record_(LDAP_LOCAL_ERROR);
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      if (maxEntries <= 0)
+         return Record_(LDAP_SUCCESS);
+
+      std::vector<char> baseBuffer;
+      std::vector<char> filterBuffer;
+
+      // A base or a filter that cannot be encoded came from configuration, so it is
+      // a parameter fault and reported as one - not a rejection, which would tell
+      // every user their password was wrong over one byte in the ini file.
+      if (!ToMutableUtf8_(searchBase, baseBuffer) || !ToMutableUtf8_(filter, filterBuffer))
+         return Record_(LDAP_PARAM_ERROR);
+
+      // The API wants an array of mutable pointers ending in a null. The buffers
+      // outlive the call and the pointers are taken only after the vector has stopped
+      // growing - the same two rules as the Windows arm, for the same reason. The
+      // pointer at index i names attributeNames[i], and the per-entry loop below
+      // relies on that.
+      std::vector<std::vector<char> > attributeBuffers;
+      std::vector<char *> attributePointers;
+
+      for (const String &name : attributeNames)
+      {
+         attributeBuffers.push_back(std::vector<char>());
+
+         if (!ToMutableUtf8_(name, attributeBuffers.back()))
+            return Record_(LDAP_PARAM_ERROR);
+      }
+
+      for (auto &buffer : attributeBuffers)
+         attributePointers.push_back(&buffer[0]);
+
+      attributePointers.push_back(nullptr);
+
+      // 1000 is Active Directory's own default MaxPageSize; slapd sets no ceiling
+      // below it by default. See the Windows arm for why matching it matters.
+      const ber_int_t pageSize = 1000;
+
+      // The paging cookie, owned here. ldap_create_page_control copies it into the
+      // control, ldap_parse_pageresponse_control allocates the next one, and
+      // ReleaseCookie_ frees it between the two; an empty berval means the first
+      // page.
+      struct berval cookie;
+      cookie.bv_val = nullptr;
+      cookie.bv_len = 0;
+
+      // The two bounds on the loop - a hard ceiling on pages and a no-progress
+      // detector - and why both are needed are explained beside the Windows copy of
+      // this loop. They are the same numbers here because the failure they guard
+      // against is a property of the protocol, not of the library.
+      const int maxPages = 10000;
+      int pagesRead = 0;
+      int pagesWithoutProgress = 0;
+
+      for (;;)
+      {
+         if (++pagesRead > maxPages)
+         {
+            truncated = true;
+            break;
+         }
+
+         LDAPControl *pageControl = nullptr;
+
+         // Not critical, as on Windows: a directory without paged results answers
+         // the search anyway, and one page is the right answer for a small one.
+         int status = ldap_create_page_control(session_, pageSize,
+            cookie.bv_val != nullptr ? &cookie : nullptr, 0, &pageControl);
+
+         if (status != LDAP_SUCCESS)
+         {
+            ReleaseCookie_(cookie);
+            return Record_(TranslateNative_(status));
+         }
+
+         LDAPControl *serverControls[2] = { pageControl, nullptr };
+
+         struct timeval timeout = SecondsAsTimeval_(timeout_seconds_);
+
+         LDAPMessage *searchResult = nullptr;
+
+         status = ldap_search_ext_s(session_, &baseBuffer[0], LDAP_SCOPE_SUBTREE,
+            &filterBuffer[0], &attributePointers[0], 0, serverControls, nullptr,
+            &timeout, 0, &searchResult);
+
+         ldap_control_free(pageControl);
+
+         // A size-limit hit is truncation, not failure, and has to be reported as
+         // such; the Windows arm records how that was learned, against slapd's own
+         // default sizelimit of 500.
+         if (status == LDAP_SIZELIMIT_EXCEEDED)
+            truncated = true;
+
+         if (status != LDAP_SUCCESS && status != LDAP_SIZELIMIT_EXCEEDED)
+         {
+            if (searchResult != nullptr)
+               ldap_msgfree(searchResult);
+
+            ReleaseCookie_(cookie);
+
+            const unsigned long translated = TranslateNative_(status);
+
+            if (IsTransportFailure_(translated))
+               Abandon_();
+
+            return Record_(translated);
+         }
+
+         if (searchResult == nullptr)
+         {
+            ReleaseCookie_(cookie);
+            return Record_(LDAP_SUCCESS);
+         }
+
+         const size_t sizeBeforeThisPage = entries.size();
+
+         for (LDAPMessage *entry = ldap_first_entry(session_, searchResult);
+              entry != nullptr;
+              entry = ldap_next_entry(session_, entry))
+         {
+            if ((int) entries.size() >= maxEntries)
+            {
+               truncated = true;
+               break;
+            }
+
+            LdapDirectoryEntry record;
+
+            char *entryDn = ldap_get_dn(session_, entry);
+
+            if (entryDn != nullptr)
+            {
+               record.dn = FromUtf8_(entryDn);
+               ldap_memfree(entryDn);
+            }
+
+            // Fetched by name rather than walked with ldap_first_attribute, for the
+            // reason given on the Windows side. ldap_get_values_len rather than
+            // ldap_get_values because the latter is deprecated and assumes
+            // NUL-terminated text, while a value is a berval - length and bytes -
+            // which is also what brings a value holding a NUL back whole rather than
+            // cut short.
+            for (size_t index = 0; index < attributeNames.size(); index++)
+            {
+               struct berval **values = ldap_get_values_len(session_, entry, attributePointers[index]);
+
+               if (values == nullptr)
+                  continue;
+
+               std::vector<String> collected;
+
+               for (int v = 0; values[v] != nullptr; v++)
+                  collected.push_back(FromUtf8_(values[v]->bv_val, values[v]->bv_len));
+
+               ldap_value_free_len(values);
+
+               // Absent rather than present-and-empty, as on Windows, so that
+               // "never sent" stays distinguishable from "sent as empty".
+               if (!collected.empty())
+                  record.attributes[attributeNames[index]] = collected;
+            }
+
+            entries.push_back(record);
+         }
+
+         if (entries.size() == sizeBeforeThisPage)
+            pagesWithoutProgress++;
+         else
+            pagesWithoutProgress = 0;
+
+         // This page's cookie was copied into the control that fetched it and is
+         // finished with.
+         ReleaseCookie_(cookie);
+
+         if (truncated || pagesWithoutProgress >= 16)
+         {
+            if (pagesWithoutProgress >= 16)
+               truncated = true;
+
+            ldap_msgfree(searchResult);
+            break;
+         }
+
+         LDAPControl **returnedControls = nullptr;
+         int resultCode = LDAP_SUCCESS;
+
+         status = ldap_parse_result(session_, searchResult, &resultCode, nullptr, nullptr,
+            nullptr, &returnedControls, 0);
+
+         if (status == LDAP_SUCCESS && returnedControls != nullptr)
+         {
+            // Found by its OID rather than assumed to be the only control there: a
+            // directory is free to attach others. A directory that ignored the
+            // request sends none, the cookie stays empty, and the loop ends after one
+            // page - the right behaviour for a server that answered the whole search
+            // at once.
+            LDAPControl *response = ldap_control_find(LDAP_CONTROL_PAGEDRESULTS, returnedControls, nullptr);
+
+            if (response != nullptr)
+            {
+               ber_int_t estimatedTotal = 0;
+
+               if (ldap_parse_pageresponse_control(session_, response, &estimatedTotal, &cookie) != LDAP_SUCCESS)
+                  ReleaseCookie_(cookie);
+            }
+         }
+
+         if (returnedControls != nullptr)
+            ldap_controls_free(returnedControls);
+
+         ldap_msgfree(searchResult);
+
+         if (cookie.bv_val == nullptr || cookie.bv_len == 0)
+         {
+            ReleaseCookie_(cookie);
+            break;
+         }
+      }
+
+      ReleaseCookie_(cookie);
+
+      return Record_(LDAP_SUCCESS);
 
 #else
       entries.clear();
@@ -1196,18 +1918,95 @@ namespace HM
    {
 #ifdef HM_PLATFORM_POSIX
 
-      // The out parameters are cleared first, so that a caller which reads them
-      // after a failure sees nothing rather than whatever it passed in.
       dn.Empty();
       matchCount = 0;
 
-      ReportLdapUnavailable_(_T("FindUserDn"));
+      if (session_ == nullptr)
+         return Record_(LDAP_LOCAL_ERROR);
 
-      // Unavailable, never Rejected. The distinction this class exists to carry is
-      // that "the directory said no" and "the directory could not answer" are
-      // different facts; recording a rejection here would tell every user that their
-      // password was wrong.
-      return Record_(LDAP_UNAVAILABLE);
+      std::vector<char> baseBuffer;
+      std::vector<char> filterBuffer;
+
+      if (!ToMutableUtf8_(configuration.search_base, baseBuffer) || !ToMutableUtf8_(filter, filterBuffer))
+         return Record_(LDAP_PARAM_ERROR);
+
+      // Only the DN is wanted, and it is requested by name for the reason the Windows
+      // arm gives: readability in a packet capture. A directory with no such
+      // attribute - slapd has none - ignores the request, and the DN is on the entry
+      // itself regardless.
+      char distinguishedName[] = "distinguishedName";
+      char *attributes[2] = { distinguishedName, nullptr };
+
+      struct timeval timeout = SecondsAsTimeval_(timeout_seconds_);
+
+      LDAPMessage *searchResult = nullptr;
+
+      // Two, not one, for the reason the Windows arm gives beside its own sizeLimit:
+      // a filter that matches several accounts must authenticate none of them.
+      const int sizeLimit = 2;
+
+      const int searchStatus = ldap_search_ext_s(session_, &baseBuffer[0], LDAP_SCOPE_SUBTREE,
+         &filterBuffer[0], attributes, 0, nullptr, nullptr, &timeout, sizeLimit, &searchResult);
+
+      if (searchStatus != LDAP_SUCCESS && searchStatus != LDAP_SIZELIMIT_EXCEEDED)
+      {
+         if (searchResult != nullptr)
+            ldap_msgfree(searchResult);
+
+         const unsigned long translated = TranslateNative_(searchStatus);
+
+         if (IsTransportFailure_(translated))
+            Abandon_();
+
+         return Record_(translated);
+      }
+
+      if (searchResult == nullptr)
+         return Record_(LDAP_SUCCESS);
+
+      matchCount = ldap_count_entries(session_, searchResult);
+
+      if (matchCount < 0)
+      {
+         // ldap_count_entries answers -1 for a message it cannot read. Not a match
+         // count of any kind, and not a rejection: the directory sent something the
+         // client cannot use.
+         ldap_msgfree(searchResult);
+         matchCount = 0;
+
+         return Record_(LDAP_LOCAL_ERROR);
+      }
+
+      if (searchStatus == LDAP_SIZELIMIT_EXCEEDED && matchCount < 2)
+         matchCount = 2;
+
+      if (matchCount == 1)
+      {
+         LDAPMessage *entry = ldap_first_entry(session_, searchResult);
+
+         if (entry != nullptr)
+         {
+            char *entryDn = ldap_get_dn(session_, entry);
+
+            if (entryDn != nullptr)
+            {
+               dn = FromUtf8_(entryDn);
+               ldap_memfree(entryDn);
+            }
+         }
+
+         if (dn.IsEmpty())
+         {
+            ldap_msgfree(searchResult);
+            matchCount = 0;
+
+            return Record_(LDAP_LOCAL_ERROR);
+         }
+      }
+
+      ldap_msgfree(searchResult);
+
+      return Record_(LDAP_SUCCESS);
 
 #else
       dn.Empty();

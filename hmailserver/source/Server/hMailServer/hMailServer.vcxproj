@@ -1280,6 +1280,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\Singleton.h" />
     <ClInclude Include="..\Common\Util\SSPIValidation.h" />
     <ClInclude Include="..\Common\Util\StdString.h" />
+    <ClInclude Include="..\Common\Util\StorePath.h" />
     <ClInclude Include="..\Common\Util\Strings\FormatArgument.h" />
     <ClInclude Include="..\Common\Util\Strings\Formatter.h" />
     <ClInclude Include="..\Common\Util\SystemInformation.h" />

@@ -6,6 +6,7 @@
 #include "stdafx.h"
 
 #include "NameChanger.h"
+#include "../Util/StorePath.h"
 #include "../BO/Domain.h"
 #include "../BO/Accounts.h"
 #include "../BO/Aliases.h"
@@ -160,11 +161,11 @@ namespace HM
    NameChanger::RenameAccount(const String& oldAccountName, std::shared_ptr<Account> pAccount, String &errorMessage)
    {
       String dataDirectory = IniFileSettings::Instance()->GetDataDirectory();
-      String domainName = StringParser::ExtractDomain(oldAccountName);
+      String domainName = StoreDirectoryName(StringParser::ExtractDomain(oldAccountName));
       String domainDirectory = FileUtilities::Combine(dataDirectory, domainName);
 
-      String oldMailboxName  = StringParser::ExtractAddress(oldAccountName);
-      String newMailboxName  = StringParser::ExtractAddress(pAccount->GetAddress());
+      String oldMailboxName  = StoreDirectoryName(StringParser::ExtractAddress(oldAccountName));
+      String newMailboxName  = StoreDirectoryName(StringParser::ExtractAddress(pAccount->GetAddress()));
       
       String oldDirectoryName = FileUtilities::Combine(domainDirectory, oldMailboxName);
       String newDirectoryName = FileUtilities::Combine(domainDirectory, newMailboxName);
@@ -185,8 +186,8 @@ namespace HM
    NameChanger::RenameDomainDataDirectory_(const String &oldDomainName, const String &newDomainName, String &errorMessage)
    {
       // Old director name
-      String oldDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), oldDomainName);
-      String newDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), newDomainName);
+      String oldDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), StoreDirectoryName(oldDomainName));
+      String newDirectory = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), StoreDirectoryName(newDomainName));
 
       if (!RenameDirectory_(oldDirectory, newDirectory, errorMessage))
          return false;

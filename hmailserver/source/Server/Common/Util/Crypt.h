@@ -44,17 +44,28 @@ namespace HM
       bool Validate(const String &password, const String &originalHash, EncryptionType iType) const;
 
       // Protects a reversible secret for storage (route/fetch/relayer passwords).
-      // When DPAPI protection is enabled (the default) and available the result is
-      // a self-describing, machine-bound "DPAPI:<base64>" envelope; otherwise it
-      // falls back to the legacy Blowfish form. Empty input returns empty.
+      // When protection is enabled (the default, ProtectStoredSecretsWithDPAPI=1)
+      // the result is a self-describing envelope: machine-bound "DPAPI:<base64>"
+      // on Windows, key-file-bound "LINUX1:<base64>" on Linux (see DataProtector).
+      // On Windows a DPAPI failure falls back to the legacy Blowfish form so a
+      // secret is never lost; on Linux it does not - the result is empty, an error
+      // says so, and the caller must treat empty as "not stored". Empty input
+      // returns empty on both.
       String ProtectSecret(const String &sInput) const;
 
-      // Reverses ProtectSecret. A "DPAPI:" prefixed value is unprotected with
-      // DPAPI; any other (legacy) value is decrypted with Blowfish, so existing
+      // Reverses ProtectSecret. A prefixed value goes to the store its prefix names
+      // when that store is this platform's, and is reported once and answered with
+      // an empty string when it is not (a database moved between Windows and
+      // Linux); any other (legacy) value is decrypted with Blowfish, so existing
       // stored secrets keep working transparently. Empty input returns empty.
       String UnprotectSecret(const String &sStored) const;
 
    private:
+
+      // The one report for an envelope from the other platform, whichever
+      // platform this is: a moved database holds one such value per route, fetch
+      // account and relaying domain, and the first says everything the rest would.
+      static void ReportForeignEnvelopeOnce_(int errorId, const String &message);
 
       // Applies the optional server-wide password pepper (HMAC-SHA256 under the
       // configured secret) ahead of Argon2id and scrypt hashing/verification. Returns the

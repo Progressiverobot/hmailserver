@@ -286,6 +286,91 @@ namespace HM
       return true;
    }
 
+   std::string
+   Unicode::ToUtf16Le(const std::wstring &text)
+   {
+      std::string bytes;
+      bytes.reserve(text.size() * 2);
+
+      for (size_t index = 0; index < text.size(); index++)
+      {
+         unsigned int codePoint = (unsigned int) text[index];
+
+         if (codePoint >= 0x10000 && codePoint <= 0x10FFFF)
+         {
+            // Only reachable where a wchar_t can hold such a value, which is
+            // where it is four bytes. On Windows every character is already a
+            // code unit and the loop below writes it as it is - a surrogate half
+            // included, so the bytes are exactly the bytes of the String.
+            codePoint -= 0x10000;
+            const unsigned int high = 0xD800 + (codePoint >> 10);
+            const unsigned int low = 0xDC00 + (codePoint & 0x3FF);
+
+            bytes.push_back((char) (high & 0xFF));
+            bytes.push_back((char) ((high >> 8) & 0xFF));
+            bytes.push_back((char) (low & 0xFF));
+            bytes.push_back((char) ((low >> 8) & 0xFF));
+         }
+         else
+         {
+            // A value above U+10FFFF is not a character and has no UTF-16 form.
+            // No decoder here produces one, so this is a defence against memory
+            // that was never a String, and it is written as the replacement
+            // character rather than as its low sixteen bits, which would be some
+            // other character altogether.
+            if (codePoint > 0x10FFFF)
+               codePoint = 0xFFFD;
+
+            bytes.push_back((char) (codePoint & 0xFF));
+            bytes.push_back((char) ((codePoint >> 8) & 0xFF));
+         }
+      }
+
+      return bytes;
+   }
+
+   std::wstring
+   Unicode::FromUtf16Le(const unsigned char *bytes, size_t byteCount)
+   {
+      std::wstring text;
+
+      if (bytes == 0)
+         return text;
+
+      text.reserve(byteCount / 2);
+
+      // Whether a surrogate pair can be joined into one wchar_t, decided by the
+      // platform rather than by the input: on Windows a wchar_t is a UTF-16 code
+      // unit and the pair IS the character, so the two units are kept as they
+      // are and the result is what a copy of the bytes would have been.
+      const bool joinsPairs = sizeof(wchar_t) >= 4;
+
+      size_t index = 0;
+
+      // A trailing odd byte is not a code unit and is left out, which is what
+      // dividing the byte count by two always did.
+      while (index + 1 < byteCount)
+      {
+         unsigned int unit = (unsigned int) bytes[index] | ((unsigned int) bytes[index + 1] << 8);
+         index += 2;
+
+         if (joinsPairs && unit >= 0xD800 && unit <= 0xDBFF && index + 1 < byteCount)
+         {
+            const unsigned int low = (unsigned int) bytes[index] | ((unsigned int) bytes[index + 1] << 8);
+
+            if (low >= 0xDC00 && low <= 0xDFFF)
+            {
+               unit = 0x10000 + ((unit - 0xD800) << 10) + (low - 0xDC00);
+               index += 2;
+            }
+         }
+
+         text.push_back((wchar_t) unit);
+      }
+
+      return text;
+   }
+
    unsigned char*
    Unicode::CharMoveNext(unsigned char* input, bool utf8)
    {

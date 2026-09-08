@@ -331,7 +331,7 @@ namespace RegressionTests.Installation
                requiredVersion + ".");
          }
 
-         foreach (string createScript in new[] { "CreateTablesMSSQL.sql", "CreateTablesMYSQL.sql", "CreateTablesPGSQL.sql" })
+         foreach (string createScript in new[] { "CreateTablesMSSQL.sql", "CreateTablesMySQL.sql", "CreateTablesPGSQL.sql" })
          {
             string create = File.ReadAllText(Paths.Combine(scriptDirectory, createScript));
 

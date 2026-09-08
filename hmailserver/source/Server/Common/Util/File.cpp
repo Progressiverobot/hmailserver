@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "File.h"
 #include "ByteBuffer.h"
+#include "Unicode.h"
 
 // <io.h> is the MSVC C runtime's low-level file header; it is where _commit and
 // _fileno live. The POSIX build reaches the same two calls through <unistd.h>,
@@ -199,11 +200,18 @@ namespace HM
       if (file_ == nullptr)
          throw std::logic_error("Attempt to write to file which has not been opened.");
 
-      String temp_nonconst = sWrite;
+      // This is the wide half of the pair that WriteBOF opens: the bytes after a
+      // FF FE mark are UTF-16LE, whatever the size of a wchar_t on the machine
+      // that wrote them. The String's own bytes used to go to the file as they
+      // lay, which is that format only where wchar_t is two bytes; on Linux it
+      // is four, and a log or a Sieve script written that way could not be read
+      // back by a Windows server, or by this one after an upgrade. The
+      // conversion is a copy on Windows, so the file is the file it always was.
+      const std::string bytes = Unicode::ToUtf16Le(sWrite);
 
-      size_t result = fwrite(temp_nonconst.GetBuffer(), sizeof(TCHAR), temp_nonconst.GetLength(), file_);
+      size_t result = fwrite(bytes.data(), 1, bytes.size(), file_);
 
-      return result == temp_nonconst.GetLength();
+      return result == bytes.size();
    }
 
    bool 
@@ -246,7 +254,10 @@ namespace HM
    bool 
    File::WriteBOF()
    {
-      // Write unicode beginner markers.
+      // The UTF-16LE byte order mark. It names the format of everything that
+      // Write(const String &) then appends - which is UTF-16LE on every platform,
+      // see there - and it is what ReadCompleteTextFile looks for to know that a
+      // file has to be decoded rather than read as narrow text.
       unsigned char charByteOrderMarker[2] = {255, 254};
 
       size_t bytesWritten;

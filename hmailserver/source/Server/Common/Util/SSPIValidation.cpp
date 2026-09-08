@@ -41,10 +41,10 @@ namespace HM
       // the Windows side's per-error, per-domain timer. That timer exists because the
       // conditions it reports come and go - a domain controller is rebooted, a broken
       // trust is repaired - so a problem that returns has to be reported again. This
-      // one cannot come and go: there is no LogonUser in this build and there will not
-      // be one before the roadmap row that replaces it is written. A second report
-      // would say exactly what the first one said, and would say it on every logon
-      // attempt the server handles.
+      // one cannot come and go: there is no LogonUser in this build, and the
+      // directory path here is LDAP, which is configured and not discovered. A
+      // second report would say exactly what the first one said, and would say
+      // it on every logon attempt the server handles.
       static std::once_flag reported;
 
       std::call_once(reported, [&sDomain]()
@@ -53,8 +53,9 @@ namespace HM
             Formatter::Format(_T("An account is linked to the Windows domain {0}, but this build cannot validate ")
                _T("a Windows credential: LogonUser is the mechanism and it is a Windows one. Every logon for ")
                _T("every account linked to a domain will be refused, whatever password is supplied. Give those ")
-               _T("accounts a native hMailServer password, or see the roadmap row 'Directory authentication ")
-               _T("without LogonUser'. Reported once per run."), sDomain));
+               _T("accounts a native hMailServer password, or turn on LDAP authentication ([LDAP] Enabled=1 in ")
+               _T("hMailServer.ini, with Server, Security and a bind method), which is the directory path on this ")
+               _T("platform. Reported once per run."), sDomain));
       });
 
       // False, and never anything else. This is an authentication decision, and the one

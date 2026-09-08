@@ -10,7 +10,16 @@
 #define MAXKEYBYTES  56    // 448 bits max
 #define NPASS           16    // SBox passes
 
+// The cipher works on 32-bit words. On Windows unsigned long is 32 bits and the
+// name is the one the Win32 headers use; on an LP64 Linux it is 64 bits, and a
+// Blowfish over 64-bit halves is not Blowfish - nothing it wrote could be read
+// back, on the same machine or any other. uint32_t on POSIX, the same width.
+#ifdef HM_PLATFORM_POSIX
+#include <cstdint>
+#define DWORD        uint32_t
+#else
 #define DWORD        unsigned long
+#endif
 #define WORD      unsigned short
 #define BYTE      unsigned char
 

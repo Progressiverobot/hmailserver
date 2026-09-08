@@ -132,6 +132,10 @@ namespace HM
       // empty string removes it - which is also the recovery for a lost
       // authenticator: delete the key from the file, as a local administrator can.
       String GetAdministratorTotpSecret();
+      // Whether a second factor is enrolled at all, judged from the stored form
+      // and not from whether it can be opened: an enrolled secret this machine
+      // cannot unprotect must refuse the logon, never wave it through.
+      bool IsAdministratorTotpEnrolled() const { return !administrator_totp_secret_protected_.IsEmpty(); }
       bool SetAdministratorTotpSecret(const String &base32Secret);
       String GetLogDirectory();
 

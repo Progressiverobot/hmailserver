@@ -179,6 +179,28 @@ find_package(PostgreSQL REQUIRED)
 # invisible here.
 find_package(Iconv REQUIRED)
 
+# OpenLDAP. LdapClient.cpp is written against wldap32 on Windows and against
+# libldap here - the same function names over a different library, which is why
+# that file has two arms - and directory authentication on this platform is that
+# client or nothing, so it is REQUIRED. Found with find_path and find_library
+# rather than a package module because CMake ships none for it, and Debian's
+# libldap-dev, Fedora's openldap-devel and Arch's libldap all put ldap.h and the
+# libraries where the default search looks. liblber is named as well as libldap:
+# the BER functions the client calls by name (ber_memfree) are exported from it,
+# and a link line that relies on libldap pulling it in is one that breaks under
+# --as-needed.
+find_path(LDAP_INCLUDE_DIR NAMES ldap.h)
+find_library(LDAP_LIBRARY NAMES ldap)
+find_library(LBER_LIBRARY NAMES lber)
+
+if(NOT LDAP_INCLUDE_DIR OR NOT LDAP_LIBRARY OR NOT LBER_LIBRARY)
+   message(FATAL_ERROR
+      "OpenLDAP was not found (ldap.h, libldap and liblber are all needed). "
+      "Directory authentication on this platform is built on it. Install "
+      "libldap-dev (Debian, Ubuntu), openldap-devel (Fedora, RHEL) or libldap "
+      "(Arch) and configure again.")
+endif()
+
 # ---------------------------------------------------------------- the target
 
 add_library(hmailserver_core STATIC ${CORE_SOURCES})
@@ -195,7 +217,8 @@ target_include_directories(hmailserver_core PUBLIC
    ${PCH_LOWER}
    ${SERVER_DIR}
    ${SERVER_DIR}/Common
-   ${SERVER_DIR}/Common/Util)
+   ${SERVER_DIR}/Common/Util
+   ${LDAP_INCLUDE_DIR})
 
 target_compile_definitions(hmailserver_core PUBLIC
    HM_PLATFORM_POSIX=1
@@ -221,6 +244,8 @@ target_link_libraries(hmailserver_core PUBLIC
    ZLIB::ZLIB
    PostgreSQL::PostgreSQL
    Iconv::Iconv
+   ${LDAP_LIBRARY}
+   ${LBER_LIBRARY}
    Boost::headers
    Boost::thread
    Boost::chrono
@@ -281,6 +306,16 @@ set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "hMailServer, a mail server for SMTP, IMAP
 set(CPACK_PACKAGE_HOMEPAGE_URL "https://github.com/Progressiverobot/hmailserver")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGING_INSTALL_PREFIX /usr)
+# DESTDIR mode, stated rather than left to CPack's version to decide. The unit,
+# the configuration and the logrotate rule are installed to absolute paths (see
+# the install rules above and why), and how CPack treats an absolute DESTINATION
+# without this flag has varied between CMake releases: the 4.x on the machine
+# the port was written on packaged them where they were written, and the 3.28
+# on ubuntu-24.04 - the first CI packaging run, on the ARM runner - did not,
+# which the install check caught as a missing /etc/hmailserver/hMailServer.ini.
+# With DESTDIR set, every install rule runs exactly as `make install` would
+# into the staging tree, and the layout is the one the rules say.
+set(CPACK_SET_DESTDIR ON)
 set(CPACK_STRIP_FILES ON)
 
 # The architecture each packager names differently for the same machine.

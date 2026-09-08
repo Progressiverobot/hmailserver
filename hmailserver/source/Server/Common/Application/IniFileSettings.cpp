@@ -318,10 +318,15 @@ namespace HM
       oauth2_introspection_fail_open_ = ReadIniSettingInteger_("Settings", "OAuth2IntrospectionFailOpen", 0) == 1;
 
       // Protect reversible secrets at rest (the database password in this INI plus
-      // the DB-stored route/fetch/relayer passwords) with machine-scoped Windows
-      // DPAPI so they cannot be decrypted off-box. Enabled by default. Set to 0 to
-      // keep the legacy Blowfish scheme (e.g. to allow restoring a backup onto a
-      // different machine). Existing legacy values are always still readable.
+      // the DB-stored route/fetch/relayer passwords) with the platform's secret
+      // store so they cannot be decrypted off-box: machine-scoped Windows DPAPI on
+      // Windows, and on Linux - which has no DPAPI - a 0600 key file under the data
+      // directory with AES-256-GCM (DataProtector.h says what each promises). The
+      // key is named for the Windows store and kept for compatibility; the default
+      // is 1 on both platforms. Set to 0 to keep the legacy Blowfish scheme (e.g. to
+      // allow restoring a backup onto a different Windows machine; on Linux the
+      // key file travels with the data directory, so there is no such reason).
+      // Existing legacy values are always still readable.
       protect_stored_secrets_with_dpapi_ = ReadIniSettingInteger_("Settings", "ProtectStoredSecretsWithDPAPI", 1) == 1;
 
       // Optional least-privilege Windows service account for the hMailServer service.
@@ -1399,6 +1404,15 @@ namespace HM
             WriteIniSetting_("Database", "PasswordEncryption", Crypt::ETDPAPI);
             return;
          }
+#ifdef HM_PLATFORM_POSIX
+         // No Blowfish here. On this platform the key-file store is the only
+         // store, and a secret it could not protect is not written at all - the
+         // same rule Crypt::ProtectSecret keeps - rather than written under a
+         // scheme anybody with the file can reverse.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6418, "IniFileSettings::SetPassword",
+            "The database password was NOT written: the secret store refused it (see the preceding error), and this build does not fall back to the reversible Blowfish scheme. Fix the key file and set the password again.");
+         return;
+#endif
       }
 
       WriteIniSetting_("Database", "Password", Crypt::Instance()->EnCrypt(password_, Crypt::ETBlowFish));

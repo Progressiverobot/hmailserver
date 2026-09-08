@@ -252,6 +252,42 @@ namespace HM
          // report the difference between an unreachable domain and a wrong password -
          // every attempt returns ERROR_LOGON_FAILURE. See LdapDirectoryAuthenticator.h
          // for the measurement.
+#ifdef HM_PLATFORM_POSIX
+
+         // On this platform the LDAP branch below is the only directory path there
+         // is. SSPIValidation, which the Windows build falls through to, is LogonUser
+         // - Windows-integrated logon - and has no counterpart here: its POSIX arm
+         // refuses and says so, but says "this build cannot", which was true of the
+         // port and is not true of a build that carries an OpenLDAP client. So a
+         // directory-linked account on a server whose [LDAP] section is off is told
+         // once, in full, what the choice is: switch LDAP on, or give the account a
+         // password of its own.
+         //
+         // Once per process rather than once per minute, because this cannot come
+         // and go the way a domain controller does. It changes when an administrator
+         // edits the configuration, and the next logon after that edit takes the
+         // LDAP branch and never reaches this line.
+         if (!LdapSettings::Instance()->GetEnabled())
+         {
+            static std::once_flag reported;
+
+            std::call_once(reported, [&sADDomain, &pAccount]()
+            {
+               ErrorManager::Instance()->ReportError(ErrorManager::High, 6421,
+                  "PasswordValidator::ValidateAccountPassword_",
+                  Formatter::Format(_T("The account {0} is linked to the directory domain {1}, but hMailServer.ini ")
+                     _T("has no [LDAP] Enabled=1. On this platform directory authentication is an LDAP bind or ")
+                     _T("nothing: Windows-integrated logon (LogonUser) does not exist here, so every logon for ")
+                     _T("every directory-linked account is refused until LDAP is configured. Set [LDAP] Enabled=1, ")
+                     _T("Server, Security=2 (LDAPS) or Security=1 (StartTLS), and either UserDnTemplate or ")
+                     _T("SearchBase with ServiceUsername and ServicePassword; or give those accounts a password ")
+                     _T("of their own. Reported once per run."), pAccount->GetAddress(), sADDomain));
+            });
+
+            return false;
+         }
+
+#endif
          if (LdapSettings::Instance()->GetEnabled())
          {
             LdapAuthenticationResult ldapResult = LdapDirectoryAuthenticator::ValidateUser(

@@ -313,6 +313,7 @@
     <Compile Include="Infrastructure\HttpFoundation.cs" />
     <Compile Include="Infrastructure\TraceContext.cs" />
     <Compile Include="Infrastructure\WindowsEventLog.cs" />
+    <Compile Include="Infrastructure\Utf16FileFormat.cs" />
     <Compile Include="Infrastructure\PrivacyTools.cs" />
     <Compile Include="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="IMAP\Utf8Append.cs" />
@@ -663,6 +664,7 @@
     <Compile Include="API\UpdateApply.cs" />
     <Compile Include="API\UpdateSchedule.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
+    <Compile Include="API\RestApiDomains.cs" />
     <Compile Include="API\RestApiSelfService.cs" />
     <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />

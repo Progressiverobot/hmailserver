@@ -50,6 +50,14 @@ Group=hmailserver
 ExecReload=/bin/kill -HUP $MAINPID
 
 Restart=on-failure
+
+# Core dumps. The server records a memory-safety fault in <LogFolder>/crash-oracle.log
+# and then dies by the signal it caught, so the kernel's own policy decides whether a
+# core is written: RLIMIT_CORE, kernel.core_pattern, and systemd-coredump where it is
+# installed. The limit is left at the distribution's default on purpose - a core of a
+# mail server holds message bodies, passwords and TLS keys - and is turned on here
+# only for the time it takes to catch one:
+#LimitCORE=infinity
 RestartSec=5
 
 # Long enough to drain. A mail server killed mid-delivery leaves the remote end

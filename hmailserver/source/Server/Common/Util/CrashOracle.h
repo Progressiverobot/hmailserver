@@ -38,9 +38,9 @@ namespace HM
    /// counters stay at zero and there is no marker file, and
    /// LogInstallationStatus() says exactly that in the application log so that an
    /// administrator is told rather than left to assume the server is watching
-   /// itself. The equivalent - a signal handler for the memory-safety signals and
-   /// a policy for the core dump the kernel writes - is the roadmap row "The Win32
-   /// tail".
+   /// itself. On POSIX the equivalent is a signal handler for SIGSEGV, SIGBUS,
+   /// SIGILL, SIGFPE and SIGABRT that writes the same record and then lets the
+   /// process die by the signal, so the kernel's core-dump policy applies.
    class CrashOracle
    {
    public:

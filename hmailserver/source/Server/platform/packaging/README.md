@@ -42,7 +42,7 @@ Debian and Ubuntu:
 
 ```sh
 sudo apt install cmake ninja-build clang \
-     libssl-dev zlib1g-dev libpq-dev \
+     libssl-dev zlib1g-dev libpq-dev libldap-dev \
      libboost-thread-dev libboost-chrono-dev libboost-filesystem-dev libboost-regex-dev \
      rpm file
 ```
@@ -51,7 +51,7 @@ Fedora and RHEL:
 
 ```sh
 sudo dnf install cmake ninja-build clang \
-     openssl-devel zlib-devel libpq-devel boost-devel \
+     openssl-devel zlib-devel libpq-devel openldap-devel boost-devel \
      rpm-build dpkg
 ```
 
@@ -150,10 +150,31 @@ removed with it:
 /etc/hmailserver/hMailServer.ini 0640 root:hmailserver
 ```
 
+Created by the server itself, the first time a stored secret is written, and
+therefore in neither list:
+
+```
+/var/lib/hmailserver/.hmailserver-secret-key   0600 hmailserver:hmailserver   the stored-secret key
+```
+
+It is 32 random bytes and it is the key under which every password the server
+has to present to somebody else - route, fetch-account and per-domain relay
+passwords, private-key passphrases, the administrator's TOTP secret - is
+AES-256-GCM encrypted in the database, as `LINUX1:<base64>`. It stands in for
+Windows DPAPI, which this platform does not have, and the INI's paragraph on
+`ProtectStoredSecretsWithDPAPI` says what that does and does not promise. Two
+things follow for an operator: **back it up with the database**, because a
+database restored without it has lost every stored password (the error log names
+the file, HM6412, when that happens); and it is refused, with the `chmod` that
+fixes it, if its mode lets any account but its owner read it (HM6411). If it
+cannot be made or read, the secret is not stored and the log says so - the server
+does not fall back to the fixed-key Blowfish scheme on its own.
+
 The configuration is owned by root and only *read* by the service. It carries the
 administrator password and the database password, and nothing in a Linux build
 rewrites it - the code that would is the COM administration API, which is Windows
-only.
+only. (`--set-admin-password`, step 4 below, is the one exception, and it runs
+as root for that reason.)
 
 ## Install and get running
 
@@ -252,10 +273,22 @@ API in the configuration (`RestApiPort`, and `RestApiBindAddress=127.0.0.1` unle
 you also set a certificate and key), reload with `sudo systemctl reload
 hmailserver`, and it authenticates as `Administrator` with the password from step
 4. Reloading stops and restarts the listeners inside the running process, so do it
-when nothing is mid-delivery. Accounts under a domain are created over
-`POST /api/v1/domains/{domain}/accounts`; **no route creates the domain itself
-yet** - that is the roadmap's *Administration without COM* row - so the first
-domain is an `INSERT INTO hm_domains` for now, and the row says so.
+when nothing is mid-delivery. The first domain, and every one after it, is a
+`POST` - the name is checked as the Control Panel checks it, and every other
+setting takes the default a domain made there gets:
+
+```sh
+curl -u Administrator:your-admin-password -H "Content-Type: application/json" \
+     -d '{"name":"example.com","active":true,"postmaster":"postmaster@example.com"}' \
+     http://127.0.0.1:8443/api/v1/domains
+```
+
+It answers `201 {"name":"example.com","active":true,"postmaster":"postmaster@example.com"}`,
+`409` when the domain exists and `400` with the reason when the name is not a
+domain name. Accounts under it are created over
+`POST /api/v1/domains/{domain}/accounts`; `PUT /api/v1/domains/{domain}` with
+`{"active":false}` switches a domain off, and `DELETE /api/v1/domains/{domain}`
+removes it with its accounts, aliases, lists and directories.
 
 **Proven, 8 September 2026.** Against PostgreSQL 18: `--create-database` built
 the schema, the server started and opened its SMTP, POP3, IMAP and REST
@@ -293,11 +326,24 @@ when the packaging changes.
 
 ## What is still owed
 
-* **The AArch64 packages have not been built on real hardware.** The
-  cross-compile census reads 496/496 and the workflow has an `ubuntu-24.04-arm`
-  job that packages; its first run is what turns that into a proof.
-* **The PKGBUILD has not been exercised**; that needs an Arch machine.
-* **MySQL and MariaDB are compiled in and not yet proven live** the way
-  PostgreSQL is; the roadmap's database row says so.
+* **The AArch64 packages come from CI, not from hands.** The `ubuntu-24.04-arm`
+  job builds and installs the `.deb` on every push; nobody has installed one on
+  ARM hardware by hand yet.
+* **There is no re-keying command.** The stored-secret key file is made once
+  and never rotated; replacing it by hand means re-entering every stored
+  password, and there is no tool that re-encrypts them under a new key.
 * **The service does not reopen its log on a signal**, which is why the
   logrotate rule uses `copytruncate`.
+* **Directory authentication is a simple bind over LDAPS or StartTLS, and only
+  that.** `[LDAP] BindMethod=1` (Negotiate) is Windows SSPI and does not exist
+  here; the server reports HM6420 once and refuses the logon as a directory
+  failure rather than a wrong password. A GSSAPI bind through Cyrus SASL would be
+  its counterpart and is not written. The server's certificate must chain to the
+  system trust store (`TLS_CACERT` in `/etc/ldap/ldap.conf`); there is no
+  private-CA setting.
+
+Proven since the list above was first written, and therefore not on it: the
+PKGBUILD builds and installs on Arch Linux (`makepkg`, `pacman -U`,
+`systemd-sysusers`, `/usr/bin/hmailserver --version`); MariaDB 11.8 runs the
+same end-to-end sequence PostgreSQL does (schema created by `--create-database`,
+an account over REST, a message over SMTP, read back over IMAP).

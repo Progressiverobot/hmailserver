@@ -16,82 +16,329 @@
 
 #ifdef HM_PLATFORM_POSIX
 
+#include <atomic>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/syscall.h>
+#include <time.h>
+#include <unistd.h>
+
 namespace HM
 {
    //------------------------------------------------------------------------//
-   // The POSIX oracle: present, honest, and armed with nothing.
+   // The POSIX oracle.
    //
-   // Both hooks the Windows oracle installs are structured exception handling -
-   // AddVectoredExceptionHandler and SetUnhandledExceptionFilter - and neither
-   // has a POSIX counterpart. A memory-safety fault arrives here as SIGSEGV,
-   // SIGBUS, SIGILL or SIGFPE, and turning those into the same records needs a
-   // signal handler written to the rules signal handlers are written to, plus a
-   // decision about the core dump the kernel writes alongside. That is a roadmap
-   // row of its own - "The Win32 tail": a core-dump policy - and not something to
-   // improvise inside a compatibility guard.
+   // The Windows oracle is two structured-exception hooks: a first-chance
+   // observer that counts every memory-safety exception, whether or not a
+   // catch (...) then swallows it, and an unhandled-exception filter that writes
+   // a record, a minidump and an error-log line before the process dies. Neither
+   // hook has a POSIX shape. What POSIX has is the signal the kernel delivers
+   // when the fault happens - SIGSEGV, SIGBUS, SIGILL, SIGFPE - and, for the
+   // C++ runtime's own give-up path (std::terminate, assert), SIGABRT. There is
+   // no first chance here: a fault is fatal the moment it is delivered, because
+   // nothing in this code base catches a signal and carries on. So the two
+   // Windows counters read the same thing on this platform, and both are true.
    //
-   // So the class keeps its whole public surface and installs nothing. What it
-   // must not do is stay quiet about it: the counters below read zero on a server
-   // that is corrupting its own memory exactly as they do on a healthy one, and
-   // the only thing standing between an administrator and that misreading is the
-   // line LogInstallationStatus writes at start-up.
+   // The handler is written to the rules signal handlers are written to. It
+   // runs on an alternate stack, so a fault caused by exhausting the thread's
+   // own stack still has somewhere to run. It calls nothing that may allocate,
+   // take a lock or touch a locale: the record is formatted by hand into a
+   // stack buffer and written with open(2) and write(2), both of which are
+   // async-signal-safe, and the timestamp is computed from clock_gettime rather
+   // than from localtime, which is not. Then it re-raises the signal with the
+   // default disposition restored (SA_RESETHAND), so the process dies by the
+   // signal it caught and the kernel's own core-dump policy applies -
+   // RLIMIT_CORE, /proc/sys/kernel/core_pattern, systemd-coredump where it is
+   // installed. That is the core-dump policy this oracle chooses: the kernel's,
+   // stated in the unit file and the packaging README, rather than a second
+   // dump writer of its own. The Windows minidump is deliberately heap-free so
+   // that no message body or key leaks into a file an administrator will mail
+   // to a list; a Linux core is not, which is why the unit ships with the core
+   // limit left at the distribution's default and a comment saying what turning
+   // it on costs.
+   //
+   // The marker file is the same file the Windows oracle writes, under the same
+   // name, in the log directory, with the same one-line record shape, so that
+   // whatever reads one reads the other.
    //------------------------------------------------------------------------//
+   namespace
+   {
+      const char *marker_file_name = "crash-oracle.log";
+
+      // Resolved in LogInstallationStatus, when the configuration has been read;
+      // Install runs before it has. Until then a fault is recorded in /tmp, which
+      // is worse than the log directory and better than nowhere.
+      char marker_file_[1024] = "/tmp/hmailserver-crash-oracle.log";
+
+      std::atomic<int> installed_{0};
+      std::atomic<long> memory_safety_events_{0};
+      std::atomic<long> fatal_events_{0};
+      std::atomic<int> shutdown_started_{0};
+
+      // The signals the oracle records, and what each is called in the record.
+      struct WatchedSignal
+      {
+         int number;
+         const char *kind;
+         bool memory_safety;
+      };
+
+      const WatchedSignal watched_signals_[] =
+      {
+         { SIGSEGV, "SIGSEGV", true },
+         { SIGBUS,  "SIGBUS",  true },
+         { SIGILL,  "SIGILL",  true },
+         { SIGFPE,  "SIGFPE",  true },
+         { SIGABRT, "SIGABRT", false }
+      };
+
+      void
+      AppendAscii_(char *buffer, size_t buffer_size, size_t &offset, const char *text)
+      {
+         while (*text != 0 && offset + 1 < buffer_size)
+         {
+            buffer[offset] = *text;
+            offset++;
+            text++;
+         }
+      }
+
+      void
+      AppendUnsigned_(char *buffer, size_t buffer_size, size_t &offset, unsigned long long value, unsigned int base_value, int minimum_digits)
+      {
+         char digits[24];
+         int count = 0;
+         do
+         {
+            unsigned int digit = static_cast<unsigned int>(value % base_value);
+            digits[count] = static_cast<char>(digit < 10 ? ('0' + digit) : ('A' + digit - 10));
+            count++;
+            value /= base_value;
+         }
+         while (value != 0 && count < 24);
+
+         while (count < minimum_digits && count < 24)
+         {
+            digits[count] = '0';
+            count++;
+         }
+
+         while (count > 0 && offset + 1 < buffer_size)
+         {
+            count--;
+            buffer[offset] = digits[count];
+            offset++;
+         }
+      }
+
+      // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm),
+      // because gmtime_r is not on the async-signal-safe list and the record
+      // should carry a date a person can read. UTC, which the record says.
+      void
+      AppendTimestamp_(char *buffer, size_t buffer_size, size_t &offset)
+      {
+         struct timespec now;
+         ::clock_gettime(CLOCK_REALTIME, &now);
+
+         long long seconds = now.tv_sec;
+         long long days = seconds / 86400;
+         long long seconds_of_day = seconds - days * 86400;
+         if (seconds_of_day < 0)
+         {
+            seconds_of_day += 86400;
+            days -= 1;
+         }
+
+         long long z = days + 719468;
+         long long era = (z >= 0 ? z : z - 146096) / 146097;
+         unsigned long long doe = static_cast<unsigned long long>(z - era * 146097);
+         unsigned long long yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+         long long y = static_cast<long long>(yoe) + era * 400;
+         unsigned long long doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+         unsigned long long mp = (5 * doy + 2) / 153;
+         unsigned long long d = doy - (153 * mp + 2) / 5 + 1;
+         unsigned long long m = mp < 10 ? mp + 3 : mp - 9;
+         if (m <= 2)
+            y += 1;
+
+         AppendUnsigned_(buffer, buffer_size, offset, static_cast<unsigned long long>(y), 10U, 4);
+         AppendAscii_(buffer, buffer_size, offset, "-");
+         AppendUnsigned_(buffer, buffer_size, offset, m, 10U, 2);
+         AppendAscii_(buffer, buffer_size, offset, "-");
+         AppendUnsigned_(buffer, buffer_size, offset, d, 10U, 2);
+         AppendAscii_(buffer, buffer_size, offset, " ");
+         AppendUnsigned_(buffer, buffer_size, offset, static_cast<unsigned long long>(seconds_of_day / 3600), 10U, 2);
+         AppendAscii_(buffer, buffer_size, offset, ":");
+         AppendUnsigned_(buffer, buffer_size, offset, static_cast<unsigned long long>((seconds_of_day / 60) % 60), 10U, 2);
+         AppendAscii_(buffer, buffer_size, offset, ":");
+         AppendUnsigned_(buffer, buffer_size, offset, static_cast<unsigned long long>(seconds_of_day % 60), 10U, 2);
+         AppendAscii_(buffer, buffer_size, offset, ".");
+         AppendUnsigned_(buffer, buffer_size, offset, static_cast<unsigned long long>(now.tv_nsec / 1000000), 10U, 3);
+         AppendAscii_(buffer, buffer_size, offset, "Z");
+      }
+
+      // One line, the same shape as the Windows record: kind, code (the signal
+      // number here), the faulting address, the thread, the process, the event
+      // number. open(2) with O_APPEND and one write(2) of well under PIPE_BUF,
+      // so faults on several threads cannot interleave half-lines.
+      void
+      AppendMarkerRecord_(const char *kind, int signal_number, const void *fault_address, long event_number)
+      {
+         char line[256];
+         size_t offset = 0;
+         AppendTimestamp_(line, sizeof(line), offset);
+         AppendAscii_(line, sizeof(line), offset, " ");
+         AppendAscii_(line, sizeof(line), offset, kind);
+         AppendAscii_(line, sizeof(line), offset, " code=0x");
+         AppendUnsigned_(line, sizeof(line), offset, static_cast<unsigned long long>(signal_number), 16U, 8);
+         AppendAscii_(line, sizeof(line), offset, " address=0x");
+         AppendUnsigned_(line, sizeof(line), offset, reinterpret_cast<unsigned long long>(fault_address), 16U, 16);
+         AppendAscii_(line, sizeof(line), offset, " thread=");
+         AppendUnsigned_(line, sizeof(line), offset, static_cast<unsigned long long>(::syscall(SYS_gettid)), 10U, 1);
+         AppendAscii_(line, sizeof(line), offset, " pid=");
+         AppendUnsigned_(line, sizeof(line), offset, static_cast<unsigned long long>(::getpid()), 10U, 1);
+         AppendAscii_(line, sizeof(line), offset, " event=");
+         AppendUnsigned_(line, sizeof(line), offset, static_cast<unsigned long long>(event_number), 10U, 1);
+         AppendAscii_(line, sizeof(line), offset, "\n");
+
+         int file = ::open(marker_file_, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0640);
+         if (file < 0)
+            return;
+
+         ssize_t written = ::write(file, line, offset);
+         (void) written;
+         ::close(file);
+      }
+
+      void
+      FaultHandler_(int signal_number, siginfo_t *info, void *)
+      {
+         const WatchedSignal *watched = nullptr;
+         for (const WatchedSignal &candidate : watched_signals_)
+         {
+            if (candidate.number == signal_number)
+               watched = &candidate;
+         }
+
+         if (watched != nullptr && watched->memory_safety)
+            memory_safety_events_.fetch_add(1);
+
+         const long event_number = fatal_events_.fetch_add(1) + 1;
+
+         AppendMarkerRecord_(shutdown_started_.load() != 0 ? "FATAL-DURING-SHUTDOWN" : "FATAL",
+                             signal_number,
+                             info != nullptr ? info->si_addr : nullptr,
+                             event_number);
+
+         // SA_RESETHAND has already restored the default disposition. Raising the
+         // signal again therefore ends the process the way the kernel ends one
+         // that was never watched - by the signal, with a core if the policy
+         // allows one - which is what makes a Linux crash of this server look
+         // like any other to the tools an administrator already has.
+         ::raise(signal_number);
+      }
+   }
 
    CrashOracle::CrashOracle()
    {
-
    }
 
    void
    CrashOracle::Install()
    {
-      // Nothing to install, and deliberately nothing pretended. The saying-so is
-      // LogInstallationStatus's job because Install() runs before the logging
-      // subsystem has a log mask, which is the same reason the two are separate
-      // on Windows.
+      int expected = 0;
+      if (!installed_.compare_exchange_strong(expected, 1))
+         return;
+
+      // An alternate stack for the handler, because one of the faults worth
+      // recording is running out of the ordinary one. Allocated once, at install,
+      // when allocating is still allowed; SIGSTKSZ is the minimum and this is
+      // generous so that the formatting above has room.
+      const size_t alternate_stack_size = 64 * 1024;
+      stack_t alternate;
+      alternate.ss_sp = ::malloc(alternate_stack_size);
+      alternate.ss_size = alternate_stack_size;
+      alternate.ss_flags = 0;
+      if (alternate.ss_sp != nullptr)
+         ::sigaltstack(&alternate, nullptr);
+
+      struct sigaction action;
+      ::memset(&action, 0, sizeof(action));
+      action.sa_sigaction = FaultHandler_;
+      ::sigemptyset(&action.sa_mask);
+      // SA_SIGINFO for the faulting address; SA_ONSTACK for the alternate stack;
+      // SA_RESETHAND so the re-raise in the handler ends the process rather than
+      // re-entering it; SA_NODEFER so a second fault inside the handler itself
+      // reaches the now-default disposition and ends the process too, instead of
+      // being held until a handler that will never return does.
+      action.sa_flags = SA_SIGINFO | SA_ONSTACK | SA_RESETHAND | SA_NODEFER;
+
+      for (const WatchedSignal &watched : watched_signals_)
+         ::sigaction(watched.number, &action, nullptr);
    }
 
    void
    CrashOracle::LogInstallationStatus()
    {
-      // LOG_APPLICATION, not ErrorManager, for the same reason as on Windows: this
-      // runs on every start of a healthy default installation, and a diagnostic
-      // that writes to the error log on a default configuration makes the error
-      // log useless. It is still stated plainly, because the alternative is an
-      // administrator who believes faults are being recorded when none are.
-      LOG_APPLICATION(_T("Crash oracle: crash capture is not installed on this platform. Memory-safety faults are not observed, no crash record is written and no mini dump is produced; a fault ends the process and leaves only whatever core dump the operating system is configured to write. The event counters therefore stay at zero and must not be read as an absence of faults."));
+      // The configuration is readable by now, so the record moves from /tmp to
+      // the log directory, where every other record of this server already is.
+      // Resolved here rather than in the handler, which must never have to work
+      // out where to write while a fault is in flight.
+      try
+      {
+         String log_directory = IniFileSettings::Instance()->GetLogDirectory();
+         if (!log_directory.IsEmpty() && FileUtilities::DirectoryExists(log_directory))
+         {
+            AnsiString candidate = FileUtilities::Combine(log_directory, String(marker_file_name));
+            if (candidate.GetLength() > 0 && candidate.GetLength() < (int) sizeof(marker_file_) - 1)
+            {
+               ::memcpy(marker_file_, candidate.c_str(), candidate.GetLength());
+               marker_file_[candidate.GetLength()] = 0;
+            }
+         }
+      }
+      catch (...)
+      {
+         // The /tmp default stands.
+      }
+
+      if (installed_.load() == 0)
+      {
+         LOG_APPLICATION(_T("Crash oracle: not installed. Memory-safety faults will end the process without a record."));
+         return;
+      }
+
+      String message;
+      message.Format(_T("Crash oracle armed. SIGSEGV, SIGBUS, SIGILL, SIGFPE and SIGABRT are recorded in %s, and the process then dies by the signal, so the kernel's core-dump policy applies (RLIMIT_CORE, kernel.core_pattern, systemd-coredump where installed; the unit file says how to allow a core)."),
+         String(marker_file_).c_str());
+      LOG_APPLICATION(message);
    }
 
    void
    CrashOracle::NotifyShutdownStarted()
    {
-      // The flag exists on Windows only to stop the fatal path killing a process
-      // that is already stopping. No hook is installed here, so there is no
-      // escalation to hold back and nothing to remember.
+      // Recorded in the kind of any record written after this point. There is no
+      // escalation to hold back here, since a signal is fatal either way, but a
+      // fault during shutdown and a fault in service are different findings.
+      shutdown_started_.store(1);
    }
 
    long
    CrashOracle::GetMemorySafetyEventCount()
    {
-      // Zero because nothing counts, not because nothing happened. The start-up
-      // line above is what tells the difference; see the note at the top of this
-      // section.
-      return 0;
+      return memory_safety_events_.load();
    }
 
    long
    CrashOracle::GetFatalEventCount()
    {
-      return 0;
+      return fatal_events_.load();
    }
 
    String
    CrashOracle::GetMarkerFile()
    {
-      // Documented as empty when no writable location was found. Here there is no
-      // marker file at all, and the same empty string tells every caller - the
-      // metrics surface included - that there is nothing to read.
-      return String();
+      return String(marker_file_);
    }
 }
 

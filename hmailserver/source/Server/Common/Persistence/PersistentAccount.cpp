@@ -10,6 +10,7 @@
 
 
 #include "PersistentAccount.h"
+#include "../Util/StorePath.h"
 #include "PersistentACLPermission.h"
 #include "PersistentFetchAccount.h"
 #include "PersistentRule.h"
@@ -144,8 +145,8 @@ namespace HM
       if (bRet)
       {
          // Delete folder from data directory
-         String sDomainName = StringParser::ExtractDomain(pAccount->GetAddress());
-         String sMailbox = StringParser::ExtractAddress(pAccount->GetAddress());
+         String sDomainName = StoreDirectoryName(StringParser::ExtractDomain(pAccount->GetAddress()));
+         String sMailbox = StoreDirectoryName(StringParser::ExtractAddress(pAccount->GetAddress()));
 
          if (!sDomainName.IsEmpty() && !sMailbox.IsEmpty())
          {

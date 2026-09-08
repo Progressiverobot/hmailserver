@@ -11,6 +11,8 @@
 #include "Hashing/HashCreator.h"
 #include "../Application/IniFileSettings.h"
 
+#include <atomic>
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -231,14 +233,34 @@ namespace HM
       if (sInput.IsEmpty())
          return "";
 
-      // When DPAPI protection is enabled (default) and available, store a
-      // self-describing, machine-bound envelope. If DPAPI fails for any reason
-      // fall back to Blowfish so a secret is never lost.
+      // When protection is enabled (the default) store a self-describing envelope
+      // whose prefix names the platform store that wrote it, so that a value
+      // carried to the other platform is recognised rather than fed to the wrong
+      // cipher. ETDPAPI is the storage identifier for "the platform's secret
+      // store" on both: DPAPI itself on Windows, the key file on Linux.
       if (IniFileSettings::Instance()->GetProtectStoredSecretsWithDPAPI())
       {
          String protectedValue = EnCrypt(sInput, ETDPAPI);
+#ifdef HM_PLATFORM_POSIX
+         if (!protectedValue.IsEmpty())
+            return _T("LINUX1:") + protectedValue;
+
+         // No Blowfish here. Its key is a constant in the source, so a value it
+         // writes is protected from nobody who has the binary, and a server that
+         // wrote one because the real store was unavailable would have downgraded
+         // a secret without anyone choosing that. DataProtector has already said
+         // why the store was unavailable and what to do; this says what it cost.
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6416, "Crypt::ProtectSecret",
+            "A secret was NOT stored: the stored-secret key file was unavailable (the error before this one "
+            "says why), and this build does not fall back to the legacy Blowfish scheme. Fix the key file and "
+            "enter the secret again.");
+         return "";
+#else
+         // If DPAPI fails for any reason fall back to Blowfish so a secret is
+         // never lost.
          if (!protectedValue.IsEmpty())
             return _T("DPAPI:") + protectedValue;
+#endif
       }
 
       return EnCrypt(sInput, ETBlowFish);
@@ -250,12 +272,50 @@ namespace HM
       if (sStored.IsEmpty())
          return "";
 
-      // A DPAPI envelope is self-describing; everything else is a legacy
-      // Blowfish value, so existing stored secrets keep working transparently.
+      // An envelope is self-describing; everything else is a legacy Blowfish
+      // value, so existing stored secrets keep working transparently. An envelope
+      // from the other platform is the one thing neither store can open, and it
+      // is reported by name - once, since a moved database holds several - and
+      // answered with an empty secret, which every caller treats as "re-enter".
       if (sStored.Left(6) == _T("DPAPI:"))
+      {
+#ifdef HM_PLATFORM_POSIX
+         ReportForeignEnvelopeOnce_(6414,
+            "A stored secret is a Windows DPAPI envelope, which only the Windows machine that wrote it can open: "
+            "the database or the INI was carried over from a Windows installation. The secret is intact there and "
+            "unreadable here; re-enter it on this machine and it is stored under this machine's key file. "
+            "Reported once; there may be more than one such value.");
+         return "";
+#else
          return DeCrypt(sStored.Mid(6), ETDPAPI);
+#endif
+      }
+
+      if (sStored.Left(7) == _T("LINUX1:"))
+      {
+#ifdef HM_PLATFORM_POSIX
+         return DeCrypt(sStored.Mid(7), ETDPAPI);
+#else
+         ReportForeignEnvelopeOnce_(6415,
+            "A stored secret is a LINUX1 envelope, written by a Linux installation under its key file, which "
+            "DPAPI cannot open: the database was carried over from a Linux installation. The secret is intact "
+            "there and unreadable here; re-enter it on this machine and it is stored with DPAPI. "
+            "Reported once; there may be more than one such value.");
+         return "";
+#endif
+      }
 
       return DeCrypt(sStored, ETBlowFish);
+   }
+
+   void
+   Crypt::ReportForeignEnvelopeOnce_(int errorId, const String &message)
+   {
+      static std::atomic<bool> reported(false);
+
+      bool expected = false;
+      if (reported.compare_exchange_strong(expected, true))
+         ErrorManager::Instance()->ReportError(ErrorManager::High, errorId, "Crypt::UnprotectSecret", message);
    }
 
    AnsiString
