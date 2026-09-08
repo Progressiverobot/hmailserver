@@ -4,9 +4,9 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentMessageIndex.h"
-#include ".\PersistentMessage.h"
-#include "..\BO\Message.h"
+#include "./PersistentMessageIndex.h"
+#include "./PersistentMessage.h"
+#include "../BO/Message.h"
 
 #include <algorithm>
 

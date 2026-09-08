@@ -8,7 +8,7 @@
 #include "IMAPConnection.h"
 
 #include "../Common/BO/Message.h"
-#include "../Common/MIME/Mime.h"
+#include "../Common/Mime/Mime.h"
 #include "../Common/Persistence/PersistentMessage.h"
 #include "../Common/Util/Time.h"
 

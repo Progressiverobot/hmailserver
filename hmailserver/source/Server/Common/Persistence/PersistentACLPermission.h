@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class ACLPermission;
-   enum PersistenceMode;
    class PersistentACLPermission
    {
    public:

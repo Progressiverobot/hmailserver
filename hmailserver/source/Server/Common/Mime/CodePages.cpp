@@ -50,8 +50,20 @@ namespace HM
       AddCodePage_("windows-1257", 1257);
       AddCodePage_("windows-1258", 1258);
 
+#ifdef HM_PLATFORM_POSIX
+      // The numbers themselves. CP_UTF8 and CP_UTF7 are Windows code page
+      // identifiers, and an identifier is a number rather than a behaviour: 65001
+      // and 65000 are what <winnls.h> defines them as, and what this table stores
+      // and hands to the conversion routines either way. Written out here rather
+      // than added to the platform header because these two are the only Windows
+      // code page names the tree uses by name; every other entry above is already
+      // a literal for exactly the same reason.
+      AddCodePage_("utf-8", 65001);
+      AddCodePage_("utf-7", 65000);
+#else
       AddCodePage_("utf-8", CP_UTF8);
       AddCodePage_("utf-7", CP_UTF7);
+#endif
    }
 
    void 

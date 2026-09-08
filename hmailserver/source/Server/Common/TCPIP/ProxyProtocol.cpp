@@ -365,7 +365,9 @@ namespace HM
             return false;
          }
 
-         unsigned __int64 mask = prefixLength == 0 ? 0 : (0xFFFFFFFFui64 << (32 - prefixLength)) & 0xFFFFFFFFui64;
+         // ULL rather than MSVC's ui64 suffix: both give an unsigned 64-bit
+         // constant of the same value, and only one of the two spellings is C++.
+         unsigned __int64 mask = prefixLength == 0 ? 0 : (0xFFFFFFFFULL << (32 - prefixLength)) & 0xFFFFFFFFULL;
 
          return (entryAddress.GetAddress1() & mask) == (address.GetAddress1() & mask);
       }
@@ -381,8 +383,8 @@ namespace HM
       int highBits = prefixLength > 64 ? 64 : prefixLength;
       int lowBits = prefixLength > 64 ? prefixLength - 64 : 0;
 
-      unsigned __int64 highMask = highBits == 0 ? 0 : (highBits == 64 ? 0xFFFFFFFFFFFFFFFFui64 : (0xFFFFFFFFFFFFFFFFui64 << (64 - highBits)));
-      unsigned __int64 lowMask = lowBits == 0 ? 0 : (lowBits == 64 ? 0xFFFFFFFFFFFFFFFFui64 : (0xFFFFFFFFFFFFFFFFui64 << (64 - lowBits)));
+      unsigned __int64 highMask = highBits == 0 ? 0 : (highBits == 64 ? 0xFFFFFFFFFFFFFFFFULL : (0xFFFFFFFFFFFFFFFFULL << (64 - highBits)));
+      unsigned __int64 lowMask = lowBits == 0 ? 0 : (lowBits == 64 ? 0xFFFFFFFFFFFFFFFFULL : (0xFFFFFFFFFFFFFFFFULL << (64 - lowBits)));
 
       return (entryAddress.GetAddress1() & highMask) == (address.GetAddress1() & highMask) &&
              (entryAddress.GetAddress2() & lowMask) == (address.GetAddress2() & lowMask);

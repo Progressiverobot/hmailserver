@@ -6,11 +6,11 @@
 #pragma once
 
 #include "../TCPIP/IPAddress.h"
+#include "PersistenceMode.h"
 
 namespace HM
 {
    class SecurityRange;
-   enum  PersistenceMode;
 
    class PersistentSecurityRange
    {

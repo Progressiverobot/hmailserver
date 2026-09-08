@@ -24,7 +24,7 @@
 #include "../BO/MessageRecipient.h"
 #include "../Application/IniFileSettings.h"
 #include "../Util/Unicode.h"
-#include "../Util/event.h"
+#include "../Util/Event.h"
 #include "../Util/TraceHeaderWriter.h"
 #include "../Persistence/PersistentMessage.h"
 

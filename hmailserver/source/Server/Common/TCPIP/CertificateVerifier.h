@@ -6,10 +6,10 @@
 
 #pragma once
 
+#include "SocketConstants.h"
+
 namespace HM
 {
-   enum ConnectionSecurity;
-
    class CertificateVerifier
    {
    public:

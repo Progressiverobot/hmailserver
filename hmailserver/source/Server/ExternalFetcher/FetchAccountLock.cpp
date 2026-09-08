@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\FetchAccountLock.h"
+#include "./FetchAccountLock.h"
 
-#include "..\Common\BO\FetchAccount.h"
+#include "../Common/BO/FetchAccount.h"
 #include "../Common/Persistence/PersistentFetchAccount.h"
 
 #ifdef _DEBUG

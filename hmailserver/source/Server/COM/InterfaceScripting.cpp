@@ -7,7 +7,7 @@
 #include "COMError.h"
 #include "InterfaceScripting.h"
 
-#include "..\Common\Scripting\ScriptServer.h"
+#include "../Common/Scripting/ScriptServer.h"
 
 InterfaceScripting::InterfaceScripting() :
    config_(nullptr),

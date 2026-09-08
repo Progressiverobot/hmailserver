@@ -119,7 +119,13 @@ namespace HM
             const std::string &text = value->AsString();
             if (text.empty() || text.find_first_not_of("0123456789") != std::string::npos)
                return false;
+#ifdef HM_PLATFORM_POSIX
+            // strtoll is the standard C name for _strtoi64 - the same conversion,
+            // the same arguments, the same 64 bits.
+            out = ::strtoll(text.c_str(), nullptr, 10);
+#else
             out = _strtoi64(text.c_str(), nullptr, 10);
+#endif
             return true;
          }
          return false;
@@ -229,10 +235,18 @@ namespace HM
          ASN1_OBJECT_free(object);
          if (index < 0)
             return false;
+         // Const on the way in, and cast away only at the call that will not take
+         // it. The two OpenSSLs disagree about this pair: 4.0.2, which the Windows
+         // build links, returns a const X509_EXTENSION * here and takes one in
+         // X509_EXTENSION_get_data, while 3.5 returns and takes a mutable one.
+         // Declaring the variable const is accepted by both - adding const to a
+         // mutable pointer is always allowed - and the const_cast below is what
+         // the older accessor needs; a const parameter takes the mutable pointer
+         // just as happily. Nothing here writes through it either way.
          const X509_EXTENSION *extension = X509_get_ext(certificate, index);
          if (!extension)
             return false;
-         const ASN1_OCTET_STRING *data = X509_EXTENSION_get_data(extension);
+         const ASN1_OCTET_STRING *data = X509_EXTENSION_get_data(const_cast<X509_EXTENSION *>(extension));
          if (!data)
             return false;
          out.assign((const char *) ASN1_STRING_get0_data(data), (size_t) ASN1_STRING_length(data));
@@ -359,7 +373,12 @@ namespace HM
          checkpoint.origin = lines[0];
          if (lines[1].empty() || lines[1].find_first_not_of("0123456789") != std::string::npos)
             return false;
+#ifdef HM_PLATFORM_POSIX
+         // See above: strtoll is _strtoi64 under its standard name.
+         checkpoint.size = ::strtoll(lines[1].c_str(), nullptr, 10);
+#else
          checkpoint.size = _strtoi64(lines[1].c_str(), nullptr, 10);
+#endif
          if (!SigstoreVerifier::Base64Decode(lines[2], checkpoint.root))
             return false;
 
@@ -472,7 +491,18 @@ namespace HM
    bool
    SigstoreVerifier::Sha256File(const String &path, std::vector<unsigned char> &digest, String &error)
    {
+#ifdef HM_PLATFORM_POSIX
+      // std::ifstream's constructor from a WIDE C string is a Microsoft extension;
+      // the standard one takes a narrow path, which is also what this filesystem's
+      // names are. Narrowed the way the rest of the tree narrows a String for a C
+      // API - and a path that could not be represented that way could not be
+      // opened by any other call here either, which is the failure the test just
+      // below already reports by name.
+      const AnsiString narrow_path = path;
+      std::ifstream file(narrow_path.c_str(), std::ios::binary);
+#else
       std::ifstream file(path.c_str(), std::ios::binary);
+#endif
       if (!file)
       {
          error = Formatter::Format(_T("{0} could not be opened."), path);

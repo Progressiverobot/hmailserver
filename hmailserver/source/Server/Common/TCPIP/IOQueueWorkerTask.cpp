@@ -5,7 +5,13 @@
 
 #include "StdAfx.h"
 
+// ERROR_ABANDONED_WAIT_0 below is an I/O completion port status, and completion
+// ports are a Windows kernel object; the POSIX build of Asio uses epoll and can
+// never produce that code, so neither the header nor the test for it exists
+// there. See the roadmap section "Linux and AArch64".
+#ifdef _MSC_VER
 #include <winerror.h>
+#endif
 
 #include "IOQueueWorkerTask.h"
 
@@ -52,6 +58,7 @@ namespace HM
          }
          catch (boost::system::system_error& error)
          {
+#ifdef _MSC_VER
             if (error.code().value() == ERROR_ABANDONED_WAIT_0)
             {
                // If a call to GetQueuedCompletionStatus fails because the completion port handle associated with it is
@@ -60,6 +67,7 @@ namespace HM
 
                return;
             }
+#endif
 
             throw;
          }

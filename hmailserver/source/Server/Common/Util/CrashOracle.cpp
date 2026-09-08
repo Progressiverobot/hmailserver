@@ -14,6 +14,89 @@
 #define new DEBUG_NEW
 #endif
 
+#ifdef HM_PLATFORM_POSIX
+
+namespace HM
+{
+   //------------------------------------------------------------------------//
+   // The POSIX oracle: present, honest, and armed with nothing.
+   //
+   // Both hooks the Windows oracle installs are structured exception handling -
+   // AddVectoredExceptionHandler and SetUnhandledExceptionFilter - and neither
+   // has a POSIX counterpart. A memory-safety fault arrives here as SIGSEGV,
+   // SIGBUS, SIGILL or SIGFPE, and turning those into the same records needs a
+   // signal handler written to the rules signal handlers are written to, plus a
+   // decision about the core dump the kernel writes alongside. That is a roadmap
+   // row of its own - "The Win32 tail": a core-dump policy - and not something to
+   // improvise inside a compatibility guard.
+   //
+   // So the class keeps its whole public surface and installs nothing. What it
+   // must not do is stay quiet about it: the counters below read zero on a server
+   // that is corrupting its own memory exactly as they do on a healthy one, and
+   // the only thing standing between an administrator and that misreading is the
+   // line LogInstallationStatus writes at start-up.
+   //------------------------------------------------------------------------//
+
+   CrashOracle::CrashOracle()
+   {
+
+   }
+
+   void
+   CrashOracle::Install()
+   {
+      // Nothing to install, and deliberately nothing pretended. The saying-so is
+      // LogInstallationStatus's job because Install() runs before the logging
+      // subsystem has a log mask, which is the same reason the two are separate
+      // on Windows.
+   }
+
+   void
+   CrashOracle::LogInstallationStatus()
+   {
+      // LOG_APPLICATION, not ErrorManager, for the same reason as on Windows: this
+      // runs on every start of a healthy default installation, and a diagnostic
+      // that writes to the error log on a default configuration makes the error
+      // log useless. It is still stated plainly, because the alternative is an
+      // administrator who believes faults are being recorded when none are.
+      LOG_APPLICATION(_T("Crash oracle: crash capture is not installed on this platform. Memory-safety faults are not observed, no crash record is written and no mini dump is produced; a fault ends the process and leaves only whatever core dump the operating system is configured to write. The event counters therefore stay at zero and must not be read as an absence of faults."));
+   }
+
+   void
+   CrashOracle::NotifyShutdownStarted()
+   {
+      // The flag exists on Windows only to stop the fatal path killing a process
+      // that is already stopping. No hook is installed here, so there is no
+      // escalation to hold back and nothing to remember.
+   }
+
+   long
+   CrashOracle::GetMemorySafetyEventCount()
+   {
+      // Zero because nothing counts, not because nothing happened. The start-up
+      // line above is what tells the difference; see the note at the top of this
+      // section.
+      return 0;
+   }
+
+   long
+   CrashOracle::GetFatalEventCount()
+   {
+      return 0;
+   }
+
+   String
+   CrashOracle::GetMarkerFile()
+   {
+      // Documented as empty when no writable location was found. Here there is no
+      // marker file at all, and the same empty string tells every caller - the
+      // metrics surface included - that there is nothing to read.
+      return String();
+   }
+}
+
+#else
+
 namespace HM
 {
    namespace
@@ -562,3 +645,5 @@ namespace HM
       return EXCEPTION_EXECUTE_HANDLER;
    }
 }
+
+#endif

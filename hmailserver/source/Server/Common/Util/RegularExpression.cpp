@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\regularexpression.h"
+#include "./RegularExpression.h"
 
-#include <Boost/Regex.hpp>
+#include <boost/regex.hpp>
 using namespace boost;
 
 #ifdef _DEBUG

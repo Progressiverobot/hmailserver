@@ -5,7 +5,12 @@
 
 #pragma once
 
+// The debug heap is Microsoft's C runtime, and _CrtMemState with it. Everything
+// this class does is a no-op away from a debug MSVC build, so on any other
+// platform the header is simply not read and the member is not declared.
+#if defined(_MSC_VER)
 #include <crtdbg.h>
+#endif
 
 namespace HM
 {
@@ -21,7 +26,7 @@ namespace HM
       void Report();
 
    private:
-#ifdef _DEBUG
+#if defined(_MSC_VER) && defined(_DEBUG)
        _CrtMemState start_;
 #endif
    };

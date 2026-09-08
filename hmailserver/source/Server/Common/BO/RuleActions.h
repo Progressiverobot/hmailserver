@@ -7,7 +7,7 @@
 
 #include "Collection.h"
 
-#include "..\Persistence\PersistentRuleAction.h"
+#include "../Persistence/PersistentRuleAction.h"
 
 #include "RuleAction.h"
 

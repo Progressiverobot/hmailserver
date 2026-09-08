@@ -12,7 +12,11 @@
 #include "Scheduler.h"
 #include "OutOfMemoryHandler.h"
 #include "ACLManager.h"
+// Nothing below names a Win32 status code, so the POSIX build does without the
+// Windows error header.
+#ifdef _MSC_VER
 #include <winerror.h>
+#endif
 
 #include "MessageIndexer.h"
 
@@ -345,6 +349,25 @@ namespace HM
    // Returns the name of the executable (h*.exe)
    //---------------------------------------------------------------------------()
    {
+#ifdef HM_PLATFORM_POSIX
+      // There are no module handles here, and no need for one: /proc/self/exe is
+      // a symbolic link the kernel maintains to the running program's own image,
+      // so reading it gives the same answer GetModuleFileName gives on Windows
+      // and needs no cooperation from the program. readlink does not terminate
+      // what it writes and does not report a truncation, so the buffer is one
+      // character longer than the length asked for and the terminator is written
+      // by hand.
+      char szPath[1024];
+      const ssize_t pathLength = ::readlink("/proc/self/exe", szPath, sizeof(szPath) - 1);
+
+      if (pathLength <= 0)
+         return String();
+
+      szPath[pathLength] = '\0';
+
+      String sPath(szPath);
+      return sPath;
+#else
       // A TCHAR array, not alloca(2048): the count passed to GetModuleFileName is
       // in characters, so asking for 2048 characters of a 2048 BYTE allocation
       // let it write twice the space that existed in a Unicode build.
@@ -366,6 +389,7 @@ namespace HM
 
       String sPath(szPath);
       return sPath;
+#endif
    }
 
    void
@@ -521,8 +545,8 @@ namespace HM
          // No certificate configured? Fall back to the ACME certificate if one exists.
          if (restCertificateFile.IsEmpty())
          {
-            String acmeCertificate = AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem");
-            String acmePrivateKey = AcmeClient::GetCertificateDirectory() + _T("\\privkey.pem");
+            String acmeCertificate = AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem");
+            String acmePrivateKey = AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("privkey.pem");
 
             if (FileUtilities::Exists(acmeCertificate) && FileUtilities::Exists(acmePrivateKey))
             {

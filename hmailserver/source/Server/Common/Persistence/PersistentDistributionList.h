@@ -5,11 +5,12 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 
 namespace HM
 {
    class DistributionList; 
-   enum PersistenceMode;
 
    class PersistentDistributionList
    {

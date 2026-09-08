@@ -8,7 +8,7 @@
 #include "../hMailServer/resource.h"       // main symbols
 #include "../hMailServer/hMailServer.h"
 
-#include "../common/BO/Account.h"
+#include "../Common/BO/Account.h"
 #include "COMCollection.h"
 
 namespace HM 

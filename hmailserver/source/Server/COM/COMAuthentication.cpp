@@ -5,13 +5,13 @@
 
 #include "stdafx.h"
 
-#include ".\COMAuthentication.h"
-#include "..\Common\Util\UpdateApplyToken.h"
-#include "..\Common\BO\Account.h"
-#include "..\Common\Util\PasswordValidator.h"
-#include "..\Common\Util\Totp.h"
-#include "..\Common\Util\Crypt.h"
-#include "..\Common\Application\IniFileSettings.h"
+#include "./COMAuthentication.h"
+#include "../Common/Util/UpdateApplyToken.h"
+#include "../Common/BO/Account.h"
+#include "../Common/Util/PasswordValidator.h"
+#include "../Common/Util/Totp.h"
+#include "../Common/Util/Crypt.h"
+#include "../Common/Application/IniFileSettings.h"
 
 #include "COMError.h"
 

@@ -179,6 +179,25 @@ namespace HM
          if (candidate.IsEmpty() || candidate.Compare(_T(".")) == 0)
             return true;
 
+#ifdef HM_PLATFORM_POSIX
+         // gethostname(2) is what GetComputerName is here. There is no
+         // MAX_COMPUTERNAME_LENGTH to size the buffer by - the POSIX ceiling is
+         // HOST_NAME_MAX and is larger - so 256 is used, which holds any name a
+         // host may be given, and the name is terminated by hand because
+         // gethostname is not required to terminate one that did not fit.
+         char narrowName[256];
+
+         if (::gethostname(narrowName, sizeof(narrowName) - 1) != 0)
+         {
+            // Cannot tell. Treated as NOT the local computer, for the same reason
+            // the Windows branch gives below.
+            return false;
+         }
+
+         narrowName[sizeof(narrowName) - 1] = '\0';
+
+         return candidate.CompareNoCase(String(narrowName)) == 0;
+#else
          TCHAR computerName[MAX_COMPUTERNAME_LENGTH + 1];
          DWORD length = MAX_COMPUTERNAME_LENGTH + 1;
 
@@ -192,6 +211,7 @@ namespace HM
          }
 
          return candidate.CompareNoCase(String(computerName)) == 0;
+#endif
       }
 
       // Whether hMailServer can hold this as an account address.

@@ -22,6 +22,15 @@
 #include "UpdateDownloader.h"
 #include "UpdateInstaller.h"
 #include "WebServicesServer.h"
+
+// The Win32 profile API - GetPrivateProfileString and the three calls beside
+// it - lives in kernel32 and has no POSIX equivalent, so the POSIX build
+// declares those four functions here and implements them over the INI file
+// itself in Common/Util/IniFile.cpp. The Windows build never reaches this line
+// and binds the same calls to <windows.h> as it always has.
+#ifdef HM_PLATFORM_POSIX
+#include "IniFile.h"
+#endif
 #include "../AntiSpam/QuarantineStore.h"
 #include "../BO/IMAPFolders.h"
 #include "../BO/IMAPFolder.h"
@@ -99,7 +108,13 @@
 #include "../TCPIP/SslContextInitializer.h"
 #include "../../SMTP/DeliveryQueue.h"
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -2825,7 +2840,15 @@ namespace HM
       AnsiString token = AnsiString(ApiKeyTokenPrefix) + BytesToLowerHex(secret, ApiKeySecretBytes);
       AnsiString hash = HashApiKeyToken(token);
 
+#ifdef HM_PLATFORM_POSIX
+      // explicit_bzero is SecureZeroMemory's promise on this platform: a write
+      // the compiler is not allowed to remove because the buffer is dead
+      // afterwards. A plain memset here would be optimised away and the raw key
+      // would stay on the stack of the REST worker thread.
+      ::explicit_bzero(secret, sizeof(secret));
+#else
       SecureZeroMemory(secret, sizeof(secret));
+#endif
 
       if (!IsLowerHex(hash, ApiKeyHashHexLength))
       {
@@ -2977,7 +3000,7 @@ namespace HM
    RestApiServer::HandleWebAdminPage_()
    {
       String pagePath = FileUtilities::Combine(
-         IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin\\index.html"));
+         FileUtilities::Combine(IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin")), _T("index.html"));
 
       // Read as the bytes on disk. The page is UTF-8 and carries characters
       // outside the system code page in its own markup (the navigation glyphs);
@@ -2986,7 +3009,15 @@ namespace HM
       AnsiString body;
       if (FileUtilities::Exists(pagePath))
       {
+#ifdef HM_PLATFORM_POSIX
+         // MSVC's <fstream> has a constructor taking a wide path; libstdc++ has
+         // none, because a file name here is bytes. Narrowed the way the rest of
+         // the tree narrows a String for a C API.
+         const AnsiString narrowPagePath = pagePath.c_str();
+         std::ifstream stream(narrowPagePath.c_str(), std::ios::binary);
+#else
          std::ifstream stream(pagePath.c_str(), std::ios::binary);
+#endif
          std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
          body = bytes.c_str();
          if (body.GetLength() != bytes.size())
@@ -4035,7 +4066,13 @@ namespace HM
       // request thread is the single REST worker. 512 KB holds 2000 lines of
       // anything this logger writes.
       const std::streamoff MaxBytes = 512 * 1024;
+#ifdef HM_PLATFORM_POSIX
+      // As above: a narrow path, because libstdc++ has no wide-path constructor.
+      const AnsiString narrowPath = path.c_str();
+      std::ifstream stream(narrowPath.c_str(), std::ios::binary);
+#else
       std::ifstream stream(path.c_str(), std::ios::binary);
+#endif
       if (!stream)
          return BuildResponse_(404, "{\"error\":\"no such log file\"}");
       // The backup log is written as UTF-16 with a byte-order mark; the others
@@ -6829,14 +6866,14 @@ namespace HM
          if (type.IsEmpty() || type.Find(_T("/")) < 0 || type.Find(_T("\r")) >= 0 || type.Find(_T("\n")) >= 0 || type.GetLength() > 100)
             type = _T("application/octet-stream");
 
-         String directory = IniFileSettings::Instance()->GetTempDirectory() + _T("\\") + GUIDCreator::GetGUID();
+         String directory = IniFileSettings::Instance()->GetTempDirectory() + FileUtilities::PathSeparator + GUIDCreator::GetGUID();
          if (!FileUtilities::CreateDirectory(directory))
          {
             error = "{\"error\":\"the attachment could not be written\"}";
             return 500;
          }
 
-         String path = directory + _T("\\") + name;
+         String path = directory + FileUtilities::PathSeparator + name;
          bool added = FileUtilities::WriteToFile(path, bytes) && messageData.GetAttachments()->Add(path, type);
 
          FileUtilities::DeleteDirectory(directory, true);
@@ -7793,7 +7830,7 @@ namespace HM
       }
 
       if (count == 0)
-         appendCertificate(_T("ACME (automatic)"), AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem"));
+         appendCertificate(_T("ACME (automatic)"), AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"));
 
       AnsiString body;
       body.Format("{\"host\":\"%hs\",\"count\":%d,\"records\":[%hs]}",

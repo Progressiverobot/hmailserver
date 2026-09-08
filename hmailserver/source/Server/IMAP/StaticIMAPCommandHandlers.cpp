@@ -20,7 +20,7 @@
 #include "IMAPCommandStatus.h"
 #include "IMAPCommandRename.h"
 #include "IMAPCommandList.h"
-#include "IMAPCommandLsub.h"
+#include "IMAPCommandLSUB.h"
 #include "IMAPCommandCopy.h"
 #include "IMAPCommandMove.h"
 #include "IMAPCommandID.h"

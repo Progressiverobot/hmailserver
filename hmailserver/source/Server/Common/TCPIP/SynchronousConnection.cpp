@@ -7,8 +7,8 @@
 
 #include "SynchronousConnection.h"
 #include "../Util/ByteBuffer.h"
-#include <Boost/optional.hpp>
-#include <Boost/system/error_code.hpp>
+#include <boost/optional.hpp>
+#include <boost/system/error_code.hpp>
 
 using namespace boost::system;
 

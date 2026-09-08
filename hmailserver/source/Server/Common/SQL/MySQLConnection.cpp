@@ -10,7 +10,7 @@
 #include "DatabaseSettings.h"
 #include "../Application/IniFileSettings.h"
 #include "Macros/MySQLMacroExpander.h"
-#include "..\Util\Unicode.h"
+#include "../Util/Unicode.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -81,11 +81,22 @@ namespace HM
          // user has configured, instead of failing with "Authentication plugin '<x>'
          // cannot be loaded". The default auth plugin is intentionally NOT forced, so
          // the client negotiates whatever the account actually uses.
+#ifndef HM_PLATFORM_POSIX
          if (MySQLInterface::Instance()->p_mysql_options != 0)
          {
             AnsiString sPluginDir = Unicode::ToANSI(MySQLInterface::Instance()->GetLibraryDirectory() + _T("\\plugin"));
             MySQLInterface::Instance()->p_mysql_options(dbconn_, HM_MYSQL_PLUGIN_DIR, sPluginDir.c_str());
          }
+#else
+         // Nothing is pointed anywhere on POSIX, and that is the whole of the
+         // POSIX behaviour rather than an omission. The plugin directory above
+         // exists because Windows carries its own copy of the client in the Bin
+         // directory with the plugins in a sub-folder beside it; here the client
+         // is a packaged shared object whose plugin directory was compiled into
+         // it by the packager and is already right. Overriding it with a path
+         // built from a Windows separator would take the authentication plugins
+         // away, which is the failure this branch exists to avoid.
+#endif
 
          // The bundled client is MariaDB Connector/C 3.4, which negotiates TLS and
          // refuses to continue against a server that has none: "SSL is required, but
@@ -276,7 +287,12 @@ namespace HM
             MySQLInterface::Instance()->p_mysql_free_result(pRes);
 
          // Fetch insert id.
-         if (iInsertID > 0)
+         //
+         // iInsertID is a pointer and this is its null check. "> 0" is an ORDERED
+         // comparison against a null pointer constant, which MSVC accepts and a
+         // conforming compiler rejects; != nullptr is the same test spelt in a way
+         // both accept, and answers the same for every value a caller can pass.
+         if (iInsertID != nullptr)
          {
             *iInsertID = MySQLInterface::Instance()->p_mysql_insert_id(dbconn_);
          }
@@ -404,7 +420,7 @@ namespace HM
       UpdatePassword_();
 
       // Run the scripts file
-      String sScriptsFile = IniFileSettings::Instance()->GetDBScriptDirectory() + "\\Internal MySQL\\HMS4.3-MySQL4.1.18.sql";
+      String sScriptsFile = FileUtilities::Combine(FileUtilities::Combine(IniFileSettings::Instance()->GetDBScriptDirectory(), "Internal MySQL"), "HMS4.3-MySQL4.1.18.sql");
       RunScriptFile_(sScriptsFile);
 
       RunCommand_("FLUSH PRIVILEGES");

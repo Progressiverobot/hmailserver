@@ -7,10 +7,27 @@
 
 #include "../Util/Time.h"
 #include "../Util/File.h"
+#include "../Util/FileUtilities.h"
 #include "../Util/OtelLogExporter.h"
 
 #include "NcsaLogFormatter.h"
 #include "SqlLogDevice.h"
+
+#ifdef HM_PLATFORM_POSIX
+// The system log - the journal on a systemd host - for the one message in this
+// file that cannot be written through the logger itself. See
+// ReportWriteFailure_ below for why that message exists at all.
+//
+// <syslog.h> is deliberately NOT included. It defines LOG_DEBUG, LOG_INFO and
+// LOG_WARNING as small integers, and this tree's Logger.h - which reaches every
+// translation unit through the precompiled header - defines LOG_DEBUG as a
+// function-like macro that is used a few dozen lines below. The two definitions
+// cannot live in one translation unit, so the single function and the single
+// priority that are wanted are declared here instead. LOG_ERR is 3 in every
+// implementation: the syslog specification fixes the value, not the platform.
+extern "C" void syslog(int priority, const char *format, ...);
+static const int kSyslogPriorityError = 3;
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -471,37 +488,37 @@ namespace HM
       switch (lt)
       {
       case Normal:
-         sFilename.Format(_T("%s\\hmailserver_%s.log"), log_dir_.c_str(), theTime.c_str());
+         sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_") + theTime + _T(".log");
          break;
       case Error:
-         sFilename.Format(_T("%s\\ERROR_hmailserver_%s.log"), log_dir_.c_str(), theTime.c_str());
+         sFilename = log_dir_ + FileUtilities::PathSeparator + _T("ERROR_hmailserver_") + theTime + _T(".log");
          break;
       case AWStats:
-         sFilename.Format(_T("%s\\hmailserver_awstats.log"), log_dir_.c_str());
+         sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_awstats.log");
          break;
       case Backup:
-         sFilename.Format(_T("%s\\hmailserver_backup.log"), log_dir_.c_str());
+         sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_backup.log");
          break;
       case Events:
-         sFilename.Format(_T("%s\\hmailserver_events.log"), log_dir_.c_str());
+         sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_events.log");
          break;
       case IMAP:
          if (sep_svc_logs_) 
-            sFilename.Format(_T("%s\\hmailserver_IMAP_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_IMAP_") + theTime + _T(".log");
          else
-            sFilename.Format(_T("%s\\hmailserver_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_") + theTime + _T(".log");
          break;
       case POP3:
          if (sep_svc_logs_) 
-            sFilename.Format(_T("%s\\hmailserver_POP3_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_POP3_") + theTime + _T(".log");
          else
-            sFilename.Format(_T("%s\\hmailserver_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_") + theTime + _T(".log");
          break;
       case SMTP:
          if (sep_svc_logs_) 
-            sFilename.Format(_T("%s\\hmailserver_SMTP_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_SMTP_") + theTime + _T(".log");
          else
-            sFilename.Format(_T("%s\\hmailserver_%s.log"), log_dir_.c_str(), theTime.c_str());
+            sFilename = log_dir_ + FileUtilities::PathSeparator + _T("hmailserver_") + theTime + _T(".log");
          break;
       }
 
@@ -749,6 +766,16 @@ namespace HM
 
          OutputDebugString(message);
 
+#ifdef HM_PLATFORM_POSIX
+         // The same argument as the Windows branch, with the sink this platform
+         // keeps for the purpose: a log line that cannot go in hMailServer's own
+         // log goes in the system's, where an operator will find it beside
+         // whatever else was failing at the time. openlog is not called first
+         // because syslog opens the connection itself, under this program's own
+         // name, and this runs once per process.
+         const AnsiString narrowMessage = message.c_str();
+         ::syslog(kSyslogPriorityError, "%s", narrowMessage.c_str());
+#else
          HANDLE eventSource = RegisterEventSource(NULL, _T("hMailServer"));
 
          if (eventSource != NULL)
@@ -757,6 +784,7 @@ namespace HM
             ReportEvent(eventSource, EVENTLOG_ERROR_TYPE, 0, 0, NULL, 1, 0, strings, NULL);
             DeregisterEventSource(eventSource);
          }
+#endif
       });
    }
 

@@ -7,8 +7,8 @@
 
 #include "InterfaceSSLCertificates.h"
 
-#include "..\Common\BO\SSLCertificate.h"
-#include "..\Common\BO\SSLCertificates.h"
+#include "../Common/BO/SSLCertificate.h"
+#include "../Common/BO/SSLCertificates.h"
 
 #include "InterfaceSSLCertificate.h"
 

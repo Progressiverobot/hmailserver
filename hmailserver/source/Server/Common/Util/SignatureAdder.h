@@ -8,6 +8,7 @@
 
 namespace HM
 {
+   class Account;
    class Message;
    class Domain;
    class MessageData;

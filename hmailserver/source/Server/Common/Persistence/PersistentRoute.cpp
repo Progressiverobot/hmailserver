@@ -110,7 +110,12 @@ namespace HM
    PersistentRoute::ReadObject(std::shared_ptr<Route> pRoute, long lID)
    {
       SQLCommand command("select * from hm_routes where routeid = @ROUTEID");
-      command.AddParameter("@ROUTEID", lID);
+      // lID is a long. AddParameter is overloaded on int, unsigned int and
+      // __int64, and the overload decides the type of the SQL parameter that is
+      // bound, so the choice is not cosmetic. MSVC binds a long to the int overload,
+      // because long and int are the same 32-bit type on Windows; clang finds all
+      // three equally distant. The cast names the overload Windows already selects.
+      command.AddParameter("@ROUTEID", (int) lID);
 
       std::shared_ptr<DALRecordset> pRS = Application::Instance()->GetDBManager()->OpenRecordset(command);
       if (!pRS)

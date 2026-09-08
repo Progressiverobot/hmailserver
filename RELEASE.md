@@ -84,6 +84,21 @@ already cost a release cycle or nearly shipped a defect.
    can check the published binary came from the published source. Both
    builds restart the service, so do this before step 9, never after.
 
+   The Linux packages keep the same promise by a different mechanism, and
+   what is proven is narrower, so it is stated narrowly. `CMakeLists.txt`
+   passes `-ffile-prefix-map=<source>=.` so no absolute path reaches the
+   binary, and the *Linux build* workflow exports `SOURCE_DATE_EPOCH` from
+   the tagged commit's own date, which is what `__DATE__`, the archiver,
+   `dpkg-deb` and `rpmbuild` stamp instead of the clock. Two builds of the
+   same tag on the same runner image therefore produce the same `hmailserver`
+   binary. What is *not* pinned is the image: `ubuntu-latest` moves, and a
+   compiler or a Boost that moved between two runs changes the binary
+   legitimately. The workflow log records the versions it built with, and the
+   release notes say "reproducible on the runner image of the day" and give
+   the binary's SHA-256 from that log, rather than claiming what the MSVC line
+   above can claim. The package containers are not compared at all yet; the
+   roadmap's CI row says so.
+
 8b. **Full regression suite on the assertion build, first.** Build with
    `build\build.ps1 -Configuration Release -Asserts` - the same source, with
    every `HM_ASSERT` kept and a violated one reported as HM6364 in the ERROR
@@ -153,11 +168,33 @@ already cost a release cycle or nearly shipped a defect.
     ```
     gh release create vX.Y.Z <installer> --draft --prerelease \
        --title "..." --notes-file <notes>
+    gh run list --workflow "Linux build" --branch vX.Y.Z   # wait for the tag's run to succeed
+    gh run download <run-id> --pattern 'linux-packages-*' --dir linux-packages
+    gh release upload vX.Y.Z linux-packages/*/*.deb linux-packages/*/*.rpm
     gh workflow run "SBOM" -f release_tag=vX.Y.Z          # SPDX + CycloneDX
     gh workflow run "Sign release artefacts" -f tag=vX.Y.Z  # LAST: signs what is attached
-    gh release view vX.Y.Z --json assets                   # expect installer + 2 SBOMs + a .cosign.bundle beside each (six assets)
+    gh release view vX.Y.Z --json assets                   # expect installer + 4 Linux packages + 2 SBOMs + a .cosign.bundle beside each (fourteen assets)
     gh release edit vX.Y.Z --draft=false                   # publish, now complete
     ```
+
+    **Linux packages: one release, every platform.** Pushing the tag started
+    the *Linux build* workflow, whose package jobs keep one `.deb` and one
+    `.rpm` per architecture as run artefacts for fourteen days. They join the
+    draft beside the installer, BEFORE the SBOM and signing steps, because
+    both act on whatever is attached when they run. Their names are as fixed
+    as the installer's: `hmailserver_<version>_amd64.deb`,
+    `hmailserver_<version>_arm64.deb`, `hmailserver-<version>-1.x86_64.rpm`
+    and `hmailserver-<version>-1.aarch64.rpm`. A Linux server's update checker
+    builds the one its own package manager and architecture would install and
+    matches it exactly, as a Windows server does the installer, so CPack's
+    names are uploaded as they are and never tidied. The signing workflow
+    lists which platforms a release carries and *warns* about a missing Linux
+    set rather than failing, because the Windows installer is what every
+    server in the field is waiting for and a Linux packaging failure must not
+    hold it back; a release that ships without them is a Windows-only release
+    and its notes say so. The PKGBUILD and the AppImage are not release
+    assets: the first is built by the user's own machine from the tag, the
+    second is a try-it-out artefact for a daemon and is labelled as one.
 
     **The installer's name is not cosmetic.** It must be exactly
     `hMailServer-<tag without the leading v>-x64.exe`, with its `.cosign.bundle`

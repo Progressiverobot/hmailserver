@@ -21,9 +21,23 @@
 #include "../TCPIP/IPAddress.h"
 #include "Time.h"
 #include "Utilities.h"
-#include "Parsing\AddresslistParser.h"
+#include "Parsing/AddresslistParser.h"
 #include "../../IMAP/IMAPSimpleCommandParser.h"
 #include "BlowFish.h"
+
+#ifdef HM_PLATFORM_POSIX
+namespace
+{
+   // _mkgmtime64 is Microsoft's name for the inverse of gmtime - a struct tm
+   // read as UTC, where mktime would read it as local time - with a 64-bit
+   // result. POSIX spells the same function timegm, and its time_t is already
+   // 64 bits here, so the cast loses nothing.
+   inline long long _mkgmtime64(struct tm *parts)
+   {
+      return (long long) ::timegm(parts);
+   }
+}
+#endif
 #include "Crypt.h"
 #include "DataProtector.h"
 #include "SRS.h"
@@ -380,7 +394,7 @@ namespace HM
             "IHt+CXzwoEOtys7tKUt6k5y/Qftj4xirfGPZCy00rzX/\n"
             "-----END CERTIFICATE-----\n";
 
-         String path = IniFileSettings::Instance()->GetTempDirectory() + _T("\\tlsa-fixture.pem");
+         String path = IniFileSettings::Instance()->GetTempDirectory() + FileUtilities::PathSeparator + _T("tlsa-fixture.pem");
          if (!FileUtilities::WriteToFile(path, AnsiString(fixture)))
             throw 0;
 
@@ -1134,8 +1148,8 @@ namespace HM
    ClassTester::LoadSettings_()
    {
       String sAppPath = Utilities::GetBinDirectory();
-      if (sAppPath.Right(1) != _T("\\"))
-         sAppPath += _T("\\");
+      if (sAppPath.Right(1) != FileUtilities::PathSeparator)
+         sAppPath += FileUtilities::PathSeparator;
 
       String sConfigFile = sAppPath + "test_config.xml";
       String sTestSpec = FileUtilities::ReadCompleteTextFile(sConfigFile);

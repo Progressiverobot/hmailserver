@@ -14,6 +14,12 @@
 #include "../Util/FileUtilities.h"
 #include "../Util/ServerStatus.h"
 
+#ifdef HM_PLATFORM_POSIX
+// The free-space reading; see CheckDestinationCapacity_ for why it is this and
+// not GetDiskFreeSpaceEx on a POSIX build.
+#include "../Util/DiskSpace.h"
+#endif
+
 #include <boost/filesystem.hpp>
 
 #ifdef _DEBUG
@@ -398,6 +404,71 @@ namespace HM
       return true;
    }
 
+#ifdef HM_PLATFORM_POSIX
+   namespace
+   {
+      // The POSIX answer to GetVolumePathName: the mount point that contains the
+      // path.
+      //
+      // There is no drive letter to look up here, so the question is put to the
+      // filesystem itself. stat reports the device a name lives on, and the mount
+      // point is the highest ancestor still on that same device - which is the
+      // definition of a mount point rather than an approximation of one. A path
+      // that does not exist yet is resolved from its nearest existing ancestor,
+      // which is what GetVolumePathName does with a path whose leaf is missing.
+      //
+      // Returns false when nothing along the path can be stat'ed at all. The
+      // caller then does exactly what it does when GetVolumePathName fails on
+      // Windows: it says nothing rather than guessing, because a wrong "these are
+      // the same volume" warning would send an administrator to move a directory
+      // that did not need moving.
+      bool GetVolumePathPosix_(const String &path, String &volume)
+      {
+         AnsiString candidate = AnsiString(path);
+
+         if (candidate.empty())
+            return false;
+
+         struct stat info;
+
+         while (::stat(candidate.c_str(), &info) != 0)
+         {
+            if (::strcmp(candidate.c_str(), "/") == 0)
+               return false;
+
+            const size_t separator = candidate.rfind('/');
+
+            if (separator == std::string::npos)
+               return false;
+
+            candidate = separator == 0 ? AnsiString("/") : AnsiString(candidate.substr(0, separator).c_str());
+         }
+
+         const dev_t device = info.st_dev;
+
+         while (::strcmp(candidate.c_str(), "/") != 0)
+         {
+            const size_t separator = candidate.rfind('/');
+
+            if (separator == std::string::npos)
+               break;
+
+            AnsiString parent = separator == 0 ? AnsiString("/") : AnsiString(candidate.substr(0, separator).c_str());
+
+            struct stat parent_info;
+
+            if (::stat(parent.c_str(), &parent_info) != 0 || parent_info.st_dev != device)
+               break;
+
+            candidate = parent;
+         }
+
+         volume = String(candidate.c_str());
+         return true;
+      }
+   }
+#endif
+
    void
    BackupScheduleTask::CheckDestinationCapacity_(const String &destination, unsigned __int64 tick)
    //---------------------------------------------------------------------------()
@@ -433,10 +504,26 @@ namespace HM
 
       if (!free_space_warning_reported_)
       {
+#ifdef HM_PLATFORM_POSIX
+         // GetDiskFreeSpaceEx is Win32 and has no POSIX twin, but the reading it
+         // takes does have one, and this tree already owns it:
+         // DiskSpace::GetFreeBytesAvailable is that same call on Windows and
+         // statvfs here, and it answers with the same "available to this process"
+         // figure that the first out parameter below carries.
+         //
+         // The local is given the shape of the Win32 union rather than a plain
+         // integer so that the body of the check underneath is one piece of code
+         // on both platforms. QuadPart is the only member this file ever reads.
+         struct { unsigned __int64 QuadPart; } freeBytesAvailable;
+         freeBytesAvailable.QuadPart = 0;
+
+         if (DiskSpace::GetFreeBytesAvailable(destination, freeBytesAvailable.QuadPart, nullptr))
+#else
          ULARGE_INTEGER freeBytesAvailable;
          freeBytesAvailable.QuadPart = 0;
 
          if (GetDiskFreeSpaceEx(destination.c_str(), &freeBytesAvailable, nullptr, nullptr))
+#endif
          {
             std::vector<BackupArchive> archives = BackupRetention::ListArchives(destination);
 
@@ -478,6 +565,23 @@ namespace HM
       if (dataDirectory.IsEmpty())
          return;
 
+#ifdef HM_PLATFORM_POSIX
+      // Same two questions, answered by GetVolumePathPosix_ above. The results are
+      // held in Strings rather than in fixed buffers because a mount point here is
+      // an ordinary path with no MAX_PATH about it; the comparison and the message
+      // underneath are then the same code on both platforms.
+      String destinationVolumeText;
+      String dataVolumeText;
+
+      if (!GetVolumePathPosix_(destination, destinationVolumeText))
+         return;
+
+      if (!GetVolumePathPosix_(dataDirectory, dataVolumeText))
+         return;
+
+      const wchar_t *destinationVolume = destinationVolumeText.c_str();
+      const wchar_t *dataVolume = dataVolumeText.c_str();
+#else
       TCHAR destinationVolume[MAX_PATH + 1];
       TCHAR dataVolume[MAX_PATH + 1];
 
@@ -486,6 +590,7 @@ namespace HM
 
       if (!GetVolumePathName(dataDirectory.c_str(), dataVolume, MAX_PATH))
          return;
+#endif
 
       if (String(destinationVolume).CompareNoCase(dataVolume) != 0)
          return;

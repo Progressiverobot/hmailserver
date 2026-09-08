@@ -87,11 +87,31 @@ namespace HM
    int
    Time::GetUTCRelationMinutes()
    {
+      long lMinutes = 0;
+
+#ifdef HM_PLATFORM_POSIX
+      // tm_gmtoff is already the number this function returns: seconds EAST of
+      // UTC, for the moment being asked about, with any daylight saving in force
+      // at that moment already applied. So there is no standard-versus-daylight
+      // choice to make and no sign to flip - the *-1 on the Windows side exists
+      // only because GetTimeZoneInformation reports the bias the other way round.
+      //
+      // The question is asked about "now" for the same reason it is on Windows:
+      // the answer changes twice a year and the caller is stamping a message with
+      // it. A localtime_r that fails leaves the offset at zero, which reads as
+      // UTC - the same thing the Windows branch produces when the switch below
+      // matches nothing.
+      time_t now = ::time(nullptr);
+      struct tm local_parts;
+
+      if (::localtime_r(&now, &local_parts) != nullptr)
+         lMinutes = (long) (local_parts.tm_gmtoff / 60);
+
+      return lMinutes;
+#else
       // GetTimeZoneInformation returns UTC's
       // relation to us. But we need to produce
       // our relation to UTC. Therefore the *-1 below.
-
-      long lMinutes = 0;
 
       TIME_ZONE_INFORMATION tzi;
       switch (GetTimeZoneInformation(&tzi))
@@ -107,6 +127,7 @@ namespace HM
       lMinutes *= -1;
 
       return lMinutes;
+#endif
    }
 
    String

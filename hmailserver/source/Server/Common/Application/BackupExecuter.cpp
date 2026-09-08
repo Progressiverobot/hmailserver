@@ -8,19 +8,26 @@
 #include "BackupExecuter.h"
 #include "Backup.h"
 
-#include "..\Util\Utilities.h"
-#include "..\Util\Time.h"
-#include "..\BO\Domains.h"
-#include "..\BO\Domain.h"
-#include "..\BO\IMAPFolders.h"
-#include "..\BO\Accounts.h"
-#include "..\BO\Aliases.h"
-#include "..\BO\DomainAliases.h"
-#include "..\BO\DistributionLists.h"
+#include "../Util/Utilities.h"
+#include "../Util/FileUtilities.h"
+#include "../Util/Time.h"
+#include "../BO/Domains.h"
+#include "../BO/Domain.h"
+#include "../BO/IMAPFolders.h"
+#include "../BO/Accounts.h"
+#include "../BO/Aliases.h"
+#include "../BO/DomainAliases.h"
+#include "../BO/DistributionLists.h"
 
-#include "..\Persistence\PersistentMessage.h"
-#include "..\Util\Compression.h"
-#include "..\Util\ServiceManager.h"
+#include "../Persistence/PersistentMessage.h"
+#include "../Util/Compression.h"
+// ServiceManager wraps the Windows service control manager, which the roadmap
+// section "Linux and AArch64" leaves out of the POSIX build entirely - systemd
+// owns that job there. Nothing below actually uses it, so the include simply
+// goes away on Linux.
+#ifdef _MSC_VER
+#include "../Util/ServiceManager.h"
+#endif
 
 #include "BackupManager.h"
 #include "BackupRetention.h"
@@ -28,7 +35,7 @@
 #include "ACLManager.h"
 #include "Reinitializator.h"
 
-#include "..\SQL\DatabaseUnavailableMarker.h"
+#include "../SQL/DatabaseUnavailableMarker.h"
 
 #include "../../IMAP/IMAPConfiguration.h"
 
@@ -439,7 +446,7 @@ namespace HM
    BackupExecuter::LoadSettings_()
    {
       destination_ = Configuration::Instance()->GetBackupDestination();
-      if (destination_.Right(1) == _T("\\"))
+      if (destination_.Right(1) == FileUtilities::PathSeparator)
          destination_ = destination_.Left(destination_.GetLength() - 1);
 
       backup_mode_ = Configuration::Instance()->GetBackupOptions();
@@ -522,8 +529,7 @@ namespace HM
 
       // Generate name for zip file. We always create zip
       // file
-      String sZipFile;
-      sZipFile.Format(_T("%s\\HMBackup %s.7z"), destination_.c_str(), sTime.c_str());
+      String sZipFile = destination_ + FileUtilities::PathSeparator + _T("HMBackup ") + sTime + _T(".7z");
 
       // Whether the archive already existed before this run touched it. Nothing
       // should be able to make that true - the name carries the local time to the
@@ -533,12 +539,11 @@ namespace HM
       // somebody's backup.
       bool zipExistedBeforeThisRun = FileUtilities::Exists(sZipFile);
 
-      String sXMLFile;
-      sXMLFile.Format(_T("%s\\hMailServerBackup.xml"), destination_.c_str());
+      String sXMLFile = destination_ + FileUtilities::PathSeparator + _T("hMailServerBackup.xml");
 
       // The name of the backup directory that
       // contains all the data files.
-      String sDataBackupDir = destination_ + "\\DataBackup";
+      String sDataBackupDir = destination_ + FileUtilities::PathSeparator + "DataBackup";
 
       // Backup all properties.
       XDoc oDoc;
@@ -590,7 +595,13 @@ namespace HM
          if (backup_mode_ & Backup::BOCompression)
          {
             pMessageFile->AppendAttr(_T("Format"), _T("7z"));
-            pMessageFile->AppendAttr(_T("Size"), StringParser::IntToString(FileUtilities::FileSize(sZipFile)));
+            // FileSize returns long, and IntToString has an int, an unsigned int and
+            // an __int64 overload - three integral conversions of equal rank, so the
+            // call is ambiguous to a conforming compiler and only MSVC's rule that
+            // int and long convert trivially picks one. The cast names the overload
+            // MSVC picks, IntToString(int), and loses nothing: FileSize saturates at
+            // LONG_MAX and never returns a negative.
+            pMessageFile->AppendAttr(_T("Size"), StringParser::IntToString((int) FileUtilities::FileSize(sZipFile)));
          }
          else
          {
@@ -658,7 +669,7 @@ namespace HM
          // successful backup.
          if (backup_mode_ & Backup::BOMessages)
          {
-            if (!oComp.AddDirectory(sZipFile, sDataBackupDir + "\\"))
+            if (!oComp.AddDirectory(sZipFile, sDataBackupDir + FileUtilities::PathSeparator))
             {
                DiscardIncompleteArchive_(sZipFile, zipExistedBeforeThisRun);
 

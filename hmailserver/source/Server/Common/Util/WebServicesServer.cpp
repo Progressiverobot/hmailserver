@@ -23,7 +23,13 @@
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
 
 #include <cstring>
 
@@ -434,8 +440,8 @@ namespace HM
          // Fall back to the ACME certificate when none is configured.
          if (certificateFile.IsEmpty() || privateKeyFile.IsEmpty())
          {
-            String acmeCertificate = AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem");
-            String acmeKey = AcmeClient::GetCertificateDirectory() + _T("\\privkey.pem");
+            String acmeCertificate = AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem");
+            String acmeKey = AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("privkey.pem");
 
             if (FileUtilities::Exists(acmeCertificate) && FileUtilities::Exists(acmeKey))
             {

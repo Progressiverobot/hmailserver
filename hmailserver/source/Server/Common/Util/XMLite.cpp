@@ -15,6 +15,30 @@
 #include <sstream>
 #include <string>
 
+#ifdef HM_PLATFORM_POSIX
+#include <cwctype>
+
+// Three Microsoft C runtime names, spelled for this platform.
+//
+// _istspace, _tcspbrk and _tcsnicmp are the TCHAR-generic family, and this
+// program is built UNICODE, so they ARE iswspace, wcspbrk and wcsncasecmp - the
+// same functions under Microsoft's names. There are ten uses of them below and
+// none anywhere else in the tree, which is why they are given a shape here
+// rather than in the platform header.
+//
+// Macros rather than inline functions, and deliberately: were the platform layer
+// ever to declare these names, a file-local function of the same name would make
+// every call site below ambiguous, whereas a macro expands before lookup happens
+// and the two cannot disagree - they are the same call either way.
+//
+// The cast on _tcspbrk is for glibc's const-correct overload pair, which answers
+// a const pointer when handed one. The callers here assign to TCHAR*, which is
+// what Microsoft's own declaration gives them.
+#define _istspace(character)          ::iswspace((wint_t) (character))
+#define _tcspbrk(text, separators)    ((wchar_t *) ::wcspbrk((text), (separators)))
+#define _tcsnicmp(left, right, count) ::wcsncasecmp((left), (right), (count))
+#endif
+
 static const TCHAR chXMLTagOpen     = '<';
 static const TCHAR chXMLTagClose = '>';
 static const TCHAR chXMLTagPre   = '/';
@@ -1210,10 +1234,24 @@ HM::String _tagXMLNode::GetText( LPDISP_OPT opt /*= &optDefault*/ )
 {
    std::ostringstream os;
 
+   // (const void *) on every insertion below, and it changes nothing: os is a
+   // NARROW stream and LPCTSTR is a wide pointer, so the overload MSVC has always
+   // selected here is basic_ostream<char>::operator<<(const void *) - it writes
+   // the ADDRESS of the string, not the string. C++20 deletes the wide-pointer
+   // overload rather than letting it decay that way, which is what a conforming
+   // compiler now reports; naming the pointer overload keeps both compilers
+   // choosing exactly what MSVC chooses today.
+   //
+   // That behaviour is a defect - this function returns a list of hex addresses -
+   // but it is a PRE-EXISTING defect and it is not this port's to change: fixing
+   // it means a wide stream and a different return value on Windows. Nothing in
+   // the server calls _tagXMLNode::GetText (only XMLite's own GetTextByPath does),
+   // which is why it has never been noticed. It is written down here so that
+   // whoever needs the function finds the explanation rather than the symptom.
    if( type == XNODE_DOC )
    {
       for( unsigned int i = 0 ; i < childs.size(); i++ )
-         os << (LPCTSTR)childs[i]->GetText( opt );
+         os << (const void *)(LPCTSTR)childs[i]->GetText( opt );
    }
    else
    if( type == XNODE_PI )
@@ -1228,7 +1266,7 @@ HM::String _tagXMLNode::GetText( LPDISP_OPT opt /*= &optDefault*/ )
    else
    if( type == XNODE_CDATA )
    {
-      os << (LPCTSTR)value;
+      os << (const void *)(LPCTSTR)value;
    }
    else
    if( type == XNODE_ELEMENT )
@@ -1241,10 +1279,10 @@ HM::String _tagXMLNode::GetText( LPDISP_OPT opt /*= &optDefault*/ )
       {
          // childs text
          for( unsigned int i = 0 ; i < childs.size(); i++ )
-            os << (LPCTSTR)childs[i]->GetText();
+            os << (const void *)(LPCTSTR)childs[i]->GetText();
          
          // Text Value
-         os << (LPCTSTR)(opt->reference_value&&opt->entitys?opt->entitys->Entity2Ref(value):value);
+         os << (const void *)(LPCTSTR)(opt->reference_value&&opt->entitys?opt->entitys->Entity2Ref(value):value);
       }
    }
    

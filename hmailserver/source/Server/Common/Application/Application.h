@@ -138,6 +138,11 @@ namespace HM
 
       const String name_lookup_queue_;
 
-      long unique_id_;
+      // LONG, not long, because GetUniqueID hands its address to
+      // InterlockedIncrement, whose parameter is LONG volatile *. On Windows
+      // LONG is a typedef for long and this is the same declaration it has
+      // always been; elsewhere long is 64 bits and the counter would be the one
+      // width the interlocked call cannot take.
+      LONG unique_id_;
    };
 }

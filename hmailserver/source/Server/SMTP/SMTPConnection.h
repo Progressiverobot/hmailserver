@@ -7,7 +7,7 @@
 #pragma once
 
 
-#include "../common/TCPIP/TCPConnection.h"
+#include "../Common/TCPIP/TCPConnection.h"
 #include "../Common/Util/RateLimiter.h"
 
 #include "RecipientParser.h"

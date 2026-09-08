@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "TestIPV6.h"
+#include "TestIPv6.h"
 
 #include "../TCPIP/TCPServer.h"
 #include "../../SMTP/SMTPConnection.h"

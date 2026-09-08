@@ -8,9 +8,9 @@
 #include "IMAPConnection.h"
 #include "IMAPSimpleCommandParser.h"
 
-#include "../common/Util/AccountLogon.h"
-#include "../common/BO/Account.h"
-#include "../common/BO/SecurityRange.h"
+#include "../Common/Util/AccountLogon.h"
+#include "../Common/BO/Account.h"
+#include "../Common/BO/SecurityRange.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

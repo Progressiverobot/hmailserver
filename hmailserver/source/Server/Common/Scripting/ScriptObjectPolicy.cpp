@@ -13,6 +13,11 @@
 #define new DEBUG_NEW
 #endif
 
+// Windows only; see the note on the class in ScriptObjectPolicy.h. The policy is
+// asked its question by an ActiveX script engine about a COM class, and neither
+// the engine nor COM is part of a POSIX build.
+#ifndef HM_PLATFORM_POSIX
+
 namespace HM
 {
    bool
@@ -102,3 +107,5 @@ namespace HM
       return _T("(unknown class)");
    }
 }
+
+#endif

@@ -8,43 +8,43 @@
 #include "./LocalDelivery.h"
 #include "QuotaWarner.h"
 
-#include "../common/Application/ObjectCache.h"
+#include "../Common/Application/ObjectCache.h"
 
-#include "../common/BO/Account.h"
-#include "../common/BO/Domain.h"
-#include "../common/BO/Message.h"
-#include "../common/BO/MessageData.h"
-#include "../common/BO/MessageRecipient.h"
-#include "../common/BO/MessageRecipients.h"
+#include "../Common/BO/Account.h"
+#include "../Common/BO/Domain.h"
+#include "../Common/BO/Message.h"
+#include "../Common/BO/MessageData.h"
+#include "../Common/BO/MessageRecipient.h"
+#include "../Common/BO/MessageRecipients.h"
 
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
 #include "../Common/AntiSpam/QuarantineStore.h"
 
-#include "../common/Cache/CacheContainer.h"
-#include "../common/Cache/AccountSizeCache.h"
+#include "../Common/Cache/CacheContainer.h"
+#include "../Common/Cache/AccountSizeCache.h"
 
-#include "../common/Persistence/PersistentMessageRecipient.h"
-#include "../common/Persistence/PersistentMessage.h"
-#include "../common/Persistence/PersistentAccount.h"
+#include "../Common/Persistence/PersistentMessageRecipient.h"
+#include "../Common/Persistence/PersistentMessage.h"
+#include "../Common/Persistence/PersistentAccount.h"
 
-#include "../common/Tracking/ChangeNotification.h"
-#include "../common/Tracking/NotificationServer.h"
+#include "../Common/Tracking/ChangeNotification.h"
+#include "../Common/Tracking/NotificationServer.h"
 
-#include "../Common/Util/AWstats.h"
-#include "../common/Util/TraceHeaderWriter.h"
-#include "../common/Util/MessageUtilities.h"
-#include "../common/Util/FileUtilities.h"
-#include "../common/Application/IniFileSettings.h"
-#include "../common/Util/Parsing/StringParser.h"
-#include "../common/Sieve/SieveStorage.h"
-#include "../common/Sieve/SieveScript.h"
-#include "../common/Sieve/SieveVacationResponder.h"
-#include "../common/Sieve/SieveDuplicateTracker.h"
-#include "../common/Sieve/SieveNotifyResponder.h"
-#include "../common/Mime/Mime.h"
-#include "../common/Mime/MimeCode.h"
-#include "../common/Util/Charset.h"
-#include "../common/Rules/RuleGuard.h"
+#include "../Common/Util/AWStats.h"
+#include "../Common/Util/TraceHeaderWriter.h"
+#include "../Common/Util/MessageUtilities.h"
+#include "../Common/Util/FileUtilities.h"
+#include "../Common/Application/IniFileSettings.h"
+#include "../Common/Util/Parsing/StringParser.h"
+#include "../Common/Sieve/SieveStorage.h"
+#include "../Common/Sieve/SieveScript.h"
+#include "../Common/Sieve/SieveVacationResponder.h"
+#include "../Common/Sieve/SieveDuplicateTracker.h"
+#include "../Common/Sieve/SieveNotifyResponder.h"
+#include "../Common/Mime/Mime.h"
+#include "../Common/Mime/MimeCode.h"
+#include "../Common/Util/Charset.h"
+#include "../Common/Rules/RuleGuard.h"
 
 #include "../IMAP/MessagesContainer.h"
 
@@ -187,12 +187,30 @@ namespace HM
       const String queueFile = PersistentMessage::GetFileName(original_message_);
       const String templateFile = queueFile + _T(".delivered");
 
+#ifdef HM_PLATFORM_POSIX
+      // link(2), the POSIX form of CreateHardLink: the EXISTING file is named
+      // first and success is 0, so the arguments swap and the test becomes a
+      // comparison. A failure - a different volume, a filesystem without links,
+      // a name-count limit - leaves its reason in errno, which is what
+      // GetLastError reads here, and takes the same branch as before: no shared
+      // template, and every local copy written on its own.
+      const AnsiString linkExisting = queueFile.c_str();
+      const AnsiString linkNew = templateFile.c_str();
+
+      if (::link(linkExisting.c_str(), linkNew.c_str()) != 0)
+      {
+         LOG_DEBUG(Formatter::Format("Delivery template: no link from {0} to {1} (errno {2}); every copy will be written.", queueFile, templateFile, (int) GetLastError()));
+         shared_template_failed_ = true;
+         return String();
+      }
+#else
       if (::CreateHardLink(templateFile, queueFile, NULL) == FALSE)
       {
          LOG_DEBUG(Formatter::Format("Delivery template: no link from {0} to {1} (Windows error {2}); every copy will be written.", queueFile, templateFile, (int) GetLastError()));
          shared_template_failed_ = true;
          return String();
       }
+#endif
       LOG_DEBUG(Formatter::Format("Delivery template {0} made; the local copies will be names for it.", templateFile));
 
       std::vector<std::pair<AnsiString, AnsiString> > fieldsToWrite;

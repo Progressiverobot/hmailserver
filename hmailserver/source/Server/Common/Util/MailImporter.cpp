@@ -5,19 +5,20 @@
 
 #include "StdAfx.h"
 #include "MailImporter.h"
-#include "..\BO\Message.h"
-#include "..\BO\MessageData.h"
-#include "..\BO\MessageRecipients.h"
-#include "..\Cache/CacheContainer.h"
-#include "..\Util\Time.h"
-#include "..\Util\Utilities.h"
+#include "../BO/Message.h"
+#include "../BO/MessageData.h"
+#include "../BO/MessageRecipients.h"
+#include "../Cache/CacheContainer.h"
+#include "../Util/Time.h"
+#include "../Util/Utilities.h"
+#include "../Util/FileUtilities.h"
 
-#include "..\Persistence\PersistentMessage.h"
+#include "../Persistence/PersistentMessage.h"
 
-#include "Parsing\AddresslistParser.h"
-#include "..\..\SMTP\RecipientParser.h"
-#include "..\..\IMAP\IMAPConfiguration.h"
-#include "..\..\IMAP\IMAPFolderContainer.h"
+#include "Parsing/AddresslistParser.h"
+#include "../../SMTP/RecipientParser.h"
+#include "../../IMAP/IMAPConfiguration.h"
+#include "../../IMAP/IMAPFolderContainer.h"
 #include "../../IMAP/MessagesContainer.h"
 
 #include "MessageUtilities.h"
@@ -108,12 +109,12 @@ namespace HM
       if (iAccountID > 0)
       {
          // Make sure we're really placing the file into an account.
-         int domainSlashPos = originalFullPath.Find(_T("\\"), dataDirectory.GetLength()+1);
+         int domainSlashPos = originalFullPath.Find(FileUtilities::PathSeparator, dataDirectory.GetLength()+1);
 
          if (domainSlashPos < 0)
             return false;
 
-         int accountSlashPos = originalFullPath.Find(_T("\\"), domainSlashPos+1);
+         int accountSlashPos = originalFullPath.Find(FileUtilities::PathSeparator, domainSlashPos+1);
 
          if (accountSlashPos < 0)
             return false;
@@ -121,7 +122,7 @@ namespace HM
       else
       {
          // Make sure the file is placed into the data directory root.
-         int invalidSlash = originalFullPath.Find(_T("\\"), dataDirectory.GetLength()+1);
+         int invalidSlash = originalFullPath.Find(FileUtilities::PathSeparator, dataDirectory.GetLength()+1);
          
          if (invalidSlash > 0)
          {
@@ -322,11 +323,11 @@ namespace HM
       else
       {
          // The file is either located in the queue folder or in an account folder.
-         int slashPosition = fullPath.Find(_T("\\"), currentTrimPosition);
+         int slashPosition = fullPath.Find(FileUtilities::PathSeparator, currentTrimPosition);
          if (slashPosition < 0)
             return false;
 
-         int accountSlashPosition = fullPath.Find(_T("\\"), slashPosition+1);
+         int accountSlashPosition = fullPath.Find(FileUtilities::PathSeparator, slashPosition+1);
 
          if (accountSlashPosition > 0)
          {

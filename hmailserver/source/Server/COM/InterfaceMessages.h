@@ -8,7 +8,7 @@
 
 #include "../hMailServer/hMailServer.h"
 
-#include "../common/bo/Messages.h"
+#include "../Common/BO/Messages.h"
 
 // InterfaceMessages
 

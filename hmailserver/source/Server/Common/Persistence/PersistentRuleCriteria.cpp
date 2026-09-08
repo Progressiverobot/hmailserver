@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\persistentrulecriteria.h"
-#include "..\BO\RuleCriteria.h"
+#include "./PersistentRuleCriteria.h"
+#include "../BO/RuleCriteria.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

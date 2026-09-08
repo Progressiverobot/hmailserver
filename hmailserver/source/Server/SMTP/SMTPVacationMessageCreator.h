@@ -6,6 +6,7 @@
 
 namespace HM
 {
+   class Account;
    class Message;
    class MimeHeader;
 

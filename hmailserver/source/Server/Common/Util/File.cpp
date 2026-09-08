@@ -7,7 +7,12 @@
 #include "File.h"
 #include "ByteBuffer.h"
 
+// <io.h> is the MSVC C runtime's low-level file header; it is where _commit and
+// _fileno live. The POSIX build reaches the same two calls through <unistd.h>,
+// which the platform layer has already included.
+#ifdef _MSC_VER
 #include <io.h>
+#endif
 #include <climits>
 #include <boost/filesystem.hpp>
 
@@ -62,7 +67,13 @@ namespace HM
       if (fflush(file_) != 0)
          return false;
 
+#ifdef _MSC_VER
       return _commit(_fileno(file_)) == 0;
+#else
+      // fsync on the underlying descriptor is _commit's exact equivalent: both
+      // ask the operating system to put its cached writes onto the device.
+      return ::fsync(::fileno(file_)) == 0;
+#endif
    }
 
    bool
@@ -104,7 +115,25 @@ namespace HM
          break;
       }
 
+#ifdef HM_PLATFORM_POSIX
+      // _wfsopen is fopen with a Windows share mode, and _SH_DENYNO is the mode
+      // that denies nothing - which is what every open already is here, because
+      // POSIX has no mandatory locking to deny with. So there is no share mode to
+      // write a POSIX side for and nothing is lost by having none: fopen with the
+      // same mode string is the same call.
+      //
+      // The path and the mode are narrowed the way the rest of the tree narrows a
+      // String for a C API. A path that cannot be represented in the filesystem's
+      // own encoding could not be opened by any other call here either, and fopen
+      // answers null for it - which is the failure this function already returns
+      // for two lines below.
+      const AnsiString narrow_name = sFilename;
+      const AnsiString narrow_mode = open_mode.c_str();
+
+      file_ = ::fopen(narrow_name.c_str(), narrow_mode.c_str());
+#else
       file_ = _wfsopen(sFilename.c_str(), open_mode.c_str(), _SH_DENYNO);
+#endif
 
       if (file_ == nullptr)
       {
@@ -131,7 +160,12 @@ namespace HM
       // ...and with the error_code overload, a file that has become unreadable
       // between Open and here answers 0 rather than throwing.
       boost::system::error_code error_code;
-      boost::uintmax_t size = boost::filesystem::file_size(name_, error_code);
+      // c_str(), not the String itself: a boost::filesystem::path is built from a
+      // wide C string on either platform, while the String class converts to one
+      // directly only where path's own character type is wide. It is the idiom the
+      // rest of the tree already uses - the same call in FileUtilities::FileSize is
+      // written this way - and it names the same file.
+      boost::uintmax_t size = boost::filesystem::file_size(name_.c_str(), error_code);
 
       if (error_code)
          return 0;
@@ -315,8 +349,30 @@ namespace HM
                }
             
                char error_msg[255];
+#ifdef HM_PLATFORM_POSIX
+               // strerror_r is the POSIX spelling of strerror_s, and glibc's is the
+               // GNU one: it is allowed to answer with a static message and leave
+               // the buffer untouched, so what it RETURNS is the message and the
+               // buffer is only where it may have put it. Copying the return value
+               // back is what makes the line below print a reason rather than
+               // whatever was on the stack.
+               const char *reported = ::strerror_r(errno, error_msg, sizeof(error_msg));
+
+               if (reported != error_msg)
+               {
+                  ::strncpy(error_msg, reported, sizeof(error_msg) - 1);
+                  error_msg[sizeof(error_msg) - 1] = '\0';
+               }
+#else
                strerror_s(error_msg, 255, errno);
-               throw std::runtime_error(Formatter::FormatAsAnsi("Unable to read file {0}. Expected bytes: {1}, Actual read bytes: {2}. Error: {3}", name_, bytes_to_read, bytes_actually_read, error_msg));
+#endif
+               // The casts are not decoration. FormatArgument has a constructor for
+               // unsigned int and one for unsigned __int64 and none for size_t,
+               // which on Win64 is exactly the second of those and on this platform
+               // is unsigned long - a distinct type that converts equally well to
+               // both, so the call is ambiguous. Naming the 64-bit one keeps the
+               // whole range of a size and is the type Windows was already picking.
+               throw std::runtime_error(Formatter::FormatAsAnsi("Unable to read file {0}. Expected bytes: {1}, Actual read bytes: {2}. Error: {3}", name_, (unsigned __int64) bytes_to_read, (unsigned __int64) bytes_actually_read, error_msg));
             }
 
             buffer_position += bytes_actually_read;

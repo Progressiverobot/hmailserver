@@ -5,10 +5,10 @@
 
 #pragma once
 
-#include <Boost\function.hpp>
-#include "..\Application\SessionManager.h"
-#include "..\Threading\Task.h"
-#include "..\Util\Event.h"
+#include <boost/function.hpp>
+#include "../Application/SessionManager.h"
+#include "../Threading/Task.h"
+#include "../Util/Event.h"
 
 #include "SocketConstants.h"
 

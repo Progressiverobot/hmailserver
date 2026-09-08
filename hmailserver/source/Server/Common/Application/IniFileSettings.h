@@ -94,6 +94,15 @@ namespace HM
 
       static String GetInitializationFile();
 
+      /// <summary>
+      /// Names the configuration file explicitly, before anything has read it.
+      /// The POSIX service host passes --config through to this; on Windows
+      /// nothing calls it, because the file's location is derived from the
+      /// registry and the executable's own directory and there is no command
+      /// line to say otherwise.
+      /// </summary>
+      static void SetInitializationFile(const String &file);
+
       bool GetDatabaseSettingsExists();
 
       String GetDatabaseProvider() const { return database_provider_; }

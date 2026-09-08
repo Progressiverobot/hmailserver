@@ -106,7 +106,13 @@ namespace HM
       template<typename Tag, typename MultiIndexContainer, typename TagValue>
       std::shared_ptr<T> GetItemBy_(const MultiIndexContainer& s, TagValue value)
       {
-         typedef index<container_type, Tag>::type items_by_tag;
+         // Spelled out in full rather than relying on the file-scope
+         // "using namespace boost::multi_index": glibc's <strings.h> declares a
+         // global index(), so the unqualified name is ambiguous outside Windows.
+         // The typename is what the standard has always required of a dependent
+         // qualified name; MSVC accepted it without. The same applies to the two
+         // other index<> typedefs below.
+         typedef typename boost::multi_index::index<container_type, Tag>::type items_by_tag;
          items_by_tag& items = get<Tag>(objects_);
          auto item = items.find(value);
 
@@ -130,7 +136,7 @@ namespace HM
       template<typename Tag, typename MultiIndexContainer, typename TagValue>
       void RemoveBy_(const MultiIndexContainer& s, TagValue value)
       {
-         typedef index<container_type, Tag>::type items_by_tag;
+         typedef typename boost::multi_index::index<container_type, Tag>::type items_by_tag;
          items_by_tag& items = get<Tag>(objects_);
 
          auto item_iter = items.find(value);
@@ -154,14 +160,14 @@ namespace HM
       boost::recursive_mutex _mutex;
       
       typedef multi_index_container<
-         CachedObject<typename T>,
+         CachedObject<T>,
          indexed_by<
             hashed_unique<
-            tag<id>, BOOST_MULTI_INDEX_MEMBER(CachedObject<typename T>, __int64, id_)>,
+            tag<id>, BOOST_MULTI_INDEX_MEMBER(CachedObject<T>, __int64, id_)>,
             hashed_non_unique<
-            tag<name>, BOOST_MULTI_INDEX_MEMBER(CachedObject<typename T>, std::wstring, name_)>,
+            tag<name>, BOOST_MULTI_INDEX_MEMBER(CachedObject<T>, std::wstring, name_)>,
             ordered_non_unique<
-            tag<timestamp>, BOOST_MULTI_INDEX_MEMBER(CachedObject<typename T>, int, creation_time_)> >
+            tag<timestamp>, BOOST_MULTI_INDEX_MEMBER(CachedObject<T>, int, creation_time_)> >
       > container_type;
 
       container_type objects_;
@@ -368,7 +374,7 @@ namespace HM
       }
 #endif
 
-      typedef index<container_type, timestamp>::type items_by_timestamp;
+      typedef typename boost::multi_index::index<container_type, timestamp>::type items_by_timestamp;
       items_by_timestamp& items = get<timestamp>(objects_);
 
       CachedObject<T> object(pObject);

@@ -5,13 +5,14 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class Message;
    class Domain;
    class Account;
    class IMAPFolder;
-   enum PersistenceMode;
 
    class PersistentMessage 
                      

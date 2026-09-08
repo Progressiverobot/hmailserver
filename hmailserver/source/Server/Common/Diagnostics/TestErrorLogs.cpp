@@ -39,7 +39,11 @@ namespace HM
 
       if (all_error_logs.size() > 0)
       {
-         diagResult.SetDetails(Formatter::Format(_T("There are {0} error logs in the log directory."), all_error_logs.size()));
+         // The cast names FormatArgument's unsigned __int64 constructor, which is the
+         // one a size_t binds to exactly on Windows. On a 64-bit POSIX build size_t is
+         // unsigned long, which matches none of the constructors exactly and is no
+         // closer to one than to the others. The cast is an identity on Windows.
+         diagResult.SetDetails(Formatter::Format(_T("There are {0} error logs in the log directory."), (unsigned __int64) all_error_logs.size()));
          diagResult.SetSuccess(false);
       }
       else

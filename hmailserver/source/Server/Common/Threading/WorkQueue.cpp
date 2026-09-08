@@ -124,8 +124,12 @@ namespace HM
          if (JoinWorkers_(5000))
             return;
 
+         // The cast names FormatArgument's unsigned __int64 constructor, which is the
+         // one a size_t binds to exactly on Windows. On a 64-bit POSIX build size_t is
+         // unsigned long, which matches none of the constructors exactly and is no
+         // closer to one than to the others. The cast is an identity on Windows.
          LOG_APPLICATION(Formatter::Format("Work queue {0} is being destroyed with {1} worker thread(s) still running.",
-                                           queue_name_, workerThreads_.size()));
+                                           queue_name_, (unsigned __int64) workerThreads_.size()));
       }
       catch (...)
       {
@@ -536,7 +540,10 @@ namespace HM
 
             if (all_threads_stalled && listed < running_count)
             {
-               task_list += Formatter::Format(" and {0} more", running_count - listed);
+               // Both operands are size_t, which is unsigned __int64 on Windows and
+               // unsigned long on POSIX; the cast names the FormatArgument constructor
+               // the Windows build already binds, and is an identity there.
+               task_list += Formatter::Format(" and {0} more", (unsigned __int64) (running_count - listed));
             }
          }
 
@@ -607,8 +614,11 @@ namespace HM
       }
       else if (workerThreads_.size() < static_cast<size_t>(max_simultaneous_))
       {
+         // As above, the cast names FormatArgument's unsigned __int64 constructor: a
+         // size_t binds to it exactly on Windows and to none of them on POSIX, where
+         // size_t is unsigned long. The cast is an identity on Windows.
          LOG_APPLICATION(Formatter::Format("Work queue {0} started {1} of the {2} threads it was configured for.",
-                                           queue_name_, workerThreads_.size(), max_simultaneous_));
+                                           queue_name_, (unsigned __int64) workerThreads_.size(), max_simultaneous_));
       }
 
       // Threads exist now, so the cap is known and anything accepted before this
@@ -679,6 +689,17 @@ namespace HM
          }
          catch (const boost::system::system_error& error)
          {
+#ifdef HM_PLATFORM_POSIX
+            // ERROR_ABANDONED_WAIT_0, excepted below, is an I/O completion port
+            // status, and completion ports are a Windows kernel object. The POSIX
+            // build of asio runs on epoll, where that status cannot arise and the
+            // constant does not exist, so here every system_error out of run() is a
+            // genuine failure and is reported as one. The same test is guarded the
+            // same way in Common/TCPIP/IOQueueWorkerTask.cpp; see the roadmap's
+            // "Linux and AArch64" section.
+            ReportWorkerException_(String(error.what()));
+            resume = true;
+#else
             if (error.code().value() != ERROR_ABANDONED_WAIT_0)
             {
                // ERROR_ABANDONED_WAIT_0 is not a failure here: GetQueuedCompletionStatus
@@ -687,6 +708,7 @@ namespace HM
                ReportWorkerException_(String(error.what()));
                resume = true;
             }
+#endif
          }
          catch (const std::exception& error)
          {
@@ -815,8 +837,11 @@ namespace HM
             if (first_task.IsEmpty())
                first_task = _T("<Unknown>");
 
+            // As above, the cast names FormatArgument's unsigned __int64 constructor: a
+            // size_t binds to it exactly on Windows and to none of them on POSIX, where
+            // size_t is unsigned long. The cast is an identity on Windows.
             LOG_DEBUG(Formatter::Format("Still {0} remaining threads in queue {1}. First task: {2}",
-                                        workerThreads_.size(), queue_name_, first_task));
+                                        (unsigned __int64) workerThreads_.size(), queue_name_, first_task));
          }
 
          Sleep(interval_ms);
@@ -875,8 +900,12 @@ namespace HM
       // it is the operator who has to act on it. It was LOG_DEBUG, which on a
       // default log level means the one line explaining a ten second stop, and the
       // threads left running on this object, were both invisible.
+
+      // As above, the cast names FormatArgument's unsigned __int64 constructor: a
+      // size_t binds to it exactly on Windows and to none of them on POSIX, where
+      // size_t is unsigned long. The cast is an identity on Windows.
       LOG_APPLICATION(Formatter::Format("Gave up waiting for {0} thread(s) in work queue {1} to finish after 10 seconds. They are still running, so the queue cannot be freed until they stop.",
-                                        workerThreads_.size(), queue_name_));
+                                        (unsigned __int64) workerThreads_.size(), queue_name_));
    }
 
    void

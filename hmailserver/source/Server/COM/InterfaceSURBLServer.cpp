@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "..\COM\InterfaceSURBLServer.h"
+#include "../COM/InterfaceSURBLServer.h"
 
 #include "../Common/Persistence/PersistentSURBLServer.h"
 

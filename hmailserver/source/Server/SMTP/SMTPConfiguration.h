@@ -4,6 +4,7 @@
 #pragma once
 
 #include "../Common/BO/IncomingRelays.h"
+#include "../Common/TCPIP/SocketConstants.h"
 
 namespace HM
 {
@@ -11,7 +12,6 @@ namespace HM
    class Routes;
    class DNSBlackLists;
    class BlockedAttachments;
-   enum ConnectionSecurity;
 
    class SMTPConfiguration
    {

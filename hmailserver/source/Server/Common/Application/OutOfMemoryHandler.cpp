@@ -15,7 +15,11 @@
 
 namespace HM
 {
+#ifdef HM_PLATFORM_POSIX
+   std::new_handler OutOfMemoryHandler::pOriginalNewHandler = nullptr;
+#else
    _PNH OutOfMemoryHandler::pOriginalNewHandler = 0;
+#endif
    boost::recursive_mutex _outOfMemoryHandlerMutex;
    
    BYTE * pMemoryChunk;
@@ -54,19 +58,48 @@ namespace HM
 
    }
 
+#ifdef HM_PLATFORM_POSIX
+   // The standard new handler takes no arguments and returns nothing: it is
+   // called after the allocation has already failed, and the runtime retries if
+   // it returns and gives up if it throws. MSVC's handler is told the size and
+   // says by its return value whether to retry. So the decision is still made
+   // once, in OnOutOfMemory above, and this adapter only turns "nothing was
+   // freed" into the std::bad_alloc that a standard handler must throw rather
+   // than return - returning without freeing anything would spin operator new
+   // in a loop forever.
+   void OnOutOfMemoryStandard()
+   {
+      if (OnOutOfMemory(0) == 0)
+         throw std::bad_alloc();
+   }
+#endif
+
    void 
    OutOfMemoryHandler::Initialize()
    {     
      pMemoryChunk = new BYTE[5 * 1024 * 1024];
 
+#ifdef HM_PLATFORM_POSIX
+      pOriginalNewHandler = std::set_new_handler( OnOutOfMemoryStandard );
+      // _set_new_mode(1) on Windows sends malloc's failures through the new
+      // handler as well. The C library here has no such switch - malloc returns
+      // null and never consults the new handler - so the POSIX build hooks
+      // operator new alone, which is where every allocation this handler was
+      // written to rescue comes from.
+#else
       pOriginalNewHandler = _set_new_handler( OnOutOfMemory );
       _set_new_mode(1);
+#endif
    }
 
    void 
    OutOfMemoryHandler::Terminate()
    {
+#ifdef HM_PLATFORM_POSIX
+      std::set_new_handler(pOriginalNewHandler);
+#else
       _set_new_handler(pOriginalNewHandler);
+#endif
 
       delete [] pMemoryChunk;
    }

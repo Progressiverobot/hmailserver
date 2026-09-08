@@ -11,8 +11,10 @@ namespace HM
    class BusinessObject
    {
    public:
-      BusinessObject<T>::BusinessObject();
-      virtual ~BusinessObject<T>() {};
+      // Named without the class qualification: repeating it inside the class is
+      // an MSVC extension that a conforming compiler rejects outright.
+      BusinessObject();
+      virtual ~BusinessObject() {};
 
       __int64 GetID() const;
       void SetID(__int64 iNewVal);

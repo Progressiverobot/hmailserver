@@ -47,7 +47,11 @@ namespace HM
          sFile = "CreateTablesMSSQL.sql";
          break;
       case TypeMYSQLServer:
-         sFile = "CreateTablesMYSQL.sql";
+         // Spelled as the file on disk is spelled. It read "MYSQL" for years and
+         // worked, because NTFS does not care; on a case-sensitive filesystem it
+         // is a database that cannot be created and an error that names a file
+         // the administrator can see is there.
+         sFile = "CreateTablesMySQL.sql";
          break;
       case TypePGServer:
          sFile = "CreateTablesPGSQL.sql";
@@ -55,7 +59,9 @@ namespace HM
 
       }
 
-      String sFullPath = sFolder + "\\" + sFile;
+      // Joined with the separator this platform uses. A backslash here is not a
+      // separator on POSIX; it is a character in a file name that does not exist.
+      String sFullPath = FileUtilities::Combine(sFolder, sFile);
 
       return sFullPath;
 

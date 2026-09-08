@@ -5,6 +5,12 @@
 
 #include "stdafx.h"
 
+#ifndef HM_PLATFORM_POSIX
+
+// The whole of this file is the Windows Service Control Manager; see the note at
+// the top of ServiceManager.h for why there is no POSIX arm rather than a set of
+// stubs. On this platform the translation unit is deliberately empty.
+
 #include "ServiceManager.h"
 
 #include "../Application/IniFileSettings.h"
@@ -449,3 +455,5 @@ namespace HM
    }
 
 }
+
+#endif

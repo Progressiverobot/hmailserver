@@ -7,10 +7,10 @@
 
 #include "PersistentGroupMember.h"
 #include "PersistentGroup.h"
-#include "..\BO\GroupMember.h"
-#include "..\BO\Group.h"
-#include "..\SQL\SQLStatement.h"
-#include "..\Cache\Cache.h"
+#include "../BO/GroupMember.h"
+#include "../BO/Group.h"
+#include "../SQL/SQLStatement.h"
+#include "../Cache/Cache.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

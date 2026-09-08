@@ -48,7 +48,7 @@ namespace HM
 
          std::vector<String> directories;
          directories.push_back(directory);
-         directories.push_back(directory + _T("\\rollback"));
+         directories.push_back(directory + FileUtilities::PathSeparator + _T("rollback"));
 
          for (const String &folder : directories)
          {
@@ -74,7 +74,7 @@ namespace HM
                if (!snapshot.available_version.IsEmpty() && name.Find(snapshot.available_version) >= 0)
                   continue;
 
-               FileUtilities::DeleteFile(folder + _T("\\") + name);
+               FileUtilities::DeleteFile(folder + FileUtilities::PathSeparator + name);
             }
          }
       }

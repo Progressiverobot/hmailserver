@@ -39,7 +39,14 @@ namespace HM
       void AddObject(const String &sName, std::shared_ptr<void> pObj, ScriptObject::ObjectType type);
 
       std::vector<String> GetObjectNames();
+      // Handing a named object to the script engine means handing it an IUnknown,
+      // and the only caller is ScriptSite - the ATL Active Scripting host. COM has
+      // no POSIX counterpart, so this accessor belongs to the Windows build alone;
+      // see the roadmap section "Linux and AArch64". The container itself is not
+      // Windows-specific and every other member of it compiles on both.
+#ifdef _MSC_VER
       bool GetObjectByName(const String &sName, LPUNKNOWN* ppunkItem) const;
+#endif
    
    private:
 

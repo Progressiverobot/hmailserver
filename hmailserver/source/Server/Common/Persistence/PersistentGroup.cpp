@@ -10,8 +10,8 @@
 
 #include "PreSaveLimitationsCheck.h"
 
-#include "..\BO\Group.h"
-#include "..\SQL\SQLStatement.h"
+#include "../BO/Group.h"
+#include "../SQL/SQLStatement.h"
 #include "../Cache/Cache.h"
 
 #include "PersistenceMode.h"

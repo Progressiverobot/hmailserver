@@ -8,7 +8,14 @@
 
 #include "WindowsEventLog.h"
 
+// <oledb.h> declares the IErrorRecords interface that GetNativeErrorCode below
+// reads. OLE DB is a COM interface reached through ADO and SQL Server Compact,
+// and the roadmap section "Linux and AArch64" leaves both of those backends out
+// of the POSIX build, so neither the header nor that one function is compiled
+// there. Everything else in this file is platform-neutral.
+#ifdef _MSC_VER
 #include <oledb.h>
+#endif
 
 #include <boost/thread/thread.hpp>
 
@@ -86,6 +93,8 @@ namespace HM
       }
    }
 
+#ifdef _MSC_VER
+
    int 
    ErrorManager::GetNativeErrorCode(IErrorInfo *pIErrorInfo)
    {
@@ -138,6 +147,8 @@ namespace HM
       return iRetValue;
    }
 
+#endif
+
    void
    ErrorManager::ReportError(eSeverity iSeverity, int iErrorID, const String &sSource, const String &sDescription, const boost::system::system_error &error)
    {
@@ -165,6 +176,11 @@ namespace HM
       ReportError(iSeverity, iErrorID, sSource, formatted_message);
    }
 
+
+   // FormatMessage reads the Windows system message table; there is no such table
+   // on POSIX, and nothing there produces a Windows error code to look up. See the
+   // roadmap section "Linux and AArch64".
+#ifdef _MSC_VER
 
    String
    ErrorManager::GetWindowsErrorText(int windows_error_code)
@@ -212,6 +228,8 @@ namespace HM
 
       return windows_error_message;
    }
+
+#endif
 
    String
    ErrorManager::NormalizeForLog_(const String &value)

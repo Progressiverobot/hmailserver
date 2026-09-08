@@ -159,6 +159,36 @@ jobs:
           fi
           echo "Found ${installer}; its .cosign.bundle is produced by the signing step below."
 
+      # One release carries every platform's artefact at one version. The Linux
+      # update checker builds the name its own package manager and architecture
+      # would install - the four below - and matches it exactly, as the Windows one
+      # does the installer. A missing Linux set is a warning and not a failure: the
+      # installer is what every server in the field is waiting for, and a Linux
+      # packaging problem must not hold it back. RELEASE.md says what a release
+      # without them is called.
+      - name: Which platforms this release carries
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          missing=0
+          for name in \
+            "hmailserver_${version}_amd64.deb" \
+            "hmailserver_${version}_arm64.deb" \
+            "hmailserver-${version}-1.x86_64.rpm" \
+            "hmailserver-${version}-1.aarch64.rpm"; do
+            if [ -f "assets/${name}" ]; then
+              echo "Linux: ${name}"
+            else
+              echo "::warning::No ${name} on ${TAG}. A Linux server of that kind will be told a new version exists and that there is nothing to download."
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "${missing}" -eq 4 ]; then
+            echo "::warning::${TAG} carries no Linux packages at all: it is a Windows-only release, and its notes should say so."
+          fi
+
       - name: Sign each asset
         env:
           TAG: ${{ steps.tag.outputs.tag }}

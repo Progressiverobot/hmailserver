@@ -7,6 +7,15 @@
 #include <ctime>
 #include <limits>
 
+// The Win32 profile API - GetPrivateProfileString and the three calls beside
+// it - lives in kernel32 and has no POSIX equivalent, so the POSIX build
+// declares those four functions here and implements them over the INI file
+// itself in Common/Util/IniFile.cpp. The Windows build never reaches this line
+// and binds the same calls to <windows.h> as it always has.
+#ifdef HM_PLATFORM_POSIX
+#include "IniFile.h"
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -275,12 +284,26 @@ namespace HM
    {
       size = 0;
 
+#ifdef HM_PLATFORM_POSIX
+      // The same question with the answer in one piece: st_size is already 64 bits
+      // here, so there is no high word to reassemble. A name that cannot be
+      // stat'ed gives the same false the Windows call gives for a name that is not
+      // there, and the caller treats it the same way.
+      struct stat attributes;
+
+      if (::stat(AnsiString(fileName).c_str(), &attributes) != 0)
+         return false;
+
+      size = (unsigned __int64) attributes.st_size;
+      return true;
+#else
       WIN32_FILE_ATTRIBUTE_DATA attributes = {};
       if (!GetFileAttributesEx(fileName.c_str(), GetFileExInfoStandard, &attributes))
          return false;
 
       size = ((unsigned __int64) attributes.nFileSizeHigh << 32) | (unsigned __int64) attributes.nFileSizeLow;
       return true;
+#endif
    }
 
    void
@@ -679,11 +702,24 @@ namespace HM
             {
                failure = "Could not write the per-account sending-limit state file. The counters will not survive a restart: " + tempFileName;
             }
+#ifdef HM_PLATFORM_POSIX
+            // rename() is MoveFileEx with MOVEFILE_REPLACE_EXISTING: it replaces an
+            // existing destination atomically within one filesystem, which is the
+            // property this line depends on - a reader of the state file never
+            // sees a half-written one. It does not retry either, which is the
+            // other property the comment below is about.
+            else if (::rename(AnsiString(tempFileName).c_str(), AnsiString(fileName).c_str()) != 0)
+            {
+               // rename rather than FileUtilities::Move: Move retries five times
+               // with a 250ms sleep between attempts, and this runs on a connection
+               // thread.
+#else
             else if (!MoveFileEx(tempFileName.c_str(), fileName.c_str(), MOVEFILE_REPLACE_EXISTING))
             {
                // MoveFileEx rather than FileUtilities::Move: Move retries five times
                // with a 250ms sleep between attempts, and this runs on a connection
                // thread.
+#endif
                failure = "Could not replace the per-account sending-limit state file. The counters will not survive a restart: " + fileName;
                FileUtilities::DeleteFile(tempFileName);
             }
@@ -1028,12 +1064,26 @@ namespace HM
       String iniFile = IniFileSettings::GetInitializationFile();
 
       ULONGLONG writeTime = 0;
+#ifdef HM_PLATFORM_POSIX
+      // Only ever compared for equality below - it is a change token for the ini
+      // file rather than a date - so what matters is that it moves when the file
+      // is written and not what it counts from. st_mtim carries the seconds and
+      // the nanoseconds of the last write, and a file that cannot be stat'ed
+      // leaves the token at zero exactly as a failed GetFileAttributesEx does.
+      struct stat attributes;
+      if (::stat(AnsiString(iniFile).c_str(), &attributes) == 0)
+      {
+         writeTime = (ULONGLONG) attributes.st_mtim.tv_sec * 1000000000ULL +
+                     (ULONGLONG) attributes.st_mtim.tv_nsec;
+      }
+#else
       WIN32_FILE_ATTRIBUTE_DATA attributes = {};
       if (GetFileAttributesEx(iniFile.c_str(), GetFileExInfoStandard, &attributes))
       {
          writeTime = ((ULONGLONG) attributes.ftLastWriteTime.dwHighDateTime << 32) |
                      (ULONGLONG) attributes.ftLastWriteTime.dwLowDateTime;
       }
+#endif
 
       {
          boost::lock_guard<boost::mutex> guard(settings_mutex_);

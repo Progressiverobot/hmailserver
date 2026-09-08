@@ -9,8 +9,8 @@
 
 #include "InterfaceBlockedSender.h"
 
-#include "..\Common\BO\BlockedSender.h"
-#include "..\Common\BO\BlockedSenders.h"
+#include "../Common/BO/BlockedSender.h"
+#include "../Common/BO/BlockedSenders.h"
 
 
 void

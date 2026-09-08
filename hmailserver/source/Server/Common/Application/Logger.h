@@ -6,7 +6,7 @@
 #pragma once
 
 #include "../Util/File.h"
-#include "..\Application\IniFileSettings.h"
+#include "../Application/IniFileSettings.h"
 
 namespace HM
 {

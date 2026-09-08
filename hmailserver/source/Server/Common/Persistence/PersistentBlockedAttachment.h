@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class BlockedAttachment;
-   enum PersistenceMode;
 
    class PersistentBlockedAttachment
    {

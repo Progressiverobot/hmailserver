@@ -189,7 +189,15 @@ namespace HM
       parts.tm_min = minute;
       parts.tm_sec = second;
 
+#ifdef HM_PLATFORM_POSIX
+      // _mkgmtime64 is Microsoft's name for the inverse of gmtime - a struct tm
+      // read as UTC rather than as local time, which mktime would do. POSIX
+      // spells the same function timegm, and time_t is already 64 bits here, so
+      // nothing is lost in the cast.
+      __int64 result = (__int64) ::timegm(&parts);
+#else
       __int64 result = _mkgmtime64(&parts);
+#endif
 
       if (result < 0)
          return false;
@@ -202,10 +210,20 @@ namespace HM
    MetricsHistoryTask::FormatTimestamp_(__int64 seconds)
    {
       struct tm parts;
+#ifdef HM_PLATFORM_POSIX
+      // __time64_t is time_t here, and _gmtime64_s is gmtime_r with its
+      // arguments the other way round and a pointer for an answer instead of an
+      // error code.
+      time_t value = (time_t) seconds;
+
+      if (::gmtime_r(&value, &parts) == nullptr)
+         return _T("");
+#else
       __time64_t value = seconds;
 
       if (_gmtime64_s(&parts, &value) != 0)
          return _T("");
+#endif
 
       String text;
       text.Format(_T("%04d-%02d-%02d %02d:%02d:%02d"),

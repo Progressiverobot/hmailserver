@@ -4,10 +4,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class BlockedSender;
-   enum PersistenceMode;
 
    class PersistentBlockedSender
    {

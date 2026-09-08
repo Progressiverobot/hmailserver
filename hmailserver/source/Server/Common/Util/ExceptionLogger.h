@@ -5,6 +5,15 @@
 
 #pragma once
 
+#ifndef HM_PLATFORM_POSIX
+
+// Windows only, in its entirety. The class is handed an EXCEPTION_POINTERS by a
+// structured-exception filter and writes a mini dump from the EXCEPTION_RECORD
+// and CONTEXT it finds there; none of those three types exists on a POSIX build,
+// and the equivalent - a signal handler and a core-dump policy - is the roadmap
+// row "The Win32 tail". ExceptionLogger.cpp carries the full explanation, and
+// CrashOracle::LogInstallationStatus is where an administrator is told.
+
 namespace HM
 {
    class ExceptionLogger
@@ -42,3 +51,5 @@ namespace HM
       static boost::mutex logging_mutex_;
    };
 }
+
+#endif

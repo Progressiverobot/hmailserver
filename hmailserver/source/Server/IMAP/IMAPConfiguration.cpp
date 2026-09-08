@@ -7,7 +7,7 @@
 #include "IMAPConfiguration.h"
 
 #include "../Common/Application/Configuration.h"
-#include "../common/Application/ObjectCache.h"
+#include "../Common/Application/ObjectCache.h"
 #include "../Common/BO/IMAPFolders.h"
 #include "../Common/BO/Groups.h"
 

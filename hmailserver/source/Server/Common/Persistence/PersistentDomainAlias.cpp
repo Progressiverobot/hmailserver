@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\PersistentDomainAlias.h"
-#include "..\BO\DomainAlias.h"
-#include "..\Application\ObjectCache.h"
+#include "./PersistentDomainAlias.h"
+#include "../BO/DomainAlias.h"
+#include "../Application/ObjectCache.h"
 
 #include "PreSaveLimitationsCheck.h"
 #include "PersistenceMode.h"

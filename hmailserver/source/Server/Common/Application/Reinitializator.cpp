@@ -7,7 +7,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\reinitializator.h"
+#include "./Reinitializator.h"
 
 #include <boost/thread/thread.hpp>
 

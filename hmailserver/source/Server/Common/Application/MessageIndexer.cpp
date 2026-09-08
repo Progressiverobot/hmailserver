@@ -11,7 +11,7 @@
 #include "../BO/Message.h"
 #include "../BO/MessageData.h"
 #include "../BO/MessageMetaData.h"
-#include "../MIME/MIME.h"
+#include "../Mime/Mime.h"
 #include "../Util/Time.h"
 #include "../Persistence/PersistentMessageMetaData.h"
 #include "../Persistence/PersistentMessage.h"

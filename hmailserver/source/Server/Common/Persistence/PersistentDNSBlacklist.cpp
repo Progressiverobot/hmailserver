@@ -5,9 +5,9 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentDNSBlackList.h"
-#include "..\BO\DNSBlackList.h"
-#include "..\SQL\SQLStatement.h"
+#include "./PersistentDNSBlacklist.h"
+#include "../BO/DNSBlackList.h"
+#include "../SQL/SQLStatement.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

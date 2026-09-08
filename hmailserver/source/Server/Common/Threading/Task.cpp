@@ -4,7 +4,7 @@
 // Created 2005-07-21
 // SPDX-License-Identifier: AGPL-3.0-or-later
 #include "StdAfx.h"
-#include ".\task.h"
+#include "./Task.h"
 #include <boost/thread/thread.hpp>
 
 #ifdef _DEBUG

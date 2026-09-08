@@ -5,8 +5,35 @@
 
 #include "stdafx.h"
 #include "DNSResolverWinApi.h"
+
+#ifdef HM_PLATFORM_POSIX
+// The resolver that answers here. Its validating path already carries the wire
+// encoder, the transport and the parser; QueryRecords is the plain lookup.
+#include "DnssecResolver.h"
+#endif
+#ifdef HM_PLATFORM_POSIX
+
+// The three verdicts a lookup can carry, in the numbers the Windows DNS client
+// uses and DNSResolver tests for. QueryRecords answers in the same numbers, so
+// the two platforms' callers read the same code paths.
+#define DNS_ERROR_RCODE_NAME_ERROR_ 9003
+#define DNS_INFO_NO_RECORDS_        9501
+
+// This class IS the Windows DNS client - DnsQueryEx, its record lists and its
+// completion callbacks - so on a platform that has none of that there is nothing
+// here to include and nothing to translate. The four members are defined below
+// instead, and every one of them reports and fails.
+//
+// The replacement is the roadmap row "Name resolution without the Windows DNS
+// API". Most of the material for it is already in this tree: DnssecResolver is a
+// complete DNS client and it builds and runs on this platform. Wiring this class
+// to it is that row's work, and doing it as part of a compilation fix would put an
+// untested resolver behind every MX lookup the server makes.
+
+#else
 #include <iphlpapi.h>
 #include <windns.h>
+#endif
 #include <boost/asio.hpp>
 
 using boost::asio::ip::tcp;
@@ -29,6 +56,77 @@ namespace HM
    {
 
    }
+#ifdef HM_PLATFORM_POSIX
+
+   namespace
+   {
+      // The status the POSIX side leaves behind. It is deliberately NOT one of the
+      // numbers DNSResolver tests for - not NXDOMAIN (9003) and not "the name exists
+      // but carries no record of this type" (9501) - so that "there is no resolver in
+      // this build" can never be read by a caller as a real negative answer from one.
+      const int NO_RESOLVER_STATUS_ = 9852;
+
+      // Reported once per query rather than once per class, because the query is the
+      // useful part: an administrator reading the log needs to know which lookup did
+      // not happen, not merely that lookups do not.
+   }
+
+   bool
+   DNSResolverWinApi::IsDNSError_(int iErrorMessage)
+   {
+      // The same four verdicts the Windows version treats as "the resolver worked
+      // and what it found was nothing", in the numbers QueryRecords reports:
+      // NXDOMAIN, and a name that exists with no record of the type asked for.
+      // Everything else is a failure of the lookup rather than an answer to it.
+      switch (iErrorMessage)
+      {
+      case 0:
+      case DNS_ERROR_RCODE_NAME_ERROR_:
+      case DNS_INFO_NO_RECORDS_:
+         return false;
+      default:
+         return true;
+      }
+   }
+
+   bool
+   DNSResolverWinApi::Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords)
+   {
+      int ignoredStatus = 0;
+
+      return Query(query, resourceType, foundRecords, ignoredStatus);
+   }
+
+   bool
+   DNSResolverWinApi::Query(const String &query, int resourceType, std::vector<DNSRecord> &foundRecords, int &outStatus)
+   {
+      // foundRecords is NOT cleared, for the same reason the Windows retry path does
+      // not clear it: callers accumulate several queries into one vector, and a failed
+      // query that emptied it would discard the answers to the ones before it.
+      outStatus = 0;
+
+      if (query.IsEmpty())
+      {
+         outStatus = DNS_ERROR_RCODE_NAME_ERROR_;
+         return true;
+      }
+
+      return DnssecResolver::QueryRecords(AnsiString(query), (unsigned short) resourceType,
+                                          foundRecords, outStatus);
+   }
+
+   bool
+   DNSResolverWinApi::RunQuery_(const String &query, int resourceType, unsigned long fOptions, std::vector<DNSRecord> &foundRecords, int &dnsStatus)
+   {
+      // Private, and reachable only from the two Query overloads above. fOptions is
+      // the Windows client's flag word - bypass the cache, refuse to use a
+      // truncated answer - and has no counterpart here: this resolver caches
+      // nothing and falls back to TCP on truncation by itself.
+      return DnssecResolver::QueryRecords(AnsiString(query), (unsigned short) resourceType,
+                                          foundRecords, dnsStatus);
+   }
+
+#else
  
    void 
    _FreeDNSRecord(PDNS_RECORD pRecord)
@@ -545,5 +643,6 @@ namespace HM
 
       return true;
    }
+#endif
 }
 

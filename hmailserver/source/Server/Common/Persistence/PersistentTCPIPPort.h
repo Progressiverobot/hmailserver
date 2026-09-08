@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class TCPIPPort;
-   enum PersistenceMode;
 
    class PersistentTCPIPPort
    {

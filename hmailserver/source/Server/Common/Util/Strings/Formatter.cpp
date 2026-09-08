@@ -260,12 +260,17 @@ namespace HM
       if (Formatter::Format(_T("{0}"), UINT_MAX) != _T("4294967295"))
          throw;
 
-      // UINT64 max.
-      if (Formatter::Format(_T("{0}"), 18446744073709551614) != _T("18446744073709551614"))
+      // UINT64 max. Suffixed, because a literal too large for a long long is an
+      // unsigned long long on MSVC and an __int128 on GCC, and the second matches
+      // no FormatArgument constructor better than any other.
+      if (Formatter::Format(_T("{0}"), 18446744073709551614ULL) != _T("18446744073709551614"))
          throw;
 
-      // INT64 max
-      if (Formatter::Format(_T("{0}"), 9223372036854775807) != _T("9223372036854775807"))
+      // INT64 max. The LL suffix is what keeps this an __int64 everywhere: on Windows
+      // a long is 32 bits, so the unsuffixed literal was already a long long, but on
+      // an LP64 build it fits in a long - and long is not one of FormatArgument's
+      // constructor types and is no closer to one of them than to the others.
+      if (Formatter::Format(_T("{0}"), 9223372036854775807LL) != _T("9223372036854775807"))
          throw;
 
       // Max parameter count.

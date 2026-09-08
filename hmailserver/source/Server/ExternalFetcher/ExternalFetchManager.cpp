@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\ExternalFetchManager.h"
+#include "./ExternalFetchManager.h"
 
 #include "../Common/BO/FetchAccounts.h"
 #include "../Common/Util/DiskSpace.h"
@@ -13,13 +13,13 @@
 
 #include "ExternalFetchTask.h"
 
-#include "../COmmon/Threading/WorkQueueManager.h"
+#include "../Common/Threading/WorkQueueManager.h"
 
-#include "../COmmon/BO/Account.h"
+#include "../Common/BO/Account.h"
 
-#include "../COmmon/BO/Domain.h"
+#include "../Common/BO/Domain.h"
 
-#include "../COmmon/Cache/CacheContainer.h"
+#include "../Common/Cache/CacheContainer.h"
 
 
 #ifdef _DEBUG

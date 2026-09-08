@@ -306,7 +306,12 @@ namespace HM
       pNode->AppendAttr(_T("PersonLastName"), person_last_name_);
       pNode->AppendAttr(_T("Active"), active_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("Password"), String(password_));
-      pNode->AppendAttr(_T("PasswordEncryption"), StringParser::IntToString(password_encryption_));
+      // password_encryption_ is a long. MSVC binds IntToString(long) to the int
+      // overload, because long and int are the same 32-bit type on Windows; clang
+      // finds int, unsigned int and __int64 all equally distant and cannot choose.
+      // The cast names the overload the Windows build already selects, and cannot
+      // lose a value that a 32-bit long could hold.
+      pNode->AppendAttr(_T("PasswordEncryption"), StringParser::IntToString((int) password_encryption_));
       pNode->AppendAttr(_T("MaxAccountSize"), StringParser::IntToString(account_max_size_));
       pNode->AppendAttr(_T("ADUsername"), adusername_);
       pNode->AppendAttr(_T("ADDomain"), addomain_);

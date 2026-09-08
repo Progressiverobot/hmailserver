@@ -19,7 +19,7 @@
 #include "../../Application/ObjectCache.h"
 #include "../../Cache/CacheContainer.h"
 #include "../../Util/Hashing/HashCreator.h"
-#include "../../MIME/Mime.h"
+#include "../../Mime/Mime.h"
 #include "../../Persistence/PersistentMessage.h"
 #include "../../Util/Parsing/AddresslistParser.h"
 

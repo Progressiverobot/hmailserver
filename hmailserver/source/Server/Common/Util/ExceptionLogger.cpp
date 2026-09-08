@@ -7,6 +7,28 @@
 
 #include "ExceptionLogger.h"
 
+#ifdef HM_PLATFORM_POSIX
+
+// The crash reporter is Win32 from end to end, so on this platform the file is
+// deliberately empty rather than a set of stubs.
+//
+// Every step of it names something that does not exist here: it is handed an
+// EXCEPTION_POINTERS by a structured-exception filter, it copies the fault record
+// and the register file - EXCEPTION_RECORD and CONTEXT - into a
+// windows_shared_memory segment, and it starts hMailServer.Minidump.exe to
+// photograph the faulted process from outside it through DbgHelp. There is no
+// honest partial version: a Log() that took a pointer nothing on this platform can
+// produce, and wrote no dump, would read like a crash reporter and record nothing.
+//
+// The POSIX equivalent is a signal handler for SIGSEGV, SIGBUS, SIGILL and SIGFPE
+// together with a policy for the core dump the kernel writes, and that is a
+// roadmap row of its own - "The Win32 tail": a core-dump policy. Until it is
+// written, an administrator is told so once at start-up rather than left to
+// assume: see CrashOracle::LogInstallationStatus, which says in the application
+// log that crash capture is not installed on this platform.
+
+#else
+
 #include "FileInfo.h"
 #include "Time.h"
 #include "GUIDCreator.h"
@@ -447,4 +469,6 @@ namespace HM
 
 
 
-} 
+}
+
+#endif 

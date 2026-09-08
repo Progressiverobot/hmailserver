@@ -11,7 +11,12 @@ namespace HM
    {
    public:
 
-      virtual const char* what() const
+      // std::exception::what() is declared not to throw, so an override of it
+      // has to promise the same. MSVC accepts the promise on a base that does
+      // not spell it out; a conforming compiler refuses an override whose
+      // exception specification is the laxer of the two. Saying noexcept here
+      // is true of this body either way - it returns a string literal.
+      virtual const char* what() const noexcept
       {
          return "The client has been disconnected.";
       }

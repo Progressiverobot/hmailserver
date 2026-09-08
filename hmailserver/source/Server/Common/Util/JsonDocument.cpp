@@ -516,7 +516,14 @@ namespace HM
       if (raw_number_.find_first_of(".eE") != std::string::npos)
          return (__int64) number_;
 
+#ifdef HM_PLATFORM_POSIX
+      // strtoll is the standard C name for _strtoi64: the same conversion, the
+      // same three arguments, and a long long which is the same 64 bits that
+      // __int64 is here.
+      return ::strtoll(raw_number_.c_str(), nullptr, 10);
+#else
       return _strtoi64(raw_number_.c_str(), nullptr, 10);
+#endif
    }
 
    bool

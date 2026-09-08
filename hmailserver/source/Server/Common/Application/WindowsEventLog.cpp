@@ -9,6 +9,38 @@
 #include "IniFileSettings.h"
 #include "Logger.h"
 
+#ifdef HM_PLATFORM_POSIX
+// syslog(3) is what this class writes to here. It is the same kind of channel the
+// Windows event log is - the place a machine's own monitoring already looks, kept
+// for signals rather than for a second copy of the mail log - so everything above
+// this line about what is forwarded, at what severity and under what throttle is
+// unchanged, and only the three calls that hand the text to the system differ.
+//
+// One collision has to be dealt with rather than ignored. <syslog.h> defines
+// LOG_DEBUG as a priority number and Logger.h, included just above, defines
+// LOG_DEBUG as this server's debug-logging macro; whichever header is second
+// wins. So the priorities this file needs are taken into constants here and the
+// name is then put out of the way entirely. Leaving it defined as a number would
+// mean that the next person to write LOG_DEBUG("...") in this file got a silent
+// nonsense expression instead of a log line; leaving it undefined means they get
+// a compiler error, which is the right answer.
+#include <syslog.h>
+
+namespace
+{
+   const int SYSLOG_PRIORITY_ERROR = LOG_ERR;
+   const int SYSLOG_PRIORITY_WARNING = LOG_WARNING;
+   const int SYSLOG_PRIORITY_INFORMATION = LOG_INFO;
+
+   // LOG_MAIL is the facility a mail server's records belong in: it is what puts
+   // them in the file an administrator's mail log already is, beside the MTA's.
+   const int SYSLOG_FACILITY = LOG_MAIL;
+   const int SYSLOG_OPTIONS = LOG_PID;
+}
+
+#undef LOG_DEBUG
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -95,7 +127,12 @@ namespace HM
       const unsigned __int64 THROTTLE_WINDOW_MS = 10 * 60 * 1000;
       const int THROTTLE_MAX_PER_WINDOW = 5;
 
+#ifndef HM_PLATFORM_POSIX
+      // The name RegisterEventSource is called with. There is no counterpart on
+      // POSIX - openlog is told the identity instead, and an unused constant here
+      // would only draw a warning - so it is declared where it is used.
       const wchar_t *EVENT_SOURCE_NAME = L"hMailServer";
+#endif
    }
 
    WindowsEventLog::WindowsEventLog()
@@ -121,6 +158,23 @@ namespace HM
    unsigned short
    WindowsEventLog::GetEventType_(int severity)
    {
+#ifdef HM_PLATFORM_POSIX
+      // The syslog priority for the same three bands. LOG_ERR, LOG_WARNING and
+      // LOG_INFO are what EVENTLOG_ERROR_TYPE, EVENTLOG_WARNING_TYPE and
+      // EVENTLOG_INFORMATION_TYPE are on the other side - the same decision, in
+      // the vocabulary the reader's tools filter on - so the mapping below is
+      // line for line the Windows one.
+      switch (severity)
+      {
+      case ErrorManager::Critical:
+      case ErrorManager::High:
+         return (unsigned short) SYSLOG_PRIORITY_ERROR;
+      case ErrorManager::Medium:
+         return (unsigned short) SYSLOG_PRIORITY_WARNING;
+      default:
+         return (unsigned short) SYSLOG_PRIORITY_INFORMATION;
+      }
+#else
       switch (severity)
       {
       case ErrorManager::Critical:
@@ -134,6 +188,7 @@ namespace HM
       default:
          return EVENTLOG_INFORMATION_TYPE;
       }
+#endif
    }
 
    String
@@ -179,6 +234,25 @@ namespace HM
    // accounts; this code then finds the value present and touches nothing.
    //---------------------------------------------------------------------------
    {
+#ifdef HM_PLATFORM_POSIX
+      // There is nothing to register. syslog has no per-source registry entry and
+      // no message table: the text of an entry IS the entry, so the readable
+      // rendering the Windows arm below goes to such lengths to arrange comes for
+      // free here. All this has to do is open the connection once, with the
+      // identity and the facility that every later syslog call inherits.
+      //
+      // openlog cannot fail and has nothing to report, so the failure path below -
+      // which exists because the HKLM write can be refused - has no counterpart
+      // and needs none.
+      static boost::once_flag opened = BOOST_ONCE_INIT;
+
+      boost::call_once(opened, []()
+      {
+         ::openlog("hmailserver", SYSLOG_OPTIONS, SYSLOG_FACILITY);
+      });
+
+      return;
+#else
       static boost::once_flag registered = BOOST_ONCE_INIT;
 
       // Written inside the call_once, logged after it. Logging can reach
@@ -249,6 +323,7 @@ namespace HM
             "Events are still written to the Application log, but Event Viewer will show "
             "\"the description for the event id cannot be found\" above each one.", (int) failure));
       }
+#endif
    }
 
    bool
@@ -351,6 +426,21 @@ namespace HM
                suppressedBefore);
          }
 
+#ifdef HM_PLATFORM_POSIX
+         // One call, because openlog has already said who this is and which
+         // facility the entry belongs to. The format is "%s" and not the message
+         // itself: the text carries an administrator's own strings - a file name,
+         // a database error - and a stray per-cent in one of those would otherwise
+         // be read as a conversion and print whatever was next on the stack.
+         //
+         // The event id goes into the text. syslog has no separate id field, and
+         // the ids are a published contract that an administrator alerts on, so
+         // they are written where they can still be matched: a Windows operator
+         // filters on id 2010, and here the same event says "[2010]".
+         const AnsiString narrow_message = message;
+
+         ::syslog(GetEventType_(severity), "[%d] %s", eventId, narrow_message.c_str());
+#else
          HANDLE eventSource = RegisterEventSource(NULL, EVENT_SOURCE_NAME);
 
          if (eventSource != NULL)
@@ -359,6 +449,7 @@ namespace HM
             ReportEvent(eventSource, GetEventType_(severity), 0, (DWORD) eventId, NULL, 1, 0, strings, NULL);
             DeregisterEventSource(eventSource);
          }
+#endif
       }
       catch (...)
       {

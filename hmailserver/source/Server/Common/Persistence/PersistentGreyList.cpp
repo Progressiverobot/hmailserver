@@ -5,10 +5,10 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentGreyList.h"
-#include "..\BO\GreyListTriplet.h"
-#include "..\SQL\DALConnection.h"
-#include "..\SQL\IPAddressSQLHelper.h"
+#include "./PersistentGreyList.h"
+#include "../BO/GreyListTriplet.h"
+#include "../SQL/DALConnection.h"
+#include "../SQL/IPAddressSQLHelper.h"
 
 
 #ifdef _DEBUG

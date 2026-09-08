@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\FetchAccountUID.h"
+#include "./FetchAccountUID.h"
 
-#include "..\Util\Time.h"
+#include "../Util/Time.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

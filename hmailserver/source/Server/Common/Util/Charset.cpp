@@ -9,6 +9,13 @@
 #include "../Mime/Mime.h"
 #include "../Mime/CodePages.h"
 
+#ifdef HM_PLATFORM_POSIX
+// Unicode::FromCodePage and Unicode::ToCodePage - what MultiByteToWideChar and
+// WideCharToMultiByte are here. See the note on their declaration for why they
+// live in Unicode rather than in the platform compatibility header.
+#include "Unicode.h"
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -178,12 +185,20 @@ namespace HM
 
       int iToCodePage = CodePages::Instance()->GetCodePage(sCharacterSet);
 
+#ifdef HM_PLATFORM_POSIX
+      int nNeedSize = Unicode::ToCodePage(iToCodePage, sWideCharString, sWideCharString.GetLength(), NULL, 0);
+#else
       int nNeedSize = WideCharToMultiByte( iToCodePage, 0, sWideCharString, sWideCharString.GetLength(), NULL, 0, NULL, NULL );
+#endif
       
       char *pOutput = new char[nNeedSize + 1];
       memset(pOutput, 0, nNeedSize + 1);
 
+#ifdef HM_PLATFORM_POSIX
+      if( Unicode::ToCodePage(iToCodePage, sWideCharString, sWideCharString.GetLength(), pOutput, nNeedSize+1) == 0 )
+#else
       if( WideCharToMultiByte( iToCodePage, 0, sWideCharString, sWideCharString.GetLength(), pOutput, nNeedSize+1, NULL, NULL ) == 0 )
+#endif
       {
          ASSERT(0);
       }
@@ -205,10 +220,18 @@ namespace HM
 
       int iToCodePage = CodePages::Instance()->GetCodePage(sCharacterSet);
 
+#ifdef HM_PLATFORM_POSIX
+      int iNeedSize = Unicode::FromCodePage(iToCodePage, sMultiByte.c_str(), -1, NULL, 0);
+#else
       int iNeedSize = MultiByteToWideChar(iToCodePage, 0, sMultiByte.c_str(), -1, NULL, NULL);
+#endif
 
       wchar_t *pOutput = new wchar_t[iNeedSize + 1];
+#ifdef HM_PLATFORM_POSIX
+      int i = Unicode::FromCodePage(iToCodePage, sMultiByte.c_str(), -1, pOutput, iNeedSize + 1);
+#else
       int i = MultiByteToWideChar(iToCodePage, 0, sMultiByte.c_str(), -1, pOutput, iNeedSize + 1);
+#endif
       String sWideStr = pOutput;
       delete [] pOutput;
 
