@@ -301,6 +301,7 @@
     <Compile Include="MIME\MalformedInput.cs" />
     <Compile Include="Infrastructure\ArchiveRetentionTests.cs" />
     <Compile Include="Infrastructure\ArchiveScopeTests.cs" />
+    <Compile Include="Infrastructure\InstallationPaths.cs" />
     <Compile Include="Infrastructure\BackupVerifiedRestore.cs" />
     <Compile Include="Infrastructure\MessageRetentionTests.cs" />
     <Compile Include="Infrastructure\AssertionBuild.cs" />

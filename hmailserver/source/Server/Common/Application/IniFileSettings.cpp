@@ -157,7 +157,7 @@ namespace HM
       if (app_directory_.Right(1) != FileUtilities::PathSeparator)
          app_directory_ += FileUtilities::PathSeparator;
 
-      data_directory_ = ReadIniSettingString_("Directories", "DataFolder", "");
+      data_directory_ = ResolveAgainstProgramDirectory_(ReadIniSettingString_("Directories", "DataFolder", ""));
 #ifdef HM_PLATFORM_POSIX
       if (data_directory_.Right(1) == _T("/") || data_directory_.Right(1) == _T("\\"))
          data_directory_ = data_directory_.Left(data_directory_.GetLength() -1);
@@ -166,7 +166,7 @@ namespace HM
          data_directory_ = data_directory_.Left(data_directory_.GetLength() -1);
 #endif
 
-      temp_directory_ = ReadIniSettingString_("Directories", "TempFolder", "");
+      temp_directory_ = ResolveAgainstProgramDirectory_(ReadIniSettingString_("Directories", "TempFolder", ""));
 #ifdef HM_PLATFORM_POSIX
       if (temp_directory_.Right(1) == _T("/") || temp_directory_.Right(1) == _T("\\"))
          temp_directory_ = temp_directory_.Left(temp_directory_.GetLength() -1);
@@ -175,7 +175,7 @@ namespace HM
          temp_directory_ = temp_directory_.Left(temp_directory_.GetLength() -1);
 #endif
 
-      event_directory_ = ReadIniSettingString_("Directories", "EventFolder", "");
+      event_directory_ = ResolveAgainstProgramDirectory_(ReadIniSettingString_("Directories", "EventFolder", ""));
 
       // Derived from the program folder, which has already been given this
       // platform's separator above, so it is reused rather than re-derived.
@@ -205,7 +205,7 @@ namespace HM
       greylisting_enabled_during_record_expiration_ = ReadIniSettingInteger_("Settings", "GreylistingEnabledDuringRecordExpiration", 1) == 1;
       greylisting_expiration_interval_ = ReadIniSettingInteger_("Settings", "GreylistingRecordExpirationInterval", 240);
 
-      database_directory_ = ReadIniSettingString_("Directories", "DatabaseFolder", "");
+      database_directory_ = ResolveAgainstProgramDirectory_(ReadIniSettingString_("Directories", "DatabaseFolder", ""));
 #ifdef HM_PLATFORM_POSIX
       if (database_directory_.Right(1) == _T("/") || database_directory_.Right(1) == _T("\\"))
          database_directory_ = database_directory_.Left(database_directory_.GetLength() -1);
@@ -1127,7 +1127,7 @@ namespace HM
       {
          TCHAR Value[255];
          GetPrivateProfileString( _T("Directories"), _T("LogFolder"), _T(""), Value, 255, GetInitializationFile() );
-         log_directory_ = Value;
+         log_directory_ = ResolveAgainstProgramDirectory_(Value);
       }
 
       return log_directory_; 
@@ -1137,6 +1137,17 @@ namespace HM
    IniFileSettings::GetLanguageDirectory() const
    {
       return app_directory_ + "Languages";
+   }
+
+   String
+   IniFileSettings::ResolveAgainstProgramDirectory_(const String &value) const
+   {
+      if (value.IsEmpty() || FileUtilities::IsFullPath(value))
+         return value;
+
+      // app_directory_ is read before any of the values this resolves and
+      // already ends with the platform separator; Combine tolerates that.
+      return FileUtilities::Combine(app_directory_, value);
    }
 
    bool
@@ -1265,10 +1276,17 @@ namespace HM
    IniFileSettings::SetProgramDirectory(const String &sNewVal)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
-   // Updates the main hMailServer administration password found in hMailServer.ini
+   // Updates the program folder in hMailServer.ini. Normalised the way LoadSettings
+   // normalises it and the derived DBScripts directory recomputed, so the running
+   // server reads the same paths a restarted one would (issue #158).
    //---------------------------------------------------------------------------()
    {
       app_directory_ = sNewVal;
+      if (!app_directory_.IsEmpty() && app_directory_.Right(1) != FileUtilities::PathSeparator)
+         app_directory_ += FileUtilities::PathSeparator;
+
+      dbscript_directory_ = app_directory_ + "DBScripts";
+
       WriteIniSetting_("Directories", "ProgramFolder", app_directory_);
    }
 

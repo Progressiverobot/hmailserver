@@ -15,6 +15,7 @@
 #include "TestDataDirectory.h"
 #include "TestIPRanges.h"
 #include "TestErrorLogs.h"
+#include "TestInstallationPaths.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -64,6 +65,9 @@ namespace HM
 
       TestInformationGatherer informationGatherer;
       results.push_back(informationGatherer.PerformTest());
+
+      TestInstallationPaths installationPaths;
+      results.push_back(installationPaths.PerformTest());
 
       TestIPv6 ipv6Test; 
       results.push_back(ipv6Test.PerformTest());

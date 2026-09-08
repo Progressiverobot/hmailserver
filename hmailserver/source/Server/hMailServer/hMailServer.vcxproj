@@ -374,6 +374,7 @@ EXIT 0
     <ClCompile Include="..\Common\Diagnostics\TestDataDirectory.cpp" />
     <ClCompile Include="..\Common\Diagnostics\TestErrorLogs.cpp" />
     <ClCompile Include="..\Common\Diagnostics\TestInformationGatherer.cpp" />
+    <ClCompile Include="..\Common\Diagnostics\TestInstallationPaths.cpp" />
     <ClCompile Include="..\Common\Diagnostics\TestIPRanges.cpp" />
     <ClCompile Include="..\Common\Diagnostics\TestIPv6.cpp" />
     <ClCompile Include="..\Common\Diagnostics\TestMXRecords.cpp" />
@@ -1067,6 +1068,7 @@ EXIT 0
     <ClInclude Include="..\Common\Diagnostics\TestDataDirectory.h" />
     <ClInclude Include="..\Common\Diagnostics\TestErrorLogs.h" />
     <ClInclude Include="..\Common\Diagnostics\TestInformationGatherer.h" />
+    <ClInclude Include="..\Common\Diagnostics\TestInstallationPaths.h" />
     <ClInclude Include="..\Common\Diagnostics\TestIPRanges.h" />
     <ClInclude Include="..\Common\Diagnostics\TestIPv6.h" />
     <ClInclude Include="..\Common\Diagnostics\TestMXRecords.h" />
