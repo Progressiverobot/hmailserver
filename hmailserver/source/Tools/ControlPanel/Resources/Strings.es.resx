@@ -935,9 +935,6 @@ El Control Panel solo puede leer archivos de mensajes cuando se ejecuta en la mi
   <data name="Administrative access" xml:space="preserve">
     <value>Acceso administrativo</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrador</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Idioma de la interfaz del administrador (solo herramientas COM de terceros)</value>
   </data>
@@ -6524,6 +6521,9 @@ SMTP 25 y 587, POP3 110, IMAP 143 - sin seguridad de conexión. Los puertos TLS 
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Autenticación del remitente</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Nombre del remitente, como lo ven los destinatarios</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Remitentes y rangos de IP que eluden por completo la protección antispam.</value>

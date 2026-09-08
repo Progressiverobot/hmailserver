@@ -1,0 +1,30 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# rpm %postun. $1 is the number of instances of this package that will remain:
+# 0 after a removal, 1 after an upgrade's old version is cleaned up.
+#
+# The only job here is to tell systemd that a unit file it knows about has gone.
+# Without it, systemctl keeps reporting the unit until the next daemon-reload,
+# which is confusing at exactly the moment somebody is checking that the server
+# really is gone.
+#
+# What this deliberately does NOT do is remove /var/lib/hmailserver. That is the
+# mail store: everything every account has received. A package removal is not a
+# statement that the mail should be destroyed, and rpm has no purge to
+# distinguish the two, so it stays and the administrator decides.
+set -e
+
+if [ "$1" -ge 1 ]; then
+   # An upgrade. The new version's %post has already run; nothing to do here,
+   # and a daemon-reload would race it.
+   exit 0
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+   systemctl daemon-reload >/dev/null 2>&1 || :
+fi
+
+exit 0

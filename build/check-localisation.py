@@ -422,6 +422,77 @@ def mnemonic_key(caption):
    return key
 
 
+
+# The controls whose Text the user edits and the program then USES. A caption on
+# one of these is not a caption; it is a starting value, and a translated one is
+# a value no server ever meant. TextBlock and Label are absent on purpose: their
+# Text is the caption.
+VALUE_CONTROLS = ("TextBox", "PasswordBox", "PasswordField", "NumberBox",
+                  "AutoSuggestBox", "ComboBox")
+
+# Text="{loc:L '...'}" on one of those, in XAML.
+XAML_VALUE = re.compile(
+   r"<(?:[A-Za-z0-9_]+:)?(" + "|".join(VALUE_CONTROLS) + r")\b[^>]*?\bText\s*=\s*\"\{loc:L\b",
+   re.S)
+
+# An object initialiser that sets Text, with whatever type the declaration or the
+# new expression names. C#'s target-typed `new()` carries no type of its own, so
+# the declaration on its left is the only place the type appears:
+#     private readonly TextBox box_ = new() { Text = ... };
+CS_INITIALISER = re.compile(
+   r"(?P<declared>[A-Za-z_][A-Za-z0-9_.]*)\s+[A-Za-z_]\w*\s*=\s*"
+   r"new(?:\s+(?P<constructed>[A-Za-z_][A-Za-z0-9_.]*))?\s*(?:\([^()]*\))?\s*"
+   r"\{(?P<initialiser>[^{}]*)\}",
+   re.S)
+CS_TEXT_FROM_CATALOGUE = re.compile(r"\bText\s*=\s*[LF]\(")
+
+
+def names_value_control(*type_names):
+   """True when any of these names IS one of the value controls.
+
+   The comparison is on the last segment, so Wpf.Ui.Controls.TextBox counts and
+   so does a bare TextBox. RichTextBox and TextBlock do not, and must not: the
+   first has no Text to set and the second is a caption.
+   """
+   for name in type_names:
+      if not name:
+         continue
+      if name.split(".")[-1] in VALUE_CONTROLS:
+         return True
+   return False
+
+
+def translated_values():
+   """Every place a VALUE is filled from the catalogue: (file, line, snippet).
+
+   Issue #156: ConnectView.xaml set the user-name box's Text from the catalogue,
+   so choosing Chinese put 管理员 where an account name belongs and the sign-in
+   failed. The catalogues were right and the binding was wrong, which is why this
+   is checked in the source rather than in the translations.
+   """
+   found = []
+   for path in source_files():
+      body = read(path)
+
+      if path.lower().endswith(".xaml"):
+         for match in XAML_VALUE.finditer(body):
+            line = body.count("\n", 0, match.start()) + 1
+            snippet = " ".join(body[match.start():match.start() + 90].split())
+            found.append((rel(path), line, snippet))
+         continue
+
+      for match in CS_INITIALISER.finditer(body):
+         if not CS_TEXT_FROM_CATALOGUE.search(match.group("initialiser")):
+            continue
+         if not names_value_control(match.group("declared"), match.group("constructed")):
+            continue
+         line = body.count("\n", 0, match.start()) + 1
+         snippet = " ".join(body[match.start():match.start() + 90].split())
+         found.append((rel(path), line, snippet))
+
+   return found
+
+
 def main():
    if hasattr(sys.stdout, "reconfigure"):
       sys.stdout.reconfigure(encoding="utf-8")
@@ -430,6 +501,14 @@ def main():
    problems = []
 
    texts = marked_texts()
+
+   for path, line, snippet in translated_values():
+      problems.append(
+         f"{path}:{line}: this fills an input control's VALUE from the catalogue, so every "
+         f"language starts it with a different string: {snippet!r}. A value is not a caption - "
+         f"issue #156 was a user name translated to 管理员, which is no account's name. Put the "
+         f"hint in PlaceholderText and leave Text a literal.")
+
    wanted = sorted(texts)
    # MSBuild's resource compiler treats names case-insensitively (MSB3568), so
    # two marked texts that differ only in case would be one resource

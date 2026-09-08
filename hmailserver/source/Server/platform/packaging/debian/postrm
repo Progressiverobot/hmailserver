@@ -1,0 +1,95 @@
+#!/bin/sh
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# https://www.progressiverobot.com
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The Debian post-removal script.
+#
+# It undoes what postinst did to systemd, and on a purge it removes the
+# configuration directory - and NOTHING ELSE. What it deliberately leaves behind
+# is written out for the administrator at the end of a purge, because a package
+# manager that silently deleted a mail store would be the worst bug in this
+# repository.
+
+set -e
+
+HM_USER=hmailserver
+HM_CONFIG_DIR=/etc/hmailserver
+HM_DATA_DIR=/var/lib/hmailserver
+HM_LOG_DIR=/var/log/hmailserver
+
+forget_the_unit()
+{
+   # The enablement symlinks postinst made. deb-systemd-helper distinguishes
+   # "the package is gone" (remove) from "the package is gone and so is its
+   # state" (purge); systemctl has only the one verb, and disabling a unit whose
+   # file has already been removed is a no-op that reports failure, hence the
+   # guard.
+   if command -v deb-systemd-helper >/dev/null 2>&1; then
+      deb-systemd-helper "$1" hmailserver.service >/dev/null 2>&1 || true
+   elif command -v systemctl >/dev/null 2>&1; then
+      systemctl disable hmailserver.service >/dev/null 2>&1 || true
+   fi
+
+   if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+      systemctl daemon-reload >/dev/null 2>&1 || true
+   fi
+}
+
+case "$1" in
+   remove)
+      forget_the_unit disable
+      ;;
+
+   purge)
+      forget_the_unit purge
+
+      # dpkg removes the files this package shipped. The directory can still hold
+      # things it did not ship - a TLS certificate and key an administrator put
+      # beside the configuration, for instance - so it is removed only when it is
+      # empty, and left standing when it is not.
+      rm -f "$HM_CONFIG_DIR/hMailServer.ini"
+      rmdir "$HM_CONFIG_DIR" 2>/dev/null || true
+
+      # The hmailserver user and group are NOT removed. The mail store below is
+      # owned by that uid and gid, and a numeric owner with no name is how a store
+      # becomes unreadable to the reinstall that was meant to pick it up - or, if
+      # the id is later handed to another system account, readable by something
+      # that has no business with it. Debian policy asks packages not to delete
+      # system accounts for exactly this reason.
+
+      cat <<'MESSAGE'
+
+hMailServer has been purged. Two things were deliberately left in place:
+
+    /var/lib/hmailserver    the mail store - every message on this server
+    /var/log/hmailserver    the logs, which are a record of who was sent what
+
+Neither is a package file and neither can be reconstructed. A purge is
+frequently a step in a reinstall, a migration, or a mistake, and a package
+manager is the wrong thing to be deciding that a mailbox is finished with. The
+database is untouched for the same reason - it is not this package's to drop.
+
+The hmailserver user and group were kept as well, so that what is left keeps an
+owner with a name.
+
+Remove them by hand when you are certain:
+
+    rm -rf /var/lib/hmailserver /var/log/hmailserver
+    deluser --system hmailserver
+
+MESSAGE
+      ;;
+
+   upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
+      # The package is being replaced rather than removed, or dpkg is unwinding.
+      # Neither is a reason to disturb systemd or anything on disk.
+      ;;
+
+   *)
+      echo "postrm called with unknown argument '$1'" >&2
+      exit 1
+      ;;
+esac
+
+exit 0

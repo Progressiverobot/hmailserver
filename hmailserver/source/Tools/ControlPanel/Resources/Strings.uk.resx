@@ -935,9 +935,6 @@
   <data name="Administrative access" xml:space="preserve">
     <value>Адміністративний доступ</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Адміністратор</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Мова інтерфейсу адміністратора (лише для сторонніх засобів на COM)</value>
   </data>
@@ -6524,6 +6521,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Автентифікація відправника</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Ім’я відправника, яким його побачать отримувачі</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Відправники та діапазони IP, які повністю оминають захист від спаму.</value>

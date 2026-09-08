@@ -935,9 +935,6 @@ Control Panel может читать файлы сообщений только
   <data name="Administrative access" xml:space="preserve">
     <value>Административный доступ</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Администратор</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Язык интерфейса администратора (только для сторонних средств на COM)</value>
   </data>
@@ -6524,6 +6521,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Аутентификация отправителя</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Имя отправителя, как его увидят получатели</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Отправители и диапазоны IP, полностью обходящие защиту от спама.</value>

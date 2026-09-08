@@ -935,9 +935,6 @@ Control Panel może czytać pliki wiadomości tylko wtedy, gdy działa na tym sa
   <data name="Administrative access" xml:space="preserve">
     <value>Dostęp administracyjny</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrator</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Język interfejsu administratora (tylko narzędzia COM innych firm)</value>
   </data>
@@ -6524,6 +6521,9 @@ Kontynuować?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Uwierzytelnianie nadawcy</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Nazwa nadawcy, jaką widzą odbiorcy</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Nadawcy i zakresy adresów IP, które całkowicie omijają ochronę antyspamową.</value>

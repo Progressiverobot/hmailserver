@@ -935,9 +935,6 @@ The Control Panel can only read message files when it runs on the same machine a
   <data name="Administrative access" xml:space="preserve">
     <value>Administrative access</value>
   </data>
-  <data name="Administrator" xml:space="preserve">
-    <value>Administrator</value>
-  </data>
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Administrator UI language (third-party COM tools only)</value>
   </data>
@@ -6524,6 +6521,9 @@ Continue?</value>
   </data>
   <data name="Sender authentication" xml:space="preserve">
     <value>Sender authentication</value>
+  </data>
+  <data name="Sender name, as recipients see it" xml:space="preserve">
+    <value>Sender name, as recipients see it</value>
   </data>
   <data name="Senders and IP ranges that bypass spam protection entirely." xml:space="preserve">
     <value>Senders and IP ranges that bypass spam protection entirely.</value>
