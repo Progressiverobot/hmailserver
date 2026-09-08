@@ -30,9 +30,9 @@
                 <ui:TextBox x:Name="UserBox" PlaceholderText="{loc:L 'User name'}" Margin="0,0,0,10" Text="{loc:L 'Administrator'}">
                     <ui:TextBox.Icon><ui:SymbolIcon Symbol="Person24" /></ui:TextBox.Icon>
                 </ui:TextBox>
-                <ui:PasswordBox x:Name="PasswordBox" PlaceholderText="{loc:L 'Password'}" Margin="0,0,0,18">
-                    <ui:PasswordBox.Icon><ui:SymbolIcon Symbol="Key24" /></ui:PasswordBox.Icon>
-                </ui:PasswordBox>
+                <local:PasswordBox x:Name="PasswordBox" PlaceholderText="{loc:L 'Password'}" Margin="0,0,0,18">
+                    <local:PasswordBox.Icon><ui:SymbolIcon Symbol="Key24" /></local:PasswordBox.Icon>
+                </local:PasswordBox>
 
                 <!-- The button and the busy indicator occupy the same cell, so the
                      card does not change height when a connection starts. A layout

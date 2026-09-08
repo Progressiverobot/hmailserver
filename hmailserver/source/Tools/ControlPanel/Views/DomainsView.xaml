@@ -5,7 +5,8 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
-    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:local="clr-namespace:hMailServer.ControlPanel.Views">
 
     <Grid Margin="26,20">
         <Grid.RowDefinitions>
@@ -173,7 +174,7 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <ui:TextBox x:Name="NewAccountBox" PlaceholderText="user@domain" Margin="0,0,8,0" />
-                        <ui:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="{loc:L 'Password'}" Margin="0,0,8,0" />
+                        <local:PasswordBox x:Name="NewAccountPassword" Grid.Column="1" PlaceholderText="{loc:L 'Password'}" Margin="0,0,8,0" />
                         <ui:Button Grid.Column="2" Content="{loc:L '_Generate'}" Margin="0,0,8,0" Click="GenerateAccountPassword_Click"
                                    ToolTip="{loc:L 'Generate a strong password (copied to clipboard)'}" />
                         <ui:Button Grid.Column="3" Content="{loc:L '_Create account'}" Appearance="Primary" Click="AddAccount_Click" />

@@ -79,7 +79,7 @@
                 <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
                            Text="{loc:L 'Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before.'}" />
                 <StackPanel Orientation="Horizontal">
-                    <ui:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="{loc:L 'New passphrase'}"
+                    <local:PasswordBox x:Name="PassphraseBox" Width="280" PlaceholderText="{loc:L 'New passphrase'}"
                                     AutomationProperties.Name="{loc:L 'New private key passphrase for the selected certificate'}" />
                     <ui:Button Content="{loc:L 'Save _passphrase'}" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
                                AutomationProperties.Name="{loc:L 'Save the private key passphrase for the selected certificate'}" />
@@ -118,7 +118,7 @@
                                AutomationProperties.Name="{loc:L 'Delete the selected certificate'}" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <ui:PasswordBox x:Name="NewKeyPassphrase" Width="280"
+                    <local:PasswordBox x:Name="NewKeyPassphrase" Width="280"
                                     PlaceholderText="{loc:L 'Key passphrase (only for an encrypted key)'}"
                                     AutomationProperties.Name="{loc:L 'Private key passphrase for the certificate being added'}" />
                 </StackPanel>
