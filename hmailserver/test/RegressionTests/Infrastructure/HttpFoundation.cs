@@ -462,9 +462,13 @@ namespace RegressionTests.Infrastructure
                   reply.Headers[lines[i].Substring(0, colon).Trim()] = lines[i].Substring(colon + 1).Trim();
             }
 
+            // A response with no Content-Length, or one that is not a number, is read
+            // as a response with no body - which is what the framing tests here expect
+            // of a 204 or a HEAD.
             int length = 0;
-            if (reply.Headers.ContainsKey("Content-Length"))
-               int.TryParse(reply.Headers["Content-Length"], out length);
+            string declaredLength;
+            if (reply.Headers.TryGetValue("Content-Length", out declaredLength))
+               int.TryParse(declaredLength, out length);
 
             byte[] body = ReadExactly(length);
             reply.Body = Encoding.UTF8.GetString(body);

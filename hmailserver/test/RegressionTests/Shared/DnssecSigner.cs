@@ -34,9 +34,10 @@ namespace RegressionTests.Shared
       public static byte[] Name(string name)
       {
          var wire = new List<byte>();
-         foreach (var label in name.TrimEnd('.').ToLowerInvariant().Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries))
+         foreach (var bytes in name.TrimEnd('.').ToLowerInvariant()
+                                   .Split(new[] { '.' }, StringSplitOptions.RemoveEmptyEntries)
+                                   .Select(label => Encoding.ASCII.GetBytes(label)))
          {
-            var bytes = Encoding.ASCII.GetBytes(label);
             wire.Add((byte) bytes.Length);
             wire.AddRange(bytes);
          }
@@ -57,9 +58,8 @@ namespace RegressionTests.Shared
          {
             var bits = new byte[32];
             var length = 0;
-            foreach (var type in window)
+            foreach (var low in window.Select(type => type & 0xFF))
             {
-               var low = type & 0xFF;
                bits[low >> 3] |= (byte) (0x80 >> (low & 7));
                length = Math.Max(length, (low >> 3) + 1);
             }

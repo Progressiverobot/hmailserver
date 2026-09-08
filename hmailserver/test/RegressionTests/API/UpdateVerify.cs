@@ -4,6 +4,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -371,7 +372,9 @@ namespace RegressionTests.API
       {
          version = version ?? Newer;
          string name = "hMailServer-" + version + "-x64.exe";
-         byte[] hash = SHA256.Create().ComputeHash(installer);
+         byte[] hash;
+         using (var sha = SHA256.Create())
+            hash = sha.ComputeHash(installer);
          digest = digest ?? "sha256:" + FakeSigstore.Hex(hash);
 
          _feed.ClearRoutes();
@@ -396,11 +399,7 @@ namespace RegressionTests.API
 
       private int CountRequests(string fragment)
       {
-         int count = 0;
-         foreach (string request in _feed.Requests)
-            if (request.Contains(fragment))
-               count++;
-         return count;
+         return _feed.Requests.Count(request => request.Contains(fragment));
       }
 
       private void AssertNothingKept()

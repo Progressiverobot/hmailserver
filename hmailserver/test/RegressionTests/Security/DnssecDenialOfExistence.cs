@@ -35,8 +35,15 @@ namespace RegressionTests.Security
       private const int Bogus = 2;
       private const uint Ttl = 60;
 
-      private static DnssecZone _root;
-      private static DnssecZone _tld;
+      // The root and the TLD are built once for the whole fixture and every test's child
+      // zone hangs off them, so they have to outlive a single test - but they are instance
+      // fields, not static ones. The setup that builds them cannot be made static: it
+      // restarts the server through TestFixtureBase.RestartServerAndReacquireCom, an
+      // instance member. NUnit gives a fixture one instance for its entire run, so a
+      // single pair of zones is what [OneTimeSetUp], the tests and [OneTimeTearDown] all
+      // see either way.
+      private DnssecZone _root;
+      private DnssecZone _tld;
 
       [OneTimeSetUp]
       public void SignTheRootAndTheTld()
@@ -96,14 +103,14 @@ namespace RegressionTests.Security
          return child;
       }
 
-      private static void PublishDs(DnssecZone child)
+      private void PublishDs(DnssecZone child)
       {
          SuiteDns.Zone.WithRaw(child.Name, DnsWire.TypeDs, child.DsRdata)
                  .WithRrsig(child.Name, DnsWire.TypeDs, _tld.Sign(child.Name, DnsWire.TypeDs, Ttl, new[] { child.DsRdata }));
       }
 
       /// <summary>An NSEC at the child's name, signed by the TLD, with the types given - the proof the parent gives that no DS exists.</summary>
-      private static void PublishNsecDenial(DnssecZone child, int[] types, DnssecZone signer = null, DateTime? expiration = null, string owner = null)
+      private void PublishNsecDenial(DnssecZone child, int[] types, DnssecZone signer = null, DateTime? expiration = null, string owner = null)
       {
          owner = owner ?? child.Name;
          var nsec = DnsWire.Nsec("zzz.test", types);
@@ -113,7 +120,7 @@ namespace RegressionTests.Security
       }
 
       /// <summary>An NSEC3 in the TLD whose hashed owner matches the child (or covers it), signed by the TLD.</summary>
-      private static void PublishNsec3Denial(DnssecZone child, int[] types, bool matching, bool optOut)
+      private void PublishNsec3Denial(DnssecZone child, int[] types, bool matching, bool optOut)
       {
          var salt = new byte[] { 0xAB, 0xCD };
          const ushort iterations = 2;

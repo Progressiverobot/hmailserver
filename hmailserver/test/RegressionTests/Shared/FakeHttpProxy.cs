@@ -4,6 +4,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -92,7 +93,10 @@ namespace RegressionTests.Shared
 
                var head = new StringBuilder();
                var buffer = new byte[4096];
-               var leftover = new MemoryStream();
+               // The body bytes that arrived with the header outlive the nested blocks
+               // below, so the declaration disposes it once this connection is done -
+               // on every path out, including the early returns.
+               using var leftover = new MemoryStream();
                int headerEnd = -1;
                while (headerEnd < 0)
                {
@@ -202,7 +206,13 @@ namespace RegressionTests.Shared
       /// <summary>Copies both ways until either side closes, then returns.</summary>
       private static void Relay(NetworkStream client, NetworkStream upstream)
       {
-         var done = new ManualResetEvent(false);
+         // Either pump finishing ends the relay, but the other is still blocked in its
+         // read at that moment and the Join below is bounded, so a pump can outlive this
+         // call. A ManualResetEvent would then have to be disposed while a live thread
+         // could still Set() it, which is a race no ordering here can close; a monitor on
+         // a plain object carries the same signal and needs no disposal at all.
+         var done = new object();
+         bool finished = false;
          ThreadStart pump = () => { };
          Action<Stream, Stream> copy = (from, to) =>
          {
@@ -218,23 +228,58 @@ namespace RegressionTests.Shared
             }
             catch (Exception ex) when (ex is IOException || ex is SocketException || ex is ObjectDisposedException)
             {
+               // The far side closing under a blocking read is how a tunnel ordinarily
+               // ends, so the pump records why it stopped rather than failing anything.
+               // The finally still runs, and whoever waits on the other pump is released.
+               Trace.WriteLine("FakeHttpProxy: a relay pump stopped on " + ex.GetType().Name + ": " + ex.Message);
             }
             finally
             {
-               done.Set();
+               lock (done)
+               {
+                  finished = true;
+                  Monitor.PulseAll(done);
+               }
             }
          };
          var toUpstream = new Thread(() => copy(client, upstream)) { IsBackground = true };
          var toClient = new Thread(() => copy(upstream, client)) { IsBackground = true };
          toUpstream.Start();
          toClient.Start();
-         done.WaitOne(15000);
-         // Closing either stream ends the other pump's blocking read.
-         try { client.Close(); } catch (Exception) { }
-         try { upstream.Close(); } catch (Exception) { }
+         lock (done)
+         {
+            // A pump that finished before this lock was taken has already set the flag,
+            // which is the latched state a ManualResetEvent gave us for free.
+            if (!finished)
+               Monitor.Wait(done, 15000);
+         }
+
+         // Closing either stream ends the other pump's blocking read. Each close stands
+         // on its own: a stream whose pump has already faulted throws on the way out, and
+         // the other side must be closed anyway.
+         CloseRelayStream(client);
+         CloseRelayStream(upstream);
          toUpstream.Join(2000);
          toClient.Join(2000);
          GC.KeepAlive(pump);
+      }
+
+      /// <summary>
+      ///    Closes one end of a relay. The pumps are blocked in a read on these streams and
+      ///    closing them is how those reads are ended, so a stream that is already torn down
+      ///    - or that faults on its way out - is the expected case here, and not something
+      ///    the proxy has anything to report.
+      /// </summary>
+      private static void CloseRelayStream(NetworkStream stream)
+      {
+         try
+         {
+            stream.Close();
+         }
+         catch (Exception ex) when (ex is IOException || ex is SocketException || ex is ObjectDisposedException)
+         {
+            Trace.WriteLine("FakeHttpProxy: closing a relay stream threw " + ex.GetType().Name + ": " + ex.Message);
+         }
       }
    }
 }
