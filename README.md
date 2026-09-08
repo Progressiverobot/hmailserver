@@ -4,7 +4,7 @@
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/14187/badge)](https://www.bestpractices.dev/projects/14187)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/Progressiverobot/hmailserver/badge)](https://scorecard.dev/viewer/?uri=github.com/Progressiverobot/hmailserver)
 
-hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3.
+hMailServer is a free, open source email server for Microsoft Windows, implementing SMTP, IMAP and POP3. Since 8 September 2026 the server itself also builds, runs and packages on Linux, for x86-64 and AArch64 - see [Linux and AArch64](#linux-and-aarch64) below for exactly how far that goes.
 
 This repository is a maintained fork of the original project, which is no longer developed upstream. It has been brought up to date with a current toolchain, current cryptography, and the transport-security and authentication standards expected of a mail server in 2026 — while remaining a drop-in upgrade for existing hMailServer installations. It is maintained by Christopher Holloway / [Progressive Robot Ltd](https://www.progressiverobot.com).
 
@@ -140,6 +140,39 @@ Supported platforms
 
 Planned, so it is not a surprise: the intention is to raise the *declared* floor to **Windows Server 2019 / Windows 10 21H2** with the first release after **12 January 2027**, when Server 2016 leaves support. That costs nothing technically — Server 2019 is the same Windows API level — and everything in support through 2029 stays covered. Anyone still on Server 2016 after that date should expect no testing rather than active removal.
 
+Linux and AArch64
+-----------------
+
+**In the tree after 6.2.28, not yet in a release.** The server core - SMTP, POP3,
+IMAP, delivery, anti-spam, the REST API and the self-service portal - compiles
+with clang or GCC from `hmailserver/source/Server/CMakeLists.txt`, links as one
+`hmailserver` executable, and packages as a `.deb` and an `.rpm` for x86-64 and
+AArch64, with a `PKGBUILD` for Arch and an AppImage script beside them. All 496
+core translation units compile for both architectures, and CI
+(`.github/workflows/linux-build.yml`) fails when one stops.
+
+What is proven, against PostgreSQL 18: `hmailserver --create-database` builds
+the schema, the server starts under systemd as the `hmailserver` user, an
+account is created over the REST API, a message submitted over SMTP is delivered
+and read back over IMAP. The Windows regression suite is the gate for every
+change; the Linux port changes nothing in what the Windows build compiles or how
+it behaves.
+
+What is not there: the Control Panel and COM are Windows, so a Linux server is
+administered through its configuration file, its own command line
+(`--set-admin-password`, `--create-database`, `--upgrade-database`,
+`--check-config`) and the REST API; no REST route creates a *domain* yet, so
+the first one is an `INSERT`; files written by one platform are not readable by
+the other (`wchar_t` is two bytes on Windows and four on Linux); MySQL and
+MariaDB are compiled in and not yet proven live; stored secrets have no DPAPI
+equivalent yet. Each is a row in the roadmap's *Linux and AArch64* section, which
+is the running record.
+
+The wiki's *Installing on Linux* page is the walk-through;
+`hmailserver/source/Server/platform/packaging/README.md` is the packaging
+reference, and `platform/packaging/hMailServer.ini` is the packaged
+configuration with a paragraph on every key.
+
 Unattended install
 ------------------
 
@@ -221,6 +254,17 @@ administrator says it may; when it is on, the request is a plain `GET` of the
 GitHub Releases API with nothing but the `User-Agent` the server always sends - no
 identifier, no configuration, no counts. `UpdateFeedUrl` points it at a mirror on a
 network without Internet access.
+
+**Through a proxy, where that is the only way out.** `HttpProxy=host:port` (or
+`[ipv6]:port`) sends every web request this server makes as a client through a
+forward proxy - the feed, the installer and its bundle, and the JWKS and token
+introspection of OAuth 2 authentication, which use the same client. For an `https`
+address the proxy is asked to `CONNECT` and the TLS handshake runs inside the
+tunnel, so the certificate is verified against the real host exactly as it is on a
+direct connection and the proxy sees the name it was asked for and nothing else. A
+proxy that refuses is reported with its own name and answer, so it is clear which
+hop said no. There is no place for proxy credentials: a proxy that demands them
+refuses, and that refusal is what you see.
 
 **Unattended.** `UpdateAutoDownload=1` fetches and verifies the installer as soon as
 the check finds a newer release, and `UpdateWindow` names when it may be applied
