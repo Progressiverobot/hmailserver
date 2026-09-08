@@ -458,6 +458,9 @@ Administration and monitoring:
    UpdateChannel=stable          ; prerelease to be told about pre-releases as well
    UpdateCheckHours=24
    UpdateFeedUrl=                ; a feed other than the GitHub Releases API (a mirror; the tests' fake)
+   HttpProxy=                    ; forward proxy (host:port, or [ipv6]:port) for EVERY web request the server
+                                 ; makes as a client: the feed and its downloads, JWKS, token introspection.
+                                 ; CONNECT for https, the absolute URL for http. Empty = direct. No credentials.
    UpdateTrustRootsFile=         ; PEM certificates trusted to have issued the release's signing certificate
                                  ; (empty = Sigstore's public Fulcio root and intermediate, embedded)
    UpdateLogPublicKeyFile=       ; the transparency log's public key (empty = Sigstore's public Rekor, embedded)

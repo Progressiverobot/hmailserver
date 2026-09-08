@@ -3205,6 +3205,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="Forward e-mail" xml:space="preserve">
     <value>Przekaż wiadomość</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Serwer proxy dla każdego żądania sieciowego tego serwera - źródła, jego pobrań, JWKS, introspekcji tokenów (host:port; puste = połączenie bezpośrednie; bez poświadczeń serwera proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Przekazywana poczta i ochrona przed odbiciami (SRS / BATV)</value>
   </data>

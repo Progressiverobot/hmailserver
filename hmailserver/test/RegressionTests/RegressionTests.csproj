@@ -416,6 +416,7 @@
     <Compile Include="SMTP\OutboundPipelining.cs" />
     <Compile Include="Shared\FakeFilterEngine.cs" />
     <Compile Include="Shared\FakeHttpEndpoint.cs" />
+    <Compile Include="Shared\FakeHttpProxy.cs" />
     <Compile Include="Shared\FakeSigstore.cs" />
     <Compile Include="Shared\ServerIniFile.cs" />
     <Compile Include="Shared\DeliveryFailedException.cs" />

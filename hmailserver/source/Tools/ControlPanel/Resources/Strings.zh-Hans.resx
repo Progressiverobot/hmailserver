@@ -3205,6 +3205,9 @@
   <data name="Forward e-mail" xml:space="preserve">
     <value>转发电子邮件</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>本服务器发出的所有 Web 请求（源、其下载、JWKS、令牌内省）所用的正向代理（host:port；留空 = 直连；不使用代理凭据）</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>转发邮件与退信保护（SRS / BATV）</value>
   </data>

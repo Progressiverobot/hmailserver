@@ -3205,6 +3205,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Forward e-mail" xml:space="preserve">
     <value>Přeposílat e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Předsazený proxy server pro každý webový požadavek tohoto serveru - zdroj, jeho stahování, JWKS, introspekci tokenů (host:port; prázdné = přímé připojení; bez přihlašovacích údajů proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Přeposílaná pošta a ochrana proti vráceným zprávám (SRS / BATV)</value>
   </data>

@@ -3205,6 +3205,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="Forward e-mail" xml:space="preserve">
     <value>E-postayı ilet</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Bu sunucunun yaptığı her web isteği için iletme proxy'si - besleme, indirmeleri, JWKS, belirteç introspection (host:port; boş = doğrudan; proxy kimlik bilgileri yok)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>İletilen posta ve geri dönme koruması (SRS / BATV)</value>
   </data>

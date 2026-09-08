@@ -3205,6 +3205,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Forward e-mail" xml:space="preserve">
     <value>Vidarebefordra e-post</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Vidarebefordrande proxy för varje webbförfrågan servern gör - flödet, dess hämtningar, JWKS, tokenintrospektion (host:port; tom = direkt; inga proxyuppgifter)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Vidarebefordrad post &amp; studsskydd (SRS / BATV)</value>
   </data>

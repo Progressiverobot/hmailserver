@@ -567,6 +567,12 @@ namespace HM
       String GetUpdateChannel() const { return update_channel_; }
       String GetUpdateFeedUrl() const { return update_feed_url_; }
 
+      // A forward proxy for every request this server makes as a web client - the
+      // update feed and its downloads, JWKS, token introspection. host:port (or
+      // [ipv6]:port); empty means direct. No proxy credentials: a proxy that wants
+      // them refuses the CONNECT, and the refusal is reported with the proxy's name.
+      String GetHttpProxy() const { return http_proxy_; }
+
       // This server implements neither CalDAV nor CardDAV. These are the URLs the
       // well-known discovery endpoints redirect to - the server that does.
       String GetCalDavRedirectUrl() const { return caldav_redirect_url_; }
@@ -1135,6 +1141,7 @@ namespace HM
       bool update_check_enabled_ = false;
       String update_channel_;
       String update_feed_url_;
+      String http_proxy_;
       String caldav_redirect_url_;
       String carddav_redirect_url_;
       int update_check_hours_ = 24;

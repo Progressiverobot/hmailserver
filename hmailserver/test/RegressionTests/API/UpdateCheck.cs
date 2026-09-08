@@ -61,9 +61,51 @@ namespace RegressionTests.API
          WriteSetting("UpdateCheckEnabled", "0");
          WriteSetting("UpdateChannel", "stable");
          WriteSetting("UpdateFeedUrl", "");
+         WriteSetting("HttpProxy", "");
          WriteSetting("RestApiPort", "0");
          _application.Reinitialize();
          _feed.Dispose();
+      }
+
+      [Test]
+      public void TheCheckGoesThroughTheConfiguredProxy()
+      {
+         using (var proxy = new FakeHttpProxy())
+         {
+            WriteSetting("HttpProxy", proxy.Address);
+            _application.Reinitialize();
+
+            var status = _application.Status;
+            Assert.IsTrue(status.CheckForUpdate(), "Through the proxy the feed is read as it is directly. Error: " + status.UpdateLastError);
+            Assert.AreEqual(Newer, status.AvailableVersion, "The release the feed served, read through the proxy.");
+
+            var targets = proxy.Targets;
+            Assert.AreEqual(1, targets.Count, "The proxy was asked exactly once. Targets: " + string.Join(", ", targets));
+            Assert.AreEqual(_feed.UrlFor(LatestPath), targets[0], "A plain-http feed is asked for by its absolute URL, which is how a forward proxy is told where to go.");
+            Assert.AreEqual(1, _feed.Requests.Count, "The feed heard from the proxy, once.");
+            StringAssert.StartsWith("GET " + LatestPath + " ", _feed.Requests[0], "The proxy forwarded the request in origin form.");
+         }
+      }
+
+      [Test]
+      public void AProxyThatRefusesTheTunnelIsReportedByName()
+      {
+         using (var proxy = new FakeHttpProxy())
+         {
+            // An https feed behind the proxy, at a port nothing listens on: the proxy
+            // cannot reach it and refuses the CONNECT with 502. The check reports the
+            // proxy by name and what it refused, so the administrator knows which of
+            // the two hops to look at.
+            WriteSetting("HttpProxy", proxy.Address);
+            WriteSetting("UpdateFeedUrl", "https://127.0.0.1:1/releases/latest");
+            _application.Reinitialize();
+
+            var status = _application.Status;
+            Assert.IsFalse(status.CheckForUpdate(), "The tunnel was refused, so the check cannot have succeeded.");
+            StringAssert.Contains("The proxy " + proxy.Address + " refused CONNECT to 127.0.0.1:1", status.UpdateLastError, "The proxy and the target are named.");
+            StringAssert.Contains("502", status.UpdateLastError, "The proxy's own status line is quoted.");
+            Assert.AreEqual(new[] { "127.0.0.1:1" }, proxy.Targets.ToArray(), "The proxy was asked to CONNECT to the feed's host and port, and nothing else.");
+         }
       }
 
       [Test]

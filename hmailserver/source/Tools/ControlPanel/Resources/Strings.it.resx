@@ -3205,6 +3205,9 @@ Nessuna posta viene toccata - l'indice ne è derivato - ma finché la ricostruzi
   <data name="Forward e-mail" xml:space="preserve">
     <value>Inoltra e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Proxy in uscita per ogni richiesta web di questo server - il feed, i suoi download, JWKS, l'introspezione dei token (host:port; vuoto = diretto; nessuna credenziale del proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Posta inoltrata e protezione dai bounce (SRS / BATV)</value>
   </data>

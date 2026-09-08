@@ -3205,6 +3205,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Forward e-mail" xml:space="preserve">
     <value>E-mail doorsturen</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Forward-proxy voor elke webaanvraag die deze server doet - de feed, de downloads ervan, JWKS, tokenintrospectie (host:port; leeg = rechtstreeks; geen proxy-inloggegevens)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Doorgestuurde mail en bouncebescherming (SRS / BATV)</value>
   </data>
