@@ -2528,7 +2528,7 @@ namespace hMailServer.ControlPanel.Views
             Path = "PasswordPolicyMaximumAgeDays",
             Label = L("Expire passwords after (days; 0 = never)"),
             Default = 0,
-            Blurb = L("READ THIS FIRST: hMailServer has no self-service password change - IMAP, POP3 and SMTP have no mechanism for it and there is no web page for users - so an expired password can only be reset by an administrator. Turning this on means someone has to be available to do that. Existing app passwords keep working, which is the one way an affected person can still collect mail; Active Directory accounts are exempt, because their password lives in the directory and expires by its policy, not this one. The clock started when this server was upgraded, so nobody is expired the moment you set this."),
+            Blurb = L("READ THIS FIRST: IMAP, POP3 and SMTP have no way to change a password, and the self-service portal refuses an expired one at sign-in like every other surface. An expired password is therefore renewed by an administrator - or by the person themselves only if they hold an app password, which still signs them in to the portal, where the expired password is accepted as the current one when setting a new one. Turning this on means someone has to be available for everybody else. Existing app passwords keep working, which is also the one way an affected person can still collect mail; Active Directory accounts are exempt, because their password lives in the directory and expires by its policy, not this one. The clock started when this server was upgraded, so nobody is expired the moment you set this."),
             IniStore = iniStore_
          });
          Tab(L("Password")).Cards.Add(ageing);
