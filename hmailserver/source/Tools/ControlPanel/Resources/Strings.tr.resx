@@ -8009,7 +8009,7 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
     <value>Denemeler</value>
   </data>
   <data name="Trust anchor override (tag alg digesttype hex; ...)" xml:space="preserve">
-    <value>Güven bağlantı noktası geçersiz kılması (tag alg digesttype hex; ...)</value>
+    <value>Güven çapası geçersiz kılması (tag alg digesttype hex; ...)</value>
   </data>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Güvenilen ARC mühürleyici etki alanları</value>
@@ -8432,7 +8432,7 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
     <value>Sunucunun hangi ad sunucularına sorduğu ve yanıtların DNSSEC ile doğrulanıp doğrulanmadığı.</value>
   </data>
   <data name="Which resolver hMailServer queries. Leave empty to use the name servers Windows is configured with. The override takes a single IPv4 address and is used on port 53; DNSSEC validation and its trust anchors are on the Transport security page." xml:space="preserve">
-    <value>hMailServer'ın hangi çözümleyiciyi sorguladığı. Windows'un yapılandırıldığı ad sunucularını kullanmak için boş bırakın. Geçersiz kılma tek bir IPv4 adresi alır ve 53 portunda kullanılır; DNSSEC doğrulaması ve güven bağlantı noktaları Taşıma güvenliği sayfasındadır.</value>
+    <value>hMailServer'ın hangi çözümleyiciyi sorguladığı. Windows'un yapılandırıldığı ad sunucularını kullanmak için boş bırakın. Geçersiz kılma tek bir IPv4 adresi alır ve 53 portunda kullanılır; DNSSEC doğrulaması ve güven çapaları Taşıma güvenliği sayfasındadır.</value>
   </data>
   <data name="Which scanners can actually run, what size of message is scanned, and what happens to one that is found to be infected." xml:space="preserve">
     <value>Hangi tarayıcıların gerçekten çalışabildiği, hangi boyuttaki iletilerin tarandığı ve virüslü bulunan bir iletiye ne olduğu.</value>

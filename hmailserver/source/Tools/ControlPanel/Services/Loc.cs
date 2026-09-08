@@ -62,6 +62,7 @@ namespace hMailServer.ControlPanel.Services
          new Language("fi", "Suomi"),   // no-loc
          new Language("fr", "Français"),   // no-loc
          new Language("it", "Italiano"),   // no-loc
+         new Language("ja", "日本語"),   // no-loc
          new Language("nb", "Norsk bokmål"),   // no-loc
          new Language("nl", "Nederlands"),   // no-loc
          new Language("pl", "Polski"),   // no-loc
@@ -70,6 +71,7 @@ namespace hMailServer.ControlPanel.Services
          new Language("sv", "Svenska"),   // no-loc
          new Language("tr", "Türkçe"),   // no-loc
          new Language("uk", "Українська"),   // no-loc
+         new Language("zh-Hans", "简体中文"),   // no-loc
       };
 
       private static Func<string, CultureInfo, string> lookup_;

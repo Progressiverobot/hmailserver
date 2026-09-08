@@ -1695,7 +1695,7 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
     <value>ClamWin (paikallinen suoritettava tiedosto)</value>
   </data>
   <data name="ClamWin and ClamAV both use the same signature database. Running both scans every message twice against the same definitions." xml:space="preserve">
-    <value>ClamWin ja ClamAV käyttävät samaa allekirjoitustietokantaa. Molempien ajaminen tarkistaa jokaisen viestin kahdesti samoja määrityksiä vasten.</value>
+    <value>ClamWin ja ClamAV käyttävät samaa virustunnistetietokantaa. Molempien ajaminen tarkistaa jokaisen viestin kahdesti samoja määrityksiä vasten.</value>
   </data>
   <data name="ClamWin was not found in the standard install locations." xml:space="preserve">
     <value>ClamWiniä ei löytynyt tavallisista asennussijainneista.</value>
@@ -3673,7 +3673,7 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
     <value>Se on sidottu osoitteeseen {0}, mikä pitää sen tällä koneella - se on tuettu tapa ajaa sitä ilman TLS:ää. Määritä varmenne postilaatikkoportille tarjotaksesi STARTTLS:n.</value>
   </data>
   <data name="JSON API under /api/v1 plus the browser-based Control Deck at the listener root. Authenticated with the administrator password, or with a scoped API key - a key can be read-only, limited to named domains and source addresses, given an expiry and revoked on its own, none of which the administrator password can. Keys are managed on the REST API keys page. TLS is required unless the listener is bound to 127.0.0.1." xml:space="preserve">
-    <value>JSON-rajapinta polussa /api/v1 sekä selainpohjainen Control Deck kuuntelijan juuressa. Todennus järjestelmänvalvojan salasanalla tai rajatulla API-avaimella - avain voi olla vain luku -tilassa, rajattu nimettyihin verkkotunnuksiin ja lähdeosoitteisiin, sille voi antaa vanhenemisajan ja sen voi kumota erikseen, mitään mistä järjestelmänvalvojan salasanalla ei voi tehdä. Avaimia hallitaan REST API -avaimet -sivulla. TLS vaaditaan, ellei kuuntelijaa ole sidottu osoitteeseen 127.0.0.1.</value>
+    <value>JSON-rajapinta polussa /api/v1 sekä selainpohjainen Control Deck kuuntelijan juuressa. Todennus järjestelmänvalvojan salasanalla tai rajatulla API-avaimella - avain voi olla vain luku -tilassa, rajattu nimettyihin verkkotunnuksiin ja lähdeosoitteisiin, sille voi antaa vanhenemisajan ja sen voi kumota erikseen, eikä mitään näistä voi tehdä järjestelmänvalvojan salasanalla. Avaimia hallitaan REST API -avaimet -sivulla. TLS vaaditaan, ellei kuuntelijaa ole sidottu osoitteeseen 127.0.0.1.</value>
   </data>
   <data name="JWK Set URL (the provider's published signing keys; empty = the key file only)" xml:space="preserve">
     <value>JWK Set -URL (tarjoajan julkaisemat allekirjoitusavaimet; tyhjä = vain avaintiedosto)</value>
@@ -4357,7 +4357,7 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
     <value>OAuth2Issuer tai OAuth2Audience ei ole asetettu, joten kumpaakaan ei tarkisteta</value>
   </data>
   <data name="Neither the executable nor the signature database folder is set." xml:space="preserve">
-    <value>Suoritettavaa tiedostoa tai allekirjoitustietokannan kansiota ei ole asetettu.</value>
+    <value>Suoritettavaa tiedostoa tai virustunnistetietokannan kansiota ei ole asetettu.</value>
   </data>
   <data name="Never" xml:space="preserve">
     <value>Ei koskaan</value>
@@ -4618,7 +4618,7 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
     <value>Ei toista tunnistustekijää. Sellaisen käyttöönotto lopettaa heti tämän tilin salasanan toimimisen postiasiakkaissa, koska IMAP:ssa, POP3:ssa ja SMTP:ssä ei ole paikkaa koodin syöttämiseen - määritä ensin sovellussalasana Sovellussalasanat-välilehdellä, tai postilaatikko hiljenee.</value>
   </data>
   <data name="No signature database folder is set." xml:space="preserve">
-    <value>Allekirjoitustietokannan kansiota ei ole asetettu.</value>
+    <value>Virustunnistetietokannan kansiota ei ole asetettu.</value>
   </data>
   <data name="No syntax errors reported." xml:space="preserve">
     <value>Syntaksivirheitä ei raportoitu.</value>
@@ -5434,7 +5434,7 @@ Jätä VANHA DNS-tietue ({2}) julkaistuksi vähintään muutamaksi päiväksi. V
     <value>Laita kuormantasaaja, TLS-terminaattori tai Postfix-välitys SMTP-kuuntelijan eteen, niin jokainen yhteys näyttää tulevan SIITÄ - mikä rikkoo hiljaa DNSBL-tarkistukset, SPF:n, harmaalistauksen, automaattisen eston ja IP-aluesäännöt kerralla, vaikka kaikki raportoi yhä onnistumista. Näillä nimetty ylävirran palvelin voi välittää todellisen asiakasosoitteen. Molemmat ovat oletuksena pois päältä eivätkä luota keneenkään, ennen kuin osoite on lueteltu, koska vastapuoli, joka voi kirjoittaa oman lähdeosoitteensa uusiksi, on kukistanut jokaisen IP-pohjaisen valvonnan tällä palvelimella. Ylävirran palvelin on määritettävä lähettämään se, tai mikään täällä ei muutu: HAProxy tarvitsee send-proxy- tai send-proxy-v2-asetuksen palvelinrivilleen, ja Postfix-välitys tarvitsee XCLIENTin käyttöön tätä konetta kohti. hMailServer ei voi tarkistaa sitä täältä - ja huomaa, että kun osoite on lueteltu PROXY-protokollan välityspalvelimena, otsake tulee siltä PAKOLLISEKSI, joten välityspalvelimen, joka ei lähetä sitä, yhteydet pudotetaan.</value>
   </data>
   <data name="QRESYNC and CONDSTORE clients ask what vanished while they were away instead of re-listing the folder. The server answers from a table of expunge records, pruned to the newest N twelve-hourly and once at service start. A client whose last sync is older than the retained history gets a full resync - never a wrong answer. Applies after a service restart." xml:space="preserve">
-    <value>QRESYNC- ja CONDSTORE-asiakkaat kysyvät, mitä katosi niiden poissa ollessa, sen sijaan että luetteloisivat kansion uudelleen. Palvelin vastaa expunge-tietueiden taulusta, joka karsitaan uusimpaan N:ään kahdestitoista tunnin välein ja kerran palvelun käynnistyessä. Asiakas, jonka viimeisin synkronointi on säilytettyä historiaa vanhempi, saa täyden uudelleensynkronoinnin - ei koskaan väärää vastausta. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
+    <value>QRESYNC- ja CONDSTORE-asiakkaat kysyvät, mitä katosi niiden poissa ollessa, sen sijaan että luetteloisivat kansion uudelleen. Palvelin vastaa expunge-tietueiden taulusta, joka karsitaan uusimpaan N:ään kahdentoista tunnin välein ja kerran palvelun käynnistyessä. Asiakas, jonka viimeisin synkronointi on säilytettyä historiaa vanhempi, saa täyden uudelleensynkronoinnin - ei koskaan väärää vastausta. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
   </data>
   <data name="QUOTA" xml:space="preserve">
     <value>QUOTA</value>
@@ -7325,7 +7325,7 @@ Käynnistetäänkö se uudelleen nyt?</value>
 Valitse yllä oleva avain ja kopioi se käsin - sitä ei näytetä uudelleen.</value>
   </data>
   <data name="The configuration is complete, but tokens are accepted over connections that are not encrypted. A bearer token is a credential in plain text: anyone who records the connection can replay it until it expires. Turn TLS back on unless something in front of this server is already terminating it." xml:space="preserve">
-    <value>Määritys on täydellinen, mutta tokenit hyväksytään salaamattomien yhteyksien yli. Bearer-token on tunnistetiedot selväkielisenä: kuka tahansa yhteyden tallentanut voi toistaa sen, kunnes se vanhenee. Kytke TLS takaisin päälle, ellei jokin tämän palvelimen edessä jo pääte sitä.</value>
+    <value>Määritys on täydellinen, mutta tokenit hyväksytään salaamattomien yhteyksien yli. Bearer-token on tunnistetiedot selväkielisenä: kuka tahansa yhteyden tallentanut voi toistaa sen, kunnes se vanhenee. Kytke TLS takaisin päälle, ellei jokin tämän palvelimen edessä jo päätä sitä.</value>
   </data>
   <data name="The configured log folder does not exist on this machine: {0}" xml:space="preserve">
     <value>Määritettyä lokikansiota ei ole tällä koneella: {0}</value>
@@ -7343,7 +7343,7 @@ Valitse yllä oleva avain ja kopioi se käsin - sitä ei näytetä uudelleen.</v
     <value>Tunnistetiedot, joilla tätä palvelinta hallitaan.</value>
   </data>
   <data name="The current password counts as the most recent one, so setting a password to itself is refused too - the repeat somebody is most likely to try." xml:space="preserve">
-    <value>Nykyinen salasana lasketaan viimeisimmäksi, joten salasanan asettaminen itsekseen hylätään myös - se on toisto, jota joku todennäköisimmin yrittää.</value>
+    <value>Nykyinen salasana lasketaan viimeisimmäksi, joten saman salasanan asettaminen uudelleen hylätään myös - se on toisto, jota joku todennäköisimmin yrittää.</value>
   </data>
   <data name="The database destination creates its table on first use and inserts asynchronously, so a log write never blocks a mail session. If the database is unreachable the entries go to the log files instead and the server says so in the application log - nothing is discarded." xml:space="preserve">
     <value>Tietokantakohde luo taulunsa ensimmäisellä käyttökerralla ja lisää rivit asynkronisesti, joten lokikirjoitus ei koskaan pysäytä postiyhteyttä. Jos tietokantaan ei saada yhteyttä, merkinnät menevät sen sijaan lokitiedostoihin, ja palvelin kertoo siitä sovelluslokissa - mitään ei hylätä.</value>
@@ -7743,10 +7743,10 @@ Se yrittää edelleen, kun käytät sovellusta.</value>
     <value>Asetukset, jotka rajaavat kunkin vaiheen</value>
   </data>
   <data name="The single value AEAD-ONLY (case-insensitive) is a named preset rather than an OpenSSL cipher string: forward-secret AEAD suites only (ECDHE or DHE with AES-GCM or ChaCha20-Poly1305), excluding every CBC-mode suite - the Lucky13 padding-oracle family - and static-RSA key exchange. The cost: TLS 1.2 clients that only speak CBC suites cannot connect, and TLS 1.0/1.1 are left with no usable cipher at all, so do not enable those protocols alongside it. TLS 1.3 is unaffected - its suites are AEAD by construction and are configured separately below. A misspelled preset name is rejected and reported, not silently ignored." xml:space="preserve">
-    <value>Yksittäinen arvo AEAD-ONLY (kirjainkoosta riippumaton) on nimetty esiasetus eikä OpenSSL-salausmerkkijono: vain eteenpäin salaiset AEAD-salausryhmät (ECDHE tai DHE AES-GCM:llä tai ChaCha20-Poly1305:llä), poissulkien jokaisen CBC-tilan salausryhmän - Lucky13-täyteoraakkeliperheen - ja staattisen RSA-avaintenvaihdon. Hinta: vain CBC-salausryhmiä puhuvat TLS 1.2 -asiakkaat eivät voi yhdistää, ja TLS 1.0/1.1 jäävät kokonaan ilman käyttökelpoista salausta, joten älä ota näitä protokollia käyttöön sen rinnalla. TLS 1.3 ei vaikutu - sen salausryhmät ovat rakenteeltaan AEAD ja ne määritetään erikseen alla. Väärin kirjoitettu esiasetuksen nimi hylätään ja raportoidaan, sitä ei ohiteta hiljaa.</value>
+    <value>Yksittäinen arvo AEAD-ONLY (kirjainkoosta riippumaton) on nimetty esiasetus eikä OpenSSL-salausmerkkijono: vain eteenpäin salaiset AEAD-salausryhmät (ECDHE tai DHE AES-GCM:llä tai ChaCha20-Poly1305:llä), poissulkien jokaisen CBC-tilan salausryhmän - Lucky13-täyteoraakkeliperheen - ja staattisen RSA-avaintenvaihdon. Hinta: vain CBC-salausryhmiä puhuvat TLS 1.2 -asiakkaat eivät voi yhdistää, ja TLS 1.0/1.1 jäävät kokonaan ilman käyttökelpoista salausta, joten älä ota näitä protokollia käyttöön sen rinnalla. Tämä ei vaikuta TLS 1.3:een - sen salausryhmät ovat rakenteeltaan AEAD ja ne määritetään erikseen alla. Väärin kirjoitettu esiasetuksen nimi hylätään ja raportoidaan, sitä ei ohiteta hiljaa.</value>
   </data>
   <data name="The smart host, its port and credentials, and the retry schedule for delivery." xml:space="preserve">
-    <value>Älykäs kone, sen portti ja tunnistetiedot sekä toimituksen uudelleenyritysten aikataulu.</value>
+    <value>Smart host, sen portti ja tunnistetiedot sekä toimituksen uudelleenyritysten aikataulu.</value>
   </data>
   <data name="The source restriction has to be an address (10.0.0.5), a range (10.0.0.1-10.0.0.99) or CIDR (10.0.0.0/24). Leave it empty to accept the key from any address." xml:space="preserve">
     <value>Lähderajoituksen on oltava osoite (10.0.0.5), alue (10.0.0.1-10.0.0.99) tai CIDR (10.0.0.0/24). Jätä tyhjäksi hyväksyäksesi avaimen mistä tahansa osoitteesta.</value>
