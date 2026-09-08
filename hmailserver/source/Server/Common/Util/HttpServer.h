@@ -71,6 +71,14 @@ namespace HM
       // take it over this is refused before the body is read.
       size_t max_request_bytes = 64 * 1024;
 
+      // A second cap, granted per request by the large-request filter once
+      // the head has been read and has passed max_request_bytes on its own.
+      // Zero means there is no such cap. A request under it gets
+      // request_seconds_large instead of request_seconds, so a body that
+      // takes time to arrive is not cut off by a timer meant for a form.
+      size_t max_request_bytes_large = 0;
+      unsigned request_seconds_large = 0;
+
       // From the moment the server starts waiting for a request (which, on a
       // kept-alive connection, is the moment the previous response was written)
       // to the last byte of the response. Handler time counts.
@@ -114,6 +122,11 @@ namespace HM
       // the responses the handlers build.
       typedef std::function<HttpResponse(int status, const AnsiString &message)> ErrorResponder;
 
+      // Whether a request, by method and target, may be as large as
+      // max_request_bytes_large. Asked after the head is parsed, before the
+      // body is read; never for the head itself.
+      typedef std::function<bool(const AnsiString &method, const AnsiString &target)> LargeRequestFilter;
+
       HttpServer(const AnsiString &name, const HttpLimits &limits, Handler handler,
                  AcceptFilter accept_filter, ErrorResponder error_responder);
       ~HttpServer();
@@ -124,6 +137,9 @@ namespace HM
       bool Listen(const String &bind_address, int port, std::shared_ptr<boost::asio::ssl::context> tls);
 
       void Start();
+
+      // Set before Listen; connections copy it as they are made.
+      void SetLargeRequestFilter(LargeRequestFilter filter);
 
       // Closes the listeners and every connection, then joins the workers. A
       // handler that is running at the time is waited for.
@@ -158,6 +174,7 @@ namespace HM
       Handler handler_;
       AcceptFilter accept_filter_;
       ErrorResponder error_responder_;
+      LargeRequestFilter large_request_filter_;
 
       boost::asio::io_context io_;
       std::unique_ptr<boost::asio::executor_work_guard<boost::asio::io_context::executor_type>> work_;

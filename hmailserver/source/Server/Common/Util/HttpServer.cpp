@@ -170,11 +170,12 @@ namespace HM
          limits_(server->limits_),
          handler_(server->handler_),
          error_responder_(server->error_responder_),
+         large_request_filter_(server->large_request_filter_),
          strand_(boost::asio::make_strand(server->io_)),
          socket_(std::move(socket)),
          request_timer_(server->io_),
          connection_timer_(server->io_),
-         buffer_(server->limits_.max_request_bytes + 1),
+         buffer_(std::max(server->limits_.max_request_bytes, server->limits_.max_request_bytes_large) + 1),
          peer_(peer),
          listen_port_(listen_port),
          requests_(0),
@@ -228,11 +229,16 @@ namespace HM
 
       void ArmRequestTimer_()
       {
+         ArmRequestTimer_(limits_.request_seconds);
+      }
+
+      void ArmRequestTimer_(unsigned seconds)
+      {
          std::shared_ptr<HttpConnection> self = shared_from_this();
 
          // expires_after cancels a wait already pending, whose handler then runs
          // with operation_aborted and does nothing.
-         request_timer_.expires_after(std::chrono::seconds(limits_.request_seconds));
+         request_timer_.expires_after(std::chrono::seconds(seconds));
          request_timer_.async_wait(boost::asio::bind_executor(strand_,
             [self](const boost::system::error_code &error)
             {
@@ -324,7 +330,20 @@ namespace HM
             return;
          }
 
-         if (request_.head.size() + content_length_ > limits_.max_request_bytes)
+         // The head alone is held to the first cap whatever the route. The
+         // body may be held to the second when the filter grants it - and
+         // then the request gets the longer timer, since the body is the
+         // point and takes time to arrive.
+         size_t cap = limits_.max_request_bytes;
+         if (request_.head.size() <= limits_.max_request_bytes && limits_.max_request_bytes_large > cap &&
+             large_request_filter_ && large_request_filter_(request_.method, request_.target))
+         {
+            cap = limits_.max_request_bytes_large;
+            if (limits_.request_seconds_large > limits_.request_seconds)
+               ArmRequestTimer_(limits_.request_seconds_large);
+         }
+
+         if (request_.head.size() > limits_.max_request_bytes || request_.head.size() + content_length_ > cap)
          {
             // Refused before the body is read. The client may still be sending
             // it; the close that follows the response resets what is in flight,
@@ -611,6 +630,7 @@ namespace HM
       HttpLimits limits_;
       HttpServer::Handler handler_;
       HttpServer::ErrorResponder error_responder_;
+      HttpServer::LargeRequestFilter large_request_filter_;
       boost::asio::strand<boost::asio::io_context::executor_type> strand_;
       boost::asio::ip::tcp::socket socket_;
       std::unique_ptr<boost::asio::ssl::stream<boost::asio::ip::tcp::socket&>> tls_;
@@ -715,6 +735,12 @@ namespace HM
 
       listeners_.push_back(listener);
       return true;
+   }
+
+   void
+   HttpServer::SetLargeRequestFilter(LargeRequestFilter filter)
+   {
+      large_request_filter_ = filter;
    }
 
    void

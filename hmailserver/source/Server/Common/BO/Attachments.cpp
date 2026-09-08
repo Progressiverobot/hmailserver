@@ -70,15 +70,38 @@ namespace HM
    bool
    Attachments::Add(const String &sFilename)
    {
-      if (!FileUtilities::Exists(sFilename))      
+      return Add(sFilename, _T(""));
+   }
+
+   bool
+   Attachments::Add(const String &sFilename, const String &contentType)
+   {
+      if (!FileUtilities::Exists(sFilename))
          return false;
 
-      // Load the attachment
+      // Always created as a part the message cannot mistake for its own body.
+      // CreatePart reads the type it is given: "text/plain" and "text/html"
+      // mean "this is the body", and it rebuilds the message around that - so
+      // creating a text/plain ATTACHMENT with its declared type replaced the
+      // message's body with the attachment, silently. The declared type is
+      // applied below, once the part exists as an attachment.
       std::shared_ptr<MimeBody> pAttachment = msg_data_->CreatePart("application/octet-stream");
       pAttachment->SetTransferEncoding("base64");
 
       if (!pAttachment->ReadFromFile(sFilename))
          return false;
+
+      if (!contentType.IsEmpty() && contentType.CompareNoCase(_T("application/octet-stream")) != 0)
+      {
+         // Setting the field replaces its parameters, so the name ReadFromFile
+         // put there is read first and put back afterwards.
+         AnsiString name = pAttachment->GetParameter(CMimeConst::ContentType(), "name");
+
+         pAttachment->SetContentType(AnsiString(contentType), "");
+
+         if (!name.IsEmpty())
+            pAttachment->SetParameter(CMimeConst::ContentType(), "name", name);
+      }
 
       // Add the attachment to the collection.
       std::shared_ptr<Attachment> pItem = std::shared_ptr<Attachment>(new Attachment(mime_body_, pAttachment));

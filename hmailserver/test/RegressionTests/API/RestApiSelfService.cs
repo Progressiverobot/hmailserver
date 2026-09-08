@@ -1565,6 +1565,78 @@ namespace RegressionTests.API
          imap.Disconnect();
       }
 
+      [Test]
+      [Description("Files named in a submission go out as attachments under their names and types, and the Sent copy serves them back")]
+      public void AttachmentsGoOutWithTheMessage()
+      {
+         string other = OtherAccount();
+         byte[] numbers = Pattern(1000);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         string body =
+            "{\"to\":\"" + other + "\",\"subject\":\"With files\",\"text\":\"See attached.\",\"attachments\":[" +
+            "{\"name\":\"numbers.bin\",\"type\":\"application/octet-stream\",\"data\":\"" + Convert.ToBase64String(numbers) + "\"}," +
+            "{\"name\":\"note.txt\",\"type\":\"text/plain\",\"data\":\"" + Convert.ToBase64String(Encoding.ASCII.GetBytes("hello")) + "\"}" +
+            "]}";
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword), body);
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         long sentId = long.Parse(Between(sent.body, "\"sent_id\":", "}"));
+
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("name=\"numbers.bin\"", received);
+         StringAssert.Contains("filename=\"numbers.bin\"", received);
+         StringAssert.Contains("Content-Type: text/plain", received);
+         StringAssert.Contains("name=\"note.txt\"", received);
+         StringAssert.Contains(Convert.ToBase64String(Encoding.ASCII.GetBytes("hello")), received);
+         StringAssert.Contains("See attached.", received);
+
+         (int status, string body) copy = Http("GET", "/api/v1/me/messages/" + sentId, UserHeader(UserPassword));
+         Assert.AreEqual(200, copy.status, "Body: " + copy.body);
+         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000}", copy.body);
+         StringAssert.Contains("{\"index\":1,\"name\":\"note.txt\",\"size\":5}", copy.body);
+
+         Response file = Raw("GET", "/api/v1/me/messages/" + sentId + "/attachments/0", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, file.Status, file.Body);
+         Assert.AreEqual(numbers, file.BodyBytes);
+
+         string tooMany = "{\"to\":\"" + other + "\",\"text\":\"x\",\"attachments\":[";
+         for (int i = 0; i < 21; i++)
+            tooMany += (i > 0 ? "," : "") + "{\"name\":\"f" + i + ".txt\",\"type\":\"text/plain\",\"data\":\"aGk=\"}";
+         tooMany += "]}";
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword), tooMany);
+         Assert.AreEqual(400, refused.status, "Body: " + refused.body);
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 0);
+      }
+
+      [Test]
+      [Description("A large body is accepted where a message is sent or a draft kept, and refused everywhere else")]
+      public void LargeBodiesAreAllowedOnlyWhereTheyBelong()
+      {
+         string big = "{\"to\":\"x@example.com\",\"text\":\"" + new string('a', 200 * 1024) + "\"}";
+
+         (int status, string body) send = Http("POST", "/api/v1/me/messages", UserHeader("not-the-password"), big);
+         Assert.AreEqual(401, send.status, "The body was read and the credentials refused, not the size. Body: " + send.body);
+
+         (int status, string body) draft = Http("POST", "/api/v1/me/drafts", UserHeader("not-the-password"), big);
+         Assert.AreEqual(401, draft.status, "Body: " + draft.body);
+
+         // The two above are sent for real, body and all, because they are meant
+         // to be read. These two are refused on the declared length before the
+         // body is read, so they are asked for the way a client asks for
+         // something that might be refused - see RefusedBySize.
+         (int status, string body) elsewhere = RefusedBySize("POST", "/api/v1/me/vacation", UserHeader(UserPassword), big.Length);
+         Assert.AreEqual(413, elsewhere.status, "Body: " + elsewhere.body);
+
+         (int status, string body) admin = RefusedBySize("POST", "/api/v1/status", AdminHeader(), big.Length);
+         Assert.AreEqual(413, admin.status, "Body: " + admin.body);
+      }
+
       // ------------------------------------------------------------ helpers ---
 
       private string SignIn()
@@ -1615,6 +1687,60 @@ namespace RegressionTests.API
       {
          Response response = Raw(method, path, authorization, requestBody);
          return (response.Status, response.Body);
+      }
+
+      /// <summary>
+      /// Asks for a body the server will refuse on its declared length, the way
+      /// RFC 7231 section 5.1.1 says to ask for one: Expect: 100-continue, with
+      /// the body withheld until the server says to send it. It never does - it
+      /// answers 413 off the Content-Length - and because nothing was in flight
+      /// the answer can be read.
+      ///
+      /// Sending the body first and then reading is not a reliable way to see a
+      /// refusal, and that is the server behaving correctly rather than a race
+      /// worth fixing: it refuses before reading the body, and closing a socket
+      /// whose receive buffer still holds an unread request resets the
+      /// connection, which discards the response with it. That surfaces here as
+      /// a connection abort instead of a status.
+      /// </summary>
+      private static (int status, string body) RefusedBySize(string method, string path, string authorization, int declaredLength)
+      {
+         using (var client = new TcpClient())
+         {
+            client.Connect("127.0.0.1", RestPort);
+
+            using (NetworkStream stream = client.GetStream())
+            using (var memory = new MemoryStream())
+            {
+               var head = new StringBuilder();
+               head.Append(method + " " + path + " HTTP/1.1\r\n");
+               head.Append("Host: 127.0.0.1\r\n");
+               if (authorization != null)
+                  head.Append("Authorization: " + authorization + "\r\n");
+               head.Append("Content-Type: application/json\r\n");
+               head.Append("Content-Length: " + declaredLength + "\r\n");
+               head.Append("Expect: 100-continue\r\n");
+               head.Append("Connection: close\r\n\r\n");
+
+               byte[] bytes = Encoding.ASCII.GetBytes(head.ToString());
+               stream.Write(bytes, 0, bytes.Length);
+
+               byte[] buffer = new byte[8192];
+               int read;
+               while ((read = stream.Read(buffer, 0, buffer.Length)) > 0)
+                  memory.Write(buffer, 0, read);
+
+               string raw = Encoding.UTF8.GetString(memory.ToArray());
+               int separator = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+               string first = raw.Split(new[] { "\r\n" }, StringSplitOptions.None)[0];
+               string[] parts = first.Split(' ');
+               int status = 0;
+               if (parts.Length >= 2)
+                  int.TryParse(parts[1], out status);
+
+               return (status, separator >= 0 ? raw.Substring(separator + 4) : "");
+            }
+         }
       }
 
       private static Response Raw(string method, string path, string authorization, string requestBody, string extraHeaders = null)
