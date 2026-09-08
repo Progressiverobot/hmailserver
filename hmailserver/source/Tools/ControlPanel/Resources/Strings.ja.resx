@@ -1055,8 +1055,8 @@
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>送信配信のセッション全体に対する制限です。0 = 制限なし。</value>
   </data>
-  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
-    <value>イベント スクリプトはサーバーの内部で、サービス アカウントの権限で実行されます。そのため、スクリプトが何をインスタンス化してよいかは、利便性の問題ではなくセキュリティ上の決定です。空が安全な既定値です。スクリプトは hMailServer 自身のオブジェクトにだけ到達でき、それ以外には何も到達できません。ここにプログラム識別子 (スクリプト用のファイル システム オブジェクト、HTTP クライアントなど) を指定すると、サーバーが実行するすべてのスクリプトにそれが与えられます。ですから、自分のスクリプトが実際に必要とするものだけを指定してください。サービスの再起動後に適用されます。</value>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. As shipped this is *, which allows any object, so that upgrading never breaks a script an installation already runs - it is the setting to narrow, not the safe state. Name only what a script of yours actually needs - a scripting file system object, an HTTP client - and everything else is refused with the object's name in the error log; empty refuses everything beyond hMailServer's own objects. Applies after a service restart." xml:space="preserve">
+    <value>イベント スクリプトはサーバーの内部で、サービス アカウントの権限で実行されます。そのため、スクリプトが何をインスタンス化してよいかは、利便性の問題ではなくセキュリティ上の決定です。出荷時の設定は * で、あらゆるオブジェクトを許可します。これは、インストール済みの環境がすでに実行しているスクリプトをアップグレードが壊すことのないようにするためであり、狭めるべき設定であって、安全な状態ではありません。自分のスクリプトが実際に必要とするものだけ (スクリプト用のファイル システム オブジェクト、HTTP クライアントなど) を指定してください。それ以外はすべて拒否され、オブジェクトの名前がエラー ログに記録されます。空にすると、hMailServer 自身のオブジェクト以外はすべて拒否されます。サービスの再起動後に適用されます。</value>
   </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>外部スキャナーのプロセスに対する制限です。0 = 制限なし。</value>
@@ -1452,8 +1452,8 @@
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
-  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
-    <value>スクリプトが作成できる COM オブジェクト (コンマ区切り、空 = hMailServer 自身のもののみ)</value>
+  <data name="COM objects a script may create (* = any, as shipped; empty = none beyond hMailServer's own; ProgIDs or CLSIDs, comma separated)" xml:space="preserve">
+    <value>スクリプトが作成できる COM オブジェクト (* = すべて、出荷時の設定、空 = hMailServer 自身のもの以外は不可、ProgIDs または CLSIDs をコンマ区切りで)</value>
   </data>
   <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
     <value>COMPRESS=DEFLATE (RFC 4978)</value>
@@ -3720,8 +3720,8 @@
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>SMTP で受信したすべてのメッセージのコピーを、通常どおり配信するのに加えてフォルダー ツリーに保持します。メールを迂回させたり保留したりはしません。ローカルの送信者からのメールは &lt;domain&gt;\&lt;mailbox&gt; の下に、それ以外からのメールは Inbound の下に、エンベロープ送信者のないメッセージ (バウンスと配信レポート) は Error の下にファイルされ、さらにローカルの各受信者のフォルダーにもコピーが置かれます。</value>
   </data>
-  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
-    <value>鍵交換グループ (空 = OpenSSL の既定のリスト)</value>
+  <data name="Key exchange groups, in order of preference (empty = the classical fallback secp384r1:x25519:secp256r1)" xml:space="preserve">
+    <value>鍵交換グループ、優先度の高い順 (空 = 従来方式のフォールバック secp384r1:x25519:secp256r1)</value>
   </data>
   <data name="Key file present" xml:space="preserve">
     <value>鍵ファイルあり</value>
@@ -7426,9 +7426,6 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>実効タイムアウトは、サーバーの負荷に応じてこれらの値の間で変動します。</value>
   </data>
-  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
-    <value>このサーバーが鍵の合意に使う楕円曲線と有限体グループを、優先度の高い順に指定します。OpenSSL のグループ リストの形式で、たとえば x25519:secp256r1 のように書きます。空にすると OpenSSL が選択します。グループを名指しするコンプライアンス上の要件がない限り、それが正しい答えです。クライアントがサポートするものを 1 つも含まないリストはハンドシェイクを終わらせてしまうため、手探りで変更するのではなく、スキャンの結果に照らして変更してください。サービスの再起動後に適用されます。</value>
-  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>有効なチェックを合計しても最大 {0} にしかならず、マークしきい値の {1} を下回っています。どれほど悪質なメッセージでも、どちらのしきい値にも達することはできません。</value>
   </data>
@@ -7472,6 +7469,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="The group members could not be read: " xml:space="preserve">
     <value>グループ メンバーを読み取れませんでした:</value>
+  </data>
+  <data name="The groups this server will agree a TLS key with, in OpenSSL's list form. As shipped it offers the two post-quantum hybrids first and falls back to X25519 and the NIST curves for a peer that has neither, so nothing changes for an older client. An empty list, or one OpenSSL rejects or that would leave no group enabled, is not applied: the server logs it and uses the classical fallback, so a mistake here cannot take TLS down - but it does silently give up the hybrids, which is why the shipped list is shown rather than a blank. Change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>このサーバーが TLS 鍵の合意に使うグループを、OpenSSL のリスト形式で指定します。出荷時の設定では、2 つのポスト量子ハイブリッドを先に提示し、どちらも持たない相手には X25519 と NIST 曲線にフォールバックするため、古いクライアントにとっては何も変わりません。空のリスト、OpenSSL が拒否するリスト、あるいは有効なグループが 1 つも残らないリストは適用されません。サーバーはそれをログに記録し、従来方式のフォールバックを使うため、ここでの誤りが TLS を停止させることはありません。ただし、ハイブリッドは黙って放棄されます。空欄ではなく出荷時のリストを表示しているのはそのためです。手探りで変更するのではなく、スキャンの結果に照らして変更してください。サービスの再起動後に適用されます。</value>
   </data>
   <data name="The guided path: which half, which log lines, and the setting that bounds each stage." xml:space="preserve">
     <value>ガイド付きの手順: どちらの半分か、どのログ行か、各ステージを制限する設定はどれか。</value>

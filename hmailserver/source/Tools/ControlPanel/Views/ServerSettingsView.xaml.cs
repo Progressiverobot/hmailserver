@@ -1736,8 +1736,12 @@ namespace hMailServer.ControlPanel.Views
          ciph.Settings.Add(new IniText
          {
             Path = "TlsKeyExchangeGroups",
-            Label = L("Key exchange groups (empty = OpenSSL's default list)"),
-            Blurb = L("The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart."),
+            // What the server uses when the key is absent - shown, so that saving
+            // the page writes the truth back rather than a blank that would drop
+            // the post-quantum hybrids to the classical fallback.
+            Default = "X25519MLKEM768:SecP256r1MLKEM768:X25519:secp384r1:secp256r1",
+            Label = L("Key exchange groups, in order of preference (empty = the classical fallback secp384r1:x25519:secp256r1)"),
+            Blurb = L("The groups this server will agree a TLS key with, in OpenSSL's list form. As shipped it offers the two post-quantum hybrids first and falls back to X25519 and the NIST curves for a peer that has neither, so nothing changes for an older client. An empty list, or one OpenSSL rejects or that would leave no group enabled, is not applied: the server logs it and uses the classical fallback, so a mistake here cannot take TLS down - but it does silently give up the hybrids, which is why the shipped list is shown rather than a blank. Change it against a scan rather than in the dark. Applies after a service restart."),
             IniStore = iniStore_
          });
          var preferServer = new ComBool { Path = "TlsOptionPreferServerCiphersEnabled", Label = L("Prefer server cipher order") };
@@ -2433,8 +2437,12 @@ namespace hMailServer.ControlPanel.Views
          script.Settings.Add(new IniText
          {
             Path = "ScriptAllowedObjects",
-            Label = L("COM objects a script may create (comma separated; empty = only hMailServer's own)"),
-            Blurb = L("An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart."),
+            // Absent means "*", so that a key appearing in an upgrade cannot break
+            // scripts an installation already runs; the editor shows that, because
+            // a blank here saved back would mean "none" and break them itself.
+            Default = "*",
+            Label = L("COM objects a script may create (* = any, as shipped; empty = none beyond hMailServer's own; ProgIDs or CLSIDs, comma separated)"),
+            Blurb = L("An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. As shipped this is *, which allows any object, so that upgrading never breaks a script an installation already runs - it is the setting to narrow, not the safe state. Name only what a script of yours actually needs - a scripting file system object, an HTTP client - and everything else is refused with the object's name in the error log; empty refuses everything beyond hMailServer's own objects. Applies after a service restart."),
             IniStore = iniStore_
          });
          Tab(L("Scripting")).Cards.Add(script);

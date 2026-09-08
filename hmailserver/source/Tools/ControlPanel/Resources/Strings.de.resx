@@ -1055,8 +1055,8 @@ Das Control Panel kann Nachrichtendateien nur lesen, wenn es auf demselben Rechn
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Eine ganze ausgehende Zustellsitzung. 0 = keine Grenze.</value>
   </data>
-  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
-    <value>Ein Ereignisskript läuft im Server mit den Rechten des Dienstkontos, was es instanziieren darf, ist also eine Sicherheitsentscheidung und keine Bequemlichkeit. Leer ist die sichere Vorgabe: ein Skript erreicht die eigenen Objekte von hMailServer und sonst nichts. Einen Programmbezeichner hier zu nennen - ein Skripting-Dateisystemobjekt, einen HTTP-Client - gewährt ihn jedem Skript, das der Server ausführt, nennen Sie also nur, was ein Skript von Ihnen tatsächlich braucht. Gilt nach einem Neustart des Dienstes.</value>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. As shipped this is *, which allows any object, so that upgrading never breaks a script an installation already runs - it is the setting to narrow, not the safe state. Name only what a script of yours actually needs - a scripting file system object, an HTTP client - and everything else is refused with the object's name in the error log; empty refuses everything beyond hMailServer's own objects. Applies after a service restart." xml:space="preserve">
+    <value>Ein Ereignisskript läuft im Server mit den Rechten des Dienstkontos, was es instanziieren darf, ist also eine Sicherheitsentscheidung und keine Bequemlichkeit. Wie ausgeliefert steht hier *, was jedes Objekt erlaubt, damit ein Upgrade nie ein Skript zerstört, das eine Installation bereits ausführt - es ist die Einstellung, die einzuschränken ist, nicht der sichere Zustand. Nennen Sie nur, was ein Skript von Ihnen tatsächlich braucht - ein Skripting-Dateisystemobjekt, einen HTTP-Client - und alles andere wird mit dem Namen des Objekts im Fehlerprotokoll abgewiesen; leer weist alles außer den eigenen Objekten von hMailServer ab. Gilt nach einem Neustart des Dienstes.</value>
   </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Ein externer Scannerprozess. 0 = keine Grenze.</value>
@@ -1452,8 +1452,8 @@ Control Panel jetzt neu starten? Wählen Sie Nein, um zu versuchen weiterzuarbei
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
-  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
-    <value>COM-Objekte, die ein Skript erzeugen darf (kommagetrennt; leer = nur die eigenen von hMailServer)</value>
+  <data name="COM objects a script may create (* = any, as shipped; empty = none beyond hMailServer's own; ProgIDs or CLSIDs, comma separated)" xml:space="preserve">
+    <value>COM-Objekte, die ein Skript erzeugen darf (* = alle, wie ausgeliefert; leer = keine außer den eigenen von hMailServer; ProgIDs oder CLSIDs, kommagetrennt)</value>
   </data>
   <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
     <value>COMPRESS=DEFLATE (RFC 4978)</value>
@@ -3720,8 +3720,8 @@ Der geprüfte Installer wird dem Update-Helfer übergeben: der Dienst stoppt, di
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Behält zusätzlich zur normalen Zustellung eine Kopie jeder über SMTP empfangenen Nachricht in einem Ordnerbaum - Mail wird dabei weder umgeleitet noch zurückgehalten. Mail von einem lokalen Absender wird unter &lt;domain&gt;\&lt;mailbox&gt; abgelegt, Mail von anderswo unter Inbound und Nachrichten ohne Umschlagabsender (Unzustellbarkeitsmeldungen und Zustellberichte) unter Error, dazu eine Kopie im Ordner jedes lokalen Empfängers.</value>
   </data>
-  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
-    <value>Schlüsselaustauschgruppen (leer = die Vorgabeliste von OpenSSL)</value>
+  <data name="Key exchange groups, in order of preference (empty = the classical fallback secp384r1:x25519:secp256r1)" xml:space="preserve">
+    <value>Schlüsselaustauschgruppen, in der Reihenfolge der Bevorzugung (leer = die klassische Ausweichliste secp384r1:x25519:secp256r1)</value>
   </data>
   <data name="Key file present" xml:space="preserve">
     <value>Schlüsseldatei vorhanden</value>
@@ -7426,9 +7426,6 @@ Markieren Sie den Schlüssel oben und kopieren Sie ihn von Hand - er wird nicht 
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Der tatsächliche Timeout bewegt sich mit der Serverlast zwischen diesen Werten.</value>
   </data>
-  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
-    <value>Die elliptischen Kurven und Gruppen über endlichen Körpern, mit denen dieser Server einen Schlüssel aushandeln wird, in der Reihenfolge der Bevorzugung - die Gruppenliste von OpenSSL, zum Beispiel x25519:secp256r1. Leer bedeutet, dass OpenSSL wählt, was die richtige Antwort ist, sofern Sie kein Compliance-Regelwerk haben, das die Gruppen benennt. Eine Liste, die nichts benennt, was der Client unterstützt, beendet den Handshake, ändern Sie sie also anhand eines Scans und nicht im Blindflug. Gilt nach einem Neustart des Dienstes.</value>
-  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>Die eingeschalteten Prüfungen können zusammen höchstens {0} beitragen, was unter der Markierungsschwelle von {1} liegt: keine Nachricht kann eine der beiden Schwellen erreichen, wie schlimm sie auch sein mag.</value>
   </data>
@@ -7472,6 +7469,9 @@ konnte nicht geladen werden. Die Nachricht wurde wahrscheinlich zugestellt und i
   </data>
   <data name="The group members could not be read: " xml:space="preserve">
     <value>Die Gruppenmitglieder konnten nicht gelesen werden: </value>
+  </data>
+  <data name="The groups this server will agree a TLS key with, in OpenSSL's list form. As shipped it offers the two post-quantum hybrids first and falls back to X25519 and the NIST curves for a peer that has neither, so nothing changes for an older client. An empty list, or one OpenSSL rejects or that would leave no group enabled, is not applied: the server logs it and uses the classical fallback, so a mistake here cannot take TLS down - but it does silently give up the hybrids, which is why the shipped list is shown rather than a blank. Change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>Die Gruppen, mit denen dieser Server einen TLS-Schlüssel aushandeln wird, in der Listenform von OpenSSL. Wie ausgeliefert bietet er zuerst die beiden Post-Quanten-Hybride an und weicht für eine Gegenstelle, die keines von beiden hat, auf X25519 und die NIST-Kurven aus, sodass sich für einen älteren Client nichts ändert. Eine leere Liste, oder eine, die OpenSSL ablehnt oder die keine Gruppe aktiviert ließe, wird nicht übernommen: der Server protokolliert sie und verwendet die klassische Ausweichliste, ein Fehler hier kann TLS also nicht lahmlegen - er gibt aber stillschweigend die Hybride auf, weshalb die ausgelieferte Liste angezeigt wird und kein leeres Feld. Ändern Sie sie anhand eines Scans und nicht im Blindflug. Gilt nach einem Neustart des Dienstes.</value>
   </data>
   <data name="The guided path: which half, which log lines, and the setting that bounds each stage." xml:space="preserve">
     <value>Der geführte Weg: welche Hälfte, welche Protokollzeilen und die Einstellung, die jede Stufe begrenzt.</value>
