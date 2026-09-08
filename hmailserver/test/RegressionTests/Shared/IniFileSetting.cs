@@ -60,12 +60,22 @@ namespace RegressionTests.Shared
       /// </summary>
       public static void Write(string key, string value)
       {
+         Write("Settings", key, value);
+      }
+
+      /// <summary>
+      ///    The same, for any section. [Directories] is the other one a test has a
+      ///    reason to write (InstallationPaths), and it takes a service restart
+      ///    rather than a Reinitialize to be read.
+      /// </summary>
+      public static void Write(string section, string key, string value)
+      {
          bool wroteAny = false;
 
          foreach (string iniPath in ExistingIniFiles())
          {
             Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
+               IniFile.WritePrivateProfileString(section, key, value, iniPath),
                "Failed to write " + key + " to " + iniPath + ".");
 
             // The value has to be on disk before the service is reinitialized and
@@ -88,8 +98,13 @@ namespace RegressionTests.Shared
       /// </summary>
       public static string Read(string key)
       {
+         return Read("Settings", key);
+      }
+
+      public static string Read(string section, string key)
+      {
          foreach (string iniPath in ExistingIniFiles())
-            return IniFile.GetValue("Settings", key, string.Empty, iniPath);
+            return IniFile.GetValue(section, key, string.Empty, iniPath);
 
          Assert.Fail("Could not locate an existing hMailServer.ini to read.");
          return string.Empty;
@@ -106,12 +121,17 @@ namespace RegressionTests.Shared
       /// </summary>
       public static void Delete(string key)
       {
+         Delete("Settings", key);
+      }
+
+      public static void Delete(string section, string key)
+      {
          bool deletedAny = false;
 
          foreach (string iniPath in ExistingIniFiles())
          {
             Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, null, iniPath),
+               IniFile.WritePrivateProfileString(section, key, null, iniPath),
                "Failed to delete " + key + " from " + iniPath + ".");
 
             IniFile.WritePrivateProfileString(null, null, null, iniPath);
