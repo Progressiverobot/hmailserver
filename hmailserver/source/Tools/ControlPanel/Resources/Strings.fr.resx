@@ -3205,6 +3205,9 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
   <data name="Forward e-mail" xml:space="preserve">
     <value>Transférer l'e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Proxy sortant pour chaque requête web de ce serveur - le flux, ses téléchargements, JWKS, l'introspection de jetons (host:port ; vide = connexion directe ; aucun identifiant de proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Courrier transféré et protection contre les rebonds (SRS / BATV)</value>
   </data>

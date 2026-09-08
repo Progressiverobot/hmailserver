@@ -3205,6 +3205,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Forward e-mail" xml:space="preserve">
     <value>Encaminhar e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Proxy de encaminhamento para cada requisição web deste servidor - o feed, seus downloads, JWKS, a introspecção de tokens (host:port; vazio = direto; sem credenciais de proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>E-mails encaminhados e proteção contra bounces (SRS / BATV)</value>
   </data>

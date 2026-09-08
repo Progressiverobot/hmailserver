@@ -3205,6 +3205,9 @@ Keine Mail wird angerührt - der Index ist daraus abgeleitet - aber bis der Neua
   <data name="Forward e-mail" xml:space="preserve">
     <value>E-Mail weiterleiten</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Forward-Proxy für jede Webanfrage dieses Servers - den Feed, dessen Downloads, JWKS, Token-Introspektion (host:port; leer = direkt; keine Proxy-Anmeldedaten)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Weitergeleitete Mail und Bounce-Schutz (SRS / BATV)</value>
   </data>

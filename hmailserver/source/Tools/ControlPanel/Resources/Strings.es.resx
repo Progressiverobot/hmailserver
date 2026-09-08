@@ -3205,6 +3205,9 @@ No se toca ningún correo - el índice se deriva de él - pero hasta que la reco
   <data name="Forward e-mail" xml:space="preserve">
     <value>Reenviar correo</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Proxy de reenvío para cada petición web que hace este servidor - la fuente, sus descargas, JWKS, la introspección de tokens (host:port; vacío = directo; sin credenciales de proxy)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Correo reenviado y protección contra rebotes (SRS / BATV)</value>
   </data>

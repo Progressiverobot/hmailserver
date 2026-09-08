@@ -3205,6 +3205,9 @@ Control Panel может читать файлы сообщений только
   <data name="Forward e-mail" xml:space="preserve">
     <value>Переслать письмо</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Прокси-сервер для каждого веб-запроса этого сервера — ленты, её загрузок, JWKS, интроспекции токенов (host:port; пусто — прямое подключение; без учётных данных прокси)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Пересылаемая почта и защита от подделки отчётов о недоставке (SRS / BATV)</value>
   </data>

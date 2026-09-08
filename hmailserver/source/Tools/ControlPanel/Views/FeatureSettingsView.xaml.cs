@@ -1933,6 +1933,7 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "UpdateCheckHours", Default = "24", Label = L("Hours between checks (1 to 168)"), Placeholder = "24" },
                      new TextSetting { Key = "UpdateChannel", Default = "stable", Label = L("Channel: stable, or prerelease to run ahead on a test machine"), Placeholder = "stable" },
                      new TextSetting { Key = "UpdateFeedUrl", Label = L("Feed URL (empty = this project's GitHub releases; set for a mirror)"), Placeholder = "https://api.github.com/repos/Progressiverobot/hmailserver/releases" },
+                     new TextSetting { Key = "HttpProxy", Label = L("Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)"), Placeholder = "proxy.example.net:3128" },
                      new BoolSetting { Key = "UpdateAutoDownload", Default = false, Label = L("Download and verify the installer as soon as a release is found") },
                      new TextSetting
                      {

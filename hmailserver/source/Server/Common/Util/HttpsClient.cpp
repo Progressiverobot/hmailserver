@@ -9,6 +9,7 @@
 #include "../TCPIP/CertificateVerifier.h"
 #include "../TCPIP/SslContextInitializer.h"
 #include "FileUtilities.h"
+#include "../Application/IniFileSettings.h"
 #include <fstream>
 
 #include <boost/asio.hpp>
@@ -77,6 +78,123 @@ namespace HM
          DWORD timeout = (DWORD) timeout_seconds * 1000;
          setsockopt(socket.native_handle(), SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
          setsockopt(socket.native_handle(), SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+      }
+   }
+
+   namespace
+   {
+      // HttpProxy split into host and port; both empty when there is none. A value
+      // without a port is an error the caller reports rather than a silent direct
+      // connection: somebody who set a proxy expects the traffic to go through it.
+      bool ProxySetting_(std::string &proxy_host, std::string &proxy_port, String &error)
+      {
+         proxy_host.clear();
+         proxy_port.clear();
+
+         AnsiString setting = AnsiString(IniFileSettings::Instance()->GetHttpProxy());
+         std::string value = std::string(setting.c_str());
+
+         size_t first = value.find_first_not_of(" \t");
+         size_t last = value.find_last_not_of(" \t");
+         value = (first == std::string::npos) ? std::string() : value.substr(first, last - first + 1);
+
+         if (value.empty())
+            return true;
+
+         const size_t colon = value.rfind(':');
+         if (colon == std::string::npos || colon == 0 || colon + 1 >= value.size())
+         {
+            error = _T("HttpProxy must be host:port (or [ipv6]:port).");
+            return false;
+         }
+
+         std::string host = value.substr(0, colon);
+         if (host.size() > 2 && host.front() == '[' && host.back() == ']')
+            host = host.substr(1, host.size() - 2);
+         else if (host.find(':') != std::string::npos)
+         {
+            // An IPv6 literal without brackets: the last colon is inside the address.
+            error = _T("HttpProxy must be host:port (or [ipv6]:port).");
+            return false;
+         }
+
+         const std::string port = value.substr(colon + 1);
+         if (port.find_first_not_of("0123456789") != std::string::npos)
+         {
+            error = _T("HttpProxy must be host:port (or [ipv6]:port).");
+            return false;
+         }
+
+         proxy_host = host;
+         proxy_port = port;
+         return true;
+      }
+
+      // Connects socket to host:port - directly, or through the proxy when one is
+      // configured. For an https target the proxy is asked to CONNECT and the TLS
+      // handshake then runs inside the tunnel, so the proxy sees the name it was
+      // asked for and nothing of what follows. For plain http the caller has put
+      // the absolute URL in its request line and the proxy forwards it.
+      bool Connect_(boost::asio::io_context &io, boost::asio::ip::tcp::socket &socket, const AnsiString &host,
+                    const AnsiString &port, bool https, int timeout_seconds, String &error)
+      {
+         std::string proxyHost, proxyPort;
+         if (!ProxySetting_(proxyHost, proxyPort, error))
+            return false;
+
+         boost::asio::ip::tcp::resolver resolver(io);
+
+         if (proxyHost.empty())
+         {
+            boost::asio::connect(socket, resolver.resolve(std::string(host.c_str()), std::string(port.c_str())));
+            SetSocketTimeouts_(socket, timeout_seconds);
+            return true;
+         }
+
+         boost::asio::connect(socket, resolver.resolve(proxyHost, proxyPort));
+         SetSocketTimeouts_(socket, timeout_seconds);
+
+         if (!https)
+            return true;
+
+         const std::string target = std::string(host.c_str()) + ":" + std::string(port.c_str());
+         const std::string connectRequest = "CONNECT " + target + " HTTP/1.1\r\nHost: " + target + "\r\nUser-Agent: hMailServer\r\n\r\n";
+         boost::asio::write(socket, boost::asio::buffer(connectRequest));
+
+         // The proxy's answer ends at the blank line, and a proxy sends nothing more
+         // until the client speaks, so read_until cannot swallow TLS bytes. A proxy
+         // that talks for longer than 16 KB before that line is refused by the cap.
+         boost::asio::streambuf answer(16384);
+         boost::asio::read_until(socket, answer, "\r\n\r\n");
+
+         std::istream lines(&answer);
+         std::string statusLine;
+         std::getline(lines, statusLine);
+         if (!statusLine.empty() && statusLine.back() == '\r')
+            statusLine.pop_back();
+
+         const size_t space = statusLine.find(' ');
+         const int status = (statusLine.compare(0, 5, "HTTP/") == 0 && space != std::string::npos) ? atoi(statusLine.c_str() + space + 1) : 0;
+
+         if (status < 200 || status > 299)
+         {
+            error = Formatter::Format(_T("The proxy {0} refused CONNECT to {1}: {2}"),
+               String((proxyHost + ":" + proxyPort).c_str()), String(target.c_str()), String(statusLine.c_str()));
+            return false;
+         }
+
+         return true;
+      }
+
+      // The request-target for the request line: the path, or through a proxy for
+      // plain http the absolute URL, which is how a forward proxy is told where to go.
+      AnsiString RequestTarget_(const AnsiString &host, const AnsiString &port, const AnsiString &path, bool https, bool via_proxy)
+      {
+         if (https || !via_proxy)
+            return path;
+
+         const std::string absolute = "http://" + std::string(host.c_str()) + ":" + std::string(port.c_str()) + std::string(path.c_str());
+         return AnsiString(absolute.c_str());
       }
    }
 
@@ -200,10 +318,14 @@ namespace HM
          return false;
       }
 
+      std::string proxyHost, proxyPort;
+      if (!ProxySetting_(proxyHost, proxyPort, error))
+         return false;
+
       AnsiString request;
       request.append(method);
       request.append(" ");
-      request.append(path);
+      request.append(RequestTarget_(host, port, path, https, !proxyHost.empty()));
       request.append(" HTTP/1.0\r\nHost: ");
       request.append(host);
       request.append("\r\nUser-Agent: hMailServer\r\nAccept: application/json\r\n");
@@ -231,9 +353,6 @@ namespace HM
       try
       {
          boost::asio::io_context ioContext;
-         boost::asio::ip::tcp::resolver resolver(ioContext);
-         boost::asio::ip::tcp::resolver::results_type endpoints =
-            resolver.resolve(std::string(host.c_str()), std::string(port.c_str()));
 
          std::string raw;
 
@@ -248,8 +367,8 @@ namespace HM
             SslContextInitializer::InitClient(sslContext, false);
 
             boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
-            boost::asio::connect(stream.next_layer(), endpoints);
-            SetSocketTimeouts_(stream.next_layer(), timeout_seconds);
+            if (!Connect_(ioContext, stream.next_layer(), host, port, true, timeout_seconds, error))
+               return false;
 
             stream.set_verify_mode(boost::asio::ssl::verify_peer);
             stream.set_verify_callback(CertificateVerifier(0, CSSSL, String(host)));
@@ -272,8 +391,8 @@ namespace HM
          else
          {
             boost::asio::ip::tcp::socket socket(ioContext);
-            boost::asio::connect(socket, endpoints);
-            SetSocketTimeouts_(socket, timeout_seconds);
+            if (!Connect_(ioContext, socket, host, port, false, timeout_seconds, error))
+               return false;
 
             boost::asio::write(socket, boost::asio::buffer(request.c_str(), request.GetLength()));
 
@@ -401,9 +520,13 @@ namespace HM
             return false;
          }
 
+         std::string proxyHost, proxyPort;
+         if (!ProxySetting_(proxyHost, proxyPort, error))
+            return false;
+
          AnsiString request;
          request.append("GET ");
-         request.append(requestPath);
+         request.append(RequestTarget_(host, port, requestPath, https, !proxyHost.empty()));
          request.append(" HTTP/1.0\r\nHost: ");
          request.append(host);
          request.append("\r\nUser-Agent: hMailServer\r\nAccept: */*\r\nConnection: close\r\n\r\n");
@@ -420,9 +543,6 @@ namespace HM
          try
          {
             boost::asio::io_context ioContext;
-            boost::asio::ip::tcp::resolver resolver(ioContext);
-            boost::asio::ip::tcp::resolver::results_type endpoints =
-               resolver.resolve(std::string(host.c_str()), std::string(port.c_str()));
 
             // The headers are read first with no sink; the body's first bytes are
             // held by the reader until the sink exists. To keep the reader simple the
@@ -445,8 +565,12 @@ namespace HM
                SslContextInitializer::InitClient(sslContext, false);
 
                boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
-               boost::asio::connect(stream.next_layer(), endpoints);
-               SetSocketTimeouts_(stream.next_layer(), timeout_seconds);
+               if (!Connect_(ioContext, stream.next_layer(), host, port, true, timeout_seconds, error))
+               {
+                  sink.close();
+                  FileUtilities::DeleteFile(path);
+                  return false;
+               }
                stream.set_verify_mode(boost::asio::ssl::verify_peer);
                stream.set_verify_callback(CertificateVerifier(0, CSSSL, String(host)));
                if (!SSL_set_tlsext_host_name(stream.native_handle(), host.c_str()))
@@ -463,8 +587,12 @@ namespace HM
             else
             {
                boost::asio::ip::tcp::socket socket(ioContext);
-               boost::asio::connect(socket, endpoints);
-               SetSocketTimeouts_(socket, timeout_seconds);
+               if (!Connect_(ioContext, socket, host, port, false, timeout_seconds, error))
+               {
+                  sink.close();
+                  FileUtilities::DeleteFile(path);
+                  return false;
+               }
                boost::asio::write(socket, boost::asio::buffer(request.c_str(), request.GetLength()));
                responded = ReadResponseToSink_(socket, headerBlock, &sink, max_bytes, bodyBytes, tooLarge);
             }

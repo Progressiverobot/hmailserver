@@ -3205,6 +3205,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Forward e-mail" xml:space="preserve">
     <value>Forward e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Forwarded mail &amp; bounce protection (SRS / BATV)</value>
   </data>

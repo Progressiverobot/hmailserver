@@ -3205,6 +3205,9 @@ Ingen post røres – indekset er udledt af den – men indtil genopbygningen ha
   <data name="Forward e-mail" xml:space="preserve">
     <value>Videresend e-mail</value>
   </data>
+  <data name="Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)" xml:space="preserve">
+    <value>Videresendelsesproxy for hver webforespørgsel denne server foretager - feedet, dets downloads, JWKS, tokenintrospektion (host:port; tom = direkte; ingen proxylegitimationsoplysninger)</value>
+  </data>
   <data name="Forwarded mail &amp; bounce protection (SRS / BATV)" xml:space="preserve">
     <value>Videresendt post og beskyttelse mod bounces (SRS / BATV)</value>
   </data>

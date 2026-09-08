@@ -120,6 +120,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Check for a new release once a day (UpdateCheckEnabled)", "UpdateCheckEnabled", "api"),
          new SettingEntry("Download and verify the installer as soon as a release is found", "UpdateAutoDownload", "api"),
          new SettingEntry("Feed URL (empty = this project's GitHub releases; set for a mirror)", "UpdateFeedUrl", "api"),
+         new SettingEntry("Forward proxy for every web request this server makes - the feed, its downloads, JWKS, token introspection (host:port; empty = direct; no proxy credentials)", "HttpProxy", "api"),
          new SettingEntry("Hours between checks (1 to 168)", "UpdateCheckHours", "api"),
          new SettingEntry("HTTP Basic password for /metrics", "MetricsServerAuthPassword", "api"),
          new SettingEntry("HTTP Basic user name for /metrics (empty = Basic off)", "MetricsServerAuthUsername", "api"),
