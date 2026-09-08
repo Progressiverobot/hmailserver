@@ -156,6 +156,16 @@ already cost a release cycle or nearly shipped a defect.
     gh release edit vX.Y.Z --draft=false                   # publish, now complete
     ```
 
+    **The installer's name is not cosmetic.** It must be exactly
+    `hMailServer-<tag without the leading v>-x64.exe`, with its `.cosign.bundle`
+    beside it. The update checker in every running server builds that name from
+    the tag and matches an asset on exact equality; a release named anything else
+    reports "a new version is available" and then "there is nothing to download"
+    to every installation in the field. This was broken once already, at
+    `v6.2.22-pre3`, whose installer was `hMailServer-6.2.22-x64.exe`. The signing
+    workflow now refuses a release that does not carry the expected name, so the
+    check happens before publication rather than after somebody notices.
+
     Order matters twice over: the SBOMs have to be on before signing, because
     cosign signs whatever is attached when it runs; and everything has to be on
     before publication, because nothing can be added afterwards. 6.2.22-pre4 was

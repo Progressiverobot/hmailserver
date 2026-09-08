@@ -464,6 +464,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>Een bericht met score {0} of hoger wordt geweigerd (550 vóór de inhoud, 554 erna). Er wordt niets gemarkeerd.</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>Een bericht aan tien lokale postvakken wordt één keer weggeschreven en tien keer gekoppeld in plaats van tien keer gekopieerd, en dat is bij een groot bericht aan een distributielijst het verschil tussen één schijfschrijfactie en tien. Vereist dat de datamap op NTFS staat; kan de koppeling niet worden gemaakt, dan kopieert de server het bestand en meldt dat in het SMTP-logboek. Geldt na een herstart van de service.</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>Een moderne beheertoepassing voor hMailServer: live dashboard, domeinen en accounts, bezorgwachtrij, logstreaming, volledige serverinstellingen en de transportbeveiligingsfuncties van 6.x (DANE, MTA-STS, ARC, TLS-RPT, ACME).</value>
   </data>
@@ -1052,6 +1055,9 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Een hele uitgaande bezorgsessie. 0 = geen grens.</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>Een gebeurtenisscript draait binnen de server met de rechten van het serviceaccount, dus wat het mag instantiëren is een beveiligingsbeslissing en geen kwestie van gemak. Leeg is de veilige standaard: een script bereikt de eigen objecten van hMailServer en niets anders. Hier een programma-identificatie noemen - een bestandssysteemobject voor scripting, een HTTP-client - verleent die aan elk script dat de server draait, dus noem alleen wat een script van u werkelijk nodig heeft. Geldt na een herstart van de service.</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Een extern scannerproces. 0 = geen grens.</value>
   </data>
@@ -1446,6 +1452,12 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>COM-objecten die een script mag aanmaken (door komma's gescheiden; leeg = alleen die van hMailServer zelf)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>C_A-certificaatbundel (PEM) waarnaar clientcertificaten moeten ketenen</value>
   </data>
@@ -1525,6 +1537,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>Certificaat en sleutel moeten BEIDE zijn ingesteld om HTTPS te kunnen serveren; met slechts één van beide wordt TLS NIET ingeschakeld en legt de server dat vast. Anders dan bij de listener van de REST-API is er hier geen terugval op het ACME-certificaat. Is TLS geconfigureerd maar kan het niet worden voorbereid (een onleesbaar bestand, een sleutel die niet past), dan blijven de gezondheidscontroles op gewone HTTP en antwoordt /metrics met 503 in plaats van de expositie in klare tekst te serveren.</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>Certificaatautoriteitsbestand voor een privé-Sigstore (PEM; leeg = de openbare Fulcio-roots)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>Certificaatbestand</value>
@@ -3343,6 +3358,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Geeft het geverifieerde installatieprogramma door aan de updatehelper. De service stopt en start; komt hij niet terug, dan wordt de vorige versie opnieuw geïnstalleerd. De uitkomst wordt hier gemeld zodra de service weer draait.</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>De kopie van elke lokale ontvanger als hardlink maken in plaats van het bestand te kopiëren</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>De kopie van elke ontvanger als hardlink maken in plaats van te kopiëren</value>
   </data>
@@ -3541,6 +3559,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="I_P address" xml:space="preserve">
     <value>I_P-adres</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>Identiteitsprovider die het ondertekeningscertificaat heeft uitgegeven (leeg = die van GitHub)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>Identiteit waaronder de resultaten worden geschreven (leeg = de naam van deze computer)</value>
   </data>
@@ -3699,6 +3720,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Bewaart een kopie van elk bericht dat via SMTP is ontvangen in een mappenboom, naast de normale bezorging - het leidt geen mail om en houdt niets tegen. Mail van een lokale afzender wordt opgeslagen onder &lt;domain&gt;\&lt;mailbox&gt;, mail van elders onder Inbound, en berichten zonder envelopafzender (bounces en bezorgingsrapporten) onder Error, plus een kopie in de map van elke lokale ontvanger.</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>Sleuteluitwisselingsgroepen (leeg = de standaardlijst van OpenSSL)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>Sleutelbestand aanwezig</value>
   </data>
@@ -3765,6 +3789,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>Laat de host leeg en het domein heeft geen mening: de serverbrede SMTP-relayer geldt, precies zoals vóór het bestaan van deze instelling. Een route wint nog steeds van allebei, omdat een route een uitspraak over de bestemming is.</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>Laat dit uitstaan tenzij u uw eigen installatieprogramma's bouwt en ondertekent. De releases van dit project zijn nog niet met Authenticode ondertekend, dus dit aanzetten weigert elke release die er is: de download stopt met "het installatieprogramma draagt geen Authenticode-handtekening" en er kan nooit een update worden toegepast. De Sigstore-handtekening, die elke release wél draagt, wordt hoe dan ook gecontroleerd en is niet optioneel.</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>Leeg gelaten gebruikt de server het meegeleverde filter dat in het grijs wordt getoond - objectCategory eerst omdat dat in Active Directory geïndexeerd is, en sAMAccountName omdat dat is wat het tabblad Directory van het account opslaat. %u is de Active Directory-gebruikersnaam van het account, %d zijn AD-domein, %m zijn volledige e-mailadres; alle drie worden vóór de substitutie geëscapet, zodat een vijandige aanmeldnaam het filter niet kan herschrijven. Een filter dat op meer dan één vermelding past, authenticeert niemand - met opzet.</value>
   </data>
@@ -3776,6 +3803,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Laat Outlook, Thunderbird en mobiele clients zichzelf instellen op basis van alleen een e-mailadres, door de configuratie-URL's van deze server op te halen.</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>Laat een client vragen of de rest van de sessie gecomprimeerd wordt, wat het meest oplevert op een trage verbinding of een verbinding met datalimiet, waar een grote postvaklijst grotendeels uit herhaalde tekst bestaat. Staat standaard aan; een client die er niet om vraagt, merkt er niets van. Geldt na een herstart van de service.</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>Laat clients zich aanmelden met bearertokens van een identiteitsprovider in plaats van met wachtwoorden; tokens worden alleen geaccepteerd als hun handtekening klopt tegen sleutelmateriaal dat u installeert.</value>
@@ -4316,6 +4346,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>Naar IMAP-map verplaatsen</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>Een bericht verplaatsen naar de map die als Junk is aangewezen, meldt het als spam aan sa-learn, en er een weer uit verplaatsen meldt het als ham, zodat het filter leert van wat mensen toch al doen in plaats van van een apart ritueel dat niemand uitvoert. Staat standaard uit: het draait sa-learn per verplaatsing, en een gebruiker die nieuwsbrieven in Junk opbergt, leert het filter dat nieuwsbrieven spam zijn voor iedereen die de scanner bedient. Geldt na een herstart van de service.</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>Moet een absolute URL zijn, net als hierboven.</value>
@@ -5783,6 +5816,9 @@ SMTP 25 en 587, POP3 110, IMAP 143 - zonder verbindingsbeveiliging. TLS-poorten 
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>De asynchrone werkwachtrij als vastgelopen melden na (seconden)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>Repository die het ondertekeningscertificaat moet noemen (leeg = dit project; - = niet controleren)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>Vragen (verifiëren en loggen, nooit weigeren)</value>
   </data>
@@ -6504,8 +6540,14 @@ Doorgaan?</value>
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>Stuurt dagelijkse samengevoegde rapporten over mislukte TLS-verbindingen naar ontvangende domeinen (RFC 8460).</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>Verstuurt de commando's van een transactie zonder op elk antwoord te wachten, wat een round trip per ontvanger scheelt - het verschil is het grootst op een trage verbinding of naar een verre server. Wordt alleen gebruikt bij een server die het aankondigt. Geldt na een herstart van de service.</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>Stuurt de dagelijkse samengevoegde rapporten waar domeinen met een rua=-tag in hun DMARC-record om vragen (RFC 7489) - wie er mail heeft verstuurd die beweerde van hen te zijn, en of die slaagde. Rapporten gaan alleen naar een adres buiten het beleidsdomein wanneer de eigen DNS van dat adres zegt dat het ze wil, zodat een domein zijn DMARC-record niet kan gebruiken om de rapporten van deze server op iemand anders te richten.</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>Verstuurt het bericht als getelde brokken in plaats van als DATA met punt-stuffing. Het is ook wat een binair bericht verderop draagt zonder het te herschrijven: een bericht dat als BINARYMIME is geaccepteerd, kan alleen zoals het aankwam worden doorgestuurd naar een server die zowel dit als BINARYMIME aanbiedt. Geldt na een herstart van de service.</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>Stuurt het adres van de ontvanger als de User:-header, zodat spamd de eigen voorkeuren van dat postvak toepast - de vorm die een spamd met virtuele gebruikers (--virtual-config-dir met %u of %d) verwacht. Een scan draait één keer per bericht, niet één keer per ontvanger, dus een bericht aan meerdere mensen kan niet onder de voorkeuren van een van hen worden gescand en gebruikt in plaats daarvan het profiel hierboven.</value>
@@ -6778,6 +6820,9 @@ Nu herstarten?</value>
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>Ondertekenings_algoritme</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>Ondertekeningsidentiteit waarmee het certificaat moet beginnen (leeg = de release-workflow van dit project)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>Bezig met aanmelden…</value>
@@ -7118,6 +7163,9 @@ Nu herstarten?</value>
   <data name="Tasks" xml:space="preserve">
     <value>Taken</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>SpamAssassin laten bijleren wanneer een gebruiker een bericht als spam opbergt of het er weer uit haalt</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Vertelt verzendende servers dat zij TLS moeten gebruiken bij bezorging aan uw domeinen, waarmee het downgradegat in opportunistische TLS wordt gedicht.</value>
   </data>
@@ -7378,6 +7426,9 @@ Selecteer de sleutel hierboven en kopieer die met de hand - hij wordt niet opnie
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>De effectieve time-out beweegt tussen deze waarden mee met de serverbelasting.</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>De elliptische krommen en groepen over eindige lichamen waarmee deze server een sleutel wil overeenkomen, in volgorde van voorkeur - de groepenlijst van OpenSSL, bijvoorbeeld x25519:secp256r1. Leeg betekent dat OpenSSL kiest, en dat is het juiste antwoord tenzij u een complianceregime hebt dat de groepen bij naam noemt. Een lijst die niets noemt wat de client ondersteunt, beëindigt de handshake, dus wijzig hem aan de hand van een scan en niet in het duister. Geldt na een herstart van de service.</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>De ingeschakelde controles kunnen samen hoogstens {0} opleveren, wat onder de markeerdrempel van {1} ligt: geen enkel bericht kan een van beide drempels bereiken, hoe slecht het ook is.</value>
   </data>
@@ -7496,6 +7547,9 @@ kon niet worden geladen. Het bericht is waarschijnlijk bezorgd en staat niet mee
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>De taal kon niet worden opgeslagen: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>De laatste vijf instellingen op deze kaart zijn bedoeld voor een site die zijn eigen releases bouwt en die met zijn eigen Sigstore ondertekent, of die de releases van dit project spiegelt. Laat ze allemaal leeg en de server vertrouwt precies één ding: een installatieprogramma dat is ondertekend door de eigen release-workflow van dit project, vastgelegd in het openbare transparantielogboek. Een ervan instellen versmalt dat of vervangt het, en er een verkeerd zetten betekent ofwel echte releases weigeren ofwel die van iemand anders vertrouwen.</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>De laatste updatestap is mislukt: {0}</value>
@@ -7990,6 +8044,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>Alleen traces. Een collector die hier is ingesteld, ontvangt spans en verder niets - meetpunten en logboeken hebben hun eigen eindpunten hieronder, elk uit totdat het is ingesteld. Prometheus-meetpunten lopen via de poort hierboven en zijn dezelfde tellers die het meetpunteneindpunt pusht, geen tweede telling.</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>Publieke sleutel van het transparantielogboek voor een privé-Sigstore (PEM; leeg = de openbare Rekor-sleutel)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>Overzicht van transportversleuteling</value>
   </data>
@@ -8142,6 +8199,12 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>ARC-resultaten van vertrouwde doorstuurders gebruiken om een DMARC-fout te compenseren</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>CHUNKING (BDAT) gebruiken wanneer de ontvangende server het aanbiedt</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>PIPELINING gebruiken wanneer de ontvangende server het aanbiedt</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>SpamAssassin gebruiken</value>

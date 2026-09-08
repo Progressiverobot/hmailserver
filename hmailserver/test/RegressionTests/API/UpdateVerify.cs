@@ -416,7 +416,18 @@ namespace RegressionTests.API
          if (!Directory.Exists(_updatesDirectory))
             return;
          foreach (string file in Directory.GetFiles(_updatesDirectory))
-            File.Delete(file);
+         {
+            try
+            {
+               File.Delete(file);
+            }
+            catch (UnauthorizedAccessException)
+            {
+               // apply-token carries a DACL naming SYSTEM, Administrators and the
+               // service account only; the suite is none of those. The server
+               // revokes it after an apply, and one never redeemed expires.
+            }
+         }
       }
 
       // ---- plumbing ----------------------------------------------------------------

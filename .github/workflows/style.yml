@@ -86,6 +86,14 @@ jobs:
       - name: The catalogues keep the server's own words, the numbers and the page names
         run: python3 build/check-catalogues.py
 
+      # A setting an administrator can only reach by opening a text file on the
+      # server is one the Control Panel does not have. This reads the keys out of
+      # IniFileSettings and fails when one of them is named nowhere in the Control
+      # Panel - which is how the live update's five trust settings were found
+      # missing after the feature had shipped.
+      - name: Every INI setting can be set from the Control Panel
+        run: python3 build/check-ini-coverage.py
+
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.
       - name: Every folder-access decision is ACLManager's

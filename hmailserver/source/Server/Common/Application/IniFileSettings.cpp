@@ -489,6 +489,8 @@ namespace HM
       update_check_enabled_ = ReadIniSettingInteger_("Settings", "UpdateCheckEnabled", 0) == 1;
       update_channel_ = ReadIniSettingString_("Settings", "UpdateChannel", "stable");
       update_feed_url_ = ReadIniSettingString_("Settings", "UpdateFeedUrl", "");
+      caldav_redirect_url_ = ReadIniSettingString_("Settings", "CalDavRedirectUrl", "");
+      carddav_redirect_url_ = ReadIniSettingString_("Settings", "CardDavRedirectUrl", "");
       update_check_hours_ = ReadIniSettingInteger_("Settings", "UpdateCheckHours", 24);
       if (update_check_hours_ < 1)
          update_check_hours_ = 1;

@@ -11,6 +11,8 @@
 #include "../Util/UpdateChecker.h"
 #include "../Util/UpdateDownloader.h"
 #include "../Util/UpdateInstaller.h"
+#include "../Util/FileUtilities.h"
+#include "../Util/FileInfo.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -24,6 +26,58 @@ namespace HM
       // A backup of a large message store takes a while; an hour is the limit
       // before the window is given up for this run.
       const int BACKUP_WAIT_SECONDS = 3600;
+
+      // Data\\Updates is the only directory this server writes to and never
+      // cleans. Each update leaves the installer it applied (tens of megabytes),
+      // the rollback image of the version it replaced (tens more), the bundles
+      // beside them and a log per attempt - on the same volume as the mail store.
+      // Left alone that is gigabytes over the life of an installation, and the
+      // first anyone hears of it is a disk filling up.
+      //
+      // Kept: anything naming the running version or the one currently offered,
+      // and the outcome file the Control Panel reads. Everything else is a version
+      // this server has finished with. Nothing here is load-bearing - a deleted
+      // installer is downloaded and verified again - so a failure is not reported.
+      void Sweep_(const UpdateChecker::Snapshot &snapshot)
+      {
+         String directory = UpdateDownloader::UpdatesDirectory();
+         if (directory.IsEmpty() || !FileUtilities::DirectoryExists(directory))
+            return;
+
+         String running = UpdateChecker::RunningVersion();
+
+         std::vector<String> directories;
+         directories.push_back(directory);
+         directories.push_back(directory + _T("\\rollback"));
+
+         for (const String &folder : directories)
+         {
+            if (!FileUtilities::DirectoryExists(folder))
+               continue;
+
+            std::vector<FileInfo> files = FileUtilities::GetFilesInDirectory(folder, _T(""));
+            for (FileInfo &file : files)
+            {
+               String name = file.GetName();
+
+               // The helper, the token and the outcome the next start reports.
+               if (name.CompareNoCase(_T("hMailServer.Updater.exe")) == 0 ||
+                   name.CompareNoCase(_T("apply-token")) == 0 ||
+                   name.Find(_T("last-apply")) >= 0)
+                  continue;
+
+               // A file naming a version still in play. The name carries the
+               // version because the release flow names it that way, which is the
+               // same convention the checker matches the asset on.
+               if (!running.IsEmpty() && name.Find(running) >= 0)
+                  continue;
+               if (!snapshot.available_version.IsEmpty() && name.Find(snapshot.available_version) >= 0)
+                  continue;
+
+               FileUtilities::DeleteFile(folder + _T("\\") + name);
+            }
+         }
+      }
 
       // Backs up before an unattended apply, when UpdateBackupBeforeApply says to.
       // False - with the reason logged - means the update is not applied this time:
@@ -97,6 +151,8 @@ namespace HM
       }
 
       UpdateChecker::Snapshot snapshot = UpdateChecker::Current();
+
+      Sweep_(snapshot);
 
       if (snapshot.state == UpdateChecker::StateAvailable && settings->GetUpdateAutoDownload() && !snapshot.installer_url.IsEmpty())
       {

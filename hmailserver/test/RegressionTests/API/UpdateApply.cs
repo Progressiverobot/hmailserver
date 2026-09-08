@@ -5,6 +5,7 @@
 using System;
 using System.CodeDom.Compiler;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
@@ -35,7 +36,7 @@ namespace RegressionTests.API
       private const string AdminPassword = "testar";
       private const string LatestPath = "/repos/Progressiverobot/hmailserver/releases/latest";
 
-      private static string _quiet, _stopper, _starter, _failing, _marker;
+      private static string _quiet, _stopper, _starter, _failing, _ager, _marker;
 
       private FakeHttpEndpoint _feed;
       private FakeSigstore _sigstore;
@@ -50,6 +51,8 @@ namespace RegressionTests.API
          _sigstore = new FakeSigstore();
          _updatesDirectory = Paths.Combine(_settings.Directories.DataDirectory, "Updates");
          CleanUpdates();
+         if (TokenListed())
+            RestartServerAndReacquireCom();
 
          _feed = new FakeHttpEndpoint(200, "{}");
          ServeRelease(_quiet, _starter);
@@ -86,6 +89,8 @@ namespace RegressionTests.API
          _feed.Dispose();
          _sigstore.Dispose();
          CleanUpdates();
+         if (TokenListed())
+            RestartServerAndReacquireCom();
       }
 
       [Test]
@@ -119,7 +124,7 @@ namespace RegressionTests.API
          Assert.AreEqual(64, token.Length, "A 32-byte token, hex: " + ran);
          Assert.IsNotNull(new Application().Authenticate("Administrator", "token:" + token), "The token is the administrator, once.");
          Assert.IsNull(new Application().Authenticate("Administrator", "token:" + token), "And only once.");
-         Assert.IsFalse(File.Exists(Paths.Combine(_updatesDirectory, "apply-token")), "A redeemed token is gone.");
+         Assert.IsFalse(TokenListed(), "A redeemed token is gone.");
          StringAssert.Contains("Update apply token redeemed", LogHandler.ReadCurrentDefaultLog());
 
          // The outcome is reported when the service next starts; a reinitialize runs
@@ -228,7 +233,7 @@ namespace RegressionTests.API
          Assert.IsFalse(status.InstallUpdate(), "Nothing has been downloaded and verified.");
          StringAssert.Contains("No verified installer is waiting", status.UpdateLastError);
          Assert.IsFalse(File.Exists(OutcomePath));
-         Assert.IsFalse(File.Exists(Paths.Combine(_updatesDirectory, "apply-token")), "No token is issued for an apply that did not start.");
+         Assert.IsFalse(TokenListed(), "No token is issued for an apply that did not start.");
       }
 
       [Test]
@@ -249,24 +254,27 @@ namespace RegressionTests.API
       [Test]
       public void TheTokenExpiresAfterAnHour()
       {
+         // The "installer" here ages the token file by two hours: it runs as the
+         // service account, which may touch the file, where the suite may not.
+         ServeRelease(_ager, _starter);
          var status = Downloaded();
          Assert.IsTrue(status.InstallUpdate(), status.UpdateLastError);
          WaitForOutcome(OutcomePath, 60);
 
-         string tokenFile = Paths.Combine(_updatesDirectory, "apply-token");
-         Assert.IsTrue(File.Exists(tokenFile), "The quiet installer never redeemed the token.");
-         string token = File.ReadAllText(tokenFile).Trim();
-         File.SetLastWriteTimeUtc(tokenFile, DateTime.UtcNow.AddHours(-2));
+         Assert.IsTrue(TokenListed(), "The ager never redeemed the token.");
+         string token = Regex.Match(File.ReadAllText(_marker), "ager .*?/upgradetoken=([0-9a-f]{64})").Groups[1].Value;
+         Assert.AreEqual(64, token.Length, "The helper handed the installer a 32-byte token.");
 
          Assert.IsNull(new Application().Authenticate("Administrator", "token:" + token), "An hour is the token's life.");
-         Assert.IsFalse(File.Exists(tokenFile), "A stale token is removed when it is presented.");
+         Assert.IsFalse(TokenListed(), "A stale token is removed when it is presented.");
          StringAssert.Contains("Update apply token refused: it had expired", LogHandler.ReadCurrentDefaultLog());
 
          // And a wrong token, right shape, is refused without touching a fresh one.
+         ServeRelease(_quiet, _starter);
          Assert.IsTrue(status.CheckForUpdate() && status.DownloadUpdate() && status.InstallUpdate(), status.UpdateLastError);
          WaitForOutcome(OutcomePath, 60);
          Assert.IsNull(new Application().Authenticate("Administrator", "token:" + new string('0', 64)));
-         Assert.IsTrue(File.Exists(tokenFile), "A wrong guess does not burn the token.");
+         Assert.IsTrue(TokenListed(), "A wrong guess does not burn the token.");
       }
 
       [Test]
@@ -298,6 +306,10 @@ namespace RegressionTests.API
          _starter = Compile(directory, "starter",
             "using (var s = new System.ServiceProcess.ServiceController(\"hMailServer\")) { s.Start(); s.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(90)); }", 0);
          _failing = Compile(directory, "failing", "", 1);
+         // Runs as the service account, so it can do what the suite cannot: age the
+         // token file, which only SYSTEM, Administrators and that account may touch.
+         _ager = Compile(directory, "ager",
+            "File.SetLastWriteTimeUtc(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, \"apply-token\"), DateTime.UtcNow.AddHours(-2));", 0);
       }
 
       // A console program that records its name and arguments, does what it is told to
@@ -420,6 +432,18 @@ namespace RegressionTests.API
          }
       }
 
+      // apply-token is written with a DACL of SYSTEM, Administrators and the
+      // service account, and the suite runs as none of those. File.Exists then
+      // answers false whether or not the file is there, because it cannot read the
+      // attributes - so presence is read off the directory listing, which needs
+      // only the directory. Nothing in the suite can delete it; the server revokes
+      // it at start, which is what TearDown relies on.
+      private bool TokenListed()
+      {
+         return Directory.Exists(_updatesDirectory) &&
+                Directory.GetFiles(_updatesDirectory).Any(f => Path.GetFileName(f) == "apply-token");
+      }
+
       private void CleanUpdates()
       {
          if (!Directory.Exists(_updatesDirectory))
@@ -433,6 +457,15 @@ namespace RegressionTests.API
             catch (IOException)
             {
                // The helper of the previous test may still hold its log open for a moment.
+            }
+            catch (UnauthorizedAccessException)
+            {
+               // apply-token is written by the service with a DACL naming SYSTEM,
+               // the Administrators group and the service account only - which is
+               // the point of it, since it authenticates as the administrator for
+               // an hour. The suite runs as none of those, so it cannot delete the
+               // file and does not need to: the server revokes it when the apply
+               // finishes, and one never redeemed expires in an hour.
             }
          }
       }

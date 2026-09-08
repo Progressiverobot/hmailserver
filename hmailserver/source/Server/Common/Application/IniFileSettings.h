@@ -566,6 +566,11 @@ namespace HM
       bool GetUpdateCheckEnabled() const { return update_check_enabled_; }
       String GetUpdateChannel() const { return update_channel_; }
       String GetUpdateFeedUrl() const { return update_feed_url_; }
+
+      // This server implements neither CalDAV nor CardDAV. These are the URLs the
+      // well-known discovery endpoints redirect to - the server that does.
+      String GetCalDavRedirectUrl() const { return caldav_redirect_url_; }
+      String GetCardDavRedirectUrl() const { return carddav_redirect_url_; }
       int GetUpdateCheckHours() const { return update_check_hours_; }
       // RFC 4978 COMPRESS=DEFLATE on IMAP; on unless an operator says otherwise.
       bool GetImapCompressionEnabled() const { return imap_compression_enabled_; }
@@ -1130,6 +1135,8 @@ namespace HM
       bool update_check_enabled_ = false;
       String update_channel_;
       String update_feed_url_;
+      String caldav_redirect_url_;
+      String carddav_redirect_url_;
       int update_check_hours_ = 24;
       bool imap_compression_enabled_ = true;
       String update_trust_roots_file_;

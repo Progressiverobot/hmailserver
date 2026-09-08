@@ -464,6 +464,9 @@ Spara det här svaga lösenordet ändå?</value>
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>Ett meddelande med {0} poäng eller mer avvisas (550 före kroppen, 554 efter den). Inget markeras.</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>Ett meddelande till tio lokala brevlådor skrivs en gång och länkas tio gånger snarare än kopieras tio gånger, vilket är skillnaden mellan en diskskrivning och tio för ett stort meddelande till en distributionslista. Kräver att datakatalogen ligger på NTFS; där en länk inte kan skapas kopierar servern filen och säger det i SMTP-loggen. Gäller efter en omstart av tjänsten.</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>En modern administrationsapp för hMailServer: direktöversikt, domäner och konton, leveranskö, loggströmning, fullständiga serverinställningar och 6.x-seriens transportsäkerhetsfunktioner (DANE, MTA-STS, ARC, TLS-RPT, ACME).</value>
   </data>
@@ -1052,6 +1055,9 @@ Kontrollpanelen kan bara läsa meddelandefiler när den körs på samma dator so
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>En hel utgående leveranssession. 0 = ingen gräns.</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>Ett händelseskript körs inne i servern med tjänstekontots rättigheter, så vad det får instansiera är ett säkerhetsbeslut snarare än en bekvämlighet. Tomt är det säkra standardvärdet: ett skript når hMailServers egna objekt och inget annat. Att namnge en programidentifierare här - ett filsystemsobjekt för skript, en HTTP-klient - ger den till varje skript servern kör, så namnge bara det som ett av dina skript faktiskt behöver. Gäller efter en omstart av tjänsten.</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>En extern skannerprocess. 0 = ingen gräns.</value>
   </data>
@@ -1446,6 +1452,12 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
   <data name="CC" xml:space="preserve">
     <value>Kopia</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>COM-objekt ett skript får skapa (kommaseparerade; tomt = bara hMailServers egna)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>_CA-certifikatpaket (PEM) som klientcertifikat måste kedja till</value>
   </data>
@@ -1525,6 +1537,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>Certifikat och nyckel måste BÅDA vara satta för att servera HTTPS; med bara ett av dem är TLS INTE aktiverat och servern loggar det. Till skillnad från REST API-lyssnaren finns här ingen reserv i ACME-certifikatet. Om TLS är konfigurerat men inte kan förberedas (en oläsbar fil, en nyckel som inte matchar) stannar hälsokontrollerna på vanlig HTTP och /metrics svarar 503 i stället för att servera utdata i klartext.</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>Certifikatutfärdarfil för en privat Sigstore (PEM; tomt = de publika Fulcio-rötterna)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>Certifikatfil</value>
@@ -3343,6 +3358,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Lämnar över det verifierade installationsprogrammet till uppdateringshjälpen. Tjänsten stoppas och startas; om den inte kommer tillbaka installeras den tidigare versionen om. Resultatet rapporteras här när tjänsten är tillbaka.</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>Hårdlänka varje lokal mottagares kopia i stället för att kopiera filen</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>Hårdlänka varje mottagares kopia i stället för att kopiera den</value>
   </data>
@@ -3541,6 +3559,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="I_P address" xml:space="preserve">
     <value>I_P-adress</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>Identitetsleverantör som utfärdade signeringscertifikatet (tomt = GitHubs)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>Identitet resultaten skrivs under (tomt = den här datorns namn)</value>
   </data>
@@ -3699,6 +3720,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Behåller en kopia av varje meddelande som tas emot över SMTP i ett mappträd, utöver att leverera det som vanligt - det avleder eller håller inte tillbaka post. Post från en lokal avsändare arkiveras under &lt;domain&gt;\&lt;mailbox&gt;, post från annat håll under Inbound, och meddelanden utan kuvertavsändare (studsar och leveransrapporter) under Error, plus en kopia i mappen för varje lokal mottagare.</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>Nyckelutbytesgrupper (tomt = OpenSSL:s standardlista)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>Nyckelfil finns</value>
   </data>
@@ -3765,6 +3789,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>Lämna värden tom så har domänen ingen åsikt: det serverövergripande SMTP-relät gäller, exakt som innan den här inställningen fanns. En rutt vinner fortfarande över båda, eftersom en rutt är ett uttalande om målet.</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>Låt det här vara av om du inte bygger dina egna installationsprogram och signerar dem. Det här projektets utgåvor är ännu inte Authenticode-signerade, så att slå på det avvisar varje utgåva som finns: hämtningen stoppar med "installationsprogrammet bär ingen Authenticode-signatur" och ingen uppdatering kan någonsin installeras. Sigstore-signaturen, som varje utgåva bär, kontrolleras i båda fallen och är inte valfri.</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>Lämnat tomt använder servern det levererade filtret som visas i grått - objectCategory först eftersom det är indexerat i Active Directory, och sAMAccountName eftersom det är vad kontots Katalog-flik lagrar. %u är kontots Active Directory-användarnamn, %d dess AD-domän, %m dess fullständiga e-postadress; alla tre escapas innan de sätts in, så ett fientligt inloggningsnamn kan inte skriva om filtret. Ett filter som matchar mer än en post autentiserar ingen, med avsikt.</value>
   </data>
@@ -3776,6 +3803,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Låter Outlook, Thunderbird och mobila klienter konfigurera sig själva utifrån bara en e-postadress, genom att hämta den här serverns konfigurations-URL:er.</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>Låter en klient be om att resten av sessionen komprimeras, vilket är värt mest på en långsam anslutning eller en med datapriser, där en stor brevlådelistning mest är upprepad text. På som standard; en klient som inte ber om det påverkas inte. Gäller efter en omstart av tjänsten.</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>Låter klienter logga in med bearer-token från en identitetsleverantör i stället för lösenord; token godtas bara om deras signatur verifieras mot nyckelmaterial du installerar.</value>
@@ -4316,6 +4346,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>Flytta till IMAP-mapp</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>Att flytta ett meddelande till mappen som är utsedd till Junk rapporterar det till sa-learn som skräppost, och att flytta ut ett igen rapporterar det som ham, så filtret lär sig av vad människor redan gör snarare än av en separat ritual som ingen utför. Av som standard: det kör sa-learn per flytt, och en användare som lägger nyhetsbrev i Junk lär filtret att nyhetsbrev är skräppost för alla som skannern betjänar. Gäller efter en omstart av tjänsten.</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>Måste vara en absolut URL, som ovan.</value>
@@ -5783,6 +5816,9 @@ SMTP 25 och 587, POP3 110, IMAP 143 - utan anslutningssäkerhet. TLS-portar och 
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>Rapportera den asynkrona arbetskön som stannad efter (sekunder)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>Kodförråd som signeringscertifikatet måste namnge (tomt = det här projektet; - = kontrollera inte)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>Begär (verifiera och logga, avvisa aldrig)</value>
   </data>
@@ -6504,8 +6540,14 @@ Fortsätt?</value>
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>Skickar dagliga sammanställda rapporter om TLS-anslutningsfel till mottagardomäner (RFC 8460).</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>Skickar en transaktions kommandon utan att vänta på varje svar, vilket tar bort en tur och retur per mottagare - skillnaden är störst på en långsam anslutning eller mot en avlägsen server. Används bara med en server som annonserar det. Gäller efter en omstart av tjänsten.</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>Skickar de dagliga sammanställda rapporter som domäner ber om med en rua=-tagg i sin DMARC-post (RFC 7489) - vem som skickade post i deras namn, och om den godkändes. Rapporter går bara till en adress utanför policydomänen när den adressens egen DNS säger att den vill ha dem, så en domän kan inte använda sin DMARC-post för att rikta den här serverns rapporter mot någon annan.</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>Skickar meddelandet som räknade block i stället för som DATA med punktstoppning. Det är också det som bär ett binärt meddelande vidare utan att skriva om det: ett meddelande som godtagits som BINARYMIME kan bara reläas som det kom, till en server som erbjuder både detta och BINARYMIME. Gäller efter en omstart av tjänsten.</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>Skickar mottagarens adress som User:-rubrik, så att spamd tillämpar den brevlådans egna inställningar - den form en spamd för virtuella användare (--virtual-config-dir med %u eller %d) förväntar sig. En skanning körs en gång per meddelande, inte en gång per mottagare, så ett meddelande till flera personer kan inte skannas under någon enskild persons inställningar och använder profilen ovan i stället.</value>
@@ -6778,6 +6820,9 @@ Starta om den nu?</value>
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>Signeringsalgorit_m</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>Signeringsidentitet som certifikatet måste börja med (tomt = det här projektets utgivningsarbetsflöde)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>Loggar in…</value>
@@ -7118,6 +7163,9 @@ Starta om den nu?</value>
   <data name="Tasks" xml:space="preserve">
     <value>Uppgifter</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>Lär upp SpamAssassin när en användare lägger ett meddelande som skräppost eller tar ut det igen</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Talar om för sändande servrar att de måste använda TLS vid leverans till dina domäner, vilket täpper till nedgraderingshålet i opportunistisk TLS.</value>
   </data>
@@ -7378,6 +7426,9 @@ Markera nyckeln ovan och kopiera den för hand - den visas inte igen.</value>
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Den faktiska tidsgränsen rör sig mellan de här värdena med serverns belastning.</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>De elliptiska kurvor och grupper över ändliga kroppar som den här servern kommer överens om en nyckel med, i preferensordning - OpenSSL:s grupplista, till exempel x25519:secp256r1. Tomt betyder att OpenSSL väljer, vilket är rätt svar om du inte har ett efterlevnadsregelverk som namnger grupperna. En lista som inte namnger något klienten stöder avslutar handskakningen, så ändra den mot en skanning snarare än i blindo. Gäller efter en omstart av tjänsten.</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>De aktiverade kontrollerna kan tillsammans lägga till högst {0}, vilket är under markeringströskeln på {1}: inget meddelande kan nå någon av trösklarna, hur illa det än är.</value>
   </data>
@@ -7496,6 +7547,9 @@ kunde inte läsas in. Meddelandet har troligen levererats och finns inte längre
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>Språket kunde inte sparas: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>De fem sista inställningarna på det här kortet är för en organisation som bygger sina egna utgåvor och signerar dem med sin egen Sigstore, eller som speglar det här projektets. Lämna var och en av dem tom och servern litar på exakt en sak: ett installationsprogram signerat av det här projektets eget utgivningsarbetsflöde, registrerat i den publika transparensloggen. Att sätta någon av dem inskränker eller ersätter det, och att få en av dem fel betyder antingen att äkta utgåvor avvisas eller att någon annans blir betrodda.</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>Det senaste uppdateringssteget misslyckades: {0}</value>
@@ -7990,6 +8044,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>Bara spårningar. En insamlare som konfigureras här tar emot span och inget annat - mätvärden och loggar har sina egna slutpunkter nedan, var och en av tills den sätts. Prometheus-mätvärden är porten ovan, och är samma räknare som mätvärdesslutpunkten skickar snarare än en andra räkning.</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>Transparensloggens publika nyckel för en privat Sigstore (PEM; tomt = den publika Rekor-nyckeln)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>Översikt över transportkryptering</value>
   </data>
@@ -8142,6 +8199,12 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>Använd ARC-resultat från betrodda vidarebefordrare för att kvitta ett DMARC-fel</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>Använd CHUNKING (BDAT) när den mottagande servern erbjuder det</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>Använd PIPELINING när den mottagande servern erbjuder det</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>Använd SpamAssassin</value>

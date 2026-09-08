@@ -61,7 +61,7 @@ namespace HM
 
       // How long the two RFC 6764 redirect targets are cached for. They are
       // read straight out of hMailServer.ini rather than from IniFileSettings
-      // (see ReadSettingsIniString below), and /.well-known/caldav is a public
+      // (read through IniFileSettings), and /.well-known/caldav is a public
       // unauthenticated path, so without a cache a client - or anyone else -
       // could make the listener touch the file once per request.
       const int DavRedirectCacheSeconds = 60;
@@ -110,28 +110,6 @@ namespace HM
       time_t dav_redirect_expires = 0;
       bool dav_caldav_invalid_reported = false;
       bool dav_carddav_invalid_reported = false;
-
-      // Reads a value from the [Settings] section of hMailServer.ini, the same
-      // file and section IniFileSettings reads.
-      //
-      // CalDavRedirectUrl and CardDavRedirectUrl have no IniFileSettings
-      // accessor yet. Rather than half-wire a setting through a class this
-      // change does not own - which would leave the two files out of step
-      // until both landed - the value is read here from the same place
-      // IniFileSettings would read it, so there is still exactly one place the
-      // setting lives. Folding it into IniFileSettings with a proper accessor
-      // is a mechanical follow-up; nothing here changes when that happens
-      // except this function being deleted.
-      String ReadSettingsIniString(const String &key)
-      {
-         const DWORD bufferSize = 1024;
-         TCHAR value[bufferSize] = {};
-
-         GetPrivateProfileString(_T("Settings"), key, _T(""), value, bufferSize,
-            IniFileSettings::GetInitializationFile());
-
-         return value;
-      }
 
       // A Location header value is written into the response verbatim, so a
       // value carrying a CR or LF would let whoever can edit hMailServer.ini
@@ -1093,8 +1071,8 @@ namespace HM
 
          if (dav_redirect_expires <= time(nullptr))
          {
-            dav_caldav_target = AnsiString(ReadSettingsIniString(_T("CalDavRedirectUrl")));
-            dav_carddav_target = AnsiString(ReadSettingsIniString(_T("CardDavRedirectUrl")));
+            dav_caldav_target = AnsiString(IniFileSettings::Instance()->GetCalDavRedirectUrl());
+            dav_carddav_target = AnsiString(IniFileSettings::Instance()->GetCardDavRedirectUrl());
 
             dav_caldav_target.Trim();
             dav_carddav_target.Trim();

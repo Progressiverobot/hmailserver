@@ -464,6 +464,9 @@
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>Повідомлення з оцінкою {0} або вищою відхиляється (550 до тіла повідомлення, 554 після нього). Нічого не позначається.</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>Повідомлення до десяти локальних поштових скриньок записується один раз і зв'язується посиланням десять разів, а не копіюється десять разів, а це різниця між одним записом на диск і десятьма для великого повідомлення, надісланого до списку розсилки. Потрібна папка даних на NTFS; якщо посилання створити не вдається, сервер копіює файл і повідомляє про це в журналі SMTP. Застосовується після перезапуску служби.</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>Сучасна програма адміністрування для hMailServer: жива інформаційна панель, домени та облікові записи, черга доставки, потокове передавання журналів, повні параметри сервера та функції безпеки транспорту 6.x (DANE, MTA-STS, ARC, TLS-RPT, ACME).</value>
   </data>
@@ -1052,6 +1055,9 @@
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Увесь сеанс вихідної доставки. 0 = без обмеження.</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>Скрипт подій виконується всередині сервера з правами облікового запису служби, тому те, які об'єкти йому дозволено створювати, — це рішення щодо безпеки, а не питання зручності. Порожньо — безпечне типове значення: скрипт дістається до власних об'єктів hMailServer і більше ні до чого. Названий тут програмний ідентифікатор — об'єкт файлової системи для скриптів, HTTP-клієнт — надається кожному скрипту, який виконує сервер, тому називайте лише те, що справді потрібне якомусь із ваших скриптів. Застосовується після перезапуску служби.</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Процес зовнішнього сканера. 0 = без обмеження.</value>
   </data>
@@ -1446,6 +1452,12 @@
   <data name="CC" xml:space="preserve">
     <value>Копія</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>Об'єкти COM, які може створювати скрипт (через кому; порожньо = лише власні об'єкти hMailServer)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>Пакет _сертифікатів ЦС (PEM), до якого мають вибудовувати ланцюжок клієнтські сертифікати</value>
   </data>
@@ -1525,6 +1537,9 @@
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>Щоб надавати HTTPS, потрібно задати ОБИДВА — і сертифікат, і ключ; лише з одним із них TLS НЕ вмикається, і сервер записує це до журналу. На відміну від слухача REST API, тут немає запасного варіанта з сертифікатом ACME. Якщо TLS налаштовано, але підготувати його не вдається (файл не читається, ключ не відповідає сертифікату), проби працездатності залишаються на звичайному HTTP, а /metrics відповідає 503 замість того, щоб віддавати експозицію у відкритому вигляді.</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>Файл центру сертифікації для приватного Sigstore (PEM; порожньо = публічні корені Fulcio)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>Файл сертифіката</value>
@@ -3343,6 +3358,9 @@
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Передає перевірений інсталятор помічнику оновлення. Служба зупиняється і запускається; якщо вона не повертається, попередню версію встановлюють знову. Результат повідомляється тут, коли служба знову працює.</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>Створювати жорстке посилання для копії кожного локального отримувача замість копіювання файлу</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>Створювати жорстке посилання для копії кожного отримувача замість копіювання</value>
   </data>
@@ -3541,6 +3559,9 @@
   <data name="I_P address" xml:space="preserve">
     <value>I_P-адреса</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>Провайдер ідентифікації, який видав сертифікат підписування (порожньо = провайдер GitHub)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>Ідентичність, під якою записуються результати (порожньо = ім'я цього комп'ютера)</value>
   </data>
@@ -3699,6 +3720,9 @@
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>Зберігає копію кожного повідомлення, отриманого через SMTP, у дереві папок на додачу до звичайної доставки — воно не відводить і не затримує пошту. Пошта від локального відправника складається в &lt;domain&gt;\&lt;mailbox&gt;, пошта з інших джерел — в Inbound, а повідомлення без відправника конверта (повернення та звіти про доставку) — в Error, плюс копія в папці кожного локального отримувача.</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>Групи обміну ключами (порожньо = типовий список OpenSSL)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>Файл ключа є</value>
   </data>
@@ -3765,6 +3789,9 @@
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>Залиште вузол порожнім — і домен не матиме власної думки: застосовується загальносерверний ретранслятор SMTP, точнісінько як до появи цього параметра. Маршрут усе одно переважає обох, бо маршрут — це твердження про призначення.</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>Залишайте це вимкненим, якщо ви не збираєте власних інсталяторів і не підписуєте їх. Випуски цього проєкту поки що не підписані Authenticode, тому ввімкнення відхиляє геть усі наявні випуски: завантаження зупиняється з повідомленням «інсталятор не має підпису Authenticode», і жодне оновлення ніколи не вдасться застосувати. Підпис Sigstore, який має кожен випуск, перевіряється в будь-якому разі й не є необов'язковим.</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>Якщо залишити порожнім, сервер використовує фільтр із постачання, показаний сірим: спершу objectCategory, бо він індексований в Active Directory, і sAMAccountName, бо саме його зберігає вкладка «Каталог» облікового запису. %u — ім’я користувача облікового запису в Active Directory, %d — його домен AD, %m — його повна поштова адреса; усі три екрануються перед підстановкою, тому зловмисне ім’я входу не зможе переписати фільтр. Фільтр, якому відповідає більше ніж один запис, навмисно не автентифікує нікого.</value>
   </data>
@@ -3776,6 +3803,9 @@
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Дозволяє Outlook, Thunderbird і мобільним клієнтам налаштовуватися самостійно лише за поштовою адресою, отримуючи URL-адреси конфігурації цього сервера.</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>Дозволяє клієнту попросити, щоб решту сеансу було стиснуто, а найбільша користь від цього — на повільному або лімітованому каналі, де великий перелік поштової скриньки складається здебільшого з повторюваного тексту. Типово ввімкнено; клієнта, який про це не просить, воно не зачіпає. Застосовується після перезапуску служби.</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>Дозволяє клієнтам входити з токенами bearer від провайдера ідентифікації замість паролів; токени приймаються, лише якщо їхній підпис перевіряється матеріалом ключів, який ви встановили.</value>
@@ -4316,6 +4346,9 @@
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>Перемістити до папки IMAP</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>Переміщення повідомлення до папки, позначеної як Junk, повідомляє про нього sa-learn як про спам, а переміщення назад повідомляє про нього як про ham, тож фільтр учиться з того, що люди й так роблять, а не з окремого ритуалу, якого ніхто не виконує. Типово вимкнено: на кожне переміщення запускається sa-learn, а користувач, який складає інформаційні розсилки до Junk, навчає фільтр, що інформаційні розсилки є спамом для всіх, кого обслуговує сканер. Застосовується після перезапуску служби.</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>Має бути абсолютною URL-адресою, як вище.</value>
@@ -5783,6 +5816,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>Повідомляти про зависання асинхронної робочої черги через (секунд)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>Репозиторій, який має бути названий у сертифікаті підписування (порожньо = цей проєкт; - = не перевіряти)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>Запитувати (перевіряти й журналювати, ніколи не відхиляти)</value>
   </data>
@@ -6504,8 +6540,14 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>Надсилає щоденні агреговані звіти про збої TLS-з'єднань доменам-отримувачам (RFC 8460).</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>Надсилає команди транзакції, не чекаючи на кожну відповідь, що прибирає один цикл «запит — відповідь» на кожного отримувача — різниця найбільша на повільному каналі або до віддаленого сервера. Використовується лише із сервером, який це оголошує. Застосовується після перезапуску служби.</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>Надсилає щоденні агреговані звіти, яких домени просять тегом rua= у своєму записі DMARC (RFC 7489) - хто надсилав пошту від їхнього імені і чи пройшла вона перевірку. Звіти йдуть на адресу поза доменом політики лише тоді, коли власний DNS цієї адреси каже, що хоче їх, тому домен не може використати свій запис DMARC, щоб спрямувати звіти цього сервера комусь іншому.</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>Надсилає повідомлення підрахованими блоками, а не через DATA з крапковим екрануванням. Саме воно й переносить двійкове повідомлення далі, не переписуючи його: повідомлення, прийняте як BINARYMIME, можна ретранслювати таким, як воно надійшло, лише до сервера, який пропонує і це, і BINARYMIME. Застосовується після перезапуску служби.</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>Надсилає адресу отримувача як заголовок User:, щоб spamd застосував власні налаштування цієї скриньки - саме цього очікує spamd з віртуальними користувачами (--virtual-config-dir з %u або %d). Сканування виконується один раз на повідомлення, а не на кожного отримувача, тому повідомлення кільком людям не може бути проскановане за налаштуваннями жодного з них і використовує профіль вище.</value>
@@ -6778,6 +6820,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>Алгоритм _підписування</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>Ідентичність підписування, з якої має починатися сертифікат (порожньо = робочий процес випуску цього проєкту)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>Вхід…</value>
@@ -7118,6 +7163,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Tasks" xml:space="preserve">
     <value>Завдання</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>Навчати SpamAssassin, коли користувач переміщує повідомлення до спаму або забирає його звідти</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Повідомляє серверам-відправникам, що вони повинні використовувати TLS під час доставки до ваших доменів, закриваючи прогалину зниження рівня в опортуністичному TLS.</value>
   </data>
@@ -7378,6 +7426,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Чинний час очікування переміщується між цими значеннями залежно від навантаження на сервер.</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>Еліптичні криві та групи скінченних полів, за якими цей сервер погоджуватиме ключ, у порядку переваги — список груп OpenSSL, наприклад x25519:secp256r1. Порожньо означає, що вибирає OpenSSL, і це правильна відповідь, якщо у вас немає режиму відповідності вимогам, який називає групи. Список, у якому не названо нічого з того, що підтримує клієнт, обриває рукостискання, тому змінюйте його за результатами сканування, а не наосліп. Застосовується після перезапуску служби.</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>Увімкнені перевірки разом можуть додати щонайбільше {0}, що нижче за поріг позначення {1}: жодне повідомлення не може досягти жодного з порогів, яким би поганим воно не було.</value>
   </data>
@@ -7496,6 +7547,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>Не вдалося зберегти мову: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>Останні п'ять параметрів на цій картці призначені для інсталяції, яка збирає власні випуски й підписує їх власним Sigstore, або яка дзеркалить випуски цього проєкту. Залиште їх усі порожніми — і сервер довірятиме рівно одному: інсталятору, підписаному власним робочим процесом випуску цього проєкту й записаному в публічному журналі прозорості. Задання будь-якого з них звужує або замінює цю довіру, а помилка в одному означає або відмову справжнім випускам, або довіру до чужих.</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>Останній крок оновлення не вдався: {0}</value>
@@ -7990,6 +8044,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>Лише трасування. Налаштований тут колектор отримує спани і нічого більше - у метрик і журналів свої кінцеві точки нижче, кожна вимкнена, доки не задана. Метрики Prometheus - це порт вище, і це ті самі лічильники, що надсилає кінцева точка метрик, а не другий підрахунок.</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>Відкритий ключ журналу прозорості для приватного Sigstore (PEM; порожньо = публічний ключ Rekor)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>Огляд шифрування транспорту</value>
   </data>
@@ -8142,6 +8199,12 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>Використовувати результати ARC від довірених пересилачів для компенсації провалу DMARC</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>Використовувати CHUNKING (BDAT), коли сервер-отримувач це пропонує</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>Використовувати PIPELINING, коли сервер-отримувач це пропонує</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>Використовувати SpamAssassin</value>

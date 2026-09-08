@@ -400,6 +400,20 @@ namespace HM
       if (tag[0] == 'v' || tag[0] == 'V')
          tag = tag.substr(1);
 
+      // The tag is text from the feed, and the installer's file name is built from
+      // it below - so it reaches a path under Data\Updates. A feed is trusted for
+      // nothing: the release it names is verified against a signature before it is
+      // run, and the name it arrives under has to be as bounded as the bytes are.
+      // A tag carrying a separator or a traversal would otherwise write the
+      // installer, its bundle and its .partial wherever the tag pointed, under the
+      // service account. Refused rather than sanitised, because a tag this server
+      // cannot spell is a release it cannot install, and saying so is the honest
+      // outcome; a real tag is a version number.
+      if (tag.size() > 64 ||
+          tag.find_first_not_of("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-") != std::string::npos ||
+          tag[0] == '.' || tag[0] == '-')
+         return false;
+
       release.found = true;
       release.version = FromUtf8_(tag);
       release.name = FromUtf8_(value.GetString("name"));

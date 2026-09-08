@@ -464,6 +464,9 @@ Bu zayıf parola yine de kaydedilsin mi?</value>
   <data name="A message scoring {0} or more is refused (550 before the body, 554 after it). Nothing is marked." xml:space="preserve">
     <value>{0} veya daha yüksek puan alan bir ileti reddedilir (gövdeden önce 550, sonra 554). Hiçbir şey işaretlenmez.</value>
   </data>
+  <data name="A message to ten local mailboxes is written once and linked ten times rather than copied ten times, which is the difference between one disk write and ten for a large message to a distribution list. Needs the data directory on NTFS; where a link cannot be made the server copies the file and says so in the SMTP log. Applies after a service restart." xml:space="preserve">
+    <value>On yerel posta kutusuna giden bir ileti on kez kopyalanmak yerine bir kez yazılır ve on kez bağlanır; bu da bir dağıtım listesine giden büyük bir ileti için tek bir disk yazması ile on disk yazması arasındaki farktır. Veri dizininin NTFS üzerinde olmasını gerektirir; bağlantı kurulamayan yerde sunucu dosyayı kopyalar ve bunu SMTP günlüğünde bildirir. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
+  </data>
   <data name="A modern administration app for hMailServer: live dashboard, domains and accounts, delivery queue, log streaming, full server settings and the 6.x transport-security features (DANE, MTA-STS, ARC, TLS-RPT, ACME)." xml:space="preserve">
     <value>hMailServer için modern bir yönetim uygulaması: canlı pano, etki alanları ve hesaplar, teslim kuyruğu, günlük akışı, eksiksiz sunucu ayarları ve 6.x aktarım güvenliği özellikleri (DANE, MTA-STS, ARC, TLS-RPT, ACME).</value>
   </data>
@@ -1052,6 +1055,9 @@ Denetim Masası, ileti dosyalarını yalnızca sunucuyla aynı makinede ve yeter
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Giden teslim oturumunun tamamı. 0 = sınır yok.</value>
   </data>
+  <data name="An event script runs inside the server with the service account's rights, so what it may instantiate is a security decision rather than a convenience. Empty is the safe default: a script reaches hMailServer's own objects and nothing else. Naming a program identifier here - a scripting file system object, an HTTP client - grants it to every script the server runs, so name only what a script of yours actually needs. Applies after a service restart." xml:space="preserve">
+    <value>Bir olay betiği sunucunun içinde, hizmet hesabının haklarıyla çalışır; bu yüzden neyin örneğini oluşturabileceği bir kolaylık değil, bir güvenlik kararıdır. Güvenli varsayılan boştur: bir betik hMailServer'ın kendi nesnelerine erişir, başka hiçbir şeye erişemez. Burada bir program tanımlayıcısı belirtmek - bir betik dosya sistemi nesnesi, bir HTTP istemcisi - onu sunucunun çalıştırdığı her betiğe verir; bu yüzden yalnızca sizin bir betiğinizin gerçekten ihtiyaç duyduğunu belirtin. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
+  </data>
   <data name="An external scanner process. 0 = no bound." xml:space="preserve">
     <value>Harici bir tarayıcı işlemi. 0 = sınır yok.</value>
   </data>
@@ -1446,6 +1452,12 @@ Denetim Masası şimdi yeniden başlatılsın mı? Çalışmayı sürdürmeyi de
   <data name="CC" xml:space="preserve">
     <value>CC</value>
   </data>
+  <data name="COM objects a script may create (comma separated; empty = only hMailServer's own)" xml:space="preserve">
+    <value>Bir betiğin oluşturabileceği COM nesneleri (virgülle ayrılmış; boş = yalnızca hMailServer'ın kendi nesneleri)</value>
+  </data>
+  <data name="COMPRESS=DEFLATE (RFC 4978)" xml:space="preserve">
+    <value>COMPRESS=DEFLATE (RFC 4978)</value>
+  </data>
   <data name="C_A certificate bundle (PEM) that client certificates must chain to" xml:space="preserve">
     <value>_İstemci sertifikalarının zincirleneceği CA sertifika paketi (PEM)</value>
   </data>
@@ -1525,6 +1537,9 @@ Hazırlanan "{0}" seçicisi sunucu yapılandırmasından kaldırılır; imzalama
   </data>
   <data name="Certificate and key must BOTH be set to serve HTTPS; with only one of them TLS is NOT enabled and the server logs it. Unlike the REST API listener there is no fall-back to the ACME certificate here. If TLS is configured but cannot be prepared (an unreadable file, a key that does not match), the health probes stay on plain HTTP and /metrics answers 503 rather than serving the exposition in the clear." xml:space="preserve">
     <value>HTTPS sunmak için sertifika ve anahtarın İKİSİ DE ayarlanmalıdır; yalnızca biriyle TLS etkin DEĞİLDİR ve sunucu bunu günlüğe yazar. REST API dinleyicisinden farklı olarak burada ACME sertifikasına geri dönüş yoktur. TLS yapılandırılmış ama hazırlanamıyorsa (okunamayan bir dosya, eşleşmeyen bir anahtar), sağlık yoklamaları düz HTTP'de kalır ve /metrics, çıktıyı açıkta sunmak yerine 503 yanıtı verir.</value>
+  </data>
+  <data name="Certificate authority file for a private Sigstore (PEM; empty = the public Fulcio roots)" xml:space="preserve">
+    <value>Özel bir Sigstore için sertifika yetkilisi dosyası (PEM; boş = genel Fulcio kökleri)</value>
   </data>
   <data name="Certificate file" xml:space="preserve">
     <value>Sertifika dosyası</value>
@@ -3343,6 +3358,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back." xml:space="preserve">
     <value>Doğrulanan yükleyiciyi güncelleştirme yardımcısına verir. Hizmet durur ve başlar; geri gelmezse önceki sürüm yeniden yüklenir. Sonuç, hizmet geri geldiğinde burada bildirilir.</value>
   </data>
+  <data name="Hard link each local recipient's copy instead of copying the file" xml:space="preserve">
+    <value>Her yerel alıcının kopyasını, dosyayı kopyalamak yerine sabit bağlantıyla oluştur</value>
+  </data>
   <data name="Hard-link each recipient's copy instead of copying it" xml:space="preserve">
     <value>Her alıcının kopyasını kopyalamak yerine sabit bağlantıyla oluştur</value>
   </data>
@@ -3541,6 +3559,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="I_P address" xml:space="preserve">
     <value>I_P adresi</value>
   </data>
+  <data name="Identity provider that issued the signing certificate (empty = GitHub's)" xml:space="preserve">
+    <value>İmzalama sertifikasını veren kimlik sağlayıcısı (boş = GitHub'ınki)</value>
+  </data>
   <data name="Identity the results are written under (empty = this computer's name)" xml:space="preserve">
     <value>Sonuçların altına yazıldığı kimlik (boş = bu bilgisayarın adı)</value>
   </data>
@@ -3699,6 +3720,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   <data name="Keeps a copy of every message received over SMTP in a folder tree, in addition to delivering it as normal - it does not divert or hold back mail. Mail from a local sender is filed under &lt;domain&gt;\&lt;mailbox&gt;, mail from elsewhere under Inbound, and messages with no envelope sender (bounces and delivery reports) under Error, plus a copy in the folder of each local recipient." xml:space="preserve">
     <value>SMTP üzerinden alınan her iletinin bir kopyasını, olağan biçimde teslim etmenin yanı sıra bir klasör ağacında tutar - postayı saptırmaz ya da alıkoymaz. Yerel bir gönderenden gelen posta &lt;domain&gt;\&lt;mailbox&gt; altına, başka yerden gelen posta Inbound altına, zarf göndereni olmayan iletiler (geri dönmeler ve teslim raporları) ise Error altına dosyalanır; ayrıca her yerel alıcının klasörüne bir kopya konur.</value>
   </data>
+  <data name="Key exchange groups (empty = OpenSSL's default list)" xml:space="preserve">
+    <value>Anahtar değişimi grupları (boş = OpenSSL'in varsayılan listesi)</value>
+  </data>
   <data name="Key file present" xml:space="preserve">
     <value>Anahtar dosyası var</value>
   </data>
@@ -3765,6 +3789,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   <data name="Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination." xml:space="preserve">
     <value>Ana bilgisayarı boş bırakın; etki alanının bir görüşü olmaz: bu ayar var olmadan önce olduğu gibi, sunucu geneli SMTP aktarıcısı uygulanır. Bir rota yine ikisine de üstün gelir, çünkü rota hedef hakkında bir ifadedir.</value>
   </data>
+  <data name="Leave this off unless you build your own installers and sign them. This project's releases are not Authenticode-signed yet, so turning it on refuses every release there is: the download stops with &quot;the installer carries no Authenticode signature&quot; and no update can ever be applied. The Sigstore signature, which every release does carry, is checked either way and is not optional." xml:space="preserve">
+    <value>Kendi kurulum programlarınızı üretip imzalamıyorsanız bunu kapalı bırakın. Bu projenin sürümleri henüz Authenticode ile imzalanmıyor; bu yüzden bunu açmak var olan her sürümü reddeder: indirme "the installer carries no Authenticode signature" iletisiyle durur ve hiçbir güncelleştirme hiçbir zaman uygulanamaz. Her sürümün gerçekten taşıdığı Sigstore imzası ise her durumda denetlenir ve isteğe bağlı değildir.</value>
+  </data>
   <data name="Left empty, the server uses the shipped filter shown in grey - objectCategory first because it is indexed in Active Directory, and sAMAccountName because that is what the account's Directory tab stores. %u is the account's Active Directory user name, %d its AD domain, %m its full mail address; all three are escaped before substitution, so a hostile logon name cannot rewrite the filter. A filter that matches more than one entry authenticates nobody, by design." xml:space="preserve">
     <value>Boş bırakıldığında sunucu, gri renkte gösterilen ürünle gelen filtreyi kullanır - önce objectCategory, çünkü Active Directory'de indekslidir; sonra sAMAccountName, çünkü hesabın Dizin sekmesinin sakladığı budur. %u hesabın Active Directory kullanıcı adı, %d AD etki alanı, %m tam posta adresidir; üçü de yerine konmadan önce kaçış işlemi görür; bu yüzden düşmanca bir oturum açma adı filtreyi yeniden yazamaz. Birden fazla girdiyle eşleşen bir filtre bilinçli olarak hiç kimsenin kimliğini doğrulamaz.</value>
   </data>
@@ -3776,6 +3803,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   </data>
   <data name="Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs." xml:space="preserve">
     <value>Outlook, Thunderbird ve mobil istemcilerin bu sunucunun yapılandırma URL'lerini getirerek yalnızca bir e-posta adresinden kendilerini kurmasına olanak verir.</value>
+  </data>
+  <data name="Lets a client ask for the rest of the session to be compressed, which is worth most on a slow or metered link where a large mailbox listing is mostly repeated text. On by default; a client that does not ask is unaffected. Applies after a service restart." xml:space="preserve">
+    <value>Bir istemcinin oturumun geri kalanının sıkıştırılmasını istemesine olanak verir; bu da büyük bir posta kutusu listelemesinin çoğunlukla yinelenen metin olduğu yavaş ya da ölçülü bir bağlantıda en çok işe yarar. Varsayılan olarak açıktır; istemeyen bir istemci etkilenmez. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
   </data>
   <data name="Lets clients log on with bearer tokens from an identity provider instead of passwords; tokens are only accepted if their signature verifies against key material you install." xml:space="preserve">
     <value>İstemcilerin parola yerine bir kimlik sağlayıcısından alınan taşıyıcı belirteçlerle oturum açmasına olanak verir; belirteçler yalnızca imzaları yüklediğiniz anahtar malzemesine karşı doğrulanırsa kabul edilir.</value>
@@ -4316,6 +4346,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   </data>
   <data name="Move to IMAP folder" xml:space="preserve">
     <value>IMAP klasörüne taşı</value>
+  </data>
+  <data name="Moving a message into the folder designated Junk reports it to sa-learn as spam, and moving one back out reports it as ham, so the filter learns from what people already do rather than from a separate ritual nobody performs. Off by default: it runs sa-learn per move, and a user who files newsletters in Junk is teaching the filter that newsletters are spam for everyone the scanner serves. Applies after a service restart." xml:space="preserve">
+    <value>Bir iletiyi \Junk olarak belirlenmiş klasöre taşımak onu sa-learn'e spam olarak bildirir, oradan geri çıkarmak ise ham olarak bildirir; böylece filtre, kimsenin yerine getirmediği ayrı bir tören yerine insanların zaten yaptıklarından öğrenir. Varsayılan olarak kapalıdır: her taşımada sa-learn'i çalıştırır ve haber bültenlerini Junk klasörüne koyan bir kullanıcı, filtreye haber bültenlerinin tarayıcının hizmet ettiği herkes için spam olduğunu öğretmiş olur. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
   </data>
   <data name="Must be an absolute URL, as above." xml:space="preserve">
     <value>Yukarıdaki gibi mutlak bir URL olmalıdır.</value>
@@ -5783,6 +5816,9 @@ SMTP 25 ve 587, POP3 110, IMAP 143 - bağlantı güvenliği olmadan. TLS portlar
   <data name="Report the async work queue as stalled after (seconds)" xml:space="preserve">
     <value>Eşzamansız iş kuyruğunu şu süre sonra takılmış olarak bildir (saniye)</value>
   </data>
+  <data name="Repository the signing certificate must name (empty = this project; - = do not check)" xml:space="preserve">
+    <value>İmzalama sertifikasının adını taşıması gereken depo (boş = bu proje; - = denetleme)</value>
+  </data>
   <data name="Request (verify and log, never refuse)" xml:space="preserve">
     <value>İste (doğrula ve günlüğe yaz, asla reddetme)</value>
   </data>
@@ -6504,8 +6540,14 @@ Devam edilsin mi?</value>
   <data name="Sends daily aggregate reports about TLS connection failures to recipient domains (RFC 8460)." xml:space="preserve">
     <value>Alıcı etki alanlarına TLS bağlantı hataları hakkında günlük toplu raporlar gönderir (RFC 8460).</value>
   </data>
+  <data name="Sends the commands of a transaction without waiting for each answer, which removes a round trip per recipient - the difference is largest on a slow link or to a distant server. Used only with a server that advertises it. Applies after a service restart." xml:space="preserve">
+    <value>Bir işlemin komutlarını her yanıtı beklemeden gönderir; bu da alıcı başına bir gidiş-dönüşü ortadan kaldırır - fark, yavaş bir bağlantıda ya da uzaktaki bir sunucuya en büyüktür. Yalnızca bunu duyuran bir sunucuyla kullanılır. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
+  </data>
   <data name="Sends the daily aggregate reports that domains ask for with a rua= tag in their DMARC record (RFC 7489) - who sent mail claiming to be them, and whether it passed. Reports only go to an address outside the policy domain when that address's own DNS says it wants them, so a domain cannot use its DMARC record to aim this server's reports at somebody else." xml:space="preserve">
     <value>Etki alanlarının DMARC kayıtlarındaki rua= etiketiyle istediği günlük toplu raporları gönderir (RFC 7489) - onlar adına kimin posta gönderdiği ve geçip geçmediği. Raporlar, ilke etki alanının dışındaki bir adrese yalnızca o adresin kendi DNS'i istediğini söylediğinde gider; böylece bir etki alanı, DMARC kaydını bu sunucunun raporlarını başkasına yöneltmek için kullanamaz.</value>
+  </data>
+  <data name="Sends the message as counted chunks rather than dot-stuffed DATA. It is also what carries a binary message onward without rewriting it: a message accepted as BINARYMIME can only be relayed as it arrived to a server that offers both this and BINARYMIME. Applies after a service restart." xml:space="preserve">
+    <value>İletiyi, nokta doldurmalı DATA yerine sayılı parçalar hâlinde gönderir. Aynı zamanda ikili bir iletiyi yeniden yazmadan ileriye taşıyan şey de budur: BINARYMIME olarak kabul edilmiş bir ileti, ancak hem bunu hem de BINARYMIME'ı sunan bir sunucuya geldiği hâliyle aktarılabilir. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
   </data>
   <data name="Sends the recipient's address as the User: header, so spamd applies that mailbox's own preferences - the shape a virtual-user spamd (--virtual-config-dir with %u or %d) expects. A scan runs once per message, not once per recipient, so a message to several people cannot be scanned under any one of their preferences and uses the profile above instead." xml:space="preserve">
     <value>Alıcının adresini User: başlığı olarak gönderir; böylece spamd o posta kutusunun kendi tercihlerini uygular - sanal kullanıcılı bir spamd'nin (%u veya %d ile --virtual-config-dir) beklediği biçim. Tarama alıcı başına değil, ileti başına bir kez çalışır; bu yüzden birden çok kişiye giden bir ileti hiçbirinin tercihleriyle taranamaz ve bunun yerine yukarıdaki profili kullanır.</value>
@@ -6778,6 +6820,9 @@ Devam edilsin mi?</value>
   </data>
   <data name="Signing _algorithm" xml:space="preserve">
     <value>_İmzalama algoritması</value>
+  </data>
+  <data name="Signing identity the certificate must begin with (empty = this project's release workflow)" xml:space="preserve">
+    <value>Sertifikanın başında bulunması gereken imzalama kimliği (boş = bu projenin sürüm iş akışı)</value>
   </data>
   <data name="Signing in…" xml:space="preserve">
     <value>Oturum açılıyor…</value>
@@ -7118,6 +7163,9 @@ Devam edilsin mi?</value>
   <data name="Tasks" xml:space="preserve">
     <value>Görevler</value>
   </data>
+  <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
+    <value>Bir kullanıcı bir iletiyi spam olarak ayırdığında ya da geri çıkardığında SpamAssassin'e öğret</value>
+  </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Gönderen sunuculara etki alanlarınıza teslim ederken TLS kullanmaları gerektiğini söyler ve fırsatçı TLS'deki düşürme açığını kapatır.</value>
   </data>
@@ -7378,6 +7426,9 @@ Yukarıdaki anahtarı seçip elle kopyalayın - bir daha gösterilmeyecek.</valu
   <data name="The effective timeout moves between these values with server load." xml:space="preserve">
     <value>Etkin zaman aşımı, sunucu yüküne göre bu değerler arasında hareket eder.</value>
   </data>
+  <data name="The elliptic curves and finite-field groups this server will agree a key with, in order of preference - OpenSSL's group list, for example x25519:secp256r1. Empty means OpenSSL chooses, which is the right answer unless you have a compliance regime that names the groups. A list naming nothing the client supports ends the handshake, so change it against a scan rather than in the dark. Applies after a service restart." xml:space="preserve">
+    <value>Bu sunucunun bir anahtar üzerinde anlaşacağı eliptik eğriler ve sonlu cisim grupları, tercih sırasına göre - OpenSSL'in grup listesi, örneğin x25519:secp256r1. Boş, OpenSSL'in seçmesi demektir ve grupları adıyla belirleyen bir uyumluluk rejiminiz yoksa doğru yanıt da budur. İstemcinin desteklediği hiçbir şeyi adlandırmayan bir liste el sıkışmayı sonlandırır; bu yüzden onu körlemesine değil, bir tarama sonucuna bakarak değiştirin. Hizmet yeniden başlatıldıktan sonra uygulanır.</value>
+  </data>
   <data name="The enabled checks can add at most {0} between them, which is below the mark threshold of {1}: no message can reach either threshold, however bad it is." xml:space="preserve">
     <value>Etkin denetimler birlikte en fazla {0} ekleyebilir; bu da {1} olan işaretleme eşiğinin altında: hiçbir ileti, ne kadar kötü olursa olsun, iki eşiğe de ulaşamaz.</value>
   </data>
@@ -7496,6 +7547,9 @@ yüklenemedi. İleti büyük olasılıkla teslim edildi ve artık kuyrukta deği
   </data>
   <data name="The language could not be saved: {0}" xml:space="preserve">
     <value>Dil kaydedilemedi: {0}</value>
+  </data>
+  <data name="The last five settings on this card are for a site that builds its own releases and signs them with its own Sigstore, or that mirrors this project's. Leave every one of them empty and the server trusts exactly one thing: an installer signed by this project's own release workflow, recorded in the public transparency log. Setting any of them narrows or replaces that, and getting one wrong means either refusing genuine releases or trusting somebody else's." xml:space="preserve">
+    <value>Bu karttaki son beş ayar, kendi sürümlerini üretip kendi Sigstore'uyla imzalayan ya da bu projeninkileri yansılayan bir kuruluş içindir. Hepsini boş bırakın; sunucu tam olarak tek bir şeye güvenir: bu projenin kendi sürüm iş akışı tarafından imzalanmış ve genel şeffaflık günlüğüne kaydedilmiş bir kurulum programına. Bunlardan herhangi birini ayarlamak bunu daraltır ya da bunun yerine geçer ve birini yanlış yapmak, ya gerçek sürümleri reddetmek ya da başkasınınkilere güvenmek demektir.</value>
   </data>
   <data name="The last update step failed: {0}" xml:space="preserve">
     <value>Son güncelleştirme adımı başarısız oldu: {0}</value>
@@ -7990,6 +8044,9 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
   <data name="Traces only. A collector configured here receives spans and nothing else - metrics and logs have their own endpoints below, each off until it is set. Prometheus metrics are the port above, and are the same counters the metrics endpoint pushes rather than a second tally." xml:space="preserve">
     <value>Yalnızca izler. Burada yapılandırılan bir toplayıcı aralıkları alır, başka bir şey almaz - ölçümlerin ve günlüklerin aşağıda kendi uç noktaları vardır, her biri ayarlanana kadar kapalıdır. Prometheus ölçümleri yukarıdaki porttur ve ikinci bir sayım değil, ölçüm uç noktasının gönderdiği sayaçların aynısıdır.</value>
   </data>
+  <data name="Transparency log's public key for a private Sigstore (PEM; empty = the public Rekor key)" xml:space="preserve">
+    <value>Özel bir Sigstore için şeffaflık günlüğünün ortak anahtarı (PEM; boş = genel Rekor anahtarı)</value>
+  </data>
   <data name="Transport encryption overview" xml:space="preserve">
     <value>Taşıma şifrelemesine genel bakış</value>
   </data>
@@ -8142,6 +8199,12 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
   </data>
   <data name="Use ARC results from trusted forwarders to offset a DMARC failure" xml:space="preserve">
     <value>Bir DMARC başarısızlığını dengelemek için güvenilen ileticilerin ARC sonuçlarını kullan</value>
+  </data>
+  <data name="Use CHUNKING (BDAT) when the receiving server offers it" xml:space="preserve">
+    <value>Alıcı sunucu sunduğunda CHUNKING (BDAT) kullan</value>
+  </data>
+  <data name="Use PIPELINING when the receiving server offers it" xml:space="preserve">
+    <value>Alıcı sunucu sunduğunda PIPELINING kullan</value>
   </data>
   <data name="Use SpamAssassin" xml:space="preserve">
     <value>SpamAssassin kullan</value>
