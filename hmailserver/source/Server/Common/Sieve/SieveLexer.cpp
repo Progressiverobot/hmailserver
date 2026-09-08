@@ -254,7 +254,14 @@ namespace HM
          Advance_();
       }
 
+#ifdef HM_PLATFORM_POSIX
+      // _ttoi64 is the TCHAR-generic name for the same function, and this program
+      // is built UNICODE, so on Windows _ttoi64 IS _wtoi64. It is already in the
+      // platform header, so the POSIX side needs nothing new.
+      __int64 value = _ttoi64(digits);
+#else
       __int64 value = _wtoi64(digits);
+#endif
 
       wchar_t quantifier = Current_();
       if (quantifier == L'K' || quantifier == L'k')

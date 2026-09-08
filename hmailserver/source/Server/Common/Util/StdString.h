@@ -2285,7 +2285,11 @@ public:
       // seems to be a bit faster when anything other then the "C" locale is
       // used...
 
-      if ( !empty() )
+      // CStdStr inherits empty() from a dependent base, std::basic_string<CT>,
+      // which a conforming compiler does not search during unqualified lookup;
+      // MSVC finds it anyway. Qualifying with this->, as every other call to an
+      // inherited member in this class already does, is correct on both.
+      if ( !this->empty() )
       {
          sslwr(this->GetBuf(), this->size(), loc);
          this->RelBuf();
@@ -2342,7 +2346,12 @@ public:
       }
       else
       {
-         return _wcsicmp(c_str(), pT) == 0;
+         // this->, because c_str() is a member of a DEPENDENT base - the
+         // std::basic_string this template derives from - and unqualified lookup
+         // does not reach one. MSVC finds it anyway; a conforming compiler does
+         // not, and every other call to a base member in this file is already
+         // written this way (RelBuf just above is one). Same member, same call.
+         return _wcsicmp(this->c_str(), pT) == 0;
       }
    } 
 

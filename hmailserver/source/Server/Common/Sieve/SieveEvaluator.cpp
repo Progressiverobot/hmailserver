@@ -610,7 +610,16 @@ namespace HM
          // decision carries it.
          std::vector<String> loopCounts = message.GetHeaderValues(_T("X-hMailServer-LoopCount"));
          if (!loopCounts.empty())
+         {
+#ifdef HM_PLATFORM_POSIX
+            // _ttoi is the TCHAR-generic name for the same function, and this
+            // program is built UNICODE, so on Windows _ttoi IS _wtoi. It is
+            // already in the platform header, so the POSIX side needs nothing new.
+            decision.loopCount = _ttoi(loopCounts[0].c_str());
+#else
             decision.loopCount = _wtoi(loopCounts[0].c_str());
+#endif
+         }
 
          if (result_)
             result_->notifications.push_back(decision);
@@ -816,7 +825,14 @@ namespace HM
       // that includes at least one of them terminates.
       std::vector<String> loopCounts = message.GetHeaderValues(_T("X-hMailServer-LoopCount"));
       if (!loopCounts.empty())
+      {
+#ifdef HM_PLATFORM_POSIX
+         // See the same call above: _ttoi is _wtoi in a UNICODE build.
+         decision.loopCount = _ttoi(loopCounts[0].c_str());
+#else
          decision.loopCount = _wtoi(loopCounts[0].c_str());
+#endif
+      }
 
       // No entry is added to actions_ and localDecided_ is left alone: a vacation
       // reply says nothing about whether the message itself is kept.

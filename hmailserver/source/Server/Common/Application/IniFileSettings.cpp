@@ -8,8 +8,19 @@
 
 #include "IniSettingStore.h"
 #include "../Util/Crypt.h"
+#include "../Util/Hashing/HashCreator.h"
 #include "../Util/DiskSpace.h"
 #include "../Util/Utilities.h"
+#include "../Util/FileUtilities.h"
+
+// The Win32 profile API - GetPrivateProfileString and the three calls
+// beside it - lives in kernel32 and has no POSIX equivalent, so the POSIX
+// build declares those four functions here and implements them over the INI
+// file itself in Common/Util/IniFile.cpp. The Windows build never reaches
+// this line and binds the same calls to <windows.h> as it always has.
+#ifdef HM_PLATFORM_POSIX
+#include "../Util/IniFile.h"
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -138,23 +149,37 @@ namespace HM
       dbport_ = ReadIniSettingInteger_( "Database", "Port", 0);
 
       app_directory_ = ReadIniSettingString_("Directories", "ProgramFolder", "");
-      if (app_directory_.Right(1) != _T("\\"))
-         app_directory_ += "\\";
+      // The separator this platform uses. Everything derived from the program
+      // directory is built by concatenation - Languages, DBScripts, Bin - so a
+      // backslash here is not cosmetic: it becomes part of every one of those
+      // names, and a POSIX filesystem creates the directory rather than
+      // objecting.
+      if (app_directory_.Right(1) != FileUtilities::PathSeparator)
+         app_directory_ += FileUtilities::PathSeparator;
 
       data_directory_ = ReadIniSettingString_("Directories", "DataFolder", "");
+#ifdef HM_PLATFORM_POSIX
+      if (data_directory_.Right(1) == _T("/") || data_directory_.Right(1) == _T("\\"))
+         data_directory_ = data_directory_.Left(data_directory_.GetLength() -1);
+#else
       if (data_directory_.Right(1) == _T("\\"))
          data_directory_ = data_directory_.Left(data_directory_.GetLength() -1);
+#endif
 
       temp_directory_ = ReadIniSettingString_("Directories", "TempFolder", "");
+#ifdef HM_PLATFORM_POSIX
+      if (temp_directory_.Right(1) == _T("/") || temp_directory_.Right(1) == _T("\\"))
+         temp_directory_ = temp_directory_.Left(temp_directory_.GetLength() -1);
+#else
       if (temp_directory_.Right(1) == _T("\\"))
          temp_directory_ = temp_directory_.Left(temp_directory_.GetLength() -1);
+#endif
 
       event_directory_ = ReadIniSettingString_("Directories", "EventFolder", "");
 
-      dbscript_directory_ = ReadIniSettingString_("Directories", "ProgramFolder", "");
-      if (dbscript_directory_.Right(1) != _T("\\"))
-         dbscript_directory_ += "\\";
-      dbscript_directory_ += "DBScripts";
+      // Derived from the program folder, which has already been given this
+      // platform's separator above, so it is reused rather than re-derived.
+      dbscript_directory_ = app_directory_ + "DBScripts";
 
       no_of_dbconnections_ = ReadIniSettingInteger_("Database", "NumberOfConnections", 5);            
       no_of_dbconnection_attempts_ = ReadIniSettingInteger_("Database", "ConnectionAttempts", 6);  
@@ -181,8 +206,13 @@ namespace HM
       greylisting_expiration_interval_ = ReadIniSettingInteger_("Settings", "GreylistingRecordExpirationInterval", 240);
 
       database_directory_ = ReadIniSettingString_("Directories", "DatabaseFolder", "");
+#ifdef HM_PLATFORM_POSIX
+      if (database_directory_.Right(1) == _T("/") || database_directory_.Right(1) == _T("\\"))
+         database_directory_ = database_directory_.Left(database_directory_.GetLength() -1);
+#else
       if (database_directory_.Right(1) == _T("\\"))
          database_directory_ = database_directory_.Left(database_directory_.GetLength() -1);
+#endif
 
       String sValidLanguages = ReadIniSettingString_("GUILanguages", "ValidLanguages", "");
       valid_languages_ = StringParser::SplitString(sValidLanguages, ",");
@@ -209,6 +239,19 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5528, "IniFileSettings::LoadSettings", message);
 
          preferred_hash_algorithm_ = 4;
+      }
+
+      // Argon2id (5) is only a choice on a build whose OpenSSL has the KDF - 3.2
+      // or later; a Linux build against a distribution's 3.0 does not. Read as
+      // scrypt (7), the other memory-hard scheme, and reported: a preference this
+      // build cannot honour must not become an empty hash stored for a password.
+      if (preferred_hash_algorithm_ == 5 && !HashCreator::Argon2idAvailable())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5607, "IniFileSettings::LoadSettings",
+            "PreferredHashAlgorithm is 5 (Argon2id), but this build's OpenSSL has no Argon2id KDF - OpenSSL 3.2 or later has it. "
+            "Using 7 (scrypt) instead, which is memory-hard as well. Set it to 7 or 4 to choose deliberately.");
+
+         preferred_hash_algorithm_ = 7;
       }
 
       // Minimum password hash scheme an account may use to authenticate. Accounts
@@ -306,7 +349,7 @@ namespace HM
       mxtries_factor_ = ReadIniSettingInteger_("Settings", "MXTriesFactor", 0);
       if (mxtries_factor_ <= 0) mxtries_factor_ = 0;
       archive_dir_ = ReadIniSettingString_("Settings", "ArchiveDir", "");
-      if (archive_dir_.Right(1) == _T("\\"))
+      if (archive_dir_.Right(1) == FileUtilities::PathSeparator)
          archive_dir_ = archive_dir_.Left(archive_dir_.GetLength() -1);
       archive_hardlinks_ =  ReadIniSettingInteger_("Settings", "ArchiveHardLinks", 0) == 1;
       delivery_hardlinks_ = ReadIniSettingInteger_("Settings", "DeliveryHardLinks", 0) == 1;
@@ -1036,6 +1079,12 @@ namespace HM
       return iValue;
    }
 
+   void
+   IniFileSettings::SetInitializationFile(const String &file)
+   {
+      ini_file_ = file;
+   }
+
    String
    IniFileSettings::GetInitializationFile() 
    {
@@ -1045,10 +1094,27 @@ namespace HM
 
          ini_file_ = AppPath;
 
-         if (ini_file_.Right(1) != _T("\\"))
-            ini_file_ += "\\";
+         // The separator this platform uses. This is the one path that has to be
+         // right before any of the rest can even be read: nothing in this server
+         // knows anything until hMailServer.INI has been found.
+         if (ini_file_.Right(1) != FileUtilities::PathSeparator)
+            ini_file_ += FileUtilities::PathSeparator;
 
          ini_file_ += "hMailServer.ini";
+
+#ifdef HM_PLATFORM_POSIX
+         // A package installs the binary under /usr/bin and its configuration
+         // under /etc, which is where an administrator looks for it and where a
+         // distribution's own tooling expects it. The executable's own directory
+         // is still tried first, because a build tree and a tarball both keep the
+         // file beside the binary and neither should need an argument.
+         if (!FileUtilities::Exists(ini_file_))
+         {
+            const String packaged = _T("/etc/hmailserver/hMailServer.ini");
+            if (FileUtilities::Exists(packaged))
+               ini_file_ = packaged;
+         }
+#endif
       }
 
       return ini_file_;

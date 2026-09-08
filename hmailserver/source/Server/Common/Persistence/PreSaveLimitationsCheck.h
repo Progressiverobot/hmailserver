@@ -5,8 +5,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
+   class Account;
    class Alias;
    class DistributionList;
    class Group;
@@ -16,7 +19,6 @@ namespace HM
    class Route;
    class SecurityRange;
 
-   enum PersistenceMode;
    class PreSaveLimitationsCheck
    {
    public:

@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "distributionlistrecipients.h"
+#include "DistributionListRecipients.h"
 
 #include "../Persistence/PersistentDistributionListRecipient.h"
 

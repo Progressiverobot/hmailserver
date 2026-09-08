@@ -246,7 +246,7 @@ namespace HM
       // excepted: a hold is a promise that nothing removes the record.
       PersistentArchiveIndex::RemoveByAddress(address);
 
-      const String userArchive = archiveDir + _T("\\") + domainPart + _T("\\") + localPart;
+      const String userArchive = archiveDir + FileUtilities::PathSeparator + domainPart + FileUtilities::PathSeparator + localPart;
 
       if (!FileUtilities::Exists(userArchive))
          return 0;

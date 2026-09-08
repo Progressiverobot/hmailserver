@@ -303,8 +303,13 @@ namespace HM
       pNode->AppendAttr(_T("Name"), name_);
       pNode->AppendAttr(_T("LowerIP"), String(lower_ip_.ToString()));
       pNode->AppendAttr(_T("UpperIP"), String(upper_ip_.ToString()));
-      pNode->AppendAttr(_T("Priority"), StringParser::IntToString(priority_));
-      pNode->AppendAttr(_T("Options"), StringParser::IntToString(options_));
+      // priority_ and options_ are longs. MSVC binds IntToString(long) to the int
+      // overload, because long and int are the same 32-bit type on Windows; clang
+      // finds int, unsigned int and __int64 all equally distant and cannot choose.
+      // The casts name the overload the Windows build already selects, and cannot
+      // lose a value that a 32-bit long could hold.
+      pNode->AppendAttr(_T("Priority"), StringParser::IntToString((int) priority_));
+      pNode->AppendAttr(_T("Options"), StringParser::IntToString((int) options_));
 
       pNode->AppendAttr(_T("ExpiresTime"), Time::GetTimeStampFromDateTime(expires_Time));
       pNode->AppendAttr(_T("Expires"), expires_ ? _T("1") : _T("0"));

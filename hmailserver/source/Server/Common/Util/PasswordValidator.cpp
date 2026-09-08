@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\passwordvalidator.h"
+#include "./PasswordValidator.h"
 
 #include "../Application/ObjectCache.h"
 #include "../Application/DefaultDomain.h"

@@ -4,6 +4,51 @@
 
 #include "StdAfx.h"
 #include "LdapClient.h"
+#ifdef HM_PLATFORM_POSIX
+
+// OpenLDAP is installed on this platform, and this file is deliberately NOT built
+// against it. The two libraries share the ldap_* names and share very little else
+// that matters here: winldap takes and returns wide strings where OpenLDAP takes
+// UTF-8, the session handle has a different lifetime, ldap_bind_sW's Negotiate path
+// has no counterpart at all, and paged results are reached through a different pair
+// of calls. A file compiled against both would be two implementations wearing one
+// set of names, and the second of them would be untested against a real directory.
+// Writing it properly is the roadmap row "Directory authentication without
+// LogonUser", and it is that row's work rather than a compilation fix.
+//
+// So every entry point that would talk to a directory reports and fails below. What
+// stays compiled is the part that is pure value-mapping and pure string handling:
+// which result code means "wrong password" as against "this directory cannot
+// answer", the text each code is given, the RFC 4515 and RFC 4514 escaping, and the
+// template expansion. Those are the parts carrying the security consequences and the
+// tests, and guarding them out would leave them unbuilt here for no reason at all.
+//
+// The result codes below are the numbers winldap.h gives, so that the classification
+// in this file reaches the same conclusion on both platforms. The first group is the
+// protocol's own (RFC 4511 appendix A), which every LDAP library agrees on; the
+// second is the set of client-side codes Windows adds above 0x50, which is exactly
+// where the two libraries' numbering parts company - one more reason not to mix
+// them.
+enum
+{
+   LDAP_SUCCESS              = 0x00,
+   LDAP_STRONG_AUTH_REQUIRED = 0x08,
+   LDAP_NO_SUCH_OBJECT       = 0x20,
+   LDAP_INAPPROPRIATE_AUTH   = 0x30,
+   LDAP_INVALID_CREDENTIALS  = 0x31,
+   LDAP_INSUFFICIENT_RIGHTS  = 0x32,
+   LDAP_BUSY                 = 0x33,
+   LDAP_UNAVAILABLE          = 0x34,
+   LDAP_UNWILLING_TO_PERFORM = 0x35,
+
+   LDAP_SERVER_DOWN          = 0x51,
+   LDAP_LOCAL_ERROR          = 0x52,
+   LDAP_TIMEOUT              = 0x55,
+   LDAP_FILTER_ERROR         = 0x57,
+   LDAP_CONNECT_ERROR        = 0x5b
+};
+
+#else
 
 // PCCERT_CONTEXT, which winldap.h uses in the VERIFYSERVERCERT signature without
 // declaring it. Included before winldap.h for that reason; crypt32.lib is already on
@@ -22,6 +67,7 @@
 // libraries. Needs wldap32.lib on the link line.
 #include <winldap.h>
 
+#endif
 #include <atomic>
 #include <vector>
 
@@ -32,6 +78,32 @@
 
 namespace HM
 {
+#ifdef HM_PLATFORM_POSIX
+
+   namespace
+   {
+      // Where every directory operation lands here. It reports rather than merely
+      // failing, because the caller's only other clue would be an OutcomeUnavailable
+      // that looks exactly like a domain controller being down - and an administrator
+      // sent to check a directory that is working perfectly is a worse outcome than a
+      // blunt line saying this build cannot talk to one.
+      //
+      // Named for the operation rather than reported once per class, because which
+      // operation was refused is the part that tells an administrator what stopped:
+      // a refused Connect and a refused SearchEntries reach the log from different
+      // features.
+      void ReportLdapUnavailable_(const String &operation)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6405, "LdapClient",
+            Formatter::Format(_T("LDAP is not available in this build: {0} was not attempted. The ")
+               _T("directory client this file is written against is the Windows one (wldap32) and ")
+               _T("this platform has none; the OpenLDAP library installed here is a different API ")
+               _T("and nothing has been ported to it. See the roadmap row 'Directory ")
+               _T("authentication without LogonUser'."), operation));
+      }
+   }
+
+#else
    namespace
    {
       // A NUL-terminated, writable copy of a String, because every wldap32 entry
@@ -87,6 +159,7 @@ namespace HM
       }
    }
 
+#endif
    LdapClient::LdapClient()
    {
       last_error_ = LDAP_SUCCESS;
@@ -105,12 +178,23 @@ namespace HM
       if (session_ == nullptr)
          return;
 
+#ifdef HM_PLATFORM_POSIX
+
+      // Unreachable as this file stands - nothing here ever opens a session, so
+      // session_ never becomes non-null and the return above always fires. The handle
+      // is dropped rather than the whole body being guarded away, so that the day a
+      // POSIX Connect does set it, closing is what happens and not nothing.
+      session_ = nullptr;
+      transport_protected_ = false;
+
+#else
       // ldap_unbind_s sends the unbind and frees the session, so the handle must not
       // be touched afterwards.
       ldap_unbind_s(session_);
 
       session_ = nullptr;
       transport_protected_ = false;
+#endif
    }
 
    void
@@ -118,6 +202,14 @@ namespace HM
    {
       if (session_ == nullptr)
          return;
+#ifdef HM_PLATFORM_POSIX
+
+      // See Disconnect: unreachable here, and dropping the handle rather than doing
+      // nothing is what keeps it unreachable safely.
+      session_ = nullptr;
+      transport_protected_ = false;
+
+#else
 
       // ldap_unbind_s is still the right call - it is what frees the session - but the
       // name is misleading here: what matters is that the socket is closed and the
@@ -126,6 +218,7 @@ namespace HM
 
       session_ = nullptr;
       transport_protected_ = false;
+#endif
    }
 
    bool
@@ -180,6 +273,13 @@ namespace HM
    {
       switch (last_error_)
       {
+#ifdef HM_PLATFORM_POSIX
+         case LDAP_UNAVAILABLE:
+            // The one code this build sets on its own: it is what every refused
+            // operation records. Named here so that a caller which logs this text gets
+            // the reason rather than a number nothing on the machine can explain.
+            return _T("LDAP is not available in this build");
+#endif
          case LDAP_SUCCESS:
             return _T("no error");
 
@@ -223,6 +323,15 @@ namespace HM
             break;
       }
 
+#ifdef HM_PLATFORM_POSIX
+
+      // ldap_err2stringW is a wldap32 entry point and there is no library here to ask.
+      // Every code this build can produce for itself is named in the switch above, so
+      // reaching this line means the code came from somewhere unexpected - and the
+      // number is then the only honest thing that can be said about it.
+      return Formatter::Format(_T("LDAP result code {0}"), (int) last_error_);
+
+#else
       // ldap_err2stringW returns a pointer into library-owned storage; it must not be
       // freed.
       PWSTR text = ldap_err2stringW(last_error_);
@@ -231,6 +340,7 @@ namespace HM
          return _T("an unrecognised LDAP error");
 
       return String(text);
+#endif
    }
 
    String
@@ -396,6 +506,17 @@ namespace HM
    LdapOperationOutcome
    LdapClient::Connect(const LdapConfiguration &configuration)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      ReportLdapUnavailable_(_T("Connect"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       Disconnect();
 
       last_diagnostic_.Empty();
@@ -515,11 +636,23 @@ namespace HM
       }
 
       return Record_(LDAP_SUCCESS);
+#endif
    }
 
    LdapOperationOutcome
    LdapClient::AwaitResult_(unsigned long messageId)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      ReportLdapUnavailable_(_T("AwaitResult_"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       LDAP_TIMEVAL timeout;
       timeout.tv_sec = timeout_seconds_;
       timeout.tv_usec = 0;
@@ -570,11 +703,23 @@ namespace HM
          return Record_(parseResult);
 
       return Record_(returnCode);
+#endif
    }
 
    LdapOperationOutcome
    LdapClient::BindAnonymous()
    {
+#ifdef HM_PLATFORM_POSIX
+
+      ReportLdapUnavailable_(_T("BindAnonymous"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       if (session_ == nullptr)
          return Record_(LDAP_LOCAL_ERROR);
 
@@ -588,11 +733,23 @@ namespace HM
          return Record_(LdapGetLastError());
 
       return AwaitResult_(messageId);
+#endif
    }
 
    LdapOperationOutcome
    LdapClient::BindSimple(const String &dn, const String &password)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      ReportLdapUnavailable_(_T("BindSimple"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       if (session_ == nullptr)
          return Record_(LDAP_LOCAL_ERROR);
 
@@ -639,11 +796,23 @@ namespace HM
          return Record_(LdapGetLastError());
 
       return AwaitResult_(messageId);
+#endif
    }
 
    LdapOperationOutcome
    LdapClient::BindNegotiate(const String &username, const String &domain, const String &password)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      ReportLdapUnavailable_(_T("BindNegotiate"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       if (session_ == nullptr)
          return Record_(LDAP_LOCAL_ERROR);
 
@@ -699,6 +868,7 @@ namespace HM
       last_diagnostic_.Empty();
 
       return Record_(bindResult);
+#endif
    }
 
    LdapOperationOutcome
@@ -750,6 +920,22 @@ namespace HM
       const std::vector<String> &attributeNames, int maxEntries,
       std::vector<LdapDirectoryEntry> &entries, bool &truncated)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      // The out parameters are cleared first, so that a caller which reads them
+      // after a failure sees nothing rather than whatever it passed in.
+      entries.clear();
+      truncated = false;
+
+      ReportLdapUnavailable_(_T("SearchEntries"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       entries.clear();
       truncated = false;
 
@@ -1001,12 +1187,29 @@ namespace HM
          ber_bvfree(cookie);
 
       return Record_(LDAP_SUCCESS);
+#endif
    }
 
    LdapOperationOutcome
    LdapClient::FindUserDn(const LdapConfiguration &configuration, const String &filter,
       String &dn, int &matchCount)
    {
+#ifdef HM_PLATFORM_POSIX
+
+      // The out parameters are cleared first, so that a caller which reads them
+      // after a failure sees nothing rather than whatever it passed in.
+      dn.Empty();
+      matchCount = 0;
+
+      ReportLdapUnavailable_(_T("FindUserDn"));
+
+      // Unavailable, never Rejected. The distinction this class exists to carry is
+      // that "the directory said no" and "the directory could not answer" are
+      // different facts; recording a rejection here would tell every user that their
+      // password was wrong.
+      return Record_(LDAP_UNAVAILABLE);
+
+#else
       dn.Empty();
       matchCount = 0;
 
@@ -1100,5 +1303,6 @@ namespace HM
       ldap_msgfree(searchResult);
 
       return Record_(LDAP_SUCCESS);
+#endif
    }
 }

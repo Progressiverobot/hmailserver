@@ -25,6 +25,21 @@ namespace HM
    // upgrade must not break the scripts an installation already runs. The row in
    // the roadmap that asked for this is the one that also says the shipped Control
    // Panel templates use WScript.Shell and MSXML2.ServerXMLHTTP.
+   //
+   // Windows only, because the thing it answers to is. The question comes from
+   // an ActiveX script engine asking its host whether a CLSID may be created
+   // (IInternetHostSecurityManager), a CLSID is a COM identity, and both the
+   // engine and COM are absent from a POSIX build. Every member of this class
+   // names REFCLSID in its signature, so the class is declared only where it can
+   // be defined - a version that took some other kind of name would be a
+   // different policy answering a different question, and the setting it
+   // implements, ScriptAllowedObjects, would silently mean something else.
+   //
+   // When a scripting host does arrive for this platform it needs a policy of its
+   // own shape, and this file is the description of what that policy has to do:
+   // default to what an existing installation already runs, name what it refused,
+   // and be readable in one place.
+#ifndef HM_PLATFORM_POSIX
    class ScriptObjectPolicy
    {
    public:
@@ -41,4 +56,5 @@ namespace HM
       static String DescribeClass_(REFCLSID clsid);
       static bool EntryMatches_(const String &entry, REFCLSID clsid, const String &progId);
    };
+#endif
 }

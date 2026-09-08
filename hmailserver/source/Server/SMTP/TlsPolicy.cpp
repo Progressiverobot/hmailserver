@@ -14,16 +14,36 @@
 #include "../Common/TCPIP/SocketConstants.h"
 #include "../Common/Util/TlsRptStore.h"
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
+// <iphlpapi.h> declares GetAdaptersAddresses, which is how the nameserver list
+// is discovered on Windows. There is no POSIX counterpart; see GetDnsServers_
+// below.
+#ifdef _MSC_VER
 #include <iphlpapi.h>
+#endif
+// The POSIX nameserver list is read out of /etc/resolv.conf in GetDnsServers_
+// below; these are the two standard headers that reading a text file and
+// comparing a keyword in it need.
+#ifdef HM_PLATFORM_POSIX
+#include <cstdio>
+#include <cstring>
+#endif
 
 #include <openssl/rand.h>
 #include <openssl/ssl.h>
 
 #include <ctime>
 
+#ifdef _MSC_VER
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -693,6 +713,7 @@ namespace HM
       }
 
       // Otherwise, pick up the system-configured DNS servers.
+#ifdef _MSC_VER
       ULONG bufferSize = 16 * 1024;
       std::vector<unsigned char> buffer(bufferSize);
 
@@ -733,6 +754,71 @@ namespace HM
                return true;
          }
       }
+#else
+      // /etc/resolv.conf is where a POSIX system records the nameservers it uses,
+      // so reading it is the counterpart of GetAdaptersAddresses above and answers
+      // with the same thing: the first two IPv4 servers, on port 53, in the order
+      // the file lists them. Leaving it unwritten would have been worse than it
+      // looks - MTA-STS and DANE would have found no server, read no TLSA record
+      // and delivered without either, on a build that reported no error at all.
+      FILE *resolv_conf = ::fopen("/etc/resolv.conf", "r");
+
+      if (resolv_conf != nullptr)
+      {
+         char line[512];
+
+         while (::fgets(line, sizeof(line), resolv_conf) != nullptr)
+         {
+            const char *cursor = line;
+
+            while (*cursor == ' ' || *cursor == '\t')
+               cursor++;
+
+            // "nameserver" has to be the whole keyword rather than the start of a
+            // longer one, so what follows it must be white space.
+            if (::strncmp(cursor, "nameserver", 10) != 0)
+               continue;
+
+            cursor += 10;
+
+            if (*cursor != ' ' && *cursor != '\t')
+               continue;
+
+            while (*cursor == ' ' || *cursor == '\t')
+               cursor++;
+
+            char address_text[64];
+            size_t length = 0;
+
+            while (length + 1 < sizeof(address_text) &&
+                   *cursor != '\0' && *cursor != ' ' && *cursor != '\t' &&
+                   *cursor != '\r' && *cursor != '\n' && *cursor != '#' && *cursor != ';')
+            {
+               address_text[length] = *cursor;
+               length++;
+               cursor++;
+            }
+
+            address_text[length] = '\0';
+
+            sockaddr_in address = {};
+            address.sin_family = AF_INET;
+            address.sin_port = htons(53);
+
+            // An IPv6 nameserver is passed over here, exactly as the Windows branch
+            // passes over a server whose family is not AF_INET.
+            if (inet_pton(AF_INET, address_text, &address.sin_addr) != 1)
+               continue;
+
+            servers.push_back(address);
+
+            if (servers.size() >= 2)
+               break;
+         }
+
+         ::fclose(resolv_conf);
+      }
+#endif
 
       return !servers.empty();
    }
@@ -802,7 +888,16 @@ namespace HM
          unsigned char receiveBuffer[4096];
 
          sockaddr_in fromAddress = {};
+         // recvfrom's last argument is an int* on Winsock and a socklen_t* on
+         // POSIX, and they are not the same type even where they are the same
+         // width, so the variable is declared as whatever the platform's recvfrom
+         // is going to write through. The Windows declaration is the one this file
+         // has always had.
+#ifdef HM_PLATFORM_POSIX
+         socklen_t fromLength = sizeof(fromAddress);
+#else
          int fromLength = sizeof(fromAddress);
+#endif
 
          int bytesReceived = recvfrom(udpSocket, reinterpret_cast<char*>(receiveBuffer), sizeof(receiveBuffer), 0,
                                       reinterpret_cast<sockaddr*>(&fromAddress), &fromLength);

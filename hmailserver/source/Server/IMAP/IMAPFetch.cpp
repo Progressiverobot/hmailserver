@@ -16,7 +16,7 @@
 #include "../Common/Util/Charset.h"
 #include "../Common/Util/Time.h"
 #include "../Common/Util/Unicode.h"
-#include "../Common/Util/Parsing/AddressListParser.h"
+#include "../Common/Util/Parsing/AddresslistParser.h"
 #include "../Common/Util/ByteBuffer.h"
 #include "../Common/BO/ACLPermission.h"
 

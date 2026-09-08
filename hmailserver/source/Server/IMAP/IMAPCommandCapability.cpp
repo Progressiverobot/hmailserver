@@ -10,8 +10,8 @@
 #include "IMAPConnection.h"
 #include "../Common/Application/IniFileSettings.h"
 #include "IMAPConfiguration.h"
-#include "../common/BO/SecurityRange.h"
-#include "../common/Util/OAuth2TokenValidator.h"
+#include "../Common/BO/SecurityRange.h"
+#include "../Common/Util/OAuth2TokenValidator.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

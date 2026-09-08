@@ -149,7 +149,7 @@ namespace HM
 
          if (!sDomainName.IsEmpty() && !sMailbox.IsEmpty())
          {
-            String sAccountFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + sDomainName + "\\" + sMailbox;
+            String sAccountFolder = FileUtilities::Combine(FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), sDomainName), sMailbox);
             FileUtilities::DeleteDirectory(sAccountFolder, false);
          }
 

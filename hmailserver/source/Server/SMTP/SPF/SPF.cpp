@@ -6,9 +6,44 @@
 #include "StdAfx.h"
 
 #include "SPF.h"
-#include "rmspf.h"
+#include "RMSPF.h"
 #include "../../Common/Application/IniFileSettings.h"
 #include "../../Common/Application/ErrorManager.h"
+
+#ifdef HM_PLATFORM_POSIX
+// USES_CONVERSION and CT2A are ATL's stack string converters: the macro declares
+// the bookkeeping the whole T2A family shares, and CT2A makes a narrow copy of a
+// TCHAR string that lives as long as the object does. Neither exists outside
+// ATL, and both are used the same way in both functions below - make a narrow
+// copy of a String, hand the pointer to the vendored SPF library, which is C and
+// takes const char *.
+//
+// So the pair is given a body here rather than six call sites being rewritten.
+// It is deliberately the narrowest thing that will serve: it holds its own copy
+// and converts to const char *, and it does nothing else. It is not an ATL
+// emulation and must not become one.
+#define USES_CONVERSION ((void) 0)
+
+namespace
+{
+   class CT2A
+   {
+   public:
+      explicit CT2A(const HM::String &text) :
+         narrow_(text.c_str())
+      {
+      }
+
+      operator const char *() const
+      {
+         return narrow_.c_str();
+      }
+
+   private:
+      HM::AnsiString narrow_;
+   };
+}
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

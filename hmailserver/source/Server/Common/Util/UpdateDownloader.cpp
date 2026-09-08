@@ -11,9 +11,15 @@
 #include "Unicode.h"
 #include "../Application/IniFileSettings.h"
 
+// Authenticode is a Windows code-signing scheme, and WinVerifyTrust is the only
+// implementation of it. See AuthenticodeTrusted below for what the POSIX build
+// does instead; everything else in this file - the download, the digest and the
+// Sigstore verification - is platform-neutral.
+#ifdef _MSC_VER
 #include <wintrust.h>
 #include <softpub.h>
 #pragma comment(lib, "wintrust.lib")
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -41,14 +47,24 @@ namespace HM
       String directory = IniFileSettings::Instance()->GetDataDirectory();
       if (directory.IsEmpty())
          return _T("");
-      if (directory.Right(1) != _T("\\"))
-         directory += _T("\\");
+      if (directory.Right(1) != FileUtilities::PathSeparator)
+         directory += FileUtilities::PathSeparator;
       return directory + _T("Updates");
    }
 
    bool
    UpdateDownloader::AuthenticodeTrusted(const String &path, String &why)
    {
+#ifndef _MSC_VER
+      // There is no Authenticode outside Windows, so there is nothing here to ask.
+      // Refusing is the only safe answer: an administrator who set
+      // UpdateRequireAuthenticode=1 asked for the signature to be checked, and a
+      // build that cannot check it must not report that it passed. The roadmap
+      // section "Linux and AArch64" leaves updating a Linux install to its package
+      // manager rather than to a signed Windows installer.
+      why = _T("Authenticode signatures can only be checked on Windows");
+      return false;
+#else
       WINTRUST_FILE_INFO fileInfo;
       memset(&fileInfo, 0, sizeof(fileInfo));
       fileInfo.cbStruct = sizeof(fileInfo);
@@ -98,6 +114,7 @@ namespace HM
          break;
       }
       return false;
+#endif
    }
 
    bool
@@ -223,7 +240,7 @@ namespace HM
          return false;
       }
 
-      String installerPath = directory + _T("\\") + snapshot.installer_name;
+      String installerPath = directory + FileUtilities::PathSeparator + snapshot.installer_name;
       SigstoreVerdict verdict;
       String why;
       if (!FetchVerified(snapshot.installer_url, snapshot.bundle_url, installerPath, snapshot.installer_size, snapshot.installer_digest, trust, verdict, why))

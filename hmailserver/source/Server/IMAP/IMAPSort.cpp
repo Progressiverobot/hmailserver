@@ -9,12 +9,21 @@
 #include "IMAPSortParser.h"
 #include "IMAPConnection.h"
 
-#include "..\Common\Persistence\PersistentMessageMetaData.h"
-#include "..\Common\BO\Message.h"
-#include "..\Common\MIME\Mime.h"
-#include "..\Common\Util\Time.h"
-#include "..\Common\Util\VariantDateTime.h"
+#include "../Common/Persistence/PersistentMessageMetaData.h"
+#include "../Common/BO/Message.h"
+#include "../Common/Mime/Mime.h"
+#include "../Common/Util/Time.h"
+#include "../Common/Util/VariantDateTime.h"
 #include "../Common/Persistence/PersistentMessage.h"
+
+#ifdef HM_PLATFORM_POSIX
+// The three answers CompareStringW gives, under their Windows names and with
+// their Windows values, because the comparison in IMAPSortHeaderField is
+// written against them and reads better left that way.
+static const int CSTR_LESS_THAN = 1;
+static const int CSTR_EQUAL = 2;
+static const int CSTR_GREATER_THAN = 3;
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -87,7 +96,27 @@ namespace HM
          else
          {
             // Use UTF8 as default.
+#ifdef HM_PLATFORM_POSIX
+            // CompareStringW with NORM_IGNORECASE is a case-insensitive
+            // comparison in the system's locale; wcscasecmp is that comparison
+            // here, in the locale the process is running in. It answers the sign
+            // of the difference rather than Windows' 1, 2 and 3, so the result is
+            // mapped onto the three values the code below tests for.
+            //
+            // The two are not identical and this is the one place it shows: the
+            // Windows call folds case across the whole of Unicode, while
+            // wcscasecmp folds whatever the process locale knows how to fold -
+            // ASCII only under the "C" locale. A SORT of non-ASCII subjects can
+            // therefore order differently between the two builds. It is honest
+            // and it is not silent: it is written down here, and getting it right
+            // needs a collation library, which is a decision larger than this
+            // file. wcscasecmp also cannot fail, so the error branch below is
+            // simply never taken on this platform.
+            const int difference = ::wcscasecmp(sHeader1, sHeader2);
+            compare_result = difference < 0 ? CSTR_LESS_THAN : (difference == 0 ? CSTR_EQUAL : CSTR_GREATER_THAN);
+#else
             compare_result = CompareStringW(LOCALE_SYSTEM_DEFAULT, NORM_IGNORECASE, sHeader1, -1, sHeader2, -1);
+#endif
          }
 
          if (compare_result == 0)

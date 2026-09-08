@@ -48,7 +48,11 @@ namespace HM
    {
       if (iLeaveEndingBytes > buffer_size_)
       {
-         throw std::logic_error(Formatter::FormatAsAnsi("The number of bytes to leave exceeds buffer size. Bytes to leave: {0}, Buffer size: {1}", iLeaveEndingBytes, buffer_size_));
+         // Both sizes are size_t, which is unsigned __int64 on Windows and binds to
+         // that FormatArgument constructor exactly. On a 64-bit POSIX build size_t is
+         // unsigned long, which matches none of them exactly and is no closer to one
+         // than to the others. The casts are identities on Windows.
+         throw std::logic_error(Formatter::FormatAsAnsi("The number of bytes to leave exceeds buffer size. Bytes to leave: {0}, Buffer size: {1}", (unsigned __int64) iLeaveEndingBytes, (unsigned __int64) buffer_size_));
       }
 
       // Allocate a temporary buffer.

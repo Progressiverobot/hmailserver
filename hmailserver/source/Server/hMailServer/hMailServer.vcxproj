@@ -723,7 +723,7 @@ EXIT 0
     <ClCompile Include="..\IMAP\IMAPCommandListRights.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandLogin.cpp" />
     <ClCompile Include="..\Imap\IMAPCommandLogout.cpp" />
-    <ClCompile Include="..\Imap\IMAPCommandLSUB.CPP" />
+    <ClCompile Include="..\Imap\IMAPCommandLSUB.cpp" />
     <ClCompile Include="..\IMAP\IMAPCommandMyRights.cpp" />
     <ClCompile Include="..\IMAP\IMAPCommandNamespace.cpp" />
     <ClCompile Include="..\IMAP\IMAPCommandRangeAction.cpp" />

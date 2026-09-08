@@ -15,7 +15,168 @@
 #undef _UNICODE
 #undef UNICODE
 
+#ifdef HM_PLATFORM_POSIX
+
+// windns.h is the header of the Windows DNS client, and this file is written
+// straight against it: DnsQuery_A, the record list it hands back, and the record
+// structure walked in a dozen places below. None of that exists on this platform, so
+// what stands in for it here is the smallest honest thing - the same types and the
+// same numbers, so that every line of SPF evaluation in this file compiles and is
+// exercised unchanged, plus one query function that refuses.
+//
+// Refusing is not the same as answering nothing, and the difference is the whole
+// reason this is written out rather than stubbed. dnsquery() below turns an
+// unrecognised status into SPF_TempError, which is what a checker must return when
+// it could not look something up (RFC 7208 section 2.6.6). Handing back
+// DNS_INFO_NO_RECORDS instead would say "this domain publishes no SPF record", and
+// every forged sender in the world would then be evaluated as SPF_None.
+//
+// The resolver that would replace it is the roadmap row "Name resolution without
+// the Windows DNS API".
+
+#include <mutex>
+
+// VOID and PVOID are Windows spellings of void and void*, used by the two function
+// typedefs below and not (yet) in the platform header. Repeating a typedef with the
+// same meaning is legal, so this stays correct on the day the platform layer grows
+// them and can then be deleted.
+typedef void  VOID;
+typedef void *PVOID;
+
+typedef DWORD DNS_STATUS;
+
+typedef enum
+{
+   DnsFreeFlat = 0,
+   DnsFreeRecordListDeep = 1,
+   DnsFreeParsedMessageFields = 2
+} DNS_FREE_TYPE;
+
+// The resource-record types are the numbers assigned by RFC 1035 and RFC 3596 -
+// what goes on the wire, and what windns.h spells them as.
+#define DNS_TYPE_A     0x0001
+#define DNS_TYPE_NS    0x0002
+#define DNS_TYPE_CNAME 0x0005
+#define DNS_TYPE_PTR   0x000c
+#define DNS_TYPE_MX    0x000f
+#define DNS_TYPE_TEXT  0x0010
+#define DNS_TYPE_AAAA  0x001c
+
+#define DNS_QUERY_STANDARD      0x00000000
+#define DNS_QUERY_BYPASS_CACHE  0x00000008
+#define DNS_QUERY_TREAT_AS_FQDN 0x00001000
+
+// Which section of the DNS message a record came out of. The code below refuses
+// anything that did not come from the answer section, which is a real check and not
+// a formality: an additional-section record is unsolicited data the queried server
+// chose to add.
+#define DNSREC_QUESTION   0
+#define DNSREC_ANSWER     1
+#define DNSREC_AUTHORITY  2
+#define DNSREC_ADDITIONAL 3
+
+#ifndef NO_ERROR
+#define NO_ERROR 0L
+#endif
+
+typedef struct _IP4_ARRAY
+{
+   DWORD AddrCount;
+   DWORD AddrArray[1];
+} IP4_ARRAY, *PIP4_ARRAY;
+
+typedef struct _DnsRecordFlags
+{
+   DWORD Section : 2;
+   DWORD Delete : 1;
+   DWORD CharSet : 2;
+   DWORD Unused : 3;
+   DWORD Reserved : 24;
+} DNS_RECORD_FLAGS;
+
+typedef struct _DnsIp6Address
+{
+   DWORD IP6Dword[4];
+} DNS_IP6_ADDRESS;
+
+// The ANSI record, because this file undefines UNICODE above and asks for
+// DnsQuery_A. Only the members the code below reads are declared: a structure that
+// nothing on this platform ever fills in does not need the rest, and inventing the
+// rest would suggest it had been checked against the real one.
+typedef struct _DnsRecordA
+{
+   struct _DnsRecordA *pNext;
+   char               *pName;
+   WORD                wType;
+   WORD                wDataLength;
+   union
+   {
+      DWORD             DW;
+      DNS_RECORD_FLAGS  S;
+   } Flags;
+   DWORD               dwTtl;
+   DWORD               dwReserved;
+
+   union
+   {
+      struct { DWORD IpAddress; } A;
+      struct { char *pNameHost; } PTR, NS, CNAME;
+      struct { char *pNameExchange; WORD wPreference; WORD Pad; } MX;
+      struct { DWORD dwStringCount; char *pStringArray[1]; } TXT;
+      struct { DNS_IP6_ADDRESS Ip6Address; } AAAA;
+   } Data;
+} DNS_RECORD, *PDNS_RECORD;
+
+// The Win32 synchronisation this file is written to, over the standard library.
+// Written as the Windows names rather than as std:: calls at each of the sixteen
+// call sites, because the alternative is sixteen conditionals threaded through the
+// middle of the library's own logic. If the platform layer ever grows these - they
+// are ordinary Win32 and there is nothing special about them - this block goes, and
+// the compiler will say so rather than quietly preferring one of the two.
+typedef std::recursive_mutex CRITICAL_SECTION;
+
+#define WAIT_OBJECT_0  0x00000000L
+#define WAIT_ABANDONED 0x00000080L
+
+// A critical section is recursive on Windows, which is why this is a
+// recursive_mutex and not a mutex. Construction and destruction are the object's
+// own, so the two calls that do them on Windows have nothing left to do here.
+inline void InitializeCriticalSection(CRITICAL_SECTION *) {}
+inline void DeleteCriticalSection(CRITICAL_SECTION *) {}
+inline void EnterCriticalSection(CRITICAL_SECTION *section) { section->lock(); }
+inline void LeaveCriticalSection(CRITICAL_SECTION *section) { section->unlock(); }
+
+// The one CreateMutex in this file makes a NAMED mutex, which on Windows serialises
+// initialisation between PROCESSES. What stands in for it here serialises between
+// THREADS only, and that is enough for what it actually guards: `initialized` is a
+// static in this process's own image, so a second process has its own copy and
+// there is nothing between them to race over. A named POSIX semaphore would be a
+// faithful translation of the call and a less faithful one of its purpose.
+//
+// The timeout is dropped with it. It exists so that a process which died holding
+// the named mutex cannot wedge every other process for ever; a mutex that no other
+// process can see has no such failure to guard against.
+inline HANDLE CreateMutex(void *, int, const wchar_t *)
+{
+   static std::recursive_mutex initialisation;
+   return &initialisation;
+}
+
+inline DWORD WaitForSingleObject(HANDLE handle, DWORD)
+{
+   ((std::recursive_mutex *) handle)->lock();
+   return WAIT_OBJECT_0;
+}
+
+inline int ReleaseMutex(HANDLE handle)
+{
+   ((std::recursive_mutex *) handle)->unlock();
+   return 1;
+}
+
+#else
 #include <windns.h>
+#endif
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
@@ -26,7 +187,7 @@
 #define SPFEXP __declspec(dllexport)
 #endif //SPFDLL
 
-#include "rmspf.h"
+#include "RMSPF.h"
 
 // if required, define custom functions
 #ifndef spfmalloc
@@ -91,6 +252,47 @@ static typDnsQuery_A* pDnsQuery; // pointer to DnsQuery_A() function
 static typDnsRecordListFree* pDnsRecordListFree; // DnsRecordListFree() func.
 
 #endif //DNSAPI_SUPP
+#ifdef HM_PLATFORM_POSIX
+
+// What the two pointers above are aimed at on this platform. Everything downstream
+// calls through those pointers and through nothing else, so this is the whole of the
+// DNS surface that has to be answered for.
+static DNS_STATUS WINAPI
+SpfDnsQueryRefused_(PCSTR pszName, WORD wType, DWORD Options, PIP4_ARRAY aipServers,
+PDNS_RECORD* ppQueryResults, PVOID* pReserved)
+{
+   if (ppQueryResults != NULL)
+      *ppQueryResults = NULL;
+
+   // Once for the life of the process. Every SPF evaluation makes several lookups and
+   // every one of them arrives here, so a report per query would bury the line that
+   // explains the failure under thousands of copies of itself.
+   static std::once_flag reported;
+
+   std::call_once(reported, [pszName]()
+   {
+      HM::ErrorManager::Instance()->ReportError(HM::ErrorManager::High, 6406, "RMSPF",
+         HM::Formatter::Format(_T("SPF cannot be evaluated in this build: it resolves names through the ")
+            _T("Windows DNS client and this platform has none. The first lookup refused was for '{0}'. ")
+            _T("Every SPF check returns TempError until the roadmap row 'Name resolution without the ")
+            _T("Windows DNS API' is written; a policy that rejects on TempError will defer mail."),
+            pszName));
+   });
+
+   // Deliberately none of the three statuses dnsquery() recognises, so that it
+   // returns SPF_TempError. DNS_INFO_NO_RECORDS here would say the domain publishes
+   // no SPF record at all, and every forged sender would then evaluate to SPF_None.
+   return (DNS_STATUS) 9852;
+}
+
+static VOID WINAPI
+SpfDnsRecordListFreeRefused_(PDNS_RECORD pRecordList, DNS_FREE_TYPE FreeType)
+{
+   // Nothing was ever allocated, so there is nothing to free: the pointer handed in
+   // is the NULL that the query above left behind.
+}
+
+#endif //HM_PLATFORM_POSIX
 
 
 #ifdef SPFFILECACHE
@@ -417,6 +619,14 @@ initspf(int multithreaded)
    }
 
 #ifndef DNSAPI_SUPP
+#ifdef HM_PLATFORM_POSIX
+   // There is no DNSAPI.DLL to load. The two pointers are aimed at the refusals
+   // defined above instead, so that the initialisation succeeds and the failure is
+   // reported where the lookup happens - which is the only place that knows which
+   // name could not be resolved.
+   pDnsQuery = SpfDnsQueryRefused_;
+   pDnsRecordListFree = SpfDnsRecordListFreeRefused_;
+#else
    // load DNSAPI library functions
    hmodDnsApi = LoadLibrary(_T("DNSAPI.DLL"));
    if (hmodDnsApi == NULL)
@@ -437,6 +647,7 @@ initspf(int multithreaded)
          ReleaseMutex(hMutex);
       return false;
    }
+#endif //HM_PLATFORM_POSIX
 #endif //DNSAPI_SUPP
 
    if (multithreaded == 0)
@@ -556,7 +767,12 @@ SPFExit(void)
    if (initialized > 0)
    {
 #ifndef DNSAPI_SUPP
+#ifdef HM_PLATFORM_POSIX
+      // Nothing was loaded here, so there is nothing to release: the two function
+      // pointers above simply stop being used.
+#else
       FreeLibrary(hmodDnsApi);
+#endif //HM_PLATFORM_POSIX
 #endif //DNSAPI_SUPP
       if (multithread)
       {

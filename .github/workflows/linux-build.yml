@@ -1,0 +1,207 @@
+name: Linux build
+
+# Builds the server core on Linux for both architectures the roadmap names, and on a
+# release tag turns each into the packages a distribution installs. It is the second
+# compile gate: server-build.yml compiles the Windows service with MSVC, and this one
+# compiles the same core with clang and GCC on x86-64 and AArch64.
+#
+# WHY BOTH COMPILERS AND BOTH ARCHITECTURES
+#
+# The port is only as portable as the narrowest thing that has compiled it. clang is what
+# the census measured with, because Common/Util/StdString.h needs its MSVC-compatibility
+# mode for two-phase lookup; GCC is what a distribution builds packages with, so a GCC job
+# is what stops the port quietly becoming clang-only. AArch64 is a GitHub-hosted runner
+# (ubuntu-24.04-arm), not a cross-build, so what it proves is that the code runs on that
+# architecture rather than merely parses for it.
+#
+# WHAT IT PUBLISHES
+#
+# On a tag, one .deb and one .rpm per architecture, plus an AppImage, all carrying the
+# SAME version as the Windows installer for that tag - one version, one release, a
+# separate artefact per platform. RELEASE.md's "Linux packages" step says how they join
+# the release and get signed.
+
+on:
+  push:
+    branches: [ master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Build the distribution packages as well as the core'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.arch }} with ${{ matrix.compiler }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86-64
+            runner: ubuntu-latest
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            package: true
+          - arch: x86-64
+            runner: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            package: false
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            package: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reproducibility, the half CMakeLists.txt cannot do on its own: every tool
+      # that would otherwise stamp the clock - __DATE__, the archiver, dpkg-deb,
+      # rpmbuild - stamps the commit's own date instead, so two builds of the same
+      # tag on the same image produce the same binary. RELEASE.md says exactly how
+      # far that claim goes.
+      - name: Pin the build's clock to the commit
+        run: |
+          echo "SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)" >> "$GITHUB_ENV"
+          echo "Building as of $(git log -1 --format=%cI)"
+
+      - name: Install the libraries the core links against
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build clang \
+            libssl-dev zlib1g-dev libpq-dev \
+            libboost-thread-dev libboost-chrono-dev libboost-system-dev libboost-filesystem-dev libboost-regex-dev \
+            file rpm
+
+      # The census is the roadmap's own measure of the port and it must not regress.
+      # It compiles every core source on its own and prints how many a POSIX compiler
+      # accepts; the step fails when any of them does not.
+      - name: Count the translation units that compile
+        if: matrix.compiler == 'clang'
+        run: |
+          bash build/linux-tu-census.sh -j "$(nproc)" | tee census.txt
+          failed=$(grep -oP 'Failed:\s+\K[0-9]+' census.txt)
+          echo "Failed: ${failed}"
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::${failed} core translation units no longer compile on Linux."
+            exit 1
+          fi
+
+      # A failure on a runner is diagnosed from the compiler's own output or not
+      # at all, so the per-file logs are kept when the census fails.
+      - name: Keep the census logs
+        if: failure() && matrix.compiler == 'clang'
+        uses: actions/upload-artifact@v4
+        with:
+          name: census-logs-${{ matrix.arch }}-${{ matrix.compiler }}
+          path: /tmp/hm-tu-census/log
+          if-no-files-found: ignore
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S hmailserver/source/Server -B build/linux -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/usr
+
+      - name: Build
+        run: cmake --build build/linux -j "$(nproc)"
+
+      - name: The binary's hash, for the release notes
+        run: sha256sum build/linux/hmailserver
+
+      - name: The service answers for itself
+        run: |
+          ./build/linux/hmailserver --version
+          ./build/linux/hmailserver --help > /dev/null
+
+      - name: Package
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        working-directory: build/linux
+        run: |
+          cpack -G DEB
+          cpack -G RPM
+          ls -la ./*.deb ./*.rpm
+
+      # A package that installs but leaves nothing runnable is worse than none, so the
+      # .deb is installed on the runner and the binary is asked for its version from the
+      # place the package put it. The service is deliberately not started: it has no
+      # database here, and a mail server that starts without one logs an error a second.
+      - name: The package installs and puts a working binary where it says
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        working-directory: build/linux
+        run: |
+          sudo apt-get install -y ./hmailserver_*.deb
+          /usr/bin/hmailserver --version
+          test -f /etc/hmailserver/hMailServer.ini
+          test -f /usr/lib/systemd/system/hmailserver.service
+          systemctl is-enabled hmailserver || true
+          sudo apt-get remove -y hmailserver
+
+      - name: Keep the packages
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages-${{ matrix.arch }}
+          path: |
+            build/linux/*.deb
+            build/linux/*.rpm
+          if-no-files-found: error
+          retention-days: 14
+
+  # Compiling for AArch64 is proved by the job above running ON AArch64. This one proves
+  # the other half of the roadmap's architecture claim - that the sources are clean enough
+  # to be CROSS-compiled - which is what a distribution's own build farm will do.
+  cross:
+    name: cross-compile for aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the cross toolchain
+        run: |
+          sudo apt-get update -qq
+          # A syntax census does not link, so the HOST's Boost, OpenSSL, zlib and
+          # libpq headers serve for the cross target: their declarations are the
+          # same source for either architecture, and clang reads the target's own
+          # macros through them. The first run of this job installed none of the
+          # four and every one of the 496 files failed on the first header it
+          # could not find, which the census then reported as 496 failures.
+          sudo apt-get install -y --no-install-recommends \
+            clang g++-aarch64-linux-gnu libboost-dev libssl-dev zlib1g-dev libpq-dev
+
+      - name: Count the translation units that compile for AArch64
+        run: |
+          bash build/linux-tu-census.sh -j "$(nproc)" --target aarch64-linux-gnu | tee census-arm.txt
+          failed=$(grep -oP 'Failed:\s+\K[0-9]+' census-arm.txt)
+          if [ "${failed}" -ne 0 ]; then
+            echo "::error::${failed} core translation units do not compile for AArch64."
+            exit 1
+          fi
+
+      - name: Keep the cross census logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: census-logs-cross-aarch64
+          path: /tmp/hm-tu-census/log
+          if-no-files-found: ignore

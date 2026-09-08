@@ -6,11 +6,31 @@
 #include "StdAfx.h"
 
 
+#ifndef HM_PLATFORM_POSIX
+// Two Windows-only headers, and the reason this file has a POSIX arm at all.
+//
+// hMailServer.h is the generated COM interface header for the administration API
+// - what a script is handed as the "hMailServer" object - and it is produced by
+// #import from a type library, which is an MSVC facility. ScriptSite.h is the ATL
+// Active Scripting host: IActiveScript, IActiveScriptSite, and the VBScript and
+// JScript engines Windows ships. Neither has an equivalent here, and inventing
+// one would mean shipping a script interpreter.
+//
+// So on POSIX this class keeps its shape and its state - the handler flags, the
+// loaded text, the lock that keeps them coherent - and says plainly that it
+// cannot run a script. What it must never do is stay silent: an administrator who
+// carried an EventHandlers.vbs across from Windows would otherwise have
+// OnClientLogon and OnClientValidatePassword quietly not run, which is a security
+// control disappearing without a word. See the roadmap section "Linux and
+// AArch64".
 #include "../../hMailServer/hMailServer.h"
+#endif
 
 
 #include "ScriptServer.h"
+#ifndef HM_PLATFORM_POSIX
 #include "ScriptSite.h"
+#endif
 #include "ScriptObjectContainer.h"
 
 
@@ -21,6 +41,7 @@
 
 namespace HM
 {
+#ifndef HM_PLATFORM_POSIX
    namespace
    {
       // Aborts a runaway script by interrupting the engine from a timer queue
@@ -119,6 +140,7 @@ namespace HM
          volatile LONG fired_;
       };
    }
+#endif
 
    ScriptServer::ScriptServer(void) :
       has_on_client_connect_(false),
@@ -167,7 +189,7 @@ namespace HM
 
       String sScriptLanguage = Configuration::Instance()->GetScriptLanguage();
 
-      String sFileName = sEventsDir + "\\EventHandlers." + GetScriptExtension_(sScriptLanguage);
+      String sFileName = FileUtilities::Combine(sEventsDir, "EventHandlers." + GetScriptExtension_(sScriptLanguage));
 
       return sFileName;
    }
@@ -296,13 +318,14 @@ namespace HM
       String sErrorMessage;
 
       // Compile the scripts.
-      sErrorMessage = Compile_(sScriptLanguage, sEventsDir + "\\EventHandlers." + sScriptExtension);
+      sErrorMessage = Compile_(sScriptLanguage, FileUtilities::Combine(sEventsDir, "EventHandlers." + sScriptExtension));
       if (!sErrorMessage.IsEmpty())
          return sErrorMessage;
 
       return String("");
    }
 
+#ifndef HM_PLATFORM_POSIX
    bool
    ScriptServer::RunInterruptible_(CComObject<CScriptSiteBasic> *pBasic)
    {
@@ -317,6 +340,7 @@ namespace HM
 
       return watchdog.Fired();
    }
+#endif
 
    void
    ScriptServer::ReportInterruption_(const String &sContext, bool bReportError)
@@ -341,6 +365,19 @@ namespace HM
    bool
    ScriptServer::DoesFunctionExist_(const String &language, const String &contents, const String &sProcedure)
    {
+#ifdef HM_PLATFORM_POSIX
+      // Finding out whether a script declares a procedure means RUNNING the
+      // script, and there is no engine here to run it in. False is the honest
+      // answer and it is also the safe one: a handler that is not registered is
+      // never fired, so nothing can believe that OnClientValidatePassword is
+      // being consulted when it is not.
+      //
+      // This is only ever reached with empty text. LoadScripts calls
+      // CompileContents_ first, and on this platform that already refuses - and
+      // reports - any script that is not empty, so a real script never gets this
+      // far.
+      return false;
+#else
       // Create an instance of the script engine and execute the script.
       CComObject<CScriptSiteBasic>* pBasic;
       CComObject<CScriptSiteBasic>::CreateInstance(&pBasic);
@@ -366,6 +403,7 @@ namespace HM
       }
 
       return bExists;
+#endif
    }
 
 
@@ -381,6 +419,24 @@ namespace HM
       if (sContents.IsEmpty())
          return "";
 
+#ifdef HM_PLATFORM_POSIX
+      // A script exists and this platform has no engine to compile it in. The
+      // caller treats a non-empty return as "the load failed", which is exactly
+      // right: nothing is installed, no handler flag is set, and LoadScripts
+      // reports the message through ErrorManager saying whether a previously
+      // loaded script remains in force.
+      //
+      // Answering "" instead would say the script compiled cleanly, and the server
+      // would go on to register handlers that can never run. That is the silent
+      // failure this branch exists to prevent - and it would be silent in the
+      // worst possible place, since OnClientLogon and OnClientValidatePassword are
+      // authentication decisions.
+      return "File: " + sFilename + "\r\n" +
+         "The event script could not be compiled: this build of hMailServer has no script engine. "
+         "VBScript and JScript are Windows Active Scripting engines and there is no equivalent on this platform, "
+         "so no event handler in this file will run. Remove the file, or turn scripting off in the settings, "
+         "to stop this being reported on every reload.";
+#else
       // Create an instance of the script engine and execute the script.
       CComObject<CScriptSiteBasic>* pBasic;
       CComObject<CScriptSiteBasic>::CreateInstance(&pBasic);
@@ -425,6 +481,7 @@ namespace HM
          sErrorMessage = "File: " + sFilename + "\r\n" + sErrorMessage;
 
       return sErrorMessage;
+#endif
 
    }
 
@@ -560,6 +617,19 @@ namespace HM
       else if (script_language == _T("JScript"))
          sScript = script_contents + "\r\n\r\n" + sEventCaller + ";\r\n";
 
+#ifdef HM_PLATFORM_POSIX
+      // Unreachable, and reported rather than ignored if it ever is reached. No
+      // handler flag can be true on this platform - DoesFunctionExist_ answers
+      // false for every one of them - so IsHandlerRegistered_ has already returned
+      // above and this code has not been entered. If it ever is, something has set
+      // a flag without an engine behind it, and an event that is believed to be
+      // handled and is not is precisely the failure worth a line in the ERROR log.
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 5018, "ScriptServer::FireEvent",
+         "The event " + event_name + " was fired with a registered handler, but this build has no script engine to run it in. The handler did not run.");
+
+      (void) sScript;
+      (void) pObjects;
+#else
       CComObject<CScriptSiteBasic>* pBasic;
       CComObject<CScriptSiteBasic>::CreateInstance(&pBasic);
       CComQIPtr<IActiveScriptSite> spUnk;
@@ -581,6 +651,7 @@ namespace HM
       {
          ReportInterruption_(event_name, e != EventOnError);
       }
+#endif
 
       LOG_DEBUG("Event completed");
    }

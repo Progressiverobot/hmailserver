@@ -6,7 +6,7 @@
 #include "StdAfx.h"
 
 #include "DKIMParameters.h"
-#include "../../MIME/MimeCode.h"
+#include "../../Mime/MimeCode.h"
 
 
 #ifdef _DEBUG

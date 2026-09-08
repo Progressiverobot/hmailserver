@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\IPAddress.h"
+#include "./IPAddress.h"
 #include "../Util/Assert.h"
 
 #ifdef _DEBUG
@@ -201,7 +201,15 @@ namespace HM
          char* position = buffer + pos;
          int remaining = buffer_length - pos;
 
+#ifdef HM_PLATFORM_POSIX
+         // snprintf IS _snprintf_s with _TRUNCATE: both write at most the given
+         // number of bytes, both terminate what they write, and both stop rather
+         // than fail when the text does not fit. The difference is only in what
+         // they return on truncation, and nothing here reads the return value.
+         ::snprintf(position, (size_t) remaining, "%02x", byte);
+#else
          _snprintf_s(position, remaining, _TRUNCATE, "%02x", byte);
+#endif
          pos += 2;
 
          if (source_position % 2 == 0 && source_position < bytes.size())
@@ -209,7 +217,12 @@ namespace HM
             position = buffer + pos;
             remaining = buffer_length - pos;
 
+#ifdef HM_PLATFORM_POSIX
+            // See above: snprintf is _snprintf_s with _TRUNCATE.
+            ::snprintf(position, (size_t) remaining, ":");
+#else
             _snprintf_s(position, remaining, _TRUNCATE, ":");
+#endif
             pos++;
          }
       }

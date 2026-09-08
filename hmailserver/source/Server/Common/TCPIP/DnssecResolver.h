@@ -23,6 +23,7 @@
 #pragma once
 
 #include "DaneVerifier.h"
+#include "DNSRecord.h"
 
 namespace HM
 {
@@ -53,6 +54,27 @@ namespace HM
       // unsigned zone is normal for TXT consumers such as SPF/DKIM/DMARC);
       // only a Bogus result withholds the data.
       ChainStatus QueryTxt(const String &name, std::vector<AnsiString> &texts);
+
+      // A PLAIN, NON-VALIDATING LOOKUP, for the platform that has no Windows DNS
+      // client.
+      //
+      // This class already carries a complete DNS implementation - the wire
+      // encoder, a UDP transport with TCP fallback on truncation, /etc/resolv.conf
+      // and the record parser - because validating a chain needs all of it. The
+      // POSIX build has no DnsQueryEx to fall back on, so DNSResolverWinApi's
+      // POSIX arm calls this instead of reimplementing the same thing badly
+      // beside it. It answers exactly what the Windows client answers, in the
+      // same DNSRecord shape and with the same status numbers, and it does NO
+      // validation: everything that wants a validated answer already calls
+      // QueryMx, QueryTxt or QueryTlsa above.
+      //
+      // status carries the resolver's verdict in the numbers DNSResolver tests
+      // for: 0 on success, 9003 when the name does not exist, 9501 when the name
+      // exists with no record of that type, and 9002 when no server answered.
+      // The distinction matters: 9003 is a permanent failure that bounces mail
+      // and 9002 is a temporary one that must not.
+      static bool QueryRecords(const AnsiString &name, unsigned short query_type,
+                               std::vector<DNSRecord> &records, int &status);
 
    private:
 

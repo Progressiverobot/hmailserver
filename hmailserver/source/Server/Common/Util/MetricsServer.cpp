@@ -25,7 +25,34 @@
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
+#ifdef HM_PLATFORM_POSIX
+namespace
+{
+   // _mkgmtime is Microsoft's name for the inverse of gmtime: a struct tm read
+   // as UTC, where mktime would read it as local time. POSIX spells the same
+   // function timegm. Giving it the Microsoft name once, here, keeps the call
+   // sites below reading the way they do on Windows.
+   inline time_t _mkgmtime(struct tm *parts)
+   {
+      return ::timegm(parts);
+   }
+}
+#endif
+
+#ifdef HM_PLATFORM_POSIX
+// Winsock's shutdown() constants under the POSIX names for the same things:
+// SD_SEND is SHUT_WR and SD_BOTH is SHUT_RDWR. Same meanings, same values.
+static const int SD_SEND = SHUT_WR;
+static const int SD_BOTH = SHUT_RDWR;
+#endif
+
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
 
 #include <openssl/bio.h>
 #include <openssl/err.h>
@@ -623,7 +650,15 @@ namespace HM
       // that made them. Fixing the rest means deciding how every secret in the ini
       // file is held, which is a change to IniFileSettings and not to this file.
       if (!secret.empty())
+#ifdef HM_PLATFORM_POSIX
+         // explicit_bzero is SecureZeroMemory's promise here: a write the
+         // compiler is not allowed to remove because the buffer is dead
+         // afterwards. A plain memset would be optimised away and the shared
+         // secret would stay in the freed block.
+         ::explicit_bzero(&secret[0], secret.size());
+#else
          SecureZeroMemory(&secret[0], secret.size());
+#endif
 
       secret.Empty();
    }
@@ -2138,7 +2173,7 @@ namespace HM
          // emitted when that file does not exist either, so the shipped default (no
          // certificate, no ACME) still produces no series and no diagnostic.
          if (count == 0)
-            addCertificate(_T("ACME (automatic)"), AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem"));
+            addCertificate(_T("ACME (automatic)"), AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"));
       }
       catch (...)
       {

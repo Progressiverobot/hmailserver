@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\Events.h"
+#include "./Events.h"
 
-#include "..\..\SMTP\SMTPConfiguration.h"
+#include "../../SMTP/SMTPConfiguration.h"
 
 #include "../BO/Account.h"
 #include "../BO/Message.h"

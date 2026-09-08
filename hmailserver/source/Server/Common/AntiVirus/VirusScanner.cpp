@@ -9,7 +9,7 @@
 #include "../../SMTP/SMTPConfiguration.h"
 #include "../Mime/Mime.h"
 #include "../BO/Message.h"
-#include "../Util/GUIDcreator.h"
+#include "../Util/GUIDCreator.h"
 #include "../Util/File.h"
 #include "../BO/MessageData.h"
 
@@ -40,7 +40,7 @@
 
 namespace HM
 {
-   long VirusScanner::running_scanners_ = 0;
+   LONG VirusScanner::running_scanners_ = 0;
 
    VirusScanner::VirusScannerAutoCount::VirusScannerAutoCount() :
       holds_slot_(VirusScanner::WaitForFreeScanner_())
@@ -110,7 +110,7 @@ namespace HM
          // Read through an interlocked operation like every other access to this
          // counter. A plain read races with the increments and decrements below,
          // and a stale value here lets more scanners run than the cap allows.
-         long currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
+         LONG currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
 
          while (currentCount >= MaxRunningScanners)
          {
@@ -135,7 +135,7 @@ namespace HM
          // if that happens, we need to continue waiting for a new thread. unless
          // a compare was used here, this function could first wait and then call
          // InterlockedIncrement twice even though only one was allowed.
-         long result = InterlockedCompareExchange(&running_scanners_, currentCount + 1, currentCount);
+         LONG result = InterlockedCompareExchange(&running_scanners_, currentCount + 1, currentCount);
          if (result == currentCount)
          {
             // woho.
@@ -162,7 +162,7 @@ namespace HM
       // to this counter.
       for (;;)
       {
-         long currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
+         LONG currentCount = InterlockedCompareExchange(&running_scanners_, 0, 0);
 
          if (currentCount <= 0)
          {
@@ -257,7 +257,7 @@ namespace HM
          std::shared_ptr<MimeBody> pBody = (*iter);
          
          // Create a temporary filename.
-         sLongFilename.Format(_T("%s\\%s.tmp"), IniFileSettings::Instance()->GetTempDirectory().c_str(), GUIDCreator::GetGUID().c_str());
+         sLongFilename = FileUtilities::Combine(IniFileSettings::Instance()->GetTempDirectory(), GUIDCreator::GetGUID() + ".tmp");
 
          // Likewise discarded before this. A failed write leaves the temp file missing
          // or empty and ScanFile_ then scans that - and reports it clean, which is the

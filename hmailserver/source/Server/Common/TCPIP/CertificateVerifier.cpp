@@ -10,6 +10,13 @@
 
 #include <openssl/x509.h>
 
+#ifdef HM_PLATFORM_POSIX
+// X509_check_host and X509_check_purpose live here rather than in <openssl/x509.h>.
+// They are the two questions CryptoAPI's CERT_CHAIN_POLICY_SSL asks over and above
+// chain trust, and the POSIX branch below asks them by hand.
+#include <openssl/x509v3.h>
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -25,6 +32,7 @@ namespace HM
 
    }
 
+#ifndef HM_PLATFORM_POSIX
    bool 
    CertificateVerifier::VerifyCertificate_( PCCERT_CONTEXT certificate, LPWSTR server_name,int &windows_error_code) const
    {
@@ -72,9 +80,92 @@ namespace HM
       bool certificate_ok = policy_checked && status.dwError == 0;
       return certificate_ok;
    }
+#endif
 
    bool CertificateVerifier::operator() (bool preverified, boost::asio::ssl::verify_context& ctx) const
    {
+#ifdef HM_PLATFORM_POSIX
+      // There is no certificate store to hand a DER blob to here, so the same
+      // three questions are asked of OpenSSL, which already has the answers.
+      //
+      // The Windows branch below ignores 'preverified' entirely and ignores every
+      // element of the chain but the leaf, because it hands the leaf to CryptoAPI
+      // and CryptoAPI does the whole job - builds the chain, checks trust,
+      // revocation, the extended key usage and the host name. Here those are
+      // separate mechanisms and each has to be consulted:
+      //
+      //   * Chain trust is OpenSSL's own, already done by the time this callback
+      //     runs, once per chain element. 'preverified' is that verdict, so it is
+      //     carried rather than discarded - discarding it for elements above the
+      //     leaf, the way the Windows branch does, would accept any chain at all.
+      //
+      //   * The host name is X509_check_host, OpenSSL's RFC 6125 matcher: the
+      //     subjectAltName dNSName entries, falling back to the common name. It is
+      //     the same question CERT_CHAIN_POLICY_SSL asks through pwszServerName.
+      //
+      //   * The extended key usage is X509_check_purpose, which is the
+      //     szOID_PKIX_KP_SERVER_AUTH in the usage list the Windows branch builds.
+      //     A certificate that is trusted and is for this name but is not allowed
+      //     to be a TLS server is still not one to talk to.
+      //
+      // The failure branch is the same policy either way: OverrideResult_ forgives
+      // a failure on an opportunistic connection (RFC 7435) and on nothing else.
+      // A refusal is logged with OpenSSL's own reason exactly as the Windows
+      // branch logs the Windows one, so an administrator can tell an expired
+      // certificate from a wrong name from an untrusted issuer.
+      X509_STORE_CTX *store_context = ctx.native_handle();
+
+      const int depth = X509_STORE_CTX_get_error_depth(store_context);
+
+      if (!preverified)
+      {
+         const int verify_error = X509_STORE_CTX_get_error(store_context);
+
+         LOG_DEBUG(Formatter::Format("Certificate verification failed for session {0}. Expected host: {1}, chain depth: {2}, OpenSSL error {3}: {4}",
+            session_id_, host_name_, depth, verify_error, String(X509_verify_cert_error_string(verify_error))));
+
+         return OverrideResult_(false);
+      }
+
+      if (depth > 0)
+      {
+         // A trusted issuer. Nothing above the leaf carries a host name or a TLS
+         // server usage to check.
+         return OverrideResult_(true);
+      }
+
+      X509 *cert = X509_STORE_CTX_get_current_cert(store_context);
+
+      if (cert == nullptr)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5512, "CertificateVerifier::operator()",
+            "The certificate verification callback was reached at the end of the chain with no certificate to check.");
+
+         return OverrideResult_(false);
+      }
+
+      const AnsiString expected_host_name = host_name_;
+
+      if (::X509_check_host(cert, expected_host_name.c_str(), expected_host_name.size(), 0, nullptr) != 1)
+      {
+         LOG_DEBUG(Formatter::Format("Certificate verification failed for session {0}. The certificate is not valid for the expected host {1}.",
+            session_id_, host_name_));
+
+         return OverrideResult_(false);
+      }
+
+      if (::X509_check_purpose(cert, X509_PURPOSE_SSL_SERVER, 0) != 1)
+      {
+         LOG_DEBUG(Formatter::Format("Certificate verification failed for session {0}. The certificate for host {1} is not usable for TLS server authentication.",
+            session_id_, host_name_));
+
+         return OverrideResult_(false);
+      }
+
+      LOG_DEBUG(Formatter::Format("Certificate verification succeeded for session {0}.", session_id_));
+
+      return OverrideResult_(true);
+#else
       // We're only interested in checking the certificate at the end of the chain.
       int depth = X509_STORE_CTX_get_error_depth(ctx.native_handle());
       if (depth > 0)
@@ -146,6 +237,7 @@ namespace HM
 
          return OverrideResult_(false);
       }
+#endif
 
    }
 

@@ -7,7 +7,7 @@
 
 
 #include "IMAPNotificationClient.h"
-#include "../common/TCPIP/TCPConnection.h"
+#include "../Common/TCPIP/TCPConnection.h"
 
 
 using namespace std;
@@ -15,6 +15,7 @@ using namespace std;
 namespace HM
 {
 
+   class Account;
    class IMAPCommand;
    class IMAPCommandAppend;
    class IMAPFolders;

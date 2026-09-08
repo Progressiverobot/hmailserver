@@ -5,12 +5,12 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentMessageMetaData.h"
-#include ".\PersistentMessage.h"
-#include "..\BO\Message.h"
+#include "./PersistentMessageMetaData.h"
+#include "./PersistentMessage.h"
+#include "../BO/Message.h"
 
-#include "..\SQL\SQLStatement.h"
-#include "..\Util\Time.h"
+#include "../SQL/SQLStatement.h"
+#include "../Util/Time.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

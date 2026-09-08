@@ -215,7 +215,7 @@ namespace HM
       XNode *pNode = pParentNode->AppendChild(_T("Message"));
 
       String sFilename = filename_;
-      sFilename.Replace(IniFileSettings::Instance()->GetDataDirectory() + _T("\\"), _T(""));
+      sFilename.Replace(IniFileSettings::Instance()->GetDataDirectory() + FileUtilities::PathSeparator, _T(""));
 
       pNode->AppendAttr(_T("CreateTime"), String(create_time_));
       pNode->AppendAttr(_T("Filename"), FileUtilities::GetFileNameFromFullPath(sFilename));

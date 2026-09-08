@@ -4,17 +4,27 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\databaseconnectionmanager.h"
+#include "./DatabaseConnectionManager.h"
 
 #include "DALConnection.h"
 #include "DALConnectionFactory.h"
 #include "DatabaseSettings.h"
 #include "DatabaseUnavailableMarker.h"
 
+// ADORecordset names the ADO smart pointers the Windows precompiled header
+// #imports; the roadmap section "Linux and AArch64" leaves that backend out of
+// the POSIX build. Nothing below uses the type, only the include had to go.
+#ifdef _MSC_VER
 #include "ADORecordset.h"
+#endif
 #include "MySQLRecordset.h"
 #include "PGRecordset.h"
+// SQLCERecordset holds an ADO _RecordsetPtr, the same reason ADORecordset.h is
+// guarded above; SQL Server Compact is the other backend the POSIX build leaves
+// out. Nothing below uses the type.
+#ifdef _MSC_VER
 #include "SQLCERecordset.h"
+#endif
 #include "MySQLInterface.h"
 
 #include "SQLCommand.h"
@@ -109,6 +119,23 @@ namespace HM
       for (int i = 0; i < iNoOfConnections; i++)
       {
          std::shared_ptr<DALConnection> pConnection = DALConnectionFactory::CreateConnection(pSettings);
+
+#ifdef HM_PLATFORM_POSIX
+         // The factory has just refused a backend this build does not carry - SQL
+         // Server or SQL Server Compact - and has said which in the error log.
+         // Without this the empty pointer would be dereferenced on the next line
+         // and the server would die instead of reporting why it cannot start. The
+         // test is POSIX-only deliberately: the Windows switch has a case for every
+         // type it is given, so the pointer cannot be empty there, and this file is
+         // under a running regression gate that must compile the same bytes it did
+         // before.
+         if (!pConnection)
+         {
+            sErrorMessage = "The database type configured in hMailServer.INI is not available in this build. See the error log for which one was asked for.";
+            return DALConnection::FatalError;
+         }
+#endif
+
          DALConnection::ConnectionResult result = pConnection->Connect(sErrorMessage);
 
          if (result != DALConnection::Connected)
@@ -148,6 +175,23 @@ namespace HM
    }
    
    bool 
+   DatabaseConnectionManager::Execute(const SQLStatement &statement, __int64 *iInsertID, int iIgnoreErrors)
+   {
+      // The caller does not want the message. It is still produced and logged by
+      // the layer below; this simply has nowhere to put it, which is what the
+      // defaulted temporary did before.
+      String discarded;
+      return Execute(statement.GetCommand(), iInsertID, iIgnoreErrors, discarded);
+   }
+
+   bool
+   DatabaseConnectionManager::Execute(const SQLCommand &command, __int64 *iInsertID, int iIgnoreErrors)
+   {
+      String discarded;
+      return Execute(command, iInsertID, iIgnoreErrors, discarded);
+   }
+
+   bool
    DatabaseConnectionManager::Execute(const SQLStatement &statement, __int64 *iInsertID, int iIgnoreErrors, String &sErrorMessage)
    {
       return Execute(statement.GetCommand(), iInsertID, iIgnoreErrors, sErrorMessage);

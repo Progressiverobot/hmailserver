@@ -7,8 +7,8 @@
 #include "COMError.h"
 #include "InterfaceGroups.h"
 
-#include "..\Common\BO\Group.h"
-#include "..\Common\BO\Groups.h"
+#include "../Common/BO/Group.h"
+#include "../Common/BO/Groups.h"
 
 #include "InterfaceGroup.h"
 

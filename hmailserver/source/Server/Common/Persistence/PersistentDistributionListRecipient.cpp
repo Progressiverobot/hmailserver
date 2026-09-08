@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "persistentdistributionlistrecipient.h"
+#include "PersistentDistributionListRecipient.h"
 
 #include "../Cache/Cache.h"
 
@@ -61,7 +61,12 @@ namespace HM
    PersistentDistributionListRecipient::ReadObject(std::shared_ptr<DistributionListRecipient> pRecipient, long ObjectID)
    {
       SQLCommand selectCommand(_T("select * from hm_distributionlistsrecipients where distributionlistrecipientid = @RECIPIENTID"));
-      selectCommand.AddParameter("@RECIPIENTID", ObjectID);
+      // ObjectID is a long. AddParameter is overloaded on int, unsigned int and
+      // __int64, and the overload decides the type of the SQL parameter that is
+      // bound, so the choice is not cosmetic. MSVC binds a long to the int overload,
+      // because long and int are the same 32-bit type on Windows; clang finds all
+      // three equally distant. The cast names the overload Windows already selects.
+      selectCommand.AddParameter("@RECIPIENTID", (int) ObjectID);
 
       return ReadObject(pRecipient, selectCommand);
    }

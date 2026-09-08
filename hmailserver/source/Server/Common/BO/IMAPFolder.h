@@ -7,7 +7,7 @@
 #pragma once
 
 #include "Messages.h"
-#include "..\Util\VariantDateTime.h"
+#include "../Util/VariantDateTime.h"
 
 namespace HM
 {

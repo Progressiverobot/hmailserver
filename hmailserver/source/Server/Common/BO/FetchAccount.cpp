@@ -5,7 +5,7 @@
 
 #include "StdAfx.h"
 
-#include "Fetchaccount.h"
+#include "FetchAccount.h"
 #include "FetchAccountUIDs.h"
 #include "FetchAccountUID.h"
 #include "../Util/Crypt.h"
@@ -62,7 +62,11 @@ namespace HM
       pNode->AppendAttr(_T("Name"), name_);
       pNode->AppendAttr(_T("ServerAddress"), server_address_);
       pNode->AppendAttr(_T("ServerType"), StringParser::IntToString(server_type_));
-      pNode->AppendAttr(_T("Port"), StringParser::IntToString(port_));
+      // port_ is a long. MSVC binds IntToString(long) to the int overload, because
+      // long and int are the same 32-bit type on Windows; clang finds int, unsigned
+      // int and __int64 all equally distant and cannot choose. The cast names the
+      // overload the Windows build already selects, and no port value is lost.
+      pNode->AppendAttr(_T("Port"), StringParser::IntToString((int) port_));
       pNode->AppendAttr(_T("Username"), username_);
       pNode->AppendAttr(_T("Password"), Crypt::Instance()->EnCrypt(password_, Crypt::ETBlowFish));
       pNode->AppendAttr(_T("Minutes"), StringParser::IntToString(minutes_));

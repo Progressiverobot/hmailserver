@@ -14,8 +14,8 @@
 #include "../Common/Application/IniFileSettings.h"
 #include "../Common/AntiSpam/DKIM/DKIM.h"
 
-#include "..\Common\BO\WhiteListAddresses.h"
-#include "..\Common\BO\BlockedSenders.h"
+#include "../Common/BO/WhiteListAddresses.h"
+#include "../Common/BO/BlockedSenders.h"
 
 #include "InterfaceAntiSpam.h"
 #include "InterfaceGreyListingWhiteAddresses.h"

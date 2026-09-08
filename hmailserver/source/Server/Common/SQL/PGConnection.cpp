@@ -7,7 +7,7 @@
 #include "PGConnection.h"
 #include "PGRecordset.h"
 #include "DatabaseSettings.h"
-#include "..\Util\Unicode.h"
+#include "../Util/Unicode.h"
 #include "../Application/IniFileSettings.h"
 #include "Macros/PGSQLMacroExpander.h"
 

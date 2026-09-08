@@ -28,8 +28,8 @@
 #include "../Common/Util/MessageUtilities.h"
 #include "../IMAP/IMAPConfiguration.h"
 #include "../IMAP/MessagesContainer.h"
-#include "../common/Threading/AsynchronousTask.h"
-#include "../common/Threading/WorkQueue.h"
+#include "../Common/Threading/AsynchronousTask.h"
+#include "../Common/Threading/WorkQueue.h"
 
 #include <algorithm>
 

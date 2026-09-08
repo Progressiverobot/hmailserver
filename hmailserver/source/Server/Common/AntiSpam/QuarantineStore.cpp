@@ -44,7 +44,7 @@ namespace HM
       // so the store comes into existence the first time something is quarantined -
       // and a server that never quarantines anything never grows an empty directory
       // it did not ask for.
-      return IniFileSettings::Instance()->GetDataDirectory() + "\\Quarantine";
+      return FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), "Quarantine");
    }
 
    String
@@ -56,7 +56,7 @@ namespace HM
       // sweep gets to delete whole directories rather than walking every file.
       String day = Time::GetCurrentDateTime().Mid(0, 10);   // YYYY-MM-DD
 
-      return day + "\\" + GUIDCreator::GetGUID() + ".eml";
+      return FileUtilities::Combine(day, GUIDCreator::GetGUID() + ".eml");
    }
 
    bool
@@ -82,7 +82,7 @@ namespace HM
             return false;
 
          String relativePath = BuildRelativePath_();
-         String targetFile = GetQuarantineDirectory() + "\\" + relativePath;
+         String targetFile = FileUtilities::Combine(GetQuarantineDirectory(), relativePath);
 
          // Copied rather than moved: the caller still owns the original and will
          // delete it as part of not delivering the message. A move would leave the
@@ -241,7 +241,7 @@ namespace HM
       if (!Application::Instance()->GetDBManager()->Execute(command))
          return false;
 
-      String file = GetQuarantineDirectory() + "\\" + message.file_name;
+      String file = FileUtilities::Combine(GetQuarantineDirectory(), message.file_name);
 
       if (FileUtilities::Exists(file))
          FileUtilities::DeleteFile(file);
@@ -260,7 +260,7 @@ namespace HM
          return false;
       }
 
-      String sourceFile = GetQuarantineDirectory() + "\\" + quarantined.file_name;
+      String sourceFile = FileUtilities::Combine(GetQuarantineDirectory(), quarantined.file_name);
 
       if (!FileUtilities::Exists(sourceFile))
       {
@@ -444,7 +444,7 @@ namespace HM
          return false;
       }
 
-      String sourceFile = GetQuarantineDirectory() + "\\" + quarantined.file_name;
+      String sourceFile = FileUtilities::Combine(GetQuarantineDirectory(), quarantined.file_name);
       if (!FileUtilities::Exists(sourceFile))
       {
          out_error = "The quarantined message file is missing, so there is nothing to release. "

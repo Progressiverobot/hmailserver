@@ -6,6 +6,11 @@
 
 #include "DiskSpace.h"
 
+#ifdef HM_PLATFORM_POSIX
+// The free-space reading itself; see GetFreeBytesAvailable.
+#include <sys/statvfs.h>
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -265,6 +270,73 @@ namespace HM
       if (path.IsEmpty())
          return false;
 
+#ifdef HM_PLATFORM_POSIX
+      // statvfs is the POSIX reading of the same volume, and it draws the same
+      // distinction the Windows call below depends on: f_bavail counts the blocks
+      // an unprivileged process may still use, while f_bfree counts the blocks
+      // reserved for root as well. The number that decides whether THIS process
+      // can write another byte is f_bavail, exactly as it is the FIRST out
+      // parameter of GetDiskFreeSpaceEx and not the third.
+      //
+      // The ancestor walk is the same walk for the same reason - the path need not
+      // exist yet - but it cuts on '/' and it ends at the root directory, which is
+      // always a mount point and so always answers.
+      String directory = path;
+
+      while (directory.GetLength() > 1 && directory.EndsWith(_T("/")))
+         directory = directory.Left(directory.GetLength() - 1);
+
+      for (int level = 0; level < MAX_ANCESTOR_LEVELS; level++)
+      {
+         // statvfs takes a byte string and the tree's paths are wide, so the name
+         // is narrowed for the call and nowhere else.
+         AnsiString query = AnsiString(directory);
+
+         struct statvfs volume;
+
+         if (::statvfs(query.c_str(), &volume) == 0)
+         {
+            // f_frsize is the unit the block counts are expressed in - POSIX says
+            // so explicitly, and it is not always f_bsize. Multiplying by f_bsize
+            // would over-report free space on any filesystem where the two differ,
+            // which is the direction that lets a disk fill.
+            const unsigned __int64 unit = volume.f_frsize != 0
+               ? (unsigned __int64) volume.f_frsize
+               : (unsigned __int64) volume.f_bsize;
+
+            freeBytesAvailable = (unsigned __int64) volume.f_bavail * unit;
+
+            if (totalBytes != nullptr)
+               *totalBytes = (unsigned __int64) volume.f_blocks * unit;
+
+            return true;
+         }
+
+         // Only "that path is not there" is worth walking up for - the same rule
+         // as on Windows. ENOENT is the missing component; ENOTDIR is a component
+         // that exists but is a file, which a path under a not-yet-created
+         // directory can produce. Anything else - EACCES, EIO - is a real failure
+         // and is reported as one rather than papered over by answering for a
+         // different volume.
+         if (errno != ENOENT && errno != ENOTDIR)
+            return false;
+
+         int separator = directory.ReverseFind(_T('/'));
+         if (separator < 0)
+            return false;
+
+         // Cutting "/usr" at its separator leaves nothing, and nothing is not a
+         // path; the parent of a top-level directory is the root directory.
+         String parent = separator == 0 ? String(_T("/")) : directory.Left(separator);
+
+         if (parent == directory)
+            return false;
+
+         directory = parent;
+      }
+
+      return false;
+#else
       String directory = path;
 
       // Strip trailing separators so the ancestor walk below has something to
@@ -335,6 +407,7 @@ namespace HM
       }
 
       return false;
+#endif
    }
 
    unsigned __int64

@@ -5,11 +5,12 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class FetchAccount;
    class FetchAccountUIDs;
-   enum PersistenceMode;
 
    class PersistentFetchAccount
    {

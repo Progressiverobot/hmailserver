@@ -6,10 +6,10 @@
 #pragma once
 
 #include "../BO/DistributionListRecipient.h"
+#include "PersistenceMode.h"
 
 namespace HM
 {  
-   enum PersistenceMode;
 
    class PersistentDistributionListRecipient
    {

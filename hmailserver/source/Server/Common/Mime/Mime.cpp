@@ -1006,7 +1006,11 @@ namespace HM
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+// <io.h> is the MSVC C runtime's low-level file header. Nothing below names a
+// symbol from it, so the POSIX build simply does without it.
+#ifdef _MSC_VER
 #include <io.h>
+#endif
 
    // initialize the content with text
    int MimeBody::SetRawText(const AnsiString &sText)
@@ -1324,7 +1328,7 @@ namespace HM
             String sFilename = pszFilename;
 
             String sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(sFilename);
-            String sMessageBackupPath = IniFileSettings::Instance()->GetLogDirectory() + "\\Problematic messages\\" + sFileNameExclPath;
+            String sMessageBackupPath = FileUtilities::Combine(FileUtilities::Combine(IniFileSettings::Instance()->GetLogDirectory(), "Problematic messages"), sFileNameExclPath);
             FileUtilities::Copy(sFilename, sMessageBackupPath, true);
 
             String sErrorMessage = Formatter::Format("An unknown error occurred while loading message. File: {0}. Backuped to: {1}", pszFilename, sMessageBackupPath);

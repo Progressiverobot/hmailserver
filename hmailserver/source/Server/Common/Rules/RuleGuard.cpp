@@ -279,8 +279,13 @@ namespace HM
          if (elapsed >= static_cast<ULONGLONG>(EvaluationBudgetMilliseconds) &&
              SuspendPatternAndClaimReport_(pattern))
          {
+            // ULONGLONG is unsigned __int64 on Windows, so elapsed binds exactly to that
+            // FormatArgument constructor. The POSIX platform layer spells ULONGLONG as
+            // uint64_t, which is unsigned long rather than unsigned long long, so there
+            // it matches none of them exactly and is no closer to one than to the others.
+            // The cast is an identity on Windows and names the same constructor.
             String errorMessage = Formatter::Format("A rule regular-expression criterion took {0} ms against a {1} character value, over the {2} ms budget, and will not be evaluated again for {3} seconds. Any sender can make this cost recur once per message, so it is being paid once per pattern instead. Pattern begins: {4}",
-               elapsed, subject.GetLength(), EvaluationBudgetMilliseconds, SuspensionSeconds, DescribePattern_(pattern));
+               (unsigned __int64) elapsed, subject.GetLength(), EvaluationBudgetMilliseconds, SuspensionSeconds, DescribePattern_(pattern));
 
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6043, "RuleGuard::RegexCriteriaMatches", errorMessage);
          }
@@ -358,8 +363,11 @@ namespace HM
          if (elapsed >= static_cast<ULONGLONG>(EvaluationBudgetMilliseconds) &&
              SuspendPatternAndClaimReport_(pattern))
          {
+            // As above: ULONGLONG is unsigned __int64 on Windows and uint64_t - unsigned
+            // long - in the POSIX platform layer, so the cast names the FormatArgument
+            // constructor the Windows build already binds and is an identity there.
             String errorMessage = Formatter::Format("A Sieve ':regex' match took {0} ms against a {1} character value, over the {2} ms budget, and will not be evaluated again for {3} seconds. Any sender can make this cost recur once per message, so it is being paid once per pattern instead. Pattern begins: {4}",
-               elapsed, subject.GetLength(), EvaluationBudgetMilliseconds, SuspensionSeconds, DescribePattern_(pattern));
+               (unsigned __int64) elapsed, subject.GetLength(), EvaluationBudgetMilliseconds, SuspensionSeconds, DescribePattern_(pattern));
 
             ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6043, "RuleGuard::SieveRegexMatches", errorMessage);
          }

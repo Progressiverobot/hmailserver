@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\transparenttransmissionbuffer.h"
+#include "./TransparentTransmissionBuffer.h"
 
 #include "ByteBuffer.h"
 #include "../Application/IniFileSettings.h"

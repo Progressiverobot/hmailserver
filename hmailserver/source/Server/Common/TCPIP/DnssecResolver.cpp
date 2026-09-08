@@ -13,8 +13,26 @@
 
 #include "DnssecResolver.h"
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
+// <iphlpapi.h> declares GetAdaptersAddresses, which is how the nameserver list
+// is discovered on Windows. There is no POSIX counterpart; see GetDnsServers
+// below.
+#ifdef _MSC_VER
 #include <iphlpapi.h>
+#endif
+// The POSIX nameserver list is read out of /etc/resolv.conf in GetDnsServers
+// below; these are the two standard headers that reading a text file and
+// comparing a keyword in it need.
+#ifdef HM_PLATFORM_POSIX
+#include <cstdio>
+#include <cstring>
+#endif
 
 #include <openssl/evp.h>
 #include <openssl/bn.h>
@@ -27,8 +45,10 @@
 #include <algorithm>
 #include <ctime>
 
+#ifdef _MSC_VER
 #pragma comment(lib, "iphlpapi.lib")
 #pragma comment(lib, "ws2_32.lib")
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -456,6 +476,7 @@ namespace HM
             }
          }
 
+#ifdef _MSC_VER
          ULONG bufferSize = 16 * 1024;
          std::vector<unsigned char> buffer(bufferSize);
 
@@ -496,6 +517,72 @@ namespace HM
                   return true;
             }
          }
+#else
+         // /etc/resolv.conf is where a POSIX system records the nameservers it
+         // uses, so reading it is the counterpart of GetAdaptersAddresses above and
+         // answers with the same thing: the first two IPv4 servers, on port 53, in
+         // the order the file lists them. Leaving it unwritten would have been
+         // worse than it looks - every DNSSEC query would have failed for want of
+         // a server, and a validator that never runs is indistinguishable from one
+         // that always passes.
+         FILE *resolv_conf = ::fopen("/etc/resolv.conf", "r");
+
+         if (resolv_conf != nullptr)
+         {
+            char line[512];
+
+            while (::fgets(line, sizeof(line), resolv_conf) != nullptr)
+            {
+               const char *cursor = line;
+
+               while (*cursor == ' ' || *cursor == '\t')
+                  cursor++;
+
+               // "nameserver" has to be the whole keyword rather than the start of
+               // a longer one, so what follows it must be white space.
+               if (::strncmp(cursor, "nameserver", 10) != 0)
+                  continue;
+
+               cursor += 10;
+
+               if (*cursor != ' ' && *cursor != '\t')
+                  continue;
+
+               while (*cursor == ' ' || *cursor == '\t')
+                  cursor++;
+
+               char address_text[64];
+               size_t length = 0;
+
+               while (length + 1 < sizeof(address_text) &&
+                      *cursor != '\0' && *cursor != ' ' && *cursor != '\t' &&
+                      *cursor != '\r' && *cursor != '\n' && *cursor != '#' && *cursor != ';')
+               {
+                  address_text[length] = *cursor;
+                  length++;
+                  cursor++;
+               }
+
+               address_text[length] = '\0';
+
+               sockaddr_in address = {};
+               address.sin_family = AF_INET;
+               address.sin_port = htons(53);
+
+               // An IPv6 nameserver is passed over here, exactly as the Windows
+               // branch passes over a server whose family is not AF_INET.
+               if (inet_pton(AF_INET, address_text, &address.sin_addr) != 1)
+                  continue;
+
+               servers.push_back(address);
+
+               if (servers.size() >= 2)
+                  break;
+            }
+
+            ::fclose(resolv_conf);
+         }
+#endif
 
          return !servers.empty();
       }
@@ -560,7 +647,16 @@ namespace HM
             unsigned char receiveBuffer[2048];
 
             sockaddr_in fromAddress = {};
+            // recvfrom's last argument is an int* on Winsock and a socklen_t* on
+            // POSIX, and they are not the same type even where they are the same
+            // width, so the variable is declared as whatever the platform's
+            // recvfrom is going to write through. The Windows declaration is the
+            // one this file has always had.
+#ifdef HM_PLATFORM_POSIX
+            socklen_t fromLength = sizeof(fromAddress);
+#else
             int fromLength = sizeof(fromAddress);
+#endif
 
             int bytesReceived = recvfrom(udpSocket, reinterpret_cast<char*>(receiveBuffer), sizeof(receiveBuffer), 0,
                                          reinterpret_cast<sockaddr*>(&fromAddress), &fromLength);
@@ -1833,6 +1929,159 @@ namespace HM
       }
 
       return ChainStatus::Insecure; // too many CNAME hops
+   }
+
+   bool
+   DnssecResolver::QueryRecords(const AnsiString &name, unsigned short query_type,
+                                std::vector<DNSRecord> &records, int &status)
+   {
+      // The record types the server asks for. Anything else is a caller error
+      // rather than a lookup failure, and is reported as such below.
+      switch (query_type)
+      {
+      case 1:     // A
+      case 5:     // CNAME
+      case 12:    // PTR
+      case 15:    // MX
+      case 16:    // TXT
+      case 28:    // AAAA
+         break;
+      default:
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5036, "DnssecResolver::QueryRecords",
+            Formatter::Format(_T("Queried for unsupported record type {0}."), query_type));
+         status = 9002;
+         return false;
+      }
+
+      DnsResponse response;
+
+      if (!RunQuery(name, query_type, response))
+      {
+         // Nothing answered: no server was configured, none was reachable, or
+         // every one of them timed out. This is TEMPORARY - it must not become a
+         // bounce - so it is not the "name does not exist" number.
+         status = 9002;
+         return false;
+      }
+
+      if (response.rcode == 3)
+      {
+         // NXDOMAIN. Permanent, and the one answer that lets a caller stop.
+         status = 9003;
+         return true;
+      }
+
+      // ToLower mutates and returns a reference, so the copy is made first.
+      AnsiString wanted = name;
+      wanted.ToLower();
+
+      // A CNAME chain: the answer for "mail.example.com" may arrive as a CNAME to
+      // "host.example.net" followed by that name's A records, and the owner of the
+      // records that matter is the end of the chain rather than the name asked
+      // for. The chain is followed by name so that the order records arrive in
+      // does not decide the answer.
+      AnsiString target = wanted;
+      for (int hop = 0; hop < 8; hop++)
+      {
+         bool followed = false;
+         for (const ParsedRr &record : response.answers)
+         {
+            if (record.type != 5 || record.owner != target)
+               continue;
+            // Reading the CNAME's target needs the whole packet, because the name
+            // in it may be compressed against an earlier one.
+            size_t offset = record.rdata_offset;
+            AnsiString canonical;
+            if (ReadName(response.packet, offset, canonical) && !canonical.IsEmpty())
+            {
+               canonical.ToLower();
+               target = canonical;
+               followed = true;
+            }
+            break;
+         }
+         if (!followed)
+            break;
+      }
+
+      for (const ParsedRr &record : response.answers)
+      {
+         if (record.type != query_type)
+            continue;
+         if (record.owner != wanted && record.owner != target)
+            continue;
+
+         switch (query_type)
+         {
+         case 1:  // A - four octets, printed the way inet_ntop prints them, which
+                  // is what WSAAddressToStringA gives on Windows.
+            {
+               if (record.rdata.size() != 4)
+                  break;
+               char text[INET_ADDRSTRLEN];
+               struct in_addr address;
+               memcpy(&address, record.rdata.data(), 4);
+               if (inet_ntop(AF_INET, &address, text, sizeof(text)))
+                  records.push_back(DNSRecord(AnsiString(text), query_type, 0));
+               break;
+            }
+         case 28: // AAAA
+            {
+               if (record.rdata.size() != 16)
+                  break;
+               char text[INET6_ADDRSTRLEN];
+               struct in6_addr address;
+               memcpy(&address, record.rdata.data(), 16);
+               if (inet_ntop(AF_INET6, &address, text, sizeof(text)))
+                  records.push_back(DNSRecord(AnsiString(text), query_type, 0));
+               break;
+            }
+         case 5:  // CNAME
+         case 12: // PTR
+            {
+               size_t offset = record.rdata_offset;
+               AnsiString host;
+               if (ReadName(response.packet, offset, host) && !host.IsEmpty())
+                  records.push_back(DNSRecord(host, query_type, 0));
+               break;
+            }
+         case 15: // MX - a two-octet preference, then the exchange's name.
+            {
+               if (record.rdata.size() < 3)
+                  break;
+               const int preference = (static_cast<int>(record.rdata[0]) << 8) | record.rdata[1];
+               size_t offset = record.rdata_offset + 2;
+               AnsiString exchange;
+               if (ReadName(response.packet, offset, exchange) && !exchange.IsEmpty())
+                  records.push_back(DNSRecord(exchange, query_type, preference));
+               break;
+            }
+         case 16: // TXT - one or more length-prefixed strings, joined without a
+                  // separator, which is what the Windows client's string array
+                  // amounts to for every consumer here (SPF, DKIM, DMARC).
+            {
+               AnsiString value;
+               size_t position = 0;
+               while (position < record.rdata.size())
+               {
+                  const size_t length = record.rdata[position];
+                  if (position + 1 + length > record.rdata.size())
+                     break;
+                  value += AnsiString(reinterpret_cast<const char *>(record.rdata.data() + position + 1), length);
+                  position += 1 + length;
+               }
+               records.push_back(DNSRecord(value, query_type, 0));
+               break;
+            }
+         default:
+            break;
+         }
+      }
+
+      // The name resolved but carries no record of this type. Distinct from
+      // NXDOMAIN, and the callers that ask for AAAA before A depend on it.
+      status = records.empty() ? 9501 : 0;
+      return true;
    }
 
    DnssecResolver::ChainStatus

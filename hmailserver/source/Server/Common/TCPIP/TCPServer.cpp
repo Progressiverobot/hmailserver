@@ -128,7 +128,26 @@ namespace HM
       try
       {
          acceptor_.open(endpoint.protocol());
+
+         // An IPv6 acceptor answers for IPv6 only. Windows sockets are made that
+         // way and this server has always bound a separate IPv4 acceptor beside
+         // each IPv6 one; Linux makes an IPv6 socket dual-stack by default, so the
+         // second of the pair to bind fails with "address already in use" and a
+         // port that was configured for both families ends up listening on
+         // neither. Saying it explicitly is the same behaviour on both.
+         if (endpoint.address().is_v6())
+            acceptor_.set_option(boost::asio::ip::v6_only(true));
+
+#ifdef HM_PLATFORM_POSIX
+         // SO_REUSEADDR means something different on the two platforms. On
+         // Windows it lets a second socket take a port that is in use, which is
+         // why it is refused below; on POSIX it only lets a restart bind while the
+         // previous instance's connections linger in TIME_WAIT, which is what
+         // every daemon wants and without which a restart fails for a minute.
+         acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(true));
+#else
          acceptor_.set_option(boost::asio::ip::tcp::acceptor::reuse_address(false));
+#endif
       }
       catch (boost::system::system_error error)
       {

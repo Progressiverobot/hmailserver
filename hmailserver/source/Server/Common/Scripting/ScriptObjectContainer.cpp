@@ -7,12 +7,19 @@
 
 //#include "../../hMailServer/hMailServer.h"   
 
+#ifndef HM_PLATFORM_POSIX
+// The ATL wrappers GetObjectByName builds. They are Server/COM, the administration
+// API, which is Windows by definition and is not part of the POSIX build; the one
+// function that names them is guarded the same way below, and the header already
+// declares it only on Windows. Everything else in this file - the container, the
+// names, the shared pointers it holds - is portable and is compiled on both.
 #include "../../COM/InterfaceResult.h"
 #include "../../COM/InterfaceMessage.h"
 #include "../../COM/InterfaceClient.h"
 #include "../../COM/InterfaceEventLog.h"
 #include "../../COM/InterfaceFetchAccount.h"
 #include "../../COM/InterfaceAccount.h"
+#endif
 
 //#include "IScriptObject.h"
 #include "ScriptObjectContainer.h"
@@ -57,6 +64,7 @@ namespace HM
       objects_[sName] = pObject;
    }
 
+#ifndef HM_PLATFORM_POSIX
    bool
    ScriptObjectContainer::GetObjectByName(const String &sName, LPUNKNOWN* ppunkItem) const
    {
@@ -135,6 +143,7 @@ namespace HM
 
       return false;
    }
+#endif
 
    std::vector<String> 
    ScriptObjectContainer::GetObjectNames()

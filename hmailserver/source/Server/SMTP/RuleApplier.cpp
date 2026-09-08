@@ -270,7 +270,7 @@ namespace HM
 
       // We need to update the SMTP envelope from address, if this
       // message is forwarded by a user-level account.
-      std::shared_ptr<CONST Account> pAccount = CacheContainer::Instance()->GetAccount(rule_account_id_);
+      std::shared_ptr<const Account> pAccount = CacheContainer::Instance()->GetAccount(rule_account_id_);
       if (pAccount && IniFileSettings::Instance()->GetRewriteEnvelopeFromWhenForwarding() && !pMsg->GetFromAddress().IsEmpty())
          pMsg->SetFromAddress(pAccount->GetAddress());
       

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "loggerfile.h"
+#include "LoggerFile.h"
 #include "../Util/Time.h"
 
 HIS_LoggerFile::HIS_LoggerFile(int iLogSetting)

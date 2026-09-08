@@ -6,6 +6,12 @@
 #include "stdafx.h"
 #include "Unicode.h"
 
+#ifdef HM_PLATFORM_POSIX
+#include <iconv.h>
+#include <langinfo.h>
+#include <cerrno>
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -13,6 +19,146 @@
 
 namespace HM
 {
+#ifdef HM_PLATFORM_POSIX
+   namespace
+   {
+      // Windows code page identifier to the name iconv knows the same character
+      // set by. Only the code pages this server names are here - the table in
+      // CodePages::Initialize is the list, and 0 is CP_ACP, "whatever this machine
+      // is set to", which nl_langinfo answers. A code page not in this table is
+      // reported as a failed conversion rather than guessed at: a mail server that
+      // silently decodes a header in the wrong character set produces mojibake
+      // that nobody can trace back to the guess.
+      const char *IconvNameForCodePage(unsigned int codePage)
+      {
+         switch (codePage)
+         {
+         case 0:     return ::nl_langinfo(CODESET);
+         case 950:   return "BIG5";
+         case 1250:  return "CP1250";
+         case 1251:  return "CP1251";
+         case 1252:  return "CP1252";
+         case 1253:  return "CP1253";
+         case 1254:  return "CP1254";
+         case 1255:  return "CP1255";
+         case 1256:  return "CP1256";
+         case 1257:  return "CP1257";
+         case 1258:  return "CP1258";
+         case 20127: return "ANSI_X3.4-1968";
+         case 50221: return "ISO-2022-JP-2";
+         case 65000: return "UTF-7";
+         case 65001: return "UTF-8";
+         default:    return 0;
+         }
+      }
+
+      // One conversion, in the two modes the Win32 pair has: measure, or fill.
+      //
+      // A fresh iconv descriptor per call, deliberately. A descriptor carries
+      // shift state for the stateful encodings (ISO-2022-JP is one of the code
+      // pages above), so a shared one would carry the tail of somebody else's
+      // string into this conversion - and this is called from every connection
+      // thread at once.
+      //
+      // unitSize is the size of one unit of the OUTPUT: iconv counts bytes and the
+      // Win32 functions count wide characters in one direction and bytes in the
+      // other, so the byte count is divided by it on the way out.
+      int ConvertWithIconv(const char *fromName, const char *toName,
+                           const char *source, size_t sourceBytes,
+                           char *destination, size_t destinationBytes,
+                           size_t unitSize)
+      {
+         if (fromName == 0 || toName == 0 || source == 0)
+            return 0;
+
+         iconv_t descriptor = ::iconv_open(toName, fromName);
+
+         if (descriptor == (iconv_t) -1)
+            return 0;
+
+         char *inputPosition = (char *) source;
+         size_t inputRemaining = sourceBytes;
+         int answer = 0;
+
+         if (destination == 0 || destinationBytes == 0)
+         {
+            // Measure. iconv has no "how long would this be" call, so the text is
+            // converted into a scratch buffer that is emptied as it fills and only
+            // the total is kept. E2BIG is that buffer filling up, which is the
+            // expected outcome here rather than an error; anything else is not.
+            char scratch[512];
+            size_t total = 0;
+
+            while (inputRemaining > 0)
+            {
+               char *outputPosition = scratch;
+               size_t outputRemaining = sizeof(scratch);
+
+               const size_t result = ::iconv(descriptor, &inputPosition, &inputRemaining, &outputPosition, &outputRemaining);
+
+               total += sizeof(scratch) - outputRemaining;
+
+               if (result == (size_t) -1 && errno != E2BIG)
+               {
+                  ::iconv_close(descriptor);
+                  return 0;
+               }
+            }
+
+            answer = (int) (total / unitSize);
+         }
+         else
+         {
+            char *outputPosition = destination;
+            size_t outputRemaining = destinationBytes;
+
+            const size_t result = ::iconv(descriptor, &inputPosition, &inputRemaining, &outputPosition, &outputRemaining);
+
+            if (result == (size_t) -1)
+            {
+               // Invalid input, an incomplete sequence at the end, or a
+               // destination too small. Win32 answers 0 for all three.
+               ::iconv_close(descriptor);
+               return 0;
+            }
+
+            answer = (int) ((destinationBytes - outputRemaining) / unitSize);
+         }
+
+         ::iconv_close(descriptor);
+
+         return answer;
+      }
+   }
+
+   int
+   Unicode::FromCodePage(unsigned int codePage, const char *source, int sourceLength, wchar_t *destination, int destinationLength)
+   {
+      if (source == 0)
+         return 0;
+
+      const size_t sourceBytes = sourceLength < 0 ? ::strlen(source) + 1 : (size_t) sourceLength;
+
+      return ConvertWithIconv(IconvNameForCodePage(codePage), "WCHAR_T",
+                              source, sourceBytes,
+                              (char *) destination, (size_t) destinationLength * sizeof(wchar_t),
+                              sizeof(wchar_t));
+   }
+
+   int
+   Unicode::ToCodePage(unsigned int codePage, const wchar_t *source, int sourceLength, char *destination, int destinationLength)
+   {
+      if (source == 0)
+         return 0;
+
+      const size_t sourceUnits = sourceLength < 0 ? ::wcslen(source) + 1 : (size_t) sourceLength;
+
+      return ConvertWithIconv("WCHAR_T", IconvNameForCodePage(codePage),
+                              (const char *) source, sourceUnits * sizeof(wchar_t),
+                              destination, (size_t) destinationLength,
+                              1);
+   }
+#endif
 
    Unicode::Unicode()
    {
@@ -30,7 +176,22 @@ namespace HM
       size_t i;
       size_t nLen = (wcslen(sString) + 1) << 1;
       char *pAnsiString = new char [nLen];
+#ifdef HM_PLATFORM_POSIX
+      // wcstombs is wcstombs_s with the answer in the return value rather than in
+      // an out-parameter, and without the guarantee of termination. It answers
+      // (size_t) -1 for a character the locale cannot represent and leaves the
+      // buffer unspecified, and it does not terminate a result that exactly fills
+      // the buffer - so both are terminated by hand, which is what wcstombs_s
+      // does for its caller.
+      i = ::wcstombs(pAnsiString, sString, nLen);
+
+      if (i == (size_t) -1)
+         pAnsiString[0] = '\0';
+      else if (i >= nLen)
+         pAnsiString[nLen - 1] = '\0';
+#else
       wcstombs_s(&i, pAnsiString, nLen, sString, nLen);
+#endif
       AnsiString retval = pAnsiString;
       delete [] pAnsiString;
 
@@ -42,7 +203,13 @@ namespace HM
    {
       int iInputLength = sInput.GetLength();
 
+#ifdef HM_PLATFORM_POSIX
+      // 65001 is CP_UTF8. See Unicode::ToCodePage: the same two calls, measure
+      // then fill, with the same length rules and the same 0 for a failure.
+      int nNeedSize = ToCodePage(65001, sInput, iInputLength, NULL, 0);
+#else
       int nNeedSize = WideCharToMultiByte(CP_UTF8, 0, sInput, iInputLength, NULL, 0, NULL, NULL );
+#endif
 
       if (nNeedSize == 0)
       {
@@ -52,7 +219,11 @@ namespace HM
          return iInputLength == 0;
       }
 
+#ifdef HM_PLATFORM_POSIX
+      int nWritten = ToCodePage(65001, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize);
+#else
       int nWritten = WideCharToMultiByte( CP_UTF8, 0, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize, NULL, NULL );
+#endif
       if (nWritten == 0)
          return false;
 
@@ -80,7 +251,12 @@ namespace HM
          return true;
       }
 
+#ifdef HM_PLATFORM_POSIX
+      // 65001 is CP_UTF8. See Unicode::FromCodePage.
+      int nNeedSize = FromCodePage(65001, sInput, iInputLength, NULL, 0);
+#else
       int nNeedSize = MultiByteToWideChar( CP_UTF8, 0, sInput, iInputLength, NULL, 0);
+#endif
 
       if (nNeedSize == 0)
          return false;
@@ -100,7 +276,11 @@ namespace HM
       // legitimate address.
       sOutput.resize(nNeedSize);
 
+#ifdef HM_PLATFORM_POSIX
+      if( FromCodePage(65001, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize) == 0 )
+#else
       if( MultiByteToWideChar( CP_UTF8, 0, sInput, iInputLength, sOutput.GetBuffer(nNeedSize), nNeedSize ) == 0 )
+#endif
          return false;
 
       return true;

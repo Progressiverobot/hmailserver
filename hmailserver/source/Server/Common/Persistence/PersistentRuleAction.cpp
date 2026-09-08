@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\persistentruleaction.h"
-#include "..\BO\RuleAction.h"
+#include "./PersistentRuleAction.h"
+#include "../BO/RuleAction.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

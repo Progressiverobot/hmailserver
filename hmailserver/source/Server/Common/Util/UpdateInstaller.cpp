@@ -35,6 +35,24 @@ namespace HM
    String
    UpdateInstaller::HelperSourcePath()
    {
+#ifdef HM_PLATFORM_POSIX
+      // The running image's own path, which Application::GetExecutableName reads
+      // from /proc/self/exe, and the separator this platform uses.
+      //
+      // What comes back will not exist. hMailServer.Updater.exe is a Windows
+      // program that stops a Windows service and runs an Inno Setup installer,
+      // and there is no Linux counterpart to point at yet - so Apply below finds
+      // no helper beside the server and refuses with the message it already has,
+      // which says exactly that. Returning the path anyway rather than an empty
+      // string keeps that message specific about what is missing.
+      String path = Application::GetExecutableName();
+      if (path.IsEmpty())
+         return _T("");
+      int slash = path.ReverseFind('/');
+      if (slash < 0)
+         return _T("");
+      return path.Left(slash + 1) + HELPER_NAME;
+#else
       wchar_t module[MAX_PATH];
       DWORD length = GetModuleFileNameW(nullptr, module, MAX_PATH);
       if (length == 0 || length >= MAX_PATH)
@@ -44,13 +62,14 @@ namespace HM
       if (slash < 0)
          return _T("");
       return path.Left(slash + 1) + HELPER_NAME;
+#endif
    }
 
    String
    UpdateInstaller::OutcomePath()
    {
       String directory = UpdateDownloader::UpdatesDirectory();
-      return directory.IsEmpty() ? String() : directory + _T("\\last-apply.txt");
+      return directory.IsEmpty() ? String() : directory + FileUtilities::PathSeparator + _T("last-apply.txt");
    }
 
    bool
@@ -58,7 +77,7 @@ namespace HM
    {
       rollbackPath.Empty();
 
-      String directory = UpdateDownloader::UpdatesDirectory() + _T("\\rollback");
+      String directory = UpdateDownloader::UpdatesDirectory() + FileUtilities::PathSeparator + _T("rollback");
       if (!FileUtilities::DirectoryExists(directory) && !FileUtilities::CreateDirectory(directory))
       {
          why = Formatter::Format(_T("{0} could not be created."), directory);
@@ -66,7 +85,7 @@ namespace HM
       }
 
       String name = _T("hMailServer-") + runningVersion + _T("-x64.exe");
-      String path = directory + _T("\\") + name;
+      String path = directory + FileUtilities::PathSeparator + name;
       String bundlePath = path + _T(".cosign.bundle");
 
       SigstoreTrust trust;
@@ -107,6 +126,26 @@ namespace HM
    bool
    UpdateInstaller::Launch_(const String &commandLine, const String &workingDirectory, String &error)
    {
+#ifdef HM_PLATFORM_POSIX
+      // There is nothing here to launch. The command line Apply assembles names
+      // hMailServer.Updater.exe, which stops a Windows service, runs a Windows
+      // installer and starts the service again - three things with no Linux
+      // counterpart yet, and none of them something a fork and an exec could
+      // stand in for. Starting nothing and answering true would be a self-update
+      // that silently did not happen, which is the worst answer available, so
+      // this refuses in the open: the caller is told, and the error log carries
+      // it whether or not the caller passes it on.
+      //
+      // When the "service host" roadmap row lands - a systemd unit and a helper
+      // that can replace the binaries under it - this is where it plugs in.
+      (void) commandLine;
+      (void) workingDirectory;
+
+      error = _T("This build cannot apply an update: the update helper is a Windows program that runs the Windows installer, and this platform has no equivalent yet. Install the new version the way this one was installed.");
+
+      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6401, "UpdateInstaller::Launch_", error);
+      return false;
+#else
       std::vector<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
       mutableCommand.push_back(L'\0');
 
@@ -137,6 +176,7 @@ namespace HM
       CloseHandle(process.hThread);
       CloseHandle(process.hProcess);
       return true;
+#endif
    }
 
    bool
@@ -205,7 +245,7 @@ namespace HM
          return false;
       }
 
-      String helper = directory + _T("\\") + HELPER_NAME;
+      String helper = directory + FileUtilities::PathSeparator + HELPER_NAME;
       if (FileUtilities::Exists(helper))
          FileUtilities::DeleteFile(helper);
       if (!FileUtilities::Copy(helperSource, helper, false))
@@ -230,7 +270,7 @@ namespace HM
       command += _T(" --service ") + String(SERVICE_NAME);
       command += _T(" --token ") + String(token);
       command += _T(" --outcome ") + Quote_(outcome);
-      command += _T(" --log ") + Quote_(directory + _T("\\apply-") + snapshot.available_version + _T(".log"));
+      command += _T(" --log ") + Quote_(directory + FileUtilities::PathSeparator + _T("apply-") + snapshot.available_version + _T(".log"));
       command += Formatter::Format(_T(" --wait {0}"), IniFileSettings::Instance()->GetUpdateServiceWaitSeconds());
 
       if (!Launch_(command, directory, why))

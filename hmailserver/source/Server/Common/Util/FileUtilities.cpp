@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\fileutilities.h"
+#include "./FileUtilities.h"
 
 #include "FileInfo.h"
 #include "File.h"
@@ -25,7 +25,31 @@
 
 namespace HM
 {
+#ifdef HM_PLATFORM_POSIX
+   // The one place the separator is spelled. Every path join in the server
+   // that goes through Combine() or names this constant follows the platform;
+   // the joins that still write a backslash by hand are the "Paths and case"
+   // roadmap row, and on POSIX each of them is a file name with a backslash
+   // in it rather than a directory.
+   const String FileUtilities::PathSeparator = _T("/");
+#else
    const String FileUtilities::PathSeparator = _T("\\");
+#endif
+
+   // Where a path splits into its directory and its name: the position of the
+   // last separator of EITHER kind, or -1 when there is none. The functions
+   // that take a path apart use this rather than looking for the platform's
+   // separator alone, because a Windows path arrives here with backslashes and
+   // a POSIX one with slashes, and Windows itself accepts both in the same
+   // path - so a split that recognised only one of them would hand back a
+   // "directory" that still had a file name on the end.
+   static int LastSeparatorPosition_(const String &path)
+   {
+      int backslash = path.ReverseFind(_T("\\"));
+      int slash = path.ReverseFind(_T("/"));
+
+      return backslash > slash ? backslash : slash;
+   }
 
    FileUtilities::FileUtilities(void)
    {
@@ -97,14 +121,21 @@ namespace HM
 
       if (bCreateMissingDirectories)
       {
-         String sToPath = sTo.Mid(0, sTo.ReverseFind(_T("\\")));
+         String sToPath = sTo.Mid(0, LastSeparatorPosition_(sTo));
          CreateDirectory(sToPath);
       }
 
       for (int i = 1; i <= iMaxNumberOfTries; i++)
       {
          boost::system::error_code error_code;
-         boost::filesystem::copy_file(sFrom, sTo, boost::filesystem::copy_options::overwrite_existing, error_code);
+         // c_str(), here and at every boost::filesystem call in this file, because
+         // a path is wide on Windows and narrow on POSIX. A wide path takes the
+         // string class straight off - it derives from std::wstring - but the
+         // wide-to-narrow conversion Boost offers is written for the exact types
+         // it knows and not for a class derived from one, so a String is not a
+         // path source there. The pointer is one on both, and on Windows it builds
+         // the identical path object.
+         boost::filesystem::copy_file(sFrom.c_str(), sTo.c_str(), boost::filesystem::copy_options::overwrite_existing, error_code);
 
          // Use classic api to copy the file
          if (!error_code)
@@ -167,7 +198,7 @@ namespace HM
       for (int i = 1; i <= iMaxNumberOfTries; i++)
       {
          boost::system::error_code error_code;
-         boost::filesystem::rename(sFrom, sTo, error_code);
+         boost::filesystem::rename(sFrom.c_str(), sTo.c_str(), error_code);
 
          if (!error_code)
             return true;
@@ -194,13 +225,20 @@ namespace HM
    bool
    FileUtilities::Exists(const String &sFilename)
    {
-      return boost::filesystem::exists(sFilename);
+      // The error_code overload: the one without it throws for any failure other
+      // than "not there" - a directory the process may not read, for one - and
+      // "does this exist" is asked from places that catch nothing, so a
+      // permission problem became an abort rather than a false. Unreadable is
+      // reported as not present, which is what every caller does with it.
+      boost::system::error_code error;
+      return boost::filesystem::exists(sFilename.c_str(), error) && !error;
    }
 
    bool
    FileUtilities::DirectoryExists(const String &sDirName)
    {
-      return boost::filesystem::exists(sDirName) && boost::filesystem::is_directory(sDirName);
+      boost::system::error_code error;
+      return boost::filesystem::is_directory(sDirName.c_str(), error) && !error;
    }
 
    String
@@ -210,7 +248,7 @@ namespace HM
    // Returns the path to the folder in which FileName resides.
    //---------------------------------------------------------------------------()
    {
-      int iLastSlash = FileName.ReverseFind(_T("\\"));
+      int iLastSlash = LastSeparatorPosition_(FileName);
       String Path = FileName.Mid(0, iLastSlash);
 
       return Path;
@@ -223,7 +261,7 @@ namespace HM
    // Returns the filename in the full path.
    //---------------------------------------------------------------------------()
    {
-      int iLastSlash = sFullPath.ReverseFind(_T("\\"));
+      int iLastSlash = LastSeparatorPosition_(sFullPath);
 
       if (iLastSlash == -1)
       {
@@ -416,7 +454,7 @@ namespace HM
       size = 0;
 
       boost::system::error_code error_code;
-      boost::uintmax_t result = boost::filesystem::file_size(sFileName, error_code);
+      boost::uintmax_t result = boost::filesystem::file_size(sFileName.c_str(), error_code);
 
       if (error_code)
          return false;
@@ -463,8 +501,7 @@ namespace HM
    String
    FileUtilities::GetTempFileName()
    {
-      String sTmpFile;
-      sTmpFile.Format(_T("%s\\%s.tmp"), IniFileSettings::Instance()->GetTempDirectory().c_str(), GUIDCreator::GetGUID().c_str());
+      String sTmpFile = Combine(IniFileSettings::Instance()->GetTempDirectory(), GUIDCreator::GetGUID() + _T(".tmp"));
       return sTmpFile;
    }
 
@@ -477,7 +514,7 @@ namespace HM
       {
          boost::system::error_code error_code;
 
-         boost::filesystem::create_directories(sName, error_code);
+         boost::filesystem::create_directories(sName.c_str(), error_code);
          
          if (!error_code)
             return true;
@@ -504,31 +541,31 @@ namespace HM
    FileUtilities::CopyDirectory(String sFrom, String sTo, String &errorMessage)
    {
       // Check whether the function call is valid
-      if (!boost::filesystem::exists(sFrom) || !boost::filesystem::is_directory(sFrom))
+      if (!boost::filesystem::exists(sFrom.c_str()) || !boost::filesystem::is_directory(sFrom.c_str()))
       {
          throw std::logic_error(Formatter::FormatAsAnsi("Source {0} is not a valid directory.", sFrom));
       }
 
-      if (!boost::filesystem::exists(sTo))
+      if (!boost::filesystem::exists(sTo.c_str()))
       {
          if (!CreateDirectory(sTo))
             return false;
       }
 
 
-      for (boost::filesystem::directory_iterator file(sFrom); file != boost::filesystem::directory_iterator(); ++file )
+      for (boost::filesystem::directory_iterator file(sFrom.c_str()); file != boost::filesystem::directory_iterator(); ++file )
       {
          boost::filesystem::path current(file->path());
          if (boost::filesystem::is_directory(current))
          {
-            if (!CopyDirectory(current.c_str(), (sTo / current.filename()).c_str(), errorMessage))
+            if (!CopyDirectory(current.c_str(), (boost::filesystem::path(sTo.c_str()) / current.filename()).c_str(), errorMessage))
             {
                return false;
             }
          }
          else
          {
-            boost::filesystem::copy_file(current, sTo / current.filename());
+            boost::filesystem::copy_file(current, boost::filesystem::path(sTo.c_str()) / current.filename());
          }
       }
 
@@ -540,7 +577,7 @@ namespace HM
    {
       if (!force)
       {
-         if (!boost::filesystem::is_directory(sDirName))
+         if (!boost::filesystem::is_directory(sDirName.c_str()))
          {
             // The directory is already gone.
             return true;
@@ -554,7 +591,7 @@ namespace HM
       }
 
       boost::system::error_code error_code;
-      boost::filesystem::remove_all(sDirName, error_code);
+      boost::filesystem::remove_all(sDirName.c_str(), error_code);
 
       if (error_code)
          return false;
@@ -647,12 +684,38 @@ namespace HM
             // skipped rather than reported with an invented time. Skipping is safe
             // for both callers: they prune, so a file left out this pass is
             // considered again on the next one.
+#ifdef HM_PLATFORM_POSIX
+            // GetFileAttributesExW has no POSIX counterpart, and neither does the
+            // time it reports: stat() answers the last modification, the last access
+            // and the inode-change time, and none of those three is when the file was
+            // made. Modification time is the closest honest stand-in and is the right
+            // one for both callers here, which prune by age. An entry that cannot be
+            // stat'ed is skipped for the reasons written above, exactly as one whose
+            // attributes cannot be read is skipped on Windows.
+            struct stat entry_status = {};
+
+            if (::stat(current.c_str(), &entry_status) != 0)
+               continue;
+
+            // A FILETIME counts hundred-nanosecond intervals from 1 January 1601; a
+            // time_t counts seconds from 1 January 1970. 11,644,473,600 seconds lie
+            // between the two epochs. Going through FILETIME rather than straight to
+            // a DateTime keeps the line below identical on both platforms.
+            const ULONGLONG intervals = ((ULONGLONG) entry_status.st_mtime + 11644473600ULL) * 10000000ULL;
+
+            FILETIME creation_time;
+            creation_time.dwLowDateTime = (DWORD) (intervals & 0xFFFFFFFFULL);
+            creation_time.dwHighDateTime = (DWORD) (intervals >> 32);
+
+            result.push_back(FileInfo(current.filename().wstring(), creation_time));
+#else
             WIN32_FILE_ATTRIBUTE_DATA file_info = {};
 
             if (!GetFileAttributesExW(current.wstring().c_str(), GetFileExInfoStandard, &file_info))
                continue;
 
             result.push_back(FileInfo(current.filename().wstring(), file_info.ftCreationTime));
+#endif
          }
       }
 
@@ -665,12 +728,12 @@ namespace HM
    bool
    FileUtilities::GetDirectoryContainsFileRecursive(const String &sDirectoryName)
    {
-      if (!boost::filesystem::is_directory(sDirectoryName))
+      if (!boost::filesystem::is_directory(sDirectoryName.c_str()))
          return false;
 
       std::vector<FileInfo> result;
 
-      for (boost::filesystem::directory_iterator file(sDirectoryName); file != boost::filesystem::directory_iterator(); ++file)
+      for (boost::filesystem::directory_iterator file(sDirectoryName.c_str()); file != boost::filesystem::directory_iterator(); ++file)
       {
          boost::filesystem::path current(file->path());
 
@@ -731,6 +794,15 @@ namespace HM
       if (sPath.GetLength() < 2)
          return false;
 
+#ifdef HM_PLATFORM_POSIX
+      // A POSIX path is absolute when it starts at the root; there are no drive
+      // letters and no UNC names to look for. Without this, a message whose
+      // stored name is already a full path would be joined onto the data
+      // directory a second time by PersistentMessage::GetFileName.
+      if (sPath.StartsWith(_T("/")))
+         return true;
+#endif
+
       bool isFullPath = (sPath[1] == ':' ||
                         IsUNCPath(sPath));
 
@@ -751,7 +823,7 @@ namespace HM
       if (secondHalf.StartsWith(_T("\\")) || secondHalf.StartsWith(_T("/")))
          secondHalf = secondHalf.Mid(1);
 
-      String result = firstHalf + "\\" + secondHalf;
+      String result = firstHalf + PathSeparator + secondHalf;
 
       return result;
    }
@@ -842,10 +914,8 @@ namespace HM
       // not exist", and DeleteFile returned true with the file still on disk. The
       // Exists check after the delete is what catches that; the return value did
       // not, and could not.
-      String unicodeName;
-      unicodeName.Format(_T("%s\\hm-\u00E5\u00E4\u00F6-\u65E5\u672C\u8A9E-%s.tmp"),
-         IniFileSettings::Instance()->GetTempDirectory().c_str(),
-         GUIDCreator::GetGUID().c_str());
+      String unicodeName = FileUtilities::Combine(IniFileSettings::Instance()->GetTempDirectory(),
+         _T("hm-\u00E5\u00E4\u00F6-\u65E5\u672C\u8A9E-") + GUIDCreator::GetGUID() + _T(".tmp"));
 
       if (FileUtilities::WriteToFile(unicodeName, AnsiString("delete me too")))
       {

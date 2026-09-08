@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
-#include ".\surbl.h"
+#include "./SURBL.h"
 
 #include "../../Common/AntiSpam/AntiSpamDiagnostics.h"
 #include "../../Common/BO/MessageData.h"
@@ -62,7 +62,11 @@ namespace HM
                break;
             }
 
-            String sURL = matches[1];
+            // sub_match converts to a std::basic_string, and String is built from
+            // one of those - two user-defined conversions, which only MSVC will
+            // chain on its own. Asking the match for its string first makes the
+            // one conversion that is left the ordinary String(std::wstring) one.
+            String sURL = matches[1].str();
 
             // Clean the URL from linefeeds
             CleanURL_(sURL);
@@ -127,7 +131,11 @@ namespace HM
 
       if (addresses.size() > 0)
       {
-         String logMessage = Formatter::Format("SURBL: {0} unique domain addresses found.", addresses.size());
+         // The cast names FormatArgument's unsigned __int64 constructor, which is the
+         // one a size_t binds to exactly on Windows. On a 64-bit POSIX build size_t is
+         // unsigned long, which matches none of the constructors exactly and is no
+         // closer to one than to the others. The cast is an identity on Windows.
+         String logMessage = Formatter::Format("SURBL: {0} unique domain addresses found.", (unsigned __int64) addresses.size());
          LOG_DEBUG(logMessage);
       }
 

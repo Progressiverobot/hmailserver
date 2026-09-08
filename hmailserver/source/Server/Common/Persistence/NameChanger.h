@@ -7,6 +7,7 @@
 
 namespace HM
 {
+   class Account;
    class Domain;
 
    class NameChanger

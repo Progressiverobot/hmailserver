@@ -5,7 +5,13 @@
 
 #include "stdafx.h"
 #include "Dictionary.h"
+// The table below is Win32 status codes and nothing else, so both the header and
+// the function that reads it belong to the Windows build alone. See the roadmap
+// section "Linux and AArch64": the POSIX core reports errno through the C
+// library, and has no caller for a Win32 error description.
+#ifdef _MSC_VER
 #include <winerror.h>
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -24,6 +30,8 @@ namespace HM
    {
 
    }
+
+#ifdef _MSC_VER
 
    String 
    Dictionary::GetWindowsErrorDescription(int iErrorCode)
@@ -56,5 +64,7 @@ namespace HM
          return "Unknown";
       }
    }
+
+#endif
 
 }

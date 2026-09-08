@@ -9,7 +9,7 @@
 #include "StringParser.h"
 
 #include "../RegularExpression.h"
-#include "../../MIME/MimeCode.h"
+#include "../../Mime/MimeCode.h"
 #include "../Unicode.h"
 #include <boost/lexical_cast.hpp>
 
@@ -768,6 +768,45 @@ namespace HM
             return true;
          }
 
+#ifdef HM_PLATFORM_POSIX
+         // There is no NormalizeString here and no Unicode Character Database in
+         // the C library to write one from - NFKC needs the composition and
+         // compatibility tables, which is a dependency (ICU) this build does not
+         // yet have. So this does the part it can prove and refuses the rest.
+         //
+         // Every ASCII code point is already in NFKC normal form and no sequence
+         // of them composes or decomposes, so for ASCII input the normalised form
+         // IS the input. That is a fact about NFKC, not a shortcut, and it is why
+         // ASCII credentials - which is nearly all of them - authenticate here
+         // exactly as they do on Windows.
+         //
+         // Anything else cannot be normalised without those tables. Guessing would
+         // mean comparing an unnormalised credential against a normalised stored
+         // one and silently answering the wrong question, so it is refused: false
+         // is what this function already returns for input it will not vouch for,
+         // and SaslPrep treats that as prohibited.
+         bool isAscii = true;
+
+         for (size_t i = 0; i < input.size(); i++)
+         {
+            if (input[i] >= 0x80)
+            {
+               isAscii = false;
+               break;
+            }
+         }
+
+         if (isAscii)
+         {
+            output = input;
+            return true;
+         }
+
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6450, "StringParser::SaslNormalizeKC",
+            "A credential containing non-ASCII characters was rejected: Unicode NFKC normalisation, which RFC 4013 SASLprep requires, is not available in this build. See the roadmap section \"Linux and AArch64\".");
+
+         return false;
+#else
          int needed = NormalizeString(NormalizationKC, input.c_str(), (int)input.size(), NULL, 0);
          if (needed <= 0)
             return false; // ERROR_NO_UNICODE_TRANSLATION or other invalid input.
@@ -787,6 +826,7 @@ namespace HM
          buffer.resize((size_t)written);
          output.swap(buffer);
          return true;
+#endif
       }
    }
 

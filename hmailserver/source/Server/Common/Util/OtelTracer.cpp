@@ -136,11 +136,23 @@ namespace HM
    unsigned __int64
    OtelTracer::NowUnixNano_()
    {
+#ifdef HM_PLATFORM_POSIX
+      // Straight to the answer the Windows branch below arrives at by two
+      // conversions: clock_gettime gives nanoseconds since 1970 already, so
+      // there is no 1601 epoch to subtract and no tick size to multiply by.
+      // CLOCK_REALTIME rather than CLOCK_MONOTONIC, because a span timestamp is
+      // a wall-clock instant that a collector lines up against other machines.
+      struct timespec now;
+      ::clock_gettime(CLOCK_REALTIME, &now);
+      return static_cast<unsigned __int64>(now.tv_sec) * 1000000000ULL +
+             static_cast<unsigned __int64>(now.tv_nsec);
+#else
       FILETIME ft;
       GetSystemTimeAsFileTime(&ft);
       unsigned __int64 t = (static_cast<unsigned __int64>(ft.dwHighDateTime) << 32) | ft.dwLowDateTime;
       t -= 116444736000000000ULL; // 1601-01-01 -> 1970-01-01 in 100ns ticks
       return t * 100ULL;          // 100ns ticks -> nanoseconds
+#endif
    }
 
    unsigned __int64

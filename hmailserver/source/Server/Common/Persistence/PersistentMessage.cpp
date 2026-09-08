@@ -32,7 +32,46 @@
 #include "../Util/GUIDCreator.h"
 #include "../Cache/CacheContainer.h"
 #include "../Cache/AccountSizeCache.h"
-#include "..\Util\FolderManipulationLock.h"
+#include "../Util/FolderManipulationLock.h"
+
+#ifdef HM_PLATFORM_POSIX
+// LoadHeader and LoadBody below read a message file through CreateFile,
+// ReadFile and CloseHandle. Two of those three are the POSIX call with a
+// different name and nothing else: ReadFile on a file opened for synchronous
+// reading is read(2), and CloseHandle on a file handle is close(2). Both are
+// used six times between the two functions, always with the same error
+// handling around them, so they are given their POSIX bodies once here and the
+// call sites - and the error handling - stay identical on both platforms.
+//
+// CreateFile is not in this list. Its share modes, security attributes and
+// creation dispositions have no POSIX counterpart, so the two calls to it are
+// written out at their call sites instead, where what is being asked for can
+// be said in full.
+namespace
+{
+   inline bool ReadFile(int descriptor, void *buffer, unsigned long count, unsigned long *read, void *)
+   {
+      const ssize_t received = ::read(descriptor, buffer, (size_t) count);
+
+      if (received < 0)
+      {
+         // Win32 leaves the reason in GetLastError and answers FALSE; read(2)
+         // leaves it in errno, which is the same place on this platform, and
+         // answers -1. The caller reads it either way.
+         *read = 0;
+         return false;
+      }
+
+      *read = (unsigned long) received;
+      return true;
+   }
+
+   inline void CloseHandle(int descriptor)
+   {
+      ::close(descriptor);
+   }
+}
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -573,8 +612,23 @@ namespace HM
       if (!linkFrom.IsEmpty())
       {
          FileUtilities::CreateDirectory(destinationPath);
+#ifdef HM_PLATFORM_POSIX
+         // link(2) is what CreateHardLink is: a second directory entry for one
+         // inode, on one filesystem, failing when the two ends are on different
+         // volumes. POSIX names the EXISTING file first and answers 0 for
+         // success, so the arguments are the other way round here and the test
+         // is a comparison; the reason for a failure is left in errno, which is
+         // what GetLastError reads on this platform. The fallback below is
+         // untouched - a link that cannot be made is still a copy, which is the
+         // whole promise DeliveryHardLinks makes.
+         const AnsiString linkExisting = linkFrom.c_str();
+         const AnsiString linkNew = destinationFile.c_str();
+         linked = ::link(linkExisting.c_str(), linkNew.c_str()) == 0;
+         LOG_DEBUG(Formatter::Format(linked ? "Local copy {0} is a name for {1}." : "Local copy {0} could not be linked from {1} (errno {2}); copied instead.", destinationFile, linkFrom, (int) GetLastError()));
+#else
          linked = ::CreateHardLink(destinationFile, linkFrom, NULL) != FALSE;
          LOG_DEBUG(Formatter::Format(linked ? "Local copy {0} is a name for {1}." : "Local copy {0} could not be linked from {1} (Windows error {2}); copied instead.", destinationFile, linkFrom, (int) GetLastError()));
+#endif
       }
 
       if (!linked && !FileUtilities::Copy(sourceFile, destinationFile, true))
@@ -1271,6 +1325,16 @@ namespace HM
 
       String sHeaderData; 
 
+#ifdef HM_PLATFORM_POSIX
+      // The whole of what the CreateFile call below asks for, on a system with
+      // no mandatory locking: open the file that is already there, for reading.
+      // FILE_SHARE_READ is Windows saying "other readers may join me", which is
+      // the only thing POSIX ever does; OPEN_EXISTING is the absence of O_CREAT.
+      const AnsiString narrowFileName = fileName.c_str();
+      int handleFile = ::open(narrowFileName.c_str(), O_RDONLY);
+
+      if (handleFile < 0)
+#else
       HANDLE handleFile;
 
       handleFile = CreateFile(fileName, 
@@ -1283,6 +1347,7 @@ namespace HM
          );
 
       if (handleFile == INVALID_HANDLE_VALUE || handleFile < 0) 
+#endif
       {
          if (reportError)
          {
@@ -1367,6 +1432,14 @@ namespace HM
       // would reach ReadFile as a huge DWORD, so it falls back to the buffer size as well.
       if (iBodyReadSize <= 0 || iBodyReadSize > iReadBufferSize) iBodyReadSize = iReadBufferSize;
 
+#ifdef HM_PLATFORM_POSIX
+      // As in LoadHeader above: open the file that is already there, for
+      // reading, and let a negative descriptor be the failure.
+      const AnsiString narrowFileName = fileName.c_str();
+      int handleFile = ::open(narrowFileName.c_str(), O_RDONLY);
+
+      if (handleFile < 0)
+#else
       HANDLE handleFile = CreateFile(fileName, 
          GENERIC_READ, 
          FILE_SHARE_READ, 
@@ -1377,6 +1450,7 @@ namespace HM
          );
 
       if (handleFile == INVALID_HANDLE_VALUE || handleFile < 0) 
+#endif
       {
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4403, "PersistentMessage::LoadBody", "Could not read the message body, since the file was not available. File: " + fileName);
          return "";

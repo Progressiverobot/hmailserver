@@ -5,7 +5,12 @@
 
 #include "stdafx.h"
 #include "DALRecordsetFactory.h"
+// ADORecordset names the ADO smart pointers the Windows precompiled header
+// #imports; the roadmap section "Linux and AArch64" leaves that backend out of
+// the POSIX build. Nothing below uses the type, only the include had to go.
+#ifdef _MSC_VER
 #include "ADORecordset.h"
+#endif
 #include "MySQLRecordset.h"
 
 #ifdef _DEBUG

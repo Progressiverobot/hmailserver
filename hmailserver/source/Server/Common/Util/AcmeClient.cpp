@@ -22,10 +22,36 @@
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
+#ifdef HM_PLATFORM_POSIX
+namespace
+{
+   // _mkgmtime is Microsoft's name for the inverse of gmtime: a struct tm read
+   // as UTC, where mktime would read it as local time. POSIX spells the same
+   // function timegm. Giving it the Microsoft name once, here, keeps the call
+   // sites below reading the way they do on Windows.
+   inline time_t _mkgmtime(struct tm *parts)
+   {
+      return ::timegm(parts);
+   }
+}
+#endif
+
+#ifdef HM_PLATFORM_POSIX
+// Winsock's half-close constant under the POSIX name for the same thing:
+// SD_SEND is SHUT_WR. Same meaning, same value, different spelling.
+static const int SD_SEND = SHUT_WR;
+#endif
+
 #include <boost/asio.hpp>
 #include <boost/asio/ssl.hpp>
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
 
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
@@ -250,7 +276,7 @@ namespace HM
       String directory = IniFileSettings::Instance()->GetAcmeCertificateDirectory();
 
       if (directory.IsEmpty())
-         directory = IniFileSettings::Instance()->GetDataDirectory() + _T("\\ACME");
+         directory = IniFileSettings::Instance()->GetDataDirectory() + FileUtilities::PathSeparator + _T("ACME");
 
       return directory;
    }
@@ -416,7 +442,7 @@ namespace HM
 
       AnsiString ariId;
 
-      if (!GetCertificateAriId(GetCertificateDirectory() + _T("\\fullchain.pem"), ariId))
+      if (!GetCertificateAriId(GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"), ariId))
          return false;
 
       AnsiString url = url_renewal_info_;
@@ -481,7 +507,7 @@ namespace HM
       time_t notBefore = 0;
       time_t notAfter = 0;
 
-      if (!ReadCertificateDates(GetCertificateDirectory() + _T("\\fullchain.pem"), notBefore, notAfter))
+      if (!ReadCertificateDates(GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"), notBefore, notAfter))
          return true;
 
       const time_t now = time(nullptr);
@@ -760,7 +786,7 @@ namespace HM
       String directory = GetCertificateDirectory();
       FileUtilities::CreateDirectory(directory);
 
-      String keyFile = directory + _T("\\account.key");
+      String keyFile = directory + FileUtilities::PathSeparator + _T("account.key");
       AnsiString narrowKeyFile = keyFile;
 
       if (FileUtilities::Exists(keyFile))
@@ -1132,7 +1158,7 @@ namespace HM
 
       if (IniFileSettings::Instance()->GetAcmeReuseKey())
       {
-         AnsiString keyPath = AnsiString(GetCertificateDirectory() + _T("\\privkey.pem"));
+         AnsiString keyPath = AnsiString(GetCertificateDirectory() + FileUtilities::PathSeparator + _T("privkey.pem"));
 
          // A BIO, not a FILE*: see GetCertificateTlsa for why a FILE* of this
          // executable's C runtime handed to the OpenSSL DLL ends the process
@@ -1295,8 +1321,8 @@ namespace HM
       // newer of the two: a certificate whose key has not arrived yet is the same
       // mismatch in the other direction.
       String directory = GetCertificateDirectory();
-      String keyFile = directory + _T("\\privkey.pem");
-      String certificateFile = directory + _T("\\fullchain.pem");
+      String keyFile = directory + FileUtilities::PathSeparator + _T("privkey.pem");
+      String certificateFile = directory + FileUtilities::PathSeparator + _T("fullchain.pem");
       String pendingKeyFile = keyFile + _T(".new");
       String pendingCertificateFile = certificateFile + _T(".new");
 
@@ -1470,7 +1496,7 @@ namespace HM
          return false;
       }
 
-      LOG_APPLICATION("ACME: Certificate issued successfully: " + GetCertificateDirectory() + _T("\\fullchain.pem"));
+      LOG_APPLICATION("ACME: Certificate issued successfully: " + GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"));
 
       // Deployment first: the certificate record, the port assignments and the
       // restart are what the renewal exists for. The TLSA line below is a
@@ -1481,7 +1507,7 @@ namespace HM
 
       // Publish-ready DANE record for administrators running inbound DANE.
       AnsiString spkiHex;
-      if (GetCertificateTlsa(GetCertificateDirectory() + _T("\\fullchain.pem"), spkiHex))
+      if (GetCertificateTlsa(GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem"), spkiHex))
       {
          LOG_APPLICATION("ACME: DANE TLSA record for this certificate: _25._tcp.<mx-host>. IN TLSA 3 1 1 " + String(spkiHex));
       }
@@ -1566,8 +1592,8 @@ namespace HM
       // else. An administrator who deleted the record on purpose gets it back
       // at the next run, which is the lesser surprise: ACME is enabled, the
       // certificate is its, and a deleted record was the symptom of #93.
-      String certificateFile = GetCertificateDirectory() + _T("\\fullchain.pem");
-      String privateKeyFile = GetCertificateDirectory() + _T("\\privkey.pem");
+      String certificateFile = GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem");
+      String privateKeyFile = GetCertificateDirectory() + FileUtilities::PathSeparator + _T("privkey.pem");
 
       if (!FileUtilities::Exists(certificateFile) || !FileUtilities::Exists(privateKeyFile))
          return false;
@@ -1589,8 +1615,8 @@ namespace HM
    AcmeClient::ApplyCertificate_()
    {
       const String certificateName = _T("ACME (automatic)");
-      String certificateFile = GetCertificateDirectory() + _T("\\fullchain.pem");
-      String privateKeyFile = GetCertificateDirectory() + _T("\\privkey.pem");
+      String certificateFile = GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem");
+      String privateKeyFile = GetCertificateDirectory() + FileUtilities::PathSeparator + _T("privkey.pem");
 
       // Create or update the SSL certificate record.
       SSLCertificates certificates;
@@ -1862,7 +1888,7 @@ namespace HM
       // watching the calendar either.
       LOG_APPLICATION("ACME: Certificate renewal FAILED. The failing step is in the lines above; the next attempt is in one hour. The certificate currently installed has not been changed.");
 
-      String certificateFile = AcmeClient::GetCertificateDirectory() + _T("\\fullchain.pem");
+      String certificateFile = AcmeClient::GetCertificateDirectory() + FileUtilities::PathSeparator + _T("fullchain.pem");
 
       time_t notAfter = 0;
 

@@ -24,7 +24,13 @@
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
+// <ws2tcpip.h> is Winsock's TCP/IP header. Everything this file takes from it -
+// the address structures and the address-conversion calls - comes from
+// <netinet/in.h>, <arpa/inet.h> and <netdb.h> on POSIX, which the platform layer
+// has already included.
+#ifdef _MSC_VER
 #include <ws2tcpip.h>
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -587,7 +593,14 @@ namespace HM
          // the same per-IP auto-ban accounting the other protocols use, and the
          // ban that accounting creates has to be enforced right here.
          sockaddr_in6 clientAddress = {};
+#ifdef HM_PLATFORM_POSIX
+         // The two spellings of one thing: POSIX declares accept's third argument
+         // socklen_t*, Winsock declares it int*. Same width, so nothing about the
+         // call changes - only the name the pointer has to have to be passed.
+         socklen_t addressLength = sizeof(clientAddress);
+#else
          int addressLength = sizeof(clientAddress);
+#endif
 
          SOCKET clientSocket = accept(listen_socket_, (sockaddr*) &clientAddress, &addressLength);
 
@@ -714,7 +727,13 @@ namespace HM
 
       if (connection.socket != INVALID_SOCKET)
       {
+#ifdef HM_PLATFORM_POSIX
+         // SHUT_RDWR is what Winsock spells SD_BOTH - stop this socket in both
+         // directions - and both are the value 2.
+         shutdown(connection.socket, SHUT_RDWR);
+#else
          shutdown(connection.socket, SD_BOTH);
+#endif
          closesocket(connection.socket);
          connection.socket = INVALID_SOCKET;
       }
@@ -775,6 +794,26 @@ namespace HM
       if (address == nullptr)
          return result;
 
+#ifdef HM_PLATFORM_POSIX
+      // inet_ntop is InetNtopW without the W: the same conversion, writing narrow
+      // characters. The text is an address in ASCII either way, and the string
+      // class widens a char buffer on construction, so what TryParse is given is
+      // the same string the Windows branch gives it.
+      char buffer[INET6_ADDRSTRLEN] = {};
+
+      if (address->sa_family == AF_INET6)
+      {
+         const sockaddr_in6 *v6 = reinterpret_cast<const sockaddr_in6*>(address);
+         if (::inet_ntop(AF_INET6, &v6->sin6_addr, buffer, INET6_ADDRSTRLEN) != nullptr)
+            result.TryParse(String(buffer), true);
+      }
+      else if (address->sa_family == AF_INET)
+      {
+         const sockaddr_in *v4 = reinterpret_cast<const sockaddr_in*>(address);
+         if (::inet_ntop(AF_INET, &v4->sin_addr, buffer, INET6_ADDRSTRLEN) != nullptr)
+            result.TryParse(String(buffer), true);
+      }
+#else
       wchar_t buffer[INET6_ADDRSTRLEN] = {};
 
       if (address->sa_family == AF_INET6)
@@ -789,6 +828,7 @@ namespace HM
          if (InetNtopW(AF_INET, (PVOID) &v4->sin_addr, buffer, INET6_ADDRSTRLEN) != nullptr)
             result.TryParse(String(buffer), true);
       }
+#endif
 
       return result;
    }

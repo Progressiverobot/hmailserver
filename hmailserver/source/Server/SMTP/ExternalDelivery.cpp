@@ -10,23 +10,23 @@
 #include "RuleResult.h"
 
 #include "../Common/BO/Message.h"
-#include "../common/BO/MessageRecipient.h"
-#include "../common/BO/Routes.h"
+#include "../Common/BO/MessageRecipient.h"
+#include "../Common/BO/Routes.h"
 
-#include "../common/Scripting/Events.h"
+#include "../Common/Scripting/Events.h"
 
-#include "../common/Persistence/PersistentMessageRecipient.h"
-#include "../common/Persistence/PersistentMessage.h"
+#include "../Common/Persistence/PersistentMessageRecipient.h"
+#include "../Common/Persistence/PersistentMessage.h"
 
-#include "../common/TCPIP/DNSResolver.h"
-#include "../common/TCPIP/IOService.h"
-#include "../common/TCPIP/HostNameAndIpAddress.h"
+#include "../Common/TCPIP/DNSResolver.h"
+#include "../Common/TCPIP/IOService.h"
+#include "../Common/TCPIP/HostNameAndIpAddress.h"
 
-#include "../Common/Util/AWstats.h"
-#include "../common/Util/ServerInfo.h"
-#include "../common/Util/OutboundOAuth2TokenClient.h"
-#include "../common/Util/Parsing/StringParser.h"
-#include "../common/Application/IniFileSettings.h"
+#include "../Common/Util/AWStats.h"
+#include "../Common/Util/ServerInfo.h"
+#include "../Common/Util/OutboundOAuth2TokenClient.h"
+#include "../Common/Util/Parsing/StringParser.h"
+#include "../Common/Application/IniFileSettings.h"
 #include "../Common/Util/TlsRptStore.h"
 #include "../Common/Util/RateLimiter.h"
 
@@ -919,7 +919,12 @@ namespace HM
          }
          else
          {
-            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Message could not be delivered. Scheduling it for later delivery in " + StringParser::IntToString(lMinutesBewteen + iRandomAdjust) + " minutes.");
+            // lMinutesBewteen is a long and iRandomAdjust an int, so the sum is a long.
+            // MSVC binds IntToString(long) to the int overload, because long and int are
+            // the same 32-bit type on Windows; clang finds int, unsigned int and __int64
+            // all equally distant. The cast names the overload Windows already selects,
+            // and a retry interval in minutes cannot overflow a 32-bit int.
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Message could not be delivered. Scheduling it for later delivery in " + StringParser::IntToString((int) (lMinutesBewteen + iRandomAdjust)) + " minutes.");
             PersistentMessage::SetNextTryTime(original_message_->GetID(), true, lMinutesBewteen + iRandomAdjust);
          
             // Unlock the message now so that a future delivery thread can pick it up.

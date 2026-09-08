@@ -44,6 +44,13 @@ namespace HM
       static bool ValidateArgon2id(const AnsiString &password, const AnsiString &storedHash);
       static bool IsArgon2idHash(const AnsiString &storedHash);
 
+      // Whether the linked OpenSSL offers the Argon2id KDF at all. It arrived in
+      // OpenSSL 3.2; the Windows build links 4.0 and always has it, while a Linux
+      // build against a distribution's 3.0 - Ubuntu 24.04, Debian 12 - does not,
+      // and every caller that would store or check an Argon2id hash asks this
+      // first rather than discovering it as an empty hash or a failed logon.
+      static bool Argon2idAvailable();
+
       // scrypt password hashing (RFC 7914, via OpenSSL EVP_PBE_scrypt) with the
       // OWASP parameters N=2^17, r=8, p=1 - 128 MiB per derivation. Produces a
       // self-describing hash string: $s2$<log2 N>$<r>$<p>$<salt-hex>$<derived-key-hex>

@@ -6,8 +6,8 @@
 #include "StdAfx.h"
 
 #include "PersistentGreyListingWhiteAddress.h"
-#include "..\BO\GreyListingWhiteAddress.h"
-#include "..\SQL\SQLStatement.h"
+#include "../BO/GreyListingWhiteAddress.h"
+#include "../SQL/SQLStatement.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

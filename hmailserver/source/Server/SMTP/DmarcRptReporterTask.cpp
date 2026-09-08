@@ -16,6 +16,20 @@
 
 #include <ctime>
 
+#ifdef HM_PLATFORM_POSIX
+namespace
+{
+   // _mkgmtime64 is Microsoft's name for the inverse of gmtime - a struct tm
+   // read as UTC, where mktime would read it as local time - with a 64-bit
+   // result. POSIX spells the same function timegm, and its time_t is already
+   // 64 bits here, so the cast loses nothing.
+   inline long long _mkgmtime64(struct tm *parts)
+   {
+      return (long long) ::timegm(parts);
+   }
+}
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW

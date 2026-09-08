@@ -5,6 +5,16 @@
 
 #include "StdAfx.h"
 #include "SSPIValidation.h"
+#ifdef HM_PLATFORM_POSIX
+
+// Nothing from netapi32 is reachable here, and nothing stands in for it. This whole
+// file is one Windows call - LogonUser - plus the machinery that turns its failures
+// into something an administrator can act on, so the POSIX side is a refusal rather
+// than a translation. Its replacement is the roadmap row "Directory authentication
+// without LogonUser", which is the LDAP path: LdapClient in Common/LDAP already has
+// the shape of it.
+
+#else
 
 // NetGetJoinInformation, and the two constants that make its answer meaningful. Not
 // pulled in by the precompiled header, and asked for explicitly rather than via
@@ -12,6 +22,7 @@
 // top of the file it is needed in. Netapi32.lib is in the project's link line.
 #include <lm.h>
 
+#endif
 #include "../Application/ErrorManager.h"
 
 #ifdef _DEBUG
@@ -21,6 +32,37 @@
 
 namespace HM
 {
+#ifdef HM_PLATFORM_POSIX
+
+   bool
+   SSPIValidation::ValidateUser(const String &sDomain, const String &sUsername, const String &sPassword)
+   {
+      // Reported once for the life of the process, rather than once per attempt or on
+      // the Windows side's per-error, per-domain timer. That timer exists because the
+      // conditions it reports come and go - a domain controller is rebooted, a broken
+      // trust is repaired - so a problem that returns has to be reported again. This
+      // one cannot come and go: there is no LogonUser in this build and there will not
+      // be one before the roadmap row that replaces it is written. A second report
+      // would say exactly what the first one said, and would say it on every logon
+      // attempt the server handles.
+      static std::once_flag reported;
+
+      std::call_once(reported, [&sDomain]()
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 6404, "SSPIValidation::ValidateUser",
+            Formatter::Format(_T("An account is linked to the Windows domain {0}, but this build cannot validate ")
+               _T("a Windows credential: LogonUser is the mechanism and it is a Windows one. Every logon for ")
+               _T("every account linked to a domain will be refused, whatever password is supplied. Give those ")
+               _T("accounts a native hMailServer password, or see the roadmap row 'Directory authentication ")
+               _T("without LogonUser'. Reported once per run."), sDomain));
+      });
+
+      // False, and never anything else. This is an authentication decision, and the one
+      // thing it may never do is answer yes for a credential nothing here has checked.
+      return false;
+   }
+
+#else
    namespace
    {
       // Whether a LogonUser failure means "this user did not prove who they are" or
@@ -329,4 +371,5 @@ namespace HM
 
       return false;
    }
+#endif
 }

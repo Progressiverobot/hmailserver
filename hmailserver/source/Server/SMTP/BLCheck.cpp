@@ -5,8 +5,8 @@
 
 #include "stdafx.h"
 #include "BLCheck.h"
-#include "../common/tcpip/dnsresolver.h"
-#include "../common/tcpip/IPAddress.h"
+#include "../Common/TCPIP/DNSResolver.h"
+#include "../Common/TCPIP/IPAddress.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -76,7 +76,11 @@ namespace HM
       if (foundAddressesJoined.IsEmpty())
          foundAddressesJoined = "(none)";
 
-      String logMessage = Formatter::Format("DNS lookup: {0}, {1} addresses found: {2}, Match: {3}", sCheckHost, foundAddresses.size(), foundAddressesJoined, isBlocked);
+      // The cast names FormatArgument's unsigned __int64 constructor, which is the
+      // one a size_t binds to exactly on Windows. On a 64-bit POSIX build size_t is
+      // unsigned long, which matches none of the constructors exactly and is no
+      // closer to one than to the others. The cast is an identity on Windows.
+      String logMessage = Formatter::Format("DNS lookup: {0}, {1} addresses found: {2}, Match: {3}", sCheckHost, (unsigned __int64) foundAddresses.size(), foundAddressesJoined, isBlocked);
       LOG_TCPIP(logMessage);
 
       return isBlocked;

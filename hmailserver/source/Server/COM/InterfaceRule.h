@@ -4,11 +4,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
-#include "..\hMailServer\resource.h"       // main symbols
+#include "../hMailServer/resource.h"       // main symbols
 
-#include "..\hMailServer\hMailServer.h"
+#include "../hMailServer/hMailServer.h"
 
-#include "..\COM\COMCollection.h"
+#include "../COM/COMCollection.h"
 
 namespace HM 
 { 

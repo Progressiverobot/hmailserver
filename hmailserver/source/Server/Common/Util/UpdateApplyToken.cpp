@@ -8,7 +8,26 @@
 #include "FileUtilities.h"
 
 #include <openssl/rand.h>
+#ifdef HM_PLATFORM_POSIX
+
+// sddl.h has no counterpart here and needs none: the rule it is used to state -
+// this file is readable by the account the server runs as and by nobody else - is
+// a creation mode on this platform rather than a security descriptor. What the
+// POSIX branches below need instead is open(2), stat(2) and unlink(2), and
+// boost::filesystem to turn the wide path the server carries into the narrow one
+// those take.
+#include <boost/filesystem.hpp>
+
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <cerrno>
+#include <ctime>
+
+#else
 #include <sddl.h>
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -21,6 +40,7 @@ namespace HM
    {
       const int TOKEN_BYTES = 32;
       const __int64 TOKEN_LIFETIME_SECONDS = 3600;
+#ifndef HM_PLATFORM_POSIX
 
       // The SID of the account this process runs as, as a string, or empty when
       // it cannot be read - in which case the DACL simply does not name it, and a
@@ -55,6 +75,7 @@ namespace HM
          CloseHandle(token);
          return result;
       }
+#endif
 
       // The token is the administrator password for one hour and one use, so the
       // file it lives in is written with a DACL of its own rather than inheriting
@@ -68,6 +89,49 @@ namespace HM
       // is worse than an upgrade that asks for a password.
       bool WriteProtected_(const String &path, const AnsiString &token, String &error)
       {
+#ifdef HM_PLATFORM_POSIX
+
+         // The POSIX statement of exactly the rule the DACL below states: this file
+         // is readable by the account the server runs as and by nobody else.
+         //
+         // 0600 is given to open(2) AT CREATION rather than applied with chmod
+         // afterwards, because a file created 0644 and narrowed a moment later is
+         // world-readable for that moment, and one moment is all a local user needs
+         // to read a token that authenticates as the administrator.
+         //
+         // The unlink-then-O_EXCL pair is the counterpart of the DeleteFile and
+         // CREATE_NEW in the Windows branch, and is there for the same reason:
+         // opening an existing file keeps whatever permissions that file already
+         // had, which is precisely the case this code exists to prevent.
+         const std::string native = boost::filesystem::path(std::wstring(path)).string();
+
+         ::unlink(native.c_str());
+
+         const int descriptor = ::open(native.c_str(), O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+
+         if (descriptor < 0)
+         {
+            error = Formatter::Format(_T("{0} could not be written (error {1})."), path, (int) errno);
+            return false;
+         }
+
+         const ssize_t written = ::write(descriptor, token.c_str(), (size_t) token.GetLength());
+
+         ::close(descriptor);
+
+         // A short write leaves a truncated token on disk, which would be redeemed by
+         // nothing and would look to the next Issue like a token already in hand, so
+         // the file goes rather than being left behind.
+         if (written != (ssize_t) token.GetLength())
+         {
+            ::unlink(native.c_str());
+            error = Formatter::Format(_T("{0} could not be written."), path);
+            return false;
+         }
+
+         return true;
+
+#else
          // SYSTEM, the local Administrators group, and the account this process
          // runs as. The last one matters: the service does not have to be
          // LocalSystem - there is a setting for running it as a named account -
@@ -119,10 +183,28 @@ namespace HM
          }
 
          return true;
+#endif
       }
 
       bool FileAgeSeconds_(const String &path, __int64 &seconds)
       {
+#ifdef HM_PLATFORM_POSIX
+
+         // st_mtime is the last modification, which is what the Windows branch reads
+         // too (ftLastWriteTime), so both platforms measure the age of the same event.
+         struct stat status = {};
+
+         if (::stat(boost::filesystem::path(std::wstring(path)).string().c_str(), &status) != 0)
+            return false;
+
+         const time_t now = ::time(nullptr);
+
+         // A file written in the future, by a clock that was then corrected, counts
+         // as fresh - the same rule the Windows branch applies below.
+         seconds = now <= status.st_mtime ? 0 : (__int64) (now - status.st_mtime);
+         return true;
+
+#else
          WIN32_FILE_ATTRIBUTE_DATA attributes;
          if (!GetFileAttributesExW(path.c_str(), GetFileExInfoStandard, &attributes))
             return false;
@@ -140,6 +222,7 @@ namespace HM
          // then corrected, counts as fresh.
          seconds = current.QuadPart <= written.QuadPart ? 0 : (__int64) ((current.QuadPart - written.QuadPart) / 10000000ULL);
          return true;
+#endif
       }
    }
 
@@ -147,7 +230,7 @@ namespace HM
    UpdateApplyToken::Path()
    {
       String directory = UpdateDownloader::UpdatesDirectory();
-      return directory.IsEmpty() ? String() : directory + _T("\\apply-token");
+      return directory.IsEmpty() ? String() : directory + FileUtilities::PathSeparator + _T("apply-token");
    }
 
    bool

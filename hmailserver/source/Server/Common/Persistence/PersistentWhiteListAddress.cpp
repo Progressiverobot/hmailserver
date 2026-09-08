@@ -6,9 +6,9 @@
 #include "StdAfx.h"
 
 #include "PersistentWhiteListAddress.h"
-#include "..\BO\WhiteListAddress.h"
-#include "..\AntiSpam\WhiteListCache.h"
-#include "..\SQL\SQLStatement.h"
+#include "../BO/WhiteListAddress.h"
+#include "../AntiSpam/WhiteListCache.h"
+#include "../SQL/SQLStatement.h"
 #include "../SQL/IPAddressSQLHelper.h"
 
 #ifdef _DEBUG

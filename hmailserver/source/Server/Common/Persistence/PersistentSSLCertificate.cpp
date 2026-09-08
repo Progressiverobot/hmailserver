@@ -5,10 +5,10 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentSSLCertificate.h"
-#include "..\BO\SSLCertificate.h"
-#include "..\SQL\SQLStatement.h"
-#include "..\Util\Crypt.h"
+#include "./PersistentSSLCertificate.h"
+#include "../BO/SSLCertificate.h"
+#include "../SQL/SQLStatement.h"
+#include "../Util/Crypt.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

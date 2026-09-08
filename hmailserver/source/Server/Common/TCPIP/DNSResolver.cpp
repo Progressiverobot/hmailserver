@@ -7,8 +7,38 @@
 #include "DNSResolver.h"
 #include "DNSResolverWinApi.h"
 #include "DnssecResolver.h"
+#ifdef HM_PLATFORM_POSIX
+
+// iphlpapi.h and windns.h are the Windows IP helper and DNS client headers. This
+// file needs nothing at all from the first - the include predates the work that
+// moved the querying into DNSResolverWinApi - and from the second it needs only
+// the eight numbers below, which is why they are written out here rather than a
+// POSIX DNS header being reached for.
+//
+// The six resource-record types are the values assigned in RFC 1035 and RFC 3596
+// and are the same numbers on every platform and on the wire; windns.h spells them
+// DNS_TYPE_* and this build agrees with it, so DNSResolverWinApi::Query - whose
+// signature takes a plain int - is called with the identical value on both.
+//
+// The two status values are Win32 codes rather than protocol ones, and they are
+// kept because they are what the querying layer hands back: DNSResolverWinApi's
+// POSIX side reports these same numbers, so the two tests below keep meaning what
+// they say instead of silently never matching.
+
+#define DNS_TYPE_A     0x0001
+#define DNS_TYPE_CNAME 0x0005
+#define DNS_TYPE_PTR   0x000c
+#define DNS_TYPE_MX    0x000f
+#define DNS_TYPE_TEXT  0x0010
+#define DNS_TYPE_AAAA  0x001c
+
+#define DNS_ERROR_RCODE_NAME_ERROR 9003L
+#define DNS_INFO_NO_RECORDS        9501L
+
+#else
 #include <iphlpapi.h>
 #include <windns.h>
+#endif
 #include <boost/asio.hpp>
 
 #include "HostNameAndIpAddress.h"

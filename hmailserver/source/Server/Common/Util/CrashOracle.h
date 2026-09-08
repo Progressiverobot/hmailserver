@@ -31,6 +31,16 @@ namespace HM
    /// Neither hook runs on the normal code path, and neither one fires on the
    /// shipped default configuration - a healthy server raises no memory-safety
    /// exceptions and has no unhandled ones, so the marker file is never created.
+   ///
+   /// Both hooks are structured exception handling, which is a Win32 mechanism.
+   /// On a POSIX build the class keeps every one of its public members - callers
+   /// read the same on both platforms - but Install() has nothing to install, the
+   /// counters stay at zero and there is no marker file, and
+   /// LogInstallationStatus() says exactly that in the application log so that an
+   /// administrator is told rather than left to assume the server is watching
+   /// itself. The equivalent - a signal handler for the memory-safety signals and
+   /// a policy for the core dump the kernel writes - is the roadmap row "The Win32
+   /// tail".
    class CrashOracle
    {
    public:
@@ -67,6 +77,13 @@ namespace HM
    private:
       CrashOracle();
 
+#ifndef HM_PLATFORM_POSIX
+      // The private half of the oracle is the Win32 machinery itself: the two
+      // exception hooks, the watchdog thread that bounds the fatal path, and the
+      // allocation-free marker writer they share. EXCEPTION_POINTERS is the Win32
+      // record of a fault in flight and has no POSIX shape, so these are declared
+      // only where they can be defined - declaring them everywhere and defining
+      // them nowhere would just invite a caller.
       static LONG CALLBACK FirstChanceExceptionObserver_(EXCEPTION_POINTERS *exception_pointers);
       static LONG WINAPI UnhandledExceptionReporter_(EXCEPTION_POINTERS *exception_pointers);
 
@@ -77,5 +94,6 @@ namespace HM
       static void ResolveMarkerFile_();
 
       static void AppendMarkerRecord_(const char *kind, DWORD exception_code, const void *exception_address, DWORD thread_id, long event_number);
+#endif
    };
 }

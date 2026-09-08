@@ -57,9 +57,14 @@ namespace HM
       pNode->AppendAttr(_T("Name"), domain_name_);
       pNode->AppendAttr(_T("Description"), description_);
       pNode->AppendAttr(_T("TargetHost"), target_smtphost_);
-      pNode->AppendAttr(_T("TargetPort"), StringParser::IntToString(target_smtpport_));
-      pNode->AppendAttr(_T("NumberOfTries"), StringParser::IntToString(number_of_tries_));
-      pNode->AppendAttr(_T("MinutesBetweenTry"), StringParser::IntToString(minutes_between_try_));
+      // These three are longs. MSVC binds IntToString(long) to the int overload,
+      // because long and int are the same 32-bit type on Windows; clang finds int,
+      // unsigned int and __int64 all equally distant and cannot choose. The casts
+      // name the overload the Windows build already selects, and cannot lose a
+      // value that a 32-bit long could hold.
+      pNode->AppendAttr(_T("TargetPort"), StringParser::IntToString((int) target_smtpport_));
+      pNode->AppendAttr(_T("NumberOfTries"), StringParser::IntToString((int) number_of_tries_));
+      pNode->AppendAttr(_T("MinutesBetweenTry"), StringParser::IntToString((int) minutes_between_try_));
       pNode->AppendAttr(_T("ToAllAddresses"), to_all_addresses_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("RequiresAuthentication"), relayer_requires_authentication_ ? _T("1") : _T("0"));
       pNode->AppendAttr(_T("Username"), relayer_auth_username_);

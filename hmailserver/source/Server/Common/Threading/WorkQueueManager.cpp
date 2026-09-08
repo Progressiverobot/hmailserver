@@ -76,9 +76,13 @@ namespace HM
          // the branch whose entire purpose was to say "this cannot happen".
          HM_ASSERT(0);
 
+         // iQueueID is a size_t, which is unsigned __int64 on Windows and binds to
+         // that FormatArgument constructor exactly. On a 64-bit POSIX build size_t
+         // is unsigned long, which matches none of them exactly and is no closer to
+         // one than to the others. The cast is an identity on Windows.
          ErrorManager::Instance()->ReportError(ErrorManager::High, 6076, "WorkQueueManager::AddTask",
             Formatter::Format("Task {0} was discarded because work queue {1} does not exist.",
-                              pTask ? pTask->GetName() : String(_T("<null>")), iQueueID));
+                              pTask ? pTask->GetName() : String(_T("<null>")), (unsigned __int64) iQueueID));
 
          return;
       }

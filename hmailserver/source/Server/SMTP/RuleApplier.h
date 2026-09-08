@@ -10,6 +10,7 @@
 namespace HM
 {
 
+   class Account;
    class Message;
    class Rules;
    class Rule; 

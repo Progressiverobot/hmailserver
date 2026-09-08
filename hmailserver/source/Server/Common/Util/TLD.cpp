@@ -8,6 +8,7 @@
 #include "TLD.h"
 
 #include "Utilities.h"
+#include "FileUtilities.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -32,8 +33,8 @@ namespace HM
       tld_.clear();
 
       String sTLDSFile = Utilities::GetBinDirectory();
-      if (sTLDSFile.Right(1) != _T("\\"))
-         sTLDSFile += "\\";
+      if (sTLDSFile.Right(1) != FileUtilities::PathSeparator)
+         sTLDSFile += FileUtilities::PathSeparator;
       sTLDSFile += "tlds.txt";
 
 #ifdef _DEBUG

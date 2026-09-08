@@ -8,7 +8,7 @@
 #include "../hMailServer/resource.h"       // main symbols
 #include "../hMailServer/hMailServer.h"
 
-#include "../Common/bo/IncomingRelays.h"
+#include "../Common/BO/IncomingRelays.h"
 
 // InterfaceIncomingRelays
 

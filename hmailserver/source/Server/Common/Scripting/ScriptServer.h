@@ -5,7 +5,14 @@
 
 #pragma once
 
+// ScriptSite.h is the ATL Active Scripting host - <activscp.h>, <urlmon.h> and
+// IActiveScriptSite - and there is no such engine on POSIX. Only the private
+// RunInterruptible_ below names a type from it, so every caller of ScriptServer
+// can still see this header on Linux; running a script is what the roadmap
+// section "Linux and AArch64" leaves for the scripting host itself.
+#ifdef _MSC_VER
 #include "ScriptSite.h"
+#endif
 
 namespace HM
 {
@@ -70,11 +77,13 @@ namespace HM
       // the event. Must be called with state_mutex_ held, since it reads the
       // handler flags.
 
+#ifdef _MSC_VER
       bool RunInterruptible_(CComObject<CScriptSiteBasic> *pBasic);
       // Runs the script which has been added to pBasic, under a watchdog which
       // aborts execution once the configured script timeout has elapsed. A
       // timeout of zero means the administrator has disabled the limit.
       // Returns true if the watchdog had to interrupt the script.
+#endif
 
       void ReportInterruption_(const String &sContext, bool bReportError);
       // Reports that the script named by sContext was killed by the watchdog.

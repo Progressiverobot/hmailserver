@@ -8,7 +8,7 @@
 #include "Collection.h"
 
 #include "DistributionList.h"
-#include "..\Persistence\PersistentDistributionList.h"
+#include "../Persistence/PersistentDistributionList.h"
 
 namespace HM
 {

@@ -54,6 +54,46 @@ namespace HM
    static void TmConvertToStandardFormat(struct tm& tmSrc);
    static DATE DateFromDouble(double dbl);
 
+#ifdef HM_PLATFORM_POSIX
+   // FileTimeToLocalFileTime followed by FileTimeToSystemTime - the pair that both
+   // FILETIME conversions below perform - done in one step, because there is no
+   // intermediate "local FILETIME" here worth constructing.
+   //
+   // A FILETIME is a count of 100-nanosecond intervals since 1 January 1601 UTC,
+   // and 11644473600 is the number of seconds between that epoch and the Unix one,
+   // so the conversion is exact arithmetic rather than an approximation.
+   // localtime_r then does what FileTimeToSystemTime does to a local FILETIME:
+   // breaks the instant into calendar fields in the machine's own time zone.
+   //
+   // Returns false for an instant the C library will not represent, which is the
+   // same answer the Windows pair gives for a FILETIME it cannot convert, and it
+   // reaches the same "invalid" branch at each call site.
+   static bool LocalSystemTimeFromFileTime(const FILETIME &fileTime, SYSTEMTIME &out)
+   {
+      const unsigned __int64 INTERVALS_PER_SECOND = 10000000ULL;
+      const unsigned __int64 SECONDS_1601_TO_1970 = 11644473600ULL;
+
+      const unsigned __int64 intervals =
+         ((unsigned __int64) fileTime.dwHighDateTime << 32) | (unsigned __int64) fileTime.dwLowDateTime;
+
+      const unsigned __int64 seconds_since_1601 = intervals / INTERVALS_PER_SECOND;
+
+      if (seconds_since_1601 < SECONDS_1601_TO_1970)
+         return false;
+
+      const time_t unix_time = (time_t) (seconds_since_1601 - SECONDS_1601_TO_1970);
+
+      struct tm parts;
+
+      if (::localtime_r(&unix_time, &parts) == nullptr)
+         return false;
+
+      HMPlatform::FillSystemTime(&out, parts, (long) ((intervals % INTERVALS_PER_SECOND) / 10000));
+
+      return true;
+   }
+#endif
+
 
    ////////////////////////////////////////////////////////////////////////////
 
@@ -75,6 +115,13 @@ namespace HM
        dt_=dateSrc.dt_;
    }
 
+#ifndef HM_PLATFORM_POSIX
+   // A VARIANT is an OLE Automation value and reaches this class only from
+   // Server/COM, the administration API, which is not part of the POSIX build.
+   // The declarations stay in the header - naming an incomplete type in a
+   // signature is legal and is how the platform layer intends COM shapes to be
+   // carried - and it is the DEFINITIONS that are Windows-only, so a POSIX build
+   // that somehow called one would fail to link rather than run a stub.
    DateTime::DateTime(const VARIANT& varSrc)
    {
        if (varSrc.vt == VT_BSTR)
@@ -91,6 +138,7 @@ namespace HM
              SetStatus(valid);
        }
    }
+#endif
 
    DateTime::DateTime(DATE dtSrc)
    {
@@ -132,6 +180,21 @@ namespace HM
 
    DateTime::DateTime(const FILETIME& filetimeSrc)
    {
+#ifdef HM_PLATFORM_POSIX
+       // The same two steps as below, in one call. See LocalSystemTimeFromFileTime.
+       SYSTEMTIME systime;
+
+       if (!LocalSystemTimeFromFileTime(filetimeSrc, systime))
+       {
+             status_ = invalid;
+       }
+       else
+       {
+             status_ = OleDateFromTm(systime.wYear, systime.wMonth,
+                  systime.wDay, systime.wHour, systime.wMinute,
+                  systime.wSecond, dt_) ? valid : invalid;
+       }
+#else
        // Assume UTC FILETIME, so convert to LOCALTIME
        FILETIME filetimeLocal;
        if (!FileTimeToLocalFileTime( &filetimeSrc, &filetimeLocal))
@@ -152,6 +215,7 @@ namespace HM
                        systime.wSecond, dt_) ? valid : invalid;
              }
        }
+#endif
     
     
    }
@@ -251,7 +315,15 @@ namespace HM
          tmTemp.tm_year -= 1900;
          tmTemp.tm_mon -= 1;
 
+#ifdef HM_PLATFORM_POSIX
+         // timegm is the POSIX name for _mkgmtime64: the inverse of gmtime, a
+         // struct tm read as UTC rather than as local time. Called directly rather
+         // than through a shim of the Microsoft name, so that the platform layer
+         // growing one later cannot collide with it.
+         time_t rawTime = ::timegm(&tmTemp);
+#else
          time_t rawTime = _mkgmtime64(&tmTemp);
+#endif
 
          int err = GetLastError();
          if (rawTime == -1)
@@ -348,6 +420,10 @@ namespace HM
              return AFX_OLE_DATETIME_ERROR;
    }
 
+#ifndef HM_PLATFORM_POSIX
+   // Both of these speak VARIANT, which is OLE Automation and reaches this class
+   // only from Server/COM. See the note on the VARIANT constructor above: the
+   // declarations stay in the header, the definitions are Windows-only.
    VARIANT 
    DateTime::GetVariant()
    {
@@ -375,6 +451,7 @@ namespace HM
     
        return *this;
    }
+#endif
 
    const DateTime& DateTime::operator=(DATE dtSrc)
    {
@@ -424,6 +501,23 @@ namespace HM
 
    const DateTime& DateTime::operator=(const FILETIME& filetimeSrc)
    {
+#ifdef HM_PLATFORM_POSIX
+       // The same two steps as below, in one call. See LocalSystemTimeFromFileTime.
+       SYSTEMTIME systime;
+
+       if (!LocalSystemTimeFromFileTime(filetimeSrc, systime))
+       {
+             status_ = invalid;
+       }
+       else
+       {
+             status_ = OleDateFromTm(systime.wYear, systime.wMonth,
+                  systime.wDay, systime.wHour, systime.wMinute,
+                  systime.wSecond, dt_) ? valid : invalid;
+       }
+
+       return *this;
+#else
        // Assume UTC FILETIME, so convert to LOCALTIME
        FILETIME filetimeLocal;
        if (!FileTimeToLocalFileTime( &filetimeSrc, &filetimeLocal))
@@ -446,6 +540,7 @@ namespace HM
        }
     
        return *this;
+#endif
    }
 
    int DateTime::SetDateTime(int nYear, int nMonth, int nDay,
@@ -470,6 +565,14 @@ namespace HM
          SetStatus(invalid);
    }
 
+#ifndef HM_PLATFORM_POSIX
+   // VarDateFromStr is OLE Automation's locale-aware date parser, and there is no
+   // POSIX equivalent worth pretending to: what it accepts depends on an LCID, and
+   // guessing at that in a mail server would parse "01/02/03" differently on two
+   // machines. Nothing in this program calls ParseDateTime - the tree's own date
+   // parsing is Time::GetDateFromSystemDate and the RFC 2822 parsers - so it has
+   // no POSIX arm rather than a wrong one, and a POSIX build that acquired a
+   // caller would fail to link and say so.
    BOOL DateTime::ParseDateTime(LPCTSTR lpszDate, DWORD dwFlags, LCID lcid)
    {
        USES_CONVERSION;
@@ -510,6 +613,7 @@ namespace HM
        SetStatus(valid);
        return TRUE;
    }
+#endif
    ////////////////////////////////////////////////////////////////////////////
 
    // DateTime class HELPERS - implementation
@@ -896,7 +1000,14 @@ namespace HM
 
       // Fill in the buffer, disregard return value as it's not necessary
       LPTSTR lpszTemp = new TCHAR[MAX_TIME_BUFFER_SIZE];
+#ifdef HM_PLATFORM_POSIX
+      // _tcsftime is the TCHAR-generic name and this program is built UNICODE, so
+      // it IS wcsftime; called by that name here rather than through a shim, so
+      // that the platform layer growing the generic name later cannot collide.
+      ::wcsftime(lpszTemp, MAX_TIME_BUFFER_SIZE, pFormat, &tmTemp);
+#else
       _tcsftime(lpszTemp, MAX_TIME_BUFFER_SIZE, pFormat, &tmTemp);
+#endif
       strSpan=lpszTemp;
       delete [] lpszTemp;
 

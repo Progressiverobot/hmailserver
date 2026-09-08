@@ -6,38 +6,38 @@
 
 #include "stdafx.h"
 
-#include <Boost/Regex.hpp>
+#include <boost/regex.hpp>
 
-#include "../common/bo/MessageData.h"
-#include "../common/persistence/PersistentArchiveIndex.h"
+#include "../Common/BO/MessageData.h"
+#include "../Common/Persistence/PersistentArchiveIndex.h"
 
-#include "../common/Cache/CacheContainer.h"
-#include "../common/Util/PasswordValidator.h"
-#include "../common/Util/AccountLogon.h"
-#include "../common/Util/AccountLockout.h"
+#include "../Common/Cache/CacheContainer.h"
+#include "../Common/Util/PasswordValidator.h"
+#include "../Common/Util/AccountLogon.h"
+#include "../Common/Util/AccountLockout.h"
 #include "../Common/AntiSpam/QuarantineStore.h"
-#include "../common/Util/OAuth2TokenValidator.h"
-#include "../common/Util/ClientCertificateIdentity.h"
-#include "../common/Util/Crypt.h"
-#include "../common/Util/Hashing/ScramSha256.h"
-#include "../common/persistence/PersistentMessage.h"
-#include "../common/BO/Message.h"
-#include "../common/BO/SecurityRange.h"
-#include "../common/Mime/Mime.h"
-#include "../common/util/MessageUtilities.h"
-#include "../common/util/Utilities.h"
-#include "../common/util/File.h"
-#include "../common/Scripting/ClientInfo.h"
-#include "../common/AntiSpam/SpamTestResult.h"
-#include "../Common/UTil/Math.h"
-#include "../Common/UTil/SignatureAdder.h"
-#include "../common/BO/Routes.h"
-#include "../common/BO/RouteAddresses.h"
-#include "../common/BO/MessageRecipient.h"
-#include "../common/BO/MessageRecipients.h"
+#include "../Common/Util/OAuth2TokenValidator.h"
+#include "../Common/Util/ClientCertificateIdentity.h"
+#include "../Common/Util/Crypt.h"
+#include "../Common/Util/Hashing/ScramSha256.h"
+#include "../Common/Persistence/PersistentMessage.h"
+#include "../Common/BO/Message.h"
+#include "../Common/BO/SecurityRange.h"
+#include "../Common/Mime/Mime.h"
+#include "../Common/Util/MessageUtilities.h"
+#include "../Common/Util/Utilities.h"
+#include "../Common/Util/File.h"
+#include "../Common/Scripting/ClientInfo.h"
+#include "../Common/AntiSpam/SpamTestResult.h"
+#include "../Common/Util/Math.h"
+#include "../Common/Util/SignatureAdder.h"
+#include "../Common/BO/Routes.h"
+#include "../Common/BO/RouteAddresses.h"
+#include "../Common/BO/MessageRecipient.h"
+#include "../Common/BO/MessageRecipients.h"
 #include "../Common/Util/ByteBuffer.h"
 #include "../Common/Util/ServerStatus.h"
-#include "../Common/Util/AWstats.h"
+#include "../Common/Util/AWStats.h"
 #include "../Common/Util/TransparentTransmissionBuffer.h"
 #include "../Common/Application/ObjectCache.h"
 #include "../Common/Application/DefaultDomain.h"
@@ -49,12 +49,12 @@
 
 #include "../Common/BO/Collection.h"
 
-#include "../common/Threading/AsynchronousTask.h"
-#include "../common/Threading/WorkQueue.h"
+#include "../Common/Threading/AsynchronousTask.h"
+#include "../Common/Threading/WorkQueue.h"
 
 #include "../Common/TCPIP/DNSResolver.h"
 #include "../Common/TCPIP/ProxyProtocol.h"
-#include "../common/persistence/PersistentSecurityRange.h"
+#include "../Common/Persistence/PersistentSecurityRange.h"
 
 #include "../Common/AntiSpam/AntiSpamConfiguration.h"
 #include "../Common/AntiSpam/SpamProtection.h"
@@ -381,7 +381,11 @@ namespace HM
             {
                // Both user name and password in line.
                String sAuthentication;
-               String sBase64Encoded = matches[1];
+               // matches[1] is a sub_match, and reaching String from one takes two
+               // user-defined conversions - sub_match to std::wstring, std::wstring
+               // to String. Only MSVC chains those on its own; str() spends the
+               // first here so a conforming compiler has only the second to make.
+               String sBase64Encoded = matches[1].str();
                StringParser::Base64Decode(sBase64Encoded, sAuthentication);
 
                // Extract the username from the decoded string.
@@ -1887,7 +1891,7 @@ namespace HM
             else if (blocalSender1)
             {
                // First copy goes to local sender
-               sMessageArchivePath = sArchiveDir + "\\" + sSenderDomain + "\\" + sSenderName + "\\Sent-" + sFileNameExclPath;
+               sMessageArchivePath = FileUtilities::Combine(FileUtilities::Combine(FileUtilities::Combine(sArchiveDir, sSenderDomain), sSenderName), "Sent-" + sFileNameExclPath);
 
                LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local sender: " + sFromAddress1 + ". Putting in user folder: " + sMessageArchivePath);
 
@@ -1899,7 +1903,7 @@ namespace HM
                LOG_SMTP(GetSessionID(), GetIPAddressString(), "Non local sender, putting in common Inbound folder..");
 
                // First copy goes to common archive folder instead
-               sMessageArchivePath = sArchiveDir + "\\Inbound\\" + sFileNameExclPath;
+               sMessageArchivePath = FileUtilities::Combine(FileUtilities::Combine(sArchiveDir, "Inbound"), sFileNameExclPath);
 
                FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
                recordArchiveCopy(PersistentArchiveIndex::DirectionInbound, _T(""), _T(""), sMessageArchivePath);
@@ -1936,14 +1940,28 @@ namespace HM
 
                   if (bDomainIsLocal && IniFileSettings::Instance()->IsArchiveDomain(sRecipientDomain))
                   {
-                     sMessageArchivePath2 = sArchiveDir + "\\" + sRecipientDomain + "\\" + sRecipientName + "\\" + sFileNameExclPath;
+                     sMessageArchivePath2 = FileUtilities::Combine(FileUtilities::Combine(FileUtilities::Combine(sArchiveDir, sRecipientDomain), sRecipientName), sFileNameExclPath);
                      LOG_SMTP(GetSessionID(), GetIPAddressString(), "Local recipient: " + sRecipientAddress + ". Putting in user folder: " + sMessageArchivePath2);
 
                      if (bArchiveHardlinks)
                      {
-                        FileUtilities::CreateDirectory(sArchiveDir + "\\" + sRecipientDomain + "\\" + sRecipientName);
+                        FileUtilities::CreateDirectory(FileUtilities::Combine(FileUtilities::Combine(sArchiveDir, sRecipientDomain), sRecipientName));
+#ifdef HM_PLATFORM_POSIX
+                        // link(2) is what CreateHardLink is: a second directory entry
+                        // for one inode, on one filesystem, failing when the two ends
+                        // are on different volumes. POSIX names the existing file
+                        // first and answers 0 for success, so the arguments are the
+                        // other way round here and the result is a comparison. The
+                        // paths are narrowed the way the rest of the tree narrows a
+                        // String for a C API, and a failure falls through to the copy
+                        // below exactly as a failed CreateHardLink does.
+                        const AnsiString sLinkExisting = sArchiveSource.c_str();
+                        const AnsiString sLinkNew = sMessageArchivePath2.c_str();
+                        BOOL fCreatedLink = ::link(sLinkExisting.c_str(), sLinkNew.c_str()) == 0 ? TRUE : FALSE;
+#else
                         // This function call is odd in that original is 2nd anc destination is 1st..
                         BOOL fCreatedLink = CreateHardLink( sMessageArchivePath2, sArchiveSource, NULL ); // Last is reserved, must be NULL
+#endif
 
                         if ( fCreatedLink == FALSE )
                         {
@@ -1977,7 +1995,7 @@ namespace HM
             // either way as failsafe.
             LOG_SMTP(GetSessionID(), GetIPAddressString(), "Sender is NULL or invalid. Saving to Error folder.");
 
-            sMessageArchivePath = sArchiveDir + "\\Error\\" + sFileNameExclPath;
+            sMessageArchivePath = FileUtilities::Combine(FileUtilities::Combine(sArchiveDir, "Error"), sFileNameExclPath);
             FileUtilities::Copy(_messageFileName, sMessageArchivePath, true);
          }
       }

@@ -372,7 +372,7 @@ namespace HM
          // Delete folder from data directory
          if (!pDomain->GetName().IsEmpty())
          {
-            String sDomainFolder = IniFileSettings::Instance()->GetDataDirectory() + "\\" + pDomain->GetName();
+            String sDomainFolder = FileUtilities::Combine(IniFileSettings::Instance()->GetDataDirectory(), pDomain->GetName());
             FileUtilities::DeleteDirectory(sDomainFolder, false);
 
             // The domain's Sieve tree lives outside that directory, so it survived

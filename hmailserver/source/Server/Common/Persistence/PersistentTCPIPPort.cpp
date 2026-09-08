@@ -5,9 +5,9 @@
 
 #include "StdAfx.h"
 
-#include ".\PersistentTCPIPPort.h"
-#include "..\BO\TCPIPPort.h"
-#include "..\SQL\SQLStatement.h"
+#include "./PersistentTCPIPPort.h"
+#include "../BO/TCPIPPort.h"
+#include "../SQL/SQLStatement.h"
 #include "../SQL/IPAddressSQLHelper.h"
 
 #include "../Persistence/PersistenceMode.h"

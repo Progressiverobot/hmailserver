@@ -23,6 +23,7 @@ namespace HM
 
    }
 
+#ifndef HM_PLATFORM_POSIX
    LONG WINAPI ExceptionFilterWithLogging(EXCEPTION_POINTERS* pExp, DWORD dwExpCode)
    {
       // if an error occurs when shutting down, we want to log it completely before
@@ -37,11 +38,31 @@ namespace HM
 
       return EXCEPTION_EXECUTE_HANDLER;
    }
+#endif
    
    
    bool
    ExceptionHandler::Run(const String &descriptive_name, boost::function<void()>& func)
    {
+#ifdef HM_PLATFORM_POSIX
+      // The C++ half of this function is unchanged; the hardware half is absent
+      // rather than stubbed, and that is the whole of the difference.
+      //
+      // __try/__except is an MSVC extension, and there is no POSIX equivalent to
+      // guard a call with: a fault arrives here as a signal, not as something a
+      // filter expression can inspect and swallow. So an exception thrown by the
+      // task is still caught, reported and rethrown by RunWithStandardExceptions
+      // exactly as it is on Windows, and an access violation or a divide by zero
+      // ends the process instead of being logged and turned into a false return.
+      // That is not a silent no-op - a false return on Windows means "the task
+      // faulted and the fault has been recorded", and here a task that faults does
+      // not return at all - and an administrator is told once at start-up by
+      // CrashOracle::LogInstallationStatus rather than being left to assume the
+      // server is catching its own faults. Closing the gap needs a signal handler
+      // and a core-dump policy, which is the roadmap row "The Win32 tail".
+      RunWithStandardExceptions(descriptive_name, func);
+      return true;
+#else
       __try
       {
          RunWithStandardExceptions(descriptive_name, func);
@@ -52,6 +73,7 @@ namespace HM
          // this has been logged in the exception filter.
          return false;
       }   
+#endif
    }
 
    void

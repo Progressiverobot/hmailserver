@@ -75,7 +75,11 @@ namespace HM
 
    private:
 
-      static long running_scanners_;
+      // LONG, not long, because every access below goes through the interlocked
+      // family and that family's argument is LONG. The two are the same type on
+      // Windows; on a 64-bit POSIX build long is twice as wide, and a counter of
+      // that width could not be handed to the atomic that guards it.
+      static LONG running_scanners_;
 
       // Only VirusScannerAutoCount may take and give back slots, so that the
       // increment and the decrement can never get out of step again.

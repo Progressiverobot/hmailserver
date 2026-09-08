@@ -21,6 +21,49 @@
 
 namespace HM
 {
+namespace
+{
+   // The artefact THIS server could install, by the name the release flow gives it.
+   //
+   // A Windows server wants the installer; a Linux one wants the package its own
+   // package manager understands, and the architecture is part of the name because
+   // one release carries both. A platform with no artefact returns an empty name,
+   // which reads through the rest of this file as "there is nothing here for us" -
+   // the check still reports the version, and the download simply has nothing to
+   // fetch, which is the truth rather than a failure.
+   std::string PlatformInstallerName_(const std::string &tag)
+   {
+#if defined(HM_PLATFORM_POSIX)
+   #if defined(__aarch64__)
+      const std::string debianArchitecture = "arm64";
+      const std::string rpmArchitecture = "aarch64";
+   #elif defined(__x86_64__)
+      const std::string debianArchitecture = "amd64";
+      const std::string rpmArchitecture = "x86_64";
+   #else
+      const std::string debianArchitecture;
+      const std::string rpmArchitecture;
+   #endif
+
+      if (debianArchitecture.empty())
+         return std::string();
+
+      // Which of the two this machine wants is decided by what is installed, not by
+      // a build-time guess: the same binary runs on Debian and on Fedora.
+      if (access("/usr/bin/dpkg", X_OK) == 0)
+         return "hmailserver_" + tag + "_" + debianArchitecture + ".deb";
+      if (access("/usr/bin/rpm", X_OK) == 0)
+         return "hmailserver-" + tag + "-1." + rpmArchitecture + ".rpm";
+
+      // Arch builds from the PKGBUILD and an AppImage is a try-it-out artefact, so
+      // neither is something this server should hand to an unattended apply.
+      return std::string();
+#else
+      return "hMailServer-" + tag + "-x64.exe";
+#endif
+   }
+}
+
    namespace
    {
       const char *STABLE_FEED = "https://api.github.com/repos/Progressiverobot/hmailserver/releases/latest";
@@ -422,10 +465,15 @@ namespace HM
       release.draft = value.GetBool("draft");
       release.prerelease = value.GetBool("prerelease");
 
-      // The installer is the one asset the update can use, and it is named by the
-      // release flow: hMailServer-<version>-x64.exe, with its Sigstore bundle beside
-      // it under the same name and .cosign.bundle.
-      std::string installerName = "hMailServer-" + tag + "-x64.exe";
+      // One release carries a separate artefact for every platform it supports, all
+      // at the same version. A server looks for the one it could actually install:
+      // the Windows installer here, the package this distribution and architecture
+      // uses there. Every one has its Sigstore bundle beside it under the same name
+      // and .cosign.bundle, so the verification is identical whichever was chosen.
+      //
+      // The names are the release flow's, not a guess: RELEASE.md fixes them and
+      // sign-release.yml checks the Windows one on every release.
+      std::string installerName = PlatformInstallerName_(tag);
       std::string bundleName = installerName + ".cosign.bundle";
 
       const JsonValue *assets = value.Get("assets");

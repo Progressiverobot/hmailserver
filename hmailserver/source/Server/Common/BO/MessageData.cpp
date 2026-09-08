@@ -119,7 +119,7 @@ namespace HM
          {
             String sFileNameExclPath = FileUtilities::GetFileNameFromFullPath(message_file_name_);
 
-            String sMessageBackupPath = IniFileSettings::Instance()->GetLogDirectory() + "\\Problematic messages\\" + sFileNameExclPath;
+            String sMessageBackupPath = FileUtilities::Combine(FileUtilities::Combine(IniFileSettings::Instance()->GetLogDirectory(), "Problematic messages"), sFileNameExclPath);
             FileUtilities::Copy(message_file_name_, sMessageBackupPath, true);
 
             String sErrorMessage;

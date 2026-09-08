@@ -14,7 +14,7 @@
 
 #include "../Application/TimeoutCalculator.h"
 
-#include <Boost/Regex.hpp>
+#include <boost/regex.hpp>
 #include <functional>
 using namespace boost;
 

@@ -6,7 +6,7 @@
 
 #include "stdafx.h"
 
-#include ".\comerror.h"
+#include "./COMError.h"
 
 COMError::COMError(void)
 {

@@ -8,8 +8,8 @@
 
 #include "Backup.h"
 
-#include "..\Util\Compression.h"
-#include "..\Util\Utilities.h"
+#include "../Util/Compression.h"
+#include "../Util/Utilities.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

@@ -8,9 +8,20 @@
 
 #include "Encoding/Base64.h"
 
+#ifdef HM_PLATFORM_POSIX
+
+// DPAPI - CryptProtectData and the machine key it derives - is a Windows facility
+// with no POSIX counterpart, so the three headers below are not read on this
+// platform and the two entry points refuse rather than pretend. What would replace
+// them is the roadmap row "Stored secrets on a machine with no DPAPI"; until that is
+// written, this build must not be able to WRITE a secret that nothing here could
+// ever read back, which is exactly what a silently succeeding Protect would arrange.
+
+#else
 #include <windows.h>
 #include <wincrypt.h>
 #include <dpapi.h>
+#endif
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -23,6 +34,16 @@ namespace HM
    DataProtector::Protect(const AnsiString &plainText, AnsiString &protectedBase64)
    {
       protectedBase64 = "";
+#ifdef HM_PLATFORM_POSIX
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 6400, "DataProtector::Protect",
+         "This build has no secret store: DPAPI is a Windows facility and nothing has been "
+         "written to replace it yet, so the value was NOT protected and has NOT been stored. "
+         "See the roadmap row \"Stored secrets on a machine with no DPAPI\".");
+
+      return false;
+
+#else
 
       DATA_BLOB input;
       input.pbData = reinterpret_cast<BYTE*>(const_cast<char*>(plainText.c_str()));
@@ -44,12 +65,23 @@ namespace HM
          LocalFree(output.pbData);
 
       return true;
+#endif
    }
 
    bool
    DataProtector::Unprotect(const AnsiString &protectedBase64, AnsiString &plainText)
    {
       plainText = "";
+#ifdef HM_PLATFORM_POSIX
+
+      ErrorManager::Instance()->ReportError(ErrorManager::High, 6401, "DataProtector::Unprotect",
+         "A protected secret was found but this build cannot read it: DPAPI is a Windows "
+         "facility and nothing has been written to replace it yet. The secret is intact on "
+         "disk; it is this build that cannot open it.");
+
+      return false;
+
+#else
 
       AnsiString raw = Base64::Decode(protectedBase64.c_str(), protectedBase64.GetLength());
       if (raw.GetLength() == 0)
@@ -72,11 +104,24 @@ namespace HM
          LocalFree(output.pbData);
 
       return true;
+#endif
    }
 
    void
    DataProtectorTester::Test()
    {
+#ifdef HM_PLATFORM_POSIX
+
+      // There is nothing to round-trip: Protect refuses on this platform, so a test
+      // that ran would only re-prove that. It is reported rather than skipped in
+      // silence, because a self-test that quietly does nothing is indistinguishable
+      // from one that passed.
+      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6402, "DataProtectorTester::Test",
+         "The DPAPI round-trip self-test did not run: this build has no secret store.");
+
+      return;
+
+#else
       // Round-trip a secret and prove the protected form is neither the plaintext
       // nor trivially recoverable without DPAPI.
       const AnsiString secret = "S3cr3t-DB-p@ssw0rd \xC3\xA4\xC3\xB6"; // includes UTF-8 bytes
@@ -113,5 +158,6 @@ namespace HM
          if (shouldFail == secret)
             throw 0;
       }
+#endif
    }
 }

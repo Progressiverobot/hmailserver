@@ -24,8 +24,15 @@ namespace HM
       
       void Disconnect();
 
-      bool Execute(const SQLStatement &statement, __int64 *iInsertID = 0, int iIgnoreErrors = 0, String &sErrorMessage = String(_T("")));
-      bool Execute(const SQLCommand &command, __int64 *iInsertID = 0, int iIgnoreErrors = 0, String &sErrorMessage = String(_T("")));
+      // Four overloads rather than two with a defaulted reference. The default
+      // used to be String(_T("")) - a temporary bound to a non-const reference,
+      // which MSVC accepts as an extension and every conforming compiler
+      // refuses. The pair without the parameter discards the message exactly as
+      // the temporary did, and every existing call site still resolves.
+      bool Execute(const SQLStatement &statement, __int64 *iInsertID = 0, int iIgnoreErrors = 0);
+      bool Execute(const SQLStatement &statement, __int64 *iInsertID, int iIgnoreErrors, String &sErrorMessage);
+      bool Execute(const SQLCommand &command, __int64 *iInsertID = 0, int iIgnoreErrors = 0);
+      bool Execute(const SQLCommand &command, __int64 *iInsertID, int iIgnoreErrors, String &sErrorMessage);
       
       std::shared_ptr<DALRecordset> OpenRecordset(const SQLStatement &statement);
       std::shared_ptr<DALRecordset> OpenRecordset(const SQLCommand &command);

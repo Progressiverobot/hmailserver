@@ -7,8 +7,8 @@
 
 #include "InterfaceBlockedSender.h"
 
-#include "..\Common\Persistence\PersistentBlockedSender.h"
-#include "..\Common\BO\BlockedSender.h"
+#include "../Common/Persistence/PersistentBlockedSender.h"
+#include "../Common/BO/BlockedSender.h"
 
 // InterfaceBlockedSender
 

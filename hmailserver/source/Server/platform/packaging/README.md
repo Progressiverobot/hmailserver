@@ -43,7 +43,7 @@ Debian and Ubuntu:
 ```sh
 sudo apt install cmake ninja-build clang \
      libssl-dev zlib1g-dev libpq-dev \
-     libboost-thread-dev libboost-filesystem-dev libboost-regex-dev \
+     libboost-thread-dev libboost-chrono-dev libboost-filesystem-dev libboost-regex-dev \
      rpm file
 ```
 
@@ -55,10 +55,10 @@ sudo dnf install cmake ninja-build clang \
      rpm-build dpkg
 ```
 
-`clang` is not a preference. `Common/Util/StdString.h` calls members of its own
-dependent base without `this->`, which only MSVC and clang's
-`-fdelayed-template-parsing` accept; the CMakeLists warns and the build then fails
-in that header under GCC. Making that header conforming is its own roadmap row.
+`clang` is a preference and not a requirement: GCC 13 and later builds the same
+tree (`export CC=gcc CXX=g++`), and the CI matrix builds with both. An earlier
+version of this page said GCC could not compile `Common/Util/StdString.h`; that
+was believed rather than measured, and measurement said otherwise.
 
 `rpm`/`rpm-build` and `dpkg` are only needed to produce the *other* distribution's
 package: CPack builds both generators from one tree.
@@ -97,10 +97,12 @@ cpack -G DEB
 cpack -G RPM
 ```
 
-The files land in the build directory as `hmailserver_6.2.28-1_amd64.deb` and
+The files land in the build directory as `hmailserver_6.2.28_amd64.deb` and
 `hmailserver-6.2.28-1.x86_64.rpm`, or their `arm64`/`aarch64` equivalents - the
 CMakeLists picks the architecture name each packager uses from
-`CMAKE_SYSTEM_PROCESSOR`.
+`CMAKE_SYSTEM_PROCESSOR`. The names are the ones the server's update checker
+builds for its own platform and matches exactly on the release page, so they are
+uploaded as they are and never tidied; RELEASE.md has the step.
 
 ### Arch
 
@@ -162,7 +164,7 @@ an error to the log every second until somebody notices.
 **1. Install the package.**
 
 ```sh
-sudo apt install ./hmailserver_6.2.28-1_amd64.deb      # or
+sudo apt install ./hmailserver_6.2.28_amd64.deb      # or
 sudo dnf install ./hmailserver-6.2.28-1.x86_64.rpm
 ```
 
@@ -171,39 +173,55 @@ opens `libmariadb.so.3` with `dlopen` at run time rather than linking it, so no
 package manager will pull it in: `libmariadb3` on Debian and Ubuntu,
 `mariadb-connector-c` on Fedora and RHEL, `mariadb-libs` on Arch.
 
-**2. Create the database and its user.** PostgreSQL:
+**2. Create the database user, and either let it create the database or create
+the database for it.** PostgreSQL:
 
 ```sh
-sudo -u postgres createuser --pwprompt hmailserver
-sudo -u postgres createdb --owner hmailserver hmailserver
+sudo -u postgres createuser --pwprompt --createdb hmailserver     # step 4b creates the database, or
+sudo -u postgres createuser --pwprompt hmailserver                # the tidier policy: no CREATEDB, and
+sudo -u postgres createdb --owner hmailserver hmailserver         # step 4b fills the empty database
 ```
 
-**3. Create the schema.** Nothing does this for you on this platform - `DBSetup`
-is a Windows tool, and the server has no `--create-database` yet.
-
-```sh
-psql -h localhost -U hmailserver -d hmailserver \
-     -f /usr/share/hmailserver/DBScripts/CreateTablesPGSQL.sql
-```
-
-For MySQL or MariaDB the script is `CreateTablesMySQL.sql` and the command is
-`mysql -h localhost -u hmailserver -p hmailserver < ...`.
-
-**4. Edit the configuration.**
+**3. Edit the configuration.**
 
 ```sh
 sudoedit /etc/hmailserver/hMailServer.ini
 ```
 
-Three things have to change, and the file has a paragraph on each:
+Two things have to change, and the file has a paragraph on each:
 
 * `[Database] Type` - `PostgreSQL` or `MySQL`.
 * `[Database] Server`, `Database`, `Username`, `Password` and `Port`. `Port` has
   to be written out (`5432`, `3306`); it is put into the connection string as it
   stands and there is no useful default.
-* `[Security] AdministratorPassword` - the password itself. Nothing on this
-  platform hashes it for you, which is the reason this file is `0640` and owned
-  by root.
+
+Leave `[Security] AdministratorPassword` alone; the next step writes it.
+
+**4. Set the administrator password.** It is read from standard input with echo
+off, hashed with PBKDF2 exactly as the Control Panel hashes it on Windows, and
+written to the file. The file is `0640` and owned by root, so this runs as root:
+
+```sh
+sudo hmailserver --set-admin-password
+```
+
+**4b. Create the schema.** `DBSetup` is a Windows tool; on this platform the
+server does the same work itself. `--create-database` connects to the server
+`[Database]` names with no database selected, creates the database in the
+backend's own dialect, and runs the create script for its type:
+
+```sh
+sudo -u hmailserver hmailserver --create-database
+```
+
+An existing empty database is used as it is; one that already holds an
+hMailServer schema is refused with its version, because the create script must
+not run over it. If the database already exists and is older than this build,
+`--upgrade-database` runs every upgrade script from its version to this one, in
+order, and refuses a database from a newer build. The package's post-install
+step runs it on upgrade; it is safe to run by hand and reports "nothing to do"
+when there is nothing to do. Both commands refuse the two Windows-only backends
+by name.
 
 **5. Check it before starting anything.**
 
@@ -232,34 +250,54 @@ setting is a Windows inheritance; on this platform it means syslog.
 **7. Administration.** There is no Control Panel here and no COM. Turn on the REST
 API in the configuration (`RestApiPort`, and `RestApiBindAddress=127.0.0.1` unless
 you also set a certificate and key), reload with `sudo systemctl reload
-hmailserver`, and it authenticates as `administrator` with the password from step
+hmailserver`, and it authenticates as `Administrator` with the password from step
 4. Reloading stops and restarts the listeners inside the running process, so do it
-when nothing is mid-delivery.
+when nothing is mid-delivery. Accounts under a domain are created over
+`POST /api/v1/domains/{domain}/accounts`; **no route creates the domain itself
+yet** - that is the roadmap's *Administration without COM* row - so the first
+domain is an `INSERT INTO hm_domains` for now, and the row says so.
 
-## What these packages do not do yet
+**Proven, 8 September 2026.** Against PostgreSQL 18: `--create-database` built
+the schema, the server started and opened its SMTP, POP3, IMAP and REST
+listeners, an account was created over the REST API, a message submitted over
+SMTP with authentication was delivered, and the same message was read back over
+IMAP with its subject intact.
 
-Stated here rather than discovered later.
+## What the packaging pass found, and fixed
 
-* **The configuration is not marked as a conffile.** CPack's DEB generator does not
-  write a `conffiles` control file and its RPM generator does not mark anything
-  `%config(noreplace)`, so an **upgrade replaces `/etc/hmailserver/hMailServer.ini`
-  and your database credentials with it**. Keep a copy until the CMakeLists names a
-  `conffiles` file in `CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA` and a
-  `CPACK_RPM_USER_FILELIST` entry for it. The Arch package does not have this
-  problem - its `backup=` array is exactly this mechanism.
-* **`tlds.txt` and `dh2048.pem` are not installed.** Both are read from the
-  directory the executable is in - `/usr/bin` for a package install - and both live
-  in `hmailserver/installation/Extras` with no install rule pointing at them. Until
-  there is one, `TLD::Initialize` reports error 4335 and `SslContextInitializer`
-  reports a critical 5603 for every TLS context. Copy them to `/usr/bin` by hand as
-  a stopgap.
-* **The RPM has no `%postun`.** `CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE` is not set,
-  so after `rpm -e` the unit file is gone without a `systemctl daemon-reload`
-  having been run. Harmless, and one `daemon-reload` fixes it.
-* **Path separators are still backslashes.** The roadmap row *Paths and case* is
-  open: about a hundred path joins in the server are literal `\`, so some files -
-  the log files among them - are created with a backslash in the name rather than
-  in the directory the configuration names. The layout above is what the packages
-  arrange and what the code will produce when that row lands.
-* **Nothing here is signed yet.** The roadmap asks for the same Sigstore flow the
-  Windows installer gets, and for the update checker to learn these artefact names.
+Each of these would have shipped a broken package, and each is fixed in the
+CMakeLists rather than worked around here. Kept as a record of what to check
+when the packaging changes.
+
+* **The configuration was not a conffile.** An upgrade replaced
+  `/etc/hmailserver/hMailServer.ini`, database credentials and all. The
+  CMakeLists now generates a `conffiles` control file for the `.deb` and marks
+  the file `%config(noreplace)` in the `.rpm`; the Arch package's `backup=`
+  array was already this mechanism.
+* **`tlds.txt` and `dh2048.pem` were not installed.** Both are read from the
+  directory the executable is in, and without the second
+  `SslContextInitializer` reports a critical 5603 for every TLS context. Both
+  are installed beside the binary from `hmailserver/installation/Extras`.
+* **The RPM had no `%postun`.** `rpm/postun` runs `systemctl daemon-reload`.
+* **The configuration landed in `/usr/etc`.** CPack prefixes a relative
+  `sysconfdir` with the packaging prefix; the install rules write `/etc`
+  absolutely.
+* **Every maintainer script would have shipped with CRLF** - `.gitattributes`
+  forces it on the whole repository - and failed on the user's machine as
+  `bad interpreter: /bin/sh^M`. This directory and `build/*.sh` have an
+  `eol=lf` exception.
+* **Paths were joined with a written backslash** in ninety-four places, so the
+  first start wrote its log to a file called `Logs\hmailserver_....log` in the
+  parent directory and delivery could not create a mailbox. Every join goes
+  through `FileUtilities::Combine` and `PathSeparator` now, which is `/` here.
+
+## What is still owed
+
+* **The AArch64 packages have not been built on real hardware.** The
+  cross-compile census reads 496/496 and the workflow has an `ubuntu-24.04-arm`
+  job that packages; its first run is what turns that into a proof.
+* **The PKGBUILD has not been exercised**; that needs an Arch machine.
+* **MySQL and MariaDB are compiled in and not yet proven live** the way
+  PostgreSQL is; the roadmap's database row says so.
+* **The service does not reopen its log on a signal**, which is why the
+  logrotate rule uses `copytruncate`.

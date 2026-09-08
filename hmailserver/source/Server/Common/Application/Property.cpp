@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
-#include "property.h"
+#include "Property.h"
 #include "../Util/Crypt.h"
 
 #ifdef _DEBUG
@@ -85,13 +85,20 @@ namespace HM
       {
          SQLCommand command("insert into hm_settings (settingname, settingstring, settinginteger) values (@SETTINGNAME, '', @SETTINGINTEGER)");
          command.AddParameter("@SETTINGNAME", name_);
-         command.AddParameter("@SETTINGINTEGER", lValue);
+         // lValue is a long. AddParameter is overloaded on int, unsigned int and
+         // __int64, and the overload decides the type of the SQL parameter that is
+         // bound, so the choice is not cosmetic. MSVC binds a long to the int overload,
+         // because long and int are the same 32-bit type on Windows; clang finds all
+         // three equally distant. The cast names the overload Windows already selects.
+         command.AddParameter("@SETTINGINTEGER", (int) lValue);
 
          return Application::Instance()->GetDBManager()->Execute(command);
       }
 
       SQLCommand command("update hm_settings set settinginteger = @SETTINGINTEGER where settingname = @SETTINGNAME");
-      command.AddParameter("@SETTINGINTEGER", lValue);
+      // As above, the cast names the int overload of AddParameter, which is the one
+      // MSVC binds a long to and so the SQL parameter type this has always used.
+      command.AddParameter("@SETTINGINTEGER", (int) lValue);
       command.AddParameter("@SETTINGNAME", name_);
 
       return Application::Instance()->GetDBManager()->Execute(command);

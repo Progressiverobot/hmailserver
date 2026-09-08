@@ -67,6 +67,19 @@ namespace HM
                      uint32_t memoryKiB, uint32_t timeCost, uint32_t parallelism,
                      unsigned char *out, size_t outLen)
       {
+#if OPENSSL_VERSION_NUMBER < 0x30200000L
+         // The Argon2 KDF and its OSSL_KDF_PARAM_ARGON2_* names arrived in OpenSSL
+         // 3.2. A build against 3.0 has neither, so this cannot even be spelled;
+         // Argon2idAvailable() is false on such a build and every caller asks it
+         // first. Reported here too, because a caller that did not ask would
+         // otherwise see a bare false.
+         (void) password; (void) salt; (void) saltLen; (void) memoryKiB; (void) timeCost;
+         (void) parallelism; (void) out; (void) outLen;
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5605, "HashCreator::DeriveArgon2id",
+            "This build's OpenSSL (" OPENSSL_VERSION_TEXT ") has no Argon2id KDF; OpenSSL 3.2 or later has it. "
+            "No Argon2id hash can be produced or checked by this build.");
+         return false;
+#else
          EVP_KDF *kdf = EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr);
          if (kdf == nullptr)
             return false;
@@ -95,7 +108,28 @@ namespace HM
          EVP_KDF_CTX_free(kctx);
 
          return rc == 1;
+#endif
       }
+   }
+
+   bool
+   HashCreator::Argon2idAvailable()
+   {
+#if OPENSSL_VERSION_NUMBER < 0x30200000L
+      return false;
+#else
+      // Asked of the library rather than the headers, because a 3.2 built with
+      // the KDF disabled is a thing a distribution can ship.
+      static const bool available = []
+      {
+         EVP_KDF *kdf = EVP_KDF_fetch(nullptr, "ARGON2ID", nullptr);
+         if (kdf == nullptr)
+            return false;
+         EVP_KDF_free(kdf);
+         return true;
+      }();
+      return available;
+#endif
    }
 
    HashCreator::HashCreator(HashCreator::HashType hashType) :
@@ -400,6 +434,15 @@ namespace HM
       if (!IsArgon2idHash(storedHash))
          return false;
 
+      if (!Argon2idAvailable())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5606, "HashCreator::ValidateArgon2id",
+            "A stored Argon2id password hash cannot be checked: this build's OpenSSL (" OPENSSL_VERSION_TEXT
+            ") has no Argon2id KDF. The logon is refused. Either run a build against OpenSSL 3.2 or later, "
+            "or have the account's password set again so it is stored under PreferredHashAlgorithm.");
+         return false;
+      }
+
       // Format: $a2$<memory-KiB>$<time-cost>$<parallelism>$<salt-hex>$<key-hex>
       std::vector<AnsiString> parts = StringParser::SplitString(storedHash, "$");
       // SplitString on "$a2$..." yields: "", "a2", memory, time, parallelism, salt, key
@@ -546,8 +589,13 @@ namespace HM
       if (pbkdf2Hash == pbkdf2Hash2)
          throw 0;
 
-      // Argon2id round-trip.
-      AnsiString argon2Hash = HashCreator::GenerateArgon2id("The quick brown fox jumps over the lazy dog");
+      // Argon2id round-trip - on a build whose OpenSSL has the KDF. On one that
+      // does not, the absence is reported once here rather than thrown as a
+      // self-test failure, since the startup clamp has already said so.
+      AnsiString argon2Hash;
+      if (HashCreator::Argon2idAvailable())
+      {
+      argon2Hash = HashCreator::GenerateArgon2id("The quick brown fox jumps over the lazy dog");
       if (!HashCreator::IsArgon2idHash(argon2Hash))
          throw 0;
       if (!HashCreator::ValidateArgon2id("The quick brown fox jumps over the lazy dog", argon2Hash))
@@ -559,6 +607,7 @@ namespace HM
       AnsiString argon2Hash2 = HashCreator::GenerateArgon2id("The quick brown fox jumps over the lazy dog");
       if (argon2Hash == argon2Hash2)
          throw 0;
+      }
 
       // The PBKDF2 and Argon2id schemes must not be confused for one another.
       if (HashCreator::IsArgon2idHash(pbkdf2Hash))
@@ -573,7 +622,7 @@ namespace HM
       // A hash derived under the current work factors is never asked to be re-derived,
       // a cheaper one is, and a costlier one is not (lowering a setting is not a
       // downgrade of what is already stored).
-      if (HashCreator::NeedsRehash(pbkdf2Hash) || HashCreator::NeedsRehash(argon2Hash))
+      if (HashCreator::NeedsRehash(pbkdf2Hash) || (HashCreator::Argon2idAvailable() && HashCreator::NeedsRehash(argon2Hash)))
          throw 0;
       if (!HashCreator::NeedsRehash("$h1$1000$00$00"))
          throw 0;

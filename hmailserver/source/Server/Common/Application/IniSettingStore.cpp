@@ -10,6 +10,15 @@
 #include "../SQL/DALRecordset.h"
 #include "../Util/XMLite.h"
 
+// The Win32 profile API - GetPrivateProfileString and the three calls beside
+// it - lives in kernel32 and has no POSIX equivalent, so the POSIX build
+// declares those four functions here and implements them over the INI file
+// itself in Common/Util/IniFile.cpp. The Windows build never reaches this line
+// and binds the same calls to <windows.h> as it always has.
+#ifdef HM_PLATFORM_POSIX
+#include "../Util/IniFile.h"
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW

@@ -27,6 +27,34 @@ namespace HM
    bool
    Registry::GetStringValue(HKEY hive, String key, String valueName, String &value)
    {
+#ifdef HM_PLATFORM_POSIX
+      // There is no registry here, and nothing on this platform is the registry
+      // under another name: the configuration this class reaches for on Windows -
+      // an installation path written by the installer, a value another product
+      // left behind - lives in files on a POSIX machine and is found by a path
+      // rather than by a hive and a key. So the answer is a refusal rather than an
+      // empty string, because an empty string out of this function is
+      // indistinguishable from a value that is genuinely empty, and a caller
+      // reading the second would carry on with a setting it never obtained.
+      //
+      // Reported as well as refused. Nothing in the tree calls this today, which
+      // is why the refusal is written rather than the whole file guarded away: the
+      // day something does, the log says which key was asked for and that this
+      // build could not go and look.
+      // The hive is a Windows HKEY and there is nothing here to name it against,
+      // so it is not part of the message; referenced so that a build with warnings
+      // as errors does not fail on it.
+      (void) hive;
+
+      value.Empty();
+
+      ErrorManager::Instance()->ReportError(ErrorManager::Medium, 6407, "Registry::GetStringValue",
+         Formatter::Format(_T("A registry value was asked for and this build has no registry to read it from: ")
+            _T("key '{0}', value '{1}'. The Windows registry is a Windows facility and there is no POSIX ")
+            _T("equivalent to read instead. Whatever needed this setting has NOT been given one."), key, valueName));
+
+      return false;
+#else
      /* HKEY   hkey; 
       DWORD  dwDisposition; 
       LONG result = RegCreateKeyEx(HKEY_CURRENT_USER, TEXT("Software"),  
@@ -55,6 +83,7 @@ namespace HM
          return false;
 
       return true;
+#endif
    }
 
 

@@ -11,7 +11,7 @@
 #include "Canonicalization.h"
 
 #include "../../BO/Message.h"
-#include "../../MIME/Mime.h"
+#include "../../Mime/Mime.h"
 #include "../../Persistence/PersistentMessage.h"
 #include "../../TCPIP/DNSResolver.h"
 #include "../../Util/TraceHeaderWriter.h"

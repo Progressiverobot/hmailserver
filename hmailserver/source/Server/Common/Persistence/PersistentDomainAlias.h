@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "PersistenceMode.h"
+
 namespace HM
 {
    class DomainAlias;
-   enum PersistenceMode;
 
    class PersistentDomainAlias
    {

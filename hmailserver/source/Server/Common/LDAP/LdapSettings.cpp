@@ -7,6 +7,15 @@
 
 #include <ctime>
 
+// The Win32 profile API - GetPrivateProfileString and the three calls beside
+// it - lives in kernel32 and has no POSIX equivalent, so the POSIX build
+// declares those four functions here and implements them over the INI file
+// itself in Common/Util/IniFile.cpp. The Windows build never reaches this line
+// and binds the same calls to <windows.h> as it always has.
+#ifdef HM_PLATFORM_POSIX
+#include "../Util/IniFile.h"
+#endif
+
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
 #define new DEBUG_NEW
@@ -208,12 +217,28 @@ namespace HM
       String iniFile = IniFileSettings::GetInitializationFile();
 
       ULONGLONG writeTime = 0;
+#ifdef HM_PLATFORM_POSIX
+      // The value is only ever compared for equality further down - it is a change
+      // token for the ini file, not a date - so what matters is that it moves when
+      // the file is written, not what it counts from. st_mtim carries the seconds
+      // and the nanoseconds of the last write, which changes at least as readily
+      // as the Windows file time the branch below packs into the same variable,
+      // and a file that cannot be stat'ed leaves the token at zero exactly as a
+      // failed GetFileAttributesEx does.
+      struct stat attributes;
+      if (::stat(AnsiString(iniFile).c_str(), &attributes) == 0)
+      {
+         writeTime = (ULONGLONG) attributes.st_mtim.tv_sec * 1000000000ULL +
+                     (ULONGLONG) attributes.st_mtim.tv_nsec;
+      }
+#else
       WIN32_FILE_ATTRIBUTE_DATA attributes = {};
       if (GetFileAttributesEx(iniFile.c_str(), GetFileExInfoStandard, &attributes))
       {
          writeTime = ((ULONGLONG) attributes.ftLastWriteTime.dwHighDateTime << 32) |
                      (ULONGLONG) attributes.ftLastWriteTime.dwLowDateTime;
       }
+#endif
 
       {
          boost::lock_guard<boost::mutex> guard(settings_mutex_);

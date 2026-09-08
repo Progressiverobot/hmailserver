@@ -9,14 +9,14 @@
 #include "PersistentRuleCriteria.h"
 #include "PersistentRuleAction.h"
 
-#include "..\BO\Rule.h"
+#include "../BO/Rule.h"
 
-#include "..\BO\RuleActions.h"
-#include "..\BO\RuleAction.h"
-#include "..\BO\RuleCriterias.h"
-#include "..\BO\RuleCriteria.h"
+#include "../BO/RuleActions.h"
+#include "../BO/RuleAction.h"
+#include "../BO/RuleCriterias.h"
+#include "../BO/RuleCriteria.h"
 
-#include "..\Application\ObjectCache.h"
+#include "../Application/ObjectCache.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)

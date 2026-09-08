@@ -100,7 +100,20 @@ and, when it reads back what you meant:
 
 MESSAGE
 else
-   # An upgrade. try-restart puts the new binary into service if the old one was
+   # An upgrade. The server runs its own schema upgrade first - every upgrade
+   # script from the database's version to this build's, in order, as the
+   # service user - but only where a database has been configured, and a
+   # failure is reported rather than failing the package, because the binary is
+   # already in place and the server's own log is the better place to read why.
+   if grep -q '^Type=[A-Za-z]' /etc/hmailserver/hMailServer.ini 2>/dev/null; then
+      if ! runuser -u hmailserver -- /usr/bin/hmailserver --upgrade-database; then
+         echo "hmailserver: the database schema was not upgraded; run" >&2
+         echo "   sudo -u hmailserver hmailserver --upgrade-database" >&2
+         echo "and read what it says before starting the service." >&2
+      fi
+   fi
+
+   # try-restart puts the new binary into service if the old one was
    # running and does nothing at all if it was not - so an installation that was
    # never configured stays stopped, and one that was configured does not silently
    # keep running the version that has just been replaced.

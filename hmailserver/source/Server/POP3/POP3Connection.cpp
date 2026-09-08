@@ -5,20 +5,20 @@
 
 #include "stdafx.h"
 
-#include "../common/BO/Account.h"
-#include "../common/BO/SecurityRange.h"
-#include "../common/BO/Message.h"
-#include "../common/util/file.h"
-#include "../common/Util/AccountLogon.h"
-#include "../common/Util/AccountLockout.h"
-#include "../common/Util/Pop3LoginDelay.h"
-#include "../common/util/ByteBuffer.h"
-#include "../common/Util/Crypt.h"
-#include "../common/Util/Hashing/ScramSha256.h"
-#include "../common/Util/Parsing/StringParser.h"
-#include "../common/Util/OAuth2TokenValidator.h"
-#include "../common/Util/ClientCertificateIdentity.h"
-#include "../common/Application/IniFileSettings.h"
+#include "../Common/BO/Account.h"
+#include "../Common/BO/SecurityRange.h"
+#include "../Common/BO/Message.h"
+#include "../Common/Util/File.h"
+#include "../Common/Util/AccountLogon.h"
+#include "../Common/Util/AccountLockout.h"
+#include "../Common/Util/Pop3LoginDelay.h"
+#include "../Common/Util/ByteBuffer.h"
+#include "../Common/Util/Crypt.h"
+#include "../Common/Util/Hashing/ScramSha256.h"
+#include "../Common/Util/Parsing/StringParser.h"
+#include "../Common/Util/OAuth2TokenValidator.h"
+#include "../Common/Util/ClientCertificateIdentity.h"
+#include "../Common/Application/IniFileSettings.h"
 #include "../Common/Application/TimeoutCalculator.h"
 
 #include "../Common/Application/FolderManager.h"
@@ -37,7 +37,7 @@
 
 #include "../Common/Util/TransparentTransmissionBuffer.h"
 
-#include "../common/Scripting/ClientInfo.h"
+#include "../Common/Scripting/ClientInfo.h"
 #include "../Common/Scripting/ScriptServer.h"
 #include "../Common/Scripting/ScriptObjectContainer.h"
 

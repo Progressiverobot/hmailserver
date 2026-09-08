@@ -550,7 +550,16 @@ namespace HM
             // is opened before the body is streamed - which means the reader must
             // be told the sink up front. So: open the file now, and delete it unless
             // the response was a 200 written in full.
+#ifdef HM_PLATFORM_POSIX
+            // A wide path is an extension MSVC's ofstream carries and libstdc++ does
+            // not, so the path is narrowed here the way the rest of the tree narrows
+            // a String for an API that takes char - the string class does the
+            // conversion on construction.
+            const AnsiString narrowPath = path.c_str();
+            sink.open(narrowPath.c_str(), std::ios::binary | std::ios::trunc);
+#else
             sink.open(path.c_str(), std::ios::binary | std::ios::trunc);
+#endif
             if (!sink)
             {
                error = Formatter::Format(_T("{0} could not be created."), path);

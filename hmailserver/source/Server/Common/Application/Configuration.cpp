@@ -15,9 +15,9 @@
 #include "../Application/IniSettingStore.h"
 #include "../Cache/CacheContainer.h"
 #include "../Application/ObjectCache.h"
-#include "..\Scripting\ScriptServer.h"
-#include "..\Util\TLD.h"
-#include "..\TCPIP\LocalIPAddresses.h"
+#include "../Scripting/ScriptServer.h"
+#include "../Util/TLD.h"
+#include "../TCPIP/LocalIPAddresses.h"
 
 #include "../../POP3/POP3Configuration.h"
 #include "../../SMTP/SMTPConfiguration.h"
@@ -27,12 +27,12 @@
 #include "../Util/AWStats.h"
 
 // BACKUP
-#include "..\BO\Rules.h"
-#include "..\BO\TCPIPPorts.h"
-#include "..\BO\SSLCertificates.h"
+#include "../BO/Rules.h"
+#include "../BO/TCPIPPorts.h"
+#include "../BO/SSLCertificates.h"
 
-#include "..\Persistence\PersistentServerMessage.h"
-#include "..\Persistence\PersistentLogonFailure.h"
+#include "../Persistence/PersistentServerMessage.h"
+#include "../Persistence/PersistentLogonFailure.h"
 
 #include "../Application/MessageIndexer.h"
 

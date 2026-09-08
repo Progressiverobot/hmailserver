@@ -65,10 +65,26 @@ namespace HM
 
 
       cached_win_32computer_name_ = "LOCALHOST";
+#ifdef HM_PLATFORM_POSIX
+      // gethostname(2) is what GetComputerName is here: the machine's own name
+      // as it is configured, with no domain appended. It answers 0 for success,
+      // writes narrow characters, and is not required to terminate what it
+      // writes when the name does not fit - so the buffer is one longer than the
+      // length offered and the terminator is written by hand. A failure leaves
+      // the LOCALHOST above in place, exactly as a failed GetComputerName does.
+      char narrowName[256];
+
+      if (::gethostname(narrowName, sizeof(narrowName) - 1) == 0)
+      {
+         narrowName[sizeof(narrowName) - 1] = '\0';
+         cached_win_32computer_name_ = narrowName;
+      }
+#else
       TCHAR pCharBuf[255];
       unsigned long iSize = 255;
       if (::GetComputerName(pCharBuf, &iSize) == TRUE)
          cached_win_32computer_name_ = pCharBuf;
+#endif
       
       return cached_win_32computer_name_ ;
 
@@ -102,6 +118,24 @@ namespace HM
    String
    Utilities::GetBinDirectory()
    {
+#ifdef HM_PLATFORM_POSIX
+      // There is no registry to ask, and none is wanted: the running image knows
+      // where it was installed. This is the same answer the else branch below
+      // falls back to on Windows - the directory the executable is in - reached
+      // through Application::GetExecutableName, which reads /proc/self/exe here,
+      // and split on the separator this platform uses.
+      //
+      // Every path in the server hangs off this one, hMailServer.INI first of
+      // all, so an empty answer is worth guarding: a program image with no
+      // directory in its name is not something this can make sense of.
+      String executable_full_path = Application::GetExecutableName();
+      int last_slash = executable_full_path.ReverseFind(_T("/"));
+
+      if (last_slash == -1)
+         return String();
+
+      return executable_full_path.Mid(0, last_slash);
+#else
       // The install key in the registry should be enough to tell us where we're installed.
       String install_path;
       Registry registry;
@@ -119,6 +153,7 @@ namespace HM
 
          return executable_full_path.Mid(0, last_slash);
       }
+#endif
    }
 
    String
@@ -127,10 +162,22 @@ namespace HM
       String sRetVal;
       try
       {
+#ifdef HM_PLATFORM_POSIX
+         // Winsock's in_addr carries a union that names the four octets; the
+         // POSIX one has only the 32-bit value. Both hold it in network order,
+         // so the octets are the bytes of that value read front to back - the
+         // same four numbers, in the same order, as S_un_b.s_b1 to s_b4.
+         const BYTE *octets = (const BYTE *) &addr.sin_addr.s_addr;
+         BYTE bt1 = octets[0];
+         BYTE bt2 = octets[1];
+         BYTE bt3 = octets[2];
+         BYTE bt4 = octets[3];
+#else
          BYTE bt1 = addr.sin_addr.S_un.S_un_b.s_b1;
          BYTE bt2 = addr.sin_addr.S_un.S_un_b.s_b2;
          BYTE bt3 = addr.sin_addr.S_un.S_un_b.s_b3;
          BYTE bt4 = addr.sin_addr.S_un.S_un_b.s_b4 ;
+#endif
          sRetVal.Format(_T("%d.%d.%d.%d"), bt1, bt2, bt3, bt4);
       }
       catch (...)
@@ -160,6 +207,29 @@ namespace HM
    bool
    Utilities::IsLocalHost(const String &sHostname)
    {
+#ifdef HM_PLATFORM_POSIX
+      // USES_CONVERSION and CT2A are ATL's stack string converters. The tree's
+      // own narrow string does the same job, and unlike the ATL macro it is an
+      // object with a lifetime rather than alloca on the current frame - which
+      // matters here only in that it is still valid for both calls below.
+      const AnsiString hostname = sHostname.c_str();
+
+      SOCKADDR_IN addr;
+      addr.sin_family = AF_INET;
+      addr.sin_addr.s_addr = inet_addr(hostname.c_str());
+
+      struct hostent *host;
+
+      if(addr.sin_addr.s_addr == INADDR_NONE)
+      {
+         host = NULL;
+         host = gethostbyname(hostname.c_str());
+         if (!host)
+            return false;
+
+         memcpy(&addr.sin_addr, host->h_addr_list[0], host->h_length);
+      }
+#else
       USES_CONVERSION;
 
       SOCKADDR_IN addr;
@@ -178,6 +248,7 @@ namespace HM
 
          memcpy(&addr.sin_addr, host->h_addr_list[0], host->h_length);
       }
+#endif
 
       String sIPAddress = GetIPAddress(addr);
 

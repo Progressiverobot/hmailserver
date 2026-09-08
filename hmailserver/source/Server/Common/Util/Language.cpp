@@ -10,6 +10,7 @@
 #include "Charset.h"
 
 #include "Language.h"
+#include "FileUtilities.h"
 
 #pragma warning (disable: 4566)
 
@@ -56,7 +57,7 @@ namespace HM
    void 
    Language::LoadEnglish()
    {
-      String sEnglishLanguageFile = IniFileSettings::Instance()->GetLanguageDirectory() + "\\english.ini";
+      String sEnglishLanguageFile = IniFileSettings::Instance()->GetLanguageDirectory() + FileUtilities::PathSeparator + "english.ini";
       String sEnglishContents = FileUtilities::ReadCompleteTextFile(sEnglishLanguageFile);
       
       
@@ -81,7 +82,7 @@ namespace HM
    void 
    Language::Load()
    {
-      String sTranslatedLanguageFile = IniFileSettings::Instance()->GetLanguageDirectory() + "\\" + name_ + ".ini";
+      String sTranslatedLanguageFile = IniFileSettings::Instance()->GetLanguageDirectory() + FileUtilities::PathSeparator + name_ + ".ini";
       String sTranslatedContents = FileUtilities::ReadCompleteTextFile(sTranslatedLanguageFile);
       
 

@@ -108,7 +108,12 @@ namespace HM
       remote_ip_address_ = remote_ip_address;
       is_client_ = true;
 
-      LOG_TCPIP(Formatter::Format("Connecting to {0}:{1}...", remote_ip_address_, remotePort));
+      // remotePort is a long. MSVC binds it to FormatArgument's int constructor,
+      // because long and int are the same 32-bit type on Windows; clang finds the
+      // int, unsigned int, __int64 and unsigned __int64 constructors all equally
+      // distant. The cast names the one the Windows build already selects, and a
+      // port number cannot be lost by it.
+      LOG_TCPIP(Formatter::Format("Connecting to {0}:{1}...", remote_ip_address_, (int) remotePort));
 
       if (!localAddress.IsAny())
       {
