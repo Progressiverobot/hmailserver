@@ -5648,7 +5648,7 @@ Kør dette, hvis klienter melder om meddelelser, der dukker op under det forkert
     <value>Registrér gatewayen som et indgående relay, så dens adresse ikke behandles som klienten.</value>
   </data>
   <data name="Register this server as an application with the identity provider, download the provider's public signing key as a PEM file, and point OAuth2PublicKeyFile in hMailServer.ini at it (or set OAuth2HmacSecret for HS256). Set OAuth2Issuer and OAuth2Audience to the values the provider puts in its tokens, or validation will reject them." xml:space="preserve">
-    <value>Registrér denne server som et program hos identitetsudbyderen, download udbyderens offentlige signeringsnøgle som en PEM-fil, og peg OAuth2PublicKeyFile i hMailServer.ini på den (eller sæt OAuth2HmacSecret til HS256). Sæt OAuth2Issuer og OAuth2Audience til de værdier, udbyderen lægger i sine tokens, ellers afviser valideringen dem.</value>
+    <value>Registrér denne server som et program hos identitetsudbyderen, download udbyderens offentlige signeringsnøgle som en PEM-fil, og peg OAuth2PublicKeyFile i hMailServer.ini på den (eller sæt OAuth2HmacSecret, hvis du bruger HS256). Sæt OAuth2Issuer og OAuth2Audience til de værdier, udbyderen lægger i sine tokens, ellers afviser valideringen dem.</value>
   </data>
   <data name="Reject empty sender addresses (MAIL FROM:&lt;&gt;)" xml:space="preserve">
     <value>Afvis tomme afsenderadresser (MAIL FROM:&lt;&gt;)</value>
@@ -8330,7 +8330,7 @@ Ingen meddelelse slettes, og ingen konto fjernes. Fortsæt?</value>
     <value>Hvad der forhindrer én sætning, der er blokeret på en lås, i at holde en arbejdstråd for evigt. Respekteres ved forbindelse af MySQL/MariaDB og PostgreSQL; MS SQL og SQL CE starter på ADO's egne 30 sekunder og samler denne værdi op på enhver forbindelse, der har kørt et opgraderings- eller vedligeholdelsesscript. Disse scripts kører under deres eget loft på 30 minutter pr. sætning uanset denne værdi. Gælder efter genstart af tjenesten.</value>
   </data>
   <data name="What the server does as the message-store volume fills. Both values are absolute megabytes rather than percentages, because what decides whether the next message fits is how many bytes are left, not what fraction of the volume they are. Applies after a service restart." xml:space="preserve">
-    <value>Hvad serveren gør, når meddelelseslagerets volumen fyldes. Begge værdier er absolutte megabyte snarere end procenter, fordi det, der afgør, om den næste meddelelse er plads til, er, hvor mange bytes der er tilbage, ikke hvilken brøkdel af volumenet de er. Gælder efter genstart af tjenesten.</value>
+    <value>Hvad serveren gør, når meddelelseslagerets volumen fyldes. Begge værdier er absolutte megabyte snarere end procenter, fordi det, der afgør, om der er plads til den næste meddelelse, er, hvor mange bytes der er tilbage, ikke hvilken brøkdel af volumenet de er. Gælder efter genstart af tjenesten.</value>
   </data>
   <data name="What the server writes to its log files (viewable on the Live logs page)." xml:space="preserve">
     <value>Hvad serveren skriver til sine logfiler (kan ses på siden Levende logs).</value>

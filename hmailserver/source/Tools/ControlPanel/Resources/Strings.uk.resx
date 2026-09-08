@@ -6586,7 +6586,7 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
     <value>Розмір серверного кешу сесій (0 = типова межа OpenSSL 20480; від'ємне = без кешу)</value>
   </data>
   <data name="Server-wide ceilings that keep one slow operation from holding a resource forever. The defaults are deliberate; each one is here because there is a diagnosable situation in which it is the right thing to change. Note that 0 does not mean the same thing for all of them - each label says." xml:space="preserve">
-    <value>Загальносерверні межі, які не дають одній повільній операції утримувати ресурс вічно. Типові значення навмисні; кожне тут тому, що є діагностована ситуація, у якій його правильно змінити. Зауважте, що 0 означає не одне й те саме для всіх - кожна підпис каже своє.</value>
+    <value>Загальносерверні межі, які не дають одній повільній операції утримувати ресурс вічно. Типові значення навмисні; кожне тут тому, що є діагностована ситуація, у якій його правильно змінити. Зауважте, що 0 означає не одне й те саме для всіх - кожен підпис каже своє.</value>
   </data>
   <data name="Server-wide ceilings, durability and abuse controls that belong to no single feature are edited here." xml:space="preserve">
     <value>Загальносерверні межі, довговічність і засоби проти зловживань, що не належать жодній окремій функції, редагуються тут.</value>
@@ -6924,7 +6924,7 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
     <value>Сховище:</value>
   </data>
   <data name="Stored in hMailServer.INI exactly as typed - the DPAPI switch above does not cover it, and there is nowhere else for the Service Control Manager's registration step to read it from. That is the strongest reason to use NT SERVICE\hMailServer or a group managed service account instead: neither has a password to store. If you do set one here, clear it again once the registration has been run - the SCM keeps its own copy from then on." xml:space="preserve">
-    <value>Зберігається в hMailServer.INI рівно так, як набрано - перемикач DPAPI вище його не охоплює, і крок реєстрації Диспетчера керування службами не має іншого місця, звідки його прочитати. Це найвагоміша причина використовувати натомість NT SERVICE\hMailServer або групову керовану службову обліковий запис: у жодного з них немає пароля для зберігання. Якщо ви все ж задаєте пароль тут, очистьте його знову після виконання реєстрації - відтоді SCM зберігає власну копію.</value>
+    <value>Зберігається в hMailServer.INI рівно так, як набрано - перемикач DPAPI вище його не охоплює, і крок реєстрації Диспетчера керування службами не має іншого місця, звідки його прочитати. Це найвагоміша причина використовувати натомість NT SERVICE\hMailServer або груповий керований службовий обліковий запис: у жодного з них немає пароля для зберігання. Якщо ви все ж задаєте пароль тут, очистьте його знову після виконання реєстрації - відтоді SCM зберігає власну копію.</value>
   </data>
   <data name="Stored in hMailServer.ini as ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays. The service reads them when it starts, so changes here apply after a service restart." xml:space="preserve">
     <value>Зберігається в hMailServer.ini як ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount і ScheduledBackupMaxAgeDays. Служба читає їх під час запуску, тому зміни тут застосовуються після перезапуску служби.</value>
@@ -7534,7 +7534,7 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
     <value>Адреса прив'язки метрик - не проста адреса IPv4 (імена вузлів та IPv6 тут не приймаються), тому слухач метрик не запуститься взагалі.</value>
   </data>
   <data name="The name spamd looks up its per-user preferences for - a user_prefs file or a row in its SQL preference store. Leave empty unless spamd has been set up for it: a spamd told to change to a user it cannot find may refuse the scan, and an unscanned message is delivered as if SpamAssassin were unreachable." xml:space="preserve">
-    <value>Ім'я, за яким spamd шукає свої налаштування користувача - файл user_prefs або рядок у своєму SQL-сховищі налаштувань. Залиште порожнім, якщо spamd під це не налаштовано: spamd, якому наказано перейти на користувача, якого він не може знайти, може відмовитися сканувати, а непросканованого повідомлення доставляється так, ніби SpamAssassin недоступний.</value>
+    <value>Ім'я, за яким spamd шукає свої налаштування користувача - файл user_prefs або рядок у своєму SQL-сховищі налаштувань. Залиште порожнім, якщо spamd під це не налаштовано: spamd, якому наказано перейти на користувача, якого він не може знайти, може відмовитися сканувати, а непроскановане повідомлення доставляється так, ніби SpamAssassin недоступний.</value>
   </data>
   <data name="The new API key, shown once" xml:space="preserve">
     <value>Новий ключ API, показується один раз</value>

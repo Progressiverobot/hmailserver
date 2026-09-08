@@ -49,7 +49,7 @@ RESOURCES = os.path.join(ROOT, "Resources")
 NEUTRAL = os.path.join(RESOURCES, "Strings.resx")
 
 # Languages whose catalogue must translate every key.
-COMPLETE = {"cs", "da", "de", "es", "fi", "fr", "it", "nb", "nl", "pl", "pt-BR", "ru", "sv", "tr", "uk"}
+COMPLETE = {"cs", "da", "de", "es", "fi", "fr", "it", "ja", "nb", "nl", "pl", "pt-BR", "ru", "sv", "tr", "uk", "zh-Hans"}
 
 # Files (relative to ROOT, forward slashes) in which every caption is marked.
 LOCALISED = {
