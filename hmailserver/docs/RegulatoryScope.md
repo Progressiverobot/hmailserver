@@ -156,6 +156,12 @@ changed:
 * Static analysis, CodeQL and OpenSSF Scorecard in CI; a full regression suite
   gating every release.
 * Release notes that name unfixed known issues rather than omitting them.
+* Security-update distribution with integrity verification, in the tree after
+  6.2.27 (not yet in a published release): the server can check the release feed,
+  fetch a newer installer with its Sigstore bundle, verify the bundle in-process
+  against the repository's release-workflow identity, and apply it inside a
+  configured window after a backup. The Roadmap's Product Liability Directive row
+  was closed on 7 September 2026 against this document's determination.
 
 Still outstanding, and tracked in [Roadmap.md](../../Roadmap.md): **Authenticode**
 signing of the installer. Cosign and Authenticode are complementary rather than

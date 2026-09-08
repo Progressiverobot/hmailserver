@@ -82,7 +82,7 @@ The DPAPI constraint — the one thing that genuinely does not travel
 -------------------------------------------------------------------
 
 Every password this server has to *present* to somebody else — route smart-host
-credentials, external POP3 fetch accounts, the per-domain relay password, SSL
+credentials, external POP3 or IMAP fetch accounts, the per-domain relay password, SSL
 private-key passphrases — is stored in the database protected by Windows DPAPI
 with `CRYPTPROTECT_LOCAL_MACHINE`. That is the right storage for a secret that
 cannot be hashed, and it has a consequence that no replication strategy can

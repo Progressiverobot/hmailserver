@@ -109,12 +109,14 @@ the application log rather than refusing to start.
 
 Two properties of this listener to design the health check around, both deliberate:
 
-* **`MetricsServerBindAddress` takes an IPv4 literal and nothing else.** It is parsed
-  with `inet_pton(AF_INET, …)`, so `0.0.0.0` and `127.0.0.1` work, while a host name,
-  `localhost` or an IPv6 address is rejected — the listener logs
+* **`MetricsServerBindAddress` takes an IP literal and nothing else.** It is parsed
+  with `inet_pton`, so `0.0.0.0`, `127.0.0.1`, `::` and a specific IPv6 address work,
+  while a host name or `localhost` is rejected — the listener logs
   `MetricsServer: Invalid bind address` and does not start, which takes the probes with
-  it. If your health check gets a refused connection on a node whose service is
-  running, this is the first thing to check.
+  it. `::` serves both families (the listener clears `IPV6_V6ONLY` and says so in the
+  log if it cannot); a specific IPv6 literal serves IPv6 only. If your health check gets
+  a refused connection on a node whose service is running, this is the first thing to
+  check.
 * **It is a single accept loop serving one connection at a time.** Probes are cheap and
   answered before anything that can refuse, but a scrape and a probe are still
   serialised behind each other. Keep the probe interval and its timeout comfortably
@@ -126,8 +128,8 @@ Probes (HTTP):
 | Path       | Meaning                                                                 | Use for                          |
 |------------|-------------------------------------------------------------------------|----------------------------------|
 | `/livez`   | Process is alive (200 whenever the listener is up).                     | Liveness restarts.               |
-| `/readyz`  | 200 only when the server is `Running` **and** the database is connected. Returns **503** while the server is stopping or draining, or if the database connection is lost. During *startup* it is not 503 but **refused**: this listener is the last thing brought up, after the state has already gone to `Running`, so there is nothing listening until the server is ready. Both read as unhealthy to a load balancer, which is all that matters here. | **VIP / load-balancer routing.** |
-| `/healthz` | JSON: `status` (`ok`/`unavailable`), `state`, `database` (`up`/`down`), `sessions` per protocol and `uptime_seconds`. 200 when running with the database up, 503 otherwise. | Dashboards / debugging.          |
+| `/readyz`  | 200 only when the server is `Running` **and** the database is connected. Returns **503** while the server is stopping or draining, or if the database connection is lost. During *startup* it is not 503 but **refused**: this listener is brought up only after the state has already gone to `Running` (it is the first of the optional listeners started, ahead of the REST API and web services), so there is nothing listening until the server is ready. Both read as unhealthy to a load balancer, which is all that matters here. | **VIP / load-balancer routing.** |
+| `/healthz` | JSON: `status` (`ok`/`unavailable`), `state`, `database` (`up`/`down`) and `uptime_seconds`. 200 when running with the database up, 503 otherwise. Per-protocol session counts are not in it — they are `hmailserver_sessions` on `/metrics`, behind its credential. | Dashboards / debugging.          |
 
 **Configure the VIP/load balancer health check against `/readyz`.** Because the
 passive node's service is stopped, its `/readyz` connection is refused (unhealthy)

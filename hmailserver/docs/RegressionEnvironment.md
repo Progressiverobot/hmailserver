@@ -1,7 +1,7 @@
 Setting up the regression environment
 ======================================
 
-The regression suite (`hmailserver/test/RegressionTests`, roughly 1,800 tests)
+The regression suite (`hmailserver/test/RegressionTests`, roughly 2,000 tests)
 does not mock the server. It runs against a real hMailServer service on the
 same machine, over SMTP, IMAP and POP3, and through the COM API, and it
 creates and deletes domains, accounts and mail as it goes. That makes it worth
@@ -52,8 +52,7 @@ INI lookup and it comes up with empty configuration while still reporting
 "Running". `build/make-hmailserver-writable.ps1` deals with the file
 permissions the build needs on the output directory.
 
-Provision the output directory as the installed layout expects
-(`IMPLEMENTATION-NOTES.md`, "Test-environment recipe", has the full list):
+Provision the output directory as the installed layout expects:
 `hMailServer.ini` with a `[Directories]` section and an empty
 `AdministratorPassword`, the `Logs`, `Temp` and `Events` folders, a copy of
 `DBScripts\` with CRLF line endings, `Languages\`, `dh2048.pem` and `tlds.txt`
@@ -140,8 +139,8 @@ restarts the service rely on.
 
 One fixture stops and restarts `SpamAssassinJAM`; rebuilding the server stops
 and starts `hMailServer`. Neither should need an elevated console. Grant
-Authenticated Users start/stop on both services with `sc sdset` (the exact
-descriptor is in `IMPLEMENTATION-NOTES.md`). The grant is silently dropped when
+Authenticated Users start/stop on both services with `sc sdset` (an access-allowed
+entry for `AU` carrying the start and stop rights). The grant is silently dropped when
 a service is re-registered, which is why "Access denied" starting the service
 after a `post-build.ps1` is the pre-flight's own diagnosis for that failure.
 

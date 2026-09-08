@@ -60,8 +60,8 @@ already cost a release cycle or nearly shipped a defect.
 
    If `hMailServer.idl` changed in this range, regenerate the checked-in COM
    wrapper after the server build and before the tools build:
-   `buildegenerate-interop.ps1`. It runs TlbImp AND rewrites the wrapper's
-   SHA-256 and size in `hmailserver\docs	hird-party-binaries.json` - the
+   `build\regenerate-interop.ps1`. It runs TlbImp AND rewrites the wrapper's
+   SHA-256 and size in `hmailserver\docs\third-party-binaries.json` - the
    binary-provenance workflow fails when those disagree, and regenerating by
    hand without the manifest did exactly that twice in one day. A stale wrapper
    still compiles, which is why this is easy to skip: the tools use a small
@@ -140,8 +140,8 @@ already cost a release cycle or nearly shipped a defect.
     key must be listed in `.github/allowed_signers` - the signing workflow
     below refuses to sign anything for a tag that is lightweight or that does
     not verify against that file, so an unsigned tag stops the release before
-    it has any assets. Every tag up to `v6.2.23-alpha1` was lightweight; there
-    was nothing to verify and nothing stopped a `v*` ref being moved.
+    it has any assets. Every tag up to `v6.2.23-alpha1` was either lightweight or annotated but
+    unsigned; there was nothing to verify and nothing stopped a `v*` ref being moved.
 
     Then publish **as a draft first** - this repository has
     immutable releases enabled, so a published release refuses every further asset
@@ -152,7 +152,7 @@ already cost a release cycle or nearly shipped a defect.
        --title "..." --notes-file <notes>
     gh workflow run "SBOM" -f release_tag=vX.Y.Z          # SPDX + CycloneDX
     gh workflow run "Sign release artefacts" -f tag=vX.Y.Z  # LAST: signs what is attached
-    gh release view vX.Y.Z --json assets                   # expect installer + 2 SBOMs + bundle
+    gh release view vX.Y.Z --json assets                   # expect installer + 2 SBOMs + a .cosign.bundle beside each (six assets)
     gh release edit vX.Y.Z --draft=false                   # publish, now complete
     ```
 

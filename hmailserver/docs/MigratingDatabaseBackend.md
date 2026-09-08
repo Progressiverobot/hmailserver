@@ -118,9 +118,9 @@ database and will not be in the new one.
 
 ### 2. Take the backup
 
-In the administration tool, under **Settings → Advanced → Backup**, select all
-three of **domains**, **settings** and **messages**, set a destination with room
-for it, and run it. Or from a script:
+In the Control Panel, under **Maintenance → Backup & restore**, tick all three of
+**Back up domains**, **Back up messages** and **Back up settings**, set a destination
+with room for it, and click **Start backup now**. Or from a script:
 
 ```powershell
 $app = New-Object -ComObject hMailServer.Application
@@ -264,9 +264,10 @@ document — but if you have external scripts, reporting or an integration that
 recorded `hm_accounts.accountid` or `hm_domains.domainid`, those values will not
 mean the same thing afterwards. Key on the address or the domain name instead.
 
-**The SQL log device's table is not part of the backup.** If you use
-`SQLLogging`, historical log rows stay in the old database. Export them separately
-if you need them; they are ordinary rows in `hm_log`.
+**The SQL log device's table is not part of the backup.** If your logging device is
+SQL (`Logging.Device = hLogDeviceSQL`, the Control Panel's Logging page), historical
+log rows stay in the old database. Export them separately if you need them; they are
+ordinary rows in `hm_log`.
 
 **MySQL and SQL Server Compact commit DDL as it executes.** If the schema
 creation in step 3 fails halfway on those two, the database is left partly built
