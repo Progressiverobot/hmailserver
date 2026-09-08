@@ -594,8 +594,16 @@ namespace RegressionTests.API
          int at = listing.IndexOf("\"subject\":\"" + subject + "\"", StringComparison.Ordinal);
          Assert.IsTrue(at >= 0, "No entry for " + subject + " in: " + listing);
          int start = listing.LastIndexOf('{', at);
-         int end = listing.IndexOf("}}", at, StringComparison.Ordinal);
-         return listing.Substring(start, end + 2 - start);
+         int depth = 0;
+         for (int i = start; i < listing.Length; i++)
+         {
+            if (listing[i] == '{')
+               depth++;
+            else if (listing[i] == '}' && --depth == 0)
+               return listing.Substring(start, i + 1 - start);
+         }
+         Assert.Fail("Unterminated entry for " + subject + " in: " + listing);
+         return null;
       }
 
       private string OtherAccount()
@@ -1461,6 +1469,99 @@ namespace RegressionTests.API
          (int status, string body) me = Http("GET", "/api/v1/me", UserHeader(UserPassword));
          StringAssert.Contains("\"subject\":\"Café \U0001F680\"", me.body);
          StringAssert.Contains("\"message\":\"Line one\\nLine two\\ttabbed\"", me.body);
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/drafts keeps a draft in the Drafts folder, made when there is none, and replaces it as a new message")]
+      public void ADraftIsKeptInTheDraftsFolderAndReplaced()
+      {
+         (int status, string body) saved = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
+            "{\"to\":\"someone@example.com\",\"subject\":\"Half written\",\"text\":\"So far so good.\"}");
+         Assert.AreEqual(201, saved.status, "Body: " + saved.body);
+         long draftId = long.Parse(Between(saved.body, "\"id\":", ","));
+         long draftsFolderId = long.Parse(Between(saved.body, "\"folder_id\":", "}"));
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         string drafts = FolderEntry(tree.body, "Drafts");
+         StringAssert.Contains("\"special_use\":\"\\\\Drafts\"", drafts);
+         StringAssert.Contains("\"messages\":1,\"unseen\":0", drafts);
+         Assert.AreEqual(draftsFolderId, IdBefore(tree.body, "\"path\":\"Drafts\""));
+
+         (int status, string body) read = Http("GET", "/api/v1/me/messages/" + draftId, UserHeader(UserPassword));
+         Assert.AreEqual(200, read.status, "Body: " + read.body);
+         StringAssert.Contains("\"subject\":\"Half written\"", read.body);
+         StringAssert.Contains("\"to\":\"someone@example.com\"", read.body);
+         StringAssert.Contains("So far so good.", read.body);
+         StringAssert.Contains("\"draft\":true", read.body);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.AreEqual(1, imap.GetMessageCount("Drafts"));
+         StringAssert.Contains("\\Draft", imap.GetFlags(1));
+         imap.Disconnect();
+
+         (int status, string body) replaced = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
+            "{\"to\":\"someone@example.com\",\"subject\":\"Nearly done\",\"text\":\"Almost there.\",\"replace_id\":" + draftId + "}");
+         Assert.AreEqual(201, replaced.status, "Body: " + replaced.body);
+         long newId = long.Parse(Between(replaced.body, "\"id\":", ","));
+         Assert.AreNotEqual(draftId, newId, "New content is a new message.");
+
+         (int status, string body) old = Http("GET", "/api/v1/me/messages/" + draftId, UserHeader(UserPassword));
+         Assert.AreEqual(404, old.status, "The replaced draft is gone. Body: " + old.body);
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + draftsFolderId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"total\":1", page.body);
+         StringAssert.Contains("Nearly done", page.body);
+
+         (int status, string body) admin = Http("POST", "/api/v1/me/drafts", AdminHeader(), "{\"subject\":\"x\"}");
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("A listing carries the thread headers, and a reply sent with them threads correctly and marks the original answered")]
+      public void AReplyCarriesTheThreadHeadersAndMarksTheOriginalAnswered()
+      {
+         string raw =
+            "From: alice@example.com\r\n" +
+            "To: " + Address + "\r\n" +
+            "Subject: Plans\r\n" +
+            "Message-ID: <original-1@example.com>\r\n" +
+            "\r\n" +
+            "What do you think?\r\n";
+         SmtpClientSimulator.StaticSendRaw("alice@example.com", Address, raw);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"message_id\":\"<original-1@example.com>\",\"in_reply_to\":\"\",\"references\":\"\"", page.body);
+         long originalId = IdBefore(page.body, "\"subject\":\"Plans\"");
+
+         string other = OtherAccount();
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"subject\":\"Re: Plans\",\"text\":\"I think yes.\"," +
+            "\"in_reply_to\":\"<original-1@example.com>\",\"references\":\"<original-1@example.com>\",\"answered_id\":" + originalId + "}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+
+         (int status, string body) theirs = Http("GET", "/api/v1/me/folders", BasicHeader(other, UserPassword));
+         long theirInbox = IdBefore(theirs.body, "\"path\":\"INBOX\"");
+         (int status, string body) theirPage = Http("GET", "/api/v1/me/folders/" + theirInbox + "/messages", BasicHeader(other, UserPassword));
+         StringAssert.Contains("\"in_reply_to\":\"<original-1@example.com>\",\"references\":\"<original-1@example.com>\"", theirPage.body);
+
+         // Fetching over POP3 removes the message, so this comes after the listing above.
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("In-Reply-To: <original-1@example.com>", received);
+         StringAssert.Contains("References: <original-1@example.com>", received);
+
+         (int status, string body) original = Http("GET", "/api/v1/me/messages/" + originalId, UserHeader(UserPassword));
+         StringAssert.Contains("\"answered\":true", original.body);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         StringAssert.Contains("\\Answered", imap.GetFlags(1));
+         imap.Disconnect();
       }
 
       // ------------------------------------------------------------ helpers ---

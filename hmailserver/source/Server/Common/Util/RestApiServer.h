@@ -180,6 +180,7 @@ namespace HM
          RouteMeSettingsPut,
          RouteMeFilters,
          RouteMeFiltersPut,
+         RouteMeDraftSave,
          RouteSessionCreate,
          RouteSessionDelete,
          RouteOpenApi
@@ -308,6 +309,9 @@ namespace HM
       static HttpResponse HandleMeFilters_(const Caller &caller);
       static HttpResponse HandleMeFiltersPut_(const Caller &caller, const AnsiString &requestBody);
       static AnsiString SettingsJson_(std::shared_ptr<const Account> account);
+      static HttpResponse HandleMeDraftSave_(const Caller &caller, const AnsiString &requestBody);
+      static AnsiString ThreadFieldsJson_(const String &fileName);
+      static String FromHeader_(std::shared_ptr<const Account> account);
       static bool ReadJsonHex4_(const AnsiString &json, int at, unsigned int &value);
       static void AppendUtf8_(AnsiString &out, unsigned int codePoint);
       static void CollectReadableFolders_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders, const String &parentPath,
