@@ -53,6 +53,22 @@ namespace RegressionTests.API
          Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
       }
 
+      [Test]
+      [Description("The Control Deck is served from the program directory with a view for each of the read-only administrative routes")]
+      public void TheControlDeckIsServedWithItsViews()
+      {
+         (int status, string body) = Http("GET", "/");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("Control Deck", body, "The real page, not the 'not installed' placeholder: build.ps1 copies it beside the server.");
+         foreach (string view in new[] { "dash", "domains", "queue", "tlsa", "settings", "logs", "certs", "rules" })
+            StringAssert.Contains("data-view=\"" + view + "\"", body, "A navigation button for " + view);
+         StringAssert.Contains("/api/v1/logs/", body);
+         StringAssert.Contains("/api/v1/settings", body);
+         StringAssert.Contains("/api/v1/certificates", body);
+         StringAssert.Contains("/api/v1/rules", body);
+         StringAssert.Contains("\u26e8", body, "The page's own non-ASCII glyphs survive: it is served as bytes, not through the ANSI code page.");
+      }
+
       private static (int status, string body) Http(string method, string path, string requestBody = null)
       {
          string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("Administrator:" + AdminPassword));
