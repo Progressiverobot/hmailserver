@@ -230,7 +230,10 @@ namespace RegressionTests.API
          StringAssert.Contains("script-src 'self'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-ancestors 'none'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-src 'self'", page.Header("Content-Security-Policy"));
-         StringAssert.Contains("<iframe id=\"message-html\" sandbox=\"\"", page.Body);
+         StringAssert.Contains("<iframe id=\"message-html\" sandbox=\"allow-popups allow-popups-to-escape-sandbox\"", page.Body);
+         StringAssert.Contains("img-src data:", page.Header("Content-Security-Policy"), "The srcdoc frame inherits this policy, and the message's own data-URI images need it.");
+         StringAssert.Contains("<input id=\"compose-bcc\"", page.Body);
+         StringAssert.Contains("<button id=\"message-reply-all\"", page.Body);
          StringAssert.Contains("<div id=\"bulk-bar\" hidden>", page.Body);
          Assert.AreEqual("no-store", page.Header("Cache-Control"));
          Assert.AreEqual("nosniff", page.Header("X-Content-Type-Options"));
@@ -244,6 +247,8 @@ namespace RegressionTests.API
          StringAssert.Contains("/api/v1/me/folders", script.Body);
          StringAssert.Contains("srcdoc", script.Body);
          StringAssert.Contains("img-src data:", script.Body);
+         StringAssert.Contains("carryAttachments", script.Body);
+         StringAssert.Contains("before_uid", script.Body);
       }
 
       [Test]
