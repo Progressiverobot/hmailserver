@@ -36,8 +36,17 @@ Entry point: `source/Server/hMailServer/hMailServer.sln`.
 Server/
   COM/               COM/IDispatch public API - the management seam
   Common/            Shared infrastructure used by every protocol
-  ExternalFetcher/   POP3 *client*: fetch mail from remote accounts
+  ExternalFetcher/   POP3 and IMAP *clients*: fetch mail from remote accounts
+                     (`ExternalFetchClientBase` turns a downloaded message into a
+                     delivered one; `IMAPClientConnection` also mirrors whole
+                     folders when `FetchAccount.MirrorFolders` is on - 6.2.25/6.2.27)
   hMailServer/       Windows service shell (WinMain, service control)
+  hMailServer.Minidump/  Crash-dump helper
+  hMailServer.Updater/   The live-update apply helper: runs a verified installer,
+                     waits for the service, rolls back (in the tree after 6.2.27,
+                     not yet in a published release)
+  zlib/              Vendored zlib 1.3.1 for IMAP COMPRESS=DEFLATE (in the tree
+                     after 6.2.27, not yet in a published release)
   IMAP/              IMAP
   POP3/              POP3
   SMTP/              SMTP, delivery queue, outbound transport security
@@ -63,7 +72,7 @@ Server/
 | `TCPIP/` | Boost.Asio networking, TLS, DNS. Also `DnssecResolver` (validating stub resolver) and `DaneVerifier` (TLSA matching) |
 | `Threading/` | Thread pools and task queues |
 | `Tracking/` | Publish/subscribe bus between components |
-| `Util/` | Utilities, plus the optional listeners: `MetricsServer`, `RestApiServer`, `WebServicesServer`, `AcmeClient`, `TlsRptStore` |
+| `Util/` | Utilities, plus the optional listeners: `MetricsServer`, `RestApiServer`, `WebServicesServer` (the last two on `HttpServer`, the shared Boost.Asio HTTP/1.1 listener), `AcmeClient`, `TlsRptStore`, `HttpsClient` and the OTLP exporters (`Otel*`), and the live update (`UpdateChecker`, `SigstoreVerifier`, `UpdateDownloader`, `UpdateInstaller`, `UpdateWindow`, `UpdateApplyToken`). `HttpServer` and the `Update*` files are in the tree after 6.2.27, not yet in a published release; `Application/` holds their tasks `UpdateCheckTask` and `MetricsHistoryTask` |
 
 ### `Server/SMTP/`
 
@@ -98,6 +107,17 @@ expanders in `SQL/Macros/`, which recognise a deliberately small vocabulary; if 
 need something they do not express, that is a design conversation, not a place to
 special-case.
 
+**The schema is pinned, one way.** `REQUIRED_DB_VERSION` in
+`Common/Application/Constants.h` (6031 today) must equal `hm_dbversion.value`; the
+server refuses to start on an older *or* newer database (error 5011; 5010 when the
+version cannot be read). A schema change is four
+`DBScripts/Upgrade<from>to<to><backend>.sql` files, a `new UpgradeScript(from, to)` row
+in `Tools/DBUpdater/formMain.cs`, a probe statement DBUpdater runs after the step, and
+the bump in `Constants.h`; `build/check-schema-versions.ps1` reconciles them and
+`build/check-db-scripts.ps1` builds a database from the create script and executes
+every probe through the SQL Server Compact provider, with a negative control — a probe
+the provider could not run took the service down with it once (#114, 6.2.26).
+
 **Server-wide optional features are INI settings, not database settings.** MTA-STS,
 DANE, ARC, TLS-RPT, ACME, the REST API, web services, metrics and JSON logging are
 all `hMailServer.ini` `[Settings]` keys read by `IniFileSettings`. The pattern for a
@@ -106,21 +126,48 @@ new one: a getter in `IniFileSettings.h`, the default on the member declaration,
 Panel's `FeatureSettingsView`. Per-account and per-domain settings go in the database
 instead.
 
-**The optional listeners are deliberately not Boost.Asio.** `MetricsServer`,
-`RestApiServer`, `WebServicesServer` and `ManageSieveServer` use raw sockets and
-`std::thread`, outside the `TCPIP/` stack, started from `Application::StartServers`
-only when their port is non-zero. Two consequences that have both bitten:
+**Two of the optional listeners are now Boost.Asio, two are not.** `RestApiServer` and
+`WebServicesServer` are hosted on `Common/Util/HttpServer` — an HTTP/1.1 server on
+Boost.Asio with its own `io_context` (separate from the mail listeners', so a request
+storm cannot starve SMTP accept), a bounded worker pool (4 threads), a connection cap
+(64) and absolute per-request (30 s) and per-connection (300 s) deadlines; a handler
+runs on a worker and may block. This is in the tree after 6.2.27, not yet in a
+published release; before it, both were raw sockets and `std::thread` like the other
+two. `MetricsServer` and `ManageSieveServer` remain raw sockets and `std::thread`,
+outside the `TCPIP/` stack. All four are started from `Application::StartServers`
+only when their port is non-zero. Two things to know, both of which have bitten the
+raw-socket pair:
 
-* **They have no exception barrier by default.** An exception escaping the top of one
-  of those threads is `std::terminate` — the whole mail server dies. Anything that
-  can throw, including any database call, needs a `try`/`catch` inside the thread.
-* **They build their own `SSL_CTX`.** They do not go through
-  `SslContextInitializer`, so TLS settings applied there — cipher lists, key-exchange
-  groups — do not reach them. Check both when changing TLS behaviour.
+* **A thread of their own has no exception barrier by default.** An exception
+  escaping the top of a raw listener thread is `std::terminate` — the whole mail
+  server dies. Anything that can throw, including any database call, needs a
+  `try`/`catch` inside the thread. (`HttpServer` catches around each handler and
+  answers 500, and again at the top of each worker.)
+* **They share the mail listeners' TLS configuration.** Each builds a
+  `boost::asio::ssl::context` and hands it to `SslContextInitializer::InitServer`
+  (MetricsServer.cpp:730, RestApiServer.cpp:618, WebServicesServer.cpp:472,
+  ManageSieveServer.cpp:497), so cipher lists, key-exchange groups and protocol floors
+  applied there reach all four; there is no second `SSL_CTX` configuration to keep in
+  step. The REST listener alone adds a TLS 1.2 floor of its own after `InitServer`,
+  which can only tighten what the shared configuration allows.
 
 **Scheduled work** uses `BO/ScheduledTask` and the `Scheduler`. `RunOnce` tasks go
 through the maintenance work queue immediately; recurring tasks are polled once a
-minute.
+minute. `Application::CreateScheduledTasks_` registers, in order: `GreyListCleanerTask`
+(every `GreylistingExpirationInterval` minutes), `RemoveExpiredRecords` (expired IP
+ranges, every minute), `TlsRptReporterTask` and `DmarcRptReporterTask` (hourly; each
+sends only when its `*RptFromAddress` is set), `LogRetentionTask` (at start, then every
+6 h), `ArchiveRetentionTask` (start + 12 h), `MailboxRetentionTask` (start + 6 h;
+message retention, 6.2.25), `MetricsHistoryTask` (start + every minute; 6.2.25),
+`UpdateCheckTask` (start + every 15 min; a no-op until `UpdateCheckEnabled=1` — in the
+tree after 6.2.27, not yet in a published release), `IMAPExpungeRetentionTask` (start +
+12 h), `MessageStoreConsistencyTask` (start + hourly), `DiskSpaceMonitorTask` (start +
+hourly), `WorkQueueHealthTask` (every minute), `BackupScheduleTask` (a one-minute tick
+against the wall clock, only when a schedule is set), `DirectorySyncScheduleTask` (only
+when `[LDAP] SyncScheduleMinutes` is set) and `AcmeRenewalTask` (start + hourly, only
+when `AcmeEnabled=1`). A startup-plus-periodic pair is the shape for a sweep that must
+also run on a server that is only ever restarted (source:
+`Common/Application/Application.cpp:600-860`).
 
 Constraints learned the hard way
 --------------------------------
@@ -167,8 +214,10 @@ Tests
 -----
 
 `test/RegressionTests/` is NUnit driving a **real running server** over real sockets,
-with live SpamAssassin and ClamAV, DMARC against live DNS, and real TLS handshakes.
-Nothing is mocked. Two things to know before adding a test:
+with live SpamAssassin and ClamAV, SPF, DKIM and DMARC evaluated against the suite's
+own DNS zone (`Shared/SuiteDns.cs` — one fake resolver the server is pointed at for
+the whole run), and real TLS handshakes. Nothing but DNS is mocked. Two things to
+know before adding a test:
 
 * **`RegressionTests.csproj` lists every source file explicitly — there is no glob.**
   A test file nobody adds to it is not merely unrun, it is invisible, and a green
@@ -213,6 +262,8 @@ Where to start
 | A per-account or per-domain setting | `Common/BO/`, `Common/Persistence/`, the COM interface, the schema, and the upgrade chain |
 | A new anti-spam test | `Common/AntiSpam/` and the score pipeline |
 | Something exposed to scripts | `Common/Scripting/` and the COM layer |
+| A new REST route or portal page | `Common/Util/RestApiServer.cpp` (dispatch, authorisation through `ACLManager`, the served `openapi.json`); the transport is `Common/Util/HttpServer` — in the tree after 6.2.27, not yet in a published release |
+| A new periodic sweep | a `ScheduledTask` subclass registered in `Application::CreateScheduledTasks_`, startup-plus-periodic |
 
 If a change spans more than about three of those rows, it is worth discussing in an
 issue before writing it.

@@ -54,7 +54,7 @@ So there were two things to build, in order:
    regression suite checks the oracle after every test, so a swallowed access
    violation now fails the test that provoked it instead of passing quietly. That
    is what makes the regression suite an oracle rather than just a lot of asserts
-   (1,257 tests as of 13 August 2026 — a figure that only ever goes up, so treat it
+   (over 2,000 tests as of September 2026 — a figure that only ever goes up, so treat it
    as a floor rather than a fact to maintain).
 2. **An oracle for the fuzz build**, which is AddressSanitizer. ASan is stronger
    than a crash handler: it traps the *first* out-of-bounds byte rather than

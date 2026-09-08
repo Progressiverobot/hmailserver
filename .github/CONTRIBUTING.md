@@ -10,8 +10,9 @@ agree to abide by it.
 See [README.md](../README.md) for full build instructions. In short:
 
 - Visual Studio 2026 (platform toolset v145), 64-bit Windows
-- External libs (OpenSSL 4.0.x, Boost 1.91, PostgreSQL 18 libpq) built
+- External libs (OpenSSL 4.0.x, Boost 1.92, PostgreSQL 18 libpq) built
   under a directory pointed to by the `hMailServerLibs` environment variable
+  (`libraries\build-openssl.ps1`, `build-boost.ps1` and `build-pgsql.ps1` do this)
 - Server solution: `hmailserver/source/Server/hMailServer/hMailServer.sln`
 - Tools solution: `hmailserver/source/Tools/hMailServer Tools.sln`
 - Helper scripts live in `build/` (`build.ps1`, `build-tests.ps1`, `run-tests.ps1`)
@@ -55,6 +56,21 @@ fix is `git commit --amend -s` and a push.
 - Use parameterised SQL exclusively — never build SQL strings manually.
 - New server-wide optional features should follow the INI-settings pattern:
   an `IniFileSettings` getter plus a control in the Server features dialog.
+- Every pull request must pass the checks that run on it: the C# builds with
+  `-warnaserror`, the hosted C++ server build, CodeQL (C#), dependency review,
+  binary provenance, and the coding-style jobs - editorconfig (`.editorconfig`:
+  spaces, width 3 for `.h`/`.cpp`/`.cs`), `dotnet format --verify-no-changes`, and
+  `python3 build/add-license-headers.py --check` (every source file carries the
+  copyright line and `SPDX-License-Identifier: AGPL-3.0-or-later`).
+- Control Panel changes are held to five more checks in the same job: every static
+  caption carries an Alt-key mnemonic (`build/check-mnemonics.py`); folder-access
+  decisions stay in `ACLManager` (`build/check-authz-choke-point.py`); and, in the
+  tree after 6.2.27, a new caption is marked for translation (`L("_Save changes")`
+  in C#, `{loc:L '_Save changes'}` in XAML), the English catalogue is regenerated
+  with `python3 build/check-localisation.py --write`, and all 17 complete languages
+  get a translation - an unmarked or untranslated caption fails CI
+  (`build/check-localisation.py`, `build/check-catalogues.py`); every INI setting
+  the server reads has a Control Panel editor (`build/check-ini-coverage.py`).
 
 ## Architecture
 

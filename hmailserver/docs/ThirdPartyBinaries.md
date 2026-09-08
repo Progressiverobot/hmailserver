@@ -45,6 +45,13 @@ outside the tree under `%hMailServerLibs%`, and
 DLLs into the output directory. That is why Scorecard does not flag them, and
 it is the model the rest of this list should be judged against.
 
+One native dependency is in the tree by design: zlib 1.3.1 is vendored as source
+under `hmailserver/source/Server/zlib` (its own LICENSE beside it, the text also
+under `docs/Licenses/`) and compiled straight into `hMailServer.exe` for IMAP
+COMPRESS=DEFLATE - in the tree after 6.2.27, not yet in a published release.
+Source, not a binary, so it is outside this inventory; it is not yet listed by
+`build/native-dependencies.ps1`, so the SBOM does not name it either.
+
 It is worth being precise about one thing. The three scripts that build those
 libraries - `libraries/build-openssl.ps1`, `build-boost.ps1` and
 `build-pgsql.ps1` - do download: each fetches one source archive from the

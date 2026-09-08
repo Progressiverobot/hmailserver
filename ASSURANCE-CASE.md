@@ -211,10 +211,14 @@ directions:
   (`TreatWarningAsError`, MSVC `/WX`), so a new warning stops the build.
 - **Platform hardening.** `/GS` buffer security checks, DEP (`/NXCOMPAT`) and
   ASLR (`/DYNAMICBASE`) are active on the shipped x64 binaries.
-- **Static analysis.** CodeQL runs on every push and pull request.
-- **Fuzzing.** A libFuzzer harness suite lives under `fuzz/`, with a corpus,
-  dictionaries and a regression directory, aimed at exactly the
-  pre-authentication parsers that A1 and A2 can reach.
+- **Static analysis.** CodeQL analyses the C# tools on every push and pull
+  request, and the C++ server on every push to master, weekly and on demand (not
+  on pull requests - a change to the protocol parsers is analysed by dispatching
+  the workflow against the branch before merging).
+- **Fuzzing.** A libFuzzer harness suite lives under `fuzz/`, with a seed corpus
+  regenerated from the real test messages (`make-corpus.ps1`; not committed), a
+  MIME token dictionary and a committed regression directory of fixed findings,
+  aimed at exactly the pre-authentication parsers that A1 and A2 can reach.
 
 ### Protocol-level smuggling (CWE-444)
 
@@ -270,6 +274,14 @@ binary is inventoried with a SHA-256 and its provenance, and an unlisted or
 changed binary fails the build — closing the "a DLL appeared and nobody
 noticed" gap that a diff review cannot catch.
 
+In the tree after 6.2.27, not yet in a published release: the server's own update
+path applies the same verification. `UpdateChecker` reads the release feed and
+`SigstoreVerifier` checks the installer against its `.cosign.bundle` in-process -
+the file's SHA-256 is the one signed and the one Rekor recorded, the certificate
+chains to the embedded Sigstore trust root, and its identity must be this
+repository's `sign-release.yml` workflow issued by GitHub's token service - so a
+substituted installer is refused before it is run.
+
 ---
 
 7. Evidence
@@ -287,8 +299,10 @@ noticed" gap that a diff review cannot catch.
 
 Release validation is not a smoke test: the full regression suite runs against
 the exact binary being shipped, with live SpamAssassin and ClamAV (real EICAR
-detection), DMARC evaluated against live DNS, and TLS 1.2 and 1.3 handshakes
-end to end. Nothing is mocked or skipped.
+detection), DMARC, SPF and DKIM evaluated against a DNS zone the suite serves
+itself (`Shared/SuiteDns.cs`, so a run cannot depend on the public DNS), and TLS
+1.2 and 1.3 handshakes end to end. Nothing is mocked except the resolver, and
+nothing is skipped.
 
 ---
 

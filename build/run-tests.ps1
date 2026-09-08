@@ -6,11 +6,12 @@
 # -StopOnError passes nunit3-console's /stoponerror, which abandons the run at the
 # first failure. That used to be unconditional, and it contradicts the thing the suite
 # is for: RELEASE.md step 8 requires "every test, nothing skipped", and a run that
-# stopped at test 40 of 1361 produces a report that looks like a completed run with one
-# failure. It cost two full runs in one afternoon to learn that twice - a single early
-# failure reported "Test Count: 240" and said nothing whatsoever about the other
-# thousand tests. It is the right flag while chasing one defect that poisons everything
-# after it, and the wrong one for a release, so it is now something you ask for.
+# stopped at test 40 of 1361 (the count then; over 2,000 now) produces a report that
+# looks like a completed run with one failure. It cost two full runs in one afternoon
+# to learn that twice - a single early failure reported "Test Count: 240" and said
+# nothing whatsoever about the other thousand tests. It is the right flag while
+# chasing one defect that poisons everything after it, and the wrong one for a
+# release, so it is now something you ask for.
 Param(
     [switch]$StopOnError,
     # Passed to --where, so a subset can be run without hand-building an nunit3-console

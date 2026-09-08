@@ -102,15 +102,14 @@ If the upgrade fails
 --------------------
 
 The installer checks both that the database tool launched *and* its exit code, so a
-failed or cancelled schema upgrade is reported instead of passing silently. Be
-clear about what that check does and does not do, because it is easy to read more
-into it than it delivers: on a non-zero exit code the installer shows an error
-dialog naming the exit code and telling you to re-run `DBSetupQuick.exe`, and then
-**carries on** — it goes on to start the service and the wizard finishes. So the
-signal is the dialog and the log, not a failed installation. If you script
-installs, treat that dialog's appearance, or a `hm_dbversion` that is still on the
-old value afterwards, as the failure; do not treat "the installer finished" as
-success.
+failed or cancelled schema upgrade is reported instead of passing silently: on a
+non-zero exit code the installer shows an error dialog naming the exit code and
+telling you to re-run `DBSetupQuick.exe`, and then **fails the install** — it
+raises, so setup ends with a non-zero exit code rather than finishing as though
+nothing had happened (it used to carry on and exit 0, which a scripted deployment
+could not tell from success). If you script installs, treat a non-zero exit code,
+or a `hm_dbversion` that is still on the old value afterwards, as the failure; do
+not treat "the installer finished" as success.
 
 If it does fail, the service may be installed but the schema only partly upgraded.
 The server does not paper over that: on startup it compares the database's version
@@ -167,25 +166,21 @@ matches where you actually put it. Upgrade afterwards, as a separate step, so th
 something goes wrong you know which of the two changes caused it.
 
 **Upgrading silently** — see the [unattended install](../../README.md#unattended-install)
-notes, and read this paragraph before you try it on an installation that has an
-administrator password set, because the failure is a hang rather than an error.
-
-`DBSetupQuick.exe` forwards only `/SilentIfOk` and `/silent` to `DBUpdater.exe`; it
-does **not** forward the `password:` argument, and it only reads that argument on
-the *create* path in the first place. DBUpdater then authenticates as
-`Administrator` by trying an empty password, then each of its own command-line
-arguments verbatim as a password, and if none works it opens a modal password
-dialog — which it does regardless of `/silent`. So:
+notes. Until 6.2.23 a silent upgrade of an installation with an administrator password
+set hung: `DBSetupQuick.exe` forwarded only `/SilentIfOk` and `/silent` to
+`DBUpdater.exe`, not the password, and DBUpdater then opened a modal password dialog
+nobody was there to answer. That is fixed. DBSetupQuick forwards the password on the
+upgrade path as well as the create path, the installer accepts it as
+`/adminpassword=<password>` and passes it through, and under `/silent` the shared
+authenticator fails with an exit code instead of prompting. So:
 
 * administrator password empty → a silent upgrade works;
-* administrator password set → a silent upgrade **blocks on a password dialog**
-  nobody is there to answer, and the install sits there until it is dismissed.
+* administrator password set → pass `/adminpassword=<password>`; without it the database
+  upgrade fails and the installer reports the non-zero exit code rather than waiting.
 
-Upgrade interactively on such an installation. (`DBUpdater.exe` on its own does
-accept the password, but only as a bare argument with no `password:` prefix —
-`DBUpdater.exe /silent <password>` — because of how that argument-as-password loop
-works. That is a workaround exploiting a quirk, not a documented interface, so
-prefer the interactive upgrade.)
+*(In the tree after 6.2.27, not yet in a published release: the live update's helper
+passes a single-use `/upgradetoken=<hex>` in place of the password, so an unattended
+update never handles the administrator password at all.)*
 
 **The .NET 10 runtime.** From the first release after 6.2.18, the Control Panel and
 the setup tools require the .NET 10 Desktop Runtime, which the installer bundles and
@@ -212,5 +207,5 @@ version at each end), `Constants.h`'s `REQUIRED_DB_VERSION`,
 (`select … from hm_dbversion`), `Application::OnDatabaseConnected` (the two refusal
 messages, verbatim), `hMailServerInnoExtension.iss` (the exit-code check and what
 follows it, and the .NET 10 bundling), `DBSetupQuick`'s `UpgradeDatabase` (which
-arguments are forwarded) and `Authenticator.AuthenticateUser` (the silent-upgrade
-password dialog).
+arguments are forwarded) and `Authenticator.AuthenticateUser` (fails instead of
+prompting under `/silent`).
