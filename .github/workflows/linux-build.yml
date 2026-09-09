@@ -321,6 +321,11 @@ jobs:
           Internal=0
           [Settings]
           ProtectStoredSecretsWithDPAPI=0
+          # The runner's OpenSSL is older than the ML-KEM hybrids the tree
+          # prefers by default, and a group list OpenSSL rejects is reported
+          # (once) as an error the fixtures would read as the server's. Name
+          # the classical groups here; the Windows gate exercises the default.
+          TlsKeyExchangeGroups=X25519:secp384r1:secp256r1
           RestApiPort=8045
           RestApiBindAddress=127.0.0.1
           WindowsEventLogEnabled=0

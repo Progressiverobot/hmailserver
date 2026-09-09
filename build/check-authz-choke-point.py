@@ -35,6 +35,7 @@ ALLOWED = {
         "IMAP/IMAPConfiguration.cpp",
         "IMAP/IMAPConfiguration.h",
         "COM/InterfaceSettings.cpp",          # the setting's own property
+        "Common/Util/RestApiSettings.cpp",    # the same property, over REST
     },
     "GetAclEnforcementEnabled(": {
         "Common/Application/ACLManager.cpp",

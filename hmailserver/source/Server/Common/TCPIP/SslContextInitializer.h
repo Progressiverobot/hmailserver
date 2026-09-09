@@ -63,6 +63,8 @@ namespace HM
       // because the list now carries hybrid post-quantum KEMs (X25519MLKEM768 and
       // friends) alongside the classical elliptic curves.
       static void SetKeyExchangeGroups_(boost::asio::ssl::context& context);
+      // One report per distinct message: see the definition.
+      static void ReportGroupListOnce_(int severity, int code, const String &message);
 
       // False if the given OpenSSL group list would end up enabling no group at
       // all, which OpenSSL accepts but which makes TLS 1.3 unusable.
