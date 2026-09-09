@@ -70,10 +70,16 @@ namespace HM
    class IPAddress;
    class Account;
    class Domain;
+   class Rule;
    class IMAPFolder;
    class IMAPFolders;
    class Message;
    class MessageData;
+
+   // The server-wide settings group as one JSON object, from the table in
+   // RestApiSettings.cpp that the GET, the PUT and the OpenAPI description all
+   // read; escape is the JSON string escaper to use for its values.
+   AnsiString RestApiSettingsServerGroupJson(AnsiString (*escape)(const AnsiString &));
 
    class RestApiServer
    {
@@ -192,12 +198,37 @@ namespace HM
          RouteMeDraftSave,
          RouteSessionCreate,
          RouteSessionDelete,
+         // Wave 162: the write surface. Server-wide ones are refused for
+         // domain-restricted keys in Authorize_; the alias and account writes
+         // are scoped to their domain the way the account routes are.
+         RouteSettingsPut,
+         RouteSettingsAntiSpamGet,
+         RouteSettingsAntiSpamPut,
+         RouteSettingsLoggingGet,
+         RouteSettingsLoggingPut,
+         RouteRuleCreate,
+         RouteRuleUpdate,
+         RouteRuleDelete,
+         RouteCertificateCreate,
+         RouteCertificateDelete,
+         RoutePortList,
+         RoutePortCreate,
+         RoutePortUpdate,
+         RoutePortDelete,
+         RouteRouteList,
+         RouteRouteCreate,
+         RouteRouteUpdate,
+         RouteRouteDelete,
+         RouteAliasCreate,
+         RouteAliasDelete,
+         RouteAccountUpdate,
+         RouteServerReinitialize,
          RouteOpenApi
       };
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0), attachment_index(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0), attachment_index(0), record_id(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
@@ -206,6 +237,7 @@ namespace HM
          __int64 archive_id;      // an archive index row id, for the routes that name one
          __int64 folder_id;       // an IMAP folder id, for the account's own mailbox routes
          int attachment_index;    // which attachment of a message, for the download route
+         __int64 record_id;       // a rule, certificate, port or route id, for the write routes that name one
          AnsiString query;        // the part after "?", for the routes that take one
       };
 
@@ -452,6 +484,43 @@ namespace HM
       HttpResponse HandleBackupStart_();
       HttpResponse HandleBackupStatus_();
       HttpResponse HandleSettings_();
+      HttpResponse HandleServerReinitialize_();
+      static void ReinitializeAfterTheAnswer_();
+
+      // Wave 162: the write surface. Each group lives in its own translation
+      // unit beside this one - RestApiSettings.cpp, RestApiRules.cpp,
+      // RestApiCertificates.cpp, RestApiRoutes.cpp - and each contributes its
+      // paths to the OpenAPI document through the OpenApi*Paths_ function,
+      // which returns either nothing or a run of entries each beginning with
+      // a comma, appended after the last path HandleOpenApi_ writes itself.
+      HttpResponse HandleSettingsPut_(const AnsiString &requestBody);
+      HttpResponse HandleSettingsAntiSpam_();
+      HttpResponse HandleSettingsAntiSpamPut_(const AnsiString &requestBody);
+      HttpResponse HandleSettingsLogging_();
+      HttpResponse HandleSettingsLoggingPut_(const AnsiString &requestBody);
+      static AnsiString OpenApiSettingsPaths_();
+      HttpResponse HandleCreateRule_(const AnsiString &requestBody);
+      HttpResponse HandleUpdateRule_(__int64 ruleId, const AnsiString &requestBody);
+      HttpResponse HandleDeleteRule_(__int64 ruleId);
+      static AnsiString OpenApiRulesPaths_();
+      // One rule as every rule route emits it: the listing, the create and
+      // the replace answer with the same document (defined in RestApiRules.cpp).
+      static AnsiString RuleEntryJson_(const std::shared_ptr<Rule> &rule);
+      HttpResponse HandleCreateCertificate_(const AnsiString &requestBody);
+      HttpResponse HandleDeleteCertificate_(__int64 certificateId);
+      HttpResponse HandleListPorts_();
+      HttpResponse HandleCreatePort_(const AnsiString &requestBody);
+      HttpResponse HandleUpdatePort_(__int64 portId, const AnsiString &requestBody);
+      HttpResponse HandleDeletePort_(__int64 portId);
+      static AnsiString OpenApiCertificatesPaths_();
+      HttpResponse HandleListRoutes_();
+      HttpResponse HandleCreateRoute_(const AnsiString &requestBody);
+      HttpResponse HandleUpdateRoute_(__int64 routeId, const AnsiString &requestBody);
+      HttpResponse HandleDeleteRoute_(__int64 routeId);
+      HttpResponse HandleCreateAlias_(const String &domainName, const AnsiString &requestBody);
+      HttpResponse HandleDeleteAlias_(const String &address);
+      HttpResponse HandleUpdateAccount_(const Caller &caller, const String &address, const AnsiString &requestBody);
+      static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);
       HttpResponse HandleArchiveHold_(const std::vector<String> &domains, __int64 archiveId, bool hold);

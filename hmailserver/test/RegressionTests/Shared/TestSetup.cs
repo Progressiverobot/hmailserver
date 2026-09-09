@@ -873,9 +873,12 @@ namespace RegressionTests.Shared
 
       public static string CreateLargeDummyMailBody()
       {
+         // CRLF, not AppendLine: this is message text, and on a Linux host
+         // Environment.NewLine is a bare LF, which the server rightly refuses
+         // ("554 Rejected - Message containing bare LF's").
          var sb = new StringBuilder();
          for (var i = 0; i < 10000; i++)
-            sb.AppendLine("0123456789012345678901234567890123456789012345678901234567890123456789");
+            sb.Append("0123456789012345678901234567890123456789012345678901234567890123456789\r\n");
 
          return sb.ToString();
       }

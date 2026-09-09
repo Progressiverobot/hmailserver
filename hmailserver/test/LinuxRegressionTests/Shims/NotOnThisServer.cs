@@ -26,13 +26,13 @@ namespace RegressionTests.Shared
       }
 
       public const string NoSettingsWrite =
-         "needs a server setting written, and GET /api/v1/settings is read-only (writing settings stays with COM and the Control Panel)";
+         "needs a server setting written, and this server's REST API has no PUT /api/v1/settings (it arrived with wave 162)";
 
       public const string NoRouteCreate =
-         "needs an SMTP route, which the REST API has no route to create";
+         "needs an SMTP route, and this server's REST API has no POST /api/v1/routes (it arrived with wave 162)";
 
       public const string NoAliasCreate =
-         "needs an alias, which the REST API has no route to create (GET /api/v1/domains/{domain}/aliases only lists them)";
+         "needs an alias, and this server's REST API has no POST /api/v1/domains/{domain}/aliases (it arrived with wave 162)";
 
       public const string NoDomainCreate =
          "needs a domain created, and this server's REST API has no POST /api/v1/domains";
@@ -106,26 +106,32 @@ namespace RegressionTests.Shared
       ///    the test is not wrong where it was written, so it is skipped with the reason
       ///    only when the host is not Windows.
       /// </summary>
-      private static readonly Dictionary<string, string> WindowsHostRegistry = new Dictionary<string, string>
+
+      // A registered reason that names a route skips only on a server without
+      // that route; the registry is written for the oldest server the project
+      // runs against, and the newest answers it.
+      private static bool StillApplies(string reason)
       {
-         { "RegressionTests.IMAP.Search.TestSearchLargeBody",
-            "builds its message with AppendLine, a bare LF on this host, which the server rightly refuses (554 Rejected - Message containing bare LF's); it passes from a Windows host" }
-      };
+         if (reason == NoRouteCreate)
+            return !ServerApi.HasRouteWriteRoutes;
+         if (reason == NoAliasCreate)
+            return !ServerApi.HasAliasWriteRoutes;
+         if (reason == NoSettingsWrite)
+            return !ServerApi.HasSettingsWriteRoutes;
+         return true;
+      }
 
       public static void SkipIfRegistered()
       {
          var test = TestContext.CurrentContext.Test;
          string reason;
 
-         if (test.ClassName != null && Registry.TryGetValue(test.ClassName, out reason))
+         if (test.ClassName != null && Registry.TryGetValue(test.ClassName, out reason) && StillApplies(reason))
             Ignore(reason);
 
-         if (test.ClassName != null && test.MethodName != null && Registry.TryGetValue(test.ClassName + "." + test.MethodName, out reason))
+         if (test.ClassName != null && test.MethodName != null && Registry.TryGetValue(test.ClassName + "." + test.MethodName, out reason) && StillApplies(reason))
             Ignore(reason);
 
-         if (!System.OperatingSystem.IsWindows() && test.ClassName != null && test.MethodName != null &&
-             WindowsHostRegistry.TryGetValue(test.ClassName + "." + test.MethodName, out reason))
-            Ignore(reason);
       }
    }
 }

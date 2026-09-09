@@ -188,15 +188,23 @@ test that passes here is the same test that passes on Windows.
 What the fixture layer does instead of COM: the test domain `example.test` is
 deleted and recreated before every test through `POST /api/v1/domains` (or, on a
 server built before that route existed, emptied of its accounts and lists);
-accounts and distribution lists go through their routes; the delivery queue is
-drained through `/api/v1/queue`; and the ERROR log is read through
-`/api/v1/logs`, judged by what was written *during* the test rather than by
-whether the file exists. Everything a test makes is removed in its teardown.
+accounts, aliases and distribution lists go through their routes; a server
+setting a fixture writes goes through `PUT /api/v1/settings` or its anti-spam
+and logging groups, and the suite's own defaults are put back before every test
+the way the Windows `PerformBasicSetup` puts them back through COM; the
+localhost SMTP routes go through `/api/v1/routes`; the TLS listeners the SSL
+fixtures need are made from the certificate and port routes and brought up with
+`POST /api/v1/server/reinitialize`; the delivery queue is drained through
+`/api/v1/queue`; and the ERROR log is read through `/api/v1/logs`, judged by
+what was written *during* the test rather than by whether the file exists.
+Everything a test makes is removed in its teardown.
 
-What it cannot do, it says: a fixture that writes a server setting, creates an
-alias or an SMTP route, needs a TLS listener, the suite's fake DNS zone or a
-COM-only call such as `Utilities.EvaluateSieveScript` is **skipped with that
-reason**, from the shim, never passed with a weakened assertion. `dotnet test`
+What it cannot do, it says: a fixture that needs the suite's fake DNS zone
+served to the server's resolver, or a COM-only call such as
+`Utilities.EvaluateSieveScript`, is **skipped with that reason**, from the
+shim, never passed with a weakened assertion. A shim that needs a route also
+asks the server's own OpenAPI document whether it has it, so an older server
+skips with the route named rather than failing. `dotnet test`
 reports those as skipped; a failure is the server's. The REST API also refuses
 a credential's 201st request in any ten-second window, and the fixture layer
 keeps under that on its own.

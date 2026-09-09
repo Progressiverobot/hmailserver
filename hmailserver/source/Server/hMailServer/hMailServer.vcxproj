@@ -564,6 +564,10 @@ EXIT 0
     <ClCompile Include="..\Common\Util\OtelTracer.cpp" />
     <ClCompile Include="..\Common\Util\HttpServer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiServer.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiSettings.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiRules.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiCertificates.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
     <ClCompile Include="..\Common\AntiSpam\QuarantineStore.cpp" />
     <ClCompile Include="..\Common\Util\Totp.cpp" />

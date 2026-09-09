@@ -105,6 +105,22 @@ namespace HM
                }
             }
 
+            // A stateful target - UTF-7 is one - holds its last group back
+            // until told the input has ended. Without this the measure is
+            // short by that group, and the conversion below is cut at it.
+            {
+               char *outputPosition = scratch;
+               size_t outputRemaining = sizeof(scratch);
+
+               if (::iconv(descriptor, 0, 0, &outputPosition, &outputRemaining) == (size_t) -1)
+               {
+                  ::iconv_close(descriptor);
+                  return 0;
+               }
+
+               total += sizeof(scratch) - outputRemaining;
+            }
+
             answer = (int) (total / unitSize);
          }
          else
@@ -118,6 +134,13 @@ namespace HM
             {
                // Invalid input, an incomplete sequence at the end, or a
                // destination too small. Win32 answers 0 for all three.
+               ::iconv_close(descriptor);
+               return 0;
+            }
+
+            // The flush that ends a stateful encoding's last group; see above.
+            if (::iconv(descriptor, 0, 0, &outputPosition, &outputRemaining) == (size_t) -1)
+            {
                ::iconv_close(descriptor);
                return 0;
             }
@@ -137,12 +160,37 @@ namespace HM
       if (source == 0)
          return 0;
 
-      const size_t sourceBytes = sourceLength < 0 ? ::strlen(source) + 1 : (size_t) sourceLength;
+      // A length of -1 means "up to and including the terminator", and the
+      // Win32 pair counts the terminator in what it answers. The terminator is
+      // not given to iconv: glibc's UTF-7 decoder refuses a NUL byte (it is not
+      // a directly encoded character), which turned every modified-UTF-7
+      // folder name into its first character and heap garbage. The text is
+      // converted, and the terminator written and counted here.
+      const bool terminated = sourceLength < 0;
+      const size_t sourceBytes = terminated ? ::strlen(source) : (size_t) sourceLength;
+      const bool measuring = destination == 0 || destinationLength == 0;
+      const size_t room = measuring ? 0 : (size_t) destinationLength - (terminated ? 1 : 0);
 
-      return ConvertWithIconv(IconvNameForCodePage(codePage), "WCHAR_T",
-                              source, sourceBytes,
-                              (char *) destination, (size_t) destinationLength * sizeof(wchar_t),
-                              sizeof(wchar_t));
+      int units = 0;
+
+      if (sourceBytes > 0)
+      {
+         units = ConvertWithIconv(IconvNameForCodePage(codePage), "WCHAR_T",
+                                  source, sourceBytes,
+                                  measuring ? 0 : (char *) destination, room * sizeof(wchar_t),
+                                  sizeof(wchar_t));
+         if (units == 0)
+            return 0;
+      }
+
+      if (terminated)
+      {
+         if (!measuring)
+            destination[units] = 0;
+         units++;
+      }
+
+      return units;
    }
 
    int
@@ -151,12 +199,33 @@ namespace HM
       if (source == 0)
          return 0;
 
-      const size_t sourceUnits = sourceLength < 0 ? ::wcslen(source) + 1 : (size_t) sourceLength;
+      // As FromCodePage: the terminator is written and counted here, not
+      // converted.
+      const bool terminated = sourceLength < 0;
+      const size_t sourceUnits = terminated ? ::wcslen(source) : (size_t) sourceLength;
+      const bool measuring = destination == 0 || destinationLength == 0;
+      const size_t room = measuring ? 0 : (size_t) destinationLength - (terminated ? 1 : 0);
 
-      return ConvertWithIconv("WCHAR_T", IconvNameForCodePage(codePage),
-                              (const char *) source, sourceUnits * sizeof(wchar_t),
-                              destination, (size_t) destinationLength,
-                              1);
+      int bytes = 0;
+
+      if (sourceUnits > 0)
+      {
+         bytes = ConvertWithIconv("WCHAR_T", IconvNameForCodePage(codePage),
+                                  (const char *) source, sourceUnits * sizeof(wchar_t),
+                                  measuring ? 0 : destination, room,
+                                  1);
+         if (bytes == 0)
+            return 0;
+      }
+
+      if (terminated)
+      {
+         if (!measuring)
+            destination[bytes] = 0;
+         bytes++;
+      }
+
+      return bytes;
    }
 #endif
 

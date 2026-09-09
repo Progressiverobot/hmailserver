@@ -105,6 +105,22 @@ namespace RegressionTests.Shared
          return Send(HttpMethod.Delete, path, null, AdminAuthorization);
       }
 
+      /// <summary>
+      ///    A GET that answers null instead of failing the test when the server
+      ///    does not answer at all - for watching a listener go away and return.
+      /// </summary>
+      public static ApiAnswer TryGet(string path)
+      {
+         try
+         {
+            return Send(HttpMethod.Get, path, null, AdminAuthorization);
+         }
+         catch (InvalidOperationException)
+         {
+            return null;
+         }
+      }
+
       /// <summary>The /api/v1/me routes: an account's own credentials, never the administrator's.</summary>
       public static ApiAnswer AsAccount(string address, string password, HttpMethod method, string path, string json = null)
       {
@@ -275,16 +291,42 @@ namespace RegressionTests.Shared
       /// </summary>
       public static bool HasDomainWriteRoutes
       {
-         get
-         {
-            var document = OpenApi.Value;
-            var domains = document.IndexOf("\"/api/v1/domains\":{", StringComparison.Ordinal);
-            if (domains < 0)
-               return false;
-            var end = document.IndexOf("\"/api/v1/", domains + 20, StringComparison.Ordinal);
-            var entry = end < 0 ? document.Substring(domains) : document.Substring(domains, end - domains);
-            return entry.Contains("\"post\":");
-         }
+         get { return HasRoute("/api/v1/domains", "post"); }
+      }
+
+      // The write surface of wave 162, each probed the same way: the path's
+      // entry in the OpenAPI document names the verb. A server without the
+      // route is an older one, and the shim that needs it skips with the
+      // reason that names it.
+      public static bool HasSettingsWriteRoutes
+      {
+         get { return HasRoute("/api/v1/settings", "put"); }
+      }
+
+      public static bool HasAliasWriteRoutes
+      {
+         get { return HasRoute("/api/v1/domains/{domain}/aliases", "post"); }
+      }
+
+      public static bool HasRouteWriteRoutes
+      {
+         get { return HasRoute("/api/v1/routes", "post"); }
+      }
+
+      public static bool HasAccountUpdateRoute
+      {
+         get { return HasRoute("/api/v1/accounts/{address}", "put"); }
+      }
+
+      public static bool HasRoute(string path, string verb)
+      {
+         var document = OpenApi.Value;
+         var start = document.IndexOf("\"" + path + "\":{", StringComparison.Ordinal);
+         if (start < 0)
+            return false;
+         var end = document.IndexOf("\"/api/v1/", start + path.Length + 4, StringComparison.Ordinal);
+         var entry = end < 0 ? document.Substring(start) : document.Substring(start, end - start);
+         return entry.Contains("\"" + verb + "\":");
       }
    }
 }

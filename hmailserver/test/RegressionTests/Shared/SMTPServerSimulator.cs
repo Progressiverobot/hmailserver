@@ -213,27 +213,33 @@ namespace RegressionTests.Shared
 
          if (ServerSupportsEhlo && command.ToUpper().StartsWith("EHLO"))
          {
+            // Every line CRLF, spelled out: AppendLine ends a line with
+            // Environment.NewLine, which is a bare LF on Linux, and a bare LF
+            // is not a line to an SMTP client - hMailServer reads on, the
+            // simulator waits for the next command, and both sit there until
+            // the test times out. That is what every route, TLS and BDAT
+            // fixture did on a Linux host until this was written out.
             var response = new StringBuilder();
 
             if (_connectionSecurity == eConnectionSecurity.eCSSTARTTLSRequired ||
                 _connectionSecurity == eConnectionSecurity.eCSSTARTTLSOptional)
-               response.AppendLine("250-STARTTLS");
+               response.Append("250-STARTTLS\r\n");
 
             if (EhloSizeAdvertisement.HasValue)
-               response.AppendLine(EhloSizeAdvertisement.Value > 0
-                  ? "250-SIZE " + EhloSizeAdvertisement.Value
-                  : "250-SIZE");
+               response.Append(EhloSizeAdvertisement.Value > 0
+                  ? "250-SIZE " + EhloSizeAdvertisement.Value + "\r\n"
+                  : "250-SIZE\r\n");
 
             if (AdvertisePipelining)
-               response.AppendLine("250-PIPELINING");
+               response.Append("250-PIPELINING\r\n");
 
             if (AdvertiseChunking)
-               response.AppendLine("250-CHUNKING");
+               response.Append("250-CHUNKING\r\n");
 
             if (AdvertiseBinaryMime)
-               response.AppendLine("250-BINARYMIME");
+               response.Append("250-BINARYMIME\r\n");
 
-            response.AppendLine("250 AUTH LOGIN PLAIN");
+            response.Append("250 AUTH LOGIN PLAIN\r\n");
 
             Send(response.ToString());
             return false;
