@@ -153,6 +153,14 @@ namespace RegressionTests.Shared
             {
                return;
             }
+            catch (ArgumentException)
+            {
+               // The same case on .NET (the Linux suite): a listener stopped with an
+               // accept pending completes that accept with ArgumentException rather
+               // than ObjectDisposedException, on a thread-pool thread, where an
+               // exception nobody catches ends the test host.
+               return;
+            }
 
             if (_connectionSecurity == eConnectionSecurity.eCSTLS) _tcpConnection.HandshakeAsServer(_localCertificate);
 

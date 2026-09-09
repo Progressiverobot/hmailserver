@@ -17,17 +17,20 @@ namespace RegressionTests.Shared
    public class Pop3ClientSimulator
    {
       private readonly IPAddress _ipaddress;
-      private readonly int _port = 110;
+      private readonly int _port;
       private readonly TcpConnection _tcpConnection;
 
+      // The port and the host come from TestPorts rather than being written here, so
+      // that the Linux suite can point the same fixtures at a server elsewhere. The
+      // defaults there are the 110 and 127.0.0.1 that used to be here.
       public Pop3ClientSimulator() :
-         this(false, 110)
+         this(false, TestPorts.Pop3)
       {
       }
 
 
       public Pop3ClientSimulator(bool useSSL, int port) :
-         this(IPAddress.Parse("127.0.0.1"), useSSL, port)
+         this(TestPorts.HostAddress, useSSL, port)
       {
       }
 

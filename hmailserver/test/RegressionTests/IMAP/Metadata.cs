@@ -160,7 +160,7 @@ namespace RegressionTests.IMAP
       public void CapabilityAdvertisesMetadata()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(143), "Could not connect to the IMAP server on port 143.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Imap), "Could not connect to the IMAP server on port " + TestPorts.Imap + ".");
          socket.ReadUntil("* OK");
 
          socket.Send("A01 CAPABILITY\r\n");

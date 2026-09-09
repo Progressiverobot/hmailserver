@@ -97,3 +97,5 @@ __pycache__/
 
 # Transcripts the libraries/build-*.ps1 dependency builds write next to themselves.
 libraries/build-*.log
+hmailserver/test/LinuxRegressionTests/bin/
+hmailserver/test/LinuxRegressionTests/obj/

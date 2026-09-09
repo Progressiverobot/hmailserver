@@ -59,7 +59,7 @@ namespace RegressionTests.SMTP
          public RawSocketClient(int port)
          {
             _client = new TcpClient(AddressFamily.InterNetwork);
-            _client.Connect(IPAddress.Parse("127.0.0.1"), port);
+            _client.Connect(TestPorts.HostAddress, port);
             _stream = _client.GetStream();
             _stream.ReadTimeout = 30000;
             _stream.WriteTimeout = 30000;
@@ -229,7 +229,7 @@ namespace RegressionTests.SMTP
 
       private static RawSocketClient ConnectAndEhloRaw()
       {
-         var smtp = new RawSocketClient(25);
+         var smtp = new RawSocketClient(TestPorts.Smtp);
          Assert.IsTrue(smtp.ReadSmtpResponse().StartsWith("220"), "No SMTP greeting.");
          smtp.SendAscii("EHLO example.test\r\n");
          string ehlo = smtp.ReadSmtpResponse();
@@ -255,7 +255,7 @@ namespace RegressionTests.SMTP
       /// </summary>
       private static byte[] FetchFirstMessageRawViaImap(string account, string password)
       {
-         using (var imap = new RawSocketClient(143))
+         using (var imap = new RawSocketClient(TestPorts.Imap))
          {
             imap.ReadLine(); // "* OK ..." greeting
 
@@ -318,7 +318,7 @@ namespace RegressionTests.SMTP
       public void TestEhloAdvertisesBinaryMimeAndChunking()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
 
          try
          {

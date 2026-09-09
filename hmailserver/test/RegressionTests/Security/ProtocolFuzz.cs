@@ -111,7 +111,7 @@ namespace RegressionTests.Security
             try
             {
                tc = new TcpConnection();
-               if (!tc.Connect(25)) continue;
+               if (!tc.Connect(TestPorts.Smtp)) continue;
                Drain(tc, 1000); // banner
 
                int commands = rng.Next(1, 6);
@@ -147,7 +147,7 @@ namespace RegressionTests.Security
             try
             {
                tc = new TcpConnection();
-               if (!tc.Connect(143)) continue;
+               if (!tc.Connect(TestPorts.Imap)) continue;
                Drain(tc, 1000); // banner
 
                int commands = rng.Next(1, 6);
@@ -192,7 +192,7 @@ namespace RegressionTests.Security
             try
             {
                tc = new TcpConnection();
-               if (!tc.Connect(25)) continue;
+               if (!tc.Connect(TestPorts.Smtp)) continue;
                Drain(tc, 1000); // banner
 
                tc.Send("EHLO fuzz.example.test\r\n"); Drain(tc, 1000);
@@ -252,7 +252,7 @@ namespace RegressionTests.Security
       {
          using (var tc = new TcpConnection())
          {
-            Assert.IsTrue(tc.Connect(25), "SMTP server is not accepting connections after fuzzing (possible crash).");
+            Assert.IsTrue(tc.Connect(TestPorts.Smtp), "SMTP server is not accepting connections after fuzzing (possible crash).");
             string banner = tc.ReadUntil("220", TimeSpan.FromSeconds(15));
             Assert.IsTrue(banner.Contains("220"), "SMTP banner missing after fuzzing. Got: " + banner);
             tc.Send("EHLO liveness.example.test\r\n");
@@ -266,7 +266,7 @@ namespace RegressionTests.Security
       {
          using (var tc = new TcpConnection())
          {
-            Assert.IsTrue(tc.Connect(143), "IMAP server is not accepting connections after fuzzing (possible crash).");
+            Assert.IsTrue(tc.Connect(TestPorts.Imap), "IMAP server is not accepting connections after fuzzing (possible crash).");
             string banner = tc.ReadUntil("* OK", TimeSpan.FromSeconds(15));
             Assert.IsTrue(banner.Contains("* OK"), "IMAP banner missing after fuzzing. Got: " + banner);
             tc.Send("L1 CAPABILITY\r\n");

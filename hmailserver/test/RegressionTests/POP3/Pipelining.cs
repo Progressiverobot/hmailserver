@@ -36,7 +36,7 @@ namespace RegressionTests.POP3
       public void CapaAdvertisesPipelining()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(110));
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Pop3));
          socket.ReadUntil("+OK");
 
          socket.Send("CAPA\r\n");
@@ -54,7 +54,7 @@ namespace RegressionTests.POP3
       public void BatchedAuthorizationAndTransactionCommands()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(110));
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Pop3));
          socket.ReadUntil("+OK");
 
          socket.Send("USER pipeline@example.test\r\nPASS test\r\nSTAT\r\nQUIT\r\n");
@@ -73,7 +73,7 @@ namespace RegressionTests.POP3
       public void BatchedListRetrDeleQuit()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(110));
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Pop3));
          socket.ReadUntil("+OK");
 
          socket.Send("USER pipeline@example.test\r\nPASS test\r\n");

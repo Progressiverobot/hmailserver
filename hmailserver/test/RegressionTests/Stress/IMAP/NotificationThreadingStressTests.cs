@@ -24,7 +24,7 @@ namespace RegressionTests.Stress.IMAP
       "single green run proves little.")]
    internal class NotificationThreadingStressTests : TestFixtureBase
    {
-      private const int ImapPort = 143;
+      private static readonly int ImapPort = TestPorts.Imap;
       private const int ImapsPort = 14301;
 
       private const int IdleSessionCount = 8;

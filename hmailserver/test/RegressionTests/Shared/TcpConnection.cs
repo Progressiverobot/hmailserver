@@ -66,9 +66,12 @@ namespace RegressionTests.Shared
          Disconnect();
       }
 
+      // The host the server is on, when the caller names only a port: 127.0.0.1 unless
+      // the Linux suite has set TestPorts.Host. The IMAP simulator has no host of its
+      // own and reaches the server through this overload.
       public bool Connect(int iPort)
       {
-         return Connect(IPAddress.Parse("127.0.0.1"), iPort);
+         return Connect(TestPorts.HostAddress, iPort);
       }
 
       public bool Connect(IPAddress ipaddress, int iPort)
@@ -94,6 +97,10 @@ namespace RegressionTests.Shared
          }
 
          _tcpClient.Client.Blocking = true;
+
+         // None unless the suite asked for one (TestPorts says which suite does and why).
+         if (TestPorts.ReceiveTimeoutMilliseconds > 0)
+            _tcpClient.ReceiveTimeout = TestPorts.ReceiveTimeoutMilliseconds;
 
          if (IsSslConnection)
             HandshakeAsClient();

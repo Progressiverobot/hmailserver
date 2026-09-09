@@ -28,7 +28,7 @@ namespace RegressionTests.SMTP
       private static TcpConnection ConnectAndHelo()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          Assert.IsTrue(socket.Receive().StartsWith("220"));
          socket.SendAndReceive("HELO example.test\r\n");
          return socket;

@@ -33,7 +33,7 @@ namespace RegressionTests.IMAP
       public void CapabilityAdvertisesLiteralMinus()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(143), "Could not connect to the IMAP server on port 143.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Imap), "Could not connect to the IMAP server on port " + TestPorts.Imap + ".");
          socket.ReadUntil("* OK");
 
          socket.Send("A01 CAPABILITY\r\n");
@@ -57,7 +57,7 @@ namespace RegressionTests.IMAP
       public void LoginWithNonSynchronizingLiteralsGetsNoContinuation()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(143), "Could not connect to the IMAP server on port 143.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Imap), "Could not connect to the IMAP server on port " + TestPorts.Imap + ".");
          socket.ReadUntil("* OK");
 
          const string username = "literals@example.test";
@@ -88,7 +88,7 @@ namespace RegressionTests.IMAP
                                 "Sent without waiting.\r\n";
 
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(143), "Could not connect to the IMAP server on port 143.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Imap), "Could not connect to the IMAP server on port " + TestPorts.Imap + ".");
          socket.ReadUntil("* OK");
 
          socket.Send("A01 LOGIN literals@example.test test\r\n");
@@ -124,7 +124,7 @@ namespace RegressionTests.IMAP
       public void ASynchronizingLiteralStillGetsTheContinuation()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(143), "Could not connect to the IMAP server on port 143.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Imap), "Could not connect to the IMAP server on port " + TestPorts.Imap + ".");
          socket.ReadUntil("* OK");
 
          const string username = "literals@example.test";
