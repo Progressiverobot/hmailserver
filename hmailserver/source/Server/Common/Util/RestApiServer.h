@@ -392,7 +392,10 @@ namespace HM
 
       static AnsiString GetAuthorizationHeader_(const AnsiString &request);
       static AnsiString GetHeader_(const AnsiString &request, const AnsiString &lowerCaseName);
-      static HttpResponse BuildUnauthorizedResponse_(bool secondFactorRequired);
+      // suppressChallenge leaves out WWW-Authenticate, for a request a page's
+      // own script made: see the definition, and IsPageScriptRequest_ below.
+      static HttpResponse BuildUnauthorizedResponse_(bool secondFactorRequired, bool suppressChallenge);
+      static bool IsPageScriptRequest_(const AnsiString &request);
       static HttpResponse BuildForbiddenResponse_(const AnsiString &reason);
       static HttpResponse BuildTooManyRequestsResponse_();
 

@@ -326,17 +326,28 @@ namespace HM
       std::mutex refused_addresses_mutex;
       std::vector<RefusedAddress> refused_addresses;
 
-      // Browser sessions for the self-service page. One row per sign-in,
-      // holding the SHA-256 of the cookie's token and the account it stands
-      // for; the token itself lives only in the browser. Bounded in number
-      // and in time (see AuthenticateSession_), and dropped on Stop() - a
-      // restarted listener holds no sessions.
+      // Browser sessions for the self-service page and for the Control Deck.
+      // One row per sign-in, holding the SHA-256 of the cookie's token and who
+      // it stands for - an account, or the administrator; the token itself
+      // lives only in the browser. Bounded in number and in time (see
+      // AuthenticateSession_), and dropped on Stop() - a restarted listener
+      // holds no sessions.
       struct BrowserSession
       {
-         BrowserSession() : account_id(0), created_at(0), last_seen_at(0) { }
+         BrowserSession() : account_id(0), administrator(false), created_at(0), last_seen_at(0) { }
 
          AnsiString token_hash;
          __int64 account_id;
+
+         // The administrator's session: account_id is 0 and credential_stamp
+         // is the SHA-256 of the stored administrator password hash as it was
+         // at sign-in, so that a change of the administrator password ends the
+         // session on its next request, as a change of an account's password
+         // ends that account's other sessions. A hash of a hash: the table
+         // still holds nothing that logs anybody in.
+         bool administrator;
+         AnsiString credential_stamp;
+
          ULONGLONG created_at;
          ULONGLONG last_seen_at;
       };
@@ -407,6 +418,35 @@ namespace HM
       {
          HashCreator hasher(HashCreator::SHA256);
          return hasher.GenerateHashNoSalt(token, HashCreator::hex);
+      }
+
+      // What an administrator session is checked against on every request: the
+      // stored administrator password hash, hashed once more. Empty when no
+      // administrator password is set, which is the state in which this API
+      // answers nobody at all.
+      AnsiString AdministratorCredentialStamp()
+      {
+         const AnsiString stored = AnsiString(IniFileSettings::Instance()->GetAdministratorPassword());
+         if (stored.IsEmpty())
+            return AnsiString();
+
+         return HashApiKeyToken(stored);
+      }
+
+      // Every administrator session at once. Called when the credential they
+      // were minted from is no longer the one in force. Takes the table's lock
+      // itself.
+      void RevokeAdministratorSessions()
+      {
+         std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+
+         browser_sessions.erase(
+            std::remove_if(browser_sessions.begin(), browser_sessions.end(),
+               [](const BrowserSession &session)
+               {
+                  return session.administrator;
+               }),
+            browser_sessions.end());
       }
 
       // Parses "<address>/<prefix>" into an inclusive address range. Handles
@@ -1330,7 +1370,7 @@ namespace HM
          }
 
          if (caller.result == AuthenticationFailed)
-            return BuildUnauthorizedResponse_(caller.second_factor_required);
+            return BuildUnauthorizedResponse_(caller.second_factor_required, IsPageScriptRequest_(request));
 
          // After authentication, so the budget belongs to the credential rather
          // than to a source address, and before routing, so that being over it
@@ -1366,7 +1406,7 @@ namespace HM
          AuthorizationResult authorization = Authorize_(caller, route, refusalReason);
 
          if (authorization == AuthorizationUnauthenticated)
-            return BuildUnauthorizedResponse_(false);
+            return BuildUnauthorizedResponse_(false, IsPageScriptRequest_(request));
 
          if (authorization == AuthorizationForbidden)
          {
@@ -2402,6 +2442,21 @@ namespace HM
    {
       refusalReason = "";
 
+      // A browser session is started by whoever holds a password - an
+      // account's, for the self-service page, or the administrator's, for the
+      // Control Deck - and ended by the session it came with. An API key is
+      // refused: a key is already the credential a script keeps, and a cookie
+      // minted from one would be a second credential with none of the key's
+      // restrictions written on it.
+      if (route.kind == RouteSessionCreate || route.kind == RouteSessionDelete)
+      {
+         if (caller.result == AuthenticatedAsAccount || caller.result == AuthenticatedAsAdministrator)
+            return AuthorizationAllowed;
+
+         refusalReason = "a browser session is started with an account's password or with the administrator password, not with an api key";
+         return AuthorizationForbidden;
+      }
+
       // The account's own endpoints, and the account's own credentials: each
       // reaches the other and nothing else. The administrator password and an
       // API key are refused there because neither is an account - there is no
@@ -2589,8 +2644,24 @@ namespace HM
       return response;
    }
 
+   bool
+   RestApiServer::IsPageScriptRequest_(const AnsiString &request)
+   {
+      // Sec-Fetch-Mode is sent by every current browser and says how the
+      // request was made: "navigate" is the address bar or a link, and anything
+      // else - cors, same-origin, no-cors - is a script's fetch.
+      // X-Requested-With is what this server's own pages set on a write.
+      AnsiString mode = GetHeader_(request, "sec-fetch-mode");
+      mode.ToLower();
+
+      if (!mode.IsEmpty() && mode != "navigate")
+         return true;
+
+      return !GetHeader_(request, "x-requested-with").IsEmpty();
+   }
+
    HttpResponse
-   RestApiServer::BuildUnauthorizedResponse_(bool secondFactorRequired)
+   RestApiServer::BuildUnauthorizedResponse_(bool secondFactorRequired, bool suppressChallenge)
    {
       // One response for every possible authentication problem: no credential,
       // a wrong administrator password, an unknown API key, an expired key and
@@ -2605,13 +2676,23 @@ namespace HM
       // the password to somebody who already holds it, and nothing to anybody
       // else.
       //
-      // The challenge advertises Basic only, exactly as before, so browsers
-      // reaching the management interface keep prompting as they always have.
+      // The challenge advertises Basic only, exactly as before - for every
+      // caller it helps. It is left out for one kind of request: the fetch a
+      // page's own script makes. A browser answers WWW-Authenticate by opening
+      // its own credential box, in front of the page that asked, and the fetch
+      // does not settle until somebody answers it - so the Control Deck and the
+      // portal, which sign in through a form and show this response's own
+      // sentence, were talking to a user standing behind a box they never put
+      // there. A script, curl, and a browser that navigated straight to a route
+      // still get the challenge, because for them the box is the way in.
       const AnsiString body = secondFactorRequired
          ? "{\"error\":\"authentication failed\",\"second_factor\":\"required\"}"
          : "{\"error\":\"authentication failed\"}";
 
-      AnsiString headers = "WWW-Authenticate: Basic realm=\"hMailServer\"\r\n";
+      AnsiString headers;
+
+      if (!suppressChallenge)
+         headers += "WWW-Authenticate: Basic realm=\"hMailServer\"\r\n";
       if (secondFactorRequired)
          headers += "X-hMailServer-OTP: required\r\n";
 
@@ -4932,7 +5013,7 @@ namespace HM
       {
          const AnsiString code = GetHeader_(request, "x-hmailserver-otp");
          if (code.IsEmpty() || !Totp::VerifyCode(AnsiString(secret), code))
-            return BuildUnauthorizedResponse_(true);
+            return BuildUnauthorizedResponse_(true, IsPageScriptRequest_(request));
       }
 
       // The same rules the Control Panel and COM apply when an administrator
@@ -5079,6 +5160,8 @@ namespace HM
          return false;
 
       __int64 accountId = 0;
+      bool administrator = false;
+      AnsiString credentialStamp;
       {
          std::lock_guard<std::mutex> guard(browser_sessions_mutex);
 
@@ -5102,8 +5185,37 @@ namespace HM
 
             it->last_seen_at = now;
             accountId = it->account_id;
+            administrator = it->administrator;
+            credentialStamp = it->credential_stamp;
             break;
          }
+      }
+
+      if (administrator)
+      {
+         // Checked afresh on every request, as an account's row is below: the
+         // administrator password that started the session has to be the one
+         // in force. An empty password is the API switched off; a different
+         // one is a change made since sign-in - quite possibly because
+         // somebody else has the old one - and either ends every
+         // administrator session.
+         const AnsiString current = AdministratorCredentialStamp();
+         if (current.IsEmpty() || !ConstantTimeEquals(current, credentialStamp))
+         {
+            RevokeAdministratorSessions();
+            return false;
+         }
+
+         // The administrator password's authority, exactly: full, unscoped,
+         // and named the same for the rate budget and for the log. via_session
+         // is what makes a write on it carry X-Requested-With.
+         caller.result = AuthenticatedAsAdministrator;
+         caller.read_only = false;
+         caller.identity = "administrator";
+         caller.via_session = true;
+         caller.session_hash = presentedHash;
+
+         return true;
       }
 
       if (accountId == 0)
@@ -5133,11 +5245,25 @@ namespace HM
    RestApiServer::HandleSessionCreate_(const Caller &caller)
    {
       if (caller.via_session)
-         return BuildResponse_(403, "{\"error\":\"a session is started with the account's password, not with another session\"}");
+         return BuildResponse_(403, "{\"error\":\"a session is started with a password, not with another session\"}");
+
+      // Who the session stands for: the account whose password was presented,
+      // or the administrator. Authorize_ lets nothing else this far.
+      const bool administrator = caller.result == AuthenticatedAsAdministrator;
 
       std::shared_ptr<const Account> account = caller.account;
-      if (!account)
+      if (!administrator && !account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      // The stamp an administrator session is checked against on every
+      // request, taken now from the credential that was just accepted.
+      AnsiString credentialStamp;
+      if (administrator)
+      {
+         credentialStamp = AdministratorCredentialStamp();
+         if (credentialStamp.IsEmpty())
+            return BuildResponse_(500, "{\"error\":\"internal error\"}");
+      }
 
       unsigned char secret[SessionTokenBytes];
       if (RAND_bytes(secret, sizeof(secret)) != 1)
@@ -5178,14 +5304,25 @@ namespace HM
 
          BrowserSession session;
          session.token_hash = tokenHash;
-         session.account_id = account->GetID();
+         session.account_id = administrator ? 0 : account->GetID();
+         session.administrator = administrator;
+         session.credential_stamp = credentialStamp;
          session.created_at = now;
          session.last_seen_at = now;
 
          browser_sessions.push_back(session);
       }
 
-      LOG_APPLICATION("REST API: " + account->GetAddress() + " started a browser session from " + String(caller.peer.ToString()) + ".");
+      // Braced: LOG_APPLICATION is a macro that carries its own if, and an
+      // unbraced else after it binds to the wrong one.
+      if (administrator)
+      {
+         LOG_APPLICATION("REST API: the administrator started a browser session from " + String(caller.peer.ToString()) + ".");
+      }
+      else
+      {
+         LOG_APPLICATION("REST API: " + account->GetAddress() + " started a browser session from " + String(caller.peer.ToString()) + ".");
+      }
 
       // HttpOnly: the script never reads it, so a script that should not be
       // there cannot either. SameSite=Strict: a request from another site does
@@ -5197,9 +5334,17 @@ namespace HM
          SessionCookieName, token.c_str(), (int) (SessionAbsoluteMilliseconds / 1000), use_tls_ ? "; Secure" : "");
 
       AnsiString body;
-      body.Format("{\"address\":\"%hs\",\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
-         JsonEscape_(Utf8_(account->GetAddress())).c_str(),
-         (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
+      if (administrator)
+      {
+         body.Format("{\"administrator\":true,\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
+            (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
+      }
+      else
+      {
+         body.Format("{\"address\":\"%hs\",\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
+            JsonEscape_(Utf8_(account->GetAddress())).c_str(),
+            (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
+      }
 
       return BuildResponse_(201, body, cookie);
    }
@@ -5238,7 +5383,9 @@ namespace HM
          std::remove_if(browser_sessions.begin(), browser_sessions.end(),
             [accountId, &keepTokenHash](const BrowserSession &session)
             {
-               return session.account_id == accountId &&
+               // Never an administrator row: its account_id is 0, and nothing
+               // that names an account means the administrator.
+               return !session.administrator && session.account_id == accountId &&
                       (keepTokenHash.IsEmpty() || !ConstantTimeEquals(session.token_hash, keepTokenHash));
             }),
          browser_sessions.end());
@@ -8127,7 +8274,7 @@ namespace HM
          "\"/api/v1/me\":{\"get\":{\"summary\":\"The signed-in account's own state\",\"description\":\"HTTP Basic with the account's address and password - the same credential and the same checks as an IMAP logon, including a per-name lockout and the auto-ban. Refused for the administrator password and for API keys.\",\"responses\":{\"200\":{\"description\":\"address, domain, active, quota (limit_mb, used_bytes), vacation (enabled, active, subject, message, expires, expires_date), password_changed, second_factor, directory_linked\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"The administrator password or an API key was presented\"}}}},"
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
          "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
-         "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account\",\"description\":\"HTTP Basic with the account's address and password, once. Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates the /api/v1/me endpoints without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions.\",\"responses\":{\"201\":{\"description\":\"address, idle_seconds, lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"A session cookie, the administrator password or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
+         "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account, or for the administrator\",\"description\":\"HTTP Basic, once: an account's address and password, or the administrator's name and password - and, when a second factor is enrolled on the administrator credential, the one-time code in X-hMailServer-OTP (without it the answer is 401 with X-hMailServer-OTP: required). Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates as the credential itself would - an account reaches the /api/v1/me endpoints, the administrator reaches everything but them - without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions, and a change of the administrator password ends every administrator session. An API key cannot start one.\",\"responses\":{\"201\":{\"description\":\"address (an account) or administrator true, with idle_seconds and lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's or the administrator's credentials\"},\"403\":{\"description\":\"A session cookie or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"

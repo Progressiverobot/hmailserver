@@ -11,6 +11,7 @@
   --accent:#36c2ff; --accent2:#7c5cff; --good:#3fb950; --warn:#d29922; --bad:#f85149;
   --glow:0 0 24px rgba(54,194,255,.25);
   --radius:14px; --font:'Segoe UI Variable','Segoe UI',system-ui,sans-serif;
+  --mono:'Cascadia Mono',Consolas,'SFMono-Regular',monospace;
 }
 [data-theme="light"]{
   --bg:#eef2f7; --bg2:#f7fafc; --surface:rgba(255,255,255,.75); --surface2:rgba(255,255,255,.95);
@@ -40,7 +41,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hid
   background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow)}
 .brand b{font-size:15px;letter-spacing:.4px}
 .brand small{display:block;color:var(--muted);font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase}
-.nav{display:flex;flex-direction:column;gap:2px}
+.nav{display:flex;flex-direction:column;gap:2px;overflow:auto}
 .nav button{all:unset;display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;
   color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s}
 .nav button:hover{background:var(--surface2);color:var(--text)}
@@ -68,20 +69,26 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hid
 .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   padding:20px;backdrop-filter:blur(14px);transition:transform .2s,box-shadow .2s,border-color .2s}
 .card:hover{transform:translateY(-2px);border-color:rgba(54,194,255,.4);box-shadow:var(--glow)}
+.card.flat:hover{transform:none;border-color:var(--border);box-shadow:none}
 .kpi .v{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;
   background:linear-gradient(90deg,var(--text),var(--accent));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .kpi .l{color:var(--muted);font-size:12px;margin-top:6px;letter-spacing:.6px;text-transform:uppercase}
 .kpi .bar{height:3px;border-radius:2px;margin-top:14px;background:linear-gradient(90deg,var(--accent),var(--accent2));opacity:.7}
 
 .sect{margin-top:26px}
-.sect h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px}
+.sect h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sect h2 code{text-transform:none;letter-spacing:0}
+.muted{color:var(--muted)}
+code{font-family:var(--mono);font-size:12px}
 
 table{width:100%;border-collapse:collapse;font-size:13.5px}
 th{color:var(--muted);text-align:left;font-weight:500;font-size:11.5px;text-transform:uppercase;
   letter-spacing:1px;padding:10px 14px;border-bottom:1px solid var(--border)}
-td{padding:11px 14px;border-bottom:1px solid var(--border)}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:top}
 tr{transition:background .15s}
 tbody tr:hover{background:var(--surface2)}
+.tablewrap{overflow-x:auto}
 
 .btn{all:unset;cursor:pointer;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;
   background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transition:all .18s;letter-spacing:.3px}
@@ -91,13 +98,17 @@ tbody tr:hover{background:var(--surface2)}
 .btn.danger{background:linear-gradient(135deg,#f85149,#c93c54)}
 .btn.sm{padding:5px 11px;font-size:12px}
 
-input,select{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);
-  padding:9px 13px;font-size:13.5px;font-family:var(--font);outline:none;transition:all .18s}
-input:focus{border-color:var(--accent);box-shadow:var(--glow)}
+input,select,textarea{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:9px 13px;font-size:13.5px;font-family:var(--font);outline:none;transition:all .18s;max-width:100%}
+textarea{font-family:var(--mono);font-size:12.5px;line-height:1.6;resize:vertical;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:var(--glow)}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);padding:0}
+option{background:var(--bg2);color:var(--text)}
 
 .badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.4px}
 .badge.good{background:rgba(63,185,80,.15);color:var(--good)}
 .badge.warn{background:rgba(210,153,34,.15);color:var(--warn)}
+.badge.info{background:rgba(54,194,255,.15);color:var(--accent)}
 
 .empty{color:var(--muted);padding:34px;text-align:center;font-size:13.5px}
 pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;font-size:12px;
@@ -106,6 +117,24 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
   border-radius:12px;padding:13px 20px;font-size:13.5px;backdrop-filter:blur(16px);box-shadow:var(--glow);
   opacity:0;transform:translateY(12px);transition:all .3s;z-index:60;pointer-events:none}
 .toast.show{opacity:1;transform:none}
+
+/* ---------- Forms built from the OpenAPI document ---------- */
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.form{display:flex;flex-direction:column}
+.fr{display:grid;grid-template-columns:minmax(210px,1fr) minmax(210px,1.1fr);gap:8px 20px;
+  padding:11px 0;border-bottom:1px solid var(--border);align-items:start}
+.fr:last-child{border-bottom:none}
+.fr .lab b{font-size:13.5px;font-weight:600;display:inline-block;margin-right:8px}
+.fr .lab code{color:var(--muted)}
+.hint{color:var(--muted);font-size:11.5px;line-height:1.5}
+.fr .hint{margin-top:4px}
+.fr .ctl input[type=text],.fr .ctl input[type=password],.fr .ctl input[type=number],.fr .ctl select{width:100%}
+.fr .ctl .ro{display:inline-block;padding:8px 0;word-break:break-all}
+.erow{padding:9px 0;border-bottom:1px dashed var(--border);align-items:flex-start}
+.erow:last-of-type{border-bottom:none}
+.err{color:var(--bad);font-size:12.5px;line-height:1.5}
+.err:empty{display:none}
+.note{color:var(--muted);font-size:12.5px;line-height:1.6;margin-bottom:14px}
 
 /* ---------- Login ---------- */
 .gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg)}
@@ -121,6 +150,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
 .login .err{color:var(--bad);font-size:12.5px;min-height:18px;margin-top:10px}
 .view{animation:fadein .25s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+[hidden]{display:none!important}
 </style>
 </head>
 <body data-theme="dark">
@@ -132,9 +162,10 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
   <form class="login" id="loginForm">
     <div class="logo">hM</div>
     <h1>Control Deck</h1>
-    <p>Sign in with the hMailServer administrator credential.</p>
+    <p>Sign in with the hMailServer administrator credential. The password is exchanged once for a session cookie and is never kept by this page.</p>
     <input id="user" placeholder="Username" value="Administrator" autocomplete="username">
     <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autofocus>
+    <input id="otp" placeholder="One-time code" inputmode="numeric" autocomplete="one-time-code" hidden>
     <button class="btn" type="submit">Connect</button>
     <div class="err" id="loginErr"></div>
   </form>
@@ -153,9 +184,11 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
       <button data-view="settings"><span class="ico">⚙</span>Settings</button>
-      <button data-view="logs"><span class="ico">≡</span>Logs</button>
-      <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
       <button data-view="rules"><span class="ico">⚖</span>Rules</button>
+      <button data-view="routes"><span class="ico">⇥</span>Routes</button>
+      <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
+      <button data-view="ports"><span class="ico">⊞</span>Ports</button>
+      <button data-view="logs"><span class="ico">≡</span>Logs</button>
     </nav>
     <div class="foot">
       <div class="pill"><span class="dot"></span><span id="connState">Connected</span></div>
@@ -179,22 +212,53 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
 <script>
 "use strict";
 const $=s=>document.querySelector(s);
-let auth=sessionStorage.getItem("hmsAuth")||null;
 let view="dash", pollTimer=null;
 
-/* ---------- API ---------- */
-async function api(path,opts={}){
-  const res=await fetch(path,{...opts,headers:{...(opts.headers||{}),"Authorization":"Basic "+auth}});
-  if(res.status===401) throw new Error("auth");
+/* The server's own OpenAPI document, fetched once per sign-in. Every form on
+   this page - which keys a settings group has, what type each one is, which
+   words an enumeration takes, which key is write-only and which is read-only -
+   is built from it, so a key added to the API appears here without this file
+   being touched. */
+let spec=null;
+
+/* The last listing each view read, so that an editor can be opened on a row
+   without asking again. Never written to instead of re-reading: every write is
+   followed by a fresh GET. */
+const cache={certificates:[],ports:[],routes:[],rules:[]};
+
+/* The editor a view has open, if any: {kind, id, values} - id 0 is a new one. */
+let editing=null;
+
+/* Per settings group: the schema it was built from and the values it was built
+   with, so that Save can send only what changed. */
+const settingsState={};
+
+/* ---------- API ----------
+   One entry point for every request. A write carries X-Requested-With, which
+   is what the server demands of a request authenticated by the session cookie
+   (its own cross-site protection, on top of the cookie's SameSite=Strict), and
+   the cookie itself travels because the request is same-origin. Nothing here
+   holds a credential: after sign-in the page has no secret at all. */
+async function api(path,opts){
+  opts=opts||{};
+  const method=(opts.method||"GET").toUpperCase();
+  const headers=Object.assign({},opts.headers||{});
+  if(method!=="GET"&&method!=="HEAD")headers["X-Requested-With"]="hMailServer";
+  if(opts.body!==undefined)headers["Content-Type"]="application/json";
+  const res=await fetch(path,{method:method,body:opts.body,headers:headers,credentials:"same-origin"});
+  if(res.status===401)throw new Error("auth");
   if(!res.ok){
     // A refused request answers {"error":"<a sentence written for the administrator>"};
-    // that sentence is the message. The whole exchange goes to the console for diagnosis.
+    // that sentence is the message, and it is what the page shows beside the
+    // control that caused it. The whole exchange goes to the console for diagnosis.
     let body="";
     try{body=await res.text();}catch(_){}
     let message="";
     try{message=String(JSON.parse(body).error||"");}catch(_){}
-    console.error("API request failed",{path,status:res.status,body});
-    throw new Error(message||("HTTP "+res.status));
+    console.error("API request failed",{path:path,status:res.status,body:body});
+    const err=new Error(message||("HTTP "+res.status));
+    err.status=res.status;
+    throw err;
   }
   const text=await res.text();
   return text?JSON.parse(text):{};
@@ -202,16 +266,20 @@ async function api(path,opts={}){
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
   clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600);}
 
-/* Server-provided values (domain names, addresses, queue entries, TLSA records) are
-   rendered into HTML, so every one of them goes through this first. */
+/* Server-provided values (domain names, addresses, queue entries, TLSA records,
+   and every word of the OpenAPI document) are rendered into HTML, so every one
+   of them goes through this first. */
 function escHtml(v){
-  return String(v)
+  return String(v===undefined||v===null?"":v)
     .replace(/&/g,"&amp;")
     .replace(/</g,"&lt;")
     .replace(/>/g,"&gt;")
     .replace(/"/g,"&quot;")
     .replace(/'/g,"&#39;");
 }
+/* The server's sentence, shown where the request came from. */
+function setErr(id,message){const e=document.getElementById(id);if(e)e.textContent=message||"";}
+function asList(x,key){return Array.isArray(x)?x:((x&&x[key])||[]);}
 
 /* ---------- Theme ---------- */
 const savedTheme=localStorage.getItem("hmsTheme")||"dark";
@@ -221,33 +289,74 @@ $("#themeBtn").onclick=()=>{
   document.body.dataset.theme=next;localStorage.setItem("hmsTheme",next);
 };
 
-/* ---------- Login ---------- */
+/* ---------- Sign in, sign out ----------
+   The password is presented once, to POST /api/v1/session, and the server
+   answers with an HttpOnly cookie; the page never reads it and never stores a
+   credential of its own. When a second factor is enrolled on the administrator
+   credential the server answers 401 with second_factor "required", and the
+   code field appears. */
+function basicCredential(user,password){
+  return "Basic "+btoa(unescape(encodeURIComponent(user+":"+password)));
+}
 $("#loginForm").onsubmit=async e=>{
   e.preventDefault();
-  const candidate=btoa($("#user").value+":"+$("#pass").value);
-  auth=candidate;
-  try{
-    const s=await api("/api/v1/status");
-    sessionStorage.setItem("hmsAuth",candidate);
-    enter(s);
-  }catch(_){auth=null;$("#loginErr").textContent="Authentication failed. Check the password.";}
+  const code=$("#otp").value.trim();
+  const headers={"Authorization":basicCredential($("#user").value,$("#pass").value),
+                 "X-Requested-With":"hMailServer"};
+  if(code)headers["X-hMailServer-OTP"]=code;
+  $("#loginErr").textContent="";
+  let res;
+  try{res=await fetch("/api/v1/session",{method:"POST",headers:headers,credentials:"same-origin"});}
+  catch(_){$("#loginErr").textContent="Could not reach the server.";return;}
+  let body={};
+  try{body=JSON.parse(await res.text());}catch(_){}
+  if(res.status===201){
+    $("#pass").value="";$("#otp").value="";$("#otp").hidden=true;
+    // Not a credential and not a secret: a mark saying this tab has a session,
+    // so that a reload asks the server whether it is still live instead of
+    // showing the sign-in card over a working session. A first visit sets
+    // nothing, and so never makes a request the server answers 401 - which is
+    // what would put the browser's own password box on the screen.
+    try{sessionStorage.setItem("hmsSession","1");}catch(_){}
+    try{enter(await api("/api/v1/status"));}
+    catch(err){$("#loginErr").textContent="Signed in, but the server did not answer: "+err.message;}
+    return;
+  }
+  if(res.status===401&&(body.second_factor==="required"||res.headers.get("X-hMailServer-OTP")==="required")){
+    $("#otp").hidden=false;$("#otp").focus();
+    $("#loginErr").textContent="A one-time code is needed. Enter the code from your authenticator app.";
+    return;
+  }
+  $("#loginErr").textContent=body.error?body.error:"Authentication failed. Check the password.";
 };
-$("#logoutBtn").onclick=()=>{sessionStorage.removeItem("hmsAuth");location.reload()};
-
+$("#logoutBtn").onclick=async()=>{
+  try{await api("/api/v1/session",{method:"DELETE"});}catch(_){}
+  signedOut("Signed out.");
+};
+function signedOut(message){
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  spec=null;editing=null;
+  try{sessionStorage.removeItem("hmsSession");}catch(_){}
+  $("#app").style.display="none";
+  $("#gate").style.display="grid";
+  $("#loginErr").textContent=message||"";
+  $("#pass").focus();
+}
 function enter(status){
   $("#gate").style.display="none";$("#app").style.display="flex";
   $("#ver").textContent=status.version||"?";
   render();
-  pollTimer=setInterval(()=>{if(view==="dash")render(true);},3000);
+  if(!pollTimer)pollTimer=setInterval(()=>{if(view==="dash")render(true);},3000);
 }
 
 /* ---------- Navigation ---------- */
 $("#nav").addEventListener("click",e=>{
   const b=e.target.closest("button");if(!b)return;
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
-  view=b.dataset.view;render();
+  view=b.dataset.view;editing=null;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",logs:"Logs",certs:"Certificates",rules:"Rules"};
+const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",
+  rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
 
 async function render(silent){
   $("#viewTitle").textContent=titles[view];
@@ -257,12 +366,14 @@ async function render(silent){
     else if(view==="queue")await renderQueue();
     else if(view==="tlsa")await renderTlsa();
     else if(view==="settings")await renderSettings();
-    else if(view==="logs")await renderLogs();
-    else if(view==="certs")await renderCerts();
     else if(view==="rules")await renderRules();
+    else if(view==="routes")await renderRoutes();
+    else if(view==="certs")await renderCerts();
+    else if(view==="ports")await renderPorts();
+    else if(view==="logs")await renderLogs();
     $("#connState").textContent="Connected";
   }catch(err){
-    if(err.message==="auth"){sessionStorage.removeItem("hmsAuth");location.reload();return;}
+    if(err.message==="auth"){signedOut("The session ended. Sign in again.");return;}
     $("#connState").textContent="Connection problem";
     if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+escHtml(err.message)+'</div>';
   }
@@ -283,9 +394,169 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="delmsg")delMsg(d.id);
   else if(d.act==="log")showLog(d.name,d.lines);
   else if(d.act==="copy")navigator.clipboard.writeText($("#tlsaPre").textContent).then(()=>toast("Copied to clipboard"));
+  else if(d.act==="setsave")saveSettings(d.group);
+  else if(d.act==="rulenew")openRule(0);
+  else if(d.act==="ruleedit")openRule(Number(d.id));
+  else if(d.act==="ruledel")deleteRule(Number(d.id),d.name);
+  else if(d.act==="rulesave")saveRule();
+  else if(d.act==="critadd"){readRuleForm();editing.rule.criteria.push({field:"subject",header:"",match:"contains",value:""});renderRuleEditor();}
+  else if(d.act==="critdel"){readRuleForm();editing.rule.criteria.splice(Number(d.i),1);renderRuleEditor();}
+  else if(d.act==="actadd"){readRuleForm();editing.rule.actions.push({type:ruleWords().types[0]||"delete"});renderRuleEditor();}
+  else if(d.act==="actdel"){readRuleForm();editing.rule.actions.splice(Number(d.i),1);renderRuleEditor();}
+  else if(d.act==="certadd")addCertificate();
+  else if(d.act==="certdel")deleteCertificate(Number(d.id),d.name);
+  else if(d.act==="portnew")openPort(0);
+  else if(d.act==="portedit")openPort(Number(d.id));
+  else if(d.act==="portdel")deletePort(Number(d.id),d.label);
+  else if(d.act==="portsave")savePort();
+  else if(d.act==="portapply")applyRestart();
+  else if(d.act==="routenew")openRoute(0);
+  else if(d.act==="routeedit")openRoute(Number(d.id));
+  else if(d.act==="routedel")deleteRoute(Number(d.id),d.name);
+  else if(d.act==="routesave")saveRoute();
+  else if(d.act==="cancel"){editing=null;render();}
+});
+/* A criterion's field or an action's type decides which further controls the
+   row has, so those two selects redraw the editor. */
+$("#content").addEventListener("change",e=>{
+  const el=e.target.closest("[data-r]");if(!el)return;
+  if(el.dataset.r==="crit-field"||el.dataset.r==="act-type"){readRuleForm();renderRuleEditor();}
 });
 
-/* ---------- Views ---------- */
+/* ---------- The OpenAPI document ---------- */
+async function loadSpec(){
+  if(!spec)spec=await api("/api/v1/openapi.json");
+  return spec;
+}
+function operation(path,method){
+  const p=((spec||{}).paths||{})[path];
+  return (p&&p[method])||{};
+}
+function bodySchema(path,method){
+  const c=((operation(path,method).requestBody||{}).content||{})["application/json"]||{};
+  return c.schema||{};
+}
+function properties(path,method){return bodySchema(path,method).properties||{};}
+function requiredOf(path,method){return bodySchema(path,method).required||[];}
+/* The sentences of a description that mention a word, so that what the page
+   tells the administrator about (say) restarting is the server's own wording
+   and not a copy of it that can drift. */
+function sentencesWith(text,word){
+  return String(text||"").split(". ")
+    .filter(s=>s.toLowerCase().indexOf(word)>=0)
+    .map(s=>s.replace(/\.$/,"")+".").join(" ");
+}
+/* The defaults a create route states in prose - "all_addresses (default true)"
+   for a route, "connection_security to none" for a port - so that a new record's
+   form starts where the server would put it rather than at blank and false. A
+   key the description does not mention simply keeps the empty control. */
+function documentedDefaults(path,method,props){
+  const text=operation(path,method).description||"";
+  const out={};
+  Object.keys(props).forEach(key=>{
+    // The gap between the key and its "(default …)" may name the key's other
+    // spelling but must not cross a bracket: without that, "addresses (an array
+    // of e-mail addresses) and connection_security (default none)" hands the
+    // address list the word "none".
+    const parenthesised=new RegExp("\\b"+key+"\\b[^.;()]{0,40}?\\(default ([^),]*)[),]").exec(text);
+    const prose=new RegExp("\\b"+key+"\\b (?:defaults to|to) ([A-Za-z0-9_.:]+)").exec(text);
+    const match=parenthesised||prose;
+    if(!match)return;
+    const raw=String(match[1]).trim();
+    const type=props[key].type||"string";
+    if(type==="boolean"){if(raw==="true"||raw==="false")out[key]=raw==="true";return;}
+    if(type==="integer"){const n=Number(raw);if(isFinite(n))out[key]=n;return;}
+    out[key]=raw;
+  });
+  return out;
+}
+
+/* ---------- Building a control from a schema property ---------- */
+const ACRONYMS={smtp:"SMTP",imap:"IMAP",pop3:"POP3",tls:"TLS",ssl:"SSL",starttls:"STARTTLS",sasl:"SASL",
+  acl:"ACL",ip:"IP",ipv6:"IPv6",kb:"KB",mb:"MB",mx:"MX",ptr:"PTR",spf:"SPF",dkim:"DKIM",dmarc:"DMARC",arc:"ARC",
+  dane:"DANE",tlsa:"TLSA",ca:"CA",id:"ID",url:"URL",tcpip:"TCP/IP",csa:"CSA",sql:"SQL",dns:"DNS",helo:"HELO"};
+function humanise(key){
+  const words=String(key).split("_");
+  return words.map((w,i)=>ACRONYMS[w]||(i===0?w.charAt(0).toUpperCase()+w.slice(1):w)).join(" ");
+}
+function optionsHtml(values,selected){
+  return values.map(v=>{
+    const value=(v&&typeof v==="object")?v.value:v;
+    const label=(v&&typeof v==="object")?v.label:humanise(v);
+    return '<option value="'+escHtml(value)+'"'+(String(value)===String(selected===undefined?"":selected)?" selected":"")+'>'+escHtml(label)+'</option>';
+  }).join("");
+}
+function isPassword(key,prop){return !!prop.writeOnly||/password$/.test(key);}
+function controlHtml(prefix,key,prop,value,opts){
+  const id=prefix+"_"+key;
+  const type=prop.type||"string";
+  if(prop.readOnly)
+    return '<code class="ro">'+escHtml(value===undefined||value===null||value===""?"—":value)+'</code>';
+  if(opts.choices&&opts.choices[key])
+    return '<select id="'+id+'">'+optionsHtml(opts.choices[key],value)+'</select>';
+  if(prop["enum"])
+    return '<select id="'+id+'">'+optionsHtml(prop["enum"],value)+'</select>';
+  if(type==="boolean")
+    return '<input type="checkbox" id="'+id+'"'+(value?" checked":"")+'>';
+  if(type==="integer")
+    return '<input type="number" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
+  if(type==="array")
+    return '<textarea id="'+id+'" rows="4" placeholder="One per line">'+escHtml((Array.isArray(value)?value:[]).join("\n"))+'</textarea>';
+  if(isPassword(key,prop))
+    return '<input type="password" id="'+id+'" value="" autocomplete="new-password" placeholder="'+escHtml(opts.passwordHint||"left unchanged unless filled")+'">';
+  return '<input type="text" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
+}
+function formHtml(prefix,props,values,opts){
+  opts=opts||{};
+  const required=opts.required||[];
+  return Object.keys(props).map(key=>{
+    if(opts.skip&&opts.skip.indexOf(key)>=0)return "";
+    const prop=props[key];
+    const value=values?values[key]:undefined;
+    const caption=humanise(key);
+    const description=prop.description||"";
+    const restart=/takes effect when the server restarts/i.test(description);
+    const flags=(required.indexOf(key)>=0?'<span class="badge info">required</span> ':"")+
+                (prop.readOnly?'<span class="badge info">read-only</span> ':"")+
+                (isPassword(key,prop)?'<span class="badge info">write-only</span> ':"")+
+                (restart?'<span class="badge warn">restart</span>':"");
+    const search=(key+" "+caption+" "+description).toLowerCase();
+    return '<div class="fr" data-k="'+escHtml(search)+'">'+
+             '<div class="lab"><b>'+escHtml(caption)+'</b><code>'+escHtml(key)+'</code> '+flags+
+               (description?'<div class="hint">'+escHtml(description)+'</div>':"")+'</div>'+
+             '<div class="ctl">'+controlHtml(prefix,key,prop,value,opts)+'</div>'+
+           '</div>';
+  }).join("");
+}
+/* Reads a form back into a plain object of the schema's types. An empty number
+   is left out rather than sent as 0: on a create that lets the server apply its
+   own default, and on a settings save it means "unchanged". */
+function readForm(prefix,props,opts){
+  opts=opts||{};
+  const out={};
+  Object.keys(props).forEach(key=>{
+    const prop=props[key];
+    if(prop.readOnly)return;
+    if(opts.skip&&opts.skip.indexOf(key)>=0)return;
+    const el=document.getElementById(prefix+"_"+key);
+    if(!el)return;
+    const type=prop.type||"string";
+    if(isPassword(key,prop)){if(el.value!=="")out[key]=el.value;return;}
+    if(type==="boolean"){out[key]=el.checked;return;}
+    if(type==="integer"){
+      const raw=String(el.value).trim();
+      if(raw==="")return;
+      const n=Number(raw);
+      if(!isFinite(n)||Math.floor(n)!==n)throw new Error(humanise(key)+" must be a whole number.");
+      out[key]=n;return;
+    }
+    if(type==="array"){out[key]=el.value.split("\n").map(s=>s.trim()).filter(Boolean);return;}
+    out[key]=el.value;
+  });
+  return out;
+}
+
+/* ---------- Dashboard ---------- */
 function animateNum(el,target){
   const start=parseInt(el.dataset.v||"0",10),diff=target-start;if(!diff){el.textContent=target.toLocaleString();return}
   const t0=performance.now();
@@ -322,21 +593,22 @@ async function renderDash(update){
   $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+escHtml(states[s.state]||("State "+s.state))+'</span>';
 }
 
+/* ---------- Domains and accounts ---------- */
 async function renderDomains(){
   const d=await api("/api/v1/domains");
-  const list=Array.isArray(d)?d:(d.domains||[]);
+  const list=asList(d,"domains");
   const rows=list.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
         <td style="text-align:right"><button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
-    <table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div>`;
+    <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div></div>`;
 }
 
 async function showAccounts(domain){
   const a=await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts");
-  const list=Array.isArray(a)?a:(a.accounts||[]);
+  const list=asList(a,"accounts");
   const rows=list.map(x=>`
     <tr><td><b>${escHtml(x.address)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
@@ -345,14 +617,15 @@ async function showAccounts(domain){
   <div class="view">
     <button class="btn ghost sm" data-act="domains">‹ All domains</button>
     <div class="sect"><h2>${escHtml(domain)} — accounts</h2>
-      <div class="card"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div>
+      <div class="card"><div class="tablewrap"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div></div>
     </div>
     <div class="sect"><h2>New account</h2>
       <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
         <input id="newAddr" placeholder="user@${escHtml(domain)}" style="flex:1;min-width:220px">
         <input id="newPass" type="password" placeholder="Password" style="flex:1;min-width:160px">
         <button class="btn" data-act="add" data-domain="${escHtml(domain)}">Create account</button>
+        <div class="err" id="err_account"></div>
       </div>
     </div>
   </div>`;
@@ -360,66 +633,536 @@ async function showAccounts(domain){
 
 async function addAccount(domain){
   const address=$("#newAddr").value.trim(),password=$("#newPass").value;
-  if(!address||!password){toast("Address and password are required");return;}
+  setErr("err_account","");
+  if(!address||!password){setErr("err_account","An address and a password are required.");return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts",
       {method:"POST",body:JSON.stringify({address:address,password:password})});
     toast("Account created: "+address);showAccounts(domain);
-  }catch(e){toast("Create failed: "+e.message)}
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);}
 }
 
 async function delAccount(address,domain){
   if(!confirm("Delete "+address+"?"))return;
+  setErr("err_account","");
   try{await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"DELETE"});
     toast("Deleted "+address);showAccounts(domain);
-  }catch(e){toast("Delete failed: "+e.message)}
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);}
 }
 
+/* ---------- Delivery queue ---------- */
 async function renderQueue(){
   const q=await api("/api/v1/queue");
   const rows=(q.messages||[]).map(x=>`
     <tr><td>${escHtml(x.id)}</td><td>${escHtml(x.from||"—")}</td><td>${escHtml(x.recipients||"—")}</td><td>${escHtml(x.next_try||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn ghost sm" data-act="retry" data-id="${escHtml(x.id)}">Retry now</button>
-          <button class="btn danger sm" data-act="delmsg" data-id="${escHtml(x.id)}">Delete</button></td></tr>`).join("");
+          <button class="btn danger sm" data-act="delmsg" data-id="${escHtml(x.id)}">Delete</button>
+          <div class="err" id="err_queue_${escHtml(x.id)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
-    <table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div>`;
+    <div class="tablewrap"><table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div></div>`;
 }
-async function retryMsg(id){try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue();}catch(e){toast("Failed: "+e.message);}}
-async function delMsg(id){if(!confirm("Remove message "+id+" from the queue?"))return;
-  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue();}catch(e){toast("Failed: "+e.message);}}
+async function retryMsg(id){
+  try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_queue_"+id,e.message);}
+}
+async function delMsg(id){
+  if(!confirm("Remove message "+id+" from the queue?"))return;
+  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_queue_"+id,e.message);}
+}
 
+/* ---------- DANE / TLSA ---------- */
 async function renderTlsa(){
   const t=await api("/api/v1/tlsa");
   const recs=(t.records||[]).map(r=>r.record||JSON.stringify(r)).join("\n");
   $("#content").innerHTML=`<div class="view">
-    <div class="card"><p style="color:var(--muted);font-size:13px;margin-bottom:14px">
+    <div class="card"><p class="note">
       Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.</p>
       <pre id="tlsaPre">${escHtml(recs||"No TLSA records available — assign an SSL certificate first.")}</pre>
       <div style="margin-top:12px"><button class="btn ghost sm" data-act="copy">Copy all</button></div>
     </div></div>`;
 }
 
-/* ---------- Read-only views over routes that already existed ----------
-   Settings, logs, certificates and rules: everything here is GET, so a key
-   that is read-only sees all of it, and nothing on these views changes the
-   server. Every value goes through escHtml; a log line is exactly the kind
-   of text an attacker can put a tag into, by sending the mail that gets
-   logged. */
-function asList(x,key){return Array.isArray(x)?x:((x&&x[key])||[]);}
-
+/* ---------- Settings ----------
+   Three groups, three forms, each one generated from the schema of that group's
+   PUT: the property names, their types, their enumerated words, which one is
+   write-only and which is read-only all come from the document, so nothing here
+   lists a settings key by name. Save sends only the keys whose control differs
+   from the value the page was drawn with, and then re-reads the group. */
+const SETTING_GROUPS=[
+  {id:"srv",  path:"/api/v1/settings",          title:"Server"},
+  {id:"spam", path:"/api/v1/settings/antispam", title:"Anti-spam"},
+  {id:"log",  path:"/api/v1/settings/logging",  title:"Logging"}
+];
 async function renderSettings(){
-  const s=await api("/api/v1/settings");
-  const labels={host_name:"Host name (HELO/EHLO)",default_domain:"Default domain",max_message_size_kb:"Max message size (KB, 0 = unlimited)",
-    max_smtp_connections:"Max SMTP connections",max_imap_connections:"Max IMAP connections",smtp_relayer:"SMTP relayer (smart host)",
-    smtp_relayer_port:"Relayer port",log_smtp_conversations:"Log SMTP conversations",log_imap_conversations:"Log IMAP conversations"};
-  const rows=Object.keys(labels).map(k=>`<tr><td>${escHtml(labels[k])}</td><td><code>${escHtml(s[k]===undefined||s[k]===null?"—":String(s[k]))}</code></td></tr>`).join("");
-  $("#content").innerHTML=`<div class="card view">
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The server-wide settings the API exposes, as the server holds them now. Editing them is not part of this page yet: change them in the Control Panel.</p>
-    <table><thead><tr><th>Setting</th><th>Value</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  await loadSpec();
+  const groups=[];
+  for(const g of SETTING_GROUPS){
+    const props=properties(g.path,"put");
+    const values=await api(g.path);
+    settingsState[g.id]={path:g.path,props:props,values:values};
+    groups.push({g:g,props:props,values:values});
+  }
+  const cards=groups.map(({g,props,values})=>`
+    <div class="sect"><h2>${escHtml(g.title)} <code class="muted">PUT ${escHtml(g.path)}</code></h2>
+      <div class="card flat">
+        <div class="form">${formHtml("set_"+g.id,props,values,{})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="setsave" data-group="${g.id}">Save ${escHtml(g.title.toLowerCase())} settings</button>
+          <div class="err" id="err_set_${g.id}"></div>
+        </div>
+      </div></div>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">Every field below, its type and its words are read from the server's own OpenAPI document, so a setting added to the API appears here on its own. Only the fields you change are sent. A key marked <span class="badge info">write-only</span> is sent only when you fill it in; one marked <span class="badge warn">restart</span> is stored at once but reaches the running server when its services restart — the Ports view has the button that restarts them.</p>
+      <input id="setFilter" placeholder="Filter settings by name or description" style="width:100%">
+    </div>
+    ${cards}</div>`;
+  $("#setFilter").oninput=e=>{
+    const q=e.target.value.trim().toLowerCase();
+    document.querySelectorAll("#content .fr").forEach(r=>{r.hidden=!!q&&r.dataset.k.indexOf(q)<0;});
+  };
+}
+async function saveSettings(groupId){
+  const st=settingsState[groupId];
+  if(!st)return;
+  setErr("err_set_"+groupId,"");
+  let all;
+  try{all=readForm("set_"+groupId,st.props,{});}
+  catch(e){setErr("err_set_"+groupId,e.message);return;}
+  const body={};
+  Object.keys(all).forEach(k=>{
+    if(isPassword(k,st.props[k])){body[k]=all[k];return;}
+    if(all[k]!==st.values[k])body[k]=all[k];
+  });
+  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  try{
+    await api(st.path,{method:"PUT",body:JSON.stringify(body)});
+    toast(Object.keys(body).length+" setting"+(Object.keys(body).length===1?"":"s")+" saved");
+    await renderSettings();
+  }catch(e){
+    if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
+    setErr("err_set_"+groupId,e.message);
+  }
 }
 
+/* ---------- Rules ----------
+   The rule vocabulary - which words a criterion's field and its match take,
+   which action types there are and what parameters each one carries - is in the
+   OpenAPI document, but written as prose in the description of POST /api/v1/rules
+   rather than as enumerations, so it is read out of that sentence here. The
+   fallback below keeps the editor usable if the wording is ever reshaped; if it
+   is being used, the document and this page have drifted apart and the document
+   is the one to fix. */
+const RULE_FALLBACK={
+  fields:["from","to","cc","subject","body","message_size","recipient_list","delivery_attempts","header"],
+  matches:["equals","not_equals","contains","not_contains","less_than","greater_than","regex","wildcard"],
+  actions:{forward:["to"],reply:["from_name","from_address","subject","body"],move_to_folder:["folder"],
+    script_function:["script_function"],set_header:["header","value"],send_using_route:["route_id"],
+    bind_to_address:["value"],"delete":[],stop:[],copy:[]}
+};
+function ruleWords(){
+  const text=operation("/api/v1/rules","post").description||"";
+  const tokens=s=>String(s).split(/,| and /)
+    .map(p=>{const m=/([a-z][a-z0-9_]*)/.exec(p.replace(/^\s*or\s+/,""));return m?m[1]:"";})
+    .filter(Boolean);
+  const inside=label=>{const m=new RegExp(label+"\\s*\\(([^)]*)\\)").exec(text);return m?tokens(m[1]):[];};
+  const fields=inside("field"), matches=inside("match");
+  const actions={};
+  const m=/the parameters that type takes\s*-\s*([^.]*)\./.exec(text);
+  if(m){
+    m[1].split(";").forEach(segment=>{
+      const colon=segment.indexOf(":");
+      if(colon>=0){
+        const type=tokens(segment.slice(0,colon))[0];
+        if(type)actions[type]=tokens(segment.slice(colon+1));
+      }else if(/takes? none/.test(segment)){
+        tokens(segment.replace(/takes? none/,"")).forEach(t=>{actions[t]=[];});
+      }
+    });
+  }
+  const words={
+    fields:fields.length?fields:RULE_FALLBACK.fields,
+    matches:matches.length?matches:RULE_FALLBACK.matches,
+    actions:Object.keys(actions).length?actions:RULE_FALLBACK.actions
+  };
+  words.types=Object.keys(words.actions);
+  return words;
+}
+async function renderRules(){
+  await loadSpec();
+  cache.rules=asList(await api("/api/v1/rules"),"rules");
+  try{cache.routes=asList(await api("/api/v1/routes"),"routes");}catch(_){cache.routes=[];}
+  if(editing&&editing.kind==="rule"){renderRuleEditor();return;}
+  const words=ruleWords();
+  const criteriaText=r=>(r.criteria||[]).map(c=>
+      escHtml(humanise(c.field))+(c.header?" "+escHtml(c.header):"")+" "+escHtml(c.match)+" “"+escHtml(c.value)+"”"
+    ).join(r.all_criteria?" AND ":" OR ")||"—";
+  const actionsText=r=>(r.actions||[]).map(a=>{
+      const params=(words.actions[a.type]||[]).map(p=>a[p]).filter(v=>v!==undefined&&v!=="");
+      const detail=params.length?params.join(", "):(a.value||"");
+      return escHtml(humanise(a.type))+(detail?" → "+escHtml(detail):"");
+    }).join("; ")||"—";
+  const rows=cache.rules.map(r=>`
+    <tr><td><b>${escHtml(r.name)}</b><div class="hint muted">id ${escHtml(r.id)}</div></td>
+        <td>${r.active?'<span class="badge good">On</span>':'<span class="badge warn">Off</span>'}</td>
+        <td>${criteriaText(r)}</td><td>${actionsText(r)}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="ruleedit" data-id="${escHtml(r.id)}">Edit</button>
+          <button class="btn danger sm" data-act="ruledel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.name)}">Delete</button>
+          <div class="err" id="err_rule_${escHtml(r.id)}"></div></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/rules","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>Rule</th><th>Active</th><th>When</th><th>Then</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" class="empty">No global rules are defined.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="rulenew">New rule</button></div>
+    </div></div>`;
+}
+function openRule(id){
+  const existing=cache.rules.filter(r=>Number(r.id)===Number(id))[0];
+  const rule=existing
+    ? JSON.parse(JSON.stringify(existing))
+    : {name:"",active:true,all_criteria:true,criteria:[],actions:[]};
+  rule.criteria=rule.criteria||[];rule.actions=rule.actions||[];
+  editing={kind:"rule",id:Number(id)||0,rule:rule};
+  renderRuleEditor();
+}
+function renderRuleEditor(){
+  const words=ruleWords(), d=editing.rule;
+  const routeChoices=[{value:0,label:"(choose a route)"}].concat(
+    cache.routes.map(r=>({value:r.id,label:r.domain_name+" → "+r.target_smtp_host+":"+r.target_smtp_port})));
+  const criteria=d.criteria.map((c,i)=>`
+    <div class="row erow">
+      <select data-r="crit-field" data-i="${i}">${optionsHtml(words.fields,c.field)}</select>
+      <input data-r="crit-header" data-i="${i}" placeholder="Header name" value="${escHtml(c.header||"")}"${c.field==="header"?"":" hidden"}>
+      <select data-r="crit-match" data-i="${i}">${optionsHtml(words.matches,c.match)}</select>
+      <input data-r="crit-value" data-i="${i}" placeholder="Value" value="${escHtml(c.value||"")}" style="flex:1;min-width:200px">
+      <button class="btn ghost sm" data-act="critdel" data-i="${i}">Remove</button>
+    </div>`).join("")||'<div class="note">No criteria: the rule matches every message.</div>';
+  const actions=d.actions.map((a,i)=>{
+    const params=words.actions[a.type]||[];
+    const controls=params.map(p=>{
+      const value=a[p]!==undefined?a[p]:(params.length===1?(a.value||""):"");
+      if(p==="route_id")
+        return '<select data-r="act-'+p+'" data-i="'+i+'">'+optionsHtml(routeChoices,value)+'</select>';
+      if(p==="body")
+        return '<textarea data-r="act-'+p+'" data-i="'+i+'" rows="3" placeholder="Body" style="flex:1;min-width:240px">'+escHtml(value)+'</textarea>';
+      return '<input data-r="act-'+p+'" data-i="'+i+'" placeholder="'+escHtml(humanise(p))+'" value="'+escHtml(value)+'" style="flex:1;min-width:170px">';
+    }).join("")||'<span class="muted" style="font-size:12.5px">This action takes no parameters.</span>';
+    return `<div class="row erow">
+      <select data-r="act-type" data-i="${i}">${optionsHtml(words.types,a.type)}</select>
+      ${controls}
+      <button class="btn ghost sm" data-act="actdel" data-i="${i}">Remove</button>
+    </div>`;
+  }).join("")||'<div class="note">No actions: the rule does nothing.</div>';
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All rules</button>
+    <div class="sect"><h2>${editing.id?"Edit rule "+escHtml(editing.id):"New rule"}</h2>
+      <div class="card flat">
+        <div class="row">
+          <input id="ruleName" placeholder="Rule name" value="${escHtml(d.name||"")}" style="flex:1;min-width:240px">
+          <label class="row" style="gap:7px"><input type="checkbox" id="ruleActive"${d.active?" checked":""}> Active</label>
+          <select id="ruleAll">${optionsHtml([{value:"all",label:"Every criterion must match"},{value:"any",label:"Any one criterion matches"}],d.all_criteria?"all":"any")}</select>
+        </div>
+      </div>
+    </div>
+    <div class="sect"><h2>When</h2><div class="card flat">${criteria}
+      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="critadd">Add criterion</button></div></div></div>
+    <div class="sect"><h2>Then</h2><div class="card flat">${actions}
+      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="actadd">Add action</button></div></div></div>
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="rulesave">Save rule</button>
+      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <div class="err" id="err_ruleedit"></div>
+    </div></div>
+  </div>`;
+}
+function readRuleForm(){
+  const d=editing.rule;
+  d.name=$("#ruleName").value;
+  d.active=$("#ruleActive").checked;
+  d.all_criteria=$("#ruleAll").value==="all";
+  document.querySelectorAll("#content [data-r]").forEach(el=>{
+    const i=Number(el.dataset.i), r=el.dataset.r;
+    if(r.indexOf("crit-")===0){if(d.criteria[i])d.criteria[i][r.slice(5)]=el.value;}
+    else if(r.indexOf("act-")===0){if(d.actions[i])d.actions[i][r.slice(4)]=el.value;}
+  });
+}
+async function saveRule(){
+  readRuleForm();
+  setErr("err_ruleedit","");
+  const words=ruleWords(), d=editing.rule;
+  const body={
+    name:d.name,active:!!d.active,all_criteria:!!d.all_criteria,
+    criteria:d.criteria.map(c=>{
+      const o={field:c.field,match:c.match,value:c.value||""};
+      if(c.field==="header")o.header=c.header||"";
+      return o;
+    }),
+    // Only the parameters that carry something: the create refuses a parameter
+    // its action does not take, and an omitted optional one is simply empty.
+    actions:d.actions.map(a=>{
+      const o={type:a.type};
+      (words.actions[a.type]||[]).forEach(p=>{
+        const v=a[p];
+        if(v===undefined||v===""||v===null)return;
+        o[p]=(p==="route_id")?Number(v):v;
+      });
+      return o;
+    })
+  };
+  try{
+    if(editing.id)await api("/api/v1/rules/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/rules",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast("Rule saved");await render();
+  }catch(e){
+    if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
+    setErr("err_ruleedit",e.message);
+  }
+}
+async function deleteRule(id,name){
+  if(!confirm("Delete the rule “"+name+"”?"))return;
+  setErr("err_rule_"+id,"");
+  try{await api("/api/v1/rules/"+id,{method:"DELETE"});toast("Rule deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_rule_"+id,e.message);}
+}
+
+/* ---------- Certificates ---------- */
+async function renderCerts(){
+  await loadSpec();
+  cache.certificates=asList(await api("/api/v1/certificates"),"certificates");
+  const rows=cache.certificates.map(c=>`
+    <tr><td><b>${escHtml(c.name)}</b><div class="hint muted">id ${escHtml(c.id)}</div></td>
+        <td><code>${escHtml(c.certificate_file||"—")}</code></td>
+        <td><code>${escHtml(c.private_key_file||"—")}</code></td>
+        <td style="text-align:right">
+          <button class="btn danger sm" data-act="certdel" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}">Delete</button>
+          <div class="err" id="err_cert_${escHtml(c.id)}"></div></td></tr>`).join("");
+  const props=properties("/api/v1/certificates","post");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/certificates","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Certificate file</th><th>Private key file</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="empty">No certificates are configured.</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="sect"><h2>Add a certificate</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/certificates","post").description||"")}</p>
+        <div class="form">${formHtml("cert",props,{},{required:requiredOf("/api/v1/certificates","post"),passwordHint:"only if the key is encrypted"})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="certadd">Add certificate</button>
+          <div class="err" id="err_certadd"></div>
+        </div>
+      </div></div>
+  </div>`;
+}
+async function addCertificate(){
+  setErr("err_certadd","");
+  const props=properties("/api/v1/certificates","post");
+  let body;
+  try{body=readForm("cert",props,{});}catch(e){setErr("err_certadd",e.message);return;}
+  try{
+    await api("/api/v1/certificates",{method:"POST",body:JSON.stringify(body)});
+    toast("Certificate added");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_certadd",e.message);}
+}
+async function deleteCertificate(id,name){
+  if(!confirm("Delete the certificate “"+name+"”?"))return;
+  setErr("err_cert_"+id,"");
+  try{await api("/api/v1/certificates/"+id,{method:"DELETE"});toast("Certificate deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_cert_"+id,e.message);}
+}
+
+/* ---------- Ports ----------
+   The listeners are built when the server starts, so this view says what the
+   document says about that and carries the button that restarts the services in
+   place (POST /api/v1/server/reinitialize). That restart also ends every browser
+   session, this one included, so the page returns to the sign-in card. */
+async function renderPorts(){
+  await loadSpec();
+  cache.ports=asList(await api("/api/v1/ports"),"ports");
+  cache.certificates=asList(await api("/api/v1/certificates"),"certificates");
+  if(editing&&editing.kind==="port"){renderPortEditor();return;}
+  const certName=id=>{
+    const c=cache.certificates.filter(x=>Number(x.id)===Number(id))[0];
+    return c?c.name:(Number(id)?"id "+id:"—");
+  };
+  const rows=cache.ports.map(p=>`
+    <tr><td><b>${escHtml(humanise(p.protocol))}</b><div class="hint muted">id ${escHtml(p.id)}</div></td>
+        <td><code>${escHtml(p.address)}:${escHtml(p.port)}</code></td>
+        <td>${escHtml(humanise(p.connection_security))}</td>
+        <td>${escHtml(certName(p.certificate_id))}</td>
+        <td>${escHtml(humanise(p.client_certificate_policy))}${p.client_certificate_ca_file?'<div class="hint muted">'+escHtml(p.client_certificate_ca_file)+'</div>':""}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="portedit" data-id="${escHtml(p.id)}">Edit</button>
+          <button class="btn danger sm" data-act="portdel" data-id="${escHtml(p.id)}" data-label="${escHtml(p.protocol+" "+p.address+":"+p.port)}">Delete</button>
+          <div class="err" id="err_port_${escHtml(p.id)}"></div></td></tr>`).join("");
+  const restartWording=[
+    sentencesWith(operation("/api/v1/ports","post").description,"restart"),
+    sentencesWith(operation("/api/v1/ports/{id}","put").description,"restart"),
+    sentencesWith(operation("/api/v1/ports/{id}","delete").description,"restart")
+  ].filter(Boolean).join(" ");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/ports","get").description||"")}</p>
+      <p class="note"><span class="badge warn">restart</span> ${escHtml(restartWording)}</p>
+      <div class="tablewrap"><table><thead><tr><th>Protocol</th><th>Listens on</th><th>Security</th><th>Certificate</th><th>Client certificate</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">No listeners are configured.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px">
+        <button class="btn" data-act="portnew">Add a port</button>
+        <button class="btn ghost" data-act="portapply">Restart the services now</button>
+        <div class="err" id="err_portapply"></div>
+      </div>
+      <p class="note" style="margin-top:12px">${escHtml(operation("/api/v1/server/reinitialize","post").description||"")}</p>
+    </div></div>`;
+}
+function portFormOptions(){
+  return {
+    required:requiredOf("/api/v1/ports","post"),
+    choices:{certificate_id:[{value:0,label:"(none)"}].concat(
+      cache.certificates.map(c=>({value:c.id,label:c.name})))}
+  };
+}
+function openPort(id){
+  const existing=cache.ports.filter(p=>Number(p.id)===Number(id))[0];
+  const values=existing
+    ? JSON.parse(JSON.stringify(existing))
+    : documentedDefaults("/api/v1/ports","post",properties("/api/v1/ports","post"));
+  editing={kind:"port",id:Number(id)||0,values:values};
+  renderPortEditor();
+}
+function renderPortEditor(){
+  const props=properties("/api/v1/ports","post");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All ports</button>
+    <div class="sect"><h2>${editing.id?"Edit port "+escHtml(editing.id):"New port"}</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation(editing.id?"/api/v1/ports/{id}":"/api/v1/ports",editing.id?"put":"post").description||"")}</p>
+        <div class="form">${formHtml("port",props,editing.values,portFormOptions())}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="portsave">Save port</button>
+          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <div class="err" id="err_portedit"></div>
+        </div>
+      </div></div></div>`;
+}
+async function savePort(){
+  setErr("err_portedit","");
+  const props=properties("/api/v1/ports","post");
+  let body;
+  try{body=readForm("port",props,portFormOptions());}catch(e){setErr("err_portedit",e.message);return;}
+  try{
+    if(editing.id)await api("/api/v1/ports/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/ports",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast("Port saved — it reaches the wire when the services restart");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_portedit",e.message);}
+}
+async function deletePort(id,label){
+  if(!confirm("Delete the listener "+label+"?"))return;
+  setErr("err_port_"+id,"");
+  try{await api("/api/v1/ports/"+id,{method:"DELETE"});toast("Port deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_port_"+id,e.message);}
+}
+async function applyRestart(){
+  setErr("err_portapply","");
+  if(!confirm("Restart the server's services now? Connections in progress are dropped, and this browser session ends with them."))return;
+  try{await api("/api/v1/server/reinitialize",{method:"POST"});}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_portapply",e.message);return;}
+  toast("Restarting the services…");
+  if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
+  // The listener stops and starts with the rest of the services, and it drops
+  // every browser session as it goes, so what is waited for is this page coming
+  // back at all - asked for without a credential, because a request the server
+  // answers 401 is a request that puts the browser's own password box on the
+  // screen. When it answers, the session this page held is gone with the
+  // listener that held it, and the sign-in card says so.
+  for(let attempt=0;attempt<60;attempt++){
+    await new Promise(r=>setTimeout(r,1000));
+    let res=null;
+    try{res=await fetch("/",{credentials:"omit",cache:"no-store"});}catch(_){continue;}
+    if(res.status===200){signedOut("The services restarted, which ended this session. Sign in again.");return;}
+  }
+  signedOut("The server did not answer after the restart. Sign in again when it is back.");
+}
+
+/* ---------- Routes ---------- */
+function routeFormOptions(){
+  return {
+    required:requiredOf("/api/v1/routes","post"),
+    // treat_security_as_local_domain is the COM spelling of
+    // treat_recipient_as_local_domain and the document gives both for the same
+    // flag; one control writes it, so only one is drawn.
+    skip:["treat_security_as_local_domain"],
+    passwordHint:"left unchanged unless filled"
+  };
+}
+async function renderRoutes(){
+  await loadSpec();
+  cache.routes=asList(await api("/api/v1/routes"),"routes");
+  if(editing&&editing.kind==="route"){renderRouteEditor();return;}
+  const rows=cache.routes.map(r=>`
+    <tr><td><b>${escHtml(r.domain_name)}</b>${r.description?'<div class="hint muted">'+escHtml(r.description)+'</div>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
+        <td><code>${escHtml(r.target_smtp_host)}:${escHtml(r.target_smtp_port)}</code></td>
+        <td>${escHtml(humanise(r.connection_security))}</td>
+        <td>${r.relayer_requires_authentication?escHtml(r.relayer_auth_username||"(no user name)"):'<span class="muted">none</span>'}</td>
+        <td>${r.all_addresses?'<span class="muted">every recipient</span>':escHtml((r.addresses||[]).length+" address"+((r.addresses||[]).length===1?"":"es"))}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="routeedit" data-id="${escHtml(r.id)}">Edit</button>
+          <button class="btn danger sm" data-act="routedel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.domain_name)}">Delete</button>
+          <div class="err" id="err_route_${escHtml(r.id)}"></div></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/routes","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Target</th><th>Security</th><th>Authentication</th><th>Recipients</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">No routes are configured; every domain is delivered to by its MX records.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="routenew">Add a route</button></div>
+    </div></div>`;
+}
+function openRoute(id){
+  const existing=cache.routes.filter(r=>Number(r.id)===Number(id))[0];
+  const values=existing
+    ? JSON.parse(JSON.stringify(existing))
+    : documentedDefaults("/api/v1/routes","post",properties("/api/v1/routes","post"));
+  editing={kind:"route",id:Number(id)||0,values:values};
+  renderRouteEditor();
+}
+function renderRouteEditor(){
+  const props=properties("/api/v1/routes","post");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All routes</button>
+    <div class="sect"><h2>${editing.id?"Edit route "+escHtml(editing.id):"New route"}</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation(editing.id?"/api/v1/routes/{id}":"/api/v1/routes",editing.id?"put":"post").description||"")}</p>
+        <div class="form">${formHtml("route",props,editing.values,routeFormOptions())}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="routesave">Save route</button>
+          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <div class="err" id="err_routeedit"></div>
+        </div>
+      </div></div></div>`;
+}
+async function saveRoute(){
+  setErr("err_routeedit","");
+  const props=properties("/api/v1/routes","post");
+  let body;
+  try{body=readForm("route",props,routeFormOptions());}catch(e){setErr("err_routeedit",e.message);return;}
+  try{
+    if(editing.id)await api("/api/v1/routes/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/routes",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast("Route saved");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_routeedit",e.message);}
+}
+async function deleteRoute(id,name){
+  if(!confirm("Delete the route for "+name+"?"))return;
+  setErr("err_route_"+id,"");
+  try{await api("/api/v1/routes/"+id,{method:"DELETE"});toast("Route deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_route_"+id,e.message);}
+}
+
+/* ---------- Logs ---------- */
 async function renderLogs(){
   const files=asList(await api("/api/v1/logs"),"files");
   const rows=files.map(f=>`
@@ -427,43 +1170,33 @@ async function renderLogs(){
         <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="200">Last 200</button>
         <button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="2000">Last 2000</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
-    <table><thead><tr><th>Log file</th><th>Size</th><th>Created</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="4" class="empty">No log files. Logging may be off, or the folder is empty.</td></tr>'}</tbody></table>
+    <div class="tablewrap"><table><thead><tr><th>Log file</th><th>Size</th><th>Created</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="empty">No log files. Logging may be off, or the folder is empty.</td></tr>'}</tbody></table></div>
+    <div class="err" id="err_log" style="margin-top:10px"></div>
     <pre id="logPre" style="margin-top:14px;max-height:60vh;overflow:auto;white-space:pre-wrap" hidden></pre></div>`;
 }
 function fmtBytes(n){n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(1)+" MB";if(n>=1024)return (n/1024).toFixed(1)+" KB";return n+" B";}
 async function showLog(name,lines){
+  setErr("err_log","");
   try{
     const t=await api("/api/v1/logs/"+encodeURIComponent(name)+"?lines="+encodeURIComponent(lines||200));
     const pre=$("#logPre");if(!pre)return;
     pre.hidden=false;
     pre.textContent=(t.lines||[]).join("\n")||"(empty)";
     pre.scrollTop=pre.scrollHeight;
-  }catch(e){toast("Could not read "+name+": "+e.message);}
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_log","Could not read "+name+": "+e.message);}
 }
 
-async function renderCerts(){
-  const certs=asList(await api("/api/v1/certificates"),"certificates");
-  const rows=certs.map(c=>`<tr><td>${escHtml(c.name)}</td><td><code>${escHtml(c.certificate_file||"—")}</code></td><td><code>${escHtml(c.private_key_file||"—")}</code></td></tr>`).join("");
-  $("#content").innerHTML=`<div class="card view">
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The certificates the server knows by name and file. A private key's password is never listed. Adding, replacing or binding one to a port is done in the Control Panel.</p>
-    <table><thead><tr><th>Name</th><th>Certificate file</th><th>Private key file</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="3" class="empty">No certificates are configured.</td></tr>'}</tbody></table></div>`;
-}
-
-async function renderRules(){
-  const rules=asList(await api("/api/v1/rules"),"rules");
-  const crit=r=>(r.criteria||[]).map(c=>`${escHtml(c.field)}${c.header?" "+escHtml(c.header):""} ${escHtml(c.match)} “${escHtml(c.value)}”`).join(r.all_criteria?" AND ":" OR ")||"—";
-  const acts=r=>(r.actions||[]).map(a=>`${escHtml(a.type)}${a.value?" → "+escHtml(a.value):""}`).join("; ")||"—";
-  const rows=rules.map(r=>`<tr><td>${escHtml(r.name)}</td><td>${r.active?"on":"off"}</td><td>${crit(r)}</td><td>${acts(r)}</td></tr>`).join("");
-  $("#content").innerHTML=`<div class="card view">
-    <p style="color:var(--muted);font-size:13px;margin-bottom:14px">The global rules, in the order the server evaluates them. Per-account rules and editing are in the Control Panel.</p>
-    <table><thead><tr><th>Rule</th><th>Active</th><th>When</th><th>Then</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="4" class="empty">No global rules are defined.</td></tr>'}</tbody></table></div>`;
-}
-
-/* ---------- Boot ---------- */
-if(auth){api("/api/v1/status").then(enter).catch(()=>{sessionStorage.removeItem("hmsAuth")});}
+/* ---------- Boot ----------
+   No credential is stored, so the only question at load is whether the browser
+   still holds a live session cookie - and that is asked only when this tab has
+   signed in before. Asking unconditionally would mean a request answered 401 on
+   every first visit, and a 401 from this API carries WWW-Authenticate: Basic,
+   which is the browser's cue to put its own password box on the screen in front
+   of the page's. */
+let resumed=false;
+try{resumed=sessionStorage.getItem("hmsSession")==="1";}catch(_){}
+if(resumed)api("/api/v1/status").then(enter).catch(()=>{signedOut("The session ended. Sign in again.");});
 </script>
 </body>
 </html>
