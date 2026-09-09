@@ -54,19 +54,204 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("The Control Deck is served from the program directory with a view for each of the read-only administrative routes")]
+      [Description("The Control Deck is served from the program directory with a view for each of the administrative routes it reads and writes")]
       public void TheControlDeckIsServedWithItsViews()
       {
          (int status, string body) = Http("GET", "/");
          Assert.AreEqual(200, status, body);
          StringAssert.Contains("Control Deck", body, "The real page, not the 'not installed' placeholder: build.ps1 copies it beside the server.");
-         foreach (string view in new[] { "dash", "domains", "queue", "tlsa", "settings", "logs", "certs", "rules" })
+         foreach (string view in new[] { "dash", "domains", "queue", "tlsa", "settings", "logs", "certs", "rules", "ports", "routes" })
             StringAssert.Contains("data-view=\"" + view + "\"", body, "A navigation button for " + view);
          StringAssert.Contains("/api/v1/logs/", body);
          StringAssert.Contains("/api/v1/settings", body);
+         StringAssert.Contains("/api/v1/settings/antispam", body);
+         StringAssert.Contains("/api/v1/settings/logging", body);
          StringAssert.Contains("/api/v1/certificates", body);
          StringAssert.Contains("/api/v1/rules", body);
+         StringAssert.Contains("/api/v1/ports", body);
+         StringAssert.Contains("/api/v1/routes", body);
+         StringAssert.Contains("/api/v1/server/reinitialize", body);
+         StringAssert.Contains("/api/v1/session", body, "The page signs in with a session, not by keeping the password.");
+         StringAssert.Contains("/api/v1/openapi.json", body, "Its forms are built from the server's own document.");
+         StringAssert.Contains("X-Requested-With", body, "Every write it makes carries the header a session write must carry.");
+         StringAssert.DoesNotContain("hmsAuth", body, "Nothing keeps the administrator password in the browser any more.");
          StringAssert.Contains("\u26e8", body, "The page's own non-ASCII glyphs survive: it is served as bytes, not through the ANSI code page.");
+      }
+
+      /// <summary>
+      ///    The administrator's browser session: started with the administrator
+      ///    password, it is the administrator - full authority, no domain
+      ///    restriction - for as long as it lives, and a request that changes
+      ///    something on it must carry X-Requested-With, which is what stops
+      ///    another site from making one.
+      /// </summary>
+      [Test]
+      [Description("POST /api/v1/session with the administrator password answers a cookie that reads and writes as the password does, and DELETE ends it.")]
+      public void AnAdministratorSessionStandsForTheAdministratorPassword()
+      {
+         string previousHostName = _settings.HostName;
+
+         try
+         {
+            (int created, string createdHeaders, string createdBody) = HttpRaw("POST", "/api/v1/session", AdminCredential, null, null);
+            Assert.AreEqual(201, created, createdBody);
+            StringAssert.Contains("\"administrator\":true", createdBody, "The answer says who the session stands for.");
+            StringAssert.DoesNotContain("\"address\"", createdBody, "An administrator session names no account.");
+
+            string cookie = SessionCookie(createdHeaders);
+            Assert.IsNotNull(cookie, "A Set-Cookie for hmailsession. Headers: " + createdHeaders);
+            StringAssert.Contains("HttpOnly", createdHeaders, "The page's own script must not be able to read the token.");
+            StringAssert.Contains("SameSite=Strict", createdHeaders, "Another site's request must not carry it.");
+
+            string cookieHeader = "Cookie: hmailsession=" + cookie + "\r\n";
+
+            // A read on the cookie alone reaches an administrator route.
+            (int readStatus, string readHeaders, string readBody) = HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader);
+            Assert.AreEqual(200, readStatus, readBody);
+            StringAssert.Contains("\"host_name\":\"" + _settings.HostName + "\"", readBody);
+
+            // A write on the cookie alone is refused without the header ...
+            (int withoutHeader, string withoutHeaders, string withoutBody) =
+               HttpRaw("PUT", "/api/v1/settings", null, "{\"host_name\":\"session.example.test\"}", cookieHeader);
+            Assert.AreEqual(403, withoutHeader, withoutBody);
+            StringAssert.Contains("X-Requested-With", withoutBody);
+            Assert.AreEqual(previousHostName, _settings.HostName, "The refused write changed nothing.");
+
+            // ... and accepted with it.
+            (int withHeader, string withHeaders, string withBody) =
+               HttpRaw("PUT", "/api/v1/settings", null, "{\"host_name\":\"session.example.test\"}",
+                       cookieHeader + "X-Requested-With: hMailServer\r\n");
+            Assert.AreEqual(200, withHeader, withBody);
+            Assert.AreEqual("session.example.test", _settings.HostName, "COM reads back what the session wrote.");
+
+            // The account endpoints stay out of its reach: it is not an account.
+            (int meStatus, string meHeaders, string meBody) = HttpRaw("GET", "/api/v1/me", null, null, cookieHeader);
+            Assert.AreEqual(403, meStatus, meBody);
+
+            // DELETE ends it, and the cookie is refused from the next request.
+            (int ended, string endedHeaders, string endedBody) =
+               HttpRaw("DELETE", "/api/v1/session", null, null, cookieHeader + "X-Requested-With: hMailServer\r\n");
+            Assert.AreEqual(200, ended, endedBody);
+            StringAssert.Contains("\"ended\":true", endedBody);
+
+            (int afterEnd, string afterHeaders, string afterBody) = HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader);
+            Assert.AreEqual(401, afterEnd, afterBody);
+         }
+         finally
+         {
+            _settings.HostName = previousHostName;
+         }
+      }
+
+      [Test]
+      [Description("An account's own session reaches the account's endpoints and no administrator route; an API key cannot start a session at all.")]
+      public void OnlyAPasswordStartsASessionAndOnlyForItsOwnSurface()
+      {
+         const string address = "sessionuser@example.test";
+         Account account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, address, "secret1234");
+
+         try
+         {
+            string accountCredential = "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes(address + ":secret1234"));
+            (int created, string headers, string body) = HttpRaw("POST", "/api/v1/session", accountCredential, null, null);
+            Assert.AreEqual(201, created, body);
+            StringAssert.Contains("\"address\":\"" + address + "\"", body);
+
+            string cookieHeader = "Cookie: hmailsession=" + SessionCookie(headers) + "\r\n";
+
+            (int meStatus, string meHeaders, string meBody) = HttpRaw("GET", "/api/v1/me", null, null, cookieHeader);
+            Assert.AreEqual(200, meStatus, meBody);
+
+            (int adminStatus, string adminHeaders, string adminBody) = HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader);
+            Assert.AreEqual(403, adminStatus, "An account's session must not read a server-wide setting. Body: " + adminBody);
+
+            // And the same for the account's password presented directly.
+            Assert.AreEqual(403, Http("GET", "/api/v1/settings", accountCredential, null).status,
+               "An account's credentials reach only its own endpoints.");
+
+            // A key is refused: a cookie minted from one would carry none of the
+            // key's restrictions.
+            (int keyCreated, string keyCreatedBody) = Http("POST", "/api/v1/apikeys",
+               "{\"label\":\"rest coverage - session\",\"scope\":\"full\"}");
+            Assert.AreEqual(201, keyCreated, keyCreatedBody);
+            string keyId = Extract(keyCreatedBody, "id");
+            try
+            {
+               (int keyStatus, string keyHeaders, string keyBody) =
+                  HttpRaw("POST", "/api/v1/session", "Bearer " + Extract(keyCreatedBody, "key"), null, null);
+               Assert.AreEqual(403, keyStatus, keyBody);
+               StringAssert.Contains("api key", keyBody);
+            }
+            finally
+            {
+               Http("DELETE", "/api/v1/apikeys/" + keyId);
+            }
+
+            // A session cannot mint another session.
+            (int again, string againHeaders, string againBody) =
+               HttpRaw("POST", "/api/v1/session", null, null, cookieHeader + "X-Requested-With: hMailServer\r\n");
+            Assert.AreEqual(403, again, againBody);
+         }
+         finally
+         {
+            _domain.Accounts.DeleteByDBID(account.ID);
+         }
+      }
+
+      [Test]
+      [Description("Changing the administrator password ends every administrator session: the cookie was minted from a credential that is no longer the one in force.")]
+      public void ChangingTheAdministratorPasswordEndsAnAdministratorSession()
+      {
+         (int created, string headers, string body) = HttpRaw("POST", "/api/v1/session", AdminCredential, null, null);
+         Assert.AreEqual(201, created, body);
+         string cookieHeader = "Cookie: hmailsession=" + SessionCookie(headers) + "\r\n";
+         Assert.AreEqual(200, HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader).status);
+
+         try
+         {
+            _settings.SetAdministratorPassword(AdminPassword + "-changed");
+            Assert.AreEqual(401, HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader).status,
+               "The session was minted from the old password and must not outlive it.");
+         }
+         finally
+         {
+            _settings.SetAdministratorPassword(AdminPassword);
+         }
+
+         Assert.AreEqual(401, HttpRaw("GET", "/api/v1/settings", null, null, cookieHeader).status,
+            "Putting the old password back does not bring the session back.");
+         Assert.AreEqual(200, Http("GET", "/api/v1/settings").status, "The password itself still works.");
+      }
+
+      [Test]
+      [Description("The OpenAPI document says that the administrator may start a browser session too.")]
+      public void OpenApiDescribesTheAdministratorSession()
+      {
+         (int status, string body) = Http("GET", "/api/v1/openapi.json");
+         Assert.AreEqual(200, status, body);
+         int at = body.IndexOf("\"/api/v1/session\"", StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "The document must describe /api/v1/session.");
+         string entry = body.Substring(at, Math.Min(2200, body.Length - at));
+         StringAssert.Contains("administrator", entry, "The entry must say the administrator may start one.");
+         StringAssert.Contains("X-Requested-With", entry, "and what a write on it has to carry.");
+      }
+
+      private const string AdminCredentialUser = "Administrator";
+
+      private static string AdminCredential =>
+         "Basic " + Convert.ToBase64String(Encoding.ASCII.GetBytes(AdminCredentialUser + ":" + AdminPassword));
+
+      // The hmailsession token out of a response's headers, or null.
+      private static string SessionCookie(string headers)
+      {
+         const string needle = "Set-Cookie: hmailsession=";
+         int at = headers.IndexOf(needle, StringComparison.Ordinal);
+         if (at < 0)
+            return null;
+
+         int start = at + needle.Length;
+         int end = headers.IndexOfAny(new[] { ';', '\r' }, start);
+         return end < 0 ? headers.Substring(start) : headers.Substring(start, end - start);
       }
 
       private static (int status, string body) Http(string method, string path, string requestBody = null)
@@ -76,6 +261,20 @@ namespace RegressionTests.API
       }
 
       private static (int status, string body) Http(string method, string path, string authorization, string requestBody)
+      {
+         (int status, string ignoredHeaders, string body) = HttpRaw(method, path, authorization, requestBody, null);
+         return (status, body);
+      }
+
+      /// <summary>
+      ///    The same exchange, with the response's header block returned as well
+      ///    and with room for request headers of the caller's own - which is what
+      ///    a session needs: a Cookie going out, a Set-Cookie coming back.
+      ///    extraHeaders, when it is given, is complete header lines each ending
+      ///    in a literal carriage return and line feed.
+      /// </summary>
+      private static (int status, string headers, string body) HttpRaw(string method, string path, string authorization,
+                                                                       string requestBody, string extraHeaders)
       {
          using (var client = new TcpClient())
          {
@@ -114,6 +313,9 @@ namespace RegressionTests.API
                   headers.Append("Content-Length: " + bodyBytes.Length + "\r\n");
                }
 
+               if (extraHeaders != null)
+                  headers.Append(extraHeaders);
+
                headers.Append("Connection: close\r\n\r\n");
 
                byte[] headerBytes = Encoding.ASCII.GetBytes(headers.ToString());
@@ -138,8 +340,9 @@ namespace RegressionTests.API
                }
 
                int separator = raw.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+               string responseHeaders = separator >= 0 ? raw.Substring(0, separator + 2) : raw;
                string body = separator >= 0 ? raw.Substring(separator + 4) : "";
-               return (statusCode, body);
+               return (statusCode, responseHeaders, body);
             }
          }
       }
