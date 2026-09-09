@@ -19,6 +19,7 @@
 
 #include <cstring>
 #include <mutex>
+#include <set>
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -877,6 +878,32 @@ namespace HM
    }
 
    void
+   SslContextInitializer::ReportGroupListOnce_(int severity, int code, const String &message)
+   {
+      // A context is built for every listener and for every outbound delivery,
+      // and the group list is the same each time - so a list this OpenSSL does
+      // not implement (the ML-KEM hybrids are newer than the OpenSSL that
+      // Debian and Ubuntu ship) would otherwise report the same medium error
+      // hundreds of times an hour for a condition the fallback below already
+      // handles. An administrator needs to read it once.
+      static std::mutex reported_mutex;
+      static std::set<String> reported;
+
+      {
+         std::lock_guard<std::mutex> guard(reported_mutex);
+
+         if (!reported.insert(message).second)
+         {
+            LOG_DEBUG("SslContextInitializer::SetKeyExchangeGroups_ - " + message + " (already reported)");
+            return;
+         }
+      }
+
+      ErrorManager::Instance()->ReportError((ErrorManager::eSeverity) severity, code,
+         "SslContextInitializer::SetKeyExchangeGroups_", message);
+   }
+
+   void
    SslContextInitializer::SetKeyExchangeGroups_(boost::asio::ssl::context& context)
    {
       // The classical-only list hMailServer used before post-quantum groups
@@ -904,7 +931,7 @@ namespace HM
          // value below.
          if (!ContainsGroupToAdd_(configuredGroups))
          {
-            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5720, "SslContextInitializer::SetKeyExchangeGroups_",
+            ReportGroupListOnce_(ErrorManager::Medium, 5720,
                Formatter::Format("The configured TLS key exchange groups '{0}' would leave no group enabled. Falling back to '{1}'.",
                   String(configuredGroups), String(classicalGroups)));
          }
@@ -918,7 +945,7 @@ namespace HM
             // OpenSSL did not accept the list: an unknown group name (a typo, or a
             // group this OpenSSL build does not implement) or malformed syntax. A
             // rejected list is not applied at all, so we still have to install one.
-            ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5720, "SslContextInitializer::SetKeyExchangeGroups_",
+            ReportGroupListOnce_(ErrorManager::Medium, 5720,
                Formatter::Format("Failed to set the TLS key exchange groups '{0}'. Message: {1}. Falling back to '{2}'.",
                   String(configuredGroups), String(GetOpenSslError_()), String(classicalGroups)));
          }
@@ -929,7 +956,7 @@ namespace HM
          // Should not happen - these three groups are present in every OpenSSL
          // build we link against. Report it loudly, because TLS on this listener
          // is now relying on whatever group list OpenSSL defaulted to.
-         ErrorManager::Instance()->ReportError(ErrorManager::High, 5721, "SslContextInitializer::SetKeyExchangeGroups_",
+         ReportGroupListOnce_(ErrorManager::High, 5721,
             Formatter::Format("Failed to set the fallback TLS key exchange groups '{0}'. Message: {1}. TLS will use the OpenSSL default groups.",
                String(classicalGroups), String(GetOpenSslError_())));
       }
