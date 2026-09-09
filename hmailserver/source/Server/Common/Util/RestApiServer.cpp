@@ -7,6 +7,8 @@
 
 #include "RestApiServer.h"
 #include "HttpServer.h"
+#include <boost/thread/thread.hpp>
+#include <boost/chrono.hpp>
 #include "../Application/MetricsHistoryTask.h"
 #include "ServerStatus.h"
 #include "OtelTracer.h"
@@ -1477,6 +1479,50 @@ namespace HM
             return HandleBackupStatus_();
          case RouteSettingsGet:
             return HandleSettings_();
+         case RouteSettingsPut:
+            return HandleSettingsPut_(GetRequestBody_(request));
+         case RouteSettingsAntiSpamGet:
+            return HandleSettingsAntiSpam_();
+         case RouteSettingsAntiSpamPut:
+            return HandleSettingsAntiSpamPut_(GetRequestBody_(request));
+         case RouteSettingsLoggingGet:
+            return HandleSettingsLogging_();
+         case RouteSettingsLoggingPut:
+            return HandleSettingsLoggingPut_(GetRequestBody_(request));
+         case RouteRuleCreate:
+            return HandleCreateRule_(GetRequestBody_(request));
+         case RouteRuleUpdate:
+            return HandleUpdateRule_(route.record_id, GetRequestBody_(request));
+         case RouteRuleDelete:
+            return HandleDeleteRule_(route.record_id);
+         case RouteCertificateCreate:
+            return HandleCreateCertificate_(GetRequestBody_(request));
+         case RouteCertificateDelete:
+            return HandleDeleteCertificate_(route.record_id);
+         case RoutePortList:
+            return HandleListPorts_();
+         case RoutePortCreate:
+            return HandleCreatePort_(GetRequestBody_(request));
+         case RoutePortUpdate:
+            return HandleUpdatePort_(route.record_id, GetRequestBody_(request));
+         case RoutePortDelete:
+            return HandleDeletePort_(route.record_id);
+         case RouteRouteList:
+            return HandleListRoutes_();
+         case RouteRouteCreate:
+            return HandleCreateRoute_(GetRequestBody_(request));
+         case RouteRouteUpdate:
+            return HandleUpdateRoute_(route.record_id, GetRequestBody_(request));
+         case RouteRouteDelete:
+            return HandleDeleteRoute_(route.record_id);
+         case RouteAliasCreate:
+            return HandleCreateAlias_(String(route.identifier), GetRequestBody_(request));
+         case RouteAliasDelete:
+            return HandleDeleteAlias_(String(route.identifier));
+         case RouteAccountUpdate:
+            return HandleUpdateAccount_(caller, String(route.identifier), GetRequestBody_(request));
+         case RouteServerReinitialize:
+            return HandleServerReinitialize_();
          case RouteArchiveSearch:
             return HandleArchiveSearch_(caller.domains, route.query);
          case RouteArchiveGet:
@@ -1837,13 +1883,13 @@ namespace HM
       // /api/v1/accounts/<address>
       const AnsiString accountsPrefix = "/api/v1/accounts/";
 
-      if (method == "DELETE" && path.StartsWith(accountsPrefix))
+      if ((method == "DELETE" || method == "PUT") && path.StartsWith(accountsPrefix))
       {
          AnsiString address = path.Mid(accountsPrefix.GetLength());
 
          if (!address.IsEmpty() && address.Find("/") < 0)
          {
-            route.kind = RouteAccountDelete;
+            route.kind = method == "DELETE" ? RouteAccountDelete : RouteAccountUpdate;
             route.identifier = address;
             return;
          }
@@ -1968,15 +2014,31 @@ namespace HM
       }
 
       // /api/v1/domains/<name>/aliases - same shape as the accounts listing.
-      if (method == "GET" && path.StartsWith(domainsPrefix) && path.EndsWith("/aliases"))
+      if ((method == "GET" || method == "POST") && path.StartsWith(domainsPrefix) && path.EndsWith("/aliases"))
       {
          AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
             path.GetLength() - domainsPrefix.GetLength() - AnsiString("/aliases").GetLength());
 
          if (!domainName.IsEmpty() && domainName.Find("/") < 0)
          {
-            route.kind = RouteAliasList;
+            route.kind = method == "GET" ? RouteAliasList : RouteAliasCreate;
             route.identifier = domainName;
+            return;
+         }
+      }
+
+      // /api/v1/aliases/<address> - the alias itself, named by its address as
+      // an account is; scoped to the address's domain in Authorize_.
+      const AnsiString aliasesPrefix = "/api/v1/aliases/";
+
+      if (method == "DELETE" && path.StartsWith(aliasesPrefix))
+      {
+         AnsiString address = path.Mid(aliasesPrefix.GetLength());
+
+         if (!address.IsEmpty() && address.Find("/") < 0)
+         {
+            route.kind = RouteAliasDelete;
+            route.identifier = address;
             return;
          }
       }
@@ -2049,10 +2111,92 @@ namespace HM
          route.kind = RouteCertificateList;
          return;
       }
+
+      if (method == "POST" && path == "/api/v1/certificates")
+      {
+         route.kind = RouteCertificateCreate;
+         return;
+      }
+
+      // The numbered resources of the write surface: /api/v1/<collection>/<id>
+      // with a decimal id and nothing after it, as an IP range is named.
+      const AnsiString certificatesPrefix = "/api/v1/certificates/";
+
+      if (method == "DELETE" && path.StartsWith(certificatesPrefix))
+      {
+         AnsiString idPart = path.Mid(certificatesPrefix.GetLength());
+         __int64 id = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+         {
+            route.kind = RouteCertificateDelete;
+            route.record_id = id;
+            return;
+         }
+      }
+
+      if (path == "/api/v1/ports" && (method == "GET" || method == "POST"))
+      {
+         route.kind = method == "GET" ? RoutePortList : RoutePortCreate;
+         return;
+      }
+
+      const AnsiString portsPrefix = "/api/v1/ports/";
+
+      if ((method == "PUT" || method == "DELETE") && path.StartsWith(portsPrefix))
+      {
+         AnsiString idPart = path.Mid(portsPrefix.GetLength());
+         __int64 id = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+         {
+            route.kind = method == "PUT" ? RoutePortUpdate : RoutePortDelete;
+            route.record_id = id;
+            return;
+         }
+      }
+
+      if (path == "/api/v1/routes" && (method == "GET" || method == "POST"))
+      {
+         route.kind = method == "GET" ? RouteRouteList : RouteRouteCreate;
+         return;
+      }
+
+      const AnsiString routesPrefix = "/api/v1/routes/";
+
+      if ((method == "PUT" || method == "DELETE") && path.StartsWith(routesPrefix))
+      {
+         AnsiString idPart = path.Mid(routesPrefix.GetLength());
+         __int64 id = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+         {
+            route.kind = method == "PUT" ? RouteRouteUpdate : RouteRouteDelete;
+            route.record_id = id;
+            return;
+         }
+      }
       if (method == "GET" && path == "/api/v1/rules")
       {
          route.kind = RouteRuleList;
          return;
+      }
+
+      if (method == "POST" && path == "/api/v1/rules")
+      {
+         route.kind = RouteRuleCreate;
+         return;
+      }
+
+      const AnsiString rulesPrefix = "/api/v1/rules/";
+
+      if ((method == "PUT" || method == "DELETE") && path.StartsWith(rulesPrefix))
+      {
+         AnsiString idPart = path.Mid(rulesPrefix.GetLength());
+         __int64 id = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+         {
+            route.kind = method == "PUT" ? RouteRuleUpdate : RouteRuleDelete;
+            route.record_id = id;
+            return;
+         }
       }
       if (method == "GET" && path == "/api/v1/logs")
       {
@@ -2081,6 +2225,30 @@ namespace HM
       if (method == "GET" && path == "/api/v1/settings")
       {
          route.kind = RouteSettingsGet;
+         return;
+      }
+
+      if (method == "PUT" && path == "/api/v1/settings")
+      {
+         route.kind = RouteSettingsPut;
+         return;
+      }
+
+      if (path == "/api/v1/settings/antispam" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsAntiSpamGet : RouteSettingsAntiSpamPut;
+         return;
+      }
+
+      if (path == "/api/v1/settings/logging" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsLoggingGet : RouteSettingsLoggingPut;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/server/reinitialize")
+      {
+         route.kind = RouteServerReinitialize;
          return;
       }
       const AnsiString archivePath = "/api/v1/archive";
@@ -2161,6 +2329,24 @@ namespace HM
       case RouteListCreate:
       case RouteListDelete:
       case RouteBackupStart:
+      case RouteSettingsPut:
+      case RouteSettingsAntiSpamPut:
+      case RouteSettingsLoggingPut:
+      case RouteRuleCreate:
+      case RouteRuleUpdate:
+      case RouteRuleDelete:
+      case RouteCertificateCreate:
+      case RouteCertificateDelete:
+      case RoutePortCreate:
+      case RoutePortUpdate:
+      case RoutePortDelete:
+      case RouteRouteCreate:
+      case RouteRouteUpdate:
+      case RouteRouteDelete:
+      case RouteAliasCreate:
+      case RouteAliasDelete:
+      case RouteAccountUpdate:
+      case RouteServerReinitialize:
       case RouteArchiveHold:
       case RouteArchiveRelease:
       // An update check changes the recorded verdict and makes the server call
@@ -2301,6 +2487,25 @@ namespace HM
       case RouteBackupStart:
       case RouteBackupStatus:
       case RouteSettingsGet:
+      case RouteSettingsPut:
+      case RouteSettingsAntiSpamGet:
+      case RouteSettingsAntiSpamPut:
+      case RouteSettingsLoggingGet:
+      case RouteSettingsLoggingPut:
+      case RouteRuleCreate:
+      case RouteRuleUpdate:
+      case RouteRuleDelete:
+      case RouteCertificateCreate:
+      case RouteCertificateDelete:
+      case RoutePortList:
+      case RoutePortCreate:
+      case RoutePortUpdate:
+      case RoutePortDelete:
+      case RouteRouteList:
+      case RouteRouteCreate:
+      case RouteRouteUpdate:
+      case RouteRouteDelete:
+      case RouteServerReinitialize:
       case RouteUpdateGet:
       case RouteUpdateCheck:
       case RouteUpdateDownload:
@@ -2323,12 +2528,15 @@ namespace HM
       case RouteAccountCreate:
       case RouteDomainUpdate:
       case RouteAliasList:
+      case RouteAliasCreate:
       case RouteListList:
       case RouteListCreate:
       case RouteDkimGet:
          targetDomain = String(route.identifier);
          break;
       case RouteListDelete:
+      case RouteAliasDelete:
+      case RouteAccountUpdate:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -3381,7 +3589,63 @@ namespace HM
       account->SetAddress(String(address));
       account->SetPassword(hashedPassword);
       account->SetPasswordEncryption(preferredHashAlgorithm);
-      account->SetActive(true);
+
+      // The optional fields, as the InterfaceAccount setters take them after
+      // InterfaceAccounts::Add: active (default true), the person's names, and
+      // the size limit in megabytes. The limit was advertised in the OpenAPI
+      // document (as maxSizeMB) and never read, so a domain with a maximum
+      // account size refused every account created here - the limitation
+      // check requires a size when the domain has one - and nothing the caller
+      // sent could change that. Both spellings are accepted; max_size_mb is the
+      // one every other field here follows.
+      account->SetActive(GetJsonBoolValue_(requestBody, "active", true));
+      account->SetPersonFirstName(JsonUtf8Value_(requestBody, "first_name"));
+      account->SetPersonLastName(JsonUtf8Value_(requestBody, "last_name"));
+
+      {
+         // A number in the body is not a string, so read it the way
+         // HandleCreateIpRange_ reads priority: the digits after the colon.
+         long maxSizeMb = 0;
+         bool maxSizeGiven = false;
+
+         const char *sizeKeys[] = { "\"max_size_mb\"", "\"maxSizeMB\"" };
+         for (const char *needle : sizeKeys)
+         {
+            int keyPosition = requestBody.Find(needle);
+            if (keyPosition < 0)
+               continue;
+
+            int colon = requestBody.Find(":", keyPosition + AnsiString(needle).GetLength());
+            if (colon < 0)
+               continue;
+
+            AnsiString digits;
+            for (int i = colon + 1; i < requestBody.GetLength(); i++)
+            {
+               char c = requestBody[i];
+               if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+                  continue;
+               if ((c >= '0' && c <= '9') || (c == '-' && digits.IsEmpty()))
+               {
+                  digits += c;
+                  continue;
+               }
+               break;
+            }
+
+            if (digits.IsEmpty() || digits.GetLength() > 10)
+               return BuildResponse_(400, "{\"error\":\"max_size_mb must be a whole number of megabytes, 0 for no limit\"}");
+
+            maxSizeMb = atol(digits.c_str());
+            maxSizeGiven = true;
+            break;
+         }
+
+         if (maxSizeGiven && maxSizeMb < 0)
+            return BuildResponse_(400, "{\"error\":\"max_size_mb must be a whole number of megabytes, 0 for no limit\"}");
+
+         account->SetAccountMaxSize(maxSizeMb);
+      }
 
       // createInbox: true. This argument is the whole reason this call changed,
       // and it was losing mail.
@@ -3766,7 +4030,9 @@ namespace HM
 
       IPAddress lower;
       IPAddress upper;
-      if (!lower.TryParse(lowerText) || !upper.TryParse(upperText))
+      // The two-argument form: a caller's typo is answered with a 400, not
+      // written to the ERROR log by the parser as the one-argument form does.
+      if (!lower.TryParse(lowerText, false) || !upper.TryParse(upperText, false))
          return BuildResponse_(400, "{\"error\":\"lower and upper must be IP addresses\"}");
 
       long priority = 0;
@@ -4106,75 +4372,9 @@ namespace HM
          if (!rule)
             continue;
 
-         AnsiString criteria = "[";
-         std::shared_ptr<RuleCriterias> criterias = rule->GetCriterias();
-         if (criterias)
-         {
-            int criterionCount = 0;
-            for (int c = 0; c < criterias->GetCount(); c++)
-            {
-               std::shared_ptr<RuleCriteria> criterion = criterias->GetItem(c);
-               if (!criterion)
-                  continue;
-               if (criterionCount > 0)
-                  criteria += ",";
-               AnsiString entry;
-               entry.Format("{\"field\":\"%hs\",\"header\":\"%hs\",\"match\":\"%hs\",\"value\":\"%hs\"}",
-                  criterion->GetUsePredefined() ? RuleFieldName(criterion->GetPredefinedField()) : "header",
-                  JsonEscape_(Utf8_(criterion->GetHeaderField())).c_str(),
-                  RuleMatchName(criterion->GetMatchType()),
-                  JsonEscape_(Utf8_(criterion->GetMatchValue())).c_str());
-               criteria += entry;
-               criterionCount++;
-            }
-         }
-         criteria += "]";
-
-         AnsiString actions = "[";
-         std::shared_ptr<RuleActions> ruleActions = rule->GetActions();
-         if (ruleActions)
-         {
-            int actionCount = 0;
-            for (int a = 0; a < ruleActions->GetCount(); a++)
-            {
-               std::shared_ptr<RuleAction> action = ruleActions->GetItem(a);
-               if (!action)
-                  continue;
-               if (actionCount > 0)
-                  actions += ",";
-               // One "value" per action, the one that matters for its type - the
-               // folder for a move, the address for a forward, the function for a
-               // script, the route for send-using-route - so the listing reads
-               // without a schema per action.
-               AnsiString value;
-               switch (action->GetType())
-               {
-               case RuleAction::MoveToIMAPFolder: value = AnsiString(action->GetIMAPFolder()); break;
-               case RuleAction::Forward: value = AnsiString(action->GetTo()); break;
-               case RuleAction::ScriptFunction: value = AnsiString(action->GetScriptFunction()); break;
-               case RuleAction::SetHeaderValue: value = AnsiString(action->GetSubject()); break;
-               case RuleAction::CreateCopy: value = AnsiString(action->GetIMAPFolder()); break;
-               default: break;
-               }
-               AnsiString entry;
-               entry.Format("{\"type\":\"%hs\",\"value\":\"%hs\"}",
-                  RuleActionName(action->GetType()), JsonEscape_(value).c_str());
-               actions += entry;
-               actionCount++;
-            }
-         }
-         actions += "]";
-
          if (count > 0)
             body += ",";
-         AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"active\":%hs,\"all_criteria\":%hs,\"criteria\":%hs,\"actions\":%hs}",
-            rule->GetID(),
-            JsonEscape_(Utf8_(rule->GetName())).c_str(),
-            rule->GetActive() ? "true" : "false",
-            rule->GetUseAND() ? "true" : "false",
-            criteria.c_str(), actions.c_str());
-         body += entry;
+         body += RuleEntryJson_(rule);
          count++;
       }
       body += "]";
@@ -4404,31 +4604,52 @@ namespace HM
    HttpResponse
    RestApiServer::HandleSettings_()
    {
-      // A snapshot of the settings an operator asks about first, and nothing
-      // that unlocks anything: no passwords, no keys, no tokens. Writing
-      // settings stays with COM and the Control Panel, where each one is
-      // validated by the code that owns it.
-      Configuration *configuration = Configuration::Instance();
-      std::shared_ptr<SMTPConfiguration> smtp = configuration->GetSMTPConfiguration();
-      std::shared_ptr<IMAPConfiguration> imap = configuration->GetIMAPConfiguration();
-      std::shared_ptr<POP3Configuration> pop3 = configuration->GetPOP3Configuration();
+      // The group is the table in RestApiSettings.cpp: the same rows the PUT
+      // applies and the OpenAPI document describes, so what a read shows is
+      // exactly what a write answers with. The ten keys this snapshot has
+      // always carried are still there under their names; the rest of
+      // InterfaceSettings' scalars come after them. No passwords: the one the
+      // group accepts (smtp_relayer_password) is write-only. The function is
+      // declared in RestApiServer.h beside the class: a block-scope extern
+      // here was placed in the global namespace by MSVC and in HM by GCC and
+      // clang, and linked on one side only.
+      return BuildResponse_(200, RestApiSettingsServerGroupJson(&RestApiServer::JsonEscape_));
+   }
 
-      AnsiString body;
-      body.Format("{\"host_name\":\"%hs\",\"default_domain\":\"%hs\",\"max_message_size_kb\":%d,"
-                  "\"max_smtp_connections\":%d,\"max_imap_connections\":%d,\"max_pop3_connections\":%d,"
-                  "\"smtp_relayer\":\"%hs\",\"smtp_relayer_port\":%d,"
-                  "\"log_smtp_conversations\":%hs,\"log_imap_conversations\":%hs}",
-         JsonEscape_(Utf8_(configuration->GetHostName())).c_str(),
-         JsonEscape_(Utf8_(configuration->GetDefaultDomain())).c_str(),
-         smtp ? smtp->GetMaxMessageSize() : 0,
-         smtp ? smtp->GetMaxSMTPConnections() : 0,
-         imap ? (int) imap->GetMaxIMAPConnections() : 0,
-         pop3 ? (int) pop3->GetMaxPOP3Connections() : 0,
-         smtp ? JsonEscape_(Utf8_(smtp->GetSMTPRelayer())).c_str() : "",
-         smtp ? (int) smtp->GetSMTPRelayerPort() : 0,
-         configuration->GetLogSMTPConversations() ? "true" : "false",
-         configuration->GetLogIMAPConversations() ? "true" : "false");
-      return BuildResponse_(200, body);
+   HttpResponse
+   RestApiServer::HandleServerReinitialize_()
+   {
+      // Application::Reinitialize stops every service - this listener among
+      // them - reloads the configuration and starts them again, which is how
+      // a port, a certificate binding or a TLS setting written over the API
+      // takes effect. It cannot run on this thread: the answer has to leave
+      // before the listener that carries it is stopped. So the answer goes
+      // first, and a thread of its own does the work a moment later; a caller
+      // polls GET /api/v1/status until it answers again. Reinitialize holds
+      // its own mutex, so two callers restart twice, in turn, and never at
+      // once.
+      LOG_APPLICATION("RestApi: Reinitialize requested; the services restart in a moment.");
+
+      boost::thread(&ReinitializeAfterTheAnswer_).detach();
+
+      return BuildResponse_(202, "{\"reinitializing\":true}");
+   }
+
+   void
+   RestApiServer::ReinitializeAfterTheAnswer_()
+   {
+      boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
+
+      String error = Application::Instance()->Reinitialize();
+
+      if (error.IsEmpty())
+      {
+         LOG_APPLICATION("RestApi: Reinitialize completed.");
+      }
+      else
+      {
+         LOG_APPLICATION("RestApi: Reinitialize failed: " + error);
+      }
    }
 
    bool
@@ -7895,13 +8116,14 @@ namespace HM
       // file would drift the way every hand-maintained count in this project
       // has. Kept to OpenAPI 3.0 syntax and deliberately terse: the reference
       // for behaviour is the server, and this is the map, not the territory.
-      static const char *openApiJson =
+      static const char *openApiHead =
          "{"
          "\"openapi\":\"3.0.3\","
          "\"info\":{\"title\":\"hMailServer REST API\",\"version\":\"1\","
          "\"description\":\"Administration API. Authenticate with the administrator password (HTTP Basic, user 'Administrator') or an API key (Bearer). API keys can be read-only or restricted to named domains; key management itself requires the administrator password. The /api/v1/me endpoints are the exception: they answer to an account\'s own credentials (HTTP Basic, user = the mailbox address) and to nothing else, and /portal is a sign-in page for them.\"},"
          "\"paths\":{"
          "\"/api/v1/status\":{\"get\":{\"summary\":\"Server status\",\"responses\":{\"200\":{\"description\":\"Status, state and uptime\"}}}},"
+         "\"/api/v1/server/reinitialize\":{\"post\":{\"summary\":\"Restart the services in place\",\"description\":\"What the Control Panel's Reinitialize does: every service is stopped, the configuration reloaded and the services started again in the same process, so that a port, a certificate binding or a setting the document marks as taking effect on restart takes effect now. Answers before it happens, because the REST listener itself restarts: poll GET /api/v1/status until it answers again. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"202\":{\"description\":\"Reinitialising; the listeners restart in a moment\"}}}},"
          "\"/api/v1/me\":{\"get\":{\"summary\":\"The signed-in account's own state\",\"description\":\"HTTP Basic with the account's address and password - the same credential and the same checks as an IMAP logon, including a per-name lockout and the auto-ban. Refused for the administrator password and for API keys.\",\"responses\":{\"200\":{\"description\":\"address, domain, active, quota (limit_mb, used_bytes), vacation (enabled, active, subject, message, expires, expires_date), password_changed, second_factor, directory_linked\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"The administrator password or an API key was presented\"}}}},"
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
          "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
@@ -7915,8 +8137,8 @@ namespace HM
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
-         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
-         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
+         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
          "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under its own media type, except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
@@ -7928,15 +8150,13 @@ namespace HM
          "\"delete\":{\"summary\":\"Delete a domain with everything in it\",\"description\":\"The accounts and their messages, the aliases, the distribution lists, the domain aliases and the domain's directories go with it, exactly as when the Control Panel deletes a domain. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
-         "\"post\":{\"summary\":\"Create an account\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\",\"password\"],\"properties\":{\"address\":{\"type\":\"string\"},\"password\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"maxSizeMB\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Malformed request\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
-         "\"/api/v1/accounts/{address}\":{\"delete\":{\"summary\":\"Delete an account\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown account\"}}}},"
+         "\"post\":{\"summary\":\"Create an account\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\",\"password\"],\"properties\":{\"address\":{\"type\":\"string\"},\"password\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"max_size_mb\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Malformed request\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/queue\":{\"get\":{\"summary\":\"List the delivery queue\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of queued messages\"}}}},"
          "\"/api/v1/queue/{id}/retry\":{\"post\":{\"summary\":\"Retry a queued message now\",\"responses\":{\"200\":{\"description\":\"Rescheduled\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/queue/{id}\":{\"delete\":{\"summary\":\"Remove a message from the queue\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/quarantine\":{\"get\":{\"summary\":\"List quarantined messages\",\"description\":\"Server-wide; refused for domain-restricted keys. Bounded to the newest 1000.\",\"responses\":{\"200\":{\"description\":\"Array of quarantined messages\"}}}},"
          "\"/api/v1/quarantine/{id}/release\":{\"post\":{\"summary\":\"Release a quarantined message to its original recipients\",\"description\":\"Delivery is direct rather than back through the filters: a release is an administrator overruling them.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/quarantine/{id}\":{\"delete\":{\"summary\":\"Delete a quarantined message\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
-         "\"/api/v1/domains/{domain}/aliases\":{\"get\":{\"summary\":\"List aliases in a domain\",\"responses\":{\"200\":{\"description\":\"Array of aliases\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/tlsa\":{\"get\":{\"summary\":\"Recommended DANE TLSA records for the configured certificates\",\"responses\":{\"200\":{\"description\":\"Array of TLSA records\"}}}},"
          "\"/api/v1/srv\":{\"get\":{\"summary\":\"Recommended client-discovery SRV records (RFC 6186/8314 and Outlook autodiscover) for the enabled listeners\",\"description\":\"One record set per active domain; a domain-restricted key sees only its own domains. Only services that are enabled and not loopback-bound are advertised.\",\"responses\":{\"200\":{\"description\":\"Array of SRV records\"}}}},"
          "\"/api/v1/update\":{\"get\":{\"summary\":\"The update check\'s verdict\",\"description\":\"state: 0 not checked since the service started, 1 up to date, 2 a newer release is available, 3 its installer is downloaded and verified, 4 installing, 5 the last check failed (lastError). availableVersion, releaseName, publishedAt, releaseUrl and installer describe the newer release when there is one. Nothing is fetched by this route; the scheduled check (UpdateCheckEnabled) or POST /api/v1/update/check does that.\",\"responses\":{\"200\":{\"description\":\"The verdict\"}}}},"
@@ -7956,21 +8176,20 @@ namespace HM
          "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"
          "\"post\":{\"summary\":\"Create a distribution list\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\"],\"properties\":{\"address\":{\"type\":\"string\"},\"members\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"require_auth\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Missing address, or one outside the domain\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"A list with that address exists\"}}}},"
          "\"/api/v1/lists/{address}\":{\"delete\":{\"summary\":\"Delete a distribution list\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown list\"}}}},"
-         "\"/api/v1/certificates\":{\"get\":{\"summary\":\"List the SSL certificates\",\"description\":\"Names and file paths, never a private key password. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of certificates\"}}}},"
          "\"/api/v1/domains/{domain}/dkim\":{\"get\":{\"summary\":\"The DKIM signing configuration of a domain\",\"responses\":{\"200\":{\"description\":\"enabled, selector, sign_aliases and the private key file\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
-         "\"/api/v1/rules\":{\"get\":{\"summary\":\"List the global rules with their criteria and actions\",\"description\":\"Read-only. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of rules\"}}}},"
          "\"/api/v1/logs\":{\"get\":{\"summary\":\"List the log files\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of files with size and creation time\"}}}},"
          "\"/api/v1/logs/{name}\":{\"get\":{\"summary\":\"The last lines of a log file\",\"description\":\"Query parameter lines (default 200, at most 2000). The name must be one the list returns; anything with a path in it is refused.\",\"responses\":{\"200\":{\"description\":\"The lines, newest last\"},\"400\":{\"description\":\"Not a log file name\"},\"404\":{\"description\":\"No such log file\"}}}},"
          "\"/api/v1/backup\":{"
          "\"get\":{\"summary\":\"The backup manager's status text and the last lines of the backup log\",\"responses\":{\"200\":{\"description\":\"status (the last failure reason, if any) and log (the backup log's tail, newest last)\"}}},"
          "\"post\":{\"summary\":\"Start a backup with the configured settings\",\"description\":\"Runs on the maintenance queue; poll GET for the outcome.\",\"responses\":{\"202\":{\"description\":\"Started\"},\"409\":{\"description\":\"A backup or restore is already running, or the backup is not configured\"}}}},"
-         "\"/api/v1/settings\":{\"get\":{\"summary\":\"A read-only snapshot of the server-wide settings\",\"description\":\"Host name, default domain, size and connection limits, the relay host, the conversation-logging switches. No secrets. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"The snapshot\"}}}},"
          "\"/api/v1/archive\":{\"get\":{\"summary\":\"Search the archive index\",\"description\":\"Query parameters: domain and mailbox (exact), sender, recipient and subject (contains), since and until (YYYY-MM-DD HH:MM:SS), hold=1 for held copies only, limit (1-1000, default 200). Newest first. A domain-restricted key must name one of its domains.\",\"responses\":{\"200\":{\"description\":\"Array of archive entries: id, time, domain, mailbox, direction, sender, recipients, subject, message_id, path, size, hold\"},\"403\":{\"description\":\"A domain-restricted key without a domain of its own\"}}}},"
          "\"/api/v1/archive/{id}\":{\"get\":{\"summary\":\"One archive entry\",\"responses\":{\"200\":{\"description\":\"The entry\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/archive/{id}/hold\":{"
          "\"post\":{\"summary\":\"Put an archived copy on legal hold\",\"description\":\"A held copy is never removed by the retention sweep or by an address erasure.\",\"responses\":{\"200\":{\"description\":\"Held\"},\"404\":{\"description\":\"Unknown id\"}}},"
          "\"delete\":{\"summary\":\"Lift the hold\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Unknown id\"}}}},"
-         "\"/api/v1/openapi.json\":{\"get\":{\"summary\":\"This document\",\"responses\":{\"200\":{\"description\":\"The OpenAPI description\"}}}}"
+         "\"/api/v1/openapi.json\":{\"get\":{\"summary\":\"This document\",\"responses\":{\"200\":{\"description\":\"The OpenAPI description\"}}}}";
+
+      static const char *openApiTail =
          "},"
          "\"components\":{\"securitySchemes\":{"
          "\"basic\":{\"type\":\"http\",\"scheme\":\"basic\"},"
@@ -7978,7 +8197,18 @@ namespace HM
          "\"security\":[{\"basic\":[]},{\"bearer\":[]}]"
          "}";
 
-      return BuildResponse_(200, AnsiString(openApiJson));
+      // The write surface's paths come from the translation units that
+      // implement them, so a route and its description still land in one
+      // diff; each function returns entries that begin with a comma, or
+      // nothing.
+      AnsiString openApiJson = AnsiString(openApiHead);
+      openApiJson += OpenApiSettingsPaths_();
+      openApiJson += OpenApiRulesPaths_();
+      openApiJson += OpenApiCertificatesPaths_();
+      openApiJson += OpenApiRoutesPaths_();
+      openApiJson += openApiTail;
+
+      return BuildResponse_(200, openApiJson);
    }
 
    HttpResponse

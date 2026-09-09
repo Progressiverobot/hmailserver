@@ -35,6 +35,14 @@ namespace RegressionTests.Shared
 
       public static string RestBaseUrl => "http://" + Host + ":" + RestPort;
 
+      /// <summary>
+      ///    True when the server is this machine, which is when a file this
+      ///    process can name by path - a certificate, a key - is one the server
+      ///    can read at that path.
+      /// </summary>
+      public static bool IsLocal =>
+         Host == "127.0.0.1" || Host == "::1" || string.Equals(Host, "localhost", StringComparison.OrdinalIgnoreCase);
+
       public static string Describe()
       {
          return Host + " (SMTP " + SmtpPort + ", POP3 " + Pop3Port + ", IMAP " + ImapPort + ", REST " + RestPort + ")";

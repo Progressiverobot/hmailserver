@@ -36,6 +36,12 @@ namespace RegressionTests.Shared
       private TcpListener _tcpListener;
       private Exception _workerThreadException;
 
+      // What ended the accepted client's conversation, when something did. Not
+      // a failure on its own - a test that got what it wanted before the
+      // connection went away has nothing to answer for - but the first thing
+      // worth reading when a test does fail on a message that never arrived.
+      private Exception _clientException;
+
       public TcpServer(int maxNumberOfConnections, int port, eConnectionSecurity connectionSecurity)
       {
          _maxNumberOfConnections = maxNumberOfConnections;
@@ -121,7 +127,13 @@ namespace RegressionTests.Shared
 
             try
             {
-               _tcpListener.BeginAcceptSocket(OnAcceptSocket, null);
+               // BeginAcceptTcpClient, because OnAcceptSocket ends the accept with
+               // EndAcceptTcpClient. .NET Framework lets the two be mixed; .NET
+               // answers the mismatch with an ArgumentException, which the handler
+               // below treats as "the listener was stopped" - so on Linux every
+               // client the simulator accepted was dropped unanswered, and a
+               // server relaying to it saw a reset or twenty seconds of silence.
+               _tcpListener.BeginAcceptTcpClient(OnAcceptSocket, null);
             }
             finally
             {
@@ -166,7 +178,22 @@ namespace RegressionTests.Shared
 
             _numberOfConnectedClients++;
 
-            HandleClient();
+            try
+            {
+               HandleClient();
+            }
+            catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
+            {
+               // This runs on a thread-pool thread, where an exception nobody
+               // catches ends the process - the whole test run, not the test.
+               // A conversation that ends abruptly (the client resets, or this
+               // server is disposed while a read is outstanding, which is what
+               // the test's own using block does when an assertion has already
+               // failed) is not worth a run: the test that owns this simulator
+               // fails on what it was actually asserting, and this is kept so
+               // that WaitForCompletion can say what happened to the client.
+               _clientException = e;
+            }
          }
          finally
          {
@@ -199,6 +226,10 @@ namespace RegressionTests.Shared
                return;
 
          var log = LogHandler.ReadCurrentDefaultLog();
+
+         if (_clientException != null)
+            Assert.Fail($"At {DateTime.Now} - the simulated server's conversation with its client ended: " +
+                        _clientException + "\r\nConversation so far:\r\n" + Conversation + "\r\nLog:\r\n" + log);
 
          if (_numberOfConnectedClients < _maxNumberOfConnections)
             Assert.Fail(

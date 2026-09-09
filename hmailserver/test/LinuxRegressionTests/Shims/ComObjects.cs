@@ -46,32 +46,87 @@ namespace hMailServer
    ///    them and none of the ones these fixtures read, so every member here is a
    ///    write the API cannot make or a read it cannot serve.
    /// </summary>
+   // A settings group over its REST resource: GET reads the whole group, PUT
+   // writes one key. A member that the server's document does not carry, or a
+   // server with no PUT, skips the test with the reason that names the gap.
+   internal static class SettingsApi
+   {
+      public const string Server = "/api/v1/settings";
+      public const string AntiSpam = "/api/v1/settings/antispam";
+
+      public static JsonElement Read(string group, string key)
+      {
+         var answer = ServerApi.Get(group).Expect(200, "GET " + group);
+         JsonElement value;
+         if (!answer.Json.HasValue || !answer.Json.Value.TryGetProperty(key, out value))
+            NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite + " (" + key + " is not in " + group + ")");
+         return answer.Json.Value.GetProperty(key);
+      }
+
+      public static string GetString(string group, string key)
+      {
+         return Read(group, key).GetString();
+      }
+
+      public static bool GetBool(string group, string key)
+      {
+         return Read(group, key).GetBoolean();
+      }
+
+      public static int GetInt(string group, string key)
+      {
+         return Read(group, key).GetInt32();
+      }
+
+      public static void Put(string group, string key, string jsonValue)
+      {
+         if (!ServerApi.HasSettingsWriteRoutes)
+            NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite);
+         ServerApi.Put(group, "{" + ServerApi.Quote(key) + ":" + jsonValue + "}").Expect(200, "PUT " + group + " " + key);
+      }
+
+      public static void Put(string group, string key, string value, bool asString)
+      {
+         Put(group, key, asString ? ServerApi.Quote(value) : value);
+      }
+
+      public static void Put(string group, string key, bool value)
+      {
+         Put(group, key, value ? "true" : "false");
+      }
+
+      public static void Put(string group, string key, int value)
+      {
+         Put(group, key, value.ToString(System.Globalization.CultureInfo.InvariantCulture));
+      }
+   }
+
    public class Settings
    {
       public AntiSpam AntiSpam { get; } = new AntiSpam();
 
       public string IMAPHierarchyDelimiter
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return null; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetString(SettingsApi.Server, "imap_hierarchy_delimiter"); }
+         set { SettingsApi.Put(SettingsApi.Server, "imap_hierarchy_delimiter", value, true); }
       }
 
       public string IMAPPublicFolderName
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return null; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetString(SettingsApi.Server, "imap_public_folder_name"); }
+         set { SettingsApi.Put(SettingsApi.Server, "imap_public_folder_name", value, true); }
       }
 
       public bool TlsOptionPreferServerCiphersEnabled
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.Server, "tls_prefer_server_ciphers"); }
+         set { SettingsApi.Put(SettingsApi.Server, "tls_prefer_server_ciphers", value); }
       }
 
       public bool TlsOptionPrioritizeChaChaEnabled
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.Server, "tls_prioritize_chacha"); }
+         set { SettingsApi.Put(SettingsApi.Server, "tls_prioritize_chacha", value); }
       }
    }
 
@@ -79,44 +134,44 @@ namespace hMailServer
    {
       public int SpamDeleteThreshold
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return 0; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetInt(SettingsApi.AntiSpam, "spam_delete_threshold"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "spam_delete_threshold", value); }
       }
 
       public bool DKIMVerificationEnabled
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiSpam, "dkim_verification_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "dkim_verification_enabled", value); }
       }
 
       public int DKIMVerificationFailureScore
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return 0; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetInt(SettingsApi.AntiSpam, "dkim_verification_failure_score"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "dkim_verification_failure_score", value); }
       }
 
       public int SpamMarkThreshold
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return 0; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetInt(SettingsApi.AntiSpam, "spam_mark_threshold"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "spam_mark_threshold", value); }
       }
 
       public bool AddHeaderSpam
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiSpam, "add_header_spam"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "add_header_spam", value); }
       }
 
       public bool AddHeaderReason
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiSpam, "add_header_reason"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "add_header_reason", value); }
       }
 
       public bool DMARCEnabled
       {
-         get { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); return false; }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiSpam, "dmarc_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiSpam, "dmarc_enabled", value); }
       }
    }
 

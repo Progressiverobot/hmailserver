@@ -214,14 +214,18 @@ namespace RegressionTests.IMAP
       public void TestSearchLargeBody()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "search@example.test", "test");
+         // CRLF spelled out: this is a message on the wire, and AppendLine ends
+         // its lines with Environment.NewLine, a bare LF on a Linux host - a
+         // message the server refuses, rightly, before this test can search it.
+         const string eol = "\r\n";
          var body = new StringBuilder();
-         body.AppendLine("From: search@example.test");
-         body.AppendLine("Subject: Test");
-         body.AppendLine();
+         body.Append("From: search@example.test" + eol);
+         body.Append("Subject: Test" + eol);
+         body.Append(eol);
          for (var i = 0; i < 20000; i++) // One megabye body.
-            body.AppendLine("12345678901234567890123456789012345678901234567890");
-         body.AppendLine("TestString");
-         body.AppendLine();
+            body.Append("12345678901234567890123456789012345678901234567890" + eol);
+         body.Append("TestString" + eol);
+         body.Append(eol);
 
          SmtpClientSimulator.StaticSendRaw(account.Address, account.Address, body.ToString());
 

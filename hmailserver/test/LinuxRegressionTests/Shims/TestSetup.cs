@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Text.Json;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -70,6 +71,8 @@ namespace RegressionTests.Shared
       public Domain PerformBasicSetup()
       {
          DeleteMessagesInQueue();
+         RemoveAllRoutes();
+         ResetSettings();
 
          var domain = AddTestDomain();
 
@@ -181,8 +184,13 @@ namespace RegressionTests.Shared
 
       public Account AddAccount(Domain domain, string address, string password)
       {
+         return CreateAccount_(domain, address, password, 0);
+      }
+      private Account CreateAccount_(Domain domain, string address, string password, int maxSize)
+      {
          var answer = ServerApi.Post("/api/v1/domains/" + domain.Name + "/accounts",
-            "{\"address\":" + ServerApi.Quote(address) + ",\"password\":" + ServerApi.Quote(password) + "}");
+            "{\"address\":" + ServerApi.Quote(address) + ",\"password\":" + ServerApi.Quote(password) +
+            (maxSize != 0 ? ",\"max_size_mb\":" + maxSize : "") + "}");
 
          if (answer.Status == 201)
          {
@@ -210,16 +218,27 @@ namespace RegressionTests.Shared
 
       public Account AddAccount(Domain domain, string address, string password, int maxSize)
       {
-         if (maxSize != 0)
+         // The create route reads max_size_mb since the server gained PUT
+         // /api/v1/accounts/{address} (wave 162); before that it advertised
+         // the field and ignored it, which a test must not mistake for a limit.
+         if (maxSize != 0 && !ServerApi.HasAccountUpdateRoute)
             NotOnThisServer.Ignore(NotOnThisServer.NoAccountMaxSize);
 
-         return AddAccount(domain, address, password);
+         return CreateAccount_(domain, address, password, maxSize);
       }
 
       public Alias AddAlias(Domain domain, string name, string value)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAliasCreate);
-         return null;
+         if (!ServerApi.HasAliasWriteRoutes)
+            NotOnThisServer.Ignore(NotOnThisServer.NoAliasCreate);
+         var answer = ServerApi.Post("/api/v1/domains/" + domain.Name + "/aliases",
+            "{\"name\":" + ServerApi.Quote(name) + ",\"value\":" + ServerApi.Quote(value) + ",\"active\":true}");
+         if (answer.Status == 400)
+            throw new COMException("Failed to save object. " + answer.Error);
+         if (answer.Status == 409)
+            throw new COMException("Failed to save object. The alias address is already in use.");
+         answer.Expect(201, "POST /api/v1/domains/" + domain.Name + "/aliases " + name);
+         return new Alias { Name = name, Value = value, Active = true };
       }
 
       public Domain AddDomain(string name)
@@ -259,15 +278,137 @@ namespace RegressionTests.Shared
 
       internal static Route AddRoutePointingAtLocalhost(int numberOfTries, int port, bool treatSecurityAsLocal)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoRouteCreate);
-         return null;
+         return AddRoutePointingAtLocalhost(numberOfTries, port, treatSecurityAsLocal, eConnectionSecurity.eCSNone);
       }
 
       internal static Route AddRoutePointingAtLocalhost(int numberOfTries, int port, bool treatSecurityAsLocal,
          eConnectionSecurity connectionSecurity)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoRouteCreate);
-         return null;
+         // The route the Windows TestSetup adds through COM, field for field.
+         if (!ServerApi.HasRouteWriteRoutes)
+            NotOnThisServer.Ignore(NotOnThisServer.NoRouteCreate);
+         var local = treatSecurityAsLocal ? "true" : "false";
+         ServerApi.Post("/api/v1/routes",
+               "{\"domain_name\":\"dummy-example.com\",\"target_smtp_host\":\"127.0.0.1\"," +
+               "\"target_smtp_port\":" + port + ",\"number_of_tries\":" + numberOfTries + ",\"minutes_between_try\":5," +
+               "\"treat_recipient_as_local_domain\":" + local + ",\"treat_security_as_local_domain\":" + local + "," +
+               "\"connection_security\":" + ServerApi.Quote(ConnectionSecurityName(connectionSecurity)) + "}")
+            .Expect(201, "POST /api/v1/routes");
+         return new Route { DomainName = "dummy-example.com" };
+      }
+      internal static string ConnectionSecurityName(eConnectionSecurity connectionSecurity)
+      {
+         switch (connectionSecurity)
+         {
+            case eConnectionSecurity.eCSTLS: return "tls";
+            case eConnectionSecurity.eCSSTARTTLSOptional: return "starttls_optional";
+            case eConnectionSecurity.eCSSTARTTLSRequired: return "starttls_required";
+            default: return "none";
+         }
+      }
+      // What the Windows PerformBasicSetup puts back through COM before every
+      // test, over the three settings groups: read each group, write back only
+      // the keys that differ, and write nothing at all when none does - which
+      // is the ordinary case, so the cost is three reads. A server without the
+      // routes keeps its settings and every test that needs one skips.
+      private static readonly (string Group, string Key, string Json)[] SuiteDefaults =
+      {
+         ("/api/v1/settings", "verify_remote_ssl_certificate", "false"),
+         ("/api/v1/settings", "auto_ban_on_logon_failure", "false"),
+         ("/api/v1/settings", "smtp_no_of_tries", "0"),
+         ("/api/v1/settings", "smtp_minutes_between_try", "60"),
+         ("/api/v1/settings", "mirror_email_address", "\"\""),
+         ("/api/v1/settings", "smtp_relayer", "\"\""),
+         ("/api/v1/settings", "smtp_relayer_connection_security", "\"none\""),
+         ("/api/v1/settings", "max_delivery_threads", "50"),
+         ("/api/v1/settings", "imap_public_folder_name", "\"#Public\""),
+         ("/api/v1/settings", "imap_hierarchy_delimiter", "\".\""),
+         ("/api/v1/settings", "max_number_of_invalid_commands", "3"),
+         ("/api/v1/settings", "disconnect_invalid_clients", "false"),
+         ("/api/v1/settings", "max_smtp_recipients_in_batch", "100"),
+         ("/api/v1/settings", "welcome_smtp", "\"\""),
+         ("/api/v1/settings", "welcome_pop3", "\"\""),
+         ("/api/v1/settings", "welcome_imap", "\"\""),
+         ("/api/v1/settings/logging", "enabled", "true"),
+         ("/api/v1/settings/logging", "log_application", "true"),
+         ("/api/v1/settings/logging", "log_smtp", "true"),
+         ("/api/v1/settings/logging", "log_pop3", "true"),
+         ("/api/v1/settings/logging", "log_imap", "true"),
+         ("/api/v1/settings/logging", "log_tcpip", "true"),
+         ("/api/v1/settings/logging", "log_debug", "true"),
+         ("/api/v1/settings/logging", "log_awstats", "true"),
+         ("/api/v1/settings/antispam", "spam_mark_threshold", "10000"),
+         ("/api/v1/settings/antispam", "spam_delete_threshold", "10000"),
+         ("/api/v1/settings/antispam", "check_host_in_helo", "false"),
+         ("/api/v1/settings/antispam", "greylisting_enabled", "false"),
+         ("/api/v1/settings/antispam", "bypass_greylisting_on_mail_from_mx", "false"),
+         ("/api/v1/settings/antispam", "spamassassin_enabled", "false"),
+         ("/api/v1/settings/antispam", "tarpit_count", "0"),
+         ("/api/v1/settings/antispam", "tarpit_delay", "0"),
+         ("/api/v1/settings/antispam", "check_mx_records", "false"),
+         ("/api/v1/settings/antispam", "use_spf", "false"),
+         ("/api/v1/settings/antispam", "check_ptr", "false"),
+         ("/api/v1/settings/antispam", "maximum_message_size_kb", "1024"),
+      };
+
+      public void ResetSettings()
+      {
+         if (!ServerApi.HasSettingsWriteRoutes)
+            return;
+
+         foreach (var group in new[] { "/api/v1/settings", "/api/v1/settings/logging", "/api/v1/settings/antispam" })
+         {
+            var current = ServerApi.Get(group).Expect(200, "GET " + group);
+            if (!current.Json.HasValue)
+               continue;
+
+            var body = new StringBuilder();
+
+            foreach (var wanted in SuiteDefaults)
+            {
+               if (wanted.Group != group)
+                  continue;
+
+               JsonElement value;
+               if (!current.Json.Value.TryGetProperty(wanted.Key, out value))
+                  continue;
+
+               var now = value.ValueKind == JsonValueKind.String
+                  ? ServerApi.Quote(value.GetString())
+                  : value.GetRawText();
+
+               if (now == wanted.Json)
+                  continue;
+
+               if (body.Length > 0)
+                  body.Append(',');
+               body.Append(ServerApi.Quote(wanted.Key)).Append(':').Append(wanted.Json);
+            }
+
+            if (body.Length == 0)
+               continue;
+
+            var answer = ServerApi.Put(group, "{" + body + "}");
+
+            // One key can be refused for a reason that is not this test's to
+            // answer for: the hierarchy delimiter cannot change while a folder
+            // holds the new character, and a fixture that left such a folder
+            // behind would otherwise fail every test after it rather than its
+            // own. The rest of the group is applied on the next attempt.
+            if (answer.Status != 200 && !answer.Body.Contains("hierarchy delimiter"))
+               answer.Expect(200, "PUT " + group + " (the suite's defaults)");
+         }
+      }
+
+      public void RemoveAllRoutes()
+      {
+         if (!ServerApi.HasRouteWriteRoutes)
+            return;
+         foreach (var route in ServerApi.Array(ServerApi.Get("/api/v1/routes").Expect(200, "GET /api/v1/routes")))
+         {
+            var id = ServerApi.LongOf(route, "id");
+            ServerApi.Delete("/api/v1/routes/" + id).Expect(200, "DELETE /api/v1/routes/" + id);
+         }
       }
 
       // ---- The delivery queue, through /api/v1/queue ----

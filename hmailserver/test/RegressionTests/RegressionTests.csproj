@@ -666,6 +666,10 @@
     <Compile Include="API\UpdateSchedule.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
     <Compile Include="API\RestApiDomains.cs" />
+    <Compile Include="API\RestApiSettings.cs" />
+    <Compile Include="API\RestApiRules.cs" />
+    <Compile Include="API\RestApiCertificatesAndPorts.cs" />
+    <Compile Include="API\RestApiRoutesAndAliases.cs" />
     <Compile Include="API\RestApiSelfService.cs" />
     <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />
