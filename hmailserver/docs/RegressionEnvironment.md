@@ -173,6 +173,66 @@ running. A rebuild restarts the service under the tests, the fixtures' restart
 detector then fails every test that follows, and the run can neither convict nor
 exonerate the code - thirty minutes are simply thrown away.
 
+On Linux
+--------
+
+`RegressionTests.csproj` is `net481` with a `COMReference` to the service and runs
+nowhere but a Windows bench. `hmailserver/test/LinuxRegressionTests` is the part
+of the suite that can test the Linux server: a `net10.0` project that compiles
+52 of the fixture files **in place** from `RegressionTests` - the ones that drive
+the server through SMTP, IMAP, POP3 and MIME rather than through COM - together
+with the socket simulators, and stands a REST-backed fixture layer under them
+(`LinuxRegressionTests/Shims`). The fixtures are not copied and not edited; a
+test that passes here is the same test that passes on Windows.
+
+What the fixture layer does instead of COM: the test domain `example.test` is
+deleted and recreated before every test through `POST /api/v1/domains` (or, on a
+server built before that route existed, emptied of its accounts and lists);
+accounts and distribution lists go through their routes; the delivery queue is
+drained through `/api/v1/queue`; and the ERROR log is read through
+`/api/v1/logs`, judged by what was written *during* the test rather than by
+whether the file exists. Everything a test makes is removed in its teardown.
+
+What it cannot do, it says: a fixture that writes a server setting, creates an
+alias or an SMTP route, needs a TLS listener, the suite's fake DNS zone or a
+COM-only call such as `Utilities.EvaluateSieveScript` is **skipped with that
+reason**, from the shim, never passed with a weakened assertion. `dotnet test`
+reports those as skipped; a failure is the server's. The REST API also refuses
+a credential's 201st request in any ten-second window, and the fixture layer
+keeps under that on its own.
+
+The server it runs against is any hMailServer with the REST listener on, on any
+host; the defaults are the PostgreSQL-backed tree the CI job lays out
+(`.github/workflows/linux-build.yml`, job `regression-on-linux`), which is also
+the recipe for a hand-made one: `DBScripts` from the checkout beside the binary,
+`tlds.txt` and `dh2048.pem` from `installation/Extras`, an INI with
+`Type=PostgreSQL` and `RestApiPort=8045`, `--create-database`, the listeners
+moved off the privileged ports with an `UPDATE` of `hm_tcpipports`, the
+auto-ban switched off with an `UPDATE` of `hm_settings`
+(`AutoBanOnLogonFailureEnabled` to 0 - the suite fails logons on purpose, and
+three of them ban the test host for an hour; the Windows setup switches it off
+over COM), and `--set-admin-password` from a pipe. The tests are told where it
+is through the environment, read once when the assembly loads:
+
+| Variable | Default |
+|---|---|
+| `HMTEST_HOST` | `127.0.0.1` |
+| `HMTEST_SMTP_PORT` | `2525` |
+| `HMTEST_POP3_PORT` | `1110` |
+| `HMTEST_IMAP_PORT` | `1143` |
+| `HMTEST_REST_PORT` | `8045` |
+| `HMTEST_ADMIN_PASSWORD` | `testar` |
+
+Then, from any machine with the .NET 10 SDK that can reach those ports:
+
+    dotnet test hmailserver/test/LinuxRegressionTests -c Release --logger trx
+
+Unlike the Windows project, this one is meant for `dotnet test`. Windows and
+Linux hosts both work - a WSL server is reachable from Windows through mirrored
+networking - and the CI job runs it on Linux against the binary the same
+workflow just built. `Shared/TestPorts.cs` is what lets the simulators be
+pointed elsewhere; the Windows suite never sets it and sees the standard ports.
+
 When a run is interrupted
 -------------------------
 

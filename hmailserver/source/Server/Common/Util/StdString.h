@@ -797,6 +797,67 @@ inline const Type& SSMAX(const Type& arg1, const Type& arg2)
 
 typedef std::codecvt<wchar_t, char, mbstate_t> SSCodeCvt;
 
+#ifdef HM_PLATFORM_POSIX
+
+// The contract these four keep on Windows is MultiByteToWideChar(CP_ACP) and
+// its inverse: a conversion that never fails, in which every byte of a narrow
+// string becomes exactly one character and comes back as the same byte. The
+// codecvt of the global locale is not that - in the "C" locale it refuses the
+// first byte above 127 and stops, so an IMAP SEARCH argument in UTF-8 or a MAIL
+// FROM under SMTPUTF8 arrived on Linux cut short at its first non-ASCII byte,
+// with everything after it gone. Bytes are mapped one-to-one here (each to the
+// code point of the same value, which is Latin-1), which is what CP_ACP gives
+// a Windows installation whose code page is 1252 for all but thirty-two
+// values, and what every caller in this server relies on: the ones that mean
+// UTF-8 say so, through Unicode::MultiByteToWide. Wide to narrow is the
+// inverse; a character above U+00FF, which no byte can carry, becomes '?',
+// as WideCharToMultiByte's default character does.
+
+inline PWSTR StdCodeCvt(PWSTR pDstW, int nDst, PCSTR pSrcA, int nSrc,
+    const std::locale& = std::locale())
+{
+    ASSERT(0 != pSrcA);
+    ASSERT(0 != pDstW);
+    int n = nSrc < nDst ? nSrc : nDst;
+    if ( n < 0 )
+        n = 0;
+    for ( int i = 0; i < n; ++i )
+        pDstW[i] = static_cast<wchar_t>(static_cast<unsigned char>(pSrcA[i]));
+    pDstW[n] = L'\0';
+    return pDstW;
+}
+
+inline PWSTR StdCodeCvt(PWSTR pDstW, int nDst, PCUSTR pSrcA, int nSrc,
+    const std::locale& loc=std::locale())
+{
+    return StdCodeCvt(pDstW, nDst, (PCSTR)pSrcA, nSrc, loc);
+}
+
+inline PSTR StdCodeCvt(PSTR pDstA, int nDst, PCWSTR pSrcW, int nSrc,
+    const std::locale& = std::locale())
+{
+    ASSERT(0 != pDstA);
+    ASSERT(0 != pSrcW);
+    int n = nSrc < nDst ? nSrc : nDst;
+    if ( n < 0 )
+        n = 0;
+    for ( int i = 0; i < n; ++i )
+    {
+        const unsigned long c = static_cast<unsigned long>(pSrcW[i]);
+        pDstA[i] = c <= 0xFF ? static_cast<char>(static_cast<unsigned char>(c)) : '?';
+    }
+    pDstA[n] = '\0';
+    return pDstA;
+}
+
+inline PUSTR StdCodeCvt(PUSTR pDstA, int nDst, PCWSTR pSrcW, int nSrc,
+    const std::locale& loc=std::locale())
+{
+    return (PUSTR)StdCodeCvt((PSTR)pDstA, nDst, pSrcW, nSrc, loc);
+}
+
+#else // the locale facets, as the class's author wrote them
+
 inline PWSTR StdCodeCvt(PWSTR pDstW, int nDst, PCSTR pSrcA, int nSrc,
     const std::locale& loc=std::locale())
 {
@@ -874,6 +935,8 @@ inline PUSTR StdCodeCvt(PUSTR pDstA, int nDst, PCWSTR pSrcW, int nSrc,
 {
     return (PUSTR)StdCodeCvt((PSTR)pDstA, nDst, pSrcW, nSrc, loc);
 }
+#endif // HM_PLATFORM_POSIX
+
 /*
 #else   // ...or are we doing things assuming win32 and Visual C++?
 

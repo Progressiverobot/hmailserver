@@ -28,7 +28,7 @@ namespace RegressionTests.SMTP
       public void TestEhloAdvertisesNewKeywords()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          var capabilities = EhloAndGetCapabilities(socket, "example.com");
          socket.Disconnect();
 
@@ -44,7 +44,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "esc@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // After EHLO the server must prefix the RFC 3463 enhanced status code.
@@ -62,7 +62,7 @@ namespace RegressionTests.SMTP
       public void TestNoEnhancedStatusCodeAfterHelo()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          Assert.IsTrue(socket.Receive().StartsWith("220"));
 
          socket.Send("HELO example.com\r\n");
@@ -82,7 +82,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "eai@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // A sender whose domain is internationalized (UTF-8) is accepted when the
@@ -101,7 +101,7 @@ namespace RegressionTests.SMTP
       public void TestUtf8SenderRejectedWithoutSmtpUtf8()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // Without SMTPUTF8 an internationalized domain must be rejected by the
@@ -120,7 +120,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "pipe@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // Stream MAIL FROM, RCPT TO and DATA as a single pipelined group (RFC 2920).
@@ -146,7 +146,7 @@ namespace RegressionTests.SMTP
       public void TestEhloAdvertisesDsn()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          var capabilities = EhloAndGetCapabilities(socket, "example.com");
          socket.Disconnect();
 
@@ -159,7 +159,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn1@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // RET and ENVID are valid DSN parameters on MAIL FROM (RFC 3461).
@@ -179,7 +179,7 @@ namespace RegressionTests.SMTP
       public void TestMailFromRejectsInvalidRet()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // RET only allows FULL or HDRS; anything else is a syntax error.
@@ -195,7 +195,7 @@ namespace RegressionTests.SMTP
       public void TestMailFromRejectsInvalidEnvid()
       {
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          // ENVID is xtext: a bare '=' is not allowed (must be encoded as +3D).
@@ -213,7 +213,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn2@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");
@@ -234,7 +234,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn3@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");
@@ -254,7 +254,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "dsn4@example.test", "test");
 
          var socket = new TcpConnection();
-         Assert.IsTrue(socket.Connect(25));
+         Assert.IsTrue(socket.Connect(TestPorts.Smtp));
          EhloAndGetCapabilities(socket, "example.com");
 
          socket.SendAndReceive("MAIL FROM:<sender@example.test>\r\n");

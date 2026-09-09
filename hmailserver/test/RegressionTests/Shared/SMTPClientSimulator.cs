@@ -17,16 +17,19 @@ namespace RegressionTests.Shared
    public class SmtpClientSimulator
    {
       private readonly IPAddress _ipaddress;
-      private readonly int _port = 25;
+      private readonly int _port;
       private readonly TcpConnection _tcpConnection;
 
+      // The port and the host come from TestPorts rather than being written here, so
+      // that the Linux suite can point the same fixtures at a server elsewhere. The
+      // defaults there are the 25 and 127.0.0.1 that used to be here.
       public SmtpClientSimulator() :
-         this(false, 25)
+         this(false, TestPorts.Smtp)
       {
       }
 
       public SmtpClientSimulator(bool useSSL, int port) :
-         this(useSSL, port, IPAddress.Parse("127.0.0.1"))
+         this(useSSL, port, TestPorts.HostAddress)
       {
       }
 

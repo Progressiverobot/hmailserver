@@ -174,7 +174,7 @@ namespace RegressionTests.SMTP
       private void AssertInvalidRcptToCommand(string command, string expectedResponse)
       {
          var smtpClientSimulator = new TcpConnection();
-         smtpClientSimulator.Connect(25);
+         smtpClientSimulator.Connect(TestPorts.Smtp);
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("220"));
          smtpClientSimulator.Send("HELO test\r\n");
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));
@@ -191,7 +191,7 @@ namespace RegressionTests.SMTP
       private void AssertValidMailRcptToCommand(string comamnd)
       {
          var smtpClientSimulator = new TcpConnection();
-         smtpClientSimulator.Connect(25);
+         smtpClientSimulator.Connect(TestPorts.Smtp);
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("220"));
          smtpClientSimulator.Send("HELO test\r\n");
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));

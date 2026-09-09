@@ -17,7 +17,9 @@ namespace RegressionTests.Shared
    /// </summary>
    public class ImapClientSimulator
    {
-      private readonly int _port = 143;
+      // TestPorts.Imap is 143 unless the Linux suite has said otherwise; the host the
+      // port is on is TestPorts.Host, which TcpConnection.Connect(int) reads.
+      private readonly int _port = TestPorts.Imap;
       private readonly TcpConnection _tcpConnection;
 
       public ImapClientSimulator()

@@ -131,7 +131,7 @@ namespace RegressionTests.SMTP
       {
          try
          {
-            var smtpClientSimulator = new SmtpClientSimulator(false, 25);
+            var smtpClientSimulator = new SmtpClientSimulator(false, TestPorts.Smtp);
 
             string errorMessage;
             smtpClientSimulator.Send(false, _account.Address, "test", _account.Address, _account.Address, "Test",

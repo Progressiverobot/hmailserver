@@ -31,7 +31,7 @@ namespace RegressionTests.POP3
       private static TcpConnection ConnectAndGreet()
       {
          var socket = new TcpConnection();
-         ClassicAssert.IsTrue(socket.Connect(110), "Could not connect to the POP3 server on port 110.");
+         ClassicAssert.IsTrue(socket.Connect(TestPorts.Pop3), "Could not connect to the POP3 server on port " + TestPorts.Pop3 + ".");
          socket.ReadUntil("+OK");
          return socket;
       }

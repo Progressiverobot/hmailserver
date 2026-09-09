@@ -134,6 +134,18 @@ jobs:
           ./build/linux/hmailserver --version
           ./build/linux/hmailserver --help > /dev/null
 
+      # The binary the regression job below tests. Kept on every run rather than
+      # only on a tag, because the tests must run on every push; it is one file and
+      # it is gone in three days.
+      - name: Keep the binary for the regression job
+        if: matrix.arch == 'x86-64' && matrix.compiler == 'clang'
+        uses: actions/upload-artifact@v4
+        with:
+          name: hmailserver-linux-x86-64
+          path: build/linux/hmailserver
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Package
         if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
         working-directory: build/linux
@@ -211,3 +223,184 @@ jobs:
           name: census-logs-cross-aarch64
           path: /tmp/hm-tu-census/log
           if-no-files-found: ignore
+
+  # The regression suite's socket-driven fixtures, run against the binary the
+  # x86-64 clang job built, on PostgreSQL. This is the difference between a Linux
+  # build that is compiled and one that is tested: test/LinuxRegressionTests links
+  # the Windows suite's SMTP, IMAP, POP3 and MIME fixtures in place and stands a
+  # REST-backed fixture layer under them (docs/RegressionEnvironment.md, "On
+  # Linux"). A fixture that needs something the REST API cannot do is skipped with
+  # the reason; a failure is the server's, and fails the job.
+  #
+  # The tree below is laid out exactly as a hand-made one is: DBScripts from the
+  # checkout, tlds.txt and dh2048.pem from installation/Extras, an INI naming the
+  # service container's database, --create-database, the listeners moved off the
+  # privileged ports by an UPDATE of hm_tcpipports, and --set-admin-password from a
+  # pipe. The test domain is inserted as a row because a server built from a tree
+  # without POST /api/v1/domains cannot make it; one that has the route deletes and
+  # remakes it before every test anyway.
+  regression-on-linux:
+    name: regression suite against the Linux server
+    needs: build
+    runs-on: ubuntu-latest
+    # A local run takes about fifteen minutes; a server that stops answering costs
+    # two minutes per test (TestPorts.ReceiveTimeoutMilliseconds), so this is the
+    # backstop, not the budget.
+    timeout-minutes: 60
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hmailserver
+          POSTGRES_PASSWORD: hmtest
+          POSTGRES_DB: hmtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hmailserver"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      HMTEST_HOST: 127.0.0.1
+      HMTEST_SMTP_PORT: '2525'
+      HMTEST_POP3_PORT: '1110'
+      HMTEST_IMAP_PORT: '1143'
+      HMTEST_REST_PORT: '8045'
+      HMTEST_ADMIN_PASSWORD: testar
+      # github.workspace rather than runner.temp: the runner context is not one a
+      # job-level env may read, and GitHub refuses the whole file for it - which is
+      # how the first push of this job produced a run with no jobs at all.
+      HMTEST_TREE: ${{ github.workspace }}/hmtest-tree
+      PGPASSWORD: hmtest
+    steps:
+      - uses: actions/checkout@v4
+
+      # What the binary loads (ldd names them: Boost thread, chrono, filesystem and
+      # regex, OpenSSL, zlib, libpq and, through libpq, LDAP and Kerberos), from the
+      # same image the build job linked against, so the versions agree. The -dev
+      # packages are the ones whose names do not change with the Boost release;
+      # they bring the runtime libraries with them.
+      - name: Install the libraries the server loads
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libboost-thread-dev libboost-chrono-dev libboost-filesystem-dev libboost-regex-dev \
+            libssl-dev zlib1g-dev libpq-dev libldap-dev \
+            postgresql-client curl
+
+      - name: Fetch the binary the build job made
+        uses: actions/download-artifact@v4
+        with:
+          name: hmailserver-linux-x86-64
+          path: hmtest/program
+
+      - name: Lay out the test tree and create the database
+        run: |
+          T="$HMTEST_TREE"
+          mkdir -p "$T/program" "$T/Data" "$T/Logs" "$T/Temp" "$T/Events" "$T/Database" "$T/results"
+          mv hmtest/program/hmailserver "$T/program/hmailserver"
+          chmod +x "$T/program/hmailserver"
+          cp -r hmailserver/source/DBScripts "$T/program/DBScripts"
+          cp hmailserver/installation/Extras/tlds.txt hmailserver/installation/Extras/dh2048.pem "$T/program/"
+          cat > "$T/program/hMailServer.ini" <<INI
+          [Directories]
+          ProgramFolder=$T/program
+          DatabaseFolder=$T/Database
+          DataFolder=$T/Data
+          LogFolder=$T/Logs
+          TempFolder=$T/Temp
+          EventFolder=$T/Events
+          [Database]
+          Type=PostgreSQL
+          Server=127.0.0.1
+          Port=5432
+          Username=hmailserver
+          Password=hmtest
+          Database=hmtest
+          Internal=0
+          [Settings]
+          ProtectStoredSecretsWithDPAPI=0
+          RestApiPort=8045
+          RestApiBindAddress=127.0.0.1
+          WindowsEventLogEnabled=0
+          INI
+          "$T/program/hmailserver" --config "$T/program/hMailServer.ini" --version
+          "$T/program/hmailserver" --config "$T/program/hMailServer.ini" --create-database
+          psql -h 127.0.0.1 -U hmailserver -d hmtest -Atc "select 'schema ' || value from hm_dbversion"
+          # The listeners are rows in hm_tcpipports; the runner is not root and the
+          # ports under 1024 are not its to bind.
+          psql -h 127.0.0.1 -U hmailserver -d hmtest -Atc "
+            update hm_tcpipports set portnumber = 2525 where portnumber = 25;
+            update hm_tcpipports set portnumber = 5870 where portnumber = 587;
+            update hm_tcpipports set portnumber = 1110 where portnumber = 110;
+            update hm_tcpipports set portnumber = 1143 where portnumber = 143;
+            select portprotocol, portnumber from hm_tcpipports order by 1"
+          # The one setting the fixtures cannot live with and the API cannot write:
+          # the suite fails logons on purpose, and three of them would ban 127.0.0.1
+          # for an hour. The Windows PerformBasicSetup switches this off over COM.
+          psql -h 127.0.0.1 -U hmailserver -d hmtest -Atc "
+            update hm_settings set settinginteger = 0 where settingname = 'AutoBanOnLogonFailureEnabled';
+            select settingname, settinginteger from hm_settings where settingname = 'AutoBanOnLogonFailureEnabled'"
+          # The test domain, as a row: every column the table declares NOT NULL
+          # without a default, with the value a new domain gets in the Control Panel.
+          psql -h 127.0.0.1 -U hmailserver -d hmtest -Atc "
+            insert into hm_domains (domainname, domainactive, domainpostmaster, domainmaxsize, domainaddomain,
+              domainmaxmessagesize, domainuseplusaddressing, domainplusaddressingchar, domainantispamoptions,
+              domainenablesignature, domainsignaturemethod, domainsignatureplaintext, domainsignaturehtml,
+              domainaddsignaturestoreplies, domainaddsignaturestolocalemail, domainmaxnoofaccounts,
+              domainmaxnoofaliases, domainmaxnoofdistributionlists, domainlimitationsenabled, domainmaxaccountsize,
+              domaindkimselector, domaindkimprivatekeyfile, domaindkimsecondaryselector,
+              domaindkimsecondaryprivatekeyfile, domainrelayhost, domainrelayport, domainrelayrequiresauth,
+              domainrelayusername, domainrelaypassword, domainrelayconnectionsecurity)
+            values ('example.test', 1, '', 0, '', 0, 0, '', 0, 0, 0, '', '', 0, 0, 0, 0, 0, 0, 0, '', '', '', '', '', 0, 0, '', '', 0);
+            select domainid, domainname from hm_domains"
+          echo testar | "$T/program/hmailserver" --config "$T/program/hMailServer.ini" --set-admin-password
+
+      - name: Start the server
+        run: |
+          cd "$HMTEST_TREE"
+          nohup "$HMTEST_TREE/program/hmailserver" --config "$HMTEST_TREE/program/hMailServer.ini" --foreground \
+            > "$HMTEST_TREE/stdout.log" 2>&1 &
+          echo $! > "$HMTEST_TREE/server.pid"
+          for i in $(seq 1 60); do
+            if curl -s -o /dev/null -u "Administrator:$HMTEST_ADMIN_PASSWORD" "http://127.0.0.1:$HMTEST_REST_PORT/api/v1/status"; then
+              break
+            fi
+            sleep 1
+          done
+          curl -s -u "Administrator:$HMTEST_ADMIN_PASSWORD" "http://127.0.0.1:$HMTEST_REST_PORT/api/v1/status"; echo
+          curl -s -u "Administrator:$HMTEST_ADMIN_PASSWORD" "http://127.0.0.1:$HMTEST_REST_PORT/api/v1/domains"; echo
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore hmailserver/test/LinuxRegressionTests/LinuxRegressionTests.csproj --locked-mode
+
+      - name: Run the fixtures against the server
+        run: |
+          dotnet test hmailserver/test/LinuxRegressionTests/LinuxRegressionTests.csproj -c Release --no-restore \
+            --logger "trx;LogFileName=linux-regression.trx" --results-directory "$HMTEST_TREE/results"
+
+      - name: Stop the server
+        if: always()
+        run: |
+          if [ -f "$HMTEST_TREE/server.pid" ]; then
+            kill "$(cat "$HMTEST_TREE/server.pid")" || true
+            sleep 2
+          fi
+
+      - name: Keep the results and the server's logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-regression-results
+          path: |
+            ${{ env.HMTEST_TREE }}/results/*.trx
+            ${{ env.HMTEST_TREE }}/Logs/
+            ${{ env.HMTEST_TREE }}/stdout.log
+          if-no-files-found: warn
+          retention-days: 14
