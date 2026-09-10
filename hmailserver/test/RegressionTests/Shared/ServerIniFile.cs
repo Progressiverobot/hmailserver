@@ -38,6 +38,17 @@ namespace RegressionTests.Shared
 
       public static string Path()
       {
+         // The server under test need not be in this tree. HMTEST_SERVER_INI names
+         // its ini where it is not - the Linux runs put the server in a directory of
+         // its own beside the test tree, and there is nothing above the test binary
+         // to search. Unset on the Windows bench, where the search below finds the
+         // ini of the service running from the repository's own Release output, and
+         // this line then does nothing.
+         var configured = Environment.GetEnvironmentVariable("HMTEST_SERVER_INI");
+
+         if (!string.IsNullOrWhiteSpace(configured))
+            return configured.Trim();
+
          var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 
          while (directory != null)

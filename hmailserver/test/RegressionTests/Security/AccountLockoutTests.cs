@@ -315,7 +315,7 @@ namespace RegressionTests.Security
 
       private static void SetIniSetting(string key, string value)
       {
-         var path = IniPath();
+         var path = ServerIniFile.Path();
          var lines = new List<string>(File.ReadAllLines(path));
          lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
          var section = lines.FindIndex(line => line.Trim() == "[Settings]");
@@ -325,20 +325,5 @@ namespace RegressionTests.Security
          File.WriteAllLines(path, lines);
       }
 
-      private static string IniPath()
-      {
-         var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-         while (directory != null)
-         {
-            var candidate = Paths.Combine(directory.FullName,
-               @"source\Server\hMailServer\x64\Release\hMailServer.ini");
-            if (File.Exists(candidate))
-               return candidate;
-            directory = directory.Parent;
-         }
-         Assert.Fail("Could not locate the server's hMailServer.ini by searching upwards from " +
-                     AppDomain.CurrentDomain.BaseDirectory);
-         return null;
-      }
    }
 }

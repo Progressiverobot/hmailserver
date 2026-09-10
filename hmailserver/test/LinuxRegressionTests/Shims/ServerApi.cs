@@ -253,6 +253,22 @@ namespace RegressionTests.Shared
          return items;
       }
 
+      /// <summary>The elements of the named array property of an object, or nothing.</summary>
+      public static List<JsonElement> Array(JsonElement element, string property)
+      {
+         var items = new List<JsonElement>();
+
+         JsonElement inner;
+         if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(property, out inner) ||
+             inner.ValueKind != JsonValueKind.Array)
+            return items;
+
+         foreach (var item in inner.EnumerateArray())
+            items.Add(item);
+
+         return items;
+      }
+
       public static string StringOf(JsonElement element, string property)
       {
          JsonElement value;

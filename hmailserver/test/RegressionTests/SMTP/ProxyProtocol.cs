@@ -61,7 +61,7 @@ namespace RegressionTests.SMTP
          public RawSmtpSocket()
          {
             _client = new TcpClient();
-            _client.Connect("127.0.0.1", 25);
+            _client.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
             _stream = _client.GetStream();
             _stream.ReadTimeout = 15000;
             _stream.WriteTimeout = 15000;

@@ -276,6 +276,25 @@ namespace HM
          return full_path.Mid(static_cast<int>(last_separator) + 1);
       }
 
+      // The real one, trimmed of nothing: a trailing separator on the left
+      // half and a leading one on the right are dropped, and the two are
+      // joined with a backslash. Mime.cpp builds the "Problematic messages"
+      // path with it, on the branch that saves a message the parser could not
+      // read - a branch whose write then fails here, as every write does.
+      static String Combine(const String &path1, const String &path2)
+      {
+         std::wstring first = path1;
+         std::wstring second = path2;
+
+         if (!first.empty() && (first[first.size() - 1] == L'\\' || first[first.size() - 1] == L'/'))
+            first.erase(first.size() - 1);
+
+         if (!second.empty() && (second[0] == L'\\' || second[0] == L'/'))
+            second.erase(0, 1);
+
+         return String((first + L"\\" + second).c_str());
+      }
+
       static bool Copy(const String &, const String &, bool = false) { return false; }
       static bool WriteToFile(const String &, const String &, bool) { return false; }
       static bool WriteToFile(const String &, const AnsiString &) { return false; }

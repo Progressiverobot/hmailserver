@@ -40,6 +40,21 @@ namespace RegressionTests.Shared
          _settings = _application.Settings;
       }
 
+      /// <summary>
+      ///    The Windows one stops the service and starts it again, for a test that
+      ///    needs the server to re-read something it only reads at process start -
+      ///    hMailServer.ini, which IniFileSettings caches for the life of the process.
+      ///    Nothing in the REST API restarts the process: POST
+      ///    /api/v1/server/reinitialize restarts the services inside it and does not
+      ///    re-read the INI, so it is not the same thing and is not put here in its
+      ///    place. A test that asks for a restart is stopped at that point, and the
+      ///    tests in the same fixture that do not ask for one still run.
+      /// </summary>
+      protected void RestartServerAndReacquireCom()
+      {
+         NotOnThisServer.Ignore(NotOnThisServer.NoServerRestart);
+      }
+
       [SetUp]
       public void SetUp()
       {

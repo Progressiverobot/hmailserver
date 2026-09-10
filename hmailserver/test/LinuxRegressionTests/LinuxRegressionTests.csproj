@@ -1,19 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The regression suite's socket-driven fixtures, compiled IN PLACE from
-       ../RegressionTests against a server that need not be on this machine and is
-       not driven over COM: the Linux server, in practice. RegressionTests.csproj is
-       net481 with a COMReference to hMailServer.exe and cannot run anywhere else;
-       this project links the fixture files that drive the server only through SMTP,
-       IMAP, POP3 and the REST API, and supplies under Shims/ the handful of types
-       those files compile against that the Windows suite gets from COM
-       (TestFixtureBase, TestSetup, hMailServer.Domain and friends), backed by the
-       REST API instead. A fixture that needs something the REST API cannot do gets
-       Assert.Ignore with the reason, from the shim, never a weakened assertion.
+  <!-- The regression suite's fixtures, compiled IN PLACE from ../RegressionTests
+       against a server that need not be on this machine and is not driven over COM:
+       the Linux server, in practice. RegressionTests.csproj is net481 with a
+       COMReference to hMailServer.exe and cannot run anywhere else; this project
+       links every fixture file that compiles against the REST-backed fixture layer
+       under Shims/, which supplies the types those files get from COM on Windows
+       (TestFixtureBase, TestSetup, hMailServer.Application and the objects under it)
+       with the REST API behind them.
+
+       The rule of this project: a test that passes here is the same test that passes
+       on Windows. No fixture is edited, no assertion is weakened. A shim member that
+       the API cannot answer honestly calls NotOnThisServer.Ignore with a reason that
+       names the missing route, so the test is skipped with that reason and never
+       passes for the wrong cause; a member that needs a route an older server does
+       not have asks the server's own OpenAPI document first (ServerApi.HasRoute).
 
        Every file under Compile below is the Windows suite's own; nothing is copied.
-       A fixture that is not listed is not run here, and docs/RegressionEnvironment.md
-       says how to run this. -->
+       A fixture that is not listed either does not compile against the shims - it
+       names a COM member the REST API has no equivalent of anywhere in the file, so
+       there is nothing to link - or reads the repository it was built from rather
+       than the server, which the Linux runs do not have beside them.
+       docs/RegressionEnvironment.md ("On Linux") says how to run this. -->
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -29,7 +37,7 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <!-- The fixtures were written for the Windows project, which does not enable
          these analyzers; they are not this project's to fix. -->
-    <NoWarn>$(NoWarn);NUnit2005;NUnit2007;SYSLIB0014</NoWarn>
+    <NoWarn>$(NoWarn);NUnit2005;NUnit2007;NUnit2045;SYSLIB0014;SYSLIB0057;CS0618;CS0108;CS0114;CS0162;CS0219</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -38,91 +46,274 @@
     <PackageReference Include="NUnit3TestAdapter" Version="6.3.0" />
   </ItemGroup>
 
-  <!-- The COM-free helpers the fixtures are built on. TestPorts is what lets the
-       simulators be pointed at another host and other ports. -->
+  <!-- The COM-free helpers the fixtures are built on: the protocol simulators, the
+       fake servers, and the small utilities. TestPorts is what lets the simulators be
+       pointed at another host and other ports. -->
   <ItemGroup>
+    <Compile Include="..\RegressionTests\API\Permissions.cs" Link="API\Permissions.cs" />
+    <Compile Include="..\RegressionTests\ExternalAccounts\ScriptedImapServer.cs" Link="ExternalAccounts\ScriptedImapServer.cs" />
+    <Compile Include="..\RegressionTests\ExternalAccounts\ScriptedPop3Server.cs" Link="ExternalAccounts\ScriptedPop3Server.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\RetryHelper.cs" Link="Infrastructure\RetryHelper.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\SpamdSimulator.cs" Link="Infrastructure\SpamdSimulator.cs" />
+    <Compile Include="..\RegressionTests\POP3\Fetching\LockHelper.cs" Link="POP3\Fetching\LockHelper.cs" />
+    <Compile Include="..\RegressionTests\SSL\SmtpDeliverySslTests.cs" Link="SSL\SmtpDeliverySslTests.cs" />
+    <Compile Include="..\RegressionTests\Security\OAuth2BearerEs256.cs" Link="Security\OAuth2BearerEs256.cs" />
+    <Compile Include="..\RegressionTests\Shared\ClientCertificateFactory.cs" Link="Shared\ClientCertificateFactory.cs" />
     <Compile Include="..\RegressionTests\Shared\DeliveryFailedException.cs" Link="Shared\DeliveryFailedException.cs" />
+    <Compile Include="..\RegressionTests\Shared\DnssecSigner.cs" Link="Shared\DnssecSigner.cs" />
     <Compile Include="..\RegressionTests\Shared\ExceptionPolicy.cs" Link="Shared\ExceptionPolicy.cs" />
+    <Compile Include="..\RegressionTests\Shared\FakeDnsServer.cs" Link="Shared\FakeDnsServer.cs" />
+    <Compile Include="..\RegressionTests\Shared\FakeFilterEngine.cs" Link="Shared\FakeFilterEngine.cs" />
+    <Compile Include="..\RegressionTests\Shared\FakeHttpEndpoint.cs" Link="Shared\FakeHttpEndpoint.cs" />
+    <Compile Include="..\RegressionTests\Shared\FakeHttpProxy.cs" Link="Shared\FakeHttpProxy.cs" />
+    <Compile Include="..\RegressionTests\Shared\FakeSigstore.cs" Link="Shared\FakeSigstore.cs" />
     <Compile Include="..\RegressionTests\Shared\IMAPClientSimulator.cs" Link="Shared\IMAPClientSimulator.cs" />
-    <Compile Include="..\RegressionTests\Shared\Paths.cs" Link="Shared\Paths.cs" />
+    <Compile Include="..\RegressionTests\Shared\IniFile.cs" Link="Shared\IniFile.cs" />
+    <Compile Include="..\RegressionTests\Shared\IniFileSetting.cs" Link="Shared\IniFileSetting.cs" />
     <Compile Include="..\RegressionTests\Shared\POP3ClientSimulator.cs" Link="Shared\POP3ClientSimulator.cs" />
+    <Compile Include="..\RegressionTests\Shared\Paths.cs" Link="Shared\Paths.cs" />
+    <Compile Include="..\RegressionTests\Shared\Pop3ServerSimulator.cs" Link="Shared\Pop3ServerSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\RetryableAssert.cs" Link="Shared\RetryableAssert.cs" />
     <Compile Include="..\RegressionTests\Shared\SMTPClientSimulator.cs" Link="Shared\SMTPClientSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\SMTPServerSimulator.cs" Link="Shared\SMTPServerSimulator.cs" />
+    <Compile Include="..\RegressionTests\Shared\ServerIniFile.cs" Link="Shared\ServerIniFile.cs" />
     <Compile Include="..\RegressionTests\Shared\SslVersions.cs" Link="Shared\SslVersions.cs" />
     <Compile Include="..\RegressionTests\Shared\StringExtensions.cs" Link="Shared\StringExtensions.cs" />
     <Compile Include="..\RegressionTests\Shared\TcpConnection.cs" Link="Shared\TcpConnection.cs" />
     <Compile Include="..\RegressionTests\Shared\TcpServer.cs" Link="Shared\TcpServer.cs" />
     <Compile Include="..\RegressionTests\Shared\TestPorts.cs" Link="Shared\TestPorts.cs" />
     <Compile Include="..\RegressionTests\Shared\TestTracer.cs" Link="Shared\TestTracer.cs" />
-    <Compile Include="..\RegressionTests\ExternalAccounts\ScriptedImapServer.cs" Link="ExternalAccounts\ScriptedImapServer.cs" />
-    <Compile Include="..\RegressionTests\ExternalAccounts\ScriptedPop3Server.cs" Link="ExternalAccounts\ScriptedPop3Server.cs" />
-    <Compile Include="..\RegressionTests\Infrastructure\RetryHelper.cs" Link="Infrastructure\RetryHelper.cs" />
-    <Compile Include="..\RegressionTests\Infrastructure\SpamdSimulator.cs" Link="Infrastructure\SpamdSimulator.cs" />
+    <Compile Include="..\RegressionTests\Shared\TlsHandshakeProbe.cs" Link="Shared\TlsHandshakeProbe.cs" />
   </ItemGroup>
 
-  <!-- The fixtures: the socket-only ones first, then those that also need the test
-       domain and accounts in it. -->
+  <!-- The fixtures. -->
   <ItemGroup>
-    <Compile Include="..\RegressionTests\API\StatusTests.cs" Link="API\StatusTests.cs" />
-    <Compile Include="..\RegressionTests\Infrastructure\DnsResolution.cs" Link="Infrastructure\DnsResolution.cs" />
-    <Compile Include="..\RegressionTests\SMTP\ESmtpTests.cs" Link="SMTP\ESmtpTests.cs" />
-    <Compile Include="..\RegressionTests\SMTP\MailFromParsing.cs" Link="SMTP\MailFromParsing.cs" />
-    <Compile Include="..\RegressionTests\SMTP\RcptToParsing.cs" Link="SMTP\RcptToParsing.cs" />
-    <Compile Include="..\RegressionTests\SMTP\StartTlsAlreadyActive.cs" Link="SMTP\StartTlsAlreadyActive.cs" />
-    <Compile Include="..\RegressionTests\Sieve\SieveEvaluation.cs" Link="Sieve\SieveEvaluation.cs" />
-    <Compile Include="..\RegressionTests\Sieve\SieveExtensionActions.cs" Link="Sieve\SieveExtensionActions.cs" />
-    <Compile Include="..\RegressionTests\Sieve\SieveExtensionRequire.cs" Link="Sieve\SieveExtensionRequire.cs" />
-    <Compile Include="..\RegressionTests\Sieve\SieveSyntax.cs" Link="Sieve\SieveSyntax.cs" />
-    <Compile Include="..\RegressionTests\Sieve\SieveVacation.cs" Link="Sieve\SieveVacation.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
+    <Compile Include="..\RegressionTests\API\ClientDiscovery.cs" Link="API\ClientDiscovery.cs" />
+    <Compile Include="..\RegressionTests\API\Message.cs" Link="API\Message.cs" />
+    <Compile Include="..\RegressionTests\API\MessageHeaderObjects.cs" Link="API\MessageHeaderObjects.cs" />
     <Compile Include="..\RegressionTests\API\Messages.cs" Link="API\Messages.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiApiKeys.cs" Link="API\RestApiApiKeys.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiArchive.cs" Link="API\RestApiArchive.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiAuthorization.cs" Link="API\RestApiAuthorization.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiDomains.cs" Link="API\RestApiDomains.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiQueue.cs" Link="API\RestApiQueue.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiSelfService.cs" Link="API\RestApiSelfService.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiSettings.cs" Link="API\RestApiSettings.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiSrvRecords.cs" Link="API\RestApiSrvRecords.cs" />
+    <Compile Include="..\RegressionTests\API\ScriptObjectPolicy.cs" Link="API\ScriptObjectPolicy.cs" />
+    <Compile Include="..\RegressionTests\API\ScriptReload.cs" Link="API\ScriptReload.cs" />
+    <Compile Include="..\RegressionTests\API\Security.cs" Link="API\Security.cs" />
+    <Compile Include="..\RegressionTests\API\StatusTests.cs" Link="API\StatusTests.cs" />
+    <Compile Include="..\RegressionTests\API\Unicode.cs" Link="API\Unicode.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\AuthenticationResultsHeader.cs" Link="AntiSpam\AuthenticationResultsHeader.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\Combinations.cs" Link="AntiSpam\Combinations.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\DKIM\ArcInboundFiltering.cs" Link="AntiSpam\DKIM\ArcInboundFiltering.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\DKIM\Sha1SignatureRejection.cs" Link="AntiSpam\DKIM\Sha1SignatureRejection.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\DKIM\Verification.cs" Link="AntiSpam\DKIM\Verification.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\DmarcNonExistentSubdomainPolicy.cs" Link="AntiSpam\DmarcNonExistentSubdomainPolicy.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\FilterHook.cs" Link="AntiSpam\FilterHook.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\GreyListing.cs" Link="AntiSpam\GreyListing.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\PerAccountSpamSettings.cs" Link="AntiSpam\PerAccountSpamSettings.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\SenderBlacklist.cs" Link="AntiSpam\SenderBlacklist.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\SpamAssassinLearning.cs" Link="AntiSpam\SpamAssassinLearning.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\SpamAssassinUserHeader.cs" Link="AntiSpam\SpamAssassinUserHeader.cs" />
+    <Compile Include="..\RegressionTests\Domains\DomainDeleteCascade.cs" Link="Domains\DomainDeleteCascade.cs" />
+    <Compile Include="..\RegressionTests\Domains\DomainLimitEnableFlags.cs" Link="Domains\DomainLimitEnableFlags.cs" />
+    <Compile Include="..\RegressionTests\Domains\DomainRenameCascade.cs" Link="Domains\DomainRenameCascade.cs" />
+    <Compile Include="..\RegressionTests\ExternalAccounts\FetchXOAuth2.cs" Link="ExternalAccounts\FetchXOAuth2.cs" />
+    <Compile Include="..\RegressionTests\ExternalAccounts\HostileRemoteServer.cs" Link="ExternalAccounts\HostileRemoteServer.cs" />
+    <Compile Include="..\RegressionTests\ExternalAccounts\ImapFetch.cs" Link="ExternalAccounts\ImapFetch.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Append.cs" Link="IMAP\Append.cs" />
     <Compile Include="..\RegressionTests\IMAP\AppendInternalDate.cs" Link="IMAP\AppendInternalDate.cs" />
+    <Compile Include="..\RegressionTests\IMAP\AppendLimit.cs" Link="IMAP\AppendLimit.cs" />
+    <Compile Include="..\RegressionTests\IMAP\AttachmentTextSearch.cs" Link="IMAP\AttachmentTextSearch.cs" />
+    <Compile Include="..\RegressionTests\IMAP\AuthorisationChokePoint.cs" Link="IMAP\AuthorisationChokePoint.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Basics.cs" Link="IMAP\Basics.cs" />
     <Compile Include="..\RegressionTests\IMAP\Binary.cs" Link="IMAP\Binary.cs" />
+    <Compile Include="..\RegressionTests\IMAP\CapabilityAuthAdvertisement.cs" Link="IMAP\CapabilityAuthAdvertisement.cs" />
     <Compile Include="..\RegressionTests\IMAP\CommandSequences.cs" Link="IMAP\CommandSequences.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Compress.cs" Link="IMAP\Compress.cs" />
     <Compile Include="..\RegressionTests\IMAP\ConcurrentConnections.cs" Link="IMAP\ConcurrentConnections.cs" />
     <Compile Include="..\RegressionTests\IMAP\Examine.cs" Link="IMAP\Examine.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Fetch.cs" Link="IMAP\Fetch.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Folders.cs" Link="IMAP\Folders.cs" />
+    <Compile Include="..\RegressionTests\IMAP\FullTextSearch.cs" Link="IMAP\FullTextSearch.cs" />
     <Compile Include="..\RegressionTests\IMAP\HierarchyDelimiter.cs" Link="IMAP\HierarchyDelimiter.cs" />
     <Compile Include="..\RegressionTests\IMAP\ListStatus.cs" Link="IMAP\ListStatus.cs" />
+    <Compile Include="..\RegressionTests\IMAP\MasterUserImpersonation.cs" Link="IMAP\MasterUserImpersonation.cs" />
     <Compile Include="..\RegressionTests\IMAP\Metadata.cs" Link="IMAP\Metadata.cs" />
+    <Compile Include="..\RegressionTests\IMAP\MultiAppend.cs" Link="IMAP\MultiAppend.cs" />
     <Compile Include="..\RegressionTests\IMAP\NonSynchronizingLiterals.cs" Link="IMAP\NonSynchronizingLiterals.cs" />
     <Compile Include="..\RegressionTests\IMAP\ObjectId.cs" Link="IMAP\ObjectId.cs" />
     <Compile Include="..\RegressionTests\IMAP\PartialFetchChunking.cs" Link="IMAP\PartialFetchChunking.cs" />
     <Compile Include="..\RegressionTests\IMAP\Preview.cs" Link="IMAP\Preview.cs" />
+    <Compile Include="..\RegressionTests\IMAP\QuotaResourceTypes.cs" Link="IMAP\QuotaResourceTypes.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Replace.cs" Link="IMAP\Replace.cs" />
     <Compile Include="..\RegressionTests\IMAP\SaveDate.cs" Link="IMAP\SaveDate.cs" />
     <Compile Include="..\RegressionTests\IMAP\Search.cs" Link="IMAP\Search.cs" />
+    <Compile Include="..\RegressionTests\IMAP\SearchLimits.cs" Link="IMAP\SearchLimits.cs" />
+    <Compile Include="..\RegressionTests\IMAP\SequenceSets.cs" Link="IMAP\SequenceSets.cs" />
+    <Compile Include="..\RegressionTests\IMAP\SessionMessageNumbering.cs" Link="IMAP\SessionMessageNumbering.cs" />
+    <Compile Include="..\RegressionTests\IMAP\SharedMailboxes.cs" Link="IMAP\SharedMailboxes.cs" />
+    <Compile Include="..\RegressionTests\IMAP\Sort.cs" Link="IMAP\Sort.cs" />
+    <Compile Include="..\RegressionTests\IMAP\SpecialUse.cs" Link="IMAP\SpecialUse.cs" />
     <Compile Include="..\RegressionTests\IMAP\ThreadCommand.cs" Link="IMAP\ThreadCommand.cs" />
+    <Compile Include="..\RegressionTests\IMAP\TombstoneRetention.cs" Link="IMAP\TombstoneRetention.cs" />
     <Compile Include="..\RegressionTests\IMAP\Unauthenticate.cs" Link="IMAP\Unauthenticate.cs" />
     <Compile Include="..\RegressionTests\IMAP\Utf8Append.cs" Link="IMAP\Utf8Append.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\AbortedSessions.cs" Link="Infrastructure\AbortedSessions.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\AcceptPathResilience.cs" Link="Infrastructure\AcceptPathResilience.cs" />
     <Compile Include="..\RegressionTests\Infrastructure\AccountProperties.cs" Link="Infrastructure\AccountProperties.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ArchiveRetentionTests.cs" Link="Infrastructure\ArchiveRetentionTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ArchiveScopeTests.cs" Link="Infrastructure\ArchiveScopeTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\AssertionBuild.cs" Link="Infrastructure\AssertionBuild.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\BackupVerifiedRestore.cs" Link="Infrastructure\BackupVerifiedRestore.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\Cache.cs" Link="Infrastructure\Cache.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DatabaseFailureHandling.cs" Link="Infrastructure\DatabaseFailureHandling.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DatabaseMetrics.cs" Link="Infrastructure\DatabaseMetrics.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DeliveryHardLinks.cs" Link="Infrastructure\DeliveryHardLinks.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DeliveryMetrics.cs" Link="Infrastructure\DeliveryMetrics.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DiskSpaceGuard.cs" Link="Infrastructure\DiskSpaceGuard.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\DnsResolution.cs" Link="Infrastructure\DnsResolution.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ErrorManagerDiagnosticsTests.cs" Link="Infrastructure\ErrorManagerDiagnosticsTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ExceptionHandlerDiagnosticsTests.cs" Link="Infrastructure\ExceptionHandlerDiagnosticsTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ExceptionHandlerTests.cs" Link="Infrastructure\ExceptionHandlerTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\HealthProbes.cs" Link="Infrastructure\HealthProbes.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\HttpFoundation.cs" Link="Infrastructure\HttpFoundation.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\IPRanges.cs" Link="Infrastructure\IPRanges.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\IniSettingsMirror.cs" Link="Infrastructure\IniSettingsMirror.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\IniSettingsOverCom.cs" Link="Infrastructure\IniSettingsOverCom.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ListenerIpv6.cs" Link="Infrastructure\ListenerIpv6.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\LogDeviceAndFormat.cs" Link="Infrastructure\LogDeviceAndFormat.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\LogFlushing.cs" Link="Infrastructure\LogFlushing.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\LogRetention.cs" Link="Infrastructure\LogRetention.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\MessageRetentionTests.cs" Link="Infrastructure\MessageRetentionTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\MessageStoreConsistency.cs" Link="Infrastructure\MessageStoreConsistency.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\MessageStoreDurability.cs" Link="Infrastructure\MessageStoreDurability.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\MetricsReadiness.cs" Link="Infrastructure\MetricsReadiness.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\MetricsSecurity.cs" Link="Infrastructure\MetricsSecurity.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\OpenTelemetryTracing.cs" Link="Infrastructure\OpenTelemetryTracing.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\PerDomainMetrics.cs" Link="Infrastructure\PerDomainMetrics.cs" />
     <Compile Include="..\RegressionTests\Infrastructure\Persistence\AccountNameValidation.cs" Link="Infrastructure\Persistence\AccountNameValidation.cs" />
     <Compile Include="..\RegressionTests\Infrastructure\Persistence\AliasNameValidation.cs" Link="Infrastructure\Persistence\AliasNameValidation.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\Persistence\DomainNameValidation.cs" Link="Infrastructure\Persistence\DomainNameValidation.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\Persistence\TCPIPPortTests.cs" Link="Infrastructure\Persistence\TCPIPPortTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\PrometheusConventions.cs" Link="Infrastructure\PrometheusConventions.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ScheduledBackup.cs" Link="Infrastructure\ScheduledBackup.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\SessionLimitingTests.cs" Link="Infrastructure\SessionLimitingTests.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\ShutdownDrain.cs" Link="Infrastructure\ShutdownDrain.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\SqlLayerErrorHandling.cs" Link="Infrastructure\SqlLayerErrorHandling.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\TCPIP.cs" Link="Infrastructure\TCPIP.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\Timeouts.cs" Link="Infrastructure\Timeouts.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\TraceContext.cs" Link="Infrastructure\TraceContext.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\Utf16FileFormat.cs" Link="Infrastructure\Utf16FileFormat.cs" />
+    <Compile Include="..\RegressionTests\Infrastructure\WorkQueueLifecycle.cs" Link="Infrastructure\WorkQueueLifecycle.cs" />
+    <Compile Include="..\RegressionTests\MIME\MalformedInput.cs" Link="MIME\MalformedInput.cs" />
     <Compile Include="..\RegressionTests\MIME\MessageParsing.cs" Link="MIME\MessageParsing.cs" />
     <Compile Include="..\RegressionTests\MIME\Parameters.cs" Link="MIME\Parameters.cs" />
     <Compile Include="..\RegressionTests\POP3\AuthRespCode.cs" Link="POP3\AuthRespCode.cs" />
+    <Compile Include="..\RegressionTests\POP3\Basics.cs" Link="POP3\Basics.cs" />
+    <Compile Include="..\RegressionTests\POP3\Fetching\ExternalAccountSslTests.cs" Link="POP3\Fetching\ExternalAccountSslTests.cs" />
+    <Compile Include="..\RegressionTests\POP3\Fetching\ServerBehaviors.cs" Link="POP3\Fetching\ServerBehaviors.cs" />
+    <Compile Include="..\RegressionTests\POP3\LoginDelay.cs" Link="POP3\LoginDelay.cs" />
     <Compile Include="..\RegressionTests\POP3\Pipelining.cs" Link="POP3\Pipelining.cs" />
+    <Compile Include="..\RegressionTests\POP3\ProtocolConformance.cs" Link="POP3\ProtocolConformance.cs" />
+    <Compile Include="..\RegressionTests\POP3\RfcConformance.cs" Link="POP3\RfcConformance.cs" />
+    <Compile Include="..\RegressionTests\SMTP\AWStatsLoggingTests.cs" Link="SMTP\AWStatsLoggingTests.cs" />
+    <Compile Include="..\RegressionTests\SMTP\AbortedTransfers.cs" Link="SMTP\AbortedTransfers.cs" />
+    <Compile Include="..\RegressionTests\SMTP\BareLineFeedEndOfData.cs" Link="SMTP\BareLineFeedEndOfData.cs" />
+    <Compile Include="..\RegressionTests\SMTP\Batv.cs" Link="SMTP\Batv.cs" />
     <Compile Include="..\RegressionTests\SMTP\Bdat.cs" Link="SMTP\Bdat.cs" />
     <Compile Include="..\RegressionTests\SMTP\BinaryMime.cs" Link="SMTP\BinaryMime.cs" />
     <Compile Include="..\RegressionTests\SMTP\Deliverability.cs" Link="SMTP\Deliverability.cs" />
+    <Compile Include="..\RegressionTests\SMTP\DeliveryStatusNotification.cs" Link="SMTP\DeliveryStatusNotification.cs" />
+    <Compile Include="..\RegressionTests\SMTP\ESmtpTests.cs" Link="SMTP\ESmtpTests.cs" />
+    <Compile Include="..\RegressionTests\SMTP\EsmtpConformance.cs" Link="SMTP\EsmtpConformance.cs" />
+    <Compile Include="..\RegressionTests\SMTP\MailFromParsing.cs" Link="SMTP\MailFromParsing.cs" />
+    <Compile Include="..\RegressionTests\SMTP\OutboundPipelining.cs" Link="SMTP\OutboundPipelining.cs" />
     <Compile Include="..\RegressionTests\SMTP\OutboundSize.cs" Link="SMTP\OutboundSize.cs" />
+    <Compile Include="..\RegressionTests\SMTP\OutboundXOAuth2.cs" Link="SMTP\OutboundXOAuth2.cs" />
+    <Compile Include="..\RegressionTests\SMTP\OverQuotaRecipientRefusal.cs" Link="SMTP\OverQuotaRecipientRefusal.cs" />
+    <Compile Include="..\RegressionTests\SMTP\ProxyProtocol.cs" Link="SMTP\ProxyProtocol.cs" />
+    <Compile Include="..\RegressionTests\SMTP\QuotaWarning.cs" Link="SMTP\QuotaWarning.cs" />
+    <Compile Include="..\RegressionTests\SMTP\RateShaping.cs" Link="SMTP\RateShaping.cs" />
+    <Compile Include="..\RegressionTests\SMTP\RcptToParsing.cs" Link="SMTP\RcptToParsing.cs" />
     <Compile Include="..\RegressionTests\SMTP\ReceivedHeaders.cs" Link="SMTP\ReceivedHeaders.cs" />
     <Compile Include="..\RegressionTests\SMTP\RecipientVerification.cs" Link="SMTP\RecipientVerification.cs" />
-    <Compile Include="..\RegressionTests\SSL\SmtpDeliverySslTests.cs" Link="SSL\SmtpDeliverySslTests.cs" />
+    <Compile Include="..\RegressionTests\SMTP\Routes.cs" Link="SMTP\Routes.cs" />
+    <Compile Include="..\RegressionTests\SMTP\SpoolWriteFailure.cs" Link="SMTP\SpoolWriteFailure.cs" />
+    <Compile Include="..\RegressionTests\SMTP\Srs.cs" Link="SMTP\Srs.cs" />
+    <Compile Include="..\RegressionTests\SMTP\StartTlsAlreadyActive.cs" Link="SMTP\StartTlsAlreadyActive.cs" />
+    <Compile Include="..\RegressionTests\SMTP\TlsRptInertReporting.cs" Link="SMTP\TlsRptInertReporting.cs" />
+    <Compile Include="..\RegressionTests\SMTP\XOriginalRcptHeaderTests.cs" Link="SMTP\XOriginalRcptHeaderTests.cs" />
+    <Compile Include="..\RegressionTests\SSL\CertificateTypes.cs" Link="SSL\CertificateTypes.cs" />
+    <Compile Include="..\RegressionTests\SSL\ListenerTlsConfiguration.cs" Link="SSL\ListenerTlsConfiguration.cs" />
+    <Compile Include="..\RegressionTests\SSL\PostQuantumKeyExchange.cs" Link="SSL\PostQuantumKeyExchange.cs" />
+    <Compile Include="..\RegressionTests\SSL\ScramPlus.cs" Link="SSL\ScramPlus.cs" />
+    <Compile Include="..\RegressionTests\SSL\ScramPlusPop3.cs" Link="SSL\ScramPlusPop3.cs" />
+    <Compile Include="..\RegressionTests\SSL\SslServerTests.cs" Link="SSL\SslServerTests.cs" />
     <Compile Include="..\RegressionTests\SSL\SslTlsVersionTests.cs" Link="SSL\SslTlsVersionTests.cs" />
+    <Compile Include="..\RegressionTests\SSL\StartTls\ImapServerTests.cs" Link="SSL\StartTls\ImapServerTests.cs" />
+    <Compile Include="..\RegressionTests\SSL\StartTls\Pop3ServerTests.cs" Link="SSL\StartTls\Pop3ServerTests.cs" />
+    <Compile Include="..\RegressionTests\SSL\StartTls\SmtpServerTests.cs" Link="SSL\StartTls\SmtpServerTests.cs" />
     <Compile Include="..\RegressionTests\SSL\TlsOptionsTests.cs" Link="SSL\TlsOptionsTests.cs" />
+    <Compile Include="..\RegressionTests\Security\AccountLockoutTests.cs" Link="Security\AccountLockoutTests.cs" />
+    <Compile Include="..\RegressionTests\Security\AccountSendingLimits.cs" Link="Security\AccountSendingLimits.cs" />
+    <Compile Include="..\RegressionTests\Security\AdministratorTwoFactor.cs" Link="Security\AdministratorTwoFactor.cs" />
+    <Compile Include="..\RegressionTests\Security\AuthenticatedSenderCheck.cs" Link="Security\AuthenticatedSenderCheck.cs" />
+    <Compile Include="..\RegressionTests\Security\AutoBan.cs" Link="Security\AutoBan.cs" />
     <Compile Include="..\RegressionTests\Security\Basics.cs" Link="Security\Basics.cs" />
-    <!-- Security\ProtocolFuzz.cs is deliberately not here: its three tests carry
-         [Timeout(180000)], which NUnit 4 on .NET refuses before any SetUp runs
-         ("TargetFramework doesn't support timeout on tests"), as an error rather
-         than a skip. It drives the server over plain sockets and would otherwise
-         belong; it comes back when the attribute goes. -->
+    <Compile Include="..\RegressionTests\Security\EtrnAuthorization.cs" Link="Security\EtrnAuthorization.cs" />
+    <Compile Include="..\RegressionTests\Security\HashPolicy.cs" Link="Security\HashPolicy.cs" />
+    <Compile Include="..\RegressionTests\Security\LdapDirectoryAuthentication.cs" Link="Security\LdapDirectoryAuthentication.cs" />
+    <Compile Include="..\RegressionTests\Security\OAuth2Bearer.cs" Link="Security\OAuth2Bearer.cs" />
+    <Compile Include="..\RegressionTests\Security\OAuth2Introspection.cs" Link="Security\OAuth2Introspection.cs" />
+    <Compile Include="..\RegressionTests\Security\OAuth2Jwks.cs" Link="Security\OAuth2Jwks.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordExpiryTests.cs" Link="Security\PasswordExpiryTests.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordHashCost.cs" Link="Security\PasswordHashCost.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordHashFloor.cs" Link="Security\PasswordHashFloor.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordHashUpgrade.cs" Link="Security\PasswordHashUpgrade.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordPepper.cs" Link="Security\PasswordPepper.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordPolicyTests.cs" Link="Security\PasswordPolicyTests.cs" />
+    <Compile Include="..\RegressionTests\Security\PasswordScrypt.cs" Link="Security\PasswordScrypt.cs" />
+    <Compile Include="..\RegressionTests\Security\SMTPAuthentication.cs" Link="Security\SMTPAuthentication.cs" />
+    <Compile Include="..\RegressionTests\Security\SaslCredentialMasking.cs" Link="Security\SaslCredentialMasking.cs" />
+    <Compile Include="..\RegressionTests\Security\SecretProtection.cs" Link="Security\SecretProtection.cs" />
+    <Compile Include="..\RegressionTests\Security\SecurityTxt.cs" Link="Security\SecurityTxt.cs" />
+    <Compile Include="..\RegressionTests\Security\Tarpits.cs" Link="Security\Tarpits.cs" />
+    <Compile Include="..\RegressionTests\Security\TlsAcmeRenewal.cs" Link="Security\TlsAcmeRenewal.cs" />
+    <Compile Include="..\RegressionTests\Security\TlsCertificateValidity.cs" Link="Security\TlsCertificateValidity.cs" />
+    <Compile Include="..\RegressionTests\Security\TlsProtocolVersions.cs" Link="Security\TlsProtocolVersions.cs" />
+    <Compile Include="..\RegressionTests\Sieve\ManageSieve.cs" Link="Sieve\ManageSieve.cs" />
+    <Compile Include="..\RegressionTests\Sieve\ManageSieveAutoBan.cs" Link="Sieve\ManageSieveAutoBan.cs" />
+    <Compile Include="..\RegressionTests\Sieve\ManageSieveSecurity.cs" Link="Sieve\ManageSieveSecurity.cs" />
+    <Compile Include="..\RegressionTests\Sieve\ManageSieveTls.cs" Link="Sieve\ManageSieveTls.cs" />
     <Compile Include="..\RegressionTests\Sieve\SieveAccountScript.cs" Link="Sieve\SieveAccountScript.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveBodyDelivery.cs" Link="Sieve\SieveBodyDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveDateDelivery.cs" Link="Sieve\SieveDateDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveDelivery.cs" Link="Sieve\SieveDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveDuplicateDelivery.cs" Link="Sieve\SieveDuplicateDelivery.cs" />
     <Compile Include="..\RegressionTests\Sieve\SieveEditheaderDelivery.cs" Link="Sieve\SieveEditheaderDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveEnvelopeDelivery.cs" Link="Sieve\SieveEnvelopeDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveEnvironmentDelivery.cs" Link="Sieve\SieveEnvironmentDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveEvaluation.cs" Link="Sieve\SieveEvaluation.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveExtensionActions.cs" Link="Sieve\SieveExtensionActions.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveExtensionRequire.cs" Link="Sieve\SieveExtensionRequire.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveFlagDelivery.cs" Link="Sieve\SieveFlagDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveIncludeDelivery.cs" Link="Sieve\SieveIncludeDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveMailboxDelivery.cs" Link="Sieve\SieveMailboxDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveNotifyDelivery.cs" Link="Sieve\SieveNotifyDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveRegexDelivery.cs" Link="Sieve\SieveRegexDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveRejectDelivery.cs" Link="Sieve\SieveRejectDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveSpamtestDelivery.cs" Link="Sieve\SieveSpamtestDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveSyntax.cs" Link="Sieve\SieveSyntax.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveVacation.cs" Link="Sieve\SieveVacation.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveVacationDelivery.cs" Link="Sieve\SieveVacationDelivery.cs" />
+    <Compile Include="..\RegressionTests\Sieve\SieveVariablesDelivery.cs" Link="Sieve\SieveVariablesDelivery.cs" />
+    <Compile Include="..\RegressionTests\Stress\ContentStressTest.cs" Link="Stress\ContentStressTest.cs" />
+    <Compile Include="..\RegressionTests\Stress\IMAP\ConcurrentConnectionsStressTests.cs" Link="Stress\IMAP\ConcurrentConnectionsStressTests.cs" />
     <Compile Include="..\RegressionTests\Stress\IMAP\NotificationThreadingStressTests.cs" Link="Stress\IMAP\NotificationThreadingStressTests.cs" />
+    <Compile Include="..\RegressionTests\Stress\StabilitySanityTests.cs" Link="Stress\StabilitySanityTests.cs" />
   </ItemGroup>
 
   <!-- The embedded messages, under the manifest names the Windows assembly gives

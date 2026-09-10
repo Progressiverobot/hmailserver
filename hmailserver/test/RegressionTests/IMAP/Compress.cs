@@ -230,7 +230,7 @@ namespace RegressionTests.IMAP
          {
             _client.ReceiveTimeout = 30000;
             _client.SendTimeout = 30000;
-            _client.Connect("127.0.0.1", 143);
+            _client.Connect(TestPorts.HostAddress, TestPorts.Actual(143));
             _network = _client.GetStream();
             StringAssert.Contains("* OK", ReadUntil("* OK"));
          }

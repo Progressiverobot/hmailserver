@@ -78,25 +78,6 @@ namespace RegressionTests.Infrastructure
       //
       // Found by searching upwards for it rather than by counting "..\" segments, so that
       // moving the test assembly's output path cannot turn this into a silent skip.
-      private static string IniPath()
-      {
-         var directory = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
-
-         while (directory != null)
-         {
-            var candidate = Paths.Combine(directory.FullName,
-               @"source\Server\hMailServer\x64\Release\hMailServer.ini");
-
-            if (File.Exists(candidate))
-               return candidate;
-
-            directory = directory.Parent;
-         }
-
-         Assert.Fail("Could not locate the server's hMailServer.ini by searching upwards from " +
-                     AppDomain.CurrentDomain.BaseDirectory);
-         return null;
-      }
 
       // Writes a key into the FIRST [Settings] section, which is the only one that counts.
       // GetPrivateProfileString reads the first section with a given name and ignores any
@@ -105,7 +86,7 @@ namespace RegressionTests.Infrastructure
       // afternoon of invalid measurements before it was spotted.
       private static void SetIniSetting(string key, string value)
       {
-         var path = IniPath();
+         var path = ServerIniFile.Path();
          var lines = new System.Collections.Generic.List<string>(File.ReadAllLines(path));
 
          lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));

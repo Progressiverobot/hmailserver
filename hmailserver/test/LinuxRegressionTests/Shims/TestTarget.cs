@@ -28,6 +28,14 @@ namespace RegressionTests.Shared
    {
       public static readonly string Host = Read("HMTEST_HOST", "127.0.0.1");
       public static readonly int SmtpPort = Read("HMTEST_SMTP_PORT", 2525);
+
+      /// <summary>
+      ///    The submission port, which the tree lays out one above the SMTP port
+      ///    (2525 and 2526, as the Linux recipe writes them). Named in its own
+      ///    variable where it is somewhere else.
+      /// </summary>
+      public static readonly int SubmissionPort = Read("HMTEST_SUBMISSION_PORT", Read("HMTEST_SMTP_PORT", 2525) + 1);
+
       public static readonly int Pop3Port = Read("HMTEST_POP3_PORT", 1110);
       public static readonly int ImapPort = Read("HMTEST_IMAP_PORT", 1143);
       public static readonly int RestPort = Read("HMTEST_REST_PORT", 8045);
@@ -63,6 +71,7 @@ namespace RegressionTests.Shared
          TestPorts.Smtp = SmtpPort;
          TestPorts.Pop3 = Pop3Port;
          TestPorts.Imap = ImapPort;
+         TestPorts.Submission = SubmissionPort;
          TestPorts.ReceiveTimeoutMilliseconds = ReceiveTimeoutMilliseconds;
       }
 

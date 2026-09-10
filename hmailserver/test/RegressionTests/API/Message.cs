@@ -117,7 +117,7 @@ namespace RegressionTests.API
          mail.BodyEncoding = Encoding.GetEncoding(1252);
          mail.SubjectEncoding = Encoding.GetEncoding(1252);
          mail.Attachments.Add(new Attachment(a.Location));
-         using var oClient = new SmtpClient("localhost", 25);
+         using var oClient = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
          oClient.Send(mail);
 
          // Check that the message exists
@@ -160,7 +160,7 @@ namespace RegressionTests.API
          mail.BodyEncoding = Encoding.GetEncoding(1252);
          mail.SubjectEncoding = Encoding.GetEncoding(1252);
          mail.Attachments.Add(new Attachment(a.Location));
-         using var oClient = new SmtpClient("localhost", 25);
+         using var oClient = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
          oClient.Send(mail);
 
          // Check that the message exists

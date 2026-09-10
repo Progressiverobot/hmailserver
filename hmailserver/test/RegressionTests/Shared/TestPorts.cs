@@ -28,6 +28,35 @@ namespace RegressionTests.Shared
       public static int Smtp { get; set; } = 25;
       public static int Pop3 { get; set; } = 110;
       public static int Imap { get; set; } = 143;
+      public static int Submission { get; set; } = 587;
+
+      /// <summary>
+      ///    The port a fixture means when it names one of the four standard numbers
+      ///    itself - TcpConnection.Connect(143) and the like, of which the suite has
+      ///    some sixty. On the Windows bench these ARE the server's ports and this is
+      ///    the identity, so nothing there changes; against a server on other ports
+      ///    they are the names of the four services, and this is what turns them into
+      ///    that server's numbers.
+      ///
+      ///    It matters more than a tidy-up. WSL here runs with mirrored networking, so
+      ///    127.0.0.1:143 inside it reaches the Windows machine's own hMailServer
+      ///    service: without this, a fixture naming 143 quietly tested the wrong
+      ///    server and failed on an account it had never heard of. On a CI runner with
+      ///    no such service the same connection is simply refused.
+      /// </summary>
+      public static int Actual(int port)
+      {
+         if (port == 25)
+            return Smtp;
+         if (port == 110)
+            return Pop3;
+         if (port == 143)
+            return Imap;
+         if (port == 587)
+            return Submission;
+
+         return port;
+      }
 
       /// <summary>
       ///    How long a client connection waits for the server to send anything before
