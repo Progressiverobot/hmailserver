@@ -332,8 +332,14 @@ replaces the installer asset, and cosign has to sign the bytes that ship.
   `AZURE_CLIENT_SECRET`, for an app registration holding the *Certificate
   Profile Signer* role on that profile.
 * Repository variables `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`,
-  `ARTIFACT_SIGNING_PROFILE`. There is no UK region; `neu.codesigning.azure.net`
-  is the nearest.
+  `ARTIFACT_SIGNING_PROFILE`. The endpoint is a full URI, not a bare host:
+  `https://neu.codesigning.azure.net`, which is the action's own documented
+  form. There is no UK region, and North Europe is the nearest of the sixteen
+  the resource provider offers.
+
+All six are required, and the job refuses a subset rather than signing with one:
+setting four of them and leaving two blank was, until the gate was rewritten, a
+release that failed at the Azure action and took the cosign job down with it.
 
 Identity validation takes **one to twenty business days** and Microsoft states it
 cannot be expedited, so this is arranged once and long before a release rather
