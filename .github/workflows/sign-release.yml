@@ -23,7 +23,8 @@ name: Sign release artefacts
 #
 # This does NOT replace Authenticode. Windows SmartScreen and the UAC prompt care
 # about Authenticode, not Sigstore, and that needs a certificate this project does
-# not currently have (Azure Trusted Signing is the realistic route). Cosign gives
+# not currently have (Azure Artifact Signing, until recently called Trusted
+# Signing, is the realistic route - and the job below is written for it). Cosign gives
 # verifiability today, for anyone who checks; Authenticode remains open on the
 # roadmap and the two are complementary, not alternatives.
 #
@@ -74,25 +75,95 @@ jobs:
       contents: write
       id-token: write
     steps:
+      # The gate has to name every value the signing step consumes, and it named
+      # four of the six. `Sign it` also reads ARTIFACT_SIGNING_ENDPOINT and
+      # ARTIFACT_SIGNING_PROFILE, and those are the two the action itself marks
+      # required - signing-account-name, which this gate did check, it marks
+      # optional - so the gate validated the wrong four and admitted five
+      # configurations that reach the action with a required input left empty.
+      # The action throws on the empty endpoint, `sign` declares needs on this
+      # job, and so a release that trips it gets no Authenticode signature AND
+      # no cosign bundle on any of its twenty assets. On a published release
+      # that cannot be corrected afterwards.
+      #
+      # Hence three outcomes rather than two. None of the six set is the
+      # ordinary case and stays a silent no-op with a notice, because a fork -
+      # and this repository until an Azure account is arranged - has to be able
+      # to cut a release without one. All six set signs. Anything in between is
+      # a half-configured release, and the only honest thing to do with it is
+      # stop and name the values that are missing, while the release can still
+      # be fixed. Widening the gate to six without this third branch would be
+      # worse than the bug: a typo in one variable would ship an unsigned
+      # installer under a notice claiming no certificate is configured, and
+      # nobody would know until a user saw Unknown publisher.
+      #
+      # The six arrive as environment variables rather than as ${{ }} written
+      # into the middle of the script, because an expression is pasted into the
+      # shell text before bash parses it: a value holding a quote or a backtick
+      # would arrive as syntax rather than as data. Emptiness is judged the way
+      # the action judges it, on a value that is blank once its whitespace is
+      # taken off, so a variable set to a stray space is missing here too rather
+      # than passing the gate and failing inside the action. Only the names of
+      # the absent settings are ever echoed, never a value.
       - name: Is there a certificate to sign with?
         id: have
         shell: bash
+        env:
+          SIGN_AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          SIGN_AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          SIGN_AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          SIGN_ARTIFACT_SIGNING_ENDPOINT: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          SIGN_ARTIFACT_SIGNING_ACCOUNT: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          SIGN_ARTIFACT_SIGNING_PROFILE: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
         run: |
-          if [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] \
-             && [ -n "${{ secrets.AZURE_CLIENT_SECRET }}" ] && [ -n "${{ vars.ARTIFACT_SIGNING_ACCOUNT }}" ]; then
+          set -euo pipefail
+          configured=()
+          missing=()
+          for name in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET \
+                      ARTIFACT_SIGNING_ENDPOINT ARTIFACT_SIGNING_ACCOUNT ARTIFACT_SIGNING_PROFILE; do
+            var="SIGN_${name}"
+            if [[ "${!var-}" =~ [^[:space:]] ]]; then
+              configured+=("$name")
+            else
+              missing+=("$name")
+            fi
+          done
+
+          if [ "${#missing[@]}" -eq 0 ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
+            echo "All six Authenticode settings are present; the installer will be signed."
+          elif [ "${#configured[@]}" -eq 0 ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
             echo "::notice::No Authenticode certificate is configured, so the installer on this release is unsigned to Windows. \
           SmartScreen will show an unknown-publisher warning. See RELEASE.md, 'Authenticode'."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::error::Authenticode signing is half configured. Missing: ${missing[*]}. See RELEASE.md, 'Authenticode'."
+            echo "Set: ${configured[*]}."
+            echo "All six are required by the signing step. Fill in the rest, or clear all six to"
+            echo "release unsigned deliberately."
+            exit 1
           fi
 
+      # Through env, the way the sign job below already does it. A ${{ }} written
+      # into the body of a run block is pasted into the script text before bash
+      # parses it, so a tag holding a shell metacharacter arrives as syntax
+      # rather than as data - and this is the one job in the repository where
+      # that matters most, because it is the job that holds the code-signing
+      # credentials and contents: write.
       - name: Resolve the tag
         if: steps.have.outputs.ready == 'true'
         id: tag
         shell: bash
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          TAG="${INPUT_TAG:-$RELEASE_TAG}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag supplied and no release tag in the event payload."
+            exit 1
+          fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Download the installer from the release
@@ -100,9 +171,11 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
           mkdir -p signing
-          gh release download "${{ steps.tag.outputs.tag }}" --repo "${{ github.repository }}" \
+          gh release download "$TAG" --repo "$REPO" \
              --pattern 'hMailServer-*-x64.exe' --dir signing
           ls -la signing
 
@@ -135,13 +208,15 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          REPO: ${{ github.repository }}
         run: |
           $exe = (Get-ChildItem signing -Filter *.exe | Select-Object -First 1).FullName
           $sig = Get-AuthenticodeSignature $exe
           "status: $($sig.Status)"
           "signer: $($sig.SignerCertificate.Subject)"
           if ($sig.Status -ne 'Valid') { throw "The installer is not validly signed: $($sig.Status)" }
-          gh release upload "${{ steps.tag.outputs.tag }}" $exe --repo "${{ github.repository }}" --clobber
+          gh release upload "$env:TAG" $exe --repo "$env:REPO" --clobber
 
   sign:
     # AFTER the Authenticode job, never beside it. That job replaces the
