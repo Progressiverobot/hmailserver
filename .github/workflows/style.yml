@@ -99,6 +99,16 @@ jobs:
       - name: Every folder-access decision is ACLManager's
         run: python3 build/check-authz-choke-point.py
 
+      # The portal's page and its script are C++ string literals, and what stood
+      # behind them was a test asserting that certain substrings appeared - which
+      # proves a name is spelled somewhere and nothing about what the page does.
+      # This extracts both literals and RUNS the script against a small DOM and a
+      # stubbed API: the sign-in that stores no password, the listing, the
+      # keyboard cursor, the inline image that never points at a URL, the change
+      # probe that stops while the tab is hidden.
+      - name: The self-service portal's script does what the page needs
+        run: python3 build/check-portal-script.py
+
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged
     # Written on 21 August 2026 and taken out of the same commit, because the
