@@ -151,6 +151,38 @@ namespace HM
       return elements;
    }
 
+   // Is `ancestorId` this folder, or anywhere above it? Walked from the folder
+   // upwards rather than downwards from the ancestor, because a folder knows its
+   // parent and the walk is then as long as the tree is deep rather than as wide
+   // as it is - and bounded the same way OwnFolderPath_ bounds itself, so a
+   // folderparentid cycle cannot spin here.
+   bool
+   RestApiServer::IsAtOrBelow_(std::shared_ptr<IMAPFolders> tree, __int64 folderId, __int64 ancestorId)
+   {
+      if (!tree)
+         return false;
+
+      __int64 walk = folderId;
+
+      for (int guard = 0; guard <= IMAPFolder::MaxFolderDepth; guard++)
+      {
+         if (walk == ancestorId)
+            return true;
+
+         if (walk < 0)
+            return false;
+
+         std::shared_ptr<IMAPFolder> node = tree->GetItemByDBIDRecursive(walk);
+
+         if (!node)
+            return false;
+
+         walk = node->GetParentFolderID();
+      }
+
+      return false;
+   }
+
    bool
    RestApiServer::OwnFolderPath_(std::shared_ptr<IMAPFolders> tree, std::shared_ptr<IMAPFolder> folder, std::vector<String> &path)
    {
@@ -463,8 +495,16 @@ namespace HM
       std::map<__int64, int> designations;
       IMAPSpecialUse::Resolve(tree, designations);
 
-      if (designations.find(folder->GetID()) != designations.end())
-         return BuildResponse_(403, Refusal("You cannot delete a folder the server has designated for a special use."));
+      // Every designation in the subtree, not just this folder's own. The delete
+      // below takes the subfolders and all their messages, so a designated
+      // folder ANYWHERE beneath the one named is destroyed by it - and deleting
+      // an ordinary "Archive" that happens to hold "Archive.Sent" would
+      // otherwise walk straight past a guard written to stop precisely that.
+      for (std::map<__int64, int>::const_iterator it = designations.begin(); it != designations.end(); ++it)
+      {
+         if (IsAtOrBelow_(tree, it->first, folder->GetID()))
+            return BuildResponse_(403, Refusal("You cannot delete a folder the server has designated for a special use."));
+      }
 
       if (!RightOn_(account, folder, ACLPermission::PermissionDeleteMailbox))
          return BuildResponse_(403, Refusal("ACL: DeleteMailbox permission denied (required for DELETE)."));
@@ -505,11 +545,19 @@ namespace HM
       // One folder as the change probe counts it.
       struct FolderCount
       {
-         FolderCount() : id(0), count(0), unseen(0) { }
+         FolderCount() : id(0), count(0), unseen(0), uid(0) { }
 
          __int64 id;
          long count;
          long unseen;
+
+         // The folder's current UID and its name, in the token but not in the
+         // answer. Counts alone cannot see a message replaced - a poll spanning
+         // a delete and a delivery finds the same two numbers - and cannot see a
+         // rename at all. A UID is never reissued, so no addition leaves it
+         // alone; the name is what a rename changes and nothing else does.
+         unsigned int uid;
+         AnsiString name;
       };
 
       bool ByFolderId(const FolderCount &left, const FolderCount &right)
@@ -578,6 +626,8 @@ namespace HM
             entry.id = folder->GetID();
             entry.count = messages ? messages->GetCount() : 0;
             entry.unseen = entry.count - (messages ? messages->GetNoOfSeen() : 0);
+            entry.uid = folder->GetCurrentUID();
+            entry.name = AnsiString(folder->GetFolderName());
             counts.push_back(entry);
 
             pending.push_back(folder->GetSubFolders());
@@ -596,12 +646,13 @@ namespace HM
       // with the account id so that two accounts whose mailboxes happen to have
       // the same shape do not share one.
       AnsiString state;
-      state.Format("hmailserver/me/changes/1\naccount=%I64d\n", account->GetID());
+      state.Format("hmailserver/me/changes/2\naccount=%I64d\n", account->GetID());
 
       for (size_t i = 0; i < counts.size(); i++)
       {
          AnsiString line;
-         line.Format("%I64d:%ld:%ld\n", counts[i].id, counts[i].count, counts[i].unseen);
+         line.Format("%I64d:%ld:%ld:%u:%hs\n", counts[i].id, counts[i].count,
+            counts[i].unseen, counts[i].uid, counts[i].name.c_str());
          state += line;
       }
 
@@ -639,7 +690,11 @@ namespace HM
    {
       // The folders path already has an entry in HandleOpenApi_'s head for its
       // listing; the entry here repeats that verb beside the new one, so that a
-      // reader keeping the last of two equal keys still sees the whole path.
+      // This unit is the only place /api/v1/me/folders is described. It used to
+      // be described here AND in RestApiServer.cpp, and two equal keys in one
+      // JSON object is not valid OpenAPI - a parser that takes it keeps only the
+      // last, so one of the two was thrown away and which one depended on the
+      // order the units are concatenated in.
       return
          ",\"/api/v1/me/folders\":{"
          "\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree. shared lists, under owner, the public folders (owner is the public namespace name) and the folders of each account that granted this one a right, named as IMAP names them; each entry carries account_id (0 for public). Every message route accepts a folder or message from those trees under the rights the owner granted.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders, shared\"}}},"

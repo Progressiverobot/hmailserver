@@ -353,6 +353,8 @@ namespace HM
       // the vector of names IMAP would have split from a mailbox name. False
       // when the walk does not reach the root, which is what a folderparentid
       // cycle looks like.
+      static String DecodeFolderName_(const String &stored);
+      static bool IsAtOrBelow_(std::shared_ptr<IMAPFolders> tree, __int64 folderId, __int64 ancestorId);
       static std::vector<String> StoredFolderPath_(const String &name, const String &delimiter);
       static bool OwnFolderPath_(std::shared_ptr<IMAPFolders> tree, std::shared_ptr<IMAPFolder> folder, std::vector<String> &path);
       // One folder as the listing renders it, subtree and all, so that what a
