@@ -7,6 +7,7 @@
 
 #include "RestApiServer.h"
 #include "HttpServer.h"
+#include "Encoding/ModifiedUTF7.h"
 #include <boost/thread/thread.hpp>
 #include <boost/chrono.hpp>
 #include "../Application/MetricsHistoryTask.h"
@@ -52,6 +53,7 @@
 #include "../Sieve/SieveScript.h"
 #include "GUIDCreator.h"
 #include <iterator>
+#include <list>
 #include <set>
 #include "../BO/MessageRecipients.h"
 #include "../BO/MessageRecipient.h"
@@ -1592,6 +1594,18 @@ namespace HM
          case RouteMeFolders:
             return HandleMeFolders_(caller);
 
+         case RouteMeFolderCreate:
+            return HandleMeFolderCreate_(caller, GetRequestBody_(request));
+
+         case RouteMeFolderRename:
+            return HandleMeFolderRename_(caller, route.folder_id, GetRequestBody_(request));
+
+         case RouteMeFolderDelete:
+            return HandleMeFolderDelete_(caller, route.folder_id);
+
+         case RouteMeChanges:
+            return HandleMeChanges_(caller, route.query);
+
          case RouteMeFolderMessages:
             return HandleMeFolderMessages_(caller, route.folder_id, route.query);
 
@@ -1729,11 +1743,15 @@ namespace HM
          return;
       }
 
-      // The account's own mailbox, read-only: the folder tree, one folder's
+      // The account's own mailbox: the folder tree and its writes, one folder's
       // messages, one message.
-      if (path == "/api/v1/me/folders" && method == "GET")
+      if (path == "/api/v1/me/folders")
       {
-         route.kind = RouteMeFolders;
+         if (method == "GET")
+            route.kind = RouteMeFolders;
+         else if (method == "POST")
+            route.kind = RouteMeFolderCreate;
+
          return;
       }
 
@@ -1748,8 +1766,23 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/messages").GetLength());
             if (ParseQueueId(idText, route.folder_id))
                route.kind = RouteMeFolderMessages;
+
+            return;
          }
 
+         // The remainder is the folder id itself, with no resource segment after
+         // it - which is what ParseQueueId enforces, since an id is digits only.
+         if (method == "PUT" && ParseQueueId(rest, route.folder_id))
+            route.kind = RouteMeFolderRename;
+         else if (method == "DELETE" && ParseQueueId(rest, route.folder_id))
+            route.kind = RouteMeFolderDelete;
+
+         return;
+      }
+
+      if (path == "/api/v1/me/changes" && method == "GET")
+      {
+         route.kind = RouteMeChanges;
          return;
       }
 
@@ -2406,6 +2439,9 @@ namespace HM
       case RouteMeSettingsPut:
       case RouteMeFiltersPut:
       case RouteMeDraftSave:
+      case RouteMeFolderCreate:
+      case RouteMeFolderRename:
+      case RouteMeFolderDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
          return true;
@@ -4910,6 +4946,10 @@ namespace HM
       case RouteMeQuarantineRelease:
       case RouteMeQuarantineDelete:
       case RouteMeFolders:
+      case RouteMeFolderCreate:
+      case RouteMeFolderRename:
+      case RouteMeFolderDelete:
+      case RouteMeChanges:
       case RouteMeFolderMessages:
       case RouteMeMessage:
       case RouteMeMessageFlags:
@@ -5511,6 +5551,58 @@ namespace HM
          return attachment->GetSize();
       }
 
+      // The media type a part declares, without the parameters the field
+      // carries beside it (name=, charset=): "image/png" out of
+      // "image/png; name=\"logo.png\"". Lower-cased, because a media type is
+      // case-insensitive and a reader that compares it should not have to know
+      // that. Empty when the part declares nothing usable, or when the value
+      // could not be a media type at all - no solidus, or a byte that would
+      // break out of the header it is written back into.
+      AnsiString MediaType(const AnsiString &declared)
+      {
+         AnsiString type = declared;
+
+         int semicolon = type.Find(";");
+         if (semicolon >= 0)
+            type = type.Mid(0, semicolon);
+
+         type.ToLower();
+         type.TrimLeft();
+         type.TrimRight();
+
+         if (type.IsEmpty() || type.Find("\r") >= 0 || type.Find("\n") >= 0 || type.Find("/") < 0)
+            return "";
+
+         return type;
+      }
+
+      // The part's Content-ID with the angle brackets stripped. RFC 2045 writes
+      // the field as a msg-id, angle brackets and all; RFC 2392 writes the same
+      // value in a cid: URL without them, and a cid: URL in the HTML body is
+      // what a page has to match against. Empty when the part carries no
+      // Content-ID, and empty for a value that could not be one.
+      AnsiString ContentId(std::shared_ptr<MimeBody> part)
+      {
+         if (!part)
+            return "";
+
+         const char *raw = part->GetRawFieldValue(CMimeConst::ContentID());
+         if (!raw)
+            return "";
+
+         AnsiString value = raw;
+         value.TrimLeft();
+         value.TrimRight();
+
+         if (value.GetLength() >= 2 && value.StartsWith("<") && value.EndsWith(">"))
+            value = value.Mid(1, value.GetLength() - 2);
+
+         if (value.Find("\r") >= 0 || value.Find("\n") >= 0)
+            return "";
+
+         return value;
+      }
+
       // How many messages one listing returns at most: the newest, and the
       // caller pages further back with before_uid.
       const int MaxMessagesPerPage = 200;
@@ -5782,36 +5874,55 @@ namespace HM
 
          String path = parentPath.IsEmpty() ? folder->GetFolderName() : parentPath + delimiter + folder->GetFolderName();
 
-         std::shared_ptr<Messages> messages = folder->GetMessages();
-         long messageCount = messages ? messages->GetCount() : 0;
-         long seen = messages ? messages->GetNoOfSeen() : 0;
-
-         std::map<__int64, int>::const_iterator designation = designations.find(folder->GetID());
-         String specialUse = designation != designations.end() ? IMAPSpecialUse::FormatDesignations(designation->second) : String();
-
          if (written > 0)
             json += ",";
 
-         AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"account_id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
-            folder->GetID(),
-            folder->GetAccountID(),
-            JsonEscape_(Utf8_(folder->GetFolderName())).c_str(),
-            JsonEscape_(Utf8_(path)).c_str(),
-            folder->GetParentFolderID(),
-            JsonEscape_(Utf8_(specialUse)).c_str(),
-            folder->GetIsSubscribed() ? "true" : "false",
-            writeAccess ? "true" : "false",
-            messageCount,
-            messageCount - seen,
-            folder->GetCreationTime().ToInt());
-         json += entry;
+         AppendOneFolderJson_(account, folder, path, designations, delimiter, writeAccess, json, depth);
 
-         AppendFolderJson_(account, folder->GetSubFolders(), path, designations, delimiter, json, depth + 1);
-
-         json += "]}";
          written++;
       }
+   }
+
+   void
+   RestApiServer::AppendOneFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder,
+                                       const String &path, const std::map<__int64, int> &designations,
+                                       const String &delimiter, bool writeAccess, AnsiString &json, int depth)
+   {
+      if (!folder)
+         return;
+
+      std::shared_ptr<Messages> messages = folder->GetMessages();
+      long messageCount = messages ? messages->GetCount() : 0;
+      long seen = messages ? messages->GetNoOfSeen() : 0;
+
+      std::map<__int64, int>::const_iterator designation = designations.find(folder->GetID());
+      String specialUse = designation != designations.end() ? IMAPSpecialUse::FormatDesignations(designation->second) : String();
+
+      AnsiString entry;
+      entry.Format("{\"id\":%I64d,\"account_id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
+         folder->GetID(),
+         folder->GetAccountID(),
+         // Decoded, as InterfaceIMAPFolder::get_Name decodes it for COM. A
+         // folder name is stored in modified UTF-7 - "&AMQ-renden" for
+         // "Ärenden" - which is the form IMAP puts on the wire and no form
+         // any other caller wants: a page that shows this to a reader shows
+         // them the encoding. The path is the same names joined by the
+         // delimiter, and decoding it whole is safe because an encoded run
+         // begins with '&' and ends with '-', neither of which a delimiter is.
+         JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(folder->GetFolderName())))).c_str(),
+         JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(path)))).c_str(),
+         folder->GetParentFolderID(),
+         JsonEscape_(Utf8_(specialUse)).c_str(),
+         folder->GetIsSubscribed() ? "true" : "false",
+         writeAccess ? "true" : "false",
+         messageCount,
+         messageCount - seen,
+         folder->GetCreationTime().ToInt());
+      json += entry;
+
+      AppendFolderJson_(account, folder->GetSubFolders(), path, designations, delimiter, json, depth + 1);
+
+      json += "]}";
    }
 
    HttpResponse
@@ -6150,7 +6261,9 @@ namespace HM
          AnsiString entry;
          entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs}",
             hits[i].folder->GetID(),
-            JsonEscape_(Utf8_(hits[i].path)).c_str(),
+            // Decoded, as the folder listing decodes it: the path is stored
+            // names joined, and a stored name is modified UTF-7.
+            JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(hits[i].path)))).c_str(),
             message->GetID(),
             message->GetUID(),
             message->GetSize(),
@@ -6221,6 +6334,19 @@ namespace HM
       if (!messageData.LoadFromMessage(MessageFile_(message), message))
          return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
 
+      // The MIME parts behind the attachment list, in the very order
+      // Attachments::Load walked them, so that index i here and index i there
+      // are the same part. Attachment itself exposes neither the Content-ID nor
+      // an unparameterised type, and adding accessors to a business object the
+      // COM API also publishes is a wider change than reading the header the
+      // list was built from.
+      std::list<std::shared_ptr<MimeBody>> attachmentBodies;
+      std::shared_ptr<MimeBody> mimeMessage = messageData.GetMimeMessage();
+      if (mimeMessage)
+         mimeMessage->GetAttachmentList(mimeMessage, attachmentBodies);
+
+      std::vector<std::shared_ptr<MimeBody>> attachmentParts(attachmentBodies.begin(), attachmentBodies.end());
+
       AnsiString attachments = "[";
       std::shared_ptr<Attachments> attachmentList = messageData.GetAttachments();
       if (attachmentList)
@@ -6234,9 +6360,19 @@ namespace HM
             if (i > 0)
                attachments += ",";
 
+            // The declared media type without its parameters, and the
+            // Content-ID with the angle brackets RFC 2392 requires in the
+            // header and forbids in a cid: URL taken off - which is the form a
+            // page needs to match a cid: reference in the HTML body against
+            // this list. Both are the empty string when the part declares
+            // neither.
+            AnsiString contentType = MediaType(attachment->GetContentType());
+            AnsiString contentId = i < attachmentParts.size() ? ContentId(attachmentParts[i]) : AnsiString();
+
             AnsiString entry;
-            entry.Format("{\"index\":%d,\"name\":\"%hs\",\"size\":%d}",
-               (int) i, JsonEscape_(Utf8_(attachment->GetFileName())).c_str(), AttachmentSize(attachment, message->GetSize() <= MaxMessageBodyBytes));
+            entry.Format("{\"index\":%d,\"name\":\"%hs\",\"size\":%d,\"content_type\":\"%hs\",\"content_id\":\"%hs\"}",
+               (int) i, JsonEscape_(Utf8_(attachment->GetFileName())).c_str(), AttachmentSize(attachment, message->GetSize() <= MaxMessageBodyBytes),
+               JsonEscape_(contentType).c_str(), JsonEscape_(contentId).c_str());
             attachments += entry;
          }
       }
@@ -6843,17 +6979,13 @@ namespace HM
       // its type; the disposition, nosniff and the sandbox policy hold too.
       AnsiString SafeMediaType(const AnsiString &declared)
       {
-         // The field value carries its parameters (name=, charset=); the
-         // media type is what precedes the first semicolon.
-         AnsiString type = declared;
-         int semicolon = type.Find(";");
-         if (semicolon >= 0)
-            type = type.Mid(0, semicolon);
-         type.ToLower();
-         type.TrimLeft();
-         type.TrimRight();
+         // The same media type the message listing reports in content_type, so
+         // that a page which decided from that field what the part is gets the
+         // very same type when it fetches the bytes - which is what lets an
+         // <img> pointed at this route render, with nosniff set.
+         AnsiString type = MediaType(declared);
 
-         if (type.IsEmpty() || type.Find("\r") >= 0 || type.Find("\n") >= 0 || type.Find("/") < 0)
+         if (type.IsEmpty())
             return "application/octet-stream";
 
          if (type == "text/html" || type == "application/xhtml+xml" || type == "image/svg+xml" ||
@@ -7528,10 +7660,10 @@ namespace HM
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
-         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size). A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
-         "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under its own media type, except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
+         "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under the very media type that listing reports in content_type - so an img element pointed here renders, with nosniff set - except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream, and a part declaring no usable type, which does too; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
          "\"/api/v1/domains\":{"
          "\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}},"
          "\"post\":{\"summary\":\"Create a domain\",\"description\":\"Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: name, active, postmaster\"},\"400\":{\"description\":\"name missing, not a domain name, or taken by a domain alias (the reason is in error)\"},\"409\":{\"description\":\"A domain with that name exists\"}}}},"
@@ -7596,6 +7728,7 @@ namespace HM
       openApiJson += OpenApiRulesPaths_();
       openApiJson += OpenApiCertificatesPaths_();
       openApiJson += OpenApiRoutesPaths_();
+      openApiJson += OpenApiMailboxPaths_();
       openApiJson += openApiTail;
 
       return BuildResponse_(200, openApiJson);

@@ -99,3 +99,13 @@ __pycache__/
 libraries/build-*.log
 hmailserver/test/LinuxRegressionTests/bin/
 hmailserver/test/LinuxRegressionTests/obj/
+
+# The NuGet bootstrapper the tools' restore downloads into the repository root.
+# An 8.7 MB executable that is not ours, matched by no other rule here, and one
+# `git add -A` away from being committed - which the binary manifest check would
+# then refuse, in the middle of a release.
+/.nuget/
+
+# Obsidian, if somebody opens the repository as a vault to read the documents.
+# Its workspace files are one machine's window layout and nothing else.
+/.obsidian/

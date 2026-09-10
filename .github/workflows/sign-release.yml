@@ -53,6 +53,81 @@ on:
 permissions: {}
 
 jobs:
+  # Authenticode, which is a different thing from the Sigstore signature below
+  # and complementary to it: SmartScreen and the UAC prompt read Authenticode
+  # and know nothing about Sigstore, while anybody who checks a signature
+  # deliberately can verify the cosign bundle without trusting a certificate
+  # authority. This job exists so that the day a certificate is bought is the
+  # day the installer is signed, rather than the day this file starts being
+  # written. It does nothing at all until the four secrets exist, and says so.
+  authenticode:
+    name: Authenticode-sign the installer (only with a certificate)
+    runs-on: windows-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Is there a certificate to sign with?
+        id: have
+        shell: bash
+        run: |
+          if [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] \
+             && [ -n "${{ secrets.AZURE_CLIENT_SECRET }}" ] && [ -n "${{ vars.TRUSTED_SIGNING_ACCOUNT }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Authenticode certificate is configured, so the installer on this release is unsigned to Windows. \
+          SmartScreen will show an unknown-publisher warning. See RELEASE.md, 'Authenticode'."
+          fi
+
+      - name: Resolve the tag
+        if: steps.have.outputs.ready == 'true'
+        id: tag
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.event.release.tag_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Download the installer from the release
+        if: steps.have.outputs.ready == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p signing
+          gh release download "${{ steps.tag.outputs.tag }}" --repo "${{ github.repository }}" \
+             --pattern 'hMailServer-*-x64.exe' --dir signing
+          ls -la signing
+
+      - name: Sign it
+        if: steps.have.outputs.ready == 'true'
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.TRUSTED_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.TRUSTED_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.TRUSTED_SIGNING_PROFILE }}
+          files-folder: signing
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Prove it is signed, then replace the asset
+        if: steps.have.outputs.ready == 'true'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $exe = (Get-ChildItem signing -Filter *.exe | Select-Object -First 1).FullName
+          $sig = Get-AuthenticodeSignature $exe
+          "status: $($sig.Status)"
+          "signer: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') { throw "The installer is not validly signed: $($sig.Status)" }
+          gh release upload "${{ steps.tag.outputs.tag }}" $exe --repo "${{ github.repository }}" --clobber
+
   sign:
     name: Sign and attach signatures
     runs-on: ubuntu-latest
