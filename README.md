@@ -145,7 +145,7 @@ Planned, so it is not a surprise: the intention is to raise the *declared* floor
 Linux and AArch64
 -----------------
 
-**In the tree after 6.2.28, not yet in a release.** The server core - SMTP, POP3,
+**Released in 6.3.0**, and the reason that number is 6.3 and not 6.2.29. The server core - SMTP, POP3,
 IMAP, delivery, anti-spam, the REST API and the self-service portal - compiles
 with clang or GCC from `hmailserver/source/Server/CMakeLists.txt`, links as one
 `hmailserver` executable, and packages as a `.deb` and an `.rpm` for x86-64 and
@@ -160,15 +160,28 @@ and read back over IMAP. The Windows regression suite is the gate for every
 change; the Linux port changes nothing in what the Windows build compiles or how
 it behaves.
 
-What is not there: the Control Panel and COM are Windows, so a Linux server is
-administered through its configuration file, its own command line
+How it is administered: the Control Panel and COM are Windows, so a Linux
+server is administered through its configuration file, its own command line
 (`--set-admin-password`, `--create-database`, `--upgrade-database`,
-`--check-config`) and the REST API; no REST route creates a *domain* yet, so
-the first one is an `INSERT`; files written by one platform are not readable by
-the other (`wchar_t` is two bytes on Windows and four on Linux); MySQL and
-MariaDB are compiled in and not yet proven live; stored secrets have no DPAPI
-equivalent yet. Each is a row in the roadmap's *Linux and AArch64* section, which
-is the running record.
+`--check-config`), the REST API - which since 6.3.0 writes accounts, aliases,
+distribution lists, SMTP routes, global rules, 108 of the server's settings,
+certificates and the listeners that bind them, and creates, enables and deletes
+domains - and the **Control Deck** at `/`, the
+browser front end for that API, which the packages install. Files written by one
+platform are readable by the other: the UTF-16LE on-disk format is a codec of
+our own on both, rather than a `wchar_t` that is two bytes on Windows and four
+on Linux. Stored secrets are AES-256-GCM under a key file with mode 0600, which
+is what DPAPI does for a Windows installation. MariaDB is proven live alongside
+PostgreSQL - schema created, account made, message delivered and read back.
+
+What is still not there: a domain's own properties beyond its active flag and
+its postmaster - **DKIM signing in particular**, along with per-domain size
+limits, the domain signature and a per-domain relay host, all of which COM sets
+and no route does; a GSSAPI bind for directory authentication; and a command
+that re-keys the secret store. On Windows the Control Panel fills those gaps.
+On Linux they have no supported route yet, so a domain that must sign its
+outbound mail with DKIM is not one to run on this platform today. Each is a row
+in the roadmap's *Linux and AArch64* section, which is the running record.
 
 The wiki's *Installing on Linux* page is the walk-through;
 `hmailserver/source/Server/platform/packaging/README.md` is the packaging

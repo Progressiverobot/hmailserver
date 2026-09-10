@@ -96,7 +96,7 @@
       "importtool": {
         "type": "Project",
         "dependencies": {
-          "Shared": "[6.2.28, )"
+          "Shared": "[6.3.0, )"
         }
       },
       "shared": {

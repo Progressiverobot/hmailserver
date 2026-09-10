@@ -8,7 +8,7 @@ database columns that hold absolute file names an administrator typed. This is
 the ordered list of every one of them, what repairs each, and the two places
 where the honest answer is "there is no clean fix".
 
-It is written for 6.2.28. Every claim below was read out of the code; the file
+It is written for 6.3.0. Every claim below was read out of the code; the file
 and line references are there so you can check any of them.
 
 **Installing somewhere new is a different, solved problem.** `/DIR="<path>"` on
