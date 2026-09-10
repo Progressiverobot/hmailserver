@@ -34,6 +34,16 @@ on:
         description: 'Release tag to attach the SBOMs to (e.g. v6.2.22-pre5). Leave blank to build them as an artifact only.'
         type: string
         required: false
+      # Only for the one case the upload step refuses: a release that has already
+      # been signed and whose SBOMs are being replaced on purpose. Setting it
+      # repairs nothing by itself - the Sigstore bundles beside the SBOMs are made
+      # from the bytes that are about to be overwritten - so signing has to be run
+      # again afterwards, and the step says so both times.
+      replace_signed_assets:
+        description: 'Replace the SBOMs on a release that is already signed. Sign release artefacts must then be run again for that tag, or the bundles beside the SBOMs verify nothing.'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
@@ -56,11 +66,44 @@ jobs:
           # must never do.
           ref: ${{ inputs.release_tag || github.ref }}
 
-      - name: Say which tree this describes
+      # Printing the commit proved nothing about it. The checkout above resolves
+      # whichever ref it was handed, and on a release event that ref comes from the
+      # event rather than from the tag by name, so the tree could be the tag's or
+      # could be whatever the default branch had reached - and a bill of materials
+      # that describes a tree the release was not built from is the one thing an
+      # SBOM must never do. The tree is therefore compared against the tag's own
+      # commit here, before Syft has run and long before anything is uploaded, and
+      # a mismatch stops the run instead of publishing a plausible-looking lie.
+      # A run with no tag in play asserts nothing, because a push to master
+      # describes master and claims nothing more than that.
+      - name: Say which tree this describes, and prove it is the tag's
+        shell: bash
+        env:
+          TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
         run: |
+          set -euo pipefail
+          head=$(git rev-parse HEAD)
           echo "ref: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo detached)"
-          echo "commit: $(git rev-parse HEAD)"
-          echo "tag: ${{ inputs.release_tag || '(none - not a dispatch for a tag)' }}"
+          echo "commit: ${head}"
+          echo "tag: ${TAG:-(none - not a run for a release)}"
+
+          if [ -z "${TAG:-}" ]; then
+            exit 0
+          fi
+
+          # Fetched rather than assumed to be present: this checkout is shallow, and
+          # it was given a ref rather than a tag name.
+          git fetch --force --depth=1 origin "refs/tags/${TAG}:refs/tags/${TAG}" >/dev/null 2>&1 || true
+          if ! tagged=$(git rev-parse --verify --quiet "refs/tags/${TAG}^{commit}"); then
+            echo "::error::${TAG} is not a tag in this repository, so there is nothing to check this tree against. A release is tagged before its assets are attached - see RELEASE.md step 12."
+            exit 1
+          fi
+
+          if [ "${tagged}" != "${head}" ]; then
+            echo "::error::These SBOMs would describe ${head}, but ${TAG} points at ${tagged}, so they describe a tree the release was not built from. Dispatch this workflow with release_tag=${TAG} so that the tag itself is what gets checked out."
+            exit 1
+          fi
+          echo "${TAG} points at ${head}, which is the tree these SBOMs describe."
 
       # Syft writes to a file and does NOT upload here. Both uploads happen further down,
       # after the native dependencies have been added - otherwise the artifact and the
@@ -132,6 +175,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag || github.event.release.tag_name }}
+          REPLACE_SIGNED: ${{ inputs.replace_signed_assets }}
         run: |
           set -euo pipefail
 
@@ -140,6 +184,39 @@ jobs:
           # always the same: attach assets while the release is a draft.
           if [ "$(gh release view "$TAG" --json isDraft --jq .isDraft)" != "true" ]; then
             echo "::warning::$TAG is already published, so its assets cannot be changed. Create the release as a draft, let this workflow and sign-release attach to it, and publish last - see RELEASE.md."
+          fi
+
+          # The upload below clobbers, which a legitimate re-run needs: the same two
+          # names are written every time, and without it a second run fails on the
+          # names already being there. What it must not do is overwrite an SBOM that
+          # has already been signed. Cosign signs the bytes of whatever is attached
+          # when it runs, and Syft writes a fresh document identifier and timestamp
+          # on every run, so a re-upload after signing leaves
+          # hmailserver.spdx.json.cosign.bundle describing bytes that no longer
+          # exist anywhere - a signature that verifies against nothing, which is
+          # worse than no signature at all because it looks like one. RELEASE.md
+          # puts signing last precisely so this cannot happen, so a release that
+          # already carries bundles is being worked on out of order: stop, and name
+          # the order, while the release is still a draft and can be fixed. A first
+          # run never sees a bundle and never notices this.
+          # The two SBOMs' OWN bundles, not any bundle on the release. Signing the
+          # installer does not sign these, so a release whose installer is signed
+          # while the SBOMs are not is one where replacing them costs nothing - and
+          # refusing it would block the ordinary case of attaching the SBOMs to a
+          # release that has been part-signed after a Linux re-run. What must never
+          # be overwritten is an SBOM whose own signature already exists.
+          bundles=$(gh release view "$TAG" --json assets --jq '
+            [.assets[].name
+             | select(. == "hmailserver.spdx.json.cosign.bundle"
+                   or . == "hmailserver.cyclonedx.json.cosign.bundle")]
+            | length')
+          if [ "${bundles:-0}" -gt 0 ]; then
+            if [ "${REPLACE_SIGNED:-}" = "true" ]; then
+              echo "::warning::$TAG already carries $bundles Sigstore bundle(s) and replace_signed_assets was set, so the SBOMs are being replaced anyway. Run 'Sign release artefacts' for $TAG again before publishing, or the bundles beside the SBOMs will verify nothing."
+            else
+              echo "::error::The SBOMs on $TAG have already been signed - $bundles of their two .cosign.bundle asset(s) are attached - and replacing them now would overwrite the very bytes those signatures were made from. Re-run this workflow with replace_signed_assets=true and then run 'Sign release artefacts' for $TAG again, in that order, before publishing. See RELEASE.md step 12."
+              exit 1
+            fi
           fi
 
           gh release upload "$TAG" \
