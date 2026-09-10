@@ -32,10 +32,14 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class TraceContext : TestFixtureBase
    {
-      // Must not collide with the other collector ports: 9099 is the server's
-      // own metrics listener (DeliveryMetrics, HealthProbes, DatabaseMetrics),
-      // 9096 is OpenTelemetryTracing's collector, 9097/9098 are taken as well.
-      private const int CollectorPort = 9095;
+      // The collector binds an ephemeral port and the server is pointed at
+      // whichever one the kernel handed out. It used to name 9095 and carry a
+      // comment listing the numbers it had to avoid; that is a list which can
+      // only go stale, and it says nothing about ports outside this suite. On
+      // Linux under WSL's mirrored networking the loopback is shared with the
+      // Windows machine, so a fixed number can be held by something that is not
+      // this suite at all - which is how these four tests failed there while
+      // passing on the bench.
 
       // Matches exactly the value shape this server may ever emit: version 00,
       // lowercase hex, 32-16-2.
@@ -70,9 +74,9 @@ namespace RegressionTests.Infrastructure
       /// </summary>
       private void RunWithTracing(Action<OtlpCollector> test)
       {
-         var collector = new OtlpCollector(CollectorPort);
+         var collector = new OtlpCollector();
 
-         WriteSetting("OtelEndpoint", "http://127.0.0.1:" + CollectorPort + "/v1/traces");
+         WriteSetting("OtelEndpoint", "http://127.0.0.1:" + collector.Port + "/v1/traces");
          _application.Reinitialize();
 
          try
@@ -342,10 +346,14 @@ namespace RegressionTests.Infrastructure
          private readonly List<string> _bodies = new List<string>();
          private volatile bool _running;
 
-         public OtlpCollector(int port)
+         public int Port { get; }
+
+         // Port 0 asks the kernel for a free one; Port reports which.
+         public OtlpCollector()
          {
-            _listener = new TcpListener(IPAddress.Loopback, port);
+            _listener = new TcpListener(IPAddress.Loopback, 0);
             _listener.Start();
+            Port = ((IPEndPoint) _listener.LocalEndpoint).Port;
             _running = true;
             _thread = new Thread(Run) { IsBackground = true };
             _thread.Start();

@@ -28,6 +28,37 @@ namespace RegressionTests.Infrastructure
    {
       private static string[] _errorMark = new string[0];
 
+      /// <summary>
+      ///    The file the server is writing now, by the name the logging group gives
+      ///    it: current_default_log and current_error_log are the server's own answer
+      ///    to "which file is this", and only its last segment is needed, because the
+      ///    log route is addressed by file name.
+      ///
+      ///    Guessing from the listing instead does not work, and cost a run to find
+      ///    out: the log directory also holds hmailserver_awstats.log and
+      ///    hmailserver_events.log, and "awstats" and "events" both sort after
+      ///    "2026-09-09", so the newest name with the prefix was the AWStats file and
+      ///    every read of "the log" came back without a line of the session in it.
+      /// </summary>
+      private static string CurrentLogNamed(string key, string prefix)
+      {
+         var answer = ServerApi.Get("/api/v1/settings/logging");
+
+         if (answer.Ok && answer.Json.HasValue)
+         {
+            var path = ServerApi.StringOf(answer.Json.Value, key);
+
+            if (!string.IsNullOrEmpty(path))
+            {
+               var slash = path.LastIndexOfAny(new[] { '/', '\\' });
+               return slash < 0 ? path : path.Substring(slash + 1);
+            }
+         }
+
+         // An older server without those fields: the newest file with the prefix.
+         return NewestLogNamed(prefix);
+      }
+
       /// <summary>The newest log file whose name starts with the prefix, by name, or null.</summary>
       private static string NewestLogNamed(string prefix)
       {
@@ -75,12 +106,12 @@ namespace RegressionTests.Infrastructure
 
       public static string ReadCurrentDefaultLog()
       {
-         return string.Join(Environment.NewLine, Tail(NewestLogNamed("hmailserver_")));
+         return string.Join(Environment.NewLine, Tail(CurrentLogNamed("current_default_log", "hmailserver_")));
       }
 
       public static string ReadErrorLog()
       {
-         return string.Join(Environment.NewLine, Tail(NewestLogNamed("ERROR_hmailserver_")));
+         return string.Join(Environment.NewLine, Tail(CurrentLogNamed("current_error_log", "ERROR_hmailserver_")));
       }
 
       /// <summary>Nothing to delete from here; the mark taken in SetUp is what stands in for it.</summary>
@@ -90,7 +121,7 @@ namespace RegressionTests.Infrastructure
 
       public static void MarkErrorLog()
       {
-         _errorMark = Tail(NewestLogNamed("ERROR_hmailserver_"));
+         _errorMark = Tail(CurrentLogNamed("current_error_log", "ERROR_hmailserver_"));
       }
 
       /// <summary>
@@ -101,7 +132,7 @@ namespace RegressionTests.Infrastructure
       /// </summary>
       public static string[] ErrorLogLinesSinceMark()
       {
-         var now = Tail(NewestLogNamed("ERROR_hmailserver_"));
+         var now = Tail(CurrentLogNamed("current_error_log", "ERROR_hmailserver_"));
 
          IEnumerable<string> fresh = now;
 
@@ -131,6 +162,86 @@ namespace RegressionTests.Infrastructure
       public static void DeleteErrorLog()
       {
          MarkErrorLog();
+      }
+
+      /// <summary>
+      ///    The file names GET /api/v1/settings/logging reports. They are the server's
+      ///    paths, which a test can open only when the server is this machine - which
+      ///    is what TestTarget.IsLocal says and what this environment is.
+      /// </summary>
+      public static string GetErrorLogFileName()
+      {
+         return hMailServer.SettingsApi.GetString(hMailServer.SettingsApi.Logging, "current_error_log");
+      }
+
+      public static string GetDefaultLogFileName()
+      {
+         return hMailServer.SettingsApi.GetString(hMailServer.SettingsApi.Logging, "current_default_log");
+      }
+
+      public static string GetEventLogFileName()
+      {
+         return hMailServer.SettingsApi.GetString(hMailServer.SettingsApi.Logging, "current_event_log");
+      }
+
+      /// <summary>
+      ///    The event log is written by the server and no route deletes it; a mark is
+      ///    taken instead, the same way the ERROR log is handled here.
+      /// </summary>
+      public static void DeleteEventLog()
+      {
+      }
+
+      /// <summary>
+      ///    Polls the default log for the text, as the Windows one polls the file.
+      ///    The route serves the last 2000 lines rather than the whole file, so a
+      ///    line pushed out of that window by 2000 later ones would be missed; ten
+      ///    seconds of a single test's logging is well inside it.
+      /// </summary>
+      public static bool DefaultLogContains(string data)
+      {
+         for (var i = 0; i < 40; i++)
+         {
+            if (ReadCurrentDefaultLog().Contains(data))
+               return true;
+
+            Thread.Sleep(250);
+         }
+
+         return false;
+      }
+
+      /// <summary>
+      ///    The Windows one deletes the ERROR log until nothing has re-created it for
+      ///    the settle window. Nothing here deletes it, so the mark is moved instead
+      ///    and the question asked of the lines after the mark: the contract - true
+      ///    when no error has arrived for the whole window - is the same.
+      /// </summary>
+      public static bool ClearErrorLogUntilSettled(int settleMilliseconds = 2500, int timeoutSeconds = 25)
+      {
+         var deadline = DateTime.UtcNow.AddSeconds(timeoutSeconds);
+         DateTime? quietSince = null;
+
+         while (DateTime.UtcNow < deadline)
+         {
+            if (ErrorLogLinesSinceMark().Length > 0)
+            {
+               MarkErrorLog();
+               quietSince = null;
+               Thread.Sleep(150);
+               continue;
+            }
+
+            if (quietSince == null)
+               quietSince = DateTime.UtcNow;
+            else if ((DateTime.UtcNow - quietSince.Value).TotalMilliseconds >= settleMilliseconds)
+               return true;
+
+            Thread.Sleep(150);
+         }
+
+         MarkErrorLog();
+         return false;
       }
    }
 
@@ -165,6 +276,14 @@ namespace RegressionTests.Infrastructure
             .Select(line => line.Trim())
             .Where(line => line.Length > 0)
             .ToArray();
+      }
+
+      /// <summary>
+      ///    Nothing to clear: the crash oracle's file is the server's and no route
+      ///    deletes it. Against the Linux server there is no file at all.
+      /// </summary>
+      public static void Clear()
+      {
       }
 
       public static void AssertNoMemorySafetyEvents()
@@ -248,6 +367,218 @@ namespace RegressionTests.Infrastructure
 
          Assert.Fail("The ERROR log does not contain " + string.Join(", ", expected) + ". It contains:" +
                      Environment.NewLine + errorLog);
+      }
+
+      /// <summary>
+      ///    GET /api/v1/status reports the SMTP, IMAP and POP3 session counts; the
+      ///    Windows one reads the same three from Status.SessionCount.
+      /// </summary>
+      public static void AssertSessionCount(hMailServer.eSessionType sessionType, int expectedCount)
+      {
+         var status = SingletonProvider<TestSetup>.Instance.GetApp().Status;
+
+         RetryHelper.TryAction(TimeSpan.FromSeconds(10), () =>
+         {
+            var count = status.get_SessionCount(sessionType);
+
+            if (count != expectedCount)
+               return;
+
+            RetryableAssert.AreEqual(expectedCount, count);
+         });
+      }
+
+      /// <summary>
+      ///    Waits for a folder to hold exactly this many messages, reading the count
+      ///    from the account's own GET /api/v1/me/folders/{id}/messages, as the
+      ///    Windows one reads it from the COM folder.
+      /// </summary>
+      public static void AssertFolderMessageCount(hMailServer.IMAPFolder folder, int expectedCount)
+      {
+         if (expectedCount == 0)
+            AssertRecipientsInDeliveryQueue(0);
+
+         var currentCount = 0;
+         var timeout = 100;
+         while (timeout > 0)
+         {
+            currentCount = folder.Messages.Count;
+
+            if (currentCount == expectedCount)
+               return;
+
+            timeout--;
+            Thread.Sleep(100);
+         }
+
+         Assert.Fail("Wrong number of messages in mailbox " + folder.Name + ". Actual: " + currentCount +
+                     " Expected: " + expectedCount);
+      }
+
+      public static hMailServer.Message AssertRetrieveFirstMessage(hMailServer.IMAPFolder folder)
+      {
+         var timeout = 100;
+         while (timeout > 0)
+         {
+            if (folder.Messages.Count > 0)
+               return folder.Messages[0];
+
+            timeout--;
+            Thread.Sleep(100);
+         }
+
+         Assert.Fail("Could not retrieve message from folder");
+         return null;
+      }
+
+      public static hMailServer.Message AssertGetFirstMessage(hMailServer.Account account, string folderName)
+      {
+         var folder = account.IMAPFolders.get_ItemByName(folderName);
+
+         AssertFolderMessageCount(folder, 1);
+
+         return folder.Messages[0];
+      }
+
+      public static hMailServer.IMAPFolder AssertFolderExists(hMailServer.IMAPFolders folders, string folderName)
+      {
+         var timeout = 100;
+         while (timeout > 0)
+         {
+            try
+            {
+               return folders.get_ItemByName(folderName);
+            }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+            {
+               // Deliberately ignored: best effort only.
+            }
+
+            timeout--;
+            Thread.Sleep(100);
+         }
+
+         Assert.Fail("Folder could not be found " + folderName);
+         return null;
+      }
+
+      // The file helpers, the Windows ones unchanged: they act on this host, and a
+      // fixture only reaches them with a path the server gave it.
+
+      public static void AssertDeleteFile(string file)
+      {
+         for (var i = 0; i <= 400; i++)
+         {
+            if (!System.IO.File.Exists(file))
+               return;
+
+            try
+            {
+               System.IO.File.Delete(file);
+               return;
+            }
+            catch (Exception)
+            {
+               if (i == 400)
+                  throw;
+            }
+
+            Thread.Sleep(25);
+         }
+      }
+
+      public static void AssertFileExists(string file, bool delete)
+      {
+         var timeout = 100;
+         while (timeout > 0)
+         {
+            try
+            {
+               if (System.IO.File.Exists(file))
+               {
+                  if (delete)
+                     System.IO.File.Delete(file);
+
+                  return;
+               }
+            }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+            {
+               // Deliberately ignored: best effort only.
+            }
+
+            timeout--;
+            Thread.Sleep(100);
+         }
+
+         Assert.Fail("Expected file does not exist:" + file);
+      }
+
+      public static void AssertFilesInDirectory(string directory, int expectedFileCount)
+      {
+         var count = 0;
+
+         if (System.IO.Directory.Exists(directory))
+         {
+            var dirs = System.IO.Directory.GetDirectories(directory);
+            count += dirs.Sum(dir => System.IO.Directory.GetFiles(dir).Length);
+         }
+
+         Assert.AreEqual(expectedFileCount, count);
+      }
+
+      public static void AssertFilesInUserDirectory(hMailServer.Account account, int expectedFileCount)
+      {
+         // Needs the server's data directory, which no route reports.
+         var settings = SingletonProvider<TestSetup>.Instance.GetApp().Settings;
+         var domain = account.Address.Substring(account.Address.IndexOf("@") + 1);
+         var mailbox = account.Address.Substring(0, account.Address.IndexOf("@"));
+
+         var domainDir = Paths.Combine(settings.Directories.DataDirectory, domain);
+         AssertFilesInDirectory(Paths.Combine(domainDir, mailbox), expectedFileCount);
+      }
+
+      public static string AssertLiveLogContents()
+      {
+         NotOnThisServer.Ignore(NotOnThisServer.NoLiveLog);
+         return null;
+      }
+
+      public static void AssertSpamAssassinIsRunning()
+      {
+         NotOnThisServer.Ignore(NotOnThisServer.NoExternalScanner + " (SpamAssassin)");
+      }
+
+      public static void AssertClamDRunning()
+      {
+         NotOnThisServer.Ignore(NotOnThisServer.NoExternalScanner + " (clamd)");
+      }
+
+      /// <summary>
+      ///    A bounce for this address is in the queue. The Windows one walks the COM
+      ///    delivery queue; GET /api/v1/queue lists the same rows with their
+      ///    recipients.
+      /// </summary>
+      public static void AssertBounceMessageExistsInQueue(string bounceTo)
+      {
+         for (var i = 0; i < 100; i++)
+         {
+            var answer = ServerApi.Get("/api/v1/queue").Expect(200, "GET /api/v1/queue");
+
+            foreach (var message in ServerApi.Array(answer, "messages"))
+            {
+               var from = ServerApi.StringOf(message, "sender") ?? string.Empty;
+               var recipients = ServerApi.StringOf(message, "recipients") ?? string.Empty;
+
+               if (from.Length == 0 && recipients.Contains(bounceTo))
+                  return;
+            }
+
+            Thread.Sleep(100);
+         }
+
+         Assert.Fail("No bounce message to " + bounceTo + " in the delivery queue: " +
+                     ServerApi.Get("/api/v1/queue").Body);
       }
 
       public static void Throws<T>(AssertionBody func) where T : Exception

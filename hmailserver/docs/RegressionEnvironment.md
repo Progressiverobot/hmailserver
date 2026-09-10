@@ -179,11 +179,13 @@ On Linux
 `RegressionTests.csproj` is `net481` with a `COMReference` to the service and runs
 nowhere but a Windows bench. `hmailserver/test/LinuxRegressionTests` is the part
 of the suite that can test the Linux server: a `net10.0` project that compiles
-52 of the fixture files **in place** from `RegressionTests` - the ones that drive
-the server through SMTP, IMAP, POP3 and MIME rather than through COM - together
-with the socket simulators, and stands a REST-backed fixture layer under them
-(`LinuxRegressionTests/Shims`). The fixtures are not copied and not edited; a
-test that passes here is the same test that passes on Windows.
+260 of the suite's files **in place** from `RegressionTests`, 226 of them
+fixtures holding some 1,400 tests, together with the socket simulators, and
+stands a REST-backed fixture layer under them (`LinuxRegressionTests/Shims`).
+The fixtures are not copied and not edited; a test that passes here is the same
+test that passes on Windows. It began at 52 files - the ones that drive the
+server through SMTP, IMAP, POP3 and MIME and nothing else - and grew as the
+shim layer learned to answer more of what COM answers.
 
 What the fixture layer does instead of COM: the test domain `example.test` is
 deleted and recreated before every test through `POST /api/v1/domains` (or, on a
@@ -230,7 +232,16 @@ is through the environment, read once when the assembly loads:
 | `HMTEST_IMAP_PORT` | `1143` |
 | `HMTEST_REST_PORT` | `8045` |
 | `HMTEST_ADMIN_PASSWORD` | `testar` |
+| `HMTEST_SERVER_INI` | *unset; the ini is searched for* |
 
+`HMTEST_SERVER_INI` is the one that is not a port. A few fixtures write a
+setting the COM API does not carry - an account-lockout threshold, a DNS
+server, an anti-virus failure policy, TLS-RPT - straight into
+`hMailServer.ini`, then reinitialise. On the Windows bench they find the file
+by searching upwards from the test binary into the repository's own Release
+output, which is where the service under test runs from; against a Linux server
+in a tree of its own there is nothing above the tests to find, and those
+fixtures fail before they begin. Set it to the ini the server was started with.
 Then, from any machine with the .NET 10 SDK that can reach those ports:
 
     dotnet test hmailserver/test/LinuxRegressionTests -c Release --logger trx
@@ -240,6 +251,56 @@ Linux hosts both work - a WSL server is reachable from Windows through mirrored
 networking - and the CI job runs it on Linux against the binary the same
 workflow just built. `Shared/TestPorts.cs` is what lets the simulators be
 pointed elsewhere; the Windows suite never sets it and sees the standard ports.
+
+Never both suites at once, on a machine with WSL
+-----------------------------------------------
+
+**Run `wsl --shutdown` before starting the Windows suite.** Not "stop the
+Linux server" - the whole VM. They are two servers on two operating systems and
+it looks as though they cannot collide. On a machine where WSL2 is in **mirrored
+networking** mode they share one port space, the sharing is invisible from
+Windows, and - this is the part that costs a run - **the reservation outlives the
+process that made it.**
+
+A socket bound inside WSL takes that port from Windows as well and `bind`
+returns WSAEADDRINUSE, while the socket appears in **neither**
+`Get-NetTCPConnection` (in any state) nor `netstat -ano` nor Resource Monitor,
+because it is not a Windows socket. Every tool you would reach for reports the
+port as free. Worse, killing the Linux process does not give it back: with every
+`hmailserver` and `dotnet` inside WSL killed and `ss -ltnp` showing nothing
+whatsoever on those ports, Windows still could not bind them, and a connection
+attempt was refused - so nothing was listening and nothing could bind. Only
+`wsl --shutdown` released them, and it released all twelve at once.
+
+Measured, rather than assumed, on 9 September 2026: a listener bound to
+`0.0.0.0:11000` from inside WSL, then `[System.Net.Sockets.TcpListener]` on the
+same port from Windows - `AddressAlreadyInUse`, with the Windows TCP table
+empty of it.
+
+What that looked like in a run: nine tests failed with **HM4316**, "Failed to
+bind to local port", on ports 11000 and 14300 - the numbers
+`Infrastructure.TCPIP.TestPortOpening` moves POP3 and IMAP to - spread across
+`StlsConformance`, `EtrnAuthorization`, `TlsCertificateValidity`,
+`ManageSieveTls` and `SieveAccountScript`, all of which bind a port of their own
+and restart. Nothing in the code was wrong and nothing in the Windows tooling
+could see why.
+
+So: one suite at a time, and `wsl --shutdown` between them. The check that
+actually answers the question, from Windows, is to try the bind rather than to
+look for a listener:
+
+```powershell
+foreach ($p in 25000,25001,25002,25003,11000,11001,11002,11003,14300,14301,14302,14303) {
+   try { $l=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Any,$p); $l.Start(); $l.Stop(); "$p free" }
+   catch { "$p TAKEN" }
+}
+```
+
+All twelve free means the bench is ready. Any of them taken with the service
+stopped means WSL still has them, whatever `ss` says inside it.
+
+The CI runners have neither problem - each job is its own machine - so this is a
+bench rule, not a workflow one.
 
 When a run is interrupted
 -------------------------

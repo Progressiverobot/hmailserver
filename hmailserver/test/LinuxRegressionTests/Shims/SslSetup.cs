@@ -107,24 +107,44 @@ namespace RegressionTests.SSL
       {
          ServerApi.Post("/api/v1/server/reinitialize", "{}").Expect(202, "POST /api/v1/server/reinitialize");
 
-         var deadline = DateTime.UtcNow.AddSeconds(90);
+         // The restart is asked for and answered before it happens, so the first
+         // thing to watch for is the server leaving the running state: either the
+         // REST listener stops answering, or GET /api/v1/status reports a state
+         // other than running (3). Polled tightly, because on an idle server the
+         // whole restart can take less than a quarter of a second and a slower poll
+         // sees nothing but "running" on both sides of it - which is why this used
+         // to fail with "the restart did not happen".
+         var settled = DateTime.UtcNow.AddSeconds(15);
          var wentDown = false;
-         while (DateTime.UtcNow < deadline)
+
+         while (!wentDown && DateTime.UtcNow < settled)
          {
-            System.Threading.Thread.Sleep(250);
             var probe = ServerApi.TryGet("/api/v1/status");
-            if (probe == null)
-            {
-               wentDown = true;
-               continue;
-            }
-            if (wentDown && probe.Status == 200)
-               return;
+            wentDown = probe == null || probe.Status != 200 ||
+                       (probe.Json.HasValue && ServerApi.LongOf(probe.Json.Value, "state", 3) != 3);
+
+            if (!wentDown)
+               System.Threading.Thread.Sleep(10);
          }
 
-         Assert.Fail(wentDown
-            ? "The REST listener did not come back within 90 seconds of POST /api/v1/server/reinitialize."
-            : "The REST listener never went down after POST /api/v1/server/reinitialize: the restart did not happen.");
+         // Whether or not the dip was seen, the server has to be answering and
+         // running before the caller connects to a listener. A restart too quick to
+         // observe is not a failure; a server that never comes back is.
+         var deadline = DateTime.UtcNow.AddSeconds(90);
+
+         while (DateTime.UtcNow < deadline)
+         {
+            var probe = ServerApi.TryGet("/api/v1/status");
+
+            if (probe != null && probe.Status == 200 && probe.Json.HasValue &&
+                ServerApi.LongOf(probe.Json.Value, "state", 0) == 3)
+               return;
+
+            System.Threading.Thread.Sleep(50);
+         }
+
+         Assert.Fail("The server did not answer GET /api/v1/status as running within 90 seconds of " +
+                     "POST /api/v1/server/reinitialize.");
       }
 
       public static string GetSslCertPath()

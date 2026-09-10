@@ -164,23 +164,38 @@ if (-not (Test-ClangSanitizerRuntime -ClangClPath $clang)) {
 The clang-cl found at
     $clang
 does not ship the x64 AddressSanitizer and libFuzzer runtime libraries
-(clang_rt.asan-x86_64.lib / clang_rt.fuzzer-x86_64.lib under
+(clang_rt.asan*-x86_64.lib and clang_rt.fuzzer-x86_64.lib under
 lib\clang\<version>\lib\windows). It is almost certainly a clang that came with
-something else - a Swift toolchain, an NDK, a bare LLVM install.
+something else - a Swift toolchain, an NDK, an SDK's bundled copy.
 
-Install Visual Studio's own Clang, which does ship them:
+Either of these gives you one that does. The first needs an administrator; the
+second does not, which is the one to reach for when this machine will not run an
+elevated installer.
+
+1. Visual Studio's own Clang:
 
   Visual Studio Installer -> Modify -> Individual components ->
       "C++ Clang tools for Windows"
   (component id Microsoft.VisualStudio.Component.VC.Llvm.Clang)
 
-Or from the command line, against the Build Tools installation:
+  Or from the command line, against the Build Tools installation:
 
   "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify ``
       --installPath "<your VS or BuildTools install path>" ``
       --add Microsoft.VisualStudio.Component.VC.Llvm.Clang --passive
 
-Then run this script again; it prefers the Visual Studio toolchain over PATH.
+2. The official LLVM release for Windows, unpacked anywhere you can write:
+
+  https://github.com/llvm/llvm-project/releases -> clang+llvm-<version>-x86_64-pc-windows-msvc.tar.xz
+  tar -xf that archive, then put its bin directory FIRST on PATH for this shell.
+
+  It ships clang_rt.fuzzer-x86_64.lib and the dynamic ASan runtime, and the MSVC
+  toolchain this script imports supplies everything else. This is the route
+  hmailserver/docs/Fuzzing.md describes first and the one the bench uses; that
+  page has the exact commands.
+
+Then run this script again. It prefers a Visual Studio Clang and falls back to
+whatever clang-cl.exe PATH resolves to, which is what makes (2) work.
 "@
     exit 2
 }

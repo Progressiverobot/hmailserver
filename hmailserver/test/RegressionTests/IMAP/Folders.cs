@@ -253,7 +253,11 @@ namespace RegressionTests.IMAP
 
          simulator.SendRaw($"A08 STATUS {{{folderName.Length}}}\r\n");
          simulator.Receive();
-         simulator.SendRaw(folderName + Environment.NewLine);
+         // CRLF, spelled out. Environment.NewLine is a bare LF on Linux, and the
+         // literal the line above announced is terminated by CRLF in IMAP on every
+         // platform there is - so this test hung for two minutes there, waiting for
+         // an end of line the server was right not to have seen.
+         simulator.SendRaw(folderName + "\r\n");
          var statusResponse = simulator.Receive();
 
          Assert.IsTrue(statusResponse.Contains("\"Test\\\\HelloWorld\""), "STATUS response should escape backslashes. Got: " + statusResponse);

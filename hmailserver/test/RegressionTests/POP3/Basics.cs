@@ -666,7 +666,7 @@ namespace RegressionTests.POP3
          for (var i = 0; i < 5; i++)
             try
             {
-               using var client = new SmtpClient("localhost", 25);
+               using var client = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
                client.Send(mailMessage);
 
                return;

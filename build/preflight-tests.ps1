@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 # Verifies this machine is in the known-good state for running the hMailServer
@@ -138,6 +138,31 @@ foreach ($port in 25, 110, 143) {
     Report ([bool](Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)) "Listening on $port" `
         'Service is running but not listening - usually the stray-registry fault above.'
 }
+
+# 8b. The twelve ports the SSL fixtures insist on. SslSetup does not look for a
+#     free port - it registers 25000-25003, 11000-11003 and 14300-14303 by
+#     number and restarts the server - so one of them being unavailable is a
+#     dozen confusing failures about STARTTLS and SCRAM, and an HM4316 in the
+#     error log that nobody reads until later.
+#
+#     Tried rather than looked up, because the holder can be invisible. With
+#     WSL2 in mirrored networking mode a port used inside WSL is reserved for
+#     Windows as well, the reservation outlives the Linux process that made it,
+#     and it shows in NEITHER Get-NetTCPConnection (in any state) nor netstat -
+#     a connection to it is refused and a bind of it still fails. That cost two
+#     full assertion runs on 9 September 2026 before it was understood.
+$reserved = @()
+foreach ($port in 25000, 25001, 25002, 25003, 11000, 11001, 11002, 11003, 14300, 14301, 14302, 14303) {
+    try {
+        $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Any, $port)
+        $probe.Start()
+        $probe.Stop()
+    } catch {
+        $reserved += $port
+    }
+}
+Report ($reserved.Count -eq 0) 'The SSL fixtures'' twelve ports are bindable' `
+    ("{0} of them are not: {1}. Nothing needs to be LISTENING on them - if the service is stopped and they still cannot be bound, something is holding the reservation invisibly. On this bench that is WSL: run ``wsl --shutdown`` (stopping the Linux server is not enough - the reservation belongs to the VM) and check again. See hmailserver/docs/RegressionEnvironment.md." -f $reserved.Count, ($reserved -join ', '))
 
 # 9. Interference sources that have broken runs before (warn only).
 $vpn = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceDescription -match 'Proton|WireGuard' -and $_.Status -eq 'Up' }

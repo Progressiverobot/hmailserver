@@ -70,7 +70,7 @@ namespace RegressionTests.SMTP
       {
          using (var client = new TcpClient())
          {
-            client.Connect("localhost", 25);
+            client.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
             client.ReceiveTimeout = replyTimeoutSeconds * 1000;
 
             using (var stream = client.GetStream())
@@ -279,7 +279,7 @@ namespace RegressionTests.SMTP
 
          using (var client = new TcpClient())
          {
-            client.Connect("localhost", 25);
+            client.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
             client.ReceiveTimeout = 20000;
 
             using (var stream = client.GetStream())
@@ -334,7 +334,7 @@ namespace RegressionTests.SMTP
 
          using (var client = new TcpClient())
          {
-            client.Connect("localhost", 25);
+            client.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
             client.ReceiveTimeout = 20000;
 
             using (var stream = client.GetStream())
@@ -414,7 +414,7 @@ namespace RegressionTests.SMTP
 
          using (var client = new TcpClient())
          {
-            client.Connect("localhost", 25);
+            client.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
             client.ReceiveTimeout = 20000;
 
             using (var stream = client.GetStream())

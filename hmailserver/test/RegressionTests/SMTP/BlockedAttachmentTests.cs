@@ -120,7 +120,7 @@ namespace RegressionTests.SMTP
                mail.SubjectEncoding = Encoding.GetEncoding(1252);
                mail.Attachments.Add(attachment);
 
-               using var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
                smtpClient.Send(mail);
             }
 
@@ -160,7 +160,7 @@ namespace RegressionTests.SMTP
                mail.Attachments.Add(attachment1);
                mail.Attachments.Add(attachment2);
 
-               using var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
                smtpClient.Send(mail);
             }
 
@@ -345,7 +345,7 @@ namespace RegressionTests.SMTP
                mail.SubjectEncoding = Encoding.GetEncoding(1252);
                mail.Attachments.Add(attachment);
 
-               using var smtpClient = new SmtpClient("localhost", 25);
+               using var smtpClient = new SmtpClient(TestPorts.Host, TestPorts.Actual(25));
                smtpClient.Send(mail);
             }
 

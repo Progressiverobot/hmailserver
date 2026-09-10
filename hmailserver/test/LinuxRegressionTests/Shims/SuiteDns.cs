@@ -47,6 +47,30 @@ namespace RegressionTests.Shared
             NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
             return this;
          }
+
+         public Zone_ ClearQueries()
+         {
+            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
+            return this;
+         }
+
+         public Zone_ WithNxDomain(string name)
+         {
+            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
+            return this;
+         }
+
+         public Zone_ WithPtr(string address, string name)
+         {
+            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
+            return this;
+         }
+
+         public Zone_ WithAaaa(string name, string address)
+         {
+            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
+            return this;
+         }
       }
    }
 }

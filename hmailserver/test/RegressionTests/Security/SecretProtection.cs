@@ -65,12 +65,31 @@ namespace RegressionTests.Security
          fa.Port = 1110;
          fa.Username = "remote-user";
          fa.Password = password;
+
+         // Inactive, and this is not tidiness. What is being tested is that the
+         // secret survives being encrypted into the database and decrypted back
+         // out; whether the account can collect anything is nobody's question
+         // here. Saved active, it is dialled the next time the server starts its
+         // fetches - which some later fixture will do - and the credential this
+         // test invented goes out on the wire long after the test has passed. On
+         // the assertion build that produced a critical HM6364 (the wide-to-narrow
+         // conversion of a non-ASCII password is refused by the locale's codecvt)
+         // reported into a window belonging to a test three fixtures away, and it
+         // failed that one.
+         fa.Enabled = false;
          fa.Save();
 
          // account.FetchAccounts re-reads the collection from the database on every
          // access (see InterfaceAccount::get_FetchAccounts -> Refresh), so this is a
          // genuine decrypt-on-load, not the cached in-memory value.
-         return account.FetchAccounts.get_Item(0).Password;
+         string stored = account.FetchAccounts.get_Item(0).Password;
+
+         // Removed rather than left for the next SetUp's domain delete, so that
+         // each of these tests is self-contained and nothing of theirs can be
+         // running while another fixture is.
+         account.FetchAccounts.get_Item(0).Delete();
+
+         return stored;
       }
 
       [Test]

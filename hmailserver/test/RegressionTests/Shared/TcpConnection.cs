@@ -71,7 +71,7 @@ namespace RegressionTests.Shared
       // own and reaches the server through this overload.
       public bool Connect(int iPort)
       {
-         return Connect(TestPorts.HostAddress, iPort);
+         return Connect(TestPorts.HostAddress, TestPorts.Actual(iPort));
       }
 
       public bool Connect(IPAddress ipaddress, int iPort)

@@ -112,13 +112,13 @@ namespace RegressionTests.Infrastructure
                for (var i = 0; i < threadCount + 5; i++)
                {
                   var blocked = new TcpClient();
-                  blocked.Connect("127.0.0.1", 25);
+                  blocked.Connect(TestPorts.HostAddress, TestPorts.Actual(25));
                   refused.Add(blocked);
                }
 
                using (var probe = new TcpClient())
                {
-                  probe.Connect("127.0.0.1", 110);
+                  probe.Connect(TestPorts.HostAddress, TestPorts.Actual(110));
                   probe.ReceiveTimeout = ProbeTimeoutMilliseconds;
 
                   var buffer = new byte[256];
@@ -188,7 +188,7 @@ namespace RegressionTests.Infrastructure
             for (var i = 0; i < 40; i++)
             {
                var socket = new TcpClient();
-               socket.Connect("127.0.0.1", port);
+               socket.Connect(TestPorts.HostAddress, TestPorts.Actual(port));
 
                // Linger with a zero timeout makes Close() send RST rather than FIN,
                // which is what leaves the accepted socket with no peer to name.
