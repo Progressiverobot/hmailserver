@@ -12,6 +12,13 @@ namespace HM
    // where it read each one from, and whether it exists - the inventory an
    // administrator otherwise assembles by hand before moving an installation
    // (docs/RelocatingAnInstallation.md, issue #158). It changes nothing.
+   //
+   // Two lines of the report differ by platform, and both differences are in
+   // PerformTest with the reason beside them: the Languages directory counts
+   // towards the result on Windows and is reported as unused on POSIX, because
+   // the only consumer of the catalogues is the COM API the Control Panel talks
+   // to; and the Control Deck page is reported on both and counts on neither,
+   // because a server without it still serves /api/v1/.
    class TestInstallationPaths
    {
    public:

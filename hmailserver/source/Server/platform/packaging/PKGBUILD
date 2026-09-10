@@ -26,7 +26,22 @@
 # server writing to the log once a second.
 
 pkgname=hmailserver
-pkgver=6.2.28
+
+# THE ONE LINUX VERSION LITERAL, and it is checked rather than trusted.
+#
+# Everything else on this platform derives its version from
+# hmailserver/source/Server/Common/Application/Version.h: the CMakeLists reads
+# that header at configure time, and CPACK_PACKAGE_VERSION - and therefore the
+# .deb and .rpm file names - comes from it. This file cannot do the same, because
+# makepkg parses it as a shell script and never runs CMake, and because
+# source= below fetches a git TAG built from this number rather than the tree it
+# was copied out of.
+#
+# So it is verified instead: build/check-linux-version-stamp.sh compares this
+# line with Version.h and is a required step of .github/workflows/linux-build.yml.
+# Stamping a release means editing Version.h and this line, and the check is what
+# says so when only one of the two was done.
+pkgver=6.3.0
 pkgrel=1
 pkgdesc="A mail server for SMTP, IMAP and POP3"
 arch=('x86_64' 'aarch64')

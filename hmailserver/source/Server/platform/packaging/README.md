@@ -97,12 +97,21 @@ cpack -G DEB
 cpack -G RPM
 ```
 
-The files land in the build directory as `hmailserver_6.2.28_amd64.deb` and
-`hmailserver-6.2.28-1.x86_64.rpm`, or their `arm64`/`aarch64` equivalents - the
+The files land in the build directory as `hmailserver_<version>_amd64.deb` and
+`hmailserver-<version>-1.x86_64.rpm`, or their `arm64`/`aarch64` equivalents - the
 CMakeLists picks the architecture name each packager uses from
 `CMAKE_SYSTEM_PROCESSOR`. The names are the ones the server's update checker
 builds for its own platform and matches exactly on the release page, so they are
-uploaded as they are and never tidied; RELEASE.md has the step.
+uploaded as they are and never tidied; `.github/workflows/linux-build.yml` attaches
+them to the release for the tag itself, and RELEASE.md has the step.
+
+`<version>` is not written anywhere in this directory. The CMakeLists reads it out
+of `hmailserver/source/Server/Common/Application/Version.h`, which is the same
+header the Windows resources and the installer stamp from; `pkgver` in the
+PKGBUILD below is the one Linux copy of the number that cannot be derived, and
+`build/check-linux-version-stamp.sh` - a step of the Linux workflow - fails the
+build when it disagrees with that header. No version literal belongs in this
+README either, which is why the commands below are written with a placeholder.
 
 ### Arch
 
@@ -112,7 +121,7 @@ cd /tmp/hmailserver-pkg
 makepkg -si
 ```
 
-It fetches the tag `v6.2.28` from the public repository rather than using the tree
+It fetches the tag `v${pkgver}` from the public repository rather than using the tree
 it was copied out of, which is what makes the resulting package reproducible by
 somebody who does not have your working copy.
 
@@ -123,7 +132,8 @@ hmailserver/source/Server/platform/packaging/build-appimage.sh --build-dir build
 ```
 
 It packages what is already built, downloads `linuxdeploy` and its AppImage plugin
-if they are not cached, and writes `hMailServer-6.2.28-x86_64.AppImage`.
+if they are not cached, and writes `hMailServer-<version>-x86_64.AppImage`. The
+Linux workflow builds one on a release tag and attaches it beside the packages.
 
 ## What lands where
 
@@ -131,11 +141,27 @@ From the CMakeLists install rules, with the prefix above:
 
 ```
 /usr/bin/hmailserver                        the server; one file
+/usr/bin/tlds.txt                           the public-suffix list, read from the
+                                            binary's own directory; without it every
+                                            DMARC organisational-domain decision
+                                            reports 4335
+/usr/bin/dh2048.pem                         the Diffie-Hellman group, also read from
+                                            the binary's own directory; without it
+                                            every TLS context reports a critical 5603
 /usr/share/hmailserver/DBScripts/*.sql      schema creation and upgrade scripts
+/usr/share/hmailserver/WebAdmin/index.html  the Control Deck, served at GET / by the
+                                            REST listener
 /usr/lib/systemd/system/hmailserver.service the unit
 /etc/hmailserver/hMailServer.ini            the configuration
 /etc/logrotate.d/hmailserver                the log rotation rule
 ```
+
+The two `/usr/bin` data files and the two under `/usr/share/hmailserver` are found
+by different mechanisms and it matters which: `tlds.txt` and `dh2048.pem` are read
+from the running executable's own directory (`Utilities::GetBinDirectory`), while
+`DBScripts` and `WebAdmin` are read from `ProgramFolder` in the configuration -
+which this package sets to `/usr/share/hmailserver`. Move either and the
+corresponding pair has to move with it.
 
 Created by the maintainer scripts, not by the package payload, and therefore not
 removed with it:
@@ -185,8 +211,8 @@ an error to the log every second until somebody notices.
 **1. Install the package.**
 
 ```sh
-sudo apt install ./hmailserver_6.2.28_amd64.deb      # or
-sudo dnf install ./hmailserver-6.2.28-1.x86_64.rpm
+sudo apt install ./hmailserver_<version>_amd64.deb      # or
+sudo dnf install ./hmailserver-<version>-1.x86_64.rpm
 ```
 
 If you are using MySQL or MariaDB, install its client library too. The server
@@ -268,13 +294,29 @@ database down, a listener that could not bind, a failed backup, the disk floor -
 which reach syslog through the `WindowsEventLogEnabled` setting. The name of that
 setting is a Windows inheritance; on this platform it means syslog.
 
-**7. Administration.** There is no Control Panel here and no COM. Turn on the REST
-API in the configuration (`RestApiPort`, and `RestApiBindAddress=127.0.0.1` unless
-you also set a certificate and key), reload with `sudo systemctl reload
-hmailserver`, and it authenticates as `Administrator` with the password from step
-4. Reloading stops and restarts the listeners inside the running process, so do it
-when nothing is mid-delivery. The first domain, and every one after it, is a
-`POST` - the name is checked as the Control Panel checks it, and every other
+**7. Administration.** There is no Control Panel here and no COM: the Windows
+administration program is an ATL application over an ATL API, and neither is in
+this build. What there is instead is the REST API and, on the same listener, the
+Control Deck - a single page the package installs at
+`/usr/share/hmailserver/WebAdmin/index.html` and the server serves at `GET /`.
+Turn on the REST API in the configuration (`RestApiPort`, and
+`RestApiBindAddress=127.0.0.1` unless you also set a certificate and key), reload
+with `sudo systemctl reload hmailserver`, and open
+`http://127.0.0.1:<RestApiPort>/` in a browser: it signs in as `Administrator`
+with the password from step 4 and writes much of what the API can write -
+settings, rules, routes, accounts, certificates and listeners. Not aliases or
+distribution lists: those have routes and no page, so they are reached with
+`curl` or any other HTTP client until the Deck grows a view for them.
+
+If that page instead says "Web administration page not installed", the file above
+is missing: the server falls back to a built-in stub whenever it is not there, and
+`hmailserver --check-config` will not tell you, because the page is not one of the
+paths it prints. Check the file itself.
+
+Everything the Deck does is the API underneath it, and the API authenticates the
+same way. Reloading stops and restarts the listeners inside the running process,
+so do it when nothing is mid-delivery. The first domain, and every one after it,
+is a `POST` - the name is checked as the Control Panel checks it, and every other
 setting takes the default a domain made there gets:
 
 ```sh

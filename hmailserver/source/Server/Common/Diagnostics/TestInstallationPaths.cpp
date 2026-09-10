@@ -111,8 +111,43 @@ namespace HM
 
       report.append(_T("Derived from ProgramFolder\r\n"));
       AppendPath_(report, all_present, _T("Bin"), ini->GetBinDirectory(), true);
+
+#ifdef HM_PLATFORM_POSIX
+      // The Languages directory is reported, and deliberately not counted.
+      //
+      // It holds the Control Panel's message catalogues, and the Control Panel is
+      // a Windows program. The directory has exactly one reader in the whole
+      // tree - Languages::Load, through GetLanguageDirectory - and the only thing
+      // that ever asks Languages for what it loaded is COM/InterfaceLanguages.cpp,
+      // which this build does not compile at all. So on this platform the
+      // catalogues are loaded by nobody, read by nobody, and no package ships
+      // them.
+      //
+      // The line is kept rather than deleted for two reasons: the report has the
+      // same shape on both platforms, which is what makes the two comparable when
+      // a problem is described in one and diagnosed on the other; and an
+      // administrator who goes looking for a Languages directory because the
+      // Windows documentation mentions one is owed the sentence saying why it is
+      // not there. What changed is only that its absence no longer fails the
+      // diagnostic - which it did on every correctly installed Linux package,
+      // making "Installation paths" a test that could not pass.
+      report.append(_T("  Languages: not used on this platform   [the message catalogues belong to the Windows Control Panel; no Linux package ships them]\r\n"));
+#else
       AppendPath_(report, all_present, _T("Languages"), ini->GetLanguageDirectory(), true);
+#endif
+
       AppendPath_(report, all_present, _T("DBScripts"), ini->GetDBScriptDirectory(), true);
+
+      // The Control Deck, which the REST listener serves at GET / and finds by
+      // this exact name. It is optional in the sense that a server without it
+      // still answers /api/v1/, so it is reported and not counted - but a
+      // missing page is the whole explanation for a Deck that shows the "not
+      // installed" stub, and that is a question this report should answer
+      // before anyone opens a browser's developer tools.
+      const String webAdminPage = FileUtilities::Combine(
+         FileUtilities::Combine(ini->GetProgramDirectory(), _T("WebAdmin")), _T("index.html"));
+      report.append(Formatter::Format(_T("  WebAdmin page: {0}   [{1}]\r\n"), webAdminPage,
+         FileUtilities::Exists(webAdminPage) ? String(_T("exists")) : String(_T("not installed; GET / serves the built-in stub"))));
 
       // Every [Settings] and [Database] value that names a file or a directory.
       // Each is optional, so an empty one is "not set" rather than a failure;

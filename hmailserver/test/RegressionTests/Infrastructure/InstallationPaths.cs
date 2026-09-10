@@ -63,6 +63,24 @@ namespace RegressionTests.Infrastructure
          StringAssert.Contains("[Settings]", details, details);
          StringAssert.Contains("PostgreSQLSslRootCert: ", details, details);
 
+         // Languages is a directory this platform genuinely uses - it is the
+         // Control Panel's message catalogues, and the Control Panel reads them
+         // through the COM API - so here it is reported with a path and it
+         // counts towards the result below. A POSIX build reports the same label
+         // with "not used on this platform" and does not count it, because the
+         // only reader of what Languages::Load loads is COM/InterfaceLanguages.cpp
+         // and that file is in no Linux build; before that change the diagnostic
+         // could not pass on a correctly installed Linux package. This assertion
+         // is what would catch the POSIX arm being applied to Windows by mistake.
+         StringAssert.Contains("Languages: " + directories.ProgramDirectory + "Languages   [exists]", details, details);
+
+         // The Control Deck page the REST listener serves at GET /, reported
+         // whether or not it is installed and never counted: a server without it
+         // still answers /api/v1/. It is here because a Deck that shows the
+         // built-in "not installed" stub is explained by this one line and by
+         // nothing else, on either platform.
+         StringAssert.Contains("WebAdmin page: " + directories.ProgramDirectory + "WebAdmin\\index.html", details, details);
+
          // The directories the server cannot run without are marked as present,
          // which is the check that the existence test looks at the right thing.
          StringAssert.Contains("ProgramFolder: " + directories.ProgramDirectory + "   [exists]", details, details);

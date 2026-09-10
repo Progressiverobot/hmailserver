@@ -16,10 +16,21 @@ name: Linux build
 #
 # WHAT IT PUBLISHES
 #
-# On a tag, one .deb and one .rpm per architecture, plus an AppImage, all carrying the
-# SAME version as the Windows installer for that tag - one version, one release, a
-# separate artefact per platform. RELEASE.md's "Linux packages" step says how they join
-# the release and get signed.
+# On a tag: one .deb and one .rpm per architecture and one AppImage per architecture, all
+# carrying the SAME version as the Windows installer for that tag - one version, one
+# release, a separate artefact per platform. The `publish` job at the bottom attaches all
+# of them, and a SHA-256 sums file, to the release for that tag; before it existed a human
+# had to download the artefacts and upload them by hand inside the fourteen days an
+# artefact lives. RELEASE.md's "Linux packages" step says where that sits in the order,
+# and sign-release.yml signs whatever is attached when it runs.
+#
+# THE VERSION IS NOT WRITTEN IN THIS REPOSITORY TWICE
+#
+# The first job below is the reason. Common/Application/Version.h is the only place the
+# number lives; the CMakeLists reads it and CPACK_PACKAGE_VERSION becomes the four package
+# file names, which sign-release.yml and the server's own update checker both match by
+# exact equality. build/check-linux-version-stamp.sh fails this workflow when the one Linux
+# copy that cannot be derived - pkgver in the PKGBUILD - has drifted from that header.
 
 on:
   push:
@@ -42,6 +53,19 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Seconds, no toolchain, and everything that produces a named artefact waits for it.
+  # A version stamp that has drifted does not produce a broken package - it produces a
+  # perfectly good package under a name nothing will ever look for, which is the failure
+  # that is hardest to notice and most expensive to discover after a release.
+  stamps:
+    name: the Linux version stamps agree with Version.h
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Check the version stamps
+        run: bash build/check-linux-version-stamp.sh
+
   build:
     name: ${{ matrix.arch }} with ${{ matrix.compiler }}
     runs-on: ${{ matrix.runner }}
@@ -69,7 +93,7 @@ jobs:
             package: true
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Reproducibility, the half CMakeLists.txt cannot do on its own: every tool
       # that would otherwise stamp the clock - __DATE__, the archiver, dpkg-deb,
@@ -108,7 +132,7 @@ jobs:
       # at all, so the per-file logs are kept when the census fails.
       - name: Keep the census logs
         if: failure() && matrix.compiler == 'clang'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: census-logs-${{ matrix.arch }}-${{ matrix.compiler }}
           path: /tmp/hm-tu-census/log
@@ -139,7 +163,7 @@ jobs:
       # it is gone in three days.
       - name: Keep the binary for the regression job
         if: matrix.arch == 'x86-64' && matrix.compiler == 'clang'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hmailserver-linux-x86-64
           path: build/linux/hmailserver
@@ -154,35 +178,119 @@ jobs:
           cpack -G RPM
           ls -la ./*.deb ./*.rpm
 
+      # The try-it-out artefact, which the header of this file used to promise and
+      # nothing produced. It is built from the tree that has just been compiled -
+      # build-appimage.sh packages an existing build and never makes one - and it is
+      # then RUN, because an AppImage that is produced and never executed is exactly
+      # the artefact most likely to be broken in a way nobody notices.
+      #
+      # patchelf and desktop-file-utils are what linuxdeploy shells out to;
+      # APPIMAGE_EXTRACT_AND_RUN is set inside the script for the tools and is set
+      # again here for the image itself, because a runner has no FUSE and an AppImage
+      # mounts itself to start.
+      - name: Install what linuxdeploy shells out to
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        run: sudo apt-get install -y --no-install-recommends patchelf desktop-file-utils
+
+      - name: Build the AppImage
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        run: bash hmailserver/source/Server/platform/packaging/build-appimage.sh --build-dir build/linux
+
+      - name: The AppImage runs, and carries the Control Deck
+        if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: '1'
+        run: |
+          set -euo pipefail
+          image=$(find build/linux -maxdepth 1 -name 'hMailServer-*.AppImage' | head -n 1)
+          test -n "$image"
+          ls -la "$image"
+          # AppRun creates its per-user tree and the configuration in it on the
+          # first run, then execs the server with --config; the version it prints
+          # is the binary's own.
+          HMAILSERVER_HOME="${RUNNER_TEMP}/appimage-home" "$image" --version
+          HMAILSERVER_HOME="${RUNNER_TEMP}/appimage-home" "$image" --check-config
+          # And what is inside it. The Deck is the file GET / serves, and an
+          # AppImage without it answers with the "not installed" stub.
+          ( cd build/linux && "./$(basename "$image")" --appimage-extract > /dev/null )
+          test -f build/linux/squashfs-root/usr/share/hmailserver/WebAdmin/index.html
+          test -f build/linux/squashfs-root/usr/share/hmailserver/DBScripts/CreateTablesPGSQL.sql
+          cmp build/linux/squashfs-root/usr/share/hmailserver/WebAdmin/index.html \
+              hmailserver/installation/WebAdmin/index.html
+          echo "The AppImage carries the Control Deck, byte for byte."
+          rm -rf build/linux/squashfs-root
+
       # A package that installs but leaves nothing runnable is worse than none, so the
-      # .deb is installed on the runner and the binary is asked for its version from the
-      # place the package put it. The service is deliberately not started: it has no
-      # database here, and a mail server that starts without one logs an error a second.
-      - name: The package installs and puts a working binary where it says
+      # .deb is installed on the runner and every file a working installation needs is
+      # asserted from the place the package put it. This runs on BOTH architectures and
+      # asks nothing of a database; the job below takes the x86-64 package further and
+      # actually starts the server against PostgreSQL.
+      - name: The package installs and puts every file it should where it says
         if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
         working-directory: build/linux
         run: |
+          set -euo pipefail
           sudo apt-get install -y ./hmailserver_*.deb
           # What the package put where, so a failing check below is diagnosed from the log.
-          dpkg -L hmailserver | grep -E 'etc/|systemd|bin/hmailserver|DBScripts/Create' || true
+          dpkg -L hmailserver | grep -vE 'DBScripts/.*\.sql$'
           /usr/bin/hmailserver --version
-          # As root, because the package makes /etc/hmailserver 0750 root:hmailserver on
-          # purpose (the configuration holds credentials) and the runner's own account
-          # cannot see into it: the first three runs of this step ended here, on a file
-          # that was there, with a bare exit code.
-          sudo test -f /etc/hmailserver/hMailServer.ini
-          sudo test -f /usr/lib/systemd/system/hmailserver.service
+
+          # Every file the server actually opens, and the reason each one is here:
+          #   hmailserver       the service
+          #   tlds.txt          the public-suffix list; without it every DMARC
+          #                     organisational-domain decision reports 4335
+          #   dh2048.pem        the Diffie-Hellman group; without it EVERY TLS context
+          #                     reports a critical 5603 and refuses the connection
+          #   CreateTables*.sql the schema --create-database runs
+          #   WebAdmin/index.html  the Control Deck the REST listener serves at GET /
+          #   the unit, the configuration, the logrotate rule
+          #
+          # Tested as root throughout, because the package makes /etc/hmailserver
+          # 0750 root:hmailserver on purpose - the configuration holds credentials -
+          # and the runner's own account cannot see into it: the first three runs of
+          # the old two-file version of this step ended there, on a file that was
+          # present, with a bare exit code and nothing to read.
+          missing=0
+          for f in \
+            /usr/bin/hmailserver \
+            /usr/bin/tlds.txt \
+            /usr/bin/dh2048.pem \
+            /usr/share/hmailserver/DBScripts/CreateTablesPGSQL.sql \
+            /usr/share/hmailserver/DBScripts/CreateTablesMySQL.sql \
+            /usr/share/hmailserver/DBScripts/ScriptPrerequisitesPGSQL.sql \
+            /usr/share/hmailserver/WebAdmin/index.html \
+            /usr/lib/systemd/system/hmailserver.service \
+            /etc/hmailserver/hMailServer.ini \
+            /etc/logrotate.d/hmailserver
+          do
+            if sudo test -f "$f"; then
+              echo "  present  $f"
+            else
+              echo "::error::The package does not install $f"
+              missing=$((missing + 1))
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::${missing} file(s) a working installation needs are not in the package."
+            exit 1
+          fi
+
+          # The page is the one in the repository and not a placeholder.
+          sudo cmp /usr/share/hmailserver/WebAdmin/index.html \
+                   "${GITHUB_WORKSPACE}/hmailserver/installation/WebAdmin/index.html"
+
           systemctl is-enabled hmailserver || true
           sudo apt-get remove -y hmailserver
 
       - name: Keep the packages
         if: matrix.package && (startsWith(github.ref, 'refs/tags/v') || inputs.package)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-packages-${{ matrix.arch }}
           path: |
             build/linux/*.deb
             build/linux/*.rpm
+            build/linux/*.AppImage
           if-no-files-found: error
           retention-days: 14
 
@@ -193,7 +301,7 @@ jobs:
     name: cross-compile for aarch64
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the cross toolchain
         run: |
@@ -218,11 +326,231 @@ jobs:
 
       - name: Keep the cross census logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: census-logs-cross-aarch64
           path: /tmp/hm-tu-census/log
           if-no-files-found: ignore
+
+  # The difference between a package that installs and a package that works. The job
+  # above proves the payload is complete; this one takes the same .deb, configures it
+  # the way the README tells an administrator to, starts it UNDER THE PACKAGED SYSTEMD
+  # UNIT - with the whole of ProtectSystem=strict, the emptied capability bounding set
+  # and the syscall filter in force - and then asks the running server two questions:
+  # whether the REST API answers, and whether GET / returns the Control Deck rather
+  # than the built-in "not installed" stub. Until the Deck was added to the install
+  # rules, every packaged Linux server answered that second question with the stub.
+  #
+  # The .rpm gets the same file assertions inside a Fedora container. It is installed
+  # with --nodeps deliberately: the package is built on Ubuntu, so its automatic
+  # requires name Ubuntu's sonames (libboost_thread.so.1.83.0 and its kin) which no
+  # Fedora will ever satisfy. What this proves is the payload and the scriptlets, which
+  # is what CPack decides; whether an RPM distribution's own Boost matches is a question
+  # for a build done on that distribution, and the PKGBUILD makes the same point for
+  # Arch by building from source.
+  package-install:
+    name: the packaged server installs, starts and serves the Deck
+    needs: [ build, stamps ]
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hmailserver
+          POSTGRES_PASSWORD: hmtest
+          POSTGRES_DB: hmpackage
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hmailserver"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      PGPASSWORD: hmtest
+      REST_PORT: '8046'
+      ADMIN_PASSWORD: testar
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fetch the x86-64 packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: linux-packages-x86-64
+          path: packages
+
+      - name: Install the .deb
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client curl
+          sudo apt-get install -y ./packages/hmailserver_*_amd64.deb
+          /usr/bin/hmailserver --version
+
+      # The packaged configuration is EDITED, not replaced, so what starts below is
+      # the file the package installs with three sections filled in - which is what an
+      # administrator does, and what the README tells them to do.
+      - name: Configure the packaged INI against the PostgreSQL service
+        run: |
+          set -euo pipefail
+          INI=/etc/hmailserver/hMailServer.ini
+          sudo sed -i \
+            -e 's|^Type=.*|Type=PostgreSQL|' \
+            -e 's|^Server=.*|Server=127.0.0.1|' \
+            -e 's|^Database=.*|Database=hmpackage|' \
+            -e 's|^Username=.*|Username=hmailserver|' \
+            -e 's|^Password=.*|Password=hmtest|' \
+            -e 's|^Port=.*|Port=5432|' \
+            -e 's|^ProtectStoredSecretsWithDPAPI=.*|ProtectStoredSecretsWithDPAPI=0|' \
+            -e "s|^RestApiPort=.*|RestApiPort=${REST_PORT}|" \
+            -e 's|^WindowsEventLogEnabled=.*|WindowsEventLogEnabled=0|' \
+            "$INI"
+          # The runner's OpenSSL is older than the ML-KEM hybrids the tree prefers by
+          # default, and a group list OpenSSL rejects is reported as an error of the
+          # server's. The Windows gate exercises the default; name the classical
+          # groups here, as regression-on-linux does.
+          sudo sed -i 's|^RestApiBindAddress=.*|&\nTlsKeyExchangeGroups=X25519:secp384r1:secp256r1|' "$INI"
+          sudo chown root:hmailserver "$INI"
+          sudo chmod 0640 "$INI"
+          sudo grep -nE '^(Type|Server|Database|Username|Port|Internal|RestApiPort|RestApiBindAddress|TlsKeyExchangeGroups)=' "$INI"
+
+      - name: Check the configuration, create the schema, set the administrator password
+        run: |
+          set -euo pipefail
+          # As the service user, with no --config: the packaged server has to find
+          # /etc/hmailserver/hMailServer.ini on its own or nothing else here means anything.
+          sudo runuser -u hmailserver -- /usr/bin/hmailserver --check-config
+          sudo runuser -u hmailserver -- /usr/bin/hmailserver --create-database
+          psql -h 127.0.0.1 -U hmailserver -d hmpackage -Atc "select 'schema ' || value from hm_dbversion"
+          # The listeners are rows in the database. They are left on 25, 587, 110 and
+          # 143 on purpose: the unit grants CAP_NET_BIND_SERVICE ambiently and nothing
+          # else, so a server that binds them here is a server whose one capability
+          # works, which is the part of the unit that would be silently wrong.
+          psql -h 127.0.0.1 -U hmailserver -d hmpackage -Atc "select portprotocol, portnumber from hm_tcpipports order by 1"
+          echo "${ADMIN_PASSWORD}" | sudo /usr/bin/hmailserver --set-admin-password
+
+          # And it is STILL root:hmailserver 0640 afterwards. This used to chown
+          # and chmod it back, which meant the job passed while the documented
+          # sequence - install, edit the database section, set the password,
+          # start - left a configuration the service could not read. The atomic
+          # rewrite preserves ownership now, so the workaround is gone and this
+          # assertion is what would catch it coming back.
+          owner=$(stat -c '%U:%G %a' /etc/hmailserver/hMailServer.ini)
+          echo "the configuration after --set-admin-password: ${owner}"
+          if [ "${owner}" != "root:hmailserver 640" ]; then
+            echo "::error::--set-admin-password left /etc/hmailserver/hMailServer.ini as '${owner}', not 'root:hmailserver 640'. The service runs as hmailserver and reads its configuration through the group; it can no longer open it."
+            exit 1
+          fi
+
+      - name: Start it under the packaged unit
+        run: |
+          set -euo pipefail
+          sudo systemctl daemon-reload
+          sudo systemctl start hmailserver
+          for _ in $(seq 1 60); do
+            if curl -fsS -o /dev/null -u "Administrator:${ADMIN_PASSWORD}" \
+                 "http://127.0.0.1:${REST_PORT}/api/v1/status"; then
+              break
+            fi
+            sleep 1
+          done
+          systemctl is-active hmailserver
+          sudo ss -lntp | grep -E ':(25|110|143|587|'"${REST_PORT}"')\b' || true
+
+      - name: The REST API answers
+        run: |
+          set -euo pipefail
+          curl -fsS -u "Administrator:${ADMIN_PASSWORD}" "http://127.0.0.1:${REST_PORT}/api/v1/status"; echo
+
+      - name: GET / returns the Control Deck and not the stub
+        run: |
+          set -euo pipefail
+          curl -fsS -D headers.txt -o deck.html "http://127.0.0.1:${REST_PORT}/"
+          head -n 1 headers.txt
+          grep -i '^content-type' headers.txt
+          echo "bytes: $(wc -c < deck.html)"
+          # -m 1 rather than piping into head: under pipefail a head that closes
+          # the pipe first turns a successful grep into a failed step.
+          grep -m 1 -o '<title>[^<]*</title>' deck.html
+          if grep -q 'Web administration page not installed' deck.html; then
+            echo "::error::GET / returned the built-in stub. The package does not carry WebAdmin/index.html where the server looks for it."
+            exit 1
+          fi
+          if ! grep -q 'Control Deck' deck.html; then
+            echo "::error::GET / returned something that is not the Control Deck."
+            exit 1
+          fi
+          # Byte for byte the file the package installed, which is the file in the
+          # repository - so this is the real page and not a coincidence of two words.
+          sudo cmp deck.html /usr/share/hmailserver/WebAdmin/index.html
+          sudo cmp /usr/share/hmailserver/WebAdmin/index.html hmailserver/installation/WebAdmin/index.html
+          echo "GET / served the installed Control Deck, byte for byte."
+
+      - name: The server's own log, whatever happened above
+        if: always()
+        run: |
+          sudo systemctl status hmailserver --no-pager --full || true
+          sudo journalctl -u hmailserver --no-pager -n 200 || true
+          sudo ls -la /var/log/hmailserver || true
+          sudo tail -n 200 /var/log/hmailserver/*.log 2>/dev/null || true
+
+      - name: Stop and remove it
+        if: always()
+        run: |
+          sudo systemctl stop hmailserver || true
+          sudo apt-get remove -y hmailserver || true
+
+      # And the .rpm, in a distribution that installs one. registry.fedoraproject.org
+      # rather than Docker Hub: an anonymous Docker Hub pull from a GitHub runner is
+      # rate-limited and would make this step fail for a reason that has nothing to do
+      # with the package. --network none because nothing inside needs one - the package
+      # is a mounted file and --nodeps means rpm resolves nothing - so a container that
+      # reaches the internet could only be doing something this check did not ask for.
+      - name: The .rpm installs in Fedora and carries the same files
+        run: |
+          set -euo pipefail
+          docker run --rm --network none -v "${PWD}/packages:/packages:ro" \
+            registry.fedoraproject.org/fedora:41 /bin/bash -eu -c '
+              rpm=$(ls /packages/hmailserver-*.x86_64.rpm | head -n 1)
+              echo "== $(basename "$rpm") =="
+              rpm -qip "$rpm"
+              echo "== install (--nodeps: built on Ubuntu, so its requires name Ubuntu sonames) =="
+              rpm -Uvh --nodeps "$rpm"
+              echo "== every file a working installation needs =="
+              missing=0
+              for f in \
+                /usr/bin/hmailserver \
+                /usr/bin/tlds.txt \
+                /usr/bin/dh2048.pem \
+                /usr/share/hmailserver/DBScripts/CreateTablesPGSQL.sql \
+                /usr/share/hmailserver/DBScripts/CreateTablesMySQL.sql \
+                /usr/share/hmailserver/DBScripts/ScriptPrerequisitesPGSQL.sql \
+                /usr/share/hmailserver/WebAdmin/index.html \
+                /usr/lib/systemd/system/hmailserver.service \
+                /etc/hmailserver/hMailServer.ini \
+                /etc/logrotate.d/hmailserver
+              do
+                if [ -f "$f" ]; then
+                  echo "  present  $f"
+                else
+                  echo "  MISSING  $f"
+                  missing=$((missing + 1))
+                fi
+              done
+              [ "$missing" -eq 0 ] || { echo "::error::${missing} file(s) missing from the .rpm."; exit 1; }
+              echo "== the scriptlet made the identity and the directories =="
+              getent passwd hmailserver
+              ls -ld /var/lib/hmailserver /var/log/hmailserver /etc/hmailserver
+              echo "== the configuration is a %config(noreplace) file owned by root =="
+              rpm -qc hmailserver
+              stat -c "%a %U:%G %n" /etc/hmailserver/hMailServer.ini
+              echo "== and it comes off again =="
+              rpm -e hmailserver
+              test ! -f /usr/bin/hmailserver
+              echo "The .rpm installs, carries every file, and removes cleanly."
+            '
 
   # The regression suite's socket-driven fixtures, run against the binary the
   # x86-64 clang job built, on PostgreSQL. This is the difference between a Linux
@@ -272,9 +600,15 @@ jobs:
       # job-level env may read, and GitHub refuses the whole file for it - which is
       # how the first push of this job produced a run with no jobs at all.
       HMTEST_TREE: ${{ github.workspace }}/hmtest-tree
+      # The handful of fixtures that write a setting the COM API does not carry
+      # edit hMailServer.ini and reinitialise. On the Windows bench they find it
+      # by searching upwards from the test binary into the repository's own
+      # Release output; here the server is in a tree of its own and nothing above
+      # the tests holds an ini, so it is named.
+      HMTEST_SERVER_INI: ${{ github.workspace }}/hmtest-tree/program/hMailServer.ini
       PGPASSWORD: hmtest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # What the binary loads (ldd names them: Boost thread, chrono, filesystem and
       # regex, OpenSSL, zlib, libpq and, through libpq, LDAP and Kerberos), from the
@@ -290,7 +624,7 @@ jobs:
             postgresql-client curl
 
       - name: Fetch the binary the build job made
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: hmailserver-linux-x86-64
           path: hmtest/program
@@ -368,7 +702,7 @@ jobs:
           nohup "$HMTEST_TREE/program/hmailserver" --config "$HMTEST_TREE/program/hMailServer.ini" --foreground \
             > "$HMTEST_TREE/stdout.log" 2>&1 &
           echo $! > "$HMTEST_TREE/server.pid"
-          for i in $(seq 1 60); do
+          for _ in $(seq 1 60); do
             if curl -s -o /dev/null -u "Administrator:$HMTEST_ADMIN_PASSWORD" "http://127.0.0.1:$HMTEST_REST_PORT/api/v1/status"; then
               break
             fi
@@ -400,7 +734,7 @@ jobs:
 
       - name: Keep the results and the server's logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: linux-regression-results
           path: |
@@ -409,3 +743,114 @@ jobs:
             ${{ env.HMTEST_TREE }}/stdout.log
           if-no-files-found: warn
           retention-days: 14
+
+  # Attaching the packages to the release, which until now was two `gh` commands a
+  # human had to remember to run inside the fourteen days an artefact lives - and
+  # only after the build, the install check and the regression suite had all passed,
+  # by which time the release was usually already published and, immutable releases
+  # being on here, refusing further uploads.
+  #
+  # It does NOT fail when there is no release for the tag. A draft is created before
+  # or after this run depending on the operator, so the job polls for a few minutes
+  # and then says plainly in the log what it found and, if it found nothing, exactly
+  # what to run by hand. A missing draft is an ordering choice; a failed upload to a
+  # release that IS there is a real problem and does fail.
+  publish:
+    name: attach the packages to the release
+    needs: [ build, package-install, stamps ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch every architecture's packages
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: linux-packages-*
+          merge-multiple: true
+          path: packages
+
+      - name: What there is to attach, and its SHA-256 sums
+        id: assets
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          cd packages
+          ls -la
+          count=$(find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) | wc -l)
+          if [ "$count" -eq 0 ]; then
+            echo "::error::The build jobs produced no packages to attach."
+            exit 1
+          fi
+          # One file, named for the tag, listing every artefact this run produced.
+          # sha256sum's own format, so `sha256sum -c` verifies a download directly.
+          #
+          # find and not a glob: a run that produced .deb and .rpm but no .AppImage
+          # would leave "./*.AppImage" unexpanded, and sha256sum would fail on the
+          # literal name and take the whole step with it.
+          sums="hmailserver-linux-${version}-SHA256SUMS.txt"
+          find . -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' -o -name '*.AppImage' \) \
+            -printf '%P\n' | sort | xargs sha256sum > "$sums"
+          cat "$sums"
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          echo "sums=${sums}" >> "$GITHUB_OUTPUT"
+
+      - name: Attach them to the release for this tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -uo pipefail
+          # There is no checkout in this job - it uploads files, it does not need
+          # the source - so `gh` cannot infer the repository and is told.
+          found=0
+          for attempt in $(seq 1 12); do
+            if gh release view "$TAG" --repo "$REPO" > /dev/null 2>&1; then
+              found=1
+              break
+            fi
+            echo "No release for ${TAG} yet (attempt ${attempt}/12); waiting 15s."
+            sleep 15
+          done
+
+          if [ "$found" -eq 0 ]; then
+            echo "::notice::There is no release for ${TAG}, draft or published, after three minutes of looking. Nothing was uploaded, and this is not a failure: the draft is created before or after this run depending on how the release is being made."
+            echo
+            echo "The packages are on this run as the artefacts linux-packages-x86-64 and"
+            echo "linux-packages-aarch64, for fourteen days. To attach them by hand once the"
+            echo "draft exists:"
+            echo
+            echo "  bash:"
+            echo "    gh run download ${GITHUB_RUN_ID} --repo ${REPO} --pattern 'linux-packages-*' --dir packages"
+            echo "    gh release upload ${TAG} --repo ${REPO} --clobber \$(find packages -type f)"
+            echo
+            echo "  PowerShell:"
+            echo "    gh run download ${GITHUB_RUN_ID} --repo ${REPO} --pattern 'linux-packages-*' --dir packages"
+            echo "    gh release upload ${TAG} --repo ${REPO} --clobber (Get-ChildItem packages -Recurse -File).FullName"
+            echo
+            echo "Both lines name the files rather than passing a wildcard: gh does not expand"
+            echo "one itself, bash expands a glob before gh sees it, and PowerShell hands a"
+            echo "native command the literal '*' - which is why a documented 'gh release upload"
+            echo "TAG packages/*' works in one shell and uploads nothing in the other."
+            exit 0
+          fi
+
+          gh release view "$TAG" --repo "$REPO" --json isDraft,name,url \
+            --template '{{printf "release %s  draft=%v  %s\n" .name .isDraft .url}}'
+
+          # --clobber so a re-run of this workflow on the same tag replaces the
+          # assets rather than failing on the first name that already exists.
+          mapfile -t assets < <(find packages -type f | sort)
+          printf 'uploading %s\n' "${assets[@]}"
+          if ! gh release upload "$TAG" --repo "$REPO" --clobber "${assets[@]}"; then
+            echo "::error::The release for ${TAG} exists but the upload failed. If it is already PUBLISHED, immutable releases refuse further uploads and the assets have to go on while it is still a draft - RELEASE.md has the order."
+            exit 1
+          fi
+
+          echo
+          echo "Attached to ${TAG}:"
+          gh release view "$TAG" --repo "$REPO" --json assets \
+            --template '{{range .assets}}{{printf "  %s  %d bytes\n" .name .size}}{{end}}'

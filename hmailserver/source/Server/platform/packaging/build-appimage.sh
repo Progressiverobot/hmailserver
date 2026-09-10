@@ -99,15 +99,17 @@ OUTPUT_DIR="$(cd "${OUTPUT_DIR}" && pwd)"
 # ---------------------------------------------------------------- version, arch
 
 # The binary is the authority on its own version - it prints what Version.h said
-# when it was compiled, which is the only answer that cannot be stale. The
-# CMakeLists is the fallback for a cross-built tree whose binary will not run
-# here.
+# when it was compiled, which is the only answer that cannot be stale. Version.h
+# itself is the fallback for a cross-built tree whose binary will not run here;
+# it used to be the CMakeLists, which stopped working the day the CMakeLists
+# began reading the header rather than carrying a literal of its own.
 VERSION="$("${BINARY}" --version 2>/dev/null | awk '{ print $2 }' || true)"
 if [ -z "${VERSION}" ]; then
-   VERSION="$(sed -n 's/^ *VERSION \([0-9.]*\).*/\1/p' "${SERVER_DIR}/CMakeLists.txt" | head -n 1)"
+   VERSION="$(sed -n 's/^#define[[:space:]][[:space:]]*HMAILSERVER_VERSION[[:space:]][[:space:]]*"\([0-9.]*\)".*/\1/p' \
+      "${SERVER_DIR}/Common/Application/Version.h" | head -n 1)"
 fi
 if [ -z "${VERSION}" ]; then
-   echo "Could not determine the version from the binary or from CMakeLists.txt." >&2
+   echo "Could not determine the version from the binary or from Common/Application/Version.h." >&2
    exit 1
 fi
 
@@ -184,6 +186,14 @@ install -m 0755 "${BINARY}" "${APPDIR}/usr/bin/hmailserver"
 # what the .deb and .rpm install to the same relative path, and an AppImage
 # without it cannot get as far as a database.
 cp -r "${REPO_ROOT}/hmailserver/source/DBScripts" "${APPDIR}/usr/share/hmailserver/DBScripts"
+
+# The Control Deck. AppRun points ProgramFolder at this same directory, and
+# RestApiServer::HandleWebAdminPage_ opens <ProgramFolder>/WebAdmin/index.html;
+# without the file the REST listener answers GET / with a stub saying the page
+# is not installed, which for a try-it-out artefact is the first thing anybody
+# would see.
+install -Dm 0644 "${REPO_ROOT}/hmailserver/installation/WebAdmin/index.html" \
+   "${APPDIR}/usr/share/hmailserver/WebAdmin/index.html"
 
 # The configuration the AppRun below copies out on first run. It is the packaged
 # default with its absolute paths still in it; AppRun rewrites them, so this file
@@ -263,6 +273,23 @@ if [ ! -f "${CONFIG}" ]; then
    echo "the schema from ${APPDIR}/usr/share/hmailserver/DBScripts, then run this" >&2
    echo "AppImage again with --check-config." >&2
 fi
+
+# ProgramFolder is the one value in this file that CANNOT be allowed to persist,
+# so it is rewritten on EVERY run and not only when the file is created. It
+# points inside the AppImage's own mount, and that path is different every time:
+# FUSE mounts the image at a fresh /tmp/.mount_XXXXXX. Left as the first run
+# wrote it, the second run would look for DBScripts and for the Control Deck
+# under a mount point that no longer exists - and the server would answer GET /
+# with the "not installed" stub on every run after the first.
+#
+# Only this one line is touched. Everything else in the file is the
+# administrator's, including the [Database] section they filled in, and stays
+# exactly as they wrote it.
+sed -i "s|^ProgramFolder=.*|ProgramFolder=${APPDIR}/usr/share/hmailserver|" "${CONFIG}"
+# sed -i writes a new file and renames it over the old one. GNU sed carries the
+# original's mode across; not every sed does, and this file holds a database
+# password, so the mode is restated rather than assumed.
+chmod 0600 "${CONFIG}"
 
 # --config is given explicitly rather than relying on the search order, because
 # the first place the server looks is beside its own executable - which here is

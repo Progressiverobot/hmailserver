@@ -495,6 +495,39 @@ namespace
          offset += (size_t) wrote;
       }
 
+      // Ownership, before the mode, because a successful fchown clears the
+      // set-user and set-group bits and the mode is what we are preserving.
+      //
+      // mkstemp creates the replacement owned by whoever is running, which for
+      // "hmailserver --set-admin-password" under sudo is root:root. The packaged
+      // configuration is root:hmailserver 0640 and the service runs as
+      // hmailserver, so the server reads its own configuration through the
+      // GROUP: replacing it with a root:root file leaves the mode intact and
+      // grants that read to nobody. The server then starts, cannot open its
+      // configuration, falls back to defaults, and reports that no database is
+      // configured - with the credentials sitting in the file the operator just
+      // edited. That is the documented first-run sequence, and it was broken.
+      //
+      // Only attempted when the ownership would actually change, and a failure
+      // to restore it fails the write: a configuration this process can no
+      // longer read is not a configuration, and losing the rewrite is far better
+      // than completing one that quietly locks the service out of its own file.
+      if (written && existed)
+      {
+         struct stat replacement;
+
+         if (::fstat(descriptor, &replacement) != 0)
+         {
+            written = false;
+         }
+         else if (replacement.st_uid != existing.st_uid ||
+                  replacement.st_gid != existing.st_gid)
+         {
+            if (::fchown(descriptor, existing.st_uid, existing.st_gid) != 0)
+               written = false;
+         }
+      }
+
       if (written && ::fchmod(descriptor, mode) != 0)
          written = false;
 

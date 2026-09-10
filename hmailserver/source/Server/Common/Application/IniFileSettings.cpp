@@ -1116,8 +1116,24 @@ namespace HM
          if (!FileUtilities::Exists(ini_file_))
          {
             const String packaged = _T("/etc/hmailserver/hMailServer.ini");
-            if (FileUtilities::Exists(packaged))
+
+            // The file itself, when a package installed it - the ordinary case.
+            //
+            // And when the file is absent but its directory is not: that is a
+            // package installation whose configuration has been removed (an
+            // apt-get remove leaves dpkg's conffile record behind, so a later
+            // reinstall does not put it back), and the next thing an
+            // administrator is told to run is --set-admin-password. Without
+            // this, that command CREATES /usr/bin/hMailServer.ini and writes
+            // the hash there, and from then on the file beside the binary wins
+            // over /etc on every start - a shadowing configuration nobody knows
+            // they have. A build tree and a tarball have no /etc/hmailserver at
+            // all and keep the file beside the binary, which is right for them.
+            if (FileUtilities::Exists(packaged) ||
+                FileUtilities::Exists(_T("/etc/hmailserver")))
+            {
                ini_file_ = packaged;
+            }
          }
 #endif
       }
