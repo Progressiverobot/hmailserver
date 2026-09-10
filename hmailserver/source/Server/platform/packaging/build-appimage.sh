@@ -182,6 +182,23 @@ mkdir -p "${APPDIR}/usr/bin" "${APPDIR}/usr/share/applications" \
 
 install -m 0755 "${BINARY}" "${APPDIR}/usr/bin/hmailserver"
 
+# Beside the binary, because that is where the server looks for them:
+# Utilities::GetBinDirectory() on this platform is the directory of the running
+# image (/proc/self/exe), not ProgramFolder. The .deb and .rpm put them in the
+# same relative place for the same reason.
+#
+#   dh2048.pem  the Diffie-Hellman group. Without it SslContextInitializer
+#               reports a CRITICAL 5603 and every TLS context refuses the
+#               connection - an AppImage without this file is a mail server
+#               that cannot do TLS at all.
+#   tlds.txt    the public-suffix list. Without it TLD::Initialize reports 4335
+#               and every DMARC organisational-domain decision is taken without
+#               one.
+install -m 0644 "${REPO_ROOT}/hmailserver/installation/Extras/dh2048.pem" \
+   "${APPDIR}/usr/bin/dh2048.pem"
+install -m 0644 "${REPO_ROOT}/hmailserver/installation/Extras/tlds.txt" \
+   "${APPDIR}/usr/bin/tlds.txt"
+
 # The SQL the administrator has to run to create the schema. It is small, it is
 # what the .deb and .rpm install to the same relative path, and an AppImage
 # without it cannot get as far as a database.

@@ -91,3 +91,19 @@ New-Item -ItemType Directory -Force -Path $webAdminDir | Out-Null
 Copy-Item -Force -Path $webAdminSource -Destination $webAdminDir
 Write-Host "Control Deck page copied to $webAdminDir"
 
+# The COM type library, for the same reason and from the same place
+# post-build.bat takes it: MIDL writes it into the intermediate directory and
+# the installer ships it out of the output directory. Without this the installer
+# cannot be compiled after a clean build - ISCC stops on
+# "Source file ...hMailServer.tlb does not exist" - and the only reason that was
+# ever survivable is an older IDE build having left one behind.
+$typeLibSource = Join-Path $scriptRoot "..\hmailserver\source\Server\hMailServer\hMailServer\x64\$Configuration\hMailServer.tlb"
+$typeLibTarget = Join-Path $scriptRoot "..\hmailserver\source\Server\hMailServer\x64\$Configuration"
+
+if (Test-Path $typeLibSource) {
+    Copy-Item -Force -Path $typeLibSource -Destination $typeLibTarget
+    Write-Host "Type library copied to $typeLibTarget"
+} else {
+    Write-Warning "MIDL produced no type library at $typeLibSource - the installer will not compile until it does."
+}
+

@@ -57,9 +57,16 @@ jobs:
   # and complementary to it: SmartScreen and the UAC prompt read Authenticode
   # and know nothing about Sigstore, while anybody who checks a signature
   # deliberately can verify the cosign bundle without trusting a certificate
-  # authority. This job exists so that the day a certificate is bought is the
-  # day the installer is signed, rather than the day this file starts being
-  # written. It does nothing at all until the four secrets exist, and says so.
+  # authority. This job exists so that the day an account is arranged is the day
+  # the installer is signed, rather than the day this file starts being written.
+  # It does nothing at all until the settings exist, and says so.
+  #
+  # What it does NOT do is remove the SmartScreen warning. Microsoft's own
+  # comparison puts a signed installer in the same row as an unsigned one -
+  # "flagged as unrecognized until reputation accumulates" - and a new 79 MB file
+  # every few weeks never accumulates any. What signing buys is the publisher
+  # NAME in the elevation prompt instead of "Unknown publisher", and the fact
+  # that an enterprise policy can refuse an unsigned binary outright.
   authenticode:
     name: Authenticode-sign the installer (only with a certificate)
     runs-on: windows-latest
@@ -72,7 +79,7 @@ jobs:
         shell: bash
         run: |
           if [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] \
-             && [ -n "${{ secrets.AZURE_CLIENT_SECRET }}" ] && [ -n "${{ vars.TRUSTED_SIGNING_ACCOUNT }}" ]; then
+             && [ -n "${{ secrets.AZURE_CLIENT_SECRET }}" ] && [ -n "${{ vars.ARTIFACT_SIGNING_ACCOUNT }}" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -101,19 +108,27 @@ jobs:
 
       - name: Sign it
         if: steps.have.outputs.ready == 'true'
-        uses: azure/trusted-signing-action@v0
+        uses: Azure/artifact-signing-action@c7ab2a863ab5f9a846ddb8265964877ef296ee82 # v2.0.0
         with:
           azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
           azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ vars.TRUSTED_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ vars.TRUSTED_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.TRUSTED_SIGNING_PROFILE }}
+          endpoint: ${{ vars.ARTIFACT_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ vars.ARTIFACT_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.ARTIFACT_SIGNING_PROFILE }}
           files-folder: signing
           files-folder-filter: exe
           file-digest: SHA256
+          # NOT optional, whatever the input's "required: false" says. The
+          # certificates this service issues live about seventy-two hours, so a
+          # signature without a countersigned timestamp stops verifying three
+          # days later. This is the service's own timestamping authority.
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
+          # The action defaults to 300 seconds for the whole signing call. The
+          # installer is around 80 MB and only its digest travels, so that is
+          # ample - but a slow runner should wait rather than fail a release.
+          timeout: 900
 
       - name: Prove it is signed, then replace the asset
         if: steps.have.outputs.ready == 'true'
@@ -129,6 +144,13 @@ jobs:
           gh release upload "${{ steps.tag.outputs.tag }}" $exe --repo "${{ github.repository }}" --clobber
 
   sign:
+    # AFTER the Authenticode job, never beside it. That job replaces the
+    # installer asset with a signed copy of itself, and cosign signs the bytes of
+    # whatever is attached when it runs: signing first and replacing after leaves
+    # a .cosign.bundle that does not verify against the file it names. While no
+    # certificate is configured the Authenticode job does nothing and succeeds,
+    # which satisfies this and costs a few seconds.
+    needs: authenticode
     name: Sign and attach signatures
     runs-on: ubuntu-latest
     permissions:

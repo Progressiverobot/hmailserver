@@ -48,9 +48,35 @@ already cost a release cycle or nearly shipped a defect.
    several steps past the last stable - and it was missing from this step until
    6.2.23.
 
-7. **Version stamp**: `Version.h` (version, numeric, build),
-   `section_setup_64.iss`, all seven `.csproj` `<Version>` values. Verify
-   nothing else still carries the old version: `git grep <old-version>`.
+7. **Version stamp**, eleven files. The Windows nine: `Version.h` (version,
+   numeric, build), `section_setup_64.iss`, and all seven `.csproj`
+   `<Version>` values. Then the two nothing on Windows looks at:
+   * `hmailserver/source/Server/platform/packaging/PKGBUILD` - `pkgver`, which
+     is also the tag the PKGBUILD fetches. It cannot be derived: `makepkg`
+     parses the PKGBUILD as a shell script and never runs CMake.
+   * `hmailserver/source/Tools/ImportTool.Tests/packages.lock.json` - the entry
+     for the project's own version. Regenerate it (`dotnet restore
+     --force-evaluate` on that project) rather than editing it by hand; a stale
+     lock file fails two *required* checks, `Build .NET tools` and `submit-nuget`.
+
+   `hmailserver/source/Server/CMakeLists.txt` is **not** on the list, and this
+   is the one line of this step worth reading twice: it used to be, and a stamp
+   missed there produced Linux packages named at the wrong version, which
+   `sign-release.yml` and the server's own update checker - both of which match
+   those file names by exact equality - would simply never find. It now reads
+   `Version.h` with `file(STRINGS)` before `project()`, so there is nothing
+   there to stamp.
+
+   Then run **`build/check-linux-version-stamp.sh`** (Git Bash, WSL or the
+   runner; it needs no toolchain, which is why the Linux workflow runs it as its
+   first job before anything is compiled). It proves Version.h agrees with
+   itself, that the CMakeLists still derives rather than declares, that
+   `pkgver` matches, and that no version literal has crept back into anything
+   else under `platform/packaging/`.
+
+   Verify nothing else still carries the old version: `git grep <old-version>`.
+   What legitimately stays behind is prose of the form "new in 6.2.28", which
+   names when something arrived and must not be moved forward.
    In `section_setup_64.iss` the `VersionInfoVersion` fourth component stays
    `0`: the build number lives in `Version.h` and the tag, and a build-only
    re-cut (the common case) must not have to touch the installer script or
@@ -96,9 +122,10 @@ already cost a release cycle or nearly shipped a defect.
    legitimately. The workflow log records the versions it built with, and the
    release notes say "reproducible on the runner image of the day" and give
    the binary's SHA-256 from that log, rather than claiming what the MSVC line
-   above can claim. Measured on 9 September 2026: commit 8926f5c3f built twice on
-   the hosted runners, hours apart, and every job's binary hashed the same both
-   times (x86-64 clang, x86-64 GCC, AArch64 clang). The package containers are
+   above can claim. Measured on 8 September 2026: commit 8926f5c3f built twice
+   on the hosted runners - the two attempts of run 34282935758, forty-four
+   minutes apart, on two runner allocations - and every job's binary hashed the
+   same both times (x86-64 clang, x86-64 GCC, AArch64 clang). The package containers are
    not compared; the binaries inside them are what the hashes above cover.
 
 8b. **Full regression suite on the assertion build, first.** Build with
@@ -120,17 +147,23 @@ already cost a release cycle or nearly shipped a defect.
    release may cite the previous minor's run when none of the fuzzed parsers
    changed; anything else runs again.
 
-9. **Full regression suite on the stamped binary** — every test, nothing
-   skipped. If *anything* changes after this run, the run is void: rebuild
+9. **Full regression suite on the stamped binary** (`build\run-tests.ps1`,
+   with no `-StopOnError`) — every test, nothing skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to
    fail and clean up before trusting any result.
 10. **README release notes** — every claim checked against the diff. "Fixed"
    means reproduced-then-fixed or negative-control-tested; anything else is
    described as hardening or diagnostics. Unfixed known issues are named as
    unfixed.
-11. **Installer**: ISCC on `hMailServer64.iss`. Never run the installer on
+11. **Installer**: ISCC on `hMailServer64.iss`. Two prerequisites the script
+   does not check: `$env:hMailServerLibs` must point at the library tree, and
+   `build\get-dotnet-runtime.ps1` must have populated `installation\DotNet\`
+   with the desktop runtime the installer carries. Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
-   (`installer-smoke.yml`), which installs it on a throwaway runner.
+   (`installer-smoke.yml`), which installs it on a throwaway runner, and it is
+   dispatched by hand: after the draft release exists and its installer asset
+   is uploaded, `gh workflow run "Installer smoke test" -f release_tag=vX.Y.Z`,
+   and it must be green **before** the release is published.
 12. **Commit** (as chrisholloway5, no co-author trailers - history has been
     rewritten once to remove them, and will be again). `master` is protected:
     changes arrive by pull request, force-pushes and deletions are refused, and
@@ -168,14 +201,32 @@ already cost a release cycle or nearly shipped a defect.
     upload and would be stuck with whatever it was created with:
 
     ```
-    gh release create vX.Y.Z <installer> --draft --prerelease \
+    # --prerelease ONLY for an alpha, beta or release candidate. A stable
+    # release must not carry it: the shipped update checker reads GitHub's
+    # "latest release" endpoint, which never answers with a pre-release, so a
+    # stable release left marked pre-release is invisible to every server in
+    # the field. If one is created that way, `gh release edit vX.Y.Z
+    # --prerelease=false` before publishing.
+    gh release create vX.Y.Z <installer> --draft \
        --title "..." --notes-file <notes>
-    gh run list --workflow "Linux build" --branch vX.Y.Z   # wait for the tag's run to succeed
-    gh run download <run-id> --pattern 'linux-packages-*' --dir linux-packages
-    gh release upload vX.Y.Z linux-packages/*/*.deb linux-packages/*/*.rpm
+
+    # The tag's own Linux run builds the six Linux artefacts - a .deb, an .rpm
+    # and an .AppImage per architecture - and its publish job attaches them and
+    # a SHA-256 sums file to this release itself. Watch it rather than
+    # downloading artefacts:
+    gh run list --workflow "Linux build" --branch vX.Y.Z
+    gh run watch <run-id>
+    # Authenticode, if a certificate has been arranged - see below. The job is
+    # part of "Sign release artefacts" and does nothing while the settings are
+    # absent, writing a notice instead.
     gh workflow run "SBOM" -f release_tag=vX.Y.Z          # SPDX + CycloneDX
     gh workflow run "Sign release artefacts" -f tag=vX.Y.Z  # LAST: signs what is attached
-    gh release view vX.Y.Z --json assets                   # expect installer + 4 Linux packages + 2 SBOMs + a .cosign.bundle beside each (fourteen assets)
+    gh workflow run "Installer smoke test" -f release_tag=vX.Y.Z   # green before publishing
+    # Expect: the installer, 2 .deb, 2 .rpm, 2 .AppImage, one SHA256SUMS.txt,
+    # 2 SBOMs, and a .cosign.bundle beside every one of them - TWENTY assets.
+    # Count them. This step exists because an artefact that failed to build
+    # goes missing quietly, and the release is immutable once published.
+    gh release view vX.Y.Z --json assets
     gh release edit vX.Y.Z --draft=false                   # publish, now complete
     ```
 
@@ -194,9 +245,11 @@ already cost a release cycle or nearly shipped a defect.
     set rather than failing, because the Windows installer is what every
     server in the field is waiting for and a Linux packaging failure must not
     hold it back; a release that ships without them is a Windows-only release
-    and its notes say so. The PKGBUILD and the AppImage are not release
-    assets: the first is built by the user's own machine from the tag, the
-    second is a try-it-out artefact for a daemon and is labelled as one.
+    and its notes say so. The AppImages are attached too, and are the one
+    asset here that is not for installing: an AppImage of a daemon is a way to
+    try the server without putting anything on the machine, and the build
+    script says so on its way out. The PKGBUILD is not a release asset at all -
+    it is built by the user's own machine from the tag.
 
     **The installer's name is not cosmetic.** It must be exactly
     `hMailServer-<tag without the leading v>-x64.exe`, with its `.cosign.bundle`
@@ -240,3 +293,57 @@ already cost a release cycle or nearly shipped a defect.
   negative-control-tested, it is not "fixed" — say "hardened", "instrumented"
   or "still open". Credibility with reporters is the project's scarcest
   resource.
+
+Authenticode
+------------
+
+Every release asset is signed with cosign, keylessly, and that signature is what
+somebody who deliberately checks can verify. It is not what Windows reads.
+SmartScreen and the UAC prompt read **Authenticode**, and until the installer
+carries one they show an unknown publisher - so the two are complementary and
+this one is still owed.
+
+**Be clear what it buys, because it is not what everybody assumes.** Signing does
+not remove the SmartScreen warning. Microsoft's own comparison puts a signed
+installer in the same row as an unsigned one - flagged as unrecognised until
+reputation accumulates - and reputation attaches to a file that does not change,
+which a new 80 MB installer every few weeks never is. What signing buys is two
+things that are real: the elevation prompt reads the publisher's name instead of
+*Unknown publisher*, from the first signed release; and an enterprise policy that
+refuses unsigned binaries outright stops being a wall. For a mail server, whose
+users are disproportionately administrators on policy-managed Windows, the second
+is the one that matters.
+
+The `authenticode` job in `sign-release.yml` signs the installer with **Azure
+Artifact Signing** - the service formerly called Trusted Signing - and does
+nothing at all until these exist. It is deliberately silent-but-visible: it
+writes a notice on every release saying the installer is unsigned, and lets the
+release proceed. It runs BEFORE the cosign job, which is not arbitrary: it
+replaces the installer asset, and cosign has to sign the bytes that ship.
+
+* A **pay-as-you-go** Azure subscription - free, trial and sponsored
+  subscriptions are refused - with an **Artifact Signing** account and a
+  certificate profile. Microsoft does the identity validation and holds the key:
+  there is no certificate file to store, steal or expire in a drawer, and none of
+  the 460-day reissue treadmill an owned certificate now carries. The account,
+  its resource group and its subscription cannot be changed afterwards, so choose
+  them as permanent.
+* Repository secrets `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+  `AZURE_CLIENT_SECRET`, for an app registration holding the *Certificate
+  Profile Signer* role on that profile.
+* Repository variables `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`,
+  `ARTIFACT_SIGNING_PROFILE`. There is no UK region; `neu.codesigning.azure.net`
+  is the nearest.
+
+Identity validation takes **one to twenty business days** and Microsoft states it
+cannot be expedited, so this is arranged once and long before a release rather
+than during one. It also has to be renewed, and signing stops if it lapses. It is
+an organisation validation against Companies House plus a one-off photo-ID check
+of the person applying; the verification email expires in seven days and cannot
+be re-sent.
+
+The certificates this service issues live about seventy-two hours, which is why
+`timestamp-rfc3161` in the job is not optional however the Action's input is
+marked: without a countersigned timestamp the signature stops verifying three
+days later.
+

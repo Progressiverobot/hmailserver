@@ -5883,6 +5883,26 @@ namespace HM
       }
    }
 
+   // A stored folder name as a person should read it. IMAP and COM store the
+   // name in modified UTF-7 - "&AMQ-renden" for "Ärenden" - and that is the form
+   // to decode. But modified UTF-7 cannot contain a character above 127 by
+   // construction, so a stored name that has one was never encoded: it is real
+   // Unicode, put there by something that did not encode (an importer, or this
+   // release's own create route before it learned to). Handing THAT to the
+   // decoder means an AnsiString conversion first, which is lossy above ASCII -
+   // the name would come back as question marks. So it is returned as it is.
+   String
+   RestApiServer::DecodeFolderName_(const String &stored)
+   {
+      for (int i = 0; i < stored.GetLength(); i++)
+      {
+         if (stored[i] > 127)
+            return stored;
+      }
+
+      return ModifiedUTF7::Decode(AnsiString(stored));
+   }
+
    void
    RestApiServer::AppendOneFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder,
                                        const String &path, const std::map<__int64, int> &designations,
@@ -5909,8 +5929,8 @@ namespace HM
          // them the encoding. The path is the same names joined by the
          // delimiter, and decoding it whole is safe because an encoded run
          // begins with '&' and ends with '-', neither of which a delimiter is.
-         JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(folder->GetFolderName())))).c_str(),
-         JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(path)))).c_str(),
+         JsonEscape_(Utf8_(DecodeFolderName_(folder->GetFolderName()))).c_str(),
+         JsonEscape_(Utf8_(DecodeFolderName_(path))).c_str(),
          folder->GetParentFolderID(),
          JsonEscape_(Utf8_(specialUse)).c_str(),
          folder->GetIsSubscribed() ? "true" : "false",
@@ -6263,7 +6283,7 @@ namespace HM
             hits[i].folder->GetID(),
             // Decoded, as the folder listing decodes it: the path is stored
             // names joined, and a stored name is modified UTF-7.
-            JsonEscape_(Utf8_(ModifiedUTF7::Decode(AnsiString(hits[i].path)))).c_str(),
+            JsonEscape_(Utf8_(DecodeFolderName_(hits[i].path))).c_str(),
             message->GetID(),
             message->GetUID(),
             message->GetSize(),
@@ -7653,7 +7673,6 @@ namespace HM
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
-         "\"/api/v1/me/folders\":{\"get\":{\"summary\":\"The signed-in account's folder tree\",\"description\":\"Every folder the account may read, as IMAP LIST gives it: id, name, path (joined with delimiter), parent_id, special_use (the RFC 6154 designation, e.g. \\\\Sent), subscribed, writable, messages, unseen, uidvalidity, subfolders. A folder the ACL keeps from the account is left out with its subtree. shared lists, under owner, the public folders (owner is the public namespace name) and the folders of each account that granted this one a right, named as IMAP names them; each entry carries account_id (0 for public). Every message route accepts a folder or message from those trees under the rights the owner granted.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders, shared\"}}}},"
          "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted), message_id, in_reply_to, references. total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
          "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
