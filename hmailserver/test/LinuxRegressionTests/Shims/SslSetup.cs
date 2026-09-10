@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Linq;
 using System.Security.Cryptography.X509Certificates;
 using hMailServer;
 using NUnit.Framework;
@@ -91,6 +92,47 @@ namespace RegressionTests.SSL
             .Expect(200, "PUT /api/v1/settings (TLS versions)");
 
          Reinitialize();
+
+         // And then wait for the listeners themselves. Reinitialize returns when
+         // the REST API answers "running", which is not the same moment: the REST
+         // listener is one of the things being brought back, and it can be
+         // answering while the mail listeners are still binding. The caller's very
+         // next act is to connect to one of these ports.
+         WaitForListeners(SslPorts.Select(p => p.Port).ToArray());
+      }
+
+      /// <summary>
+      ///    Polls each port until it accepts a TCP connection. Twenty seconds is
+      ///    far longer than binding twelve sockets takes; a port that never comes
+      ///    up is a real failure and the message names it.
+      /// </summary>
+      private static void WaitForListeners(int[] ports)
+      {
+         var deadline = DateTime.UtcNow.AddSeconds(20);
+
+         foreach (var port in ports)
+         {
+            while (true)
+            {
+               try
+               {
+                  using (var probe = new System.Net.Sockets.TcpClient())
+                  {
+                     probe.Connect(TestPorts.HostAddress, port);
+                     break;
+                  }
+               }
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+               {
+                  if (DateTime.UtcNow >= deadline)
+                     Assert.Fail("The server did not begin listening on port " + port +
+                                 " within twenty seconds of POST /api/v1/server/reinitialize. " +
+                                 "The other ports asked for were " + string.Join(", ", ports) + ".");
+
+                  System.Threading.Thread.Sleep(50);
+               }
+            }
+         }
       }
 
       private static string Word(bool value)
@@ -138,13 +180,29 @@ namespace RegressionTests.SSL
 
             if (probe != null && probe.Status == 200 && probe.Json.HasValue &&
                 ServerApi.LongOf(probe.Json.Value, "state", 0) == 3)
+            {
+               WaitForTheUsualListeners();
                return;
+            }
 
             System.Threading.Thread.Sleep(50);
          }
 
          Assert.Fail("The server did not answer GET /api/v1/status as running within 90 seconds of " +
                      "POST /api/v1/server/reinitialize.");
+      }
+
+      /// <summary>
+      ///    A restart takes the mail listeners down with everything else, and the
+      ///    REST API answers "running" before they are all back - it is one of the
+      ///    things being restarted, not a report on the others. Every caller of
+      ///    Reinitialize goes on to connect to SMTP, POP3 or IMAP, so waiting for
+      ///    the REST API alone leaves a race that shows up as "Unable to connect to
+      ///    server" in a fixture that never mentions restarting.
+      /// </summary>
+      internal static void WaitForTheUsualListeners()
+      {
+         WaitForListeners(new[] { TestPorts.Smtp, TestPorts.Pop3, TestPorts.Imap });
       }
 
       public static string GetSslCertPath()

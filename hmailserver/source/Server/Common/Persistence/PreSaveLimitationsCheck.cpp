@@ -132,6 +132,91 @@ namespace HM
          return false;
       }
 
+      // The account's other fixed-width text columns, checked here for the same reason
+      // as the auto reply message above. Without a check the over-long value travels
+      // all the way to the database driver, the driver refuses the row, and
+      // PersistentAccount::SaveObject returns false with resultDescription still EMPTY.
+      // An empty reason is all a caller has to go on: RestApiRoutes turns a non-empty
+      // one into a 400 carrying the sentence and an empty one into 500 "failed to save
+      // account", so PUT /api/v1/accounts blames the server for the caller's
+      // 8,000-character first name, and the COM Save() raises a failure with nothing an
+      // administrator can read. RegressionTests/Stress/StabilitySanityTests.cs,
+      // TestInsertionOfTooLongString, is exactly that case.
+      //
+      // MySQL truncates instead of failing only where STRICT_TRANS_TABLES has been
+      // switched off - the default before MySQL 5.7.5 and MariaDB 10.2.4, and still
+      // what an administrator gets who has cleared sql_mode by hand. On a modern
+      // default-configured server it is error 1406, "Data too long for column". The
+      // 2010-era comment in that test records the truncation as a possibility rather
+      // than a certainty, and no MySQL server was measured for this change - so
+      // the identical save "succeeds" with a shortened name on one backend and fails
+      // with no explanation on another. Checking before the save makes the answer the
+      // same on every backend, and makes it a sentence.
+      //
+      // The widths below were read from the create scripts, not assumed:
+      // DBScripts/CreateTablesMSSQL.sql, CreateTablesMySQL.sql and CreateTablesPGSQL.sql.
+      // There is no CreateTablesMSSQLCE.sql - a Compact Edition database is built from
+      // the MSSQL script with " varchar" rewritten to " nvarchar" (the create path in
+      // build/check-db-scripts.ps1 reproduces what a fresh install runs), so Compact
+      // Edition's widths are MSSQL's. All seven of these columns carry the SAME width in
+      // all four backends, so none of them sets a narrower limit than the others. Where
+      // they do differ the narrowest has to win, or a save that works on one backend
+      // fails on the next; the auto reply message above is the example - nvarchar(1000)
+      // on MSSQL against text on MySQL and PostgreSQL - which is where its 1000 comes
+      // from.
+      //
+      // Deliberately absent: accountsignatureplaintext and accountsignaturehtml are
+      // ntext on MSSQL and text on MySQL and PostgreSQL, fixed width in none of them, so
+      // any limit invented here would refuse a signature the database would have stored.
+      // accountvacationmessage is likewise text on two of the three, and is covered
+      // above by the MSSQL width rather than by a guess.
+
+      if (account->GetAddress().GetLength() > 255)
+      {
+         // accountaddress holds 255, one more than the 254 IsValidAccountAddress_
+         // enforces just below. It is still worth testing first: a caller who sends a
+         // 300-character address should be told the address is too long, rather than
+         // that it is not a valid email address.
+         resultDescription = "The account address length exceeds the 255 character limit.";
+         return false;
+      }
+
+      if (account->GetVacationSubject().GetLength() > 200)
+      {
+         resultDescription = "The auto reply subject length exceeds the 200 character limit.";
+         return false;
+      }
+
+      if (account->GetForwardAddress().GetLength() > 255)
+      {
+         resultDescription = "The forward address length exceeds the 255 character limit.";
+         return false;
+      }
+
+      if (account->GetPersonFirstName().GetLength() > 60)
+      {
+         resultDescription = "The first name length exceeds the 60 character limit.";
+         return false;
+      }
+
+      if (account->GetPersonLastName().GetLength() > 60)
+      {
+         resultDescription = "The last name length exceeds the 60 character limit.";
+         return false;
+      }
+
+      if (account->GetADDomain().GetLength() > 255)
+      {
+         resultDescription = "The Active Directory domain length exceeds the 255 character limit.";
+         return false;
+      }
+
+      if (account->GetADUsername().GetLength() > 255)
+      {
+         resultDescription = "The Active Directory user name length exceeds the 255 character limit.";
+         return false;
+      }
+
       if (!IsValidAccountAddress_(account->GetAddress()))
       {
          resultDescription = "The account address is not a valid email address.";

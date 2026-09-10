@@ -38,7 +38,18 @@ namespace RegressionTests.Shared
       public Pop3ClientSimulator(IPAddress ipaddress, bool useSSL, int port)
       {
          _tcpConnection = new TcpConnection(useSSL);
-         _port = port;
+
+         // Mapped here, because this simulator cannot be mapped where the other two
+         // are. TcpConnection has two Connect overloads and only Connect(int) puts a
+         // standard port through TestPorts.Actual; the SMTP and IMAP simulators reach
+         // the server through that one, but this one carries its own address and calls
+         // Connect(IPAddress, int), which does not map. So "new Pop3ClientSimulator(
+         // false, 110)" stayed on 110 while "new ImapClientSimulator(false, 143)"
+         // became 1143 - and against a server on other ports the POP3 call hung for
+         // the full ten-second connect timeout while the IMAP one worked, which reads
+         // as anything but a port problem. On the Windows bench TestPorts.Actual is
+         // the identity, so this changes nothing there.
+         _port = TestPorts.Actual(port);
          _ipaddress = ipaddress;
       }
 

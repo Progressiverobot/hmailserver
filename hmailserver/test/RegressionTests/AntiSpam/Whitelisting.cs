@@ -326,7 +326,7 @@ namespace RegressionTests.AntiSpam
          surblServer.Save();
 
          // Make sure we are now blacklisted.
-         var smtpClient = new SmtpClientSimulator(false, 25, IPAddress.Parse(firstAddress));
+         var smtpClient = new SmtpClientSimulator(false, TestPorts.Smtp, IPAddress.Parse(firstAddress));
          CustomAsserts.Throws<DeliveryFailedException>(() =>
             smtpClient.Send("user@example.com", "whitelist@example.test", "Hello", SurblTestPointBody));
 
@@ -390,7 +390,7 @@ namespace RegressionTests.AntiSpam
          surblServer.Save();
 
          // Make sure we are now blacklisted.
-         var smtpClient = new SmtpClientSimulator(false, 25, IPAddress.Parse(firstAddress));
+         var smtpClient = new SmtpClientSimulator(false, TestPorts.Smtp, IPAddress.Parse(firstAddress));
          CustomAsserts.Throws<DeliveryFailedException>(() =>
             smtpClient.Send("user@example.com", "whitelist@example.test", "Hello", SurblTestPointBody));
 
@@ -420,7 +420,7 @@ namespace RegressionTests.AntiSpam
          surblServer.Save();
 
          // Make sure we are now blacklisted.
-         var smtpClient = new SmtpClientSimulator(false, 25, IPAddress.Parse(firstAddress));
+         var smtpClient = new SmtpClientSimulator(false, TestPorts.Smtp, IPAddress.Parse(firstAddress));
          CustomAsserts.Throws<DeliveryFailedException>(() =>
             smtpClient.Send("user@example.com", "whitelist@example.test", "Hello", SurblTestPointBody));
 
@@ -451,7 +451,7 @@ namespace RegressionTests.AntiSpam
          surblServer.Save();
 
          // Make sure we are now blacklisted.
-         var smtpClient = new SmtpClientSimulator(false, 25);
+         var smtpClient = new SmtpClientSimulator(false, TestPorts.Smtp);
          CustomAsserts.Throws<DeliveryFailedException>(() =>
             smtpClient.Send("user@example.com", "whitelist@example.test", "Hello", SurblTestPointBody));
 
@@ -511,7 +511,7 @@ namespace RegressionTests.AntiSpam
          surblServer.Save();
 
          // Make sure we are now blacklisted.
-         var smtpClient = new SmtpClientSimulator(false, 25, IPAddress.Parse(firstAddress));
+         var smtpClient = new SmtpClientSimulator(false, TestPorts.Smtp, IPAddress.Parse(firstAddress));
          CustomAsserts.Throws<DeliveryFailedException>(() =>
             smtpClient.Send("user@example.com", "whitelist@example.test", "Hello", SurblTestPointBody));
 

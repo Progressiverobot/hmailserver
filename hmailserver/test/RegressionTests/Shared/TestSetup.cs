@@ -821,7 +821,10 @@ namespace RegressionTests.Shared
          {
             try
             {
-               return client.ConnectAsync(ip, 25).Wait(2000) && client.Connected;
+               // The SMTP port this run is configured with, not the number 25:
+               // against a server on another port no address would ever answer and
+               // the caller would be told the machine has no reachable address.
+               return client.ConnectAsync(ip, TestPorts.Smtp).Wait(2000) && client.Connected;
             }
             catch (AggregateException)
             {

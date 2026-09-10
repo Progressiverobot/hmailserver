@@ -30,7 +30,10 @@ namespace RegressionTests.SSL.StartTls
       [Test]
       public void IfStartTlsNotEnabledStartTlsShouldNotBeShownInEhloResponse()
       {
-         var pop3Simulator = new Pop3ClientSimulator(false, 110);
+         // The plain POP3 port, named rather than written as 110: the POP3 simulator
+         // reaches TcpConnection.Connect(IPAddress, int), which does not map a standard
+         // port through TestPorts.Actual the way Connect(int) does.
+         var pop3Simulator = new Pop3ClientSimulator(false, TestPorts.Pop3);
          pop3Simulator.Connect();
          string banner;
 

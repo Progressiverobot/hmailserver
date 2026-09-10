@@ -377,15 +377,15 @@ namespace RegressionTests.Infrastructure
       {
          var status = SingletonProvider<TestSetup>.Instance.GetApp().Status;
 
+         // No early return. RetryHelper.TryAction retries while its action THROWS
+         // and takes a clean return as success, so a guard that returned on
+         // mismatch made a wrong count pass on the first attempt and left the
+         // assertion below it reachable only when the values already agreed -
+         // an assertion that could not fail. Throwing is what asks for another
+         // attempt, and TryAction's last call is unguarded, so the real failure
+         // arrives when the ten seconds are up.
          RetryHelper.TryAction(TimeSpan.FromSeconds(10), () =>
-         {
-            var count = status.get_SessionCount(sessionType);
-
-            if (count != expectedCount)
-               return;
-
-            RetryableAssert.AreEqual(expectedCount, count);
-         });
+            RetryableAssert.AreEqual(expectedCount, status.get_SessionCount(sessionType)));
       }
 
       /// <summary>

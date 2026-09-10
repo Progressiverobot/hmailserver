@@ -131,7 +131,11 @@ namespace RegressionTests.SSL
             }
 
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", i + 1);
-         var pop3Sim = new Pop3ClientSimulator(false, 110);
+         // TestPorts.Pop3, not the literal 110: the POP3 simulator connects through
+         // TcpConnection.Connect(IPAddress, int), which is the one overload that does
+         // not map a standard port through TestPorts.Actual, so a literal here reaches
+         // port 110 whatever the server under test is listening on.
+         var pop3Sim = new Pop3ClientSimulator(false, TestPorts.Pop3);
          var text = pop3Sim.GetFirstMessageText(account.Address, "test");
          Assert.IsTrue(text.Contains("MyBody"));
       }

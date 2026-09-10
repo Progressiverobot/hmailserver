@@ -51,7 +51,7 @@ namespace RegressionTests.AntiSpam
          // Connect via the machine's LAN address: the HELO host check is by design
          // skipped for loopback connections (SpamTestHeloHost), so a 127.0.0.1
          // client would never produce the expected score.
-         var smtpClientSimulator = new SmtpClientSimulator(false, 25, TestSetup.GetLocalIpAddress());
+         var smtpClientSimulator = new SmtpClientSimulator(false, TestPorts.Smtp, TestSetup.GetLocalIpAddress());
 
          // Should not be possible to send this email since it's results in a spam
          // score over the delete threshold.
@@ -91,7 +91,7 @@ namespace RegressionTests.AntiSpam
          // We should only detect one of these two:
          // Connect via the machine's LAN address: the HELO host check is by design
          // skipped for loopback connections (SpamTestHeloHost).
-         var smtpClientSimulator = new SmtpClientSimulator(false, 25, TestSetup.GetLocalIpAddress());
+         var smtpClientSimulator = new SmtpClientSimulator(false, TestPorts.Smtp, TestSetup.GetLocalIpAddress());
 
          // Should not be possible to send this email since it's results in a spam
          // score over the delete threshold.

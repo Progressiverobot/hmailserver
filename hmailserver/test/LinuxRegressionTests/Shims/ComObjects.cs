@@ -1161,13 +1161,13 @@ namespace hMailServer
    {
       public IMAPFolder Add(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
          return null;
       }
 
       public IMAPFolder get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
          return null;
       }
 
@@ -1175,14 +1175,14 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+            NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
             return 0;
          }
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
       }
    }
 
@@ -3069,6 +3069,24 @@ namespace hMailServer
             throw new System.Runtime.InteropServices.COMException("Failed to save object. " + vacation.Error);
 
          vacation.Expect(200, "PUT /api/v1/me/vacation as " + Address);
+
+         // Read back out of the answer, which the route documents as "the state
+         // as saved". These five were plain backing fields, so a test that set
+         // them and read them back was reading its own input and would have read
+         // the same thing if the route had stored nothing at all. There is no GET
+         // for this state; the PUT's response is the only read there is, and it
+         // is a real one.
+         if (vacation.Json.HasValue)
+         {
+            var saved = vacation.Json.Value;
+
+            _vacationOn = ServerApi.FlagOf(saved, "enabled", _vacationOn);
+            _vacationSubject = ServerApi.StringOf(saved, "subject") ?? string.Empty;
+            _vacationMessage = ServerApi.StringOf(saved, "message") ?? string.Empty;
+            _vacationExpires = ServerApi.FlagOf(saved, "expires", _vacationExpires);
+            _vacationExpiresDate = ServerApi.StringOf(saved, "expires_date") ?? string.Empty;
+         }
+
          _vacationTouched = false;
       }
 

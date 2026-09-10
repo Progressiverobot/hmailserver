@@ -57,6 +57,21 @@ namespace RegressionTests.Stress
 
          account.PersonFirstName = sb.ToString();
 
+         // Refused, and refused with a reason. This used to swallow whatever came
+         // back and assert only that the attempt was quick, which stopped meaning
+         // anything the moment the refusal moved earlier: with the length checked
+         // before the statement is built, the save never reaches the database, no
+         // error log is written, and what was left was a stopwatch over an in-memory
+         // string comparison - a test that could not fail and would have passed just
+         // as well with the check taken out.
+         //
+         // What the fixture is for is that an absurd value neither hangs nor crashes
+         // the server, so that is still timed; but the outcome is pinned too, because
+         // the alternative the server had until 6.3.0 was to attempt the insert, fail
+         // in the driver, and report nothing a caller could act on - which over REST
+         // was a 500 for what is plainly the caller's mistake.
+         Exception refusal = null;
+
          try
          {
             watch.Start();
@@ -64,14 +79,23 @@ namespace RegressionTests.Stress
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
+            refusal = fatalCheck;
          }
 
          watch.Stop();
          Assert.Greater(10000, watch.ElapsedMilliseconds);
 
-         // an error log file may have been created. if we're using MySQL,
-         // the value may have been silently truncated.
+         Assert.IsNotNull(refusal,
+            "An 8,000-character first name was accepted for a column that holds 60. It has to be refused: " +
+            "silently truncating it loses data, and reporting nothing leaves a REST caller with a 500 for " +
+            "their own mistake.");
+
+         Assert.That(refusal.Message, Does.Contain("60"),
+            "The refusal should name the limit it enforced, so a caller can fix the value. Got: " + refusal.Message);
+
+         // Nothing should have been written to the ERROR log: this is a refused
+         // request, not a server fault. AssertDeleteFile is kept because a failure
+         // here must not leave a log behind to fail the next test's setup.
          CustomAsserts.AssertDeleteFile(LogHandler.GetErrorLogFileName());
       }
 

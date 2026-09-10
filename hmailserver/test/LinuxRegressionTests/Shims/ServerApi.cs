@@ -277,6 +277,25 @@ namespace RegressionTests.Shared
          return null;
       }
 
+      /// <summary>
+      ///    A JSON true/false, or the fallback when the property is absent or is
+      ///    not a boolean. There was no such helper: everything read until now was
+      ///    a string, a number or an array.
+      /// </summary>
+      public static bool FlagOf(JsonElement element, string property, bool fallback = false)
+      {
+         JsonElement value;
+         if (element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out value))
+         {
+            if (value.ValueKind == JsonValueKind.True)
+               return true;
+            if (value.ValueKind == JsonValueKind.False)
+               return false;
+         }
+
+         return fallback;
+      }
+
       public static long LongOf(JsonElement element, string property, long fallback = 0)
       {
          JsonElement value;
