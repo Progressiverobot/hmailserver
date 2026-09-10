@@ -72,6 +72,7 @@ namespace RegressionTests.Shared
          _domain = SingletonProvider<TestSetup>.Instance.PerformBasicSetup();
 
          LogHandler.MarkErrorLog();
+         LogHandler.MarkDefaultLog();
       }
 
       [TearDown]
