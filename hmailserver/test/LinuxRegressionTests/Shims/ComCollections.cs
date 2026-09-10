@@ -931,7 +931,13 @@ namespace hMailServer
          return ServerApi.Array(ServerApi.Get("/api/v1/routes").Expect(200, "GET /api/v1/routes"));
       }
 
-      private static Route From(JsonElement element)
+      /// <summary>
+      ///    One route as the API describes it. Internal rather than private
+      ///    because TestSetup maps the answer to POST /api/v1/routes with it -
+      ///    a created route has to come back knowing its own id, or the next
+      ///    Save on it inserts a duplicate instead of updating.
+      /// </summary>
+      internal static Route From(JsonElement element)
       {
          return new Route
          {
@@ -1518,24 +1524,95 @@ namespace hMailServer
          };
       }
 
+      /// <summary>
+      ///    POST /api/v1/me/folders. When this collection is a subfolder
+      ///    collection its parent id goes with the request, so Add on
+      ///    folder.SubFolders creates underneath it, as the COM collection does.
+      /// </summary>
       public IMAPFolder Add(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
-         return null;
+         _account.RequireOwnCredentials("creates a folder");
+
+         var body = "{\"name\":" + ServerApi.Quote(name ?? string.Empty) +
+            (_parentId == RootParent ? string.Empty : ",\"parent_id\":" + _parentId) + "}";
+
+         var answer = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Post,
+            "/api/v1/me/folders", body);
+
+         // The route refuses an invalid name in IMAP CREATE's own sentences, and
+         // the COM collection throws for the same input - so the fixtures that
+         // check a refusal get an exception either way.
+         if (answer.Status == 400 || answer.Status == 403 || answer.Status == 409)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(201, "POST /api/v1/me/folders as " + _account.Address);
+
+         if (!answer.Json.HasValue)
+            throw new InvalidOperationException("POST /api/v1/me/folders answered no body: " + answer.Body);
+
+         return From(answer.Json.Value);
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         _account.RequireOwnCredentials("deletes a folder");
+
+         var answer = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Delete,
+            "/api/v1/me/folders/" + id);
+
+         if (answer.Status == 403)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+
+         answer.Expect(200, "DELETE /api/v1/me/folders/" + id + " as " + _account.Address);
       }
 
       public void Delete(int index)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         DeleteByDBID(All()[index].GetProperty("id").GetInt64());
       }
 
       public void Refresh()
       {
+      }
+
+      /// <summary>The hierarchy delimiter this server is configured with.</summary>
+      internal static string Delimiter(Account account)
+      {
+         var answer = ServerApi.AsAccount(account.Address, account.Password, HttpMethod.Get,
+            "/api/v1/me/folders").Expect(200, "GET /api/v1/me/folders as " + account.Address);
+
+         var delimiter = answer.Json.HasValue ? ServerApi.StringOf(answer.Json.Value, "delimiter") : null;
+
+         return string.IsNullOrEmpty(delimiter) ? "." : delimiter;
+      }
+
+      /// <summary>
+      ///    The path the listing reports for one folder of this account, or null.
+      ///    The route already joins the names with the delimiter, so this is a
+      ///    lookup rather than a walk.
+      /// </summary>
+      internal string PathOf(long id)
+      {
+         var answer = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Get,
+            "/api/v1/me/folders").Expect(200, "GET /api/v1/me/folders as " + _account.Address);
+
+         return PathIn(ServerApi.Array(answer, "folders"), id);
+      }
+
+      private static string PathIn(List<JsonElement> folders, long id)
+      {
+         foreach (var folder in folders)
+         {
+            if (ServerApi.LongOf(folder, "id") == id)
+               return ServerApi.StringOf(folder, "path");
+
+            var found = PathIn(ServerApi.Array(folder, "subfolders"), id);
+
+            if (found != null)
+               return found;
+         }
+
+         return null;
       }
    }
 
@@ -1560,14 +1637,39 @@ namespace hMailServer
 
       public Messages Messages => new Messages(Account, ID);
 
+      /// <summary>
+      ///    PUT /api/v1/me/folders/{id}, which is a rename. Its body is a WHOLE
+      ///    mailbox name, exactly as IMAP RENAME's second argument is - so
+      ///    sending this folder's leaf name on its own would move it to the top
+      ///    level. The parent's path is read back out of the tree and put in
+      ///    front of it, which leaves the folder where it is and renames it.
+      /// </summary>
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         Account.RequireOwnCredentials("renames a folder");
+
+         string whole = Name;
+
+         if (ParentID >= 0)
+         {
+            var parent = new IMAPFolders(Account, IMAPFolders.RootParent).PathOf(ParentID);
+
+            if (!string.IsNullOrEmpty(parent))
+               whole = parent + IMAPFolders.Delimiter(Account) + Name;
+         }
+
+         var answer = ServerApi.AsAccount(Account.Address, Account.Password, HttpMethod.Put,
+            "/api/v1/me/folders/" + ID, "{\"name\":" + ServerApi.Quote(whole) + "}");
+
+         if (answer.Status == 400 || answer.Status == 403 || answer.Status == 409)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(200, "PUT /api/v1/me/folders/" + ID + " as " + Account.Address);
       }
 
       public void Delete()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderWrite);
+         new IMAPFolders(Account, IMAPFolders.RootParent).DeleteByDBID(ID);
       }
    }
 }

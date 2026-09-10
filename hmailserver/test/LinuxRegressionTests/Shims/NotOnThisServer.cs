@@ -141,9 +141,6 @@ namespace RegressionTests.Shared
       public const string NoDomainUpdate =
          "changes a domain, and this server's REST API has no PUT /api/v1/domains/{domain}";
 
-      public const string NoSecondRouteForADomain =
-         "adds a second SMTP route for a domain that already has one, which POST /api/v1/routes refuses (\"a route for that domain name already exists\") where COM allows it";
-
       public const string WindowsPathInTheFixture =
          "names a file with a backslash in its path, which is a directory separator only on Windows";
 
@@ -192,8 +189,26 @@ namespace RegressionTests.Shared
       public const string NoAccountRules =
          "needs an account's own rules, and /api/v1/rules carries the global rules only";
 
-      public const string NoFolderWrite =
-         "needs an IMAP folder created or deleted through the account object, and the REST API has GET /api/v1/me/folders and nothing that writes a folder";
+      /// <summary>
+      ///    The account's OWN folders are written now - POST, PUT and DELETE
+      ///    /api/v1/me/folders arrived with this release, and the shim drives
+      ///    them. This reason is for the PUBLIC namespace, which those routes do
+      ///    not reach and were never meant to: they are the signed-in account's
+      ///    mailbox by design, and #Public has no route at all.
+      /// </summary>
+      /// <summary>
+      ///    A few fixtures have to reach the server from an address the "My computer"
+      ///    security range does NOT cover - they send local-to-local without
+      ///    authenticating and expect the refusal that range would waive. That needs a
+      ///    private address on a non-loopback interface which the server answers on,
+      ///    and two supported configurations have none: a server on another host, and
+      ///    a server bound to loopback only.
+      /// </summary>
+      public const string NoAddressOutsideMyComputer =
+         "needs to reach the server from an address outside the \"My computer\" security range, and this host has no non-loopback private address the server answers on";
+
+      public const string NoPublicFolderWrite =
+         "needs a public folder created, listed or deleted, and the REST API's folder routes reach the signed-in account's own mailbox only - the public namespace has no route";
 
       public const string NoFetchAccounts =
          "needs external (fetch) accounts, and no REST route carries them";

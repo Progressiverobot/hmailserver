@@ -6,6 +6,8 @@ using System.Text.Json;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -325,15 +327,22 @@ namespace RegressionTests.Shared
             "\"treat_recipient_as_local_domain\":" + local + ",\"treat_security_as_local_domain\":" + local + "," +
             "\"connection_security\":" + ServerApi.Quote(ConnectionSecurityName(connectionSecurity)) + "}");
 
-         // COM lets a second route be added for a domain that already has one; the
-         // route refuses it in as many words. A test that asks for two is asking for
-         // something this API does not do, and says so rather than quietly running
-         // against the first route.
+         // A 409 here is a route left behind by an earlier test, not a limitation:
+         // POST refuses a second route for a domain exactly as COM does, in
+         // PreSaveLimitationsCheck::CheckLimitations. Said plainly, because it
+         // used to be skipped as though the API were the odd one out.
          if (answer.Status == 409)
-            NotOnThisServer.Ignore(NotOnThisServer.NoSecondRouteForADomain);
+            Assert.Fail("A route for dummy-example.com already exists, so an earlier test did not " +
+                        "clean up: " + answer.Body);
 
          answer.Expect(201, "POST /api/v1/routes");
-         return new Route { DomainName = "dummy-example.com" };
+
+         // Mapped from the answer, id and all - NOT a bare new Route. Callers set
+         // one more field and call Save() again (SMTP/Routes.cs does, two lines
+         // after calling this), and on COM that second Save updates the row the
+         // first one inserted. A returned object with no id makes it a second
+         // INSERT instead, which the API then refuses as a duplicate.
+         return Routes.From(answer.Json.Value);
       }
       internal static string ConnectionSecurityName(eConnectionSecurity connectionSecurity)
       {
@@ -813,16 +822,103 @@ namespace RegressionTests.Shared
          return _freePort;
       }
 
+      private static IPAddress _localIpAddress;
+
       /// <summary>
-      ///    The address the server is reachable on. The Windows one walks the network
-      ///    interfaces for a private address that answers on port 25, which is both a
-      ///    check that the machine has a network and the address the fixtures give the
-      ///    server to connect back to. Here the target is known and there is no
-      ///    interface to probe, so it is the configured host.
+      ///    The address the server is reachable on, and specifically NOT the loopback.
+      ///    The fixtures that ask for it connect to it so that the server sees them as
+      ///    a client from outside "My computer", whose security range is 127.0.0.1 to
+      ///    127.0.0.1 and which requires no SMTP authentication; the "Internet" range
+      ///    that every other address falls in does.
+      ///
+      ///    This shim first returned TestPorts.HostAddress, which here is 127.0.0.1,
+      ///    and that made AWStatsLoggingTests.FailedDeliveriesDueToAuthErrorShouldBeLogged
+      ///    unfailable: it sends local-to-local without authenticating and expects the
+      ///    530 that refusal writes to the AWStats journal, and from the loopback the
+      ///    server accepted the message instead.
+      ///
+      ///    So it now does what the Windows TestSetup does - walk the interfaces for a
+      ///    private IPv4 address the server actually answers on - with one addition:
+      ///    loopback interfaces are passed over. Not because the addresses on them
+      ///    are the wrong server - under WSL the loopback also carries 10.255.255.254
+      ///    and the server, bound to 0.0.0.0, answers there and logs the session like
+      ///    any other - but because every one of them falls inside the "My computer"
+      ///    security range, which is what these fixtures need to be OUTSIDE of.
+      ///
+      ///    Cached, because TestFixtureBase asks for it in every fixture's setup and the
+      ///    probe opens a socket per candidate.
       /// </summary>
       internal static IPAddress GetLocalIpAddress()
       {
-         return TestPorts.HostAddress;
+         if (_localIpAddress != null)
+            return _localIpAddress;
+
+         var allAddresses = new StringBuilder();
+
+         foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+         {
+            if (networkInterface.OperationalStatus != OperationalStatus.Up)
+               continue;
+
+            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
+               continue;
+
+            foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses)
+            {
+               var address = unicastAddress.Address;
+               allAddresses.AppendLine($"Family: {address.AddressFamily}, Address: {address}");
+
+               if (address.AddressFamily != AddressFamily.InterNetwork)
+                  continue;
+
+               if (!IsPrivateIp(address) || !CanReachSmtp(address))
+                  continue;
+
+               _localIpAddress = address;
+               return address;
+            }
+         }
+
+         // A skip, not a failure. Two configurations this project documents as
+         // supported have no such address at all - a server on another host, which
+         // TestTarget exists to detect, and a server bound to loopback only - and
+         // failing here would fail every test in the run rather than the handful
+         // that need to reach the server from outside the "My computer" range.
+         NotOnThisServer.Ignore(NotOnThisServer.NoAddressOutsideMyComputer +
+                                " (addresses seen: " + allAddresses.ToString().Replace("\n", " ").Trim() + ")");
+         return null;
+      }
+
+      /// <summary>
+      ///    Whether the server under test answers on this address, on the SMTP port this
+      ///    run is configured with rather than the number 25 - a machine may have several
+      ///    private addresses and the server need not be reachable on all of them.
+      /// </summary>
+      private static bool CanReachSmtp(IPAddress address)
+      {
+         using (var client = new TcpClient())
+         {
+            try
+            {
+               return client.ConnectAsync(address, TestPorts.Smtp).Wait(2000) && client.Connected;
+            }
+            catch (AggregateException)
+            {
+               return false;
+            }
+         }
+      }
+
+      /// <summary>
+      ///    The RFC 1918 ranges, the same test the Windows TestSetup makes.
+      /// </summary>
+      private static bool IsPrivateIp(IPAddress address)
+      {
+         var bytes = address.GetAddressBytes();
+         return
+            bytes[0] == 10 ||
+            (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31) ||
+            (bytes[0] == 192 && bytes[1] == 168);
       }
 
       public static string GetResource(string resourceName)

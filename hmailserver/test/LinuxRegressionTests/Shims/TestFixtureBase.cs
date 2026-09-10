@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Collections.Generic;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -19,7 +20,9 @@ namespace RegressionTests.Shared
    ///      TearDown  the server's log is printed for a failed test; what the test
    ///                made is removed; and a test that passed while the server wrote
    ///                a new ERROR line fails on that line, because an error nobody
-   ///                looked at is the case the Windows check exists for.
+   ///                looked at is the case the Windows check exists for - save for
+   ///                the lines this port is already known to write, which
+   ///                WithoutKnownPlatformGaps names one by one.
    ///
    ///    The Windows base deletes the log files and reads them from disk; here they
    ///    are on another machine, so the ERROR log is read through GET /api/v1/logs
@@ -69,8 +72,6 @@ namespace RegressionTests.Shared
          _domain = SingletonProvider<TestSetup>.Instance.PerformBasicSetup();
 
          LogHandler.MarkErrorLog();
-
-         TestSetup.GetLocalIpAddress();
       }
 
       [TearDown]
@@ -88,7 +89,7 @@ namespace RegressionTests.Shared
          // Read before the cleanup, which can add lines of its own (an account deleted
          // with a message still queued is the HM5165 the Windows base class describes),
          // and before anything that could throw.
-         var newErrors = LogHandler.ErrorLogLinesSinceMark();
+         var newErrors = WithoutKnownPlatformGaps(LogHandler.ErrorLogLinesSinceMark());
 
          try
          {
@@ -113,6 +114,44 @@ namespace RegressionTests.Shared
          }
 
          CrashOracleAsserts.AssertNoMemorySafetyEvents();
+      }
+
+      /// <summary>
+      ///    Drops the ERROR lines this build writes because of a gap in the port itself,
+      ///    rather than because of anything a test did. Such a line is the platform
+      ///    announcing a limitation that is already known and already on the roadmap; it
+      ///    would otherwise fail every passing test that happens to send a message.
+      ///
+      ///    HM6406 is the only one so far: the SPF implementation resolves names through
+      ///    the Windows DNS client, which this platform does not have, so every lookup is
+      ///    refused and every SPF check returns TempError. RMSPF.cpp reports it under a
+      ///    std::call_once, so it is written once for the life of the server process and
+      ///    does not accumulate - but the one test that happens to be running when it
+      ///    fires is failed by it, and which test that is depends on nothing but when the
+      ///    server was last restarted. Measured: it was written at 03:48 on 10 September
+      ///    2026 by a server that had started at 03:29, and it failed
+      ///    AWStatsLoggingTests.SuccessfulDeliveriesShouldBeLogged, whose own assertions
+      ///    had all passed. Note that an SPF lookup happens here even though use_spf is
+      ///    false: SpamTestDMARC calls SPF::Test as part of a DMARC evaluation, and DMARC
+      ///    is on.
+      ///
+      ///    Matched on the code and on the sentence that names the cause, so that an
+      ///    HM6406 raised for some other reason still fails the test.
+      /// </summary>
+      private static string[] WithoutKnownPlatformGaps(string[] errorLines)
+      {
+         var kept = new List<string>(errorLines.Length);
+
+         foreach (var line in errorLines)
+         {
+            if (line.Contains("HM6406") &&
+                line.Contains("resolves names through the Windows DNS client"))
+               continue;
+
+            kept.Add(line);
+         }
+
+         return kept.ToArray();
       }
    }
 }

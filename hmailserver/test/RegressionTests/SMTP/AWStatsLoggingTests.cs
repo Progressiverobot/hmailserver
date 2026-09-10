@@ -39,7 +39,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
          var localAddress = TestSetup.GetLocalIpAddress();
-         var smtpClientSimulator = new SmtpClientSimulator(false, 25, localAddress);
+         var smtpClientSimulator = new SmtpClientSimulator(false, TestPorts.Smtp, localAddress);
 
          // Delivery from external to local.
          smtpClientSimulator.Send("test@external.com", "test@example.test", "Mail 1", "Mail 1");
@@ -62,7 +62,7 @@ namespace RegressionTests.SMTP
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "test@example.test", "test");
 
          var localAddress = TestSetup.GetLocalIpAddress();
-         var smtpClientSimulator = new SmtpClientSimulator(false, 25, localAddress);
+         var smtpClientSimulator = new SmtpClientSimulator(false, TestPorts.Smtp, localAddress);
 
          // Failed delivery from local to local.
          CustomAsserts.Throws<DeliveryFailedException>(() =>
