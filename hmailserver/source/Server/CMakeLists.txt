@@ -41,10 +41,41 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+# ---------------------------------------------------------------- the version
+#
+# NOT written here. Common/Application/Version.h is the one place the number
+# lives - the Windows resources, the installer and the update checker all stamp
+# from it - and this file's PROJECT_VERSION becomes CPACK_PACKAGE_VERSION, which
+# decides the four package FILE NAMES that .github/workflows/sign-release.yml
+# matches by exact equality and that the Linux update checker builds from a tag.
+# A hand-written number here that lagged Version.h by one release produced
+# packages nothing would ever find, and nothing checked it.
+#
+# So it is read out of the header at configure time. The other Linux stamp -
+# pkgver in platform/packaging/PKGBUILD - cannot be derived this way, because
+# makepkg parses that file as a shell script and never runs CMake; it is verified
+# instead, by build/check-linux-version-stamp.sh, which is a required step of
+# .github/workflows/linux-build.yml. CMAKE_CURRENT_LIST_DIR rather than
+# CMAKE_CURRENT_SOURCE_DIR only because this runs before project().
+file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/Common/Application/Version.h HMAILSERVER_VERSION_DEFINE
+   REGEX "^#define[ \t]+HMAILSERVER_VERSION[ \t]+\"")
+
+string(REGEX REPLACE "^.*\"([0-9]+\\.[0-9]+\\.[0-9]+)\".*$" "\\1"
+   HMAILSERVER_VERSION "${HMAILSERVER_VERSION_DEFINE}")
+
+if(NOT HMAILSERVER_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+   message(FATAL_ERROR
+      "Could not read HMAILSERVER_VERSION out of Common/Application/Version.h. "
+      "That header is where the version of everything this repository builds comes "
+      "from; the line read was: '${HMAILSERVER_VERSION_DEFINE}'.")
+endif()
+
 project(hmailserver_core
-   VERSION 6.2.28
+   VERSION ${HMAILSERVER_VERSION}
    DESCRIPTION "hMailServer core, portable build"
    LANGUAGES CXX)
+
+message(STATUS "hMailServer version ${PROJECT_VERSION}, read from Common/Application/Version.h")
 
 if(WIN32)
    message(FATAL_ERROR
@@ -267,6 +298,25 @@ install(TARGETS hmailserver RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY ${SERVER_DIR}/../DBScripts/
    DESTINATION ${CMAKE_INSTALL_DATADIR}/hmailserver/DBScripts
    FILES_MATCHING PATTERN "*.sql")
+
+# The Control Deck - the administration page the REST listener serves at GET /.
+#
+# RestApiServer::HandleWebAdminPage_ builds the path as
+# GetProgramDirectory() + "WebAdmin" + "index.html", and IniFileSettings gives
+# the program directory a trailing separator when it reads it, so with the
+# ProgramFolder=/usr/share/hmailserver that platform/packaging/hMailServer.ini
+# sets, the file the server opens is exactly
+# /usr/share/hmailserver/WebAdmin/index.html - which is what the DESTINATION
+# below resolves to under the /usr prefix these packages are built with, and it
+# is the same derivation the DBScripts rule above relies on.
+#
+# Until this rule existed, every packaged Linux server answered GET / with the
+# built-in "Web administration page not installed" stub: the page was in the
+# repository, the code looked for it, and nothing put it there. The install
+# check in .github/workflows/linux-build.yml now asks the installed server for
+# the page and refuses the stub.
+install(FILES ${SERVER_DIR}/../../installation/WebAdmin/index.html
+   DESTINATION ${CMAKE_INSTALL_DATADIR}/hmailserver/WebAdmin)
 # Absolute for the same reason, and /usr/lib rather than /lib because that is
 # where a distribution's own units live and where systemd looks first.
 install(FILES ${SERVER_DIR}/platform/packaging/hmailserver.service
