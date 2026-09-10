@@ -53,6 +53,28 @@ on:
 
 permissions: {}
 
+# One run at a time for one tag, and queued rather than cancelled. This workflow
+# downloads a release's assets, signs the bytes it downloaded, and uploads the
+# bundles back to a release that is still a draft and therefore still mutable:
+# two dispatches for the same tag overlap happily, and the second one can replace
+# an asset - the Authenticode job clobbers the installer - between the moment the
+# first one hashed that asset and the moment it attaches the bundle. The bundle
+# then names a file whose bytes have changed, and a user who verifies the download
+# gets the same answer as for a tampered one. Cancelling in progress would trade
+# that for a worse fault, because a run stopped between signing the assets and
+# uploading the bundles leaves the release with assets carrying no signature at
+# all.
+#
+# The group name is this workflow's alone. A group is matched as a plain string
+# across the whole repository, and the only other groups in .github/workflows are
+# `linux-build-<ref>` in linux-build.yml and `server-build-<ref>` in
+# server-build.yml - sbom.yml, installer-smoke.yml and every other workflow here
+# declare none at all. The prefix below is this workflow's own full name, so it
+# can clash with neither of those nor with anything likely to be added.
+concurrency:
+  group: sign-release-artefacts-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
 jobs:
   # Authenticode, which is a different thing from the Sigstore signature below
   # and complementary to it: SmartScreen and the UAC prompt read Authenticode
@@ -151,8 +173,12 @@ jobs:
       # rather than as data - and this is the one job in the repository where
       # that matters most, because it is the job that holds the code-signing
       # credentials and contents: write.
+      #
+      # No longer conditional on the certificate gate: the completeness check below
+      # it has to run whether or not there is a certificate to sign with, and it
+      # needs the tag. A dispatch with no tag to resolve now fails here rather than
+      # in the sign job - the same run, one job earlier, with the same message.
       - name: Resolve the tag
-        if: steps.have.outputs.ready == 'true'
         id: tag
         shell: bash
         env:
@@ -165,6 +191,127 @@ jobs:
             exit 1
           fi
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      # The rest of what a release must carry, asserted rather than described - and
+      # asserted HERE, in the first job, rather than beside the cosign steps below.
+      # It costs one API call and no download, and the two steps below it that do
+      # anything cannot be undone: `Sign it` spends a code-signing certificate, and
+      # the step after it replaces the installer asset on the release with what it
+      # signed. A release missing an SBOM has to go round again regardless, so the
+      # cheapest check is the one that has to come first.
+      #
+      # Until now the SBOMs were named in this file's header and in RELEASE.md and
+      # checked nowhere, and the only count this workflow made was that it had
+      # signed more than nothing: a release whose SBOM workflow was never dispatched
+      # came through green, was published, and could never be added to afterwards,
+      # because an immutable release refuses every later upload. RELEASE.md records
+      # what that cost - "6.2.22-pre4 was published straight away and ended up with
+      # an installer and no SBOM at all".
+      #
+      # The sums file is a WARNING and not a failure, deliberately. linux-build.yml
+      # computes it in its publish job, from the packages that job has just
+      # downloaded, and it is NOT one of the linux-packages-* artefacts - so the
+      # recovery path that same job prints into its own log when no release exists
+      # yet,
+      #
+      #   gh run download <id> --pattern 'linux-packages-*' --dir packages
+      #   gh release upload <tag> --clobber $(find packages -type f)
+      #
+      # attaches every .deb, .rpm and .AppImage and no sums file at all. That is a
+      # documented, legitimate way to make a release, and nothing on the release
+      # tells it apart from an upload that went wrong, so no amount of precision
+      # here could separate the two: a hard failure would simply block a good
+      # release at its last step, with the tag already spent and unable to back
+      # another. The file itself is a list of SHA-256 sums of assets that are each
+      # signed individually a few steps below, so its absence costs a convenience
+      # and not a guarantee. The SBOMs stay hard because nothing on the release can
+      # reconstruct them, and one dispatch of one workflow puts them right.
+      - name: Everything the release must carry is on it
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # Exactly the name linux-build.yml's publish job builds: the tag with its
+          # leading v taken off, in that shape. Never a bare "SHA256SUMS" and never
+          # a glob - a sums file left over from another version would satisfy a glob
+          # and tell a Linux user nothing about this one.
+          sums="hmailserver-linux-${version}-SHA256SUMS.txt"
+
+          if ! names="$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')"; then
+            echo "::error::There is no release for ${TAG} to check, draft or published. The draft is created first - RELEASE.md has the order."
+            exit 1
+          fi
+          # Into an array, and compared with = rather than piped into grep: a
+          # `printf ... | grep -q` returns grep's answer through a pipeline that
+          # `set -o pipefail` also watches, and grep -q exits on its first match
+          # while printf is still writing, so a long enough asset list makes the
+          # pipeline report printf's SIGPIPE and a present asset read as missing.
+          mapfile -t attached <<< "$names"
+          echo "Attached to ${TAG}:"
+          printf '  %s\n' "${attached[@]}"
+
+          has() {
+            local n
+            for n in "${attached[@]}"; do
+              if [ "$n" = "$1" ]; then
+                return 0
+              fi
+            done
+            return 1
+          }
+
+          missing=()
+          for name in hmailserver.spdx.json hmailserver.cyclonedx.json; do
+            if has "$name"; then
+              echo "Found ${name}."
+            else
+              missing+=("${name}")
+            fi
+          done
+
+          if [ "${#missing[@]}" -ne 0 ]; then
+            echo "::error::${TAG} is missing ${#missing[@]} required asset(s): ${missing[*]}."
+            echo "The SBOMs come from the SBOM workflow and have to be attached BEFORE this one"
+            echo "runs: cosign signs whatever is present when it runs, and a published release"
+            echo "takes nothing more. Nothing has been signed and no asset has been replaced."
+            echo "  gh workflow run \"SBOM\" -f release_tag=${TAG}"
+            echo "then dispatch this workflow again."
+            exit 1
+          fi
+
+          # By suffix, the way the last step of the sign job classifies too.
+          linux=0
+          for name in "${attached[@]}"; do
+            case "$name" in
+              *.deb|*.rpm|*.AppImage) linux=1 ;;
+            esac
+          done
+
+          if [ "${linux}" -eq 1 ]; then
+            if has "$sums"; then
+              echo "Found ${sums}."
+            else
+              # The annotation is one line because that is all an annotation can
+              # be; the remedy goes underneath it, the way the rest of this file
+              # says anything long.
+              echo "::warning::${TAG} carries Linux packages but not ${sums}."
+              echo "Not a failure. linux-build.yml computes that file in its publish job and it is"
+              echo "not one of the linux-packages-* artefacts, so the hand-run recovery upload that"
+              echo "job documents attaches the packages without it."
+              echo ""
+              echo "To add it, from a directory holding the packages: sha256sum every .deb, .rpm"
+              echo "and .AppImage into a file named exactly ${sums}, then"
+              echo "  gh release upload ${TAG} ${sums}"
+              echo "while the release is still a draft, and dispatch this workflow again so the"
+              echo "sums file is signed like everything else."
+            fi
+          else
+            echo "No Linux artefacts on ${TAG}, so no ${sums} is expected."
+          fi
 
       - name: Download the installer from the release
         if: steps.have.outputs.ready == 'true'
@@ -203,6 +350,24 @@ jobs:
           # ample - but a slow runner should wait rather than fail a release.
           timeout: 900
 
+      # The countersigned timestamp is proved here as well as the status, because
+      # Status alone cannot see the failure this job is most likely to have. The
+      # certificates this service issues live about seventy-two hours, and
+      # Get-AuthenticodeSignature answers Valid for a signature carrying no
+      # timestamp as long as the certificate is still inside its own lifetime -
+      # which it always is at this point, the signature having been made seconds
+      # earlier. Three days later the same installer reads NotTimeValid on every
+      # machine in the field, and the release it came from was published and
+      # immutable long before.
+      #
+      # Throwing for it fails this job, and the sign job below needs this one, so an
+      # untimestamped installer costs the release its cosign bundles as well. That
+      # trade is taken deliberately, and nothing is lost by it: the throw is BEFORE
+      # the `gh release upload` in this same step, so the release still holds the
+      # installer it had, the draft is still mutable, and there is nothing to undo.
+      # The alternative is a release whose installer stops verifying in three days
+      # and which cannot be corrected by then. A run dispatched again is cheap, and
+      # the message says what to do next.
       - name: Prove it is signed, then replace the asset
         if: steps.have.outputs.ready == 'true'
         shell: pwsh
@@ -216,6 +381,25 @@ jobs:
           "status: $($sig.Status)"
           "signer: $($sig.SignerCertificate.Subject)"
           if ($sig.Status -ne 'Valid') { throw "The installer is not validly signed: $($sig.Status)" }
+          if ($null -eq $sig.TimeStamperCertificate) {
+            $lines = @(
+              "The installer is signed but carries no RFC3161 countersignature, and reads"
+              "Valid here only because the signing certificate is minutes old. That"
+              "certificate expires in about seventy-two hours and the signature stops"
+              "verifying with it, on a release that is immutable once published."
+              ""
+              "Nothing has been changed. This check runs before the release asset is"
+              "replaced, so the release still holds the installer it had and no cosign"
+              "bundle has been made."
+              ""
+              "Check that the timestamping authority named on the signing step above"
+              "(timestamp-rfc3161) is reachable from the runner and that the certificate"
+              "profile permits timestamping, then dispatch this workflow again at the same"
+              "tag while the release is still a draft."
+            )
+            throw ($lines -join "`n")
+          }
+          "timestamper: $($sig.TimeStamperCertificate.Subject)"
           gh release upload "$env:TAG" $exe --repo "$env:REPO" --clobber
 
   sign:
@@ -298,7 +482,10 @@ jobs:
         run: |
           mkdir -p assets
           # Signatures and bundles from an earlier run are excluded, so re-running
-          # this workflow does not sign its own output.
+          # this workflow does not sign its own output. These three suffixes are the
+          # whole of this workflow's notion of an asset it does not sign, and the
+          # last step of this job excludes exactly the same three from its rule that
+          # every asset carries a bundle: add a kind here and add it there too.
           gh release download "$TAG" --dir assets --pattern '*' --clobber
           rm -f assets/*.cosign.bundle assets/*.sig assets/*.pem
           echo "Assets to sign:"
@@ -362,6 +549,7 @@ jobs:
           fi
 
       - name: Sign each asset
+        id: signing
         env:
           TAG: ${{ steps.tag.outputs.tag }}
         run: |
@@ -383,11 +571,13 @@ jobs:
             echo "::error::No assets found on $TAG - nothing was signed."
             exit 1
           fi
+          echo "count=${signed}" >> "$GITHUB_OUTPUT"
           echo "Signed $signed asset(s)."
 
       - name: Verify what we just signed
         env:
           REPO: ${{ github.repository }}
+          SIGNED: ${{ steps.signing.outputs.count }}
         run: |
           set -euo pipefail
           shopt -s nullglob
@@ -395,6 +585,12 @@ jobs:
           # well-formed and the identity matches, which is exactly the failure
           # mode of a mis-configured signing step. A user's own verification is
           # the real check, but a broken bundle should never reach them.
+          #
+          # The count is asserted afterwards because this loop is a glob: with no
+          # bundles in ./assets it iterates nothing, verifies nothing and passes -
+          # which is precisely the shape of a signing step that produced no output.
+          # It has to check as many bundles as that step says it made.
+          verified=0
           for bundle in assets/*.cosign.bundle; do
             file="${bundle%.cosign.bundle}"
             echo "::group::Verifying $(basename "$file")"
@@ -403,8 +599,31 @@ jobs:
               --certificate-identity-regexp "^https://github\.com/${REPO}/" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
               "$file"
+            verified=$((verified + 1))
             echo "::endgroup::"
           done
+
+          # The count from the signing step is compared as a number, so it has to
+          # BE one. An empty value - a step output that never got written because
+          # the step above changed - makes [ x -ne "" ] exit 2, which an if reads
+          # as false, and this check would then pass having proved nothing. That
+          # is the exact shape of the bug this step exists to close, so it is
+          # refused here rather than trusted.
+          case "${SIGNED}" in
+            ''|*[!0-9]*)
+              echo "::error::The signing step reported '${SIGNED}' as the number of assets it signed, which is not a number. This step cannot confirm what it verified, so it refuses to pass."
+              exit 1
+              ;;
+          esac
+          if [ "${verified}" -eq 0 ]; then
+            echo "::error::There are no bundles in ./assets to verify, so this step checked nothing at all. The signing step above reported ${SIGNED}."
+            exit 1
+          fi
+          if [ "${verified}" -ne "${SIGNED}" ]; then
+            echo "::error::The step above signed ${SIGNED} asset(s) and ${verified} bundle(s) verified here. Nothing has been attached to the release."
+            exit 1
+          fi
+          echo "Verified ${verified} of ${SIGNED} bundle(s)."
 
       - name: Attach the signatures to the release
         env:
@@ -416,3 +635,120 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
           gh release upload "$TAG" assets/*.cosign.bundle --clobber
+
+      # Everything above verifies this job's own copy in ./assets, which proves the
+      # bundles are well-formed and says nothing whatever about the release. The
+      # release is a draft while this runs and stays mutable until somebody
+      # publishes it, and there are four known ways an asset changes after it has
+      # been signed: the Linux build's publish job re-runs and re-uploads its
+      # packages with --clobber, the SBOM workflow is dispatched a second time and
+      # uploads its two files with --clobber, a second dispatch of this workflow
+      # replaces the installer with a freshly Authenticode-signed copy of it, and
+      # the recovery commands the Linux job prints into its own log are pasted by
+      # hand into a terminal. Each of those leaves a bundle that signs bytes the
+      # release no longer holds, and to a user who verifies a download that is
+      # indistinguishable from tampering.
+      #
+      # So the last thing this job does is fetch the release exactly as it is
+      # attached and verify every asset against the bundle attached beside it. A
+      # green run here means the release was correct at that moment. What RELEASE.md
+      # does after this step is the installer smoke test and `gh release view
+      # vX.Y.Z --json assets`, and neither attaches or replaces anything -
+      # installer-smoke.yml downloads the installer from the release and keeps its
+      # own results as a run artefact, and `gh release view` reads - so nothing
+      # between here and `gh release edit vX.Y.Z --draft=false` changes an asset.
+      # Dispatch any of the four workflows above again, though, and this step's
+      # answer is the answer to an older question: dispatch this one again too, and
+      # publish on a green run.
+      - name: Verify the release as attached, not as we signed it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Same reason as the download step: no checkout, so no inferred repo.
+          GH_REPO: ${{ github.repository }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          rm -rf published
+          mkdir -p published
+          gh release download "$TAG" --dir published --pattern '*' --clobber
+          echo "The release as attached:"
+          ls -la published
+
+          primary=0
+          verified=0
+          bundles=0
+          unsigned=0
+          bad=0
+          # Classified by SUFFIX, and by exactly the three kinds the download step at
+          # the top of this job strips before signing: a .sig or a .pem is
+          # deliberately not signed there, so demanding a bundle beside one here
+          # would fail this step permanently on a release that is perfectly correct.
+          # The patterns are anchored at the end of the name, as that `rm` is, so an
+          # asset whose name merely CONTAINS .cosign.bundle - notes.cosign.bundle.txt
+          # - is a primary asset here and was signed there, which agrees.
+          for file in published/*; do
+            [ -f "$file" ] || continue
+            name="$(basename "$file")"
+            case "$name" in
+              *.cosign.bundle)
+                bundles=$((bundles + 1))
+                continue
+                ;;
+              *.sig|*.pem)
+                unsigned=$((unsigned + 1))
+                echo "${name} is a kind this workflow does not sign, so no bundle is expected beside it."
+                continue
+                ;;
+            esac
+            primary=$((primary + 1))
+            if [ ! -f "${file}.cosign.bundle" ]; then
+              echo "::error::${name} is attached to ${TAG} with no signature beside it: it went on after the signing step above, or its bundle failed to upload."
+              bad=$((bad + 1))
+              continue
+            fi
+            echo "::group::Verifying ${name} as attached"
+            if cosign verify-blob \
+              --bundle "${file}.cosign.bundle" \
+              --certificate-identity-regexp "^https://github\.com/${REPO}/" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              "$file"; then
+              verified=$((verified + 1))
+              echo "${name} verifies against the bundle attached to ${TAG}."
+            else
+              echo "::error::${name} does NOT verify against the bundle attached to ${TAG}: its bytes changed after they were signed. Find out what replaced it, dispatch this workflow again, and do not publish until this step is green."
+              bad=$((bad + 1))
+            fi
+            echo "::endgroup::"
+          done
+
+          # The other direction: a bundle whose file is gone is the signature of an
+          # asset somebody deleted after it was signed.
+          for bundle in published/*.cosign.bundle; do
+            file="${bundle%.cosign.bundle}"
+            if [ ! -f "$file" ]; then
+              echo "::error::$(basename "$bundle") is attached to ${TAG} but $(basename "$file") is not: a signature for an asset that is no longer on the release."
+              bad=$((bad + 1))
+            fi
+          done
+
+          # This step globs a directory it filled itself, so it can pass having
+          # checked nothing: an empty download, or a release carrying bundles and
+          # nothing else, runs both loops zero times and succeeds.
+          if [ "${primary}" -eq 0 ]; then
+            echo "::error::${TAG} has ${bundles} bundle(s) and not one signable asset, so this step verified nothing at all. That is not a release."
+            exit 1
+          fi
+
+          if [ "${bad}" -ne 0 ]; then
+            echo "::error::${TAG} is not correctly signed as it is attached, and must not be published in this state."
+            exit 1
+          fi
+
+          if [ "${verified}" -ne "${primary}" ]; then
+            echo "::error::${TAG} carries ${primary} signable asset(s) and only ${verified} verified. Refusing to call this release signed."
+            exit 1
+          fi
+
+          echo "${verified} of ${primary} asset(s) on ${TAG} verify against the bundle attached beside them: ${bundles} bundle(s), ${unsigned} asset(s) unsigned by design."
