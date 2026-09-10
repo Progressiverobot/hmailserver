@@ -27,6 +27,7 @@ namespace RegressionTests.Infrastructure
    public class LogHandler
    {
       private static string[] _errorMark = new string[0];
+      private static string[] _defaultMark = new string[0];
 
       /// <summary>
       ///    The file the server is writing now, by the name the logging group gives
@@ -104,9 +105,38 @@ namespace RegressionTests.Infrastructure
          return answer.Body.Split('\n').Select(line => line.TrimEnd('\r')).Where(line => line.Length > 0).ToArray();
       }
 
+      /// <summary>
+      ///    The default log SINCE THE MARK, not the whole file. The Windows suite
+      ///    reads a log that the gate's service restart left empty and that a test
+      ///    wanting a clean one deletes; here the file is one per day on a server
+      ///    that stays up across many runs, so the whole of it is hours of other
+      ///    sessions. A fixture searching it for a string it must NOT find - the
+      ///    plaintext-command-injection test looks for "RSET" - then fails on
+      ///    somebody else's traffic, alone passes and in a full run does not.
+      /// </summary>
       public static string ReadCurrentDefaultLog()
       {
-         return string.Join(Environment.NewLine, Tail(CurrentLogNamed("current_default_log", "hmailserver_")));
+         var now = Tail(CurrentLogNamed("current_default_log", "hmailserver_"));
+
+         IEnumerable<string> fresh = now;
+
+         if (_defaultMark.Length > 0)
+         {
+            var last = _defaultMark[_defaultMark.Length - 1];
+            var at = Array.LastIndexOf(now, last);
+
+            // Not found means the log rolled over or was replaced under us, and
+            // everything now in it is newer than the mark.
+            if (at >= 0)
+               fresh = now.Skip(at + 1);
+         }
+
+         return string.Join(Environment.NewLine, fresh);
+      }
+
+      public static void MarkDefaultLog()
+      {
+         _defaultMark = Tail(CurrentLogNamed("current_default_log", "hmailserver_"));
       }
 
       public static string ReadErrorLog()
@@ -114,9 +144,14 @@ namespace RegressionTests.Infrastructure
          return string.Join(Environment.NewLine, Tail(CurrentLogNamed("current_error_log", "ERROR_hmailserver_")));
       }
 
-      /// <summary>Nothing to delete from here; the mark taken in SetUp is what stands in for it.</summary>
+      /// <summary>
+      ///    No route deletes a log, so this takes a fresh mark instead - which is
+      ///    what the callers mean by it: everything read after this call should be
+      ///    what happened after this call.
+      /// </summary>
       public static void DeleteCurrentDefaultLog()
       {
+         MarkDefaultLog();
       }
 
       public static void MarkErrorLog()
