@@ -947,7 +947,7 @@ namespace HM
       // A [Directories] value that is not a full path is taken to be relative to
       // the program folder, so that an installation can be written to be movable
       // (docs/RelocatingAnInstallation.md, issue #158). An absolute value, which
-      // is what every installation before 6.2.29 holds, is returned exactly as
+      // is what every installation before 6.3.0 holds, is returned exactly as
       // it was; an empty one stays empty, because empty means "not set" to
       // every reader of these.
       String ResolveAgainstProgramDirectory_(const String &value) const;

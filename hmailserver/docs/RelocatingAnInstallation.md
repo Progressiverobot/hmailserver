@@ -255,7 +255,7 @@ hand.
 This came up as [issue #158](https://github.com/Progressiverobot/hmailserver/issues/158).
 The short answer is that `ProgramFolder` is not the root of anything: it is one
 of six independent absolute strings, and the registry holds a seventh copy that
-the server actually uses to find its own INI file. From 6.2.29 a *relative*
+the server actually uses to find its own INI file. From 6.3.0 a *relative*
 value in the five non-program directories is resolved against the program folder,
 so a new installation can be written to be movable; an existing installation's
 absolute values are left exactly as they are, because rewriting a configured
