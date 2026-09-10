@@ -28,7 +28,14 @@ on:
         required: false
 
 permissions:
-  contents: read
+  # write, not read, and only so that a DRAFT release can be read. GitHub shows
+  # an unpublished release to a token with push access and to nobody else, so
+  # with contents: read this job answered "release not found" for a draft and
+  # threw - which made RELEASE.md's ordering impossible to follow: it requires
+  # this test to be green BEFORE the release is published, and immutable
+  # releases mean publishing first to make the test pass is not a fallback but a
+  # one-way door. Found cutting 6.3.0, on the last gate before publication.
+  contents: write
   actions: read
 
 jobs:
