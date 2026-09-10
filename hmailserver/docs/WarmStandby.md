@@ -192,8 +192,14 @@ Building the standby
    store, certificates and DKIM keys.
 4. Record the DPAPI credential list (routes, fetch accounts, per-domain
    relays) somewhere that survives the primary.
-5. Rehearse the failover below at least once before it is real. A standby that
-   has never been started is a hope, not a topology.
+5. Set the administrator password on the standby as well
+   (`--set-admin-password`, or the Control Panel). It lives in
+   `hMailServer.ini` and not in the database, so it does not travel; without it
+   the standby has no REST API and no COM authentication when you most need
+   both. Found by the rehearsal below, where the standby came up mute.
+6. Rehearse the failover below at least once before it is real. A standby that
+   has never been started is a hope, not a topology. One rehearsal is recorded
+   below.
 
 Failover
 --------
@@ -241,6 +247,74 @@ After either direction:
 * Check the application log for `ERROR` entries since the failover timestamp.
 * Confirm TLS on 25/143/110/587/993/995 presents the right certificate —
   this is the file-path row of the table above proving itself.
+
+The rehearsal, 9 September 2026
+-------------------------------
+
+Everything above was argued from the code. This is what happened when it was
+done, on two machines, with one database between them.
+
+**The pair.** The primary was a Linux server on the development machine; the
+standby was a second machine (`linix`, Ubuntu 26.04, a separate host with its
+own filesystem and network stack) running the same build. Both were configured
+against one PostgreSQL 18 database. The standby reached it over an SSH tunnel,
+which is this lab's stand-in for a LAN route and changes nothing about the
+topology: two servers, one database, two message stores.
+
+That is not a Windows pair, and three things below therefore stand as arguments
+rather than measurements: DPAPI itself (the Linux server seals secrets with a
+key file instead), a Windows file-replication tool, and the service manager. The
+rest is now measured, and the parts that are measured are the parts this
+document's shape depends on.
+
+**Exactly one service may run against the database - measured.** With the
+primary running and holding a queued message (`hm_messages.messagelocked = 1`,
+which is what a delivery in flight looks like), the standby was started on the
+second machine. Two things happened at once. It bound the same ports - 2700,
+1300, 1400 - because the listeners are rows in `hm_tcpipports` and both servers
+read the same rows; and the lock went to 0. The message the primary was
+delivering became a message anybody could deliver, which is the sentence at the
+top of this document turned into an observation. Nothing warned, on either side.
+
+**The store is replicated, not shared - and the failover works.** The primary
+was stopped, its `Data` directory copied to the second machine, and the standby
+started. A message delivered before the failover was readable over IMAP on the
+standby; a message sent after it arrived and was read the same way. Two messages
+in the mailbox, one from each side of the failure.
+
+**What travelled, and what did not.** The standby inherited from the database
+everything the `hm_settings` and `hm_inisettings` mirrors carry: the host name
+(`pair.standby.test`) and the connection limit set on the primary, the domain,
+the account, and the SMTP route with its host, port, authentication flag and
+user name. Two things did not travel, and both are worth knowing before a real
+failover rather than during one:
+
+* **The administrator password.** It lives in `hMailServer.ini`, not in the
+  database. Until `--set-admin-password` (or the Control Panel) sets it on the
+  standby, the standby has no REST API and no COM authentication - the API
+  refuses to start at all with an empty administrator password. The failover
+  checklist above now says so.
+* **The route's relay password.** The route arrived; its password did not. The
+  standby reported `HM6412` from `DataProtector::Unprotect` - the stored-secret
+  key file does not exist here - every time it tried to use the route, and the
+  delivery attempt went out unauthenticated. This is the DPAPI constraint in its
+  Linux form, and it behaves exactly as the Windows one is argued to: the
+  secrets are sealed to the installation, not to the database.
+
+  There is one difference from DPAPI worth stating plainly. On Windows the
+  secret is sealed by the machine and **cannot** be copied. On Linux it is
+  sealed by `<DataFolder>/.hmailserver-secret-key`, which is a file - and a
+  replication that copies the data directory wholesale will copy it too, and
+  the standby will then read every secret the primary could. Decide which you
+  want: exclude the key file and re-enter the passwords after a failover, as on
+  Windows, or replicate it deliberately and accept that the standby holds the
+  primary's secrets. The rehearsal excluded it.
+
+**What is still not rehearsed.** A Windows-to-Windows pair; DPAPI itself; a
+file-replication product rather than a copy at the moment of failure; DNS or IP
+takeover; and failback. The failover procedure below has been walked end to end
+once, on two machines, and the three constraints it is built around have been
+observed rather than reasoned about.
 
 Verified against the code
 -------------------------

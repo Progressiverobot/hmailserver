@@ -1090,8 +1090,9 @@ namespace RegressionTests.API
 
          (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
          Assert.AreEqual(200, message.status, "Body: " + message.body);
-         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000}", message.body);
+         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000,\"content_type\":\"application/octet-stream\",\"content_id\":\"\"}", message.body);
          StringAssert.Contains("\"name\":\"page.html\"", message.body);
+         StringAssert.Contains("\"content_type\":\"text/html\"", message.body);
          StringAssert.Contains("See attached.", message.body);
 
          string path = "/api/v1/me/messages/" + messageId + "/attachments/";
@@ -1603,8 +1604,15 @@ namespace RegressionTests.API
 
          (int status, string body) copy = Http("GET", "/api/v1/me/messages/" + sentId, UserHeader(UserPassword));
          Assert.AreEqual(200, copy.status, "Body: " + copy.body);
-         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000}", copy.body);
-         StringAssert.Contains("{\"index\":1,\"name\":\"note.txt\",\"size\":5}", copy.body);
+         // The entry carries its type and its content id as well as its name and
+         // size: the page reads those to decide whether an attachment is an inline
+         // cid: image, and what type to hand the frame it renders the body in.
+         StringAssert.Contains("{\"index\":0,\"name\":\"numbers.bin\",\"size\":1000,"
+            + "\"content_type\":\"application/octet-stream\",\"content_id\":\"\"}", copy.body,
+            "An unknown type is reported as application/octet-stream, which is what stops a browser running it. Body: " + copy.body);
+         StringAssert.Contains("{\"index\":1,\"name\":\"note.txt\",\"size\":5,"
+            + "\"content_type\":\"text/plain\",\"content_id\":\"\"}", copy.body,
+            "Body: " + copy.body);
 
          Response file = Raw("GET", "/api/v1/me/messages/" + sentId + "/attachments/0", UserHeader(UserPassword), null);
          Assert.AreEqual(200, file.Status, file.Body);
@@ -1640,6 +1648,422 @@ namespace RegressionTests.API
 
          (int status, string body) admin = RefusedBySize("POST", "/api/v1/status", AdminHeader(), big.Length);
          Assert.AreEqual(413, admin.status, "Body: " + admin.body);
+      }
+
+      // ------------------------------------------------- the folder writes ---
+
+      // The account's root folders as COM sees them, which is how the Control
+      // Panel would: the collection is the one the running server holds, so a
+      // folder a REST call made is in it without a reload.
+      private bool ComHasRootFolder(string name)
+      {
+         IMAPFolders folders = _account.IMAPFolders;
+         for (int i = 0; i < folders.Count; i++)
+         {
+            if (string.Equals(folders[i].Name, name, StringComparison.OrdinalIgnoreCase))
+               return true;
+         }
+
+         return false;
+      }
+
+      private string Delimiter()
+      {
+         return Between(Http("GET", "/api/v1/me/folders", UserHeader(UserPassword)).body, "\"delimiter\":\"", "\"");
+      }
+
+      private long FolderIdOf(string path)
+      {
+         return IdBefore(Http("GET", "/api/v1/me/folders", UserHeader(UserPassword)).body, "\"path\":\"" + path + "\"");
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/folders creates a folder COM then reads back, a name carrying the delimiter creates the whole path, and parent_id nests")]
+      public void FoldersAreCreatedThroughTheirRoute()
+      {
+         string delimiter = Delimiter();
+
+         (int status, string body) plain = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Projects\"}");
+         Assert.AreEqual(201, plain.status, "Body: " + plain.body);
+         StringAssert.Contains("\"name\":\"Projects\"", plain.body);
+         StringAssert.Contains("\"path\":\"Projects\"", plain.body);
+         StringAssert.Contains("\"parent_id\":-1", plain.body);
+         StringAssert.Contains("\"special_use\":\"\"", plain.body);
+         StringAssert.Contains("\"messages\":0,\"unseen\":0", plain.body);
+         StringAssert.Contains("\"subfolders\":[]", plain.body);
+
+         long projectsId = IdBefore(plain.body, "\"path\":\"Projects\"");
+         IMAPFolder projects = CustomAsserts.AssertFolderExists(_account.IMAPFolders, "Projects");
+         Assert.AreEqual(projectsId, (long) projects.ID, "The answer names the folder COM now holds.");
+
+         // A name carrying the hierarchy delimiter is a path, and CREATE makes
+         // every level of it that is missing.
+         (int status, string body) tree = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"Work" + delimiter + "2026" + delimiter + "Q1\"}");
+         Assert.AreEqual(201, tree.status, "Body: " + tree.body);
+         StringAssert.Contains("\"name\":\"Q1\"", tree.body);
+         StringAssert.Contains("\"path\":\"Work" + delimiter + "2026" + delimiter + "Q1\"", tree.body);
+
+         IMAPFolder work = CustomAsserts.AssertFolderExists(_account.IMAPFolders, "Work");
+         IMAPFolder year = CustomAsserts.AssertFolderExists(work.SubFolders, "2026");
+         IMAPFolder quarter = CustomAsserts.AssertFolderExists(year.SubFolders, "Q1");
+         Assert.AreEqual((long) year.ID, (long) quarter.ParentID);
+
+         // parent_id nests under a folder of this account.
+         (int status, string body) nested = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"Alpha\",\"parent_id\":" + projectsId + "}");
+         Assert.AreEqual(201, nested.status, "Body: " + nested.body);
+         StringAssert.Contains("\"path\":\"Projects" + delimiter + "Alpha\"", nested.body);
+         StringAssert.Contains("\"parent_id\":" + projectsId, nested.body);
+         CustomAsserts.AssertFolderExists(projects.SubFolders, "Alpha");
+
+         // And the listing shows what the create answered.
+         (int status, string body) listing = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"name\":\"Alpha\"", FolderEntry(listing.body, "Projects" + delimiter + "Alpha"));
+      }
+
+      [Test]
+      [Description("The folder create refuses what IMAP CREATE refuses, with CREATE's own sentences")]
+      public void TheFolderCreateRefusesWhatImapRefuses()
+      {
+         string delimiter = Delimiter();
+
+         Assert.AreEqual(201, Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Projects\"}").status);
+
+         (int status, string body) again = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Projects\"}");
+         Assert.AreEqual(409, again.status, "Body: " + again.body);
+         StringAssert.Contains("Folder already exists.", again.body);
+
+         (int status, string body) nameless = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{}");
+         Assert.AreEqual(400, nameless.status, "Body: " + nameless.body);
+         StringAssert.Contains("Folder name not specified.", nameless.body);
+
+         (int status, string body) empty = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"\"}");
+         Assert.AreEqual(400, empty.status, "Body: " + empty.body);
+         StringAssert.Contains("Folder name not specified.", empty.body);
+
+         // A namespace prefix is not this account's to write, and IsValidFolderName
+         // is what says so - the same answer CREATE gives.
+         (int status, string body) namespaced = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"#Public" + delimiter + "Shared\"}");
+         Assert.AreEqual(400, namespaced.status, "Body: " + namespaced.body);
+         StringAssert.Contains("CREATE The folder name is invalid.", namespaced.body);
+
+         (int status, string body) hole = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"A" + delimiter + delimiter + "B\"}");
+         Assert.AreEqual(400, hole.status, "An empty element is not a folder name. Body: " + hole.body);
+         StringAssert.Contains("CREATE The folder name is invalid.", hole.body);
+
+         (int status, string body) nowhere = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"X\",\"parent_id\":987654321}");
+         Assert.AreEqual(404, nowhere.status, "Body: " + nowhere.body);
+         StringAssert.Contains("Folder could not be found.", nowhere.body);
+
+         (int status, string body) garbage = Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "not json");
+         Assert.AreEqual(400, garbage.status, "Body: " + garbage.body);
+
+         // Another account's folder cannot be a parent, and the administrator is
+         // not an account at all.
+         (int status, string body) theirs = Http("POST", "/api/v1/me/folders", BasicHeader(OtherAccount(), UserPassword),
+            "{\"name\":\"Mine\",\"parent_id\":" + FolderIdOf("Projects") + "}");
+         Assert.AreEqual(404, theirs.status, "Body: " + theirs.body);
+
+         (int status, string body) admin = Http("POST", "/api/v1/me/folders", AdminHeader(), "{\"name\":\"Nope\"}");
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+
+         // The create is a write, so a browser session needs the header.
+         string cookie = SignIn();
+         Response bare = Raw("POST", "/api/v1/me/folders", null, "{\"name\":\"ViaSession\"}",
+            "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, bare.Status, "A create on a session needs X-Requested-With. " + bare.Body);
+         Assert.IsFalse(ComHasRootFolder("ViaSession"), "Nothing was created.");
+
+         Response withHeader = Raw("POST", "/api/v1/me/folders", null, "{\"name\":\"ViaSession\"}",
+            "Cookie: hmailsession=" + cookie + "\r\nX-Requested-With: hMailServer\r\n");
+         Assert.AreEqual(201, withHeader.Status, withHeader.Body);
+         Assert.IsTrue(ComHasRootFolder("ViaSession"));
+      }
+
+      [Test]
+      [Description("PUT /api/v1/me/folders/{id} renames as IMAP RENAME does: the subfolders follow, and a path moves the folder under a parent it makes")]
+      public void FoldersAreRenamedThroughTheirRoute()
+      {
+         string delimiter = Delimiter();
+
+         long projectsId = IdBefore(Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Projects\"}").body, "\"path\":\"Projects\"");
+         long alphaId = IdBefore(Http("POST", "/api/v1/me/folders", UserHeader(UserPassword),
+            "{\"name\":\"Alpha\",\"parent_id\":" + projectsId + "}").body, "\"name\":\"Alpha\"");
+
+         (int status, string body) renamed = Http("PUT", "/api/v1/me/folders/" + projectsId, UserHeader(UserPassword), "{\"name\":\"Ideas\"}");
+         Assert.AreEqual(200, renamed.status, "Body: " + renamed.body);
+         StringAssert.Contains("\"id\":" + projectsId, renamed.body);
+         StringAssert.Contains("\"name\":\"Ideas\"", renamed.body);
+         StringAssert.Contains("\"path\":\"Ideas\"", renamed.body);
+         // The child kept its id and followed its parent, which is what RENAME
+         // does and why nothing has to be done to it.
+         StringAssert.Contains("\"id\":" + alphaId, renamed.body);
+         StringAssert.Contains("\"path\":\"Ideas" + delimiter + "Alpha\"", renamed.body);
+
+         Assert.IsFalse(ComHasRootFolder("Projects"), "The old name is gone.");
+         IMAPFolder ideas = CustomAsserts.AssertFolderExists(_account.IMAPFolders, "Ideas");
+         Assert.AreEqual(projectsId, (long) ideas.ID, "It is the same folder, renamed.");
+         Assert.AreEqual(alphaId, (long) CustomAsserts.AssertFolderExists(ideas.SubFolders, "Alpha").ID);
+
+         // A path moves it, making the parent it names when that is missing.
+         (int status, string body) moved = Http("PUT", "/api/v1/me/folders/" + projectsId, UserHeader(UserPassword),
+            "{\"name\":\"Archive" + delimiter + "Old\"}");
+         Assert.AreEqual(200, moved.status, "Body: " + moved.body);
+         StringAssert.Contains("\"path\":\"Archive" + delimiter + "Old\"", moved.body);
+         StringAssert.Contains("\"path\":\"Archive" + delimiter + "Old" + delimiter + "Alpha\"", moved.body);
+
+         IMAPFolder archive = CustomAsserts.AssertFolderExists(_account.IMAPFolders, "Archive");
+         IMAPFolder old = CustomAsserts.AssertFolderExists(archive.SubFolders, "Old");
+         Assert.AreEqual(projectsId, (long) old.ID);
+         Assert.AreEqual((long) archive.ID, (long) old.ParentID);
+
+         // And IMAP sees the same tree.
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("Archive" + delimiter + "Old" + delimiter + "Alpha"));
+         imap.Disconnect();
+      }
+
+      [Test]
+      [Description("The folder rename refuses what IMAP RENAME refuses, with RENAME's own sentences")]
+      public void TheFolderRenameRefusesWhatImapRefuses()
+      {
+         string delimiter = Delimiter();
+
+         long inboxId = FolderIdOf("INBOX");
+         long workId = IdBefore(Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Work\"}").body, "\"path\":\"Work\"");
+         Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Taken\"}");
+
+         (int status, string body) inbox = Http("PUT", "/api/v1/me/folders/" + inboxId, UserHeader(UserPassword), "{\"name\":\"NotInbox\"}");
+         Assert.AreEqual(403, inbox.status, "Body: " + inbox.body);
+         StringAssert.Contains("Cannot rename INBOX.", inbox.body);
+
+         (int status, string body) toInbox = Http("PUT", "/api/v1/me/folders/" + workId, UserHeader(UserPassword), "{\"name\":\"inbox\"}");
+         Assert.AreEqual(403, toInbox.status, "The name is compared without case, as IMAP compares it. Body: " + toInbox.body);
+         StringAssert.Contains("Cannot rename INBOX.", toInbox.body);
+
+         (int status, string body) taken = Http("PUT", "/api/v1/me/folders/" + workId, UserHeader(UserPassword), "{\"name\":\"Taken\"}");
+         Assert.AreEqual(409, taken.status, "Body: " + taken.body);
+         StringAssert.Contains("Target folder already exist.", taken.body);
+
+         (int status, string body) intoItself = Http("PUT", "/api/v1/me/folders/" + workId, UserHeader(UserPassword),
+            "{\"name\":\"Work" + delimiter + "Deeper\"}");
+         Assert.AreEqual(400, intoItself.status, "Body: " + intoItself.body);
+         StringAssert.Contains("A folder cannot be moved into one of its subfolders.", intoItself.body);
+
+         (int status, string body) invalid = Http("PUT", "/api/v1/me/folders/" + workId, UserHeader(UserPassword),
+            "{\"name\":\"#Public" + delimiter + "X\"}");
+         Assert.AreEqual(400, invalid.status, "Body: " + invalid.body);
+         StringAssert.Contains("The new folder name is invalid.", invalid.body);
+
+         (int status, string body) unknown = Http("PUT", "/api/v1/me/folders/987654321", UserHeader(UserPassword), "{\"name\":\"X\"}");
+         Assert.AreEqual(404, unknown.status, "Body: " + unknown.body);
+         StringAssert.Contains("Folder could not be found.", unknown.body);
+
+         (int status, string body) theirs = Http("PUT", "/api/v1/me/folders/" + workId, BasicHeader(OtherAccount(), UserPassword), "{\"name\":\"Mine\"}");
+         Assert.AreEqual(404, theirs.status, "Another account's folder is not found, not forbidden. Body: " + theirs.body);
+         Assert.IsTrue(ComHasRootFolder("Work"), "And nothing happened to it.");
+
+         (int status, string body) admin = Http("PUT", "/api/v1/me/folders/" + workId, AdminHeader(), "{\"name\":\"Mine\"}");
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+      }
+
+      [Test]
+      [Description("DELETE /api/v1/me/folders/{id} deletes the folder with its subfolders and their messages, and refuses the inbox and a designated folder")]
+      public void FoldersAreDeletedThroughTheirRoute()
+      {
+         string delimiter = Delimiter();
+
+         long tempId = IdBefore(Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Temp\"}").body, "\"path\":\"Temp\"");
+         Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Inner\",\"parent_id\":" + tempId + "}");
+
+         Deliver(Address, "Filed away", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         long inboxId = FolderIdOf("INBOX");
+         long messageId = IdBefore(Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword)).body, "\"subject\":\"Filed away\"");
+         long innerId = FolderIdOf("Temp" + delimiter + "Inner");
+         Assert.AreEqual(200, Http("POST", "/api/v1/me/messages/" + messageId + "/move", UserHeader(UserPassword),
+            "{\"folder_id\":" + innerId + "}").status);
+
+         (int status, string body) gone = Http("DELETE", "/api/v1/me/folders/" + tempId, UserHeader(UserPassword));
+         Assert.AreEqual(200, gone.status, "Body: " + gone.body);
+         StringAssert.Contains("\"deleted\":true", gone.body);
+
+         Assert.IsFalse(ComHasRootFolder("Temp"), "The folder and its subtree are gone.");
+
+         (int status, string body) listing = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         Assert.IsFalse(listing.body.Contains("\"Temp\""), "Body: " + listing.body);
+         Assert.IsFalse(listing.body.Contains("\"Inner\""), "The subfolder went with it: " + listing.body);
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(404, message.status, "And so did the message in it. Body: " + message.body);
+
+         // The two refusals.
+         (int status, string body) inbox = Http("DELETE", "/api/v1/me/folders/" + inboxId, UserHeader(UserPassword));
+         Assert.AreEqual(403, inbox.status, "Body: " + inbox.body);
+         StringAssert.Contains("You cannot delete the inbox.", inbox.body);
+
+         // A folder the server designates - here by its name, which is how an
+         // account that never sent CREATE ... USE gets a \Sent - is refused.
+         Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Sent\"}");
+         long sentId = FolderIdOf("Sent");
+         StringAssert.Contains("\"special_use\":\"\\\\Sent\"", FolderEntry(Http("GET", "/api/v1/me/folders", UserHeader(UserPassword)).body, "Sent"));
+
+         (int status, string body) designated = Http("DELETE", "/api/v1/me/folders/" + sentId, UserHeader(UserPassword));
+         Assert.AreEqual(403, designated.status, "Body: " + designated.body);
+         StringAssert.Contains("designated for a special use", designated.body);
+         Assert.IsTrue(ComHasRootFolder("Sent"));
+
+         (int status, string body) unknown = Http("DELETE", "/api/v1/me/folders/987654321", UserHeader(UserPassword));
+         Assert.AreEqual(404, unknown.status, "Body: " + unknown.body);
+
+         (int status, string body) theirs = Http("DELETE", "/api/v1/me/folders/" + sentId, BasicHeader(OtherAccount(), UserPassword));
+         Assert.AreEqual(404, theirs.status, "Body: " + theirs.body);
+
+         (int status, string body) admin = Http("DELETE", "/api/v1/me/folders/" + sentId, AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
+
+         string cookie = SignIn();
+         Response bare = Raw("DELETE", "/api/v1/me/folders/" + sentId, null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(403, bare.Status, "A delete on a session needs X-Requested-With. " + bare.Body);
+         Assert.IsTrue(ComHasRootFolder("Sent"));
+      }
+
+      // --------------------------------------------- the inline image, and ---
+      // ------------------------------------------------- the change probe ----
+
+      [Test]
+      [Description("An inline image is listed with its declared type and its Content-ID, and the download answers under that type")]
+      public void AnInlineImageCarriesItsTypeAndContentId()
+      {
+         // The smallest real PNG: one transparent pixel.
+         byte[] png = Convert.FromBase64String(
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+
+         string raw =
+            "From: sender@example.com\r\n" +
+            "To: " + Address + "\r\n" +
+            "Subject: Inline image\r\n" +
+            "MIME-Version: 1.0\r\n" +
+            "Content-Type: multipart/related; boundary=\"b1\"; type=\"text/html\"\r\n" +
+            "\r\n" +
+            "--b1\r\n" +
+            "Content-Type: text/html; charset=us-ascii\r\n" +
+            "Content-Transfer-Encoding: 7bit\r\n" +
+            "\r\n" +
+            "<html><body>Look: <img src=\"cid:logo@example.com\"></body></html>\r\n" +
+            "--b1\r\n" +
+            "Content-Type: image/png; name=\"logo.png\"\r\n" +
+            "Content-Transfer-Encoding: base64\r\n" +
+            "Content-ID: <logo@example.com>\r\n" +
+            "Content-Disposition: inline; filename=\"logo.png\"\r\n" +
+            "\r\n" +
+            Convert.ToBase64String(png, Base64FormattingOptions.InsertLineBreaks) + "\r\n" +
+            "--b1--\r\n";
+
+         SmtpClientSimulator.StaticSendRaw("sender@example.com", Address, raw);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         long inboxId = FolderIdOf("INBOX");
+         long messageId = IdBefore(Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword)).body,
+            "\"subject\":\"Inline image\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+
+         // What the page needs to render it: the cid: reference in the HTML, the
+         // same value in content_id with the angle brackets off, and a type it
+         // can decide from before it fetches anything.
+         StringAssert.Contains("cid:logo@example.com", message.body);
+         StringAssert.Contains("\"content_type\":\"image/png\"", message.body);
+         StringAssert.Contains("\"content_id\":\"logo@example.com\"", message.body);
+         StringAssert.Contains("\"name\":\"logo.png\"", message.body);
+
+         Response image = Raw("GET", "/api/v1/me/messages/" + messageId + "/attachments/0", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, image.Status, image.Body);
+         Assert.AreEqual("image/png", image.Header("Content-Type"), "An img element pointed here has to get the declared type.");
+         Assert.AreEqual("nosniff", image.Header("X-Content-Type-Options"));
+         Assert.AreEqual(png, image.BodyBytes);
+      }
+
+      [Test]
+      [Description("GET /api/v1/me/changes hands back a stable, opaque token and says changed only when this account's mailbox moved")]
+      public void TheChangeProbeSaysWhenTheMailboxMoved()
+      {
+         (int status, string body) first = Http("GET", "/api/v1/me/changes", UserHeader(UserPassword));
+         Assert.AreEqual(200, first.status, "Body: " + first.body);
+
+         string token = Between(first.body, "\"token\":\"", "\"");
+         Assert.AreEqual(64, token.Length, "The token is a SHA-256 in hex: " + first.body);
+         Assert.IsFalse(first.body.Contains("\"changed\""), "changed is answered only when since was asked: " + first.body);
+
+         long inboxId = FolderIdOf("INBOX");
+         StringAssert.Contains("{\"id\":" + inboxId + ",\"count\":0,\"unseen\":0}", first.body);
+
+         (int status, string body) again = Http("GET", "/api/v1/me/changes", UserHeader(UserPassword));
+         Assert.AreEqual(token, Between(again.body, "\"token\":\"", "\""), "An unchanged mailbox stands still.");
+
+         (int status, string body) unchanged = Http("GET", "/api/v1/me/changes?since=" + token, UserHeader(UserPassword));
+         Assert.AreEqual(200, unchanged.status, "Body: " + unchanged.body);
+         StringAssert.Contains("\"changed\":false", unchanged.body);
+
+         Deliver(Address, "Something arrived", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) changed = Http("GET", "/api/v1/me/changes?since=" + token, UserHeader(UserPassword));
+         StringAssert.Contains("\"changed\":true", changed.body);
+         StringAssert.Contains("{\"id\":" + inboxId + ",\"count\":1,\"unseen\":1}", changed.body);
+
+         string moved = Between(changed.body, "\"token\":\"", "\"");
+         Assert.AreNotEqual(token, moved, "A delivery moves the token.");
+
+         // A folder created moves it too, and reading a message moves it back to
+         // neither of the two before.
+         Http("POST", "/api/v1/me/folders", UserHeader(UserPassword), "{\"name\":\"Later\"}");
+         (int status, string body) afterFolder = Http("GET", "/api/v1/me/changes?since=" + moved, UserHeader(UserPassword));
+         StringAssert.Contains("\"changed\":true", afterFolder.body);
+         string withFolder = Between(afterFolder.body, "\"token\":\"", "\"");
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.SelectFolder("INBOX"));
+         Assert.IsTrue(imap.SetFlagOnMessage(1, true, "\\Seen"));
+         imap.Disconnect();
+
+         (int status, string body) afterSeen = Http("GET", "/api/v1/me/changes?since=" + withFolder, UserHeader(UserPassword));
+         StringAssert.Contains("\"changed\":true", afterSeen.body);
+         StringAssert.Contains("{\"id\":" + inboxId + ",\"count\":1,\"unseen\":0}", afterSeen.body);
+         string settled = Between(afterSeen.body, "\"token\":\"", "\"");
+
+         // Another account's mailbox never moves this one's.
+         string other = OtherAccount();
+         Deliver(other, "Not mine", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+
+         (int status, string body) stillSettled = Http("GET", "/api/v1/me/changes?since=" + settled, UserHeader(UserPassword));
+         StringAssert.Contains("\"changed\":false", stillSettled.body);
+         Assert.IsFalse(stillSettled.body.Contains("Not mine"), "The probe carries counts and nothing else: " + stillSettled.body);
+
+         // Two accounts standing at the same shape do not share a token.
+         (int status, string body) theirs = Http("GET", "/api/v1/me/changes", BasicHeader(other, UserPassword));
+         Assert.AreEqual(200, theirs.status, "Body: " + theirs.body);
+         Assert.AreNotEqual(settled, Between(theirs.body, "\"token\":\"", "\""));
+
+         (int status, string body) theirsOnMine = Http("GET", "/api/v1/me/changes?since=" + settled, BasicHeader(other, UserPassword));
+         StringAssert.Contains("\"changed\":true", theirsOnMine.body);
+
+         // A since that is not a token this mailbox ever had reads as a change,
+         // which is the answer that cannot lose a message.
+         (int status, string body) nonsense = Http("GET", "/api/v1/me/changes?since=not-a-token", UserHeader(UserPassword));
+         StringAssert.Contains("\"changed\":true", nonsense.body);
+
+         (int status, string body) admin = Http("GET", "/api/v1/me/changes", AdminHeader());
+         Assert.AreEqual(403, admin.status, "Body: " + admin.body);
       }
 
       // ------------------------------------------------------------ helpers ---

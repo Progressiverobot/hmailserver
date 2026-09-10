@@ -48,6 +48,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The tag when this was dispatched for one, and the event's own ref
+          # otherwise. Without it a dispatch checks out the default branch, and
+          # the bill of materials attached to a release would describe a tree
+          # the release was not built from - which is the one thing an SBOM
+          # must never do.
+          ref: ${{ inputs.release_tag || github.ref }}
+
+      - name: Say which tree this describes
+        run: |
+          echo "ref: $(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo detached)"
+          echo "commit: $(git rev-parse HEAD)"
+          echo "tag: ${{ inputs.release_tag || '(none - not a dispatch for a tag)' }}"
 
       # Syft writes to a file and does NOT upload here. Both uploads happen further down,
       # after the native dependencies have been added - otherwise the artifact and the

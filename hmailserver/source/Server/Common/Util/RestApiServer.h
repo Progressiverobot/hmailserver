@@ -184,6 +184,12 @@ namespace HM
          RouteMeQuarantineDelete,
          RouteMeFolders,
          RouteMeFolderMessages,
+         // Wave 164: the account's own folder writes, and the change probe the
+         // portal polls instead of reloading the whole folder tree.
+         RouteMeFolderCreate,
+         RouteMeFolderRename,
+         RouteMeFolderDelete,
+         RouteMeChanges,
          RouteMeMessage,
          RouteMeMessageFlags,
          RouteMeMessageMove,
@@ -328,6 +334,30 @@ namespace HM
       static HttpResponse HandleMeQuarantineRelease_(const Caller &caller, __int64 id);
       static HttpResponse HandleMeQuarantineDelete_(const Caller &caller, __int64 id);
       static HttpResponse HandleMeFolders_(const Caller &caller);
+      // Wave 164, all of them in RestApiMailbox.cpp: the account's own folder
+      // writes and the change probe. Each judges a name exactly as the IMAP
+      // command of the same purpose judges it and answers with that command's
+      // own sentence, so a portal and a mail client are never told different
+      // things about the same mailbox.
+      static HttpResponse HandleMeFolderCreate_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeFolderRename_(const Caller &caller, __int64 folderId, const AnsiString &requestBody);
+      static HttpResponse HandleMeFolderDelete_(const Caller &caller, __int64 folderId);
+      static HttpResponse HandleMeChanges_(const Caller &caller, const AnsiString &query);
+      static AnsiString OpenApiMailboxPaths_();
+      // The folder the id names in the SIGNED-IN ACCOUNT'S OWN tree, and
+      // nowhere else: the public namespace and a delegating owner's folders are
+      // readable through the message routes, but they are not this account's to
+      // create, rename or delete.
+      static std::shared_ptr<IMAPFolder> FindOwnFolder_(std::shared_ptr<const Account> account, __int64 folderId);
+      // The path of one folder inside its own tree, walked up by parent id, as
+      // the vector of names IMAP would have split from a mailbox name. False
+      // when the walk does not reach the root, which is what a folderparentid
+      // cycle looks like.
+      static std::vector<String> StoredFolderPath_(const String &name, const String &delimiter);
+      static bool OwnFolderPath_(std::shared_ptr<IMAPFolders> tree, std::shared_ptr<IMAPFolder> folder, std::vector<String> &path);
+      // One folder as the listing renders it, subtree and all, so that what a
+      // create or a rename answers is exactly what the next listing shows.
+      static AnsiString FolderEntryJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder);
       static HttpResponse HandleMeFolderMessages_(const Caller &caller, __int64 folderId, const AnsiString &query);
       static HttpResponse HandleMeMessage_(const Caller &caller, __int64 messageId);
       static std::shared_ptr<IMAPFolder> FindReadableFolder_(std::shared_ptr<const Account> account, __int64 folderId);
@@ -336,6 +366,12 @@ namespace HM
       static void AppendFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolders> folders,
                                     const String &parentPath, const std::map<__int64, int> &designations,
                                     const String &delimiter, AnsiString &json, int depth);
+      // One entry of that listing, with its subtree. Split out of the loop so
+      // that the folder writes answer with the very same document rather than a
+      // second spelling of it that could drift.
+      static void AppendOneFolderJson_(std::shared_ptr<const Account> account, std::shared_ptr<IMAPFolder> folder,
+                                       const String &path, const std::map<__int64, int> &designations,
+                                       const String &delimiter, bool writeAccess, AnsiString &json, int depth);
       static HttpResponse HandleMeMessageFlags_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
       static HttpResponse HandleMeMessageMove_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
       static HttpResponse HandleMeMessageDelete_(const Caller &caller, __int64 messageId, const AnsiString &query);
