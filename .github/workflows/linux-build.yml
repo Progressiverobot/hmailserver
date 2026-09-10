@@ -437,7 +437,14 @@ jobs:
           # start - left a configuration the service could not read. The atomic
           # rewrite preserves ownership now, so the workaround is gone and this
           # assertion is what would catch it coming back.
-          owner=$(stat -c '%U:%G %a' /etc/hmailserver/hMailServer.ini)
+          # sudo, like every other command in this step. The package makes
+          # /etc/hmailserver 0750 root:hmailserver on purpose - the configuration
+          # holds credentials - so the runner's own account cannot even traverse
+          # the directory, and a bare stat here answers "cannot statx: Permission
+          # denied" and, under `set -e`, takes the job with it. The comment forty
+          # lines above this one says exactly that about the file checks; this
+          # assertion was added without it and failed the 6.3.0 packaging run.
+          owner=$(sudo stat -c '%U:%G %a' /etc/hmailserver/hMailServer.ini)
           echo "the configuration after --set-admin-password: ${owner}"
           if [ "${owner}" != "root:hmailserver 640" ]; then
             echo "::error::--set-admin-password left /etc/hmailserver/hMailServer.ini as '${owner}', not 'root:hmailserver 640'. The service runs as hmailserver and reads its configuration through the group; it can no longer open it."
