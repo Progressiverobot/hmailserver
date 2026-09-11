@@ -392,7 +392,7 @@ namespace HM
       static HttpResponse HandleMe_(const Caller &caller);
       static HttpResponse HandleMePassword_(const Caller &caller, const AnsiString &request);
       static HttpResponse HandleMeVacation_(const Caller &caller, const AnsiString &requestBody);
-      static HttpResponse HandlePortalPage_();
+      static HttpResponse HandlePortalPage_(const AnsiString &request);
       static HttpResponse HandleMeQuarantineList_(const Caller &caller);
       static HttpResponse HandleMeQuarantineRelease_(const Caller &caller, __int64 id);
       static HttpResponse HandleMeQuarantineDelete_(const Caller &caller, __int64 id);
@@ -553,6 +553,11 @@ namespace HM
       static HttpResponse HandlePortalBranding_(const AnsiString &query);
       static HttpResponse HandlePortalBrandingPut_(const AnsiString &requestBody);
       HttpResponse HandleAccountSupportSession_(const Caller &caller, const AnsiString &address);
+
+      // The webmail's catalogues (RestApiLanguages.cpp).
+      static HttpResponse HandlePortalLanguage_(const AnsiString &code);
+      static AnsiString PortalLanguageJson_(const AnsiString &code);
+      static AnsiString NegotiatePortalLanguage_(const AnsiString &request);
 
       // Files sent as links (RestApiFiles.cpp).
       static HttpResponse HandleMeFiles_(const Caller &caller);

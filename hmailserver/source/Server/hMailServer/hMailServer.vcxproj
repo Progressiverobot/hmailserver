@@ -575,6 +575,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiContacts.cpp" />
     <ClCompile Include="..\Common\Util\RestApiBranding.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFiles.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiLanguages.cpp" />
+    <ClCompile Include="..\Common\Util\PortalLanguagesData.cpp" />
     <ClCompile Include="..\Common\Util\RestApiScheduled.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMessageReplies.cpp" />
     <ClCompile Include="..\Common\Util\RestApiAppPasswords.cpp" />

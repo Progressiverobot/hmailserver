@@ -109,6 +109,12 @@ jobs:
       - name: The self-service portal's script does what the page needs
         run: python3 build/check-portal-script.py
 
+      # Every language's catalogue has every text the page has and nothing
+      # else, keeps the tokens a reader types verbatim, and the embedded unit
+      # is what the generator writes now.
+      - name: The self-service portal's catalogues match the page
+        run: python3 build/check-portal-languages.py
+
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged
     # Written on 21 August 2026 and taken out of the same commit, because the

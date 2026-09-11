@@ -1361,7 +1361,7 @@ namespace HM
       // The self-service page, likewise unauthenticated: it is a static sign-in
       // form whose script presents the account's credentials to /api/v1/me.
       if (method == "GET" && path == "/portal")
-         return HandlePortalPage_();
+         return HandlePortalPage_(request);
 
       if (method == "GET" && path == "/portal.js")
          return HandlePortalScript_();
@@ -1374,6 +1374,10 @@ namespace HM
       // What the page says it is, for the sign-in page, which has no account yet.
       if (method == "GET" && path == "/api/v1/portal/branding")
          return HandlePortalBranding_(query);
+
+      // One language's catalogue of the page's texts, for a reader who chose it.
+      if (method == "GET" && path.StartsWith("/portal-lang/") && path.EndsWith(".json") && path.GetLength() > 18)
+         return HandlePortalLanguage_(path.Mid(13, path.GetLength() - 18));
 
       // A file sent as a link: anyone with the link, and the password when
       // the sender set one (a form, posted back here).
@@ -9256,7 +9260,7 @@ namespace HM
    extern const char *PortalServiceWorker;
 
    HttpResponse
-   RestApiServer::HandlePortalPage_()
+   RestApiServer::HandlePortalPage_(const AnsiString &request)
    {
       HttpResponse response;
       response.content_type = "text/html; charset=utf-8";
@@ -9265,6 +9269,14 @@ namespace HM
       // first paint. A domain's own arrives after sign-in.
       AnsiString page = PortalHtml;
       page.Replace("<!--hm-branding-->", ("<script type=\"application/json\" id=\"branding-data\">" + BrandingJson_(String()) + "</script>").c_str());
+      // The catalogue for the reader's Accept-Language rides in the page too,
+      // so the first paint is already in their language; the script fetches
+      // another on a choice. English is the page itself: no block.
+      const AnsiString language = NegotiatePortalLanguage_(request);
+      AnsiString languageBlock;
+      if (!language.IsEmpty())
+         languageBlock = "<script type=\"application/json\" id=\"lang-data\" data-lang=\"" + language + "\">" + PortalLanguageJson_(language) + "</script>";
+      page.Replace("<!--hm-language-->", languageBlock.c_str());
       response.body = page;
       response.extra_headers = PortalHeaders;
       return response;
@@ -9348,6 +9360,7 @@ namespace HM
          "\"/api/v1/me/files/{id}/content\":{\"put\":{\"summary\":\"Append a chunk of the file's bytes\",\"description\":\"The body is the chunk, raw (up to the large request cap); offset= is where it starts and must be what the record has stored so far, so a chunk lost is sent again and a chunk sent twice is refused (409, with stored). The record is complete when the declared size is reached.\",\"responses\":{\"200\":{\"description\":\"id, stored, size, complete, link\"},\"409\":{\"description\":\"The offset is not where the file has got to, or the file is complete\"},\"413\":{\"description\":\"More than the size that was declared\"}}}},"
          "\"/files/{token}\":{\"get\":{\"summary\":\"Fetch a file sent as a link (no credentials)\",\"description\":\"The bytes as a download (Content-Disposition attachment, nosniff, a sandbox policy, no-store), under the declared type unless a browser would render or run it. A file with a password answers a form instead, posted back here as password=; ten wrong answers pause the file for fifteen minutes. An expired link answers 410, an unknown or unfinished one 404.\",\"responses\":{\"200\":{\"description\":\"The bytes, or the password form\"},\"410\":{\"description\":\"Expired\"},\"404\":{\"description\":\"No such file\"}}}},"
          "\"/api/v1/portal/files\":{\"get\":{\"summary\":\"The policy for files sent as links (administrator)\",\"description\":\"link_above_kb, days, max_days, max_mb, quota_mb - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"The policy\"}}},\"put\":{\"summary\":\"Set the policy (administrator)\",\"description\":\"Body: link_above_kb (0 to 1048576), days (1 to 90), max_mb (1 to 500), quota_mb (1 to 102400) - each written when given a number, removed when given null, left alone when absent; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The policy as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
+         "\"/portal-lang/{code}.json\":{\"get\":{\"summary\":\"The webmail's texts in one language\",\"description\":\"Unauthenticated. An object, English to translation, for one of the languages the page speaks (the page's Language preference lists them); cached a day. The page itself carries the catalogue for the request's Accept-Language.\",\"responses\":{\"200\":{\"description\":\"The catalogue\"},\"404\":{\"description\":\"No such language\"}}}},"
          "\"/api/v1/portal/branding\":{\"get\":{\"summary\":\"What the webmail says it is\",\"description\":\"Unauthenticated, so the sign-in page can ask: name, logo (an inline image), announcement - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"name, logo, announcement, domain\"}}},\"put\":{\"summary\":\"Set the branding (administrator)\",\"description\":\"Body: name (100), logo (an inline data:image/ under 3,900 characters), announcement (1,000), each written when given and removed when given empty; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The branding as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
          "\"/api/v1/accounts/{address}/support-session\":{\"post\":{\"summary\":\"Open a mailbox as its user, for support (administrator)\",\"description\":\"Refused with 403 unless the user has turned on support access under Security. Answers a session cookie for the account; the moment and the administrator are recorded where the user sees them, every request of the session is written to the application log, and the user's session list shows it and can end it.\",\"responses\":{\"201\":{\"description\":\"support, account, idle_seconds, lifetime_seconds, with the cookie\"},\"403\":{\"description\":\"Not allowed by the user\"},\"404\":{\"description\":\"No such account\"}}}},"
          "\"/api/v1/me/drafts/{id}/schedule\":{\"post\":{\"summary\":\"Send a draft later\",\"description\":\"Body: send_at, YYYY-MM-DD HH:MM in the server's local time, within a year. At that minute the draft is sent as the account would have sent it - its To, Cc and Bcc under the checks a send makes, a copy in the Sent folder - and the draft goes. One schedule per draft; a new one replaces it.\",\"responses\":{\"201\":{\"description\":\"id, message_id, send_at\"},\"400\":{\"description\":\"Not a draft, not a time, in the past or too far\"}}},\"delete\":{\"summary\":\"Do not send it later after all\",\"responses\":{\"200\":{\"description\":\"cancelled\"},\"404\":{\"description\":\"Nothing scheduled for it\"}}}},"

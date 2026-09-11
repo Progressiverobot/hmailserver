@@ -2040,6 +2040,35 @@ namespace RegressionTests.API
          }
       }
 
+      [Test]
+      [Description("A catalogue is served to anyone and cached, an unknown language is not, and the page carries the catalogue for the request's Accept-Language - none for English")]
+      public void TheCatalogueIsServedAndThePageCarriesTheNegotiatedOne()
+      {
+         Response german = Raw("GET", "/portal-lang/de.json", null, null);
+         Assert.AreEqual(200, german.Status, german.Body.Length > 200 ? german.Body.Substring(0, 200) : german.Body);
+         StringAssert.Contains("application/json", german.Header("Content-Type"));
+         StringAssert.Contains("public, max-age=86400", german.Header("Cache-Control"));
+         StringAssert.StartsWith("{\"", german.Body);
+         StringAssert.Contains("\"Sign in\":\"", german.Body);
+
+         Response anyCase = Raw("GET", "/portal-lang/DE.json", null, null);
+         Assert.AreEqual(200, anyCase.Status, anyCase.Body.Length > 200 ? anyCase.Body.Substring(0, 200) : anyCase.Body);
+         Response unknown = Raw("GET", "/portal-lang/xx.json", null, null);
+         Assert.AreEqual(404, unknown.Status, unknown.Body);
+         Response english = Raw("GET", "/portal-lang/en.json", null, null);
+         Assert.AreEqual(404, english.Status, "English is the page itself. " + english.Body);
+
+         Response page = Raw("GET", "/portal", null, null, "Accept-Language: de-DE,de;q=0.9,en;q=0.5\r\n");
+         Assert.AreEqual(200, page.Status, page.Body.Length > 200 ? page.Body.Substring(0, 200) : page.Body);
+         StringAssert.Contains("id=\"lang-data\" data-lang=\"de\"", page.Body);
+         Response regional = Raw("GET", "/portal", null, null, "Accept-Language: pt-PT, zh-TW;q=0.8\r\n");
+         StringAssert.Contains("data-lang=\"pt-BR\"", regional.Body);
+         Response plain = Raw("GET", "/portal", null, null);
+         Assert.IsFalse(plain.Body.Contains("id=\"lang-data\""), "No catalogue for English.");
+         Response englishFirst = Raw("GET", "/portal", null, null, "Accept-Language: en-GB,de;q=0.7\r\n");
+         Assert.IsFalse(englishFirst.Body.Contains("id=\"lang-data\""), "English before German is the page as it is.");
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
