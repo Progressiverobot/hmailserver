@@ -242,7 +242,9 @@ already cost a release cycle or nearly shipped a defect.
     gh workflow run "Sign release artefacts" -f tag=vX.Y.Z  # LAST: signs what is attached
     gh workflow run "Installer smoke test" -f release_tag=vX.Y.Z   # green before publishing
     # Expect: the installer, 2 .deb, 2 .rpm, 2 .AppImage, one SHA256SUMS.txt,
-    # 2 SBOMs, and a .cosign.bundle beside every one of them - TWENTY assets.
+    # 2 SBOMs, a .cosign.bundle AND a .sigstore.json (the same bytes, under the
+    # name OpenSSF Scorecard recognises) beside every one of them, and one
+    # hmailserver-vX.Y.Z.intoto.jsonl of SLSA provenance - THIRTY-ONE assets.
     # Count them. This step exists because an artefact that failed to build
     # goes missing quietly, and the release is immutable once published.
     gh release view vX.Y.Z --json assets
