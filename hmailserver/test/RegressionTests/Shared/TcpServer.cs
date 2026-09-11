@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Text;
 using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
@@ -53,7 +54,10 @@ namespace RegressionTests.Shared
 
       public int SecondsToWaitBeforeTerminate { get; set; }
 
-      public string Conversation { get; private set; }
+      // Appended in linear time: a large message arriving in small reads
+      // used to re-copy the whole conversation on every read.
+      private readonly StringBuilder _conversation = new StringBuilder();
+      public string Conversation => _conversation.ToString();
 
       public void Dispose()
       {
@@ -246,28 +250,28 @@ namespace RegressionTests.Shared
 
       public void Send(string s)
       {
-         Conversation += s;
+         _conversation.Append(s);
          _tcpConnection.Send(s);
       }
 
       public string Receive()
       {
          var data = _tcpConnection.Receive();
-         Conversation += data;
+         _conversation.Append(data);
          return data;
       }
 
       public string ReadUntil(string text)
       {
          var data = _tcpConnection.ReadUntil(text);
-         Conversation += data;
+         _conversation.Append(data);
          return data;
       }
 
       public string ReadUntil(List<string> possibleReplies)
       {
          var data = _tcpConnection.ReadUntil(possibleReplies);
-         Conversation += data;
+         _conversation.Append(data);
          return data;
       }
    }

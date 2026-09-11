@@ -110,6 +110,12 @@ namespace RegressionTests.Shared
 
       public string MessageData { get; private set; } = "";
 
+      // The message as it arrives, appended in linear time; MessageData is
+      // made from it once the terminator has been seen. A 720 KB message that
+      // arrived in small reads used to be re-copied and re-searched on every
+      // read, which took longer than the tests wait.
+      private readonly StringBuilder _data = new StringBuilder();
+
       // The most recent MAIL FROM command line received (including the envelope
       // address and any parameters), so tests can assert the transmitted sender.
       public string MailFromCommand { get; private set; } = "";
@@ -362,7 +368,8 @@ namespace RegressionTests.Shared
                _pending = string.Concat(_pending, more); // one socket read at a time; a line or a chunk, never a document
             }
 
-            MessageData += _pending.Substring(0, size);
+            _data.Append(_pending, 0, size);
+            MessageData = _data.ToString();
             _pending = _pending.Substring(size);
 
             if (!_hasMailFrom)
@@ -410,6 +417,7 @@ namespace RegressionTests.Shared
             Send("354 Test Server - Give it to me...\r\n");
             _transmittingData = true;
             MessageData = "";
+            _data.Clear();
             return false;
          }
 
@@ -432,12 +440,18 @@ namespace RegressionTests.Shared
                return true;
             }
 
-            MessageData += command;
+            // The terminator is looked for in what just arrived and the four
+            // characters before it, in case a read split it - never in the
+            // whole message again.
+            int before = _data.Length;
+            _data.Append(command);
+            int windowStart = Math.Max(0, before - 4);
+            string window = _data.ToString(windowStart, _data.Length - windowStart);
 
-            if (MessageData.IndexOf("\r\n.\r\n") > 0)
+            if (window.IndexOf("\r\n.\r\n", StringComparison.Ordinal) >= 0)
             {
                // remove the ending...
-               MessageData = MessageData.Replace("\r\n.\r\n", "\r\n");
+               MessageData = _data.ToString().Replace("\r\n.\r\n", "\r\n");
 
                Send("250 Test Server - Queued for delivery\r\n");
 
