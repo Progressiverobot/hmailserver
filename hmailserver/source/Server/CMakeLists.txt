@@ -199,10 +199,16 @@ find_package(ZLIB REQUIRED)
 # what every release ships under a stable soname: libssl3, libpq5, libldap2,
 # libstdc++6. The -dev packages carry the archives on Debian, Ubuntu and Fedora;
 # the AppImage is unaffected (it bundled the shared libraries and now has none
-# to bundle). Boost.Regex's static archive pulls ICU in only where ICU is
-# called, which this code does not, so no libicu soname appears either.
+# to bundle).
+#
+# Boost.Regex is not linked at all: it has been header-only since 1.76, and
+# Debian's compiled archive is built with ICU support, so linking it statically
+# drags in libicu - whose soname also changes with every release (libicu74 on
+# Ubuntu 24.04, libicu76 on 26.04). The first static-Boost package proved that:
+# no Boost in its Depends, and libicu74 still there. The headers alone give
+# the same boost::regex, and nothing here includes boost/regex/icu.hpp.
 set(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.83 REQUIRED COMPONENTS thread chrono filesystem regex)
+find_package(Boost 1.83 REQUIRED COMPONENTS thread chrono filesystem)
 
 # libpq. PGConnection.h and PGRecordset.h include <libpq-fe.h> by that bare name,
 # the way the Windows project reaches it through an include directory, and Debian
@@ -293,7 +299,6 @@ target_link_libraries(hmailserver_core PUBLIC
    Boost::thread
    Boost::chrono
    Boost::filesystem
-   Boost::regex
    ${CMAKE_DL_LIBS})
 
 # ---------------------------------------------------------------- the service
