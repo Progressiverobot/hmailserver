@@ -854,7 +854,8 @@ namespace hMailServer
          // the same constraint and the fixtures clear the ports first.
          foreach (var answer in All().Select(element => ServerApi.Delete("/api/v1/certificates/" + ServerApi.LongOf(element, "id"))))
          {
-            if (answer.Status != 200 && answer.Status != 404)
+            var gone = answer.Status == 200 || answer.Status == 404;
+            if (!gone)
                throw new System.Runtime.InteropServices.COMException("Failed to delete object. " + answer.Error);
          }
       }
