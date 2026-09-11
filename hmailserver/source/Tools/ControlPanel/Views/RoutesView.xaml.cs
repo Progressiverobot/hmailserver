@@ -25,6 +25,7 @@ namespace hMailServer.ControlPanel.Views
       public RoutesView()
       {
          InitializeComponent();
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(RouteGrid, PropertiesButton, DeleteButton);
       }
 
       public void OnEnter() => Reload();

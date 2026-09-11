@@ -2917,8 +2917,8 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Anna kelvollinen portin numero.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Anna osoite ja hae. Jäljitys ei tallenna yhtään mitään, ellei MessageTraceEnabled ole asetettu hMailServer.ini-tiedostossa - se on oletuksena pois päältä, koska se tallentaa, kuka kirjoittaa kenelle.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Anna osoite ja hae. Jäljitys ei tallenna mitään ennen kuin viestien jäljitys otetaan käyttöön Lokitus-sivulla – se on oletuksena pois käytöstä, koska se tallentaa, kuka kirjoittaa kenelle.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Anna osa nimestä ja paina Hae, tai hae tyhjällä kentällä luetellaksesi kaikki käyttäjät.</value>
@@ -3438,6 +3438,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Kone/Nimi:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Isännöity verkkotunnus</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Tarkistusten väli tunteina (1–168)</value>
@@ -4554,8 +4557,8 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Tässä portissa ei ole salausta saatavilla. Muilta palvelimilta saapuva posti on yleensä muutenkin salaamatonta, mutta tämä portti hyväksyy myös AUTH-komennon, ja sitä käyttävä asiakas lähettää salasanansa selväkielisenä.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Ei tapahtumia tuolle osoitteelle. Joko sille ei ole tapahtunut mitään, tai jäljitys oli tuolloin pois päältä - se tallentaa vain, kun MessageTraceEnabled on asetettu.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Osoitteelle ei ole tapahtumia. Joko sille ei ole tapahtunut mitään tai jäljitys oli tuolloin pois käytöstä – se tallentaa vain, kun viestien jäljitys on käytössä (Lokitus-sivu).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Ei tapahtumia tuolle viestille.</value>
@@ -4710,8 +4713,8 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Ei tarkistettu täältä, rehellisesti sanoen: PTR:n tarkistaminen vaatii palvelimen JULKISEN IP-osoitteen, jota tämä paneeli ei voi selvittää (NAT:n takana kone ei tiedä sitä itsekään), ja tämän sivun tarkistin lukee vain TXT-tietueita. Testaa sen sijaan ulkopuolelta: nslookup &lt;your public IP&gt; näyttää PTR:n; sen pitäisi nimetä yllä oleva kone.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Ei vielä tarkistettu (Tarkista päivitykset, tai UpdateCheckEnabled=1 hMailServer.INI-tiedostossa päivittäistä tarkistusta varten)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Ei vielä tarkistettu (Tarkista päivitykset tai ota päivittäinen tarkistus käyttöön kohdassa Päivitykset sivulla API ja valvonta)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Ei vielä tarkistettu. Julkaise tietue, anna aikaa leviämiselle ja paina sitten "Tarkista DNS".</value>
@@ -4758,11 +4761,14 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Mikään täällä ei vaadi päätöstä: yhtään postilaatikkoa ei ohiteta eikä yhtään poisteta käytöstä.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Täällä ei ole vielä mitään – Lisää luo ensimmäisen merkinnän.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Mitään ei koskaan merkitä roskapostiksi: merkintä vaatii merkintäkynnyksen yli 0, ja 0 siinä tarkoittaa "ei koskaan" eikä "aina". Viestit, jotka saavuttavat {0}, hylätään silti.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Mitään ei pidätetä. Karanteeni on pois päältä, ellei QuarantineEnabled ole asetettu hMailServer.ini-tiedostossa - siihen asti poistokynnyksen ylittävä roskaposti hylätään SMTP-keskustelun aikana tallentamisen sijaan.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Mitään ei ole pidätetty. Karanteeni on pois käytöstä – ota se käyttöön kohdassa Roskapostisuojauksen asetukset – ja siihen asti poistokynnyksen ylittävä roskaposti hylätään SMTP-keskustelun aikana tallentamisen sijaan.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Mikään ei täsmännyt hakuun "{0}". Kokeile sitä, mitä yrität saada aikaan ("pysäytä roskaposti", "anna laitteen lähettää postia"), sivun nimeä tai hMailServer.INI-avainta.</value>
@@ -5749,6 +5755,9 @@ Aja tämä, jos asiakkaat raportoivat viestien näkyvän väärän UID:n alla, t
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Muista näin monta aiempaa salasanaa (0 = ei historiaa)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Etäverkkotunnus</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>P_oista vanhentuneet</value>
   </data>
@@ -6708,12 +6717,6 @@ Jatketaanko?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Aseta TlsRptFromAddress hMailServer.ini-tiedoston [Settings]-osiossa postilaatikoksi, josta raportit lähetetään. Tyhjäksi jättäminen on kelvollinen valinta - se tarkoittaa vain, että kerätyt tilastot hylätään eikä raportteja koskaan lähetetä.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Aseta WebServicesHttpPort ja/tai WebServicesHttpsPort hMailServer.ini-tiedostossa, jotta URL-osoitteet vastaavat, ja julkaise sitten jokaiselle postiverkkotunnukselle autoconfig.&lt;domain&gt;- ja autodiscover.&lt;domain&gt;-DNS-tietueet, jotka osoittavat tähän palvelimeen. Nämä ovat osoitetietueita, ja tämä sivu tarkistaa vain TXT-tietueet, joten niitä ei voi vahvistaa täältä.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Aseta WebServicesHttpsPort hMailServer.ini-tiedostossa (RFC 8461 vaatii käytännön HTTPS:n yli), anna kuuntelijalle varmenne, joka kattaa nimen mta-sts.&lt;domain&gt;, ja julkaise sitten jokaiselle verkkotunnukselle A/AAAA-tietue (tai CNAME) nimelle mta-sts.&lt;domain&gt;, joka osoittaa tähän palvelimeen, sekä TXT-tietue osoitteeseen _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Tämä sivu tarkistaa TXT-tietueen; osoitetietuetta ja varmenteen nimikattavuutta ei voi tarkistaa täältä.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Aseta uusi palvelimen hallintasalasana.</value>
   </data>
@@ -6725,6 +6728,12 @@ Jatketaanko?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Aseta otsakkeen arvo</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Aseta HTTP- tai HTTPS-portti sivulla Verkkopalvelut ja automaattinen määritys-tiedostossa, jotta URL-osoitteet vastaavat, ja julkaise sitten jokaiselle postiverkkotunnukselle autoconfig.&lt;domain&gt;- ja autodiscover.&lt;domain&gt;-DNS-tietueet, jotka osoittavat tähän palvelimeen. Nämä ovat osoitetietueita, ja tämä sivu tarkistaa vain TXT-tietueet, joten niitä ei voi vahvistaa täältä.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Aseta HTTPS-portti sivulla Verkkopalvelut ja automaattinen määritys-tiedostossa (RFC 8461 vaatii käytännön HTTPS:n yli), anna kuuntelijalle varmenne, joka kattaa nimen mta-sts.&lt;domain&gt;, ja julkaise sitten jokaiselle verkkotunnukselle A/AAAA-tietue (tai CNAME) nimelle mta-sts.&lt;domain&gt;, joka osoittaa tähän palvelimeen, sekä TXT-tietue osoitteeseen _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Tämä sivu tarkistaa TXT-tietueen; osoitetietuetta ja varmenteen nimikattavuutta ei voi tarkistaa täältä.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Aseta SMTP-välittäjä ja sen tunnistetiedot, jos palveluntarjoaja niitä tarvitsee.</value>

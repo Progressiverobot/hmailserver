@@ -37,6 +37,7 @@ namespace hMailServer.ControlPanel.Views
       public TcpIpPortsView()
       {
          InitializeComponent();
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(PortGrid, PropertiesButton, DeleteButton);
       }
 
       public void OnEnter() => Reload();

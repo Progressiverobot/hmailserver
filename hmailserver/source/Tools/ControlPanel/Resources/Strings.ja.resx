@@ -2917,8 +2917,8 @@
   <data name="Enter a valid port number." xml:space="preserve">
     <value>有効なポート番号を入力してください。</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>アドレスを入力して検索してください。hMailServer.ini で MessageTraceEnabled が設定されていない限り、トレースは何も記録しません。誰と誰がやり取りしているかを保存するため、既定ではオフになっています。</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>アドレスを入力して検索してください。メッセージ トレースはログ ページでオンにするまで何も記録しません。誰と誰がやり取りしたかを保存するため、既定ではオフになっています。</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>名前の一部を入力して「検索」を押すか、空のまま検索してすべてのユーザーを一覧表示してください。</value>
@@ -3438,6 +3438,9 @@
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>ホスト/名前:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>ホストしているドメイン</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>チェックの間隔 (時間、1 から 168)</value>
@@ -4554,8 +4557,8 @@
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>このポートでは暗号化が利用できません。ほかのサーバーからの受信メールはもともと暗号化されていないのが普通ですが、このポートは AUTH も受け付けるため、それを使うクライアントはパスワードを平文で送信します。</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>そのアドレスのイベントはありません。何も起きていないか、その時点でトレースがオフだったかのどちらかです。トレースは MessageTraceEnabled が設定されている間だけ記録します。</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>そのアドレスのイベントはありません。何も起きていないか、当時トレースがオフだったかのどちらかです。メッセージ トレースがオンの間だけ記録されます (ログ ページ)。</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>そのメッセージのイベントはありません。</value>
@@ -4710,8 +4713,8 @@
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>正直に言って、ここからは確認していません: PTR の検証にはサーバーの「公開」IP アドレスが必要ですが、このパネルはそれを特定できず (NAT の背後ではコンピューター自身も知りません)、このページのチェッカーは TXT レコードしか読み取りません。代わりに外部からテストしてください: nslookup &lt;あなたの公開 IP&gt; で PTR が表示され、上のホスト名を指しているはずです。</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>まだ確認していません (「更新プログラムを確認」を実行するか、毎日確認するには hMailServer.INI で UpdateCheckEnabled=1 を設定)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>未確認です (更新プログラムを確認するか、API と監視ページの更新プログラムで毎日の確認をオンにしてください)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>まだ確認していません。レコードを公開し、伝播の時間を置いてから「DNS を確認」を押してください。</value>
@@ -4758,11 +4761,14 @@
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>ここで決めることは何もありません: スキップされるメールボックスも、無効化されるメールボックスもありません。</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>まだ何もありません。追加で最初の項目を作成します。</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>スパムとしてマークされるものはありません: マークにはマークしきい値が 0 より大きい必要があり、そこでの 0 は「常に」ではなく「決してしない」を意味します。{0} に達したメッセージは引き続き拒否されます。</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>何も保留されていません。hMailServer.ini で QuarantineEnabled が設定されていない限り検疫はオフで、それまでは削除しきい値を超えたスパムは保存されるのではなく SMTP のやり取り中に拒否されます。</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>保留中のメッセージはありません。検疫はオフです。スパム対策の設定でオンにしてください。オンになるまで、削除しきい値を超えるスパムは保存されず、SMTP セッション中に拒否されます。</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>"{0}" に一致するものはありません。達成したいこと (「スパムを止める」「機器にメールを送らせる」)、ページ名、または hMailServer.INI のキーで試してください。</value>
@@ -5749,6 +5755,9 @@
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>記憶する過去のパスワードの数 (0 = 履歴なし)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>リモート ドメイン</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>期限切れを削除(_E)</value>
   </data>
@@ -6708,12 +6717,6 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>hMailServer.ini の [Settings] セクションで TlsRptFromAddress を、レポートの送信元にするメールボックスに設定してください。空のままにするのも有効な選択です。収集した統計が破棄され、レポートが送信されないというだけです。</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>hMailServer.ini で WebServicesHttpPort と WebServicesHttpsPort のいずれかまたは両方を設定して URL が応答するようにし、次に各メール ドメインについて、このサーバーを指す autoconfig.&lt;domain&gt; と autodiscover.&lt;domain&gt; の DNS レコードを公開してください。これらはアドレス レコードであり、このページは TXT レコードしか確認しないため、ここからは確認できません。</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>hMailServer.ini で WebServicesHttpsPort を設定し (RFC 8461 はポリシーを HTTPS で提供することを要求します)、リスナーに mta-sts.&lt;domain&gt; をカバーする証明書を与え、次に各ドメインについて、このサーバーを指す mta-sts.&lt;domain&gt; の A/AAAA (または CNAME) レコードと、mta-sts.&lt;domain&gt; の TXT レコード (v=STSv1; id=...) を公開してください。このページは TXT レコードを確認します。アドレス レコードと証明書の名前のカバー範囲はここからは確認できません。(_M)</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>新しいサーバー管理パスワードを設定します。</value>
   </data>
@@ -6725,6 +6728,12 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>ヘッダー値を設定</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>URL が応答するように、Web サービスと自動設定ページで HTTP または HTTPS ポートを設定し、次に各メール ドメインについて、このサーバーを指す autoconfig.&lt;domain&gt; と autodiscover.&lt;domain&gt; の DNS レコードを公開してください。これらはアドレス レコードであり、このページは TXT レコードのみを確認するため、ここからは確認できません。</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Web サービスと自動設定ページで HTTPS ポートを設定し (RFC 8461 はポリシーを HTTPS で提供することを要求します)、リスナーに mta-sts.&lt;domain&gt; をカバーする証明書を与え、次に各ドメインについて、このサーバーを指す mta-sts.&lt;domain&gt; の A/AAAA (または CNAME) レコードと、_mta-sts.&lt;domain&gt; の TXT レコード (v=STSv1; id=...) を公開してください。このページは TXT レコードを確認します。アドレス レコードと証明書の名前のカバー範囲はここからは確認できません。</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>SMTP リレーと、プロバイダーが必要とする場合はその資格情報を設定します。</value>

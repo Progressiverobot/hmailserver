@@ -859,7 +859,7 @@ namespace hMailServer.ControlPanel.Services
          {
             Title = L("MTA-STS policy hosting - HTTPS listener plus two DNS entries per domain"),
             Purpose = L("Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS."),
-            Action = L("Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.<domain>, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.<domain> pointing at this server and a TXT record at _mta-sts.<domain> (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here."),
+            Action = L("Set the HTTPS port on the Web services & autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.<domain>, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.<domain> pointing at this server and a TXT record at _mta-sts.<domain> (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here."),
             Page = "webservices"
          };
 
@@ -1413,7 +1413,7 @@ namespace hMailServer.ControlPanel.Services
          {
             Title = L("Client autoconfiguration - a listener plus the DNS names clients probe"),
             Purpose = L("Lets Outlook, Thunderbird and mobile clients set themselves up from an e-mail address alone, by fetching this server's configuration URLs."),
-            Action = L("Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.<domain> and autodiscover.<domain> DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here."),
+            Action = L("Set the HTTP or HTTPS port on the Web services & autoconfiguration page so the URLs answer, then publish autoconfig.<domain> and autodiscover.<domain> DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here."),
             Page = "webservices"
          };
 

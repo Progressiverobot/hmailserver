@@ -2917,8 +2917,8 @@
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Введіть дійсний номер порту.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Введіть адресу і шукайте. Трасування не записує взагалі нічого, доки MessageTraceEnabled не задано в hMailServer.ini - типово воно вимкнене, бо зберігає, хто з ким листується.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Введіть адресу та виконайте пошук. Трасування нічого не записує, доки трасування повідомлень не буде ввімкнено на сторінці «Журналювання», – типово воно вимкнене, бо зберігає, хто з ким листується.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Введіть частину імені й натисніть «Пошук», або шукайте з порожнім полем, щоб перелічити всіх користувачів.</value>
@@ -3438,6 +3438,9 @@
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Вузол/Ім'я:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Розміщений домен</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Годин між перевірками (від 1 до 168)</value>
@@ -4554,8 +4557,8 @@
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>На цьому порту шифрування недоступне. Вхідна пошта з інших серверів зазвичай і так незашифрована, але цей порт також приймає AUTH, і клієнт, який ним користується, надсилає пароль відкритим текстом.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Подій для цієї адреси немає. Або з нею нічого не відбувалося, або трасування в той час було вимкнено — воно записує лише тоді, коли задано MessageTraceEnabled.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Подій для цієї адреси немає. Або з нею нічого не відбувалося, або трасування тоді було вимкнене – воно записує лише доки трасування повідомлень увімкнене (сторінка «Журналювання»).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Подій для цього повідомлення немає.</value>
@@ -4710,8 +4713,8 @@
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Звідси не перевіряється, чесно кажучи: для перевірки PTR потрібна ПУБЛІЧНА IP-адреса сервера, яку ця панель не може визначити (за NAT комп’ютер і сам її не знає), а перевірник цієї сторінки читає лише TXT-записи. Перевірте натомість ззовні: nslookup &lt;your public IP&gt; показує PTR; він має називати вузол, наведений вище.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Ще не перевірено («Перевірити наявність оновлень» або UpdateCheckEnabled=1 у hMailServer.INI для щоденної перевірки)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Ще не перевірялося (натисніть «Перевірити оновлення» або ввімкніть щоденну перевірку в розділі «Оновлення» на сторінці «API та моніторинг»)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Ще не перевірено. Опублікуйте запис, дайте час на поширення, а потім натисніть «Перевірити DNS».</value>
@@ -4758,11 +4761,14 @@
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Тут нічого не потребує рішення: жодну поштову скриньку не пропущено й жодну не вимикають.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Поки що порожньо – кнопка «Додати» створює перший запис.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Ніщо ніколи не позначається як спам: для позначення потрібен поріг позначення більший за 0, а 0 там означає «ніколи», а не «завжди». Повідомлення, що досягають {0}, усе одно відхиляються.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Ніщо не утримується. Карантин вимкнено, доки в hMailServer.ini не задано QuarantineEnabled — до того спам понад поріг видалення відхиляється під час сеансу SMTP, а не зберігається.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Нічого не затримано. Карантин вимкнено – увімкніть його в розділі «Параметри захисту від спаму», – а доки він вимкнений, спам вище порога видалення відхиляється під час сеансу SMTP, а не зберігається.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>За запитом «{0}» нічого не знайдено. Спробуйте описати, чого ви хочете досягти («зупинити спам», «дозволити пристрою надсилати пошту»), назву сторінки або ключ hMailServer.INI.</value>
@@ -5749,6 +5755,9 @@
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Пам’ятати стільки попередніх паролів (0 = без історії)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Віддалений домен</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Вилучити _прострочені</value>
   </data>
@@ -6708,12 +6717,6 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Задайте TlsRptFromAddress у розділі [Settings] файлу hMailServer.ini як поштову скриньку, з якої слід надсилати звіти. Залишити порожнім - припустимий вибір; це просто означає, що зібрана статистика відкидається і звіти ніколи не надсилаються.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Задайте WebServicesHttpPort і/або WebServicesHttpsPort у hMailServer.ini, щоб URL-адреси відповідали, потім опублікуйте записи DNS autoconfig.&lt;domain&gt; і autodiscover.&lt;domain&gt; для кожного поштового домену, що вказують на цей сервер. Це адресні записи, а ця сторінка перевіряє лише записи TXT, тому підтвердити їх звідси неможливо.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Задайте WebServicesHttpsPort у hMailServer.ini (RFC 8461 вимагає політику через HTTPS), дайте слухачу сертифікат, що покриває mta-sts.&lt;domain&gt;, потім для кожного домену опублікуйте запис A/AAAA (або CNAME) для mta-sts.&lt;domain&gt;, що вказує на цей сервер, і запис TXT на _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Ця сторінка перевіряє запис TXT; адресний запис і покриття імені сертифікатом звідси перевірити неможливо.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Задайте новий пароль адміністрування сервера.</value>
   </data>
@@ -6725,6 +6728,12 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Установити значення заголовка</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Задайте порт HTTP або HTTPS на сторінці «Вебслужби та автоконфігурація», щоб URL-адреси відповідали, потім опублікуйте записи DNS autoconfig.&lt;domain&gt; і autodiscover.&lt;domain&gt; для кожного поштового домену, що вказують на цей сервер. Це адресні записи, а ця сторінка перевіряє лише записи TXT, тому підтвердити їх звідси неможливо.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Задайте порт HTTPS на сторінці «Вебслужби та автоконфігурація» (RFC 8461 вимагає політику через HTTPS), дайте слухачу сертифікат, що покриває mta-sts.&lt;domain&gt;, потім для кожного домену опублікуйте запис A/AAAA (або CNAME) для mta-sts.&lt;domain&gt;, що вказує на цей сервер, і запис TXT на _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Ця сторінка перевіряє запис TXT; адресний запис і покриття імені сертифікатом звідси перевірити неможливо.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Задайте ретранслятор SMTP і його облікові дані, якщо провайдер їх вимагає.</value>

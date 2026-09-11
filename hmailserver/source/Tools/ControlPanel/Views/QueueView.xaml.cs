@@ -28,6 +28,8 @@ namespace hMailServer.ControlPanel.Views
       public QueueView()
       {
          InitializeComponent();
+         // The three act on the selected message; enabled only while one is selected.
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(QueueGrid, ViewButton, RetryButton, RemoveButton);
       }
 
       public void OnEnter() => Reload();

@@ -2917,8 +2917,8 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Geçerli bir port numarası girin.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Bir adres girip arayın. hMailServer.ini içinde MessageTraceEnabled ayarlanmadıkça izleme hiçbir şey kaydetmez - kimin kiminle yazıştığını sakladığı için varsayılan olarak kapalıdır.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Bir adres girin ve arayın. İzleme, Günlükleme sayfasında ileti izleme açılana kadar hiçbir şey kaydetmez – kimin kiminle yazıştığını sakladığı için varsayılan olarak kapalıdır.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Bir adın bir kısmını girip Ara'ya basın ya da tüm kullanıcıları listelemek için kutu boşken arayın.</value>
@@ -3438,6 +3438,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Ana bilgisayar/Ad:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Barındırılan etki alanı</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Denetimler arasındaki saat sayısı (1 ile 168 arası)</value>
@@ -4554,8 +4557,8 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Bu portta şifreleme yok. Diğer sunuculardan gelen posta zaten olağan olarak şifresizdir, ama bu port AUTH de kabul eder ve onu kullanan bir istemci parolasını düz metin olarak gönderir.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>O adres için olay yok. Ya ona hiçbir şey olmadı ya da izleme o sırada kapalıydı - izleme yalnızca MessageTraceEnabled ayarlıyken kayıt tutar.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Bu adres için olay yok. Ya ona hiçbir şey olmadı ya da izleme o sırada kapalıydı – yalnızca ileti izleme açıkken kayıt yapar (Günlükleme sayfası).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>O ileti için olay yok.</value>
@@ -4710,8 +4713,8 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Buradan denetlenmedi, açıkçası: PTR'yi doğrulamak sunucunun GENEL IP adresini gerektirir ve bu panel onu belirleyemez (NAT arkasında makine de bilmez); bu sayfanın denetleyicisi ise yalnızca TXT kayıtlarını okur. Bunun yerine dışarıdan sınayın: nslookup &lt;your public IP&gt; PTR'yi gösterir; yukarıdaki ana bilgisayarı adlandırması gerekir.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Henüz denetlenmedi (Güncelleştirmeleri denetle ya da günlük denetim için hMailServer.INI'de UpdateCheckEnabled=1)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Henüz denetlenmedi (Güncelleştirmeleri denetleyin veya API ve izleme sayfasındaki Güncelleştirmeler altından günlük denetimi açın)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Henüz denetlenmedi. Kaydı yayımlayın, yayılması için zaman tanıyın, sonra "DNS'yi denetle"ye basın.</value>
@@ -4758,11 +4761,14 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Burada karar gerektiren bir şey yok: hiçbir posta kutusu atlanmıyor ve hiçbiri devre dışı bırakılmıyor.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Henüz burada bir şey yok – Ekle ilk girişi oluşturur.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Hiçbir şey hiçbir zaman spam olarak işaretlenmiyor: işaretleme 0'ın üzerinde bir işaretleme eşiği gerektirir ve oradaki 0 "her zaman" değil "hiçbir zaman" demektir. {0} puanına ulaşan iletiler yine reddedilir.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Hiçbir şey bekletilmiyor. hMailServer.ini içinde QuarantineEnabled ayarlanmadıkça karantina kapalıdır - o zamana kadar silme eşiğini aşan spam saklanmak yerine SMTP görüşmesi sırasında reddedilir.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Bekletilen bir şey yok. Karantina kapalı – Spam önleme ayarları altından açın – ve açılana kadar silme eşiğinin üzerindeki spam, depolanmak yerine SMTP oturumu sırasında reddedilir.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>"{0}" ile eşleşen bir şey yok. Yapmaya çalıştığınız şeyi ("spam'i durdur", "bir cihazın posta göndermesine izin ver"), bir sayfa adını ya da bir hMailServer.INI anahtarını deneyin.</value>
@@ -5749,6 +5755,9 @@ Her klasör için sayaç, o klasörün gerçekten tuttuğu en yüksek ileti UID'
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Bu kadar önceki parolayı hatırla (0 = geçmiş yok)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Uzak etki alanı</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Süresi _dolanları kaldır</value>
   </data>
@@ -6708,12 +6717,6 @@ Devam edilsin mi?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>hMailServer.ini'nin [Settings] bölümünde TlsRptFromAddress'i raporların gönderileceği bir posta kutusuna ayarlayın. Boş bırakmak geçerli bir seçimdir - yalnızca toplanan istatistiklerin atıldığı ve hiç rapor gönderilmediği anlamına gelir.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>URL'lerin yanıt vermesi için hMailServer.ini'de WebServicesHttpPort ve/veya WebServicesHttpsPort'u ayarlayın, ardından her posta etki alanı için bu sunucuya işaret eden autoconfig.&lt;domain&gt; ve autodiscover.&lt;domain&gt; DNS kayıtlarını yayımlayın. Bunlar adres kayıtlarıdır ve bu sayfa yalnızca TXT kayıtlarını denetler, bu yüzden buradan doğrulanamazlar.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>hMailServer.ini'de WebServicesHttpsPort'u ayarlayın (RFC 8461 ilkeyi HTTPS üzerinden gerektirir), dinleyiciye mta-sts.&lt;domain&gt; adını kapsayan bir sertifika verin, ardından her etki alanı için bu sunucuya işaret eden bir mta-sts.&lt;domain&gt; A/AAAA (veya CNAME) kaydı ve _mta-sts.&lt;domain&gt; adresinde bir TXT kaydı (v=STSv1; id=...) yayımlayın. Bu sayfa TXT kaydını denetler; adres kaydı ve sertifikanın ad kapsamı buradan denetlenemez.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Yeni bir sunucu yönetim parolası ayarlayın.</value>
   </data>
@@ -6725,6 +6728,12 @@ Devam edilsin mi?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Başlık değerini ayarla</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>HTTP veya HTTPS bağlantı noktasını Web hizmetleri ve otomatik yapılandırma sayfasında ayarlayın'de WebServicesHttpPort ve/veya WebServicesHttpsPort'u ayarlayın, ardından her posta etki alanı için bu sunucuya işaret eden autoconfig.&lt;domain&gt; ve autodiscover.&lt;domain&gt; DNS kayıtlarını yayımlayın. Bunlar adres kayıtlarıdır ve bu sayfa yalnızca TXT kayıtlarını denetler, bu yüzden buradan doğrulanamazlar.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>HTTPS bağlantı noktasını Web hizmetleri ve otomatik yapılandırma sayfasında ayarlayın'de WebServicesHttpsPort'u ayarlayın (RFC 8461 ilkeyi HTTPS üzerinden gerektirir), dinleyiciye mta-sts.&lt;domain&gt; adını kapsayan bir sertifika verin, ardından her etki alanı için bu sunucuya işaret eden bir mta-sts.&lt;domain&gt; A/AAAA (veya CNAME) kaydı ve _mta-sts.&lt;domain&gt; adresinde bir TXT kaydı (v=STSv1; id=...) yayımlayın. Bu sayfa TXT kaydını denetler; adres kaydı ve sertifikanın ad kapsamı buradan denetlenemez.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>SMTP aktarıcısını ve sağlayıcı gerektiriyorsa kimlik bilgilerini ayarlayın.</value>

@@ -2917,8 +2917,8 @@
   <data name="Enter a valid port number." xml:space="preserve">
     <value>请输入有效的端口号。</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>输入地址并搜索。除非在 hMailServer.ini 中设置了 MessageTraceEnabled，否则跟踪不会记录任何内容 - 它默认关闭，因为它会存储谁与谁通信。</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>输入地址并搜索。在“日志记录”页面开启邮件跟踪之前，跟踪不会记录任何内容 - 它默认关闭，因为它会存储谁与谁通信。</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>输入名称的一部分并按“搜索”，或者用空白框搜索以列出所有用户。</value>
@@ -3438,6 +3438,9 @@
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>主机/名称：  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>托管的域</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>两次检查之间的小时数（1 到 168）</value>
@@ -4554,8 +4557,8 @@
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>此端口上没有可用的加密。来自其他服务器的入站邮件本来通常就不加密，但此端口也接受 AUTH，使用它的客户端会以明文发送密码。</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>该地址没有任何事件。要么它没有发生过任何事情，要么当时跟踪已关闭 - 只有在设置了 MessageTraceEnabled 时才会记录。</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>该地址没有事件。要么它没有发生任何事情，要么当时跟踪已关闭 - 它只在邮件跟踪开启时记录（“日志记录”页面）。</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>该邮件没有任何事件。</value>
@@ -4710,8 +4713,8 @@
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>坦率地说，此处未做检查：验证 PTR 需要服务器的公网 IP 地址，而此面板无法确定它（在 NAT 之后机器自己也不知道），而且本页的检查器只读取 TXT 记录。请改为从外部测试：nslookup &lt;your public IP&gt; 会显示 PTR；它应当指向上面的主机名。</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>尚未检查（“检查更新”，或在 hMailServer.INI 中设置 UpdateCheckEnabled=1 以每日检查）</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>尚未检查（请检查更新，或在“API 与监控”页面的“更新”下开启每日检查）</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>尚未检查。请发布记录，留出传播时间，然后按“检查 DNS”。</value>
@@ -4758,11 +4761,14 @@
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>此处不需要做任何决定：没有邮箱被跳过，也没有邮箱被禁用。</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>这里还没有任何内容 - “添加”会创建第一个条目。</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>永远不会有邮件被标记为垃圾邮件：标记需要一个大于 0 的标记阈值，而 0 表示“从不”而不是“总是”。达到 {0} 的邮件仍会被拒绝。</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>没有任何邮件被暂挂。除非在 hMailServer.ini 中设置了 QuarantineEnabled，否则隔离是关闭的 - 在那之前，超过删除阈值的垃圾邮件会在 SMTP 会话期间被拒绝，而不是被存储。</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>没有被扣留的邮件。隔离已关闭 - 请在“反垃圾邮件设置”中开启 - 在开启之前，超过删除阈值的垃圾邮件会在 SMTP 会话中被拒绝，而不会被存储。</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>没有与 "{0}" 匹配的内容。请尝试输入您想达成的目标（“阻止垃圾邮件”、“允许设备发送邮件”）、页面名称或 hMailServer.INI 键名。</value>
@@ -5749,6 +5755,9 @@
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>记住这么多个历史密码（0 = 不保留历史）</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>远程域</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>移除已过期项(_E)</value>
   </data>
@@ -6708,12 +6717,6 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>在 hMailServer.ini 的 [Settings] 节中把 TlsRptFromAddress 设为用来发送报告的邮箱。留空也是有效的选择 - 它只是意味着收集的统计信息被丢弃，永远不发送报告。</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>在 hMailServer.ini 中设置 WebServicesHttpPort 和/或 WebServicesHttpsPort 以便这些 URL 能够应答，然后为每个邮件域发布指向本服务器的 autoconfig.&lt;domain&gt; 和 autodiscover.&lt;domain&gt; DNS 记录。这些是地址记录，而本页只检查 TXT 记录，因此无法从此处确认。</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>在 hMailServer.ini 中设置 WebServicesHttpsPort (RFC 8461 要求通过 HTTPS 提供策略)，为监听器配置一个覆盖 mta-sts.&lt;domain&gt; 的证书，然后为每个域发布一条指向本服务器的 mta-sts.&lt;domain&gt; A/AAAA (或 CNAME) 记录，以及在 _mta-sts.&lt;domain&gt; 处的一条 TXT 记录 (v=STSv1; id=...)。本页检查 TXT 记录；地址记录和证书的名称覆盖范围无法从此处检查。</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>设置新的服务器管理密码。</value>
   </data>
@@ -6725,6 +6728,12 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>设置标头值</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>在“Web 服务和自动配置”页面设置 HTTP 或 HTTPS 端口以使 URL 能够响应，然后为每个邮件域发布指向此服务器的 autoconfig.&lt;domain&gt; 和 autodiscover.&lt;domain&gt; DNS 记录。这些是地址记录，而此页面只检查 TXT 记录，因此无法从此处确认。</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>在“Web 服务和自动配置”页面设置 HTTPS 端口（RFC 8461 要求通过 HTTPS 提供策略），为侦听器提供覆盖 mta-sts.&lt;domain&gt; 的证书，然后为每个域发布指向此服务器的 mta-sts.&lt;domain&gt; 的 A/AAAA（或 CNAME）记录，以及 _mta-sts.&lt;domain&gt; 的 TXT 记录（v=STSv1; id=...）。此页面检查 TXT 记录；地址记录和证书的名称覆盖范围无法从此处检查。</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>设置 SMTP 中继，以及提供商需要时的凭据。</value>

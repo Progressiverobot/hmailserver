@@ -2917,8 +2917,8 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Voer een geldig poortnummer in.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Voer een adres in en zoek. De trace legt helemaal niets vast tenzij MessageTraceEnabled is ingesteld in hMailServer.ini - dat staat standaard uit omdat het vastlegt wie met wie correspondeert.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Voer een adres in en zoek. De tracering legt niets vast totdat berichttracering wordt ingeschakeld op de pagina Logboekregistratie – standaard staat deze uit omdat ze opslaat wie met wie correspondeert.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Voer een deel van een naam in en druk op Zoeken, of zoek met een leeg vak om alle gebruikers op te sommen.</value>
@@ -3438,6 +3438,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Host/Naam:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Gehost domein</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Uren tussen controles (1 tot 168)</value>
@@ -4554,8 +4557,8 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Op deze poort is geen versleuteling beschikbaar. Inkomende mail van andere servers is toch al meestal onversleuteld, maar deze poort accepteert ook AUTH, en een client die dat gebruikt, stuurt zijn wachtwoord in klare tekst.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Geen gebeurtenissen voor dat adres. Ofwel is er niets mee gebeurd, ofwel stond de tracering op dat moment uit - er wordt alleen vastgelegd zolang MessageTraceEnabled is ingesteld.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Geen gebeurtenissen voor dat adres. Of er is niets mee gebeurd, of de tracering stond op dat moment uit – ze legt alleen vast zolang berichttracering aan staat (pagina Logboekregistratie).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Geen gebeurtenissen voor dat bericht.</value>
@@ -4710,8 +4713,8 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Eerlijk gezegd wordt dit hiervandaan niet gecontroleerd: het verifiëren van de PTR vereist het PUBLIEKE IP-adres van de server, dat dit paneel niet kan bepalen (achter NAT weet de machine het zelf ook niet), en de controlefunctie van deze pagina leest alleen TXT-records. Test in plaats daarvan van buitenaf: nslookup &lt;your public IP&gt; toont de PTR; die hoort de host hierboven te noemen.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Nog niet gecontroleerd (Controleren op updates, of UpdateCheckEnabled=1 in hMailServer.INI voor een dagelijkse controle)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Nog niet gecontroleerd (Controleren op updates, of zet de dagelijkse controle aan onder Updates op de pagina API en monitoring)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Nog niet gecontroleerd. Publiceer het record, geef het tijd om te propageren, en druk dan op "DNS controleren".</value>
@@ -4758,11 +4761,14 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Hier hoeft niets te worden besloten: er wordt geen postvak overgeslagen en er wordt er geen uitgeschakeld.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Nog niets hier – Toevoegen maakt het eerste item.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Er wordt nooit iets als spam gemarkeerd: markeren vereist een markeerdrempel boven 0, en een 0 daar betekent "nooit" en niet "altijd". Berichten die {0} halen, worden nog steeds geweigerd.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Er wordt niets vastgehouden. Quarantaine staat uit tenzij QuarantineEnabled is ingesteld in hMailServer.ini - tot die tijd wordt spam boven de verwijderdrempel tijdens het SMTP-gesprek geweigerd in plaats van opgeslagen.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Er wordt niets vastgehouden. Quarantaine staat uit – zet deze aan onder Antispaminstellingen – en zolang deze uit staat, wordt spam boven de verwijderdrempel tijdens het SMTP-gesprek geweigerd in plaats van opgeslagen.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Niets kwam overeen met "{0}". Probeer wat u wilt bereiken ("spam stoppen", "een apparaat mail laten verzenden"), een paginanaam, of een sleutel uit hMailServer.INI.</value>
@@ -5749,6 +5755,9 @@ Voer dit uit als clients melden dat berichten onder de verkeerde UID verschijnen
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Dit aantal vorige wachtwoorden onthouden (0 = geen geschiedenis)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Extern domein</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Verlopen _items verwijderen</value>
   </data>
@@ -6708,12 +6717,6 @@ Doorgaan?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Stel TlsRptFromAddress in de sectie [Settings] van hMailServer.ini in op een postvak waarvandaan rapporten moeten worden verstuurd. Het leeg laten is een geldige keuze - het betekent alleen dat de verzamelde statistieken worden weggegooid en er nooit rapporten worden verstuurd.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Stel WebServicesHttpPort en/of WebServicesHttpsPort in hMailServer.ini in zodat de URL's antwoorden, en publiceer vervolgens voor elk maildomein DNS-records autoconfig.&lt;domain&gt; en autodiscover.&lt;domain&gt; die naar deze server wijzen. Dit zijn adresrecords, en deze pagina controleert alleen TXT-records, dus ze kunnen hiervandaan niet worden bevestigd.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Stel WebServicesHttpsPort in hMailServer.ini in (RFC 8461 vereist het beleid over HTTPS), geef de listener een certificaat dat mta-sts.&lt;domain&gt; dekt, en publiceer vervolgens voor elk domein een A/AAAA-record (of CNAME) voor mta-sts.&lt;domain&gt; dat naar deze server wijst en een TXT-record op _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Deze pagina controleert het TXT-record; het adresrecord en de naamdekking van het certificaat kunnen hiervandaan niet worden gecontroleerd.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Stel een nieuw wachtwoord voor serverbeheer in.</value>
   </data>
@@ -6725,6 +6728,12 @@ Doorgaan?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Headerwaarde instellen</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Stel de HTTP- of HTTPS-poort in op de pagina Webservices en autoconfiguratie in zodat de URL's antwoorden, en publiceer vervolgens voor elk maildomein DNS-records autoconfig.&lt;domain&gt; en autodiscover.&lt;domain&gt; die naar deze server wijzen. Dit zijn adresrecords, en deze pagina controleert alleen TXT-records, dus ze kunnen hiervandaan niet worden bevestigd.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Stel de HTTPS-poort in op de pagina Webservices en autoconfiguratie in (RFC 8461 vereist het beleid over HTTPS), geef de listener een certificaat dat mta-sts.&lt;domain&gt; dekt, en publiceer vervolgens voor elk domein een A/AAAA-record (of CNAME) voor mta-sts.&lt;domain&gt; dat naar deze server wijst en een TXT-record op _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Deze pagina controleert het TXT-record; het adresrecord en de naamdekking van het certificaat kunnen hiervandaan niet worden gecontroleerd.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Stel de SMTP-relayserver in, en de referenties ervan als de provider die nodig heeft.</value>
