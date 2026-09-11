@@ -100,6 +100,12 @@ jobs:
       # the committed packages.lock.json files, the same way ci.yml's explicit
       # restores are, so the code that is analysed is built against the graph
       # that was reviewed.
+      # The COM wrapper the tools reference is generated from the IDL, as in
+      # ci.yml; a build without it has nothing to compile the tools against.
+      - name: Generate the COM wrapper from the IDL
+        shell: pwsh
+        run: ./build/generate-com-wrapper.ps1 -FromIdl
+
       - name: Build Control Panel
         run: dotnet build hmailserver/source/Tools/ControlPanel/ControlPanel.csproj -c Release -p:RestoreLockedMode=true
 

@@ -357,18 +357,18 @@
     },
     {
       "path": "hmailserver/source/Tools/Interop/Interop.hMailServer.dll",
-      "sha256": "f74c3e953703fbe332b81e766ea8ee50baccd57cdd5360c88e30c6d57ffd7229",
-      "size": 195072,
+      "sha256": null,
+      "size": null,
       "component": "Interop.hMailServer (tlbimp wrapper for this project COM API)",
       "version": "1.0.0.0",
       "publisher": "this repository",
       "license": "AGPL-3.0-or-later (same as the project)",
-      "upstream": "Generated from hmailserver/source/Server/hMailServer/hMailServer.idl in this repository",
+      "upstream": "Generated from hmailserver/source/Server/hMailServer/hMailServer.idl in this repository by build/generate-com-wrapper.ps1",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain-generated",
+      "disposition": "generated",
       "used_by": "Shared.csproj line 25 and five other tool projects reference it by HintPath",
-      "why": "Not third-party. TlbImp output from our own type library, committed so the .NET tools build with plain dotnet build and no registered typelib. Regeneration steps are in hmailserver/source/Tools/Interop/README.md."
+      "why": "Not third-party and not in git since 11 September 2026. TlbImp output from our own type library; build.ps1, build-tools.ps1 and the CI workflows make it with build/generate-com-wrapper.ps1, from the server build's type library or from the IDL alone. Listed so the provenance check refuses it if it is ever committed again; it has no hash because TlbImp output carries a fresh module id on every run. hmailserver/source/Tools/Interop/README.md."
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/libmysql.dll",
@@ -585,6 +585,7 @@
     "retain": "committed on purpose, with the reason in 'why'",
     "retain-generated": "generated from this repository's own sources and committed for the build's convenience",
     "gathered": "not in git; copied from the build machine by build/get-installer-binaries.ps1 and verified against 'sha256'",
+    "generated": "not in git; produced from this repository's own sources by build/generate-com-wrapper.ps1 on every build, with no 'sha256' because the output is not byte-reproducible",
     "fetched": "not in git; downloaded from the build-inputs release named in 'source' by build/get-installer-binaries.ps1 and verified against 'sha256'"
   }
 }

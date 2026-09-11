@@ -101,17 +101,17 @@ already cost a release cycle or nearly shipped a defect.
    `build-tests.ps1`. Confirm the stamped `FileVersion` on
    `hMailServer.exe` and `publish\hMailCP.dll`.
 
-   If `hMailServer.idl` changed in this range, regenerate the checked-in COM
-   wrapper after the server build and before the tools build:
-   `build\regenerate-interop.ps1`. It runs TlbImp AND rewrites the wrapper's
-   SHA-256 and size in `hmailserver\docs\third-party-binaries.json` - the
-   binary-provenance workflow fails when those disagree, and regenerating by
-   hand without the manifest did exactly that twice in one day. A stale wrapper
-   still compiles, which is why this is easy to skip: the tools use a small
-   stable subset of the API, so nothing fails, and the members added this
-   release are simply invisible to them. Regenerate AFTER any interface-ordering
-   fix, never before, or the old vtable layout is baked into the shipped wrapper
-   permanently.
+   The COM wrapper the tools compile against (`source\Tools\Interop\
+   Interop.hMailServer.dll`) is not in git since 11 September 2026: `build.ps1`
+   generates it from the type library it just built, and `build-tools.ps1`
+   generates it if it is missing or stale, both through
+   `build\generate-com-wrapper.ps1`, which rewrites it only when the type
+   library changed. So the order above - server, then tools - is what keeps the
+   shipped wrapper current after an IDL change, and there is nothing to
+   regenerate by hand and no manifest hash to update. An interface-ordering fix
+   still has to land BEFORE the server build that the tools are built after,
+   for the same reason as ever: the wrapper freezes the vtable layout of the
+   type library it was made from.
 
    Then prove the build is still reproducible: build Release a second time
    from clean (`build\build.ps1 -Configuration Release -Clean`) and compare
