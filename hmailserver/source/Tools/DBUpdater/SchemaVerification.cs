@@ -427,7 +427,29 @@ namespace DBUpdater
                          "update hm_files set filedownloads = filedownloads where 1 = 0"),
          // Upgrade6035to6036* - IMAP keywords (labels) on a message.
          new SchemaProbe(6036, "hm_messages.messagekeywords",
-                         "update hm_messages set messagekeywords = messagekeywords where 1 = 0")
+                         "update hm_messages set messagekeywords = messagekeywords where 1 = 0"),
+         // Upgrade6036to6037* - the webmail's S/MIME key store (hm_smimekeys); the
+         // identity column is never probed.
+         new SchemaProbe(6037, "hm_smimekeys.smimeaccountid",
+                         "update hm_smimekeys set smimeaccountid = smimeaccountid where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimekind",
+                         "update hm_smimekeys set smimekind = smimekind where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimeaddress",
+                         "update hm_smimekeys set smimeaddress = smimeaddress where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimename",
+                         "update hm_smimekeys set smimename = smimename where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimefingerprint",
+                         "update hm_smimekeys set smimefingerprint = smimefingerprint where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimecertificate",
+                         "update hm_smimekeys set smimecertificate = smimecertificate where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimechain",
+                         "update hm_smimekeys set smimechain = smimechain where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimekey",
+                         "update hm_smimekeys set smimekey = smimekey where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimenotafter",
+                         "update hm_smimekeys set smimenotafter = smimenotafter where 1 = 0"),
+         new SchemaProbe(6037, "hm_smimekeys.smimecreated",
+                         "update hm_smimekeys set smimecreated = smimecreated where 1 = 0")
       };
 
       /// <summary>

@@ -1366,6 +1366,9 @@ namespace HM
       if (method == "GET" && path == "/portal.js")
          return HandlePortalScript_();
 
+      if (method == "GET" && path == "/portal-smime.js")
+         return HandlePortalSmimeScript_();
+
       // The two files that make the page installable and reachable without a
       // connection: the manifest, and the service worker that keeps the shell.
       if (method == "GET" && path == "/portal.webmanifest")
@@ -1748,6 +1751,24 @@ namespace HM
          case RouteMeSessionDelete:
             return HandleMeSessionDelete_(caller, route.identifier);
 
+         case RouteMeSmime:
+            return HandleMeSmime_(caller);
+
+         case RouteMeSmimeOwnPut:
+            return HandleMeSmimeOwnPut_(caller, GetRequestBody_(request));
+
+         case RouteMeSmimeOwnDelete:
+            return HandleMeSmimeOwnDelete_(caller, route.identifier);
+
+         case RouteMeSmimeRecipientPut:
+            return HandleMeSmimeRecipientPut_(caller, GetRequestBody_(request));
+
+         case RouteMeSmimeRecipientDelete:
+            return HandleMeSmimeRecipientDelete_(caller, route.identifier);
+
+         case RouteMeSmimeChain:
+            return HandleMeSmimeChain_(GetRequestBody_(request));
+
          case RouteMeStorage:
             return HandleMeStorage_(caller);
 
@@ -1962,6 +1983,40 @@ namespace HM
          {
             route.identifier = rest;
             route.kind = RouteMeSessionDelete;
+         }
+
+         return;
+      }
+
+      // S/MIME: the key store (own certificates with wrapped keys, recipients'
+      // certificates, each named by its SHA-256 fingerprint) and the chain check.
+      const AnsiString meSmimePath = "/api/v1/me/smime";
+      if (path == meSmimePath)
+      {
+         if (method == "GET")
+            route.kind = RouteMeSmime;
+
+         return;
+      }
+
+      if (path.StartsWith(meSmimePath + "/"))
+      {
+         AnsiString rest = path.Mid(meSmimePath.GetLength() + 1);
+         if (rest == "own" && method == "PUT")
+            route.kind = RouteMeSmimeOwnPut;
+         else if (rest == "recipients" && method == "PUT")
+            route.kind = RouteMeSmimeRecipientPut;
+         else if (rest == "chain" && method == "POST")
+            route.kind = RouteMeSmimeChain;
+         else if (rest.StartsWith("own/") && method == "DELETE" && rest.GetLength() == 4 + 64)
+         {
+            route.identifier = rest.Mid(4);
+            route.kind = RouteMeSmimeOwnDelete;
+         }
+         else if (rest.StartsWith("recipients/") && method == "DELETE" && rest.GetLength() == 11 + 64)
+         {
+            route.identifier = rest.Mid(11);
+            route.kind = RouteMeSmimeRecipientDelete;
          }
 
          return;
@@ -2807,6 +2862,10 @@ namespace HM
       case RouteMeFileContent:
       case RouteMeFileUpdate:
       case RouteMeFileDelete:
+      case RouteMeSmimeOwnPut:
+      case RouteMeSmimeOwnDelete:
+      case RouteMeSmimeRecipientPut:
+      case RouteMeSmimeRecipientDelete:
       case RoutePortalFilesPolicyPut:
       case RoutePortalBrandingPut:
       case RouteAccountSupportSession:
@@ -5403,6 +5462,12 @@ namespace HM
       case RouteMeSessionsEnd:
       case RouteMeSessionDelete:
       case RouteMeStorage:
+      case RouteMeSmime:
+      case RouteMeSmimeOwnPut:
+      case RouteMeSmimeOwnDelete:
+      case RouteMeSmimeRecipientPut:
+      case RouteMeSmimeRecipientDelete:
+      case RouteMeSmimeChain:
       case RouteMeFolderEmpty:
       case RouteMeMessageSource:
       case RouteMeMessageHtml:
@@ -8430,44 +8495,61 @@ namespace HM
       // and nowhere else.
       const String fileName = PersistentMessage::GetFileName(message);
 
-      MessageData messageData;
-      messageData.LoadFromMessage(fileName, message);
-      messageData.SetCharset(_T("utf-8"));
-      messageData.SetFrom(fromHeader);
-      messageData.SetTo(JoinEntries(toEntries));
-      if (!ccEntries.empty())
-         messageData.SetCC(JoinEntries(ccEntries));
-      messageData.SetSubject(JsonUtf8Value_(requestBody, "subject"));
-      messageData.SetBody(JsonUtf8Value_(requestBody, "text"));
+      // "mime": a message the page built itself - a signed or an encrypted one,
+      // whose body bytes must reach the recipient exactly as signed. The
+      // entity (its Content-Type headers, a blank line, its body) is written
+      // under this server's own RFC 5322 headers; text, html and attachments
+      // are not read. RestApiSmime.cpp.
+      String mimeEntity = JsonUtf8Value_(requestBody, "mime");
+      if (!mimeEntity.IsEmpty())
       {
-         // html beside text: the message goes as multipart/alternative, the
-         // text part first, as a client with a formatting bar writes it.
-         String html = JsonUtf8Value_(requestBody, "html");
-         if (!html.IsEmpty())
-            messageData.SetHTMLBody(html);
+         AnsiString problem;
+         int refused = WriteMimeEntity_(account, fromHeader, JoinEntries(toEntries), ccEntries.empty() ? String() : JoinEntries(ccEntries), requestBody, mimeEntity, fileName, problem);
+         if (refused != 0)
+            return BuildResponse_(refused, problem);
       }
-      messageData.SetSentTime(Time::GetCurrentMimeDate());
-      messageData.GenerateMessageID();
+      else
+      {
 
-      // A reply names what it answers, so the recipient's client threads it.
-      String inReplyTo = JsonUtf8Value_(requestBody, "in_reply_to");
-      String references = JsonUtf8Value_(requestBody, "references");
-      if (!inReplyTo.IsEmpty())
-         messageData.SetFieldValue(_T("In-Reply-To"), inReplyTo);
-      if (!references.IsEmpty())
-         messageData.SetFieldValue(_T("References"), references);
+         MessageData messageData;
+         messageData.LoadFromMessage(fileName, message);
+         messageData.SetCharset(_T("utf-8"));
+         messageData.SetFrom(fromHeader);
+         messageData.SetTo(JoinEntries(toEntries));
+         if (!ccEntries.empty())
+            messageData.SetCC(JoinEntries(ccEntries));
+         messageData.SetSubject(JsonUtf8Value_(requestBody, "subject"));
+         messageData.SetBody(JsonUtf8Value_(requestBody, "text"));
+         {
+            // html beside text: the message goes as multipart/alternative, the
+            // text part first, as a client with a formatting bar writes it.
+            String html = JsonUtf8Value_(requestBody, "html");
+            if (!html.IsEmpty())
+               messageData.SetHTMLBody(html);
+         }
+         messageData.SetSentTime(Time::GetCurrentMimeDate());
+         messageData.GenerateMessageID();
 
-      // receipt: true asks the recipient's client to say when it was read.
-      if (GetJsonBoolValue_(requestBody, "receipt", false))
-         messageData.SetFieldValue(_T("Disposition-Notification-To"), fromHeader);
+         // A reply names what it answers, so the recipient's client threads it.
+         String inReplyTo = JsonUtf8Value_(requestBody, "in_reply_to");
+         String references = JsonUtf8Value_(requestBody, "references");
+         if (!inReplyTo.IsEmpty())
+            messageData.SetFieldValue(_T("In-Reply-To"), inReplyTo);
+         if (!references.IsEmpty())
+            messageData.SetFieldValue(_T("References"), references);
 
-      AnsiString attachmentError;
-      int attachmentStatus = AddAttachmentsFromJson_(messageData, requestBody, attachmentError);
-      if (attachmentStatus != 0)
-         return BuildResponse_(attachmentStatus, attachmentError);
+         // receipt: true asks the recipient's client to say when it was read.
+         if (GetJsonBoolValue_(requestBody, "receipt", false))
+            messageData.SetFieldValue(_T("Disposition-Notification-To"), fromHeader);
 
-      if (!messageData.Write(fileName))
-         return BuildResponse_(500, "{\"error\":\"the message could not be written\"}");
+         AnsiString attachmentError;
+         int attachmentStatus = AddAttachmentsFromJson_(messageData, requestBody, attachmentError);
+         if (attachmentStatus != 0)
+            return BuildResponse_(attachmentStatus, attachmentError);
+
+         if (!messageData.Write(fileName))
+            return BuildResponse_(500, "{\"error\":\"the message could not be written\"}");
+      }
 
       message->SetSize((int) FileUtilities::FileSize(fileName));
 
@@ -9340,6 +9422,13 @@ namespace HM
          "\"/api/v1/me/preferences\":{\"get\":{\"summary\":\"The signed-in account's preferences\",\"description\":\"A key/value store the webmail keeps its choices in (theme, density, undo-send delay, notifications) so they follow the account between browsers. The server attaches no meaning to a key.\",\"responses\":{\"200\":{\"description\":\"preferences: an object of string values\"}}},\"put\":{\"summary\":\"Change preferences\",\"description\":\"Body: an object. Each string member is written, each null member removed, anything else refused. Keys are 1-64 letters, digits, dots, dashes or underscores; values at most 4000 characters; at most 100 keys per account.\",\"responses\":{\"200\":{\"description\":\"The preferences after the change\"},\"400\":{\"description\":\"Not an object of strings, a bad key, a long value, or too many keys\"}}}},"
          "\"/api/v1/me/app-passwords\":{\"get\":{\"summary\":\"The signed-in account's app passwords\",\"description\":\"id, name, created, last_used, active - never the password.\",\"responses\":{\"200\":{\"description\":\"app_passwords\"}}},\"post\":{\"summary\":\"Make an app password\",\"description\":\"Body: name (what it is for) and password - the account's own password, proving it is the account holder asking; never an app password. An account with a second factor enrolled sends the code in X-hMailServer-OTP, and the 401 that asks for it says X-hMailServer-OTP: required. Refused (403) to a request that was itself authenticated with an app password, or by a session started with one. The answer carries the password in clear text, the only time it exists outside the caller; at most 20 per account. Logged, with the caller's address.\",\"responses\":{\"201\":{\"description\":\"id, name, created, active, password\"},\"400\":{\"description\":\"No name, no password, or twenty already\"},\"401\":{\"description\":\"The one-time code is missing or wrong\"},\"403\":{\"description\":\"The password is not the account's own, or the request came in on an app password\"}}}},"
          "\"/api/v1/me/app-passwords/{id}\":{\"delete\":{\"summary\":\"Remove an app password\",\"description\":\"Refused to a request authenticated with an app password. Logged, with the caller's address.\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"403\":{\"description\":\"The request came in on an app password\"},\"404\":{\"description\":\"No such app password of this account\"}}}},"
+         "\"/api/v1/me/smime\":{\"get\":{\"summary\":\"The account's S/MIME key store\",\"description\":\"own: the account's certificates, each with its chain and its private key as the page wrapped it (AES-256-GCM under a PBKDF2 key from the account password; this server cannot open it); recipients: the certificates of correspondents. Each carries address, name, fingerprint (SHA-256, hex), certificate (base64 DER), not_after and created (Unix seconds). limits: how many of each.\",\"responses\":{\"200\":{\"description\":\"own, recipients, limits\"}}}},"
+         "\"/api/v1/me/smime/own\":{\"put\":{\"summary\":\"Add or replace one of the account's own certificates\",\"description\":\"Body: address, name, fingerprint, certificate, chain (array of base64 DER, at most eight), key {kdf, iterations, salt, iv, data}, not_after. Replaced by fingerprint. At most twenty.\",\"responses\":{\"201\":{\"description\":\"added\"},\"200\":{\"description\":\"replaced\"},\"400\":{\"description\":\"a field is missing or malformed, or the limit is reached\"}}}},"
+         "\"/api/v1/me/smime/own/{fingerprint}\":{\"delete\":{\"summary\":\"Remove one of the account's own certificates and its key\",\"responses\":{\"200\":{\"description\":\"removed\"},\"404\":{\"description\":\"no such certificate\"}}}},"
+         "\"/api/v1/me/smime/recipients\":{\"put\":{\"summary\":\"Add or replace a correspondent's certificate\",\"description\":\"Body: address, name, fingerprint, certificate, not_after. Replaced by fingerprint. At most five hundred.\",\"responses\":{\"201\":{\"description\":\"added\"},\"200\":{\"description\":\"replaced\"},\"400\":{\"description\":\"a field is missing or malformed, or the limit is reached\"}}}},"
+         "\"/api/v1/me/smime/recipients/{fingerprint}\":{\"delete\":{\"summary\":\"Remove a correspondent's certificate\",\"responses\":{\"200\":{\"description\":\"removed\"},\"404\":{\"description\":\"no such certificate\"}}}},"
+         "\"/api/v1/me/smime/chain\":{\"post\":{\"summary\":\"Does a certificate chain end at a root this machine trusts\",\"description\":\"Body: certificates (the leaf first, then its chain; base64 DER each, at most nine), purpose (sign or encrypt). OpenSSL's verdict against the system's roots - the Windows ROOT and CA stores, the distribution's bundle on Linux: trusted, error (OpenSSL's reason when not), depth, roots (how many were consulted; -1 when the platform's bundle was taken), subject, issuer, not_after.\",\"responses\":{\"200\":{\"description\":\"the verdict\"},\"400\":{\"description\":\"not a list of base64 certificates\"}}}},"
+         "\"/portal-smime.js\":{\"get\":{\"summary\":\"The webmail's S/MIME module\",\"description\":\"Unauthenticated. DER, X.509, PKCS#8 and PKCS#12, CMS SignedData and EnvelopedData and the MIME around them, on the Web Crypto API; what build/check-portal-smime.js runs against OpenSSL.\",\"responses\":{\"200\":{\"description\":\"The script\"}}}},"
          "\"/api/v1/me/sessions\":{\"get\":{\"summary\":\"The signed-in account's browser sessions\",\"description\":\"Each: id (twelve hex digits of the token's hash), created_seconds_ago, idle_seconds, current.\",\"responses\":{\"200\":{\"description\":\"sessions\"}}},\"delete\":{\"summary\":\"End every other session\",\"description\":\"The session asking stays; a caller on a password ends them all.\",\"responses\":{\"200\":{\"description\":\"ended (how many)\"}}}},"
          "\"/api/v1/me/sessions/{id}\":{\"delete\":{\"summary\":\"End one session\",\"responses\":{\"200\":{\"description\":\"Ended\"},\"404\":{\"description\":\"No such session of this account\"}}}},"
          "\"/api/v1/me/storage\":{\"get\":{\"summary\":\"What the mailbox holds\",\"description\":\"used_bytes and limit_mb (0 = no limit); folders, each with id, path, messages and bytes; largest, the twenty biggest messages with id, folder_id, folder, subject, from, date and size.\",\"responses\":{\"200\":{\"description\":\"The storage view\"}}}},"
@@ -9351,7 +9440,7 @@ namespace HM
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, and from:, to:, subject:, has:attachment, before:YYYY-MM-DD, after:YYYY-MM-DD, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name (an IMAP keyword the message carries; several must all be there); a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
-         "\"/api/v1/me/messages\":{\"post\":{\"x-body\":\"text and, when given, html (the message goes as multipart/alternative); attachments; from (one of the identities); receipt; in_reply_to, references, answered_id.\",\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
+         "\"/api/v1/me/messages\":{\"post\":{\"x-body\":\"text and, when given, html (the message goes as multipart/alternative); attachments; from (one of the identities); receipt; in_reply_to, references, answered_id; or mime - the MIME entity the page built (a signed or an encrypted message: its Content-Type headers, a blank line, its body, 7-bit), sent under this server's headers in place of text, html and attachments.\",\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
