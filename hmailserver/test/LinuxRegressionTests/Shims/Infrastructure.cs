@@ -68,9 +68,8 @@ namespace RegressionTests.Infrastructure
             return null;
 
          string newest = null;
-         foreach (var file in ServerApi.Array(answer))
+         foreach (var name in ServerApi.Array(answer).Select(file => ServerApi.StringOf(file, "name")))
          {
-            var name = ServerApi.StringOf(file, "name");
             if (name != null && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
                 (newest == null || string.CompareOrdinal(name, newest) > 0))
                newest = name;
@@ -575,8 +574,7 @@ namespace RegressionTests.Infrastructure
 
       public static string AssertLiveLogContents()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoLiveLog);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoLiveLog);
       }
 
       public static void AssertSpamAssassinIsRunning()

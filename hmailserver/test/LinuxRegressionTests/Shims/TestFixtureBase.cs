@@ -3,6 +3,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -141,18 +142,9 @@ namespace RegressionTests.Shared
       /// </summary>
       private static string[] WithoutKnownPlatformGaps(string[] errorLines)
       {
-         var kept = new List<string>(errorLines.Length);
-
-         foreach (var line in errorLines)
-         {
-            if (line.Contains("HM6406") &&
-                line.Contains("resolves names through the Windows DNS client"))
-               continue;
-
-            kept.Add(line);
-         }
-
-         return kept.ToArray();
+         return errorLines
+            .Where(line => !(line.Contains("HM6406") && line.Contains("resolves names through the Windows DNS client")))
+            .ToArray();
       }
    }
 }

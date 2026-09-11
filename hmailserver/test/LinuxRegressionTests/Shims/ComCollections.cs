@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Text;
 using System.Text.Json;
+using System.Linq;
 using RegressionTests.Shared;
 
 // The collections the Windows suite reaches through COM - the server's domains and
@@ -31,6 +32,14 @@ namespace hMailServer
          if (!_unsupported.Contains(property))
             _unsupported.Add(property);
       }
+
+      /// <summary>
+      ///    A setter with no route: remembered with the value it was handed, so
+      ///    that the skip Save() raises says what the test wanted, not only which
+      ///    field it wanted it in.
+      /// </summary>
+      protected void Unsupported(string property, object value)
+         => Unsupported(property + "=" + (value == null ? "null" : value.ToString()));
 
       protected void SkipIfAnythingUnsupported(string route)
       {
@@ -103,11 +112,8 @@ namespace hMailServer
 
       public void Clear()
       {
-         foreach (var element in All())
-         {
-            var name = ServerApi.StringOf(element, "name");
+         foreach (var name in All().Select(element => ServerApi.StringOf(element, "name")))
             ServerApi.Delete("/api/v1/domains/" + name).Expect(200, "DELETE /api/v1/domains/" + name);
-         }
       }
    }
 
@@ -253,7 +259,7 @@ namespace hMailServer
       public Alias Add()
       {
          if (!ServerApi.HasAliasWriteRoutes)
-            NotOnThisServer.Ignore(NotOnThisServer.NoAliasCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAliasCreate);
 
          return new Alias { DomainName = _domain, Active = true, Unsaved = true };
       }
@@ -312,8 +318,7 @@ namespace hMailServer
 
       public DistributionList Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject);
       }
 
       public void DeleteByDBID(long id)
@@ -342,21 +347,18 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
          }
       }
 
       public DomainAlias Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
       }
 
       public DomainAlias get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
       }
 
       public void DeleteByDBID(long id)
@@ -483,7 +485,7 @@ namespace hMailServer
       public TCPIPPort Add()
       {
          if (!ServerApi.HasRoute("/api/v1/ports", "post"))
-            NotOnThisServer.Ignore(NotOnThisServer.NoPortCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoPortCreate);
 
          return new TCPIPPort { Unsaved = true };
       }
@@ -679,7 +681,7 @@ namespace hMailServer
       public SecurityRange Add()
       {
          if (!ServerApi.HasRoute("/api/v1/ipranges", "post"))
-            NotOnThisServer.Ignore(NotOnThisServer.NoIpRangeCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoIpRangeCreate);
 
          return new SecurityRange();
       }
@@ -854,7 +856,7 @@ namespace hMailServer
       public SSLCertificate Add()
       {
          if (!ServerApi.HasRoute("/api/v1/certificates", "post"))
-            NotOnThisServer.Ignore(NotOnThisServer.NoCertificateCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCertificateCreate);
 
          return new SSLCertificate();
       }
@@ -871,9 +873,8 @@ namespace hMailServer
 
       public void Clear()
       {
-         foreach (var element in All())
+         foreach (var id in All().Select(element => ServerApi.LongOf(element, "id")))
          {
-            var id = ServerApi.LongOf(element, "id");
             var answer = ServerApi.Delete("/api/v1/certificates/" + id);
 
             // A certificate a listener is bound to cannot go; the Windows Clear has
@@ -984,7 +985,7 @@ namespace hMailServer
       public Route Add()
       {
          if (!ServerApi.HasRouteWriteRoutes)
-            NotOnThisServer.Ignore(NotOnThisServer.NoRouteCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoRouteCreate);
 
          return new Route();
       }
@@ -1035,7 +1036,7 @@ namespace hMailServer
       public Rule Add()
       {
          if (!ServerApi.HasRoute("/api/v1/rules", "post"))
-            NotOnThisServer.Ignore(NotOnThisServer.NoRuleCreate);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoRuleCreate);
 
          return new Rule();
       }
@@ -1061,11 +1062,8 @@ namespace hMailServer
 
       public void Clear()
       {
-         foreach (var element in All())
-         {
-            var id = ServerApi.LongOf(element, "id");
+         foreach (var id in All().Select(element => ServerApi.LongOf(element, "id")))
             ServerApi.Delete("/api/v1/rules/" + id).Expect(200, "DELETE /api/v1/rules/" + id);
-         }
       }
 
       public void Refresh()

@@ -376,7 +376,7 @@ function answer(method, path) {
    }
    if (/\/flags$/.test(path)) { return json(200, { flags: { seen: true, flagged: false, draft: false } }); }
    if (path.startsWith('/api/v1/me/changes')) {
-      if (changesMissing) { return json(changesMissing === 403 ? 403 : 404, { error: 'Not found.' }); }
+      if (changesMissing) { return json(404, { error: 'Not found.' }); }
       changeStep += 1;
       if (changeStep === 1) { return json(200, { token: 't1', folders: [{ id: 1, count: 3, unseen: 2 }, { id: 2, count: 1, unseen: 0 }, { id: 3, count: 0, unseen: 0 }] }); }
       if (changeStep === 2) { arrived = true; return json(200, { token: 't2', changed: true, folders: [{ id: 1, count: 4, unseen: 3 }, { id: 2, count: 1, unseen: 0 }, { id: 3, count: 0, unseen: 0 }] }); }

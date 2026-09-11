@@ -25,6 +25,38 @@ namespace RegressionTests.Shared
          Assert.Ignore("Not runnable against this server: " + reason);
       }
 
+      /// <summary>
+      ///    A setter that has no route to write through: the value the fixture
+      ///    tried to set is part of the reason, because a skip list that says what
+      ///    the test wanted is a better list of API gaps than one that only says
+      ///    where it stopped.
+      /// </summary>
+      public static void Ignore(string reason, object attempted)
+      {
+         Assert.Ignore("Not runnable against this server: " + reason + " (the test tried to set " + Describe(attempted) + ")");
+      }
+
+      /// <summary>
+      ///    For a getter that can only skip: <c>get { throw NotOnThisServer.Skipped(reason); }</c>.
+      ///    Throwing the exception is what Assert.Ignore does; writing it as a throw
+      ///    lets the compiler and the analysers see that the getter never returns,
+      ///    where an Ignore() call followed by <c>return null</c> reads as a
+      ///    property that answers null.
+      /// </summary>
+      public static IgnoreException Skipped(string reason)
+      {
+         return new IgnoreException("Not runnable against this server: " + reason);
+      }
+
+      private static string Describe(object value)
+      {
+         if (value == null)
+            return "null";
+         if (value is string s)
+            return "\"" + s + "\"";
+         return value.ToString();
+      }
+
       public const string NoSettingsWrite =
          "needs a server setting written, and this server's REST API has no PUT /api/v1/settings (it arrived with wave 162)";
 
