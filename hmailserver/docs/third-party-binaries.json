@@ -14,9 +14,10 @@
       "upstream": "https://www.7-zip.org/a/7z1900-extra.7z",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain-review",
+      "disposition": "fetched",
       "used_by": "Compression::GetExecutableFullPath_() in hmailserver/source/Server/Common/Util/Compression.cpp line 81; run from {app}\\Bin",
-      "why": "Used to create archives. Version 19.00 dates from 2019; upstream is 26.02. Update it and re-record the hash - this is the committed binary most overdue a refresh."
+      "why": "Used to create archives. Version 19.00 dates from 2019; upstream is 26.02. Update it and re-record the hash - this is the committed binary most overdue a refresh.",
+      "source": "build-inputs-1/7za-19.00.exe"
     },
     {
       "path": "hmailserver/installation/Extras/libmysql.dll",
@@ -29,9 +30,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 33",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/libmysql.dll. Repoint the installer at the libraries copy and delete this one."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/libmysql.dll. Repoint the installer at the libraries copy and delete this one.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#libmysql.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/auth_gssapi_client.dll",
@@ -44,9 +46,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/auth_gssapi_client.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/auth_gssapi_client.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/auth_gssapi_client.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/auth_named_pipe.dll",
@@ -59,9 +62,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/auth_named_pipe.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/auth_named_pipe.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/auth_named_pipe.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/authentication_windows_client.dll",
@@ -74,9 +78,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/authentication_windows_client.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/authentication_windows_client.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/authentication_windows_client.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/caching_sha2_password.dll",
@@ -89,9 +94,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/caching_sha2_password.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/caching_sha2_password.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/caching_sha2_password.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/client_ed25519.dll",
@@ -104,9 +110,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/client_ed25519.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/client_ed25519.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/client_ed25519.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/dialog.dll",
@@ -119,9 +126,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/dialog.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/dialog.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/dialog.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/mysql_clear_password.dll",
@@ -134,9 +142,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/mysql_clear_password.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/mysql_clear_password.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/mysql_clear_password.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/parsec.dll",
@@ -149,9 +158,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/parsec.dll."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/parsec.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/parsec.dll"
     },
     {
       "path": "hmailserver/installation/Extras/plugin/sha256_password.dll",
@@ -164,39 +174,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "remove-duplicate",
+      "disposition": "fetched",
       "used_by": "section_files_common.iss line 37 (.\\Extras\\plugin\\*.dll)",
-      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/sha256_password.dll."
-    },
-    {
-      "path": "hmailserver/installation/ISC.dll",
-      "sha256": "7e29e3e056c24ea839a7b59e3157a48306ca755b08bff5562fd64ea9a67c339e",
-      "size": 45056,
-      "component": "Unidentified - exports CheckPorts()",
-      "version": "none (no version resource)",
-      "publisher": "none (no company or product string)",
-      "license": "unknown",
-      "upstream": "unknown",
-      "authenticode": "NotSigned",
-      "authenticode_signer": null,
-      "disposition": "retain-review",
-      "used_by": "hMailServerInnoExtension.iss line 94 declares CheckPorts@files:ISC.DLL; called at line 695",
-      "why": "WEAKEST PROVENANCE IN THE REPOSITORY. A 45 KB unsigned native DLL with no version resource, no publisher and no known upstream, loaded by the installer to test whether ports 25/110/143 are already in use. It is genuinely called, so it cannot simply be deleted - but it should be replaced by Inno Setup Pascal code or a rebuilt-from-source DLL."
-    },
-    {
-      "path": "hmailserver/installation/isxdl.dll",
-      "sha256": "21bc620515ebbdeb125d273c2d8db45577d05408ef624464af26afcfecfd201a",
-      "size": 59392,
-      "component": "ISX Download DLL (isxdl)",
-      "version": "5.1.5.0",
-      "publisher": "Bjornar Henden",
-      "license": "Freeware Inno Setup plugin - licence text not held in this repository",
-      "upstream": "No maintained upstream; historically distributed with ISTool",
-      "authenticode": "NotSigned",
-      "authenticode_signer": null,
-      "disposition": "remove-unused",
-      "used_by": "Nothing. hMailServerInnoExtension.iss lines 97-119 declare all eight exports; not one is called.",
-      "why": "An unsigned, unmaintained HTTP downloader packed into the installer and never invoked. Deleting it removes an unused network-fetch capability from a payload that runs with installer privileges."
+      "why": "Byte-identical to libraries/mariadb-connector-c-3.4.9/plugin/sha256_password.dll.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/sha256_password.dll"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/concrt140.dll",
@@ -209,9 +190,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/msvcp140_1.dll",
@@ -224,9 +206,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/msvcp140_2.dll",
@@ -239,9 +222,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/msvcp140_atomic_wait.dll",
@@ -254,9 +238,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/msvcp140_codecvt_ids.dll",
@@ -269,9 +254,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/msvcp140.dll",
@@ -284,9 +270,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/vccorlib140.dll",
@@ -299,9 +286,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/vcruntime140_1.dll",
@@ -314,9 +302,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/vcruntime140_threads.dll",
@@ -329,9 +318,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/Microsoft.VC145.CRT/vcruntime140.dll",
@@ -344,9 +334,10 @@
       "upstream": "Visual Studio installation: %VCToolsRedistDir%\\x64\\Microsoft.VC*.CRT",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Windows Software Compatibility Publisher, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain-review",
+      "disposition": "gathered",
       "used_by": "section_files_64.iss line 9 (Microsoft.VC145.CRT\\* to {app}\\Bin)",
-      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy."
+      "why": "MSVC runtime shipped beside the server so a target machine needs no separate redistributable. Copyable from the build machine Visual Studio installation instead of being committed - see the policy.",
+      "source": "VCToolsRedistDir/x64/Microsoft.VC145.CRT"
     },
     {
       "path": "hmailserver/installation/SQLCE/SSCERuntime_x64-ENU.msi",
@@ -359,54 +350,10 @@
       "upstream": "Retired from the Microsoft Download Center. No current first-party download; this copy is the archive of record.",
       "authenticode": "Valid",
       "authenticode_signer": "CN=Microsoft Corporation, OU=MOPR, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "section_files_64.iss line 26; installed by InstallSQLCE() in hMailServerInnoExtension.iss line 843",
-      "why": "The built-in database backend. Microsoft has withdrawn the download, so a committed copy is the only way to keep the internal-database install path working."
-    },
-    {
-      "path": "hmailserver/installation/SQLCE/SSCERuntime_x86-ENU.msi",
-      "sha256": "0525e6b3e1cb69a22995fa0524ea88cc2d591036c4c7e9646b2552be60c667d2",
-      "size": 9083392,
-      "component": "Microsoft SQL Server Compact 4.0 SP1 ENU (x86)",
-      "version": "4.0 SP1 (MSI built 2012-04-06)",
-      "publisher": "Microsoft Corporation",
-      "license": "Microsoft SQL Server Compact Edition EULA",
-      "upstream": "Retired from the Microsoft Download Center.",
-      "authenticode": "Valid",
-      "authenticode_signer": "CN=Microsoft Corporation, OU=MOPR, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
-      "disposition": "remove-unused",
-      "used_by": "Nothing. Referenced only by a comment in hMailServerInnoExtension.iss line 839 that records the x86 branch was deleted.",
-      "why": "The installer is x64 only (ArchitecturesAllowed=x64 in section_setup_64.iss). This MSI is never staged into {tmp} and never executed. 8.7 MB of unreachable binary."
-    },
-    {
-      "path": "hmailserver/installation/System Files/ATL/atl70.dll",
-      "sha256": "6e4f674619f5ab33190c9b841d31e06a7451adde41bdcd9d39461e7f924dda67",
-      "size": 84992,
-      "component": "ATL 7.0 runtime (Visual Studio .NET 2003)",
-      "version": "7.00.9466.0",
-      "publisher": "Microsoft Corporation",
-      "license": "Microsoft Visual Studio .NET 2003 Distributable Code terms",
-      "upstream": "Visual Studio .NET 2003 - long out of support, no current first-party download",
-      "authenticode": "NotSigned",
-      "authenticode_signer": null,
-      "disposition": "retain-review",
-      "used_by": "section_files_common.iss line 12 (installed to {sys} with onlyifdoesntexist)",
-      "why": "Vestigial on a v145 build - nothing in this tree links ATL 7.0 - but the installer still ships it and removing it needs an install test on a clean machine. section_files_common.iss says the same in its own comment."
-    },
-    {
-      "path": "hmailserver/installation/System Files/dnsapi.dll",
-      "sha256": "3cdec2716426a8c3488fc1e94e146d913c672c402b13e9028dfa0c525555fa4f",
-      "size": 134928,
-      "component": "Windows 2000 DNS Client API",
-      "version": "5.00.2195.6680",
-      "publisher": "Microsoft Corporation",
-      "license": "Microsoft Windows 2000 operating system component - not redistributable",
-      "upstream": "Windows 2000 - end of support 2010",
-      "authenticode": "NotSigned",
-      "authenticode_signer": null,
-      "disposition": "remove-unused",
-      "used_by": "Nothing. No .iss file references it and no build step copies it.",
-      "why": "A 2003-vintage copy of a Windows system DLL. RMSPF.cpp line 415 calls LoadLibrary(\"DNSAPI.DLL\"), which resolves against System32; it never loads this file. Committed, shipped nowhere, and a DLL-planting hazard if it ever reached an application directory."
+      "why": "The built-in database backend. Microsoft has withdrawn the download, so a committed copy is the only way to keep the internal-database install path working.",
+      "source": "build-inputs-1/SSCERuntime_x64-ENU.msi"
     },
     {
       "path": "hmailserver/source/Tools/Interop/Interop.hMailServer.dll",
@@ -434,9 +381,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "MySQLInterface::GetLibraryFullPath_() builds a path beside the running executable and loads it at runtime; post-build.bat copies it to the build output",
-      "why": "The MySQL/MariaDB client. Loaded only when the configured database type is MySQL or MariaDB."
+      "why": "The MySQL/MariaDB client. Loaded only when the configured database type is MySQL or MariaDB.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#libmysql.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/auth_gssapi_client.dll",
@@ -449,9 +397,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (auth_gssapi_client). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (auth_gssapi_client). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/auth_gssapi_client.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/auth_named_pipe.dll",
@@ -464,9 +413,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (auth_named_pipe). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (auth_named_pipe). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/auth_named_pipe.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/authentication_windows_client.dll",
@@ -479,9 +429,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (authentication_windows_client). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (authentication_windows_client). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/authentication_windows_client.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/caching_sha2_password.dll",
@@ -494,9 +445,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (caching_sha2_password). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (caching_sha2_password). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/caching_sha2_password.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/client_ed25519.dll",
@@ -509,9 +461,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (client_ed25519). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (client_ed25519). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/client_ed25519.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/dialog.dll",
@@ -524,9 +477,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (dialog). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (dialog). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/dialog.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/mysql_clear_password.dll",
@@ -539,9 +493,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (mysql_clear_password). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (mysql_clear_password). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/mysql_clear_password.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/parsec.dll",
@@ -554,9 +509,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (parsec). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (parsec). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/parsec.dll"
     },
     {
       "path": "libraries/mariadb-connector-c-3.4.9/plugin/sha256_password.dll",
@@ -569,9 +525,10 @@
       "upstream": "https://dlm.mariadb.com/browse/c_connector/",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "fetched",
       "used_by": "Found by libmysql.dll via MYSQL_PLUGIN_DIR; post-build.bat copies the directory to the build output",
-      "why": "Client authentication plugin (sha256_password). Without the set, common MySQL and MariaDB account types cannot authenticate."
+      "why": "Client authentication plugin (sha256_password). Without the set, common MySQL and MariaDB account types cannot authenticate.",
+      "source": "build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip#plugin/sha256_password.dll"
     },
     {
       "path": "libraries/msado28/msado28-x32.tlb",
@@ -603,5 +560,31 @@
       "used_by": "hmailserver/source/Server/hMailServer/stdafx.h lines 47 and 51 (#import at compile time)",
       "why": "The server #imports this type library to generate the ADO wrappers it compiles against. Importing the host OS copy instead would make the generated wrappers vary with the build machine Windows version."
     }
-  ]
+  ],
+  "build_inputs": [
+    {
+      "release": "build-inputs-1",
+      "asset": "7za-19.00.exe",
+      "sha256": "8117e40ee7f824f63373a4f5625bb62749f69159d0c449b3ce2f35aad3b83549",
+      "size": 1152000
+    },
+    {
+      "release": "build-inputs-1",
+      "asset": "mariadb-connector-c-3.4.9-win64-client.zip",
+      "sha256": "a23e96857e7e02fd26c9317638655c4d3da3f11d0ac2f40ae310842a5169cc8d",
+      "size": 300212
+    },
+    {
+      "release": "build-inputs-1",
+      "asset": "SSCERuntime_x64-ENU.msi",
+      "sha256": "b2d2aba2102d0fa8915421b1e0b850f7c538983eed06e89c358cc2a0c578f958",
+      "size": 10609664
+    }
+  ],
+  "dispositions": {
+    "retain": "committed on purpose, with the reason in 'why'",
+    "retain-generated": "generated from this repository's own sources and committed for the build's convenience",
+    "gathered": "not in git; copied from the build machine by build/get-installer-binaries.ps1 and verified against 'sha256'",
+    "fetched": "not in git; downloaded from the build-inputs release named in 'source' by build/get-installer-binaries.ps1 and verified against 'sha256'"
+  }
 }

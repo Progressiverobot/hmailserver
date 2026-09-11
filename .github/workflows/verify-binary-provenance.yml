@@ -67,9 +67,26 @@ jobs:
           $listed = @{}
 
           # --- 1. Every listed artifact is present and unchanged --------------
+          $trackedSet = @{}
+          foreach ($f in ((git ls-files -z) -split ([char]0) | Where-Object { $_ })) { $trackedSet[$f] = $true }
           foreach ($artifact in $manifest.artifacts) {
              $listed[$artifact.path] = $true
 
+             if ($artifact.disposition -in @('fetched', 'gathered')) {
+                # Not in git by design: build/get-installer-binaries.ps1 puts it in
+                # place and verifies it. Here the only failure is its being tracked
+                # after all, or present with the wrong bytes.
+                if ($trackedSet.ContainsKey($artifact.path)) {
+                   $problems.Add("TRACKED   $($artifact.path)`n          Marked '$($artifact.disposition)' but committed. Remove it from git; the build fetches it.")
+                }
+                if (Test-Path -LiteralPath $artifact.path -PathType Leaf) {
+                   $actual = (Get-FileHash -LiteralPath $artifact.path -Algorithm SHA256).Hash.ToLower()
+                   if ($actual -ne ([string]$artifact.sha256).ToLower()) {
+                      $problems.Add("CHANGED   $($artifact.path)`n          A fetched or gathered file on disk does not match the manifest.")
+                   }
+                }
+                continue
+             }
              if (-not (Test-Path -LiteralPath $artifact.path -PathType Leaf)) {
                 # Not automatically an error: the manifest deliberately lists
                 # files marked for removal, and the whole point is that removing

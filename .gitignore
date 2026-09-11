@@ -109,3 +109,13 @@ hmailserver/test/LinuxRegressionTests/obj/
 # Obsidian, if somebody opens the repository as a vault to read the documents.
 # Its workspace files are one machine's window layout and nothing else.
 /.obsidian/
+
+# Third-party binaries the build fetches or gathers (build/get-installer-binaries.ps1)
+# rather than carrying in git; each is verified against hmailserver/docs/third-party-binaries.json.
+/hmailserver/installation/Microsoft.VC145.CRT/
+/hmailserver/installation/Extras/7za.exe
+/hmailserver/installation/Extras/libmysql.dll
+/hmailserver/installation/Extras/plugin/
+/hmailserver/installation/SQLCE/
+/libraries/mariadb-connector-c-3.4.9/libmysql.dll
+/libraries/mariadb-connector-c-3.4.9/plugin/

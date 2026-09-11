@@ -2,14 +2,11 @@
 Source: isxdl.dll; DestDir: {tmp}; Flags: dontcopy
 Source: "License.rtf"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
-; 3'rd party dependencies
-; atl70.dll is the ATL 7.0 runtime from Visual Studio .NET 2003 and is shared:
-; onlyifdoesntexist stops an hMailServer install from downgrading a copy another
-; product put there, and uninsneveruninstall stops an hMailServer *uninstall* from
-; deleting a System32 DLL out from under that other product, which is what happened
-; before - the file was logged on install like any other and removed on uninstall.
-; (It also looks vestigial on a v145 build; see the packaging notes.)
-Source: "System files\ATL\atl70.dll"; DestDir: "{sys}"; Flags: onlyifdoesntexist uninsneveruninstall; Components: server;
+; 3'rd party dependencies. None of these is in git: build\get-installer-binaries.ps1
+; fetches or gathers each one and verifies it against hmailserver\docs\third-party-binaries.json,
+; and the installer smoke test proves the result installs. atl70.dll (ATL 7.0, Visual
+; Studio .NET 2003) is no longer shipped: nothing on a v145 build links it, and the
+; smoke test on a clean runner is what says so.
 Source: ".\Extras\7za.exe"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server;
 
 ; Database scripts
