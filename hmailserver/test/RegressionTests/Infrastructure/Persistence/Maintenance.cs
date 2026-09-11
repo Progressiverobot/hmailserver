@@ -84,8 +84,7 @@ namespace RegressionTests.Infrastructure.Persistence
             CustomAsserts.AssertRecipientsInDeliveryQueue(1, false);
 
             // The whole point: this must not throw.
-            Assert.DoesNotThrow(() =>
-               _application.Utilities.PerformMaintenance(eMaintenanceOperation.eUpdateIMAPFolderUID));
+            Assert.That(() => _application.Utilities.PerformMaintenance(eMaintenanceOperation.eUpdateIMAPFolderUID), Throws.Nothing);
 
             // And the folder that did have a message must have been brought up to
             // date rather than skipped - the old code could abort before reaching it.

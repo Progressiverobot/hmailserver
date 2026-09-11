@@ -15,16 +15,14 @@ namespace hMailServer
    {
       public BlockedAttachment Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
       }
 
@@ -56,39 +54,31 @@ namespace hMailServer
    {
       public Rule Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
          }
       }
 
       public Rule get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public Rule this[int index]
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules); }
       }
 
       public Rule get_Item(int index)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
       public void DeleteByDBID(long id)
@@ -110,39 +100,31 @@ namespace hMailServer
    {
       public FetchAccount Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
          }
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public FetchAccount this[int index]
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts); }
       }
 
       public FetchAccount get_Item(int index)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
       }
 
       public FetchAccount get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
       }
 
       public void DeleteByDBID(long id)
@@ -210,33 +192,26 @@ namespace hMailServer
    {
       public AppPassword Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
          }
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public AppPassword this[int index]
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords); }
       }
 
       public AppPassword get_Item(int index)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
       }
 
       public void DeleteByDBID(long id)
@@ -264,8 +239,7 @@ namespace hMailServer
 
       public string Generate()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
       }
 
       public void SetPassword(string password)
@@ -297,31 +271,24 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
          }
       }
 
       public IMAPFolderPermission Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public IMAPFolderPermission this[int index]
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl); }
       }
 
       public IMAPFolderPermission get_Item(int index)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
       }
 
       public void DeleteByDBID(long id)
@@ -354,8 +321,7 @@ namespace hMailServer
 
       public bool get_Permission(eACLPermission permission)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
-         return false;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
       }
    }
 }
