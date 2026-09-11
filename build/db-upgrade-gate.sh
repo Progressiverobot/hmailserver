@@ -104,12 +104,28 @@ version=$(query "select value from hm_dbversion;")
 [ "$version" = "$required" ] || { echo "created database is at $version, expected $required" >&2; exit 1; }
 echo "-- created at schema $required"
 
-# 2. Wind it back to 6029: what 6030 and 6031 added, removed.
+# 2. Wind it back to 6029: everything every step after it added, removed -
+#    read from the steps' own scripts, so a new step needs nothing here.
+#    Foreign keys first, then columns, then tables. The foreign keys the
+#    create script made are counted now, and expected back after the upgrade.
 echo "-- winding back to 6029"
+expected_fks=$(query "$count_fks")
+dialect=$( [ "$backend" = pgsql ] && echo PGSQL || echo MySQL )
 {
-   grep -ioE 'alter table \w+ add constraint \w+ foreign key' "$HM_SCRIPTS/Upgrade6029to6030$( [ "$backend" = pgsql ] && echo PGSQL || echo MySQL ).sql" \
-      | awk '{print tolower($3), tolower($6)}' | while read -r table name; do drop_fk "$table" "$name"; done
-   echo "alter table hm_fetchaccounts drop column famirrorfolders;"
+   for ((v = required; v > 6029; v--)); do
+      script="$HM_SCRIPTS/Upgrade$((v - 1))to${v}${dialect}.sql"
+      [ -f "$script" ] || { echo "no $script" >&2; exit 1; }
+      (grep -ioE 'alter table \w+ add constraint \w+ foreign key' "$script" || true) \
+         | awk '{print tolower($3), tolower($6)}' | while read -r table name; do drop_fk "$table" "$name"; done
+   done
+   for ((v = required; v > 6029; v--)); do
+      script="$HM_SCRIPTS/Upgrade$((v - 1))to${v}${dialect}.sql"
+      (grep -ioE 'alter table \w+ add (column )?\w+' "$script" || true) \
+         | awk '{ c = tolower($NF); if (c != "constraint" && c != "index" && c != "unique" && c != "primary") print tolower($3), c }' \
+         | while read -r table column; do echo "alter table $table drop column $column;"; done
+      (grep -ioE 'create table \w+' "$script" || true) \
+         | awk '{print tolower($3)}' | while read -r table; do echo "drop table if exists $table;"; done
+   done
    echo "update hm_dbversion set value = 6029;"
 } > "$work/rewind.sql"
 run_file "$work/rewind.sql"
@@ -130,8 +146,8 @@ rc=$?
 set -e
 version=$(query "select value from hm_dbversion;")
 fks=$(query "$count_fks")
-echo "-- upgrade exit $rc; schema now $version; foreign keys $fks of 17"
-if [ "$rc" -ne 0 ] || [ "$version" != "$required" ] || [ "$fks" != 17 ]; then
+echo "-- upgrade exit $rc; schema now $version; foreign keys $fks of $expected_fks"
+if [ "$rc" -ne 0 ] || [ "$version" != "$required" ] || [ "$fks" != "$expected_fks" ]; then
    echo "GATE FAILED: a 6029 database holding orphaned rows did not upgrade cleanly on $backend" >&2
    exit 1
 fi
