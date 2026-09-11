@@ -3,7 +3,7 @@ name: CI
 # Builds the .NET 10 Control Panel (hMailCP) and the .NET tools solution on
 # every push / PR, and verifies the committed generated code still matches its
 # sources. This catches C# regressions cheaply. The tools build against
-# the checked-in COM interop wrapper (source/Tools/Interop), so no registered
+# the generated COM interop wrapper (source/Tools/Interop), so no registered
 # typelib is needed. The C++ server is compiled by server-build.yml, which
 # builds the native libraries it links against (OpenSSL, Boost, PostgreSQL's
 # libpq - see libraries/build-*.ps1) on a hosted runner and caches them; the
@@ -62,6 +62,14 @@ jobs:
       # source/Tools/Directory.Build.props); a package bump without its lock
       # file update fails here rather than building against a different graph
       # than the one reviewed.
+      # The COM wrapper the tools reference (source/Tools/Interop) is not in git:
+      # it is TlbImp output from hMailServer.idl, made here from the IDL alone
+      # with MIDL and TlbImp, which the runner's Visual Studio carries. The same
+      # script makes it on a maintainer's machine from the server build.
+      - name: Generate the COM wrapper from the IDL
+        shell: pwsh
+        run: ./build/generate-com-wrapper.ps1 -FromIdl
+
       - name: Restore
         run: dotnet restore hmailserver/source/Tools/ControlPanel/ControlPanel.csproj --locked-mode
 
@@ -109,6 +117,14 @@ jobs:
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
+
+      # The COM wrapper the tools reference (source/Tools/Interop) is not in git:
+      # it is TlbImp output from hMailServer.idl, made here from the IDL alone
+      # with MIDL and TlbImp, which the runner's Visual Studio carries. The same
+      # script makes it on a maintainer's machine from the server build.
+      - name: Generate the COM wrapper from the IDL
+        shell: pwsh
+        run: ./build/generate-com-wrapper.ps1 -FromIdl
 
       - name: Restore (locked to packages.lock.json)
         run: dotnet restore "hmailserver/source/Tools/hMailServer Tools.sln" --locked-mode

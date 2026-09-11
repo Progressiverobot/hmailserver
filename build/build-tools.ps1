@@ -18,6 +18,13 @@ $ErrorActionPreference = 'Stop'
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $toolsDir = Resolve-Path (Join-Path $scriptRoot '..\hmailserver\source\Tools')
 
+# The COM wrapper every tool project references by HintPath is generated, not
+# committed: from the server build's type library when there is a current one,
+# otherwise from the IDL (MIDL needs the Visual C++ tools for that). A no-op
+# when the wrapper is already made from the same type library.
+& (Join-Path $scriptRoot 'generate-com-wrapper.ps1')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 $publishProjects = 'DBSetup', 'DBSetupQuick', 'DBUpdater', 'DataDirectorySynchronizer', 'ImportTool'
 
 foreach ($project in $publishProjects) {

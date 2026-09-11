@@ -107,3 +107,12 @@ if (Test-Path $typeLibSource) {
     Write-Warning "MIDL produced no type library at $typeLibSource - the installer will not compile until it does."
 }
 
+# The COM wrapper the .NET tools compile against, from the type library this
+# build just made. Not in git: generate-com-wrapper.ps1 makes it here, in
+# build-tools.ps1 and in CI, and rewrites it only when the type library changed.
+& (Join-Path $scriptRoot 'generate-com-wrapper.ps1') -Configuration $Configuration
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "generate-com-wrapper.ps1 failed with exit code $LASTEXITCODE."
+    exit $LASTEXITCODE
+}
+

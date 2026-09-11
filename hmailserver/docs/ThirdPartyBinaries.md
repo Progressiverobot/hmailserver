@@ -156,7 +156,7 @@ Grouped by component. Per-file hashes are in
 
 | Component | Files | Note |
 |---|---|---|
-| `source/Tools/Interop/Interop.hMailServer.dll` | 1 | TlbImp output from *this project's* own `hMailServer.idl`. Committed deliberately so the .NET tools build with a plain `dotnet build` and no registered typelib; the reasoning and the regeneration command are in [Interop/README.md](../source/Tools/Interop/README.md). It is in the manifest because Scorecard cannot tell our binary from anyone else's, and because "it's ours" is a claim that deserves to be written down and hashed like any other. |
+| `source/Tools/Interop/Interop.hMailServer.dll` | 0 | TlbImp output from *this project's* own `hMailServer.idl`. Not in git since 11 September 2026: `build/generate-com-wrapper.ps1` makes it from the server build's type library, or from the IDL alone with MIDL, and `build.ps1`, `build-tools.ps1` and the CI workflows all run it. It stays in the manifest as `generated` so the provenance check refuses it if it is ever committed again; it has no hash there because TlbImp output is not byte-reproducible (a fresh module id per run). [Interop/README.md](../source/Tools/Interop/README.md). |
 
 What CI checks
 --------------

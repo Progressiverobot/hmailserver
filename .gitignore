@@ -119,3 +119,10 @@ hmailserver/test/LinuxRegressionTests/obj/
 /hmailserver/installation/SQLCE/
 /libraries/mariadb-connector-c-3.4.9/libmysql.dll
 /libraries/mariadb-connector-c-3.4.9/plugin/
+
+# The COM wrapper the .NET tools compile against: TlbImp output from
+# hMailServer.idl, made by build/generate-com-wrapper.ps1 (build.ps1,
+# build-tools.ps1 and CI all run it), with the hash of the type library it was
+# made from recorded beside it.
+/hmailserver/source/Tools/Interop/Interop.hMailServer.dll
+/hmailserver/source/Tools/Interop/Interop.hMailServer.dll.source-sha256
