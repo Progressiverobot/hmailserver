@@ -385,7 +385,22 @@ namespace DBUpdater
          new SchemaProbe(6033, "hm_accountprefs.prefname",
                          "update hm_accountprefs set prefname = prefname where 1 = 0"),
          new SchemaProbe(6033, "hm_accountprefs.prefvalue",
-                         "update hm_accountprefs set prefvalue = prefvalue where 1 = 0")
+                         "update hm_accountprefs set prefvalue = prefvalue where 1 = 0"),
+         // Upgrade6033to6034* - what is scheduled (hm_scheduled): a draft to be
+         // sent at a time, a snoozed message to come back; the identity column
+         // is not probed.
+         new SchemaProbe(6034, "hm_scheduled.schedaccountid",
+                         "update hm_scheduled set schedaccountid = schedaccountid where 1 = 0"),
+         new SchemaProbe(6034, "hm_scheduled.schedmessageid",
+                         "update hm_scheduled set schedmessageid = schedmessageid where 1 = 0"),
+         new SchemaProbe(6034, "hm_scheduled.schedaction",
+                         "update hm_scheduled set schedaction = schedaction where 1 = 0"),
+         new SchemaProbe(6034, "hm_scheduled.schedat",
+                         "update hm_scheduled set schedat = schedat where 1 = 0"),
+         new SchemaProbe(6034, "hm_scheduled.schedfolderid",
+                         "update hm_scheduled set schedfolderid = schedfolderid where 1 = 0"),
+         new SchemaProbe(6034, "hm_scheduled.schedcreated",
+                         "update hm_scheduled set schedcreated = schedcreated where 1 = 0")
       };
 
       /// <summary>

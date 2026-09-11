@@ -272,6 +272,7 @@ EXIT 0
     <ClCompile Include="..\Common\Application\ArchiveRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\MailboxRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\MetricsHistoryTask.cpp" />
+    <ClCompile Include="..\Common\Application\ScheduledMailTask.cpp" />
     <ClCompile Include="..\Common\Application\UpdateCheckTask.cpp" />
     <ClCompile Include="..\Common\Application\IMAPExpungeRetentionTask.cpp" />
     <ClCompile Include="..\Common\Application\LogRetentionTask.cpp" />
@@ -572,6 +573,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMailbox.cpp" />
     <ClCompile Include="..\Common\Util\RestApiContacts.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiScheduled.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMessageReplies.cpp" />
     <ClCompile Include="..\Common\Util\RestApiAppPasswords.cpp" />
     <ClCompile Include="..\Common\Util\RestApiPreferences.cpp" />
@@ -970,6 +972,7 @@ EXIT 0
     <ClInclude Include="..\Common\Application\ArchiveRetentionTask.h" />
     <ClInclude Include="..\Common\Application\MailboxRetentionTask.h" />
     <ClInclude Include="..\Common\Application\MetricsHistoryTask.h" />
+    <ClInclude Include="..\Common\Application\ScheduledMailTask.h" />
     <ClInclude Include="..\Common\Application\UpdateCheckTask.h" />
     <ClInclude Include="..\Common\Application\IMAPExpungeRetentionTask.h" />
     <ClInclude Include="..\Common\Application\LogRetentionTask.h" />

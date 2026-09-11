@@ -1709,6 +1709,30 @@ namespace HM
          case RouteMeMessageUnsubscribe:
             return HandleMeMessageUnsubscribe_(caller, route.message_id);
 
+         case RouteMeDraftSchedule:
+            return HandleMeDraftSchedule_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeDraftUnschedule:
+            return HandleMeDraftUnschedule_(caller, route.message_id);
+
+         case RouteMeMessageSnooze:
+            return HandleMeMessageSnooze_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeScheduled:
+            return HandleMeScheduled_(caller);
+
+         case RouteMeScheduledCancel:
+            return HandleMeScheduledCancel_(caller, route.message_id);
+
+         case RouteScheduledRun:
+            return HandleScheduledRun_();
+
+         case RouteMeFolderExport:
+            return HandleMeFolderExport_(caller, route.folder_id);
+
+         case RouteMeFolderImport:
+            return HandleMeFolderImport_(caller, route.folder_id, GetRequestBody_(request));
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1778,6 +1802,40 @@ namespace HM
       if (path == "/api/v1/me" && method == "GET")
       {
          route.kind = RouteMe;
+         return;
+      }
+
+      // Later: a draft sent at a time, what is scheduled, one item cancelled.
+      const AnsiString meDraftsPath = "/api/v1/me/drafts/";
+      if (path.StartsWith(meDraftsPath))
+      {
+         AnsiString rest = path.Mid(meDraftsPath.GetLength());
+         if (rest.EndsWith("/schedule"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/schedule").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+            {
+               if (method == "POST")
+                  route.kind = RouteMeDraftSchedule;
+               else if (method == "DELETE")
+                  route.kind = RouteMeDraftUnschedule;
+            }
+         }
+         return;
+      }
+
+      const AnsiString meScheduledPath = "/api/v1/me/scheduled";
+      if (path == meScheduledPath)
+      {
+         if (method == "GET")
+            route.kind = RouteMeScheduled;
+         return;
+      }
+      if (path.StartsWith(meScheduledPath + "/"))
+      {
+         AnsiString rest = path.Mid(meScheduledPath.GetLength() + 1);
+         if (method == "DELETE" && ParseQueueId(rest, route.message_id))
+            route.kind = RouteMeScheduledCancel;
          return;
       }
 
@@ -1935,6 +1993,24 @@ namespace HM
             return;
          }
 
+         if (method == "POST" && rest.EndsWith("/messages"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/messages").GetLength());
+            if (ParseQueueId(idText, route.folder_id))
+               route.kind = RouteMeFolderImport;
+
+            return;
+         }
+
+         if (method == "GET" && rest.EndsWith("/export"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/export").GetLength());
+            if (ParseQueueId(idText, route.folder_id))
+               route.kind = RouteMeFolderExport;
+
+            return;
+         }
+
          if (method == "POST" && rest.EndsWith("/empty"))
          {
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/empty").GetLength());
@@ -2048,6 +2124,14 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/move").GetLength());
             if (ParseQueueId(idText, route.message_id))
                route.kind = RouteMeMessageMove;
+            return;
+         }
+
+         if (method == "POST" && rest.EndsWith("/snooze"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/snooze").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageSnooze;
             return;
          }
 
@@ -2177,6 +2261,14 @@ namespace HM
       if (method == "GET" && path == "/api/v1/queue")
       {
          route.kind = RouteQueueList;
+         return;
+      }
+
+      // The administrator runs what the webmail scheduled, now.
+      if (path == "/api/v1/scheduled/run")
+      {
+         if (method == "POST")
+            route.kind = RouteScheduledRun;
          return;
       }
 
@@ -2592,6 +2684,12 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMeDraftSchedule:
+      case RouteMeDraftUnschedule:
+      case RouteMeMessageSnooze:
+      case RouteMeScheduledCancel:
+      case RouteScheduledRun:
+      case RouteMeFolderImport:
       case RouteMeMessageReceipt:
       case RouteMeMessageUnsubscribe:
       case RouteMeAppPasswordCreate:
@@ -5158,6 +5256,13 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeDraftSchedule:
+      case RouteMeDraftUnschedule:
+      case RouteMeMessageSnooze:
+      case RouteMeScheduled:
+      case RouteMeScheduledCancel:
+      case RouteMeFolderExport:
+      case RouteMeFolderImport:
       case RouteMeMessageReceipt:
       case RouteMeMessageUnsubscribe:
       case RouteMeAppPasswords:
@@ -8821,6 +8926,8 @@ namespace HM
       if (query >= 0)
          path = path.Mid(0, query);
 
+      if (path.StartsWith("/api/v1/me/folders/") && path.EndsWith("/messages"))
+         return true;
       return path == "/api/v1/me/messages" || path == "/api/v1/me/drafts";
    }
 
@@ -8895,6 +9002,13 @@ namespace HM
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
+         "\"/api/v1/me/drafts/{id}/schedule\":{\"post\":{\"summary\":\"Send a draft later\",\"description\":\"Body: send_at, YYYY-MM-DD HH:MM in the server's local time, within a year. At that minute the draft is sent as the account would have sent it - its To, Cc and Bcc under the checks a send makes, a copy in the Sent folder - and the draft goes. One schedule per draft; a new one replaces it.\",\"responses\":{\"201\":{\"description\":\"id, message_id, send_at\"},\"400\":{\"description\":\"Not a draft, not a time, in the past or too far\"}}},\"delete\":{\"summary\":\"Do not send it later after all\",\"responses\":{\"200\":{\"description\":\"cancelled\"},\"404\":{\"description\":\"Nothing scheduled for it\"}}}},"
+         "\"/api/v1/me/messages/{id}/snooze\":{\"post\":{\"summary\":\"Snooze a message\",\"description\":\"Body: until, YYYY-MM-DD HH:MM. The message waits in a folder named Snoozed, made when the account has none, and comes back to the folder it left - or the inbox - unread, at that minute.\",\"responses\":{\"200\":{\"description\":\"id, message_id (its new id), until, folder_id (Snoozed)\"},\"400\":{\"description\":\"Not a time, in the past, too far, or snoozed already\"}}}},"
+         "\"/api/v1/me/scheduled\":{\"get\":{\"summary\":\"What the signed-in account has put off\",\"responses\":{\"200\":{\"description\":\"scheduled: id, action (send | return), message_id, at, folder_id, subject\"}}}},"
+         "\"/api/v1/me/scheduled/{id}\":{\"delete\":{\"summary\":\"Cancel one\",\"description\":\"A cancelled send leaves the draft where it is; a cancelled snooze brings the message back now.\",\"responses\":{\"200\":{\"description\":\"cancelled, returned\"},\"404\":{\"description\":\"Nothing by that id\"}}}},"
+         "\"/api/v1/scheduled/run\":{\"post\":{\"summary\":\"Run what is due now\",\"description\":\"Administrator. What the minute task would do at its next tick, done now; answers how many rows were acted on.\",\"responses\":{\"200\":{\"description\":\"ran\"}}}},"
+         "\"/api/v1/me/folders/{id}/export\":{\"get\":{\"summary\":\"The folder as mbox\",\"description\":\"application/mbox, as a download: every message after a From_ line, body lines beginning with From quoted. Larger than 200 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
+         "\"/api/v1/me/folders/{id}/messages\":{\"post\":{\"summary\":\"Import a message into the folder\",\"description\":\"The body is the message itself (message/rfc822, a .eml file), at most 25 MB; stored unread, as IMAP APPEND would store it.\",\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"400\":{\"description\":\"Not a message\"},\"403\":{\"description\":\"The folder does not allow it\"},\"413\":{\"description\":\"Too large\"}}}},"
          "\"/api/v1/me/messages/{id}/receipt\":{\"post\":{\"summary\":\"Send a read receipt\",\"description\":\"For a message that carries Disposition-Notification-To: an RFC 8098 disposition notification (displayed, sent manually) queued from the account to that address, under the recipient checks a send makes. A message that did not ask is 400.\",\"responses\":{\"201\":{\"description\":\"queued, to\"},\"400\":{\"description\":\"No receipt was asked for, or the address is refused\"},\"404\":{\"description\":\"No such message\"}}}},"
          "\"/api/v1/me/messages/{id}/unsubscribe\":{\"post\":{\"summary\":\"Unsubscribe by the list's own method\",\"description\":\"With List-Unsubscribe-Post: List-Unsubscribe=One-Click and an https address in List-Unsubscribe, the one RFC 8058 POST (method one-click, with the list's status) - made only to a public address, judged by what the name resolves to and connected to those addresses, never through HttpProxy, within ten seconds and 32 KB; else a message to the mailto address with its subject (method mail, queued). Neither is 400. A mailto address carrying a control character is refused.\",\"responses\":{\"200\":{\"description\":\"one-click: ok, status\"},\"201\":{\"description\":\"mail: queued, to\"},\"400\":{\"description\":\"No method, or a mailto address that cannot be written into a header\"},\"502\":{\"description\":\"The list could not be reached, or its address is not public (error says which)\"}}}},"
          "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"

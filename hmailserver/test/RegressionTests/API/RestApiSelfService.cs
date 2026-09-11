@@ -1533,6 +1533,133 @@ namespace RegressionTests.API
          StringAssert.Contains("Auto-Submitted: auto-generated", received);
       }
 
+      [Test]
+      [Description("A draft scheduled with send_at is sent when its minute comes - the task run by the administrator's route - and the draft goes")]
+      public void ADraftIsSentLaterOnTheMinute()
+      {
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) draft = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"subject\":\"Later\",\"text\":\"Sent when the minute comes.\"}");
+         Assert.AreEqual(201, draft.status, "Body: " + draft.body);
+         long draftId = long.Parse(Between(draft.body, "\"id\":", ","));
+
+         (int status, string body) past = Http("POST", "/api/v1/me/drafts/" + draftId + "/schedule", UserHeader(UserPassword), "{\"send_at\":\"2000-01-01 09:00\"}");
+         Assert.AreEqual(400, past.status, "Body: " + past.body);
+         (int status, string body) junk = Http("POST", "/api/v1/me/drafts/" + draftId + "/schedule", UserHeader(UserPassword), "{\"send_at\":\"soon\"}");
+         Assert.AreEqual(400, junk.status, "Body: " + junk.body);
+
+         string at = DateTime.Now.AddSeconds(2).ToString("yyyy-MM-dd HH:mm:ss");
+         (int status, string body) scheduled = Http("POST", "/api/v1/me/drafts/" + draftId + "/schedule", UserHeader(UserPassword), "{\"send_at\":\"" + at + "\"}");
+         Assert.AreEqual(201, scheduled.status, "Body: " + scheduled.body);
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/scheduled", UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("\"action\":\"send\"", listed.body);
+         StringAssert.Contains("\"subject\":\"Later\"", listed.body);
+
+         Thread.Sleep(3000);
+         (int status, string body) ran = Http("POST", "/api/v1/scheduled/run", AdminHeader());
+         Assert.AreEqual(200, ran.status, "Body: " + ran.body);
+         StringAssert.Contains("\"ran\":1", ran.body);
+
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("Subject: Later", received);
+         StringAssert.DoesNotContain("Bcc:", received);
+
+         (int status, string body) empty = Http("GET", "/api/v1/me/scheduled", UserHeader(UserPassword));
+         Assert.AreEqual("{\"scheduled\":[]}", empty.body);
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":0,", FolderEntry(tree.body, "Drafts"));
+         StringAssert.Contains("\"messages\":1,", FolderEntry(tree.body, "Sent"));
+      }
+
+      [Test]
+      [Description("A snoozed message waits in Snoozed and comes back to its folder unread when its minute comes; a cancelled snooze brings it back now")]
+      public void ASnoozedMessageComesBackUnread()
+      {
+         Deliver(Address, "Later please", "Not now.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Later please\"");
+         Http("PUT", "/api/v1/me/messages/" + messageId + "/flags", UserHeader(UserPassword), "{\"seen\":true}");
+
+         string until = DateTime.Now.AddSeconds(2).ToString("yyyy-MM-dd HH:mm:ss");
+         (int status, string body) snoozed = Http("POST", "/api/v1/me/messages/" + messageId + "/snooze", UserHeader(UserPassword), "{\"until\":\"" + until + "\"}");
+         Assert.AreEqual(200, snoozed.status, "Body: " + snoozed.body);
+         long moved = long.Parse(Between(snoozed.body, "\"message_id\":", ","));
+
+         (int status, string body) after = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":0,", FolderEntry(after.body, "INBOX"));
+         StringAssert.Contains("\"messages\":1,", FolderEntry(after.body, "Snoozed"));
+
+         Thread.Sleep(3000);
+         (int status, string body) ran = Http("POST", "/api/v1/scheduled/run", AdminHeader());
+         Assert.AreEqual(200, ran.status, "Body: " + ran.body);
+
+         (int status, string body) back = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         string entry = EntryFor(back.body, "Later please");
+         StringAssert.Contains("\"seen\":false", entry);
+         (int status, string body) again = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":0,", FolderEntry(again.body, "Snoozed"));
+
+         // Cancelled: back now.
+         long returned = IdBefore(back.body, "\"subject\":\"Later please\"");
+         (int status, string body) far = Http("POST", "/api/v1/me/messages/" + returned + "/snooze", UserHeader(UserPassword),
+            "{\"until\":\"" + DateTime.Now.AddHours(2).ToString("yyyy-MM-dd HH:mm") + "\"}");
+         Assert.AreEqual(200, far.status, "Body: " + far.body);
+         long schedId = long.Parse(Between(far.body, "\"id\":", ","));
+         (int status, string body) cancelled = Http("DELETE", "/api/v1/me/scheduled/" + schedId, UserHeader(UserPassword));
+         Assert.AreEqual(200, cancelled.status, "Body: " + cancelled.body);
+         StringAssert.Contains("\"returned\":true", cancelled.body);
+         (int status, string body) home = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":1,", FolderEntry(home.body, "INBOX"));
+         (int status, string body) gone = Http("DELETE", "/api/v1/me/scheduled/" + schedId, UserHeader(UserPassword));
+         Assert.AreEqual(404, gone.status, "Body: " + gone.body);
+      }
+
+      [Test]
+      [Description("A folder downloads as mbox with a From_ line before each message, and a .eml posted to the folder is stored in it unread")]
+      public void AFolderExportsAsMboxAndImportsAMessage()
+      {
+         Deliver(Address, "First of two", "One.");
+         Deliver(Address, "Second of two", "From the start of a line, quoted.\r\nFrom here too.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+
+         (int status, string body) mbox = Http("GET", "/api/v1/me/folders/" + inboxId + "/export", UserHeader(UserPassword));
+         Assert.AreEqual(200, mbox.status, "Body: " + mbox.body);
+         Assert.AreEqual(2, CountOf(mbox.body, "\r\nFrom sender@example.com ") + (mbox.body.StartsWith("From sender@example.com ") ? 1 : 0), mbox.body);
+         StringAssert.Contains("Subject: First of two", mbox.body);
+         StringAssert.Contains(">From here too.", mbox.body);
+
+         (int status, string body) imported = Http("POST", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword),
+            "From: keeper@example.org\r\nTo: " + Address + "\r\nSubject: Kept from elsewhere\r\n\r\nA message that lived in another mailbox.\r\n");
+         Assert.AreEqual(201, imported.status, "Body: " + imported.body);
+         long id = long.Parse(Between(imported.body, "\"id\":", ","));
+
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         string entry = EntryFor(page.body, "Kept from elsewhere");
+         StringAssert.Contains("\"seen\":false", entry);
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("A message that lived in another mailbox.", message.body);
+
+         (int status, string body) notOne = Http("POST", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword), "no header here");
+         Assert.AreEqual(400, notOne.status, "Body: " + notOne.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);

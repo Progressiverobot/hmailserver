@@ -233,6 +233,14 @@ namespace HM
          RouteMeStorage,
          RouteMeMessageReceipt,
          RouteMeMessageUnsubscribe,
+         RouteMeDraftSchedule,
+         RouteMeDraftUnschedule,
+         RouteMeMessageSnooze,
+         RouteMeScheduled,
+         RouteMeScheduledCancel,
+         RouteScheduledRun,
+         RouteMeFolderExport,
+         RouteMeFolderImport,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -487,6 +495,18 @@ namespace HM
       static HttpResponse HandleMeMessageReceipt_(const Caller &caller, __int64 messageId);
       static HttpResponse HandleMeMessageUnsubscribe_(const Caller &caller, __int64 messageId);
       static int QueueRawMessage_(std::shared_ptr<const Account> account, const String &toAddress, const AnsiString &rawText, AnsiString &problem);
+
+      // Later: a draft sent at a time, a message snoozed until a time, what is
+      // scheduled and its cancelling, the administrator's run-now; a folder as
+      // mbox and a message into a folder (RestApiScheduled.cpp).
+      static HttpResponse HandleMeDraftSchedule_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
+      static HttpResponse HandleMeDraftUnschedule_(const Caller &caller, __int64 messageId);
+      static HttpResponse HandleMeMessageSnooze_(const Caller &caller, __int64 messageId, const AnsiString &requestBody);
+      static HttpResponse HandleMeScheduled_(const Caller &caller);
+      static HttpResponse HandleMeScheduledCancel_(const Caller &caller, __int64 schedId);
+      static HttpResponse HandleScheduledRun_();
+      static HttpResponse HandleMeFolderExport_(const Caller &caller, __int64 folderId);
+      static HttpResponse HandleMeFolderImport_(const Caller &caller, __int64 folderId, const AnsiString &requestBody);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
