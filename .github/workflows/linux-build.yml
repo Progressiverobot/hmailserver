@@ -343,11 +343,12 @@ jobs:
   #
   # The .rpm gets the same file assertions inside a Fedora container. It is installed
   # with --nodeps deliberately: the package is built on Ubuntu, so its automatic
-  # requires name Ubuntu's sonames (libboost_thread.so.1.83.0 and its kin) which no
-  # Fedora will ever satisfy. What this proves is the payload and the scriptlets, which
-  # is what CPack decides; whether an RPM distribution's own Boost matches is a question
-  # for a build done on that distribution, and the PKGBUILD makes the same point for
-  # Arch by building from source.
+  # requires name Ubuntu's sonames - libldap-2.5.so.0 where Fedora has libldap.so.2 -
+  # which no Fedora will ever satisfy (Boost is no longer among them: it is linked
+  # statically, see CMakeLists.txt). What this proves is the payload and the
+  # scriptlets, which is what CPack decides; whether an RPM distribution's own
+  # libraries match is a question for a build done on that distribution, and the
+  # PKGBUILD makes the same point for Arch by building from source.
   package-install:
     name: the packaged server installs, starts and serves the Deck
     needs: [ build, stamps ]
@@ -388,6 +389,20 @@ jobs:
           sudo apt-get install -y postgresql-client curl
           sudo apt-get install -y ./packages/hmailserver_*_amd64.deb
           /usr/bin/hmailserver --version
+
+      # The same .deb on the NEXT Ubuntu release, in a container. Boost is linked
+      # statically so that a package built on one release installs on the next;
+      # this is where that claim is checked on every run, against the release the
+      # 6.3.1 package was refused by. The dependencies that remain are printed so
+      # a new soname in the list is seen in the log before a user sees it.
+      - name: The .deb installs on Ubuntu 26.04 too
+        run: |
+          set -euo pipefail
+          deb=$(ls packages/hmailserver_*_amd64.deb)
+          echo "Depends: $(dpkg-deb -f "$deb" Depends)"
+          docker run --rm -v "$PWD/packages:/packages:ro" \
+            ubuntu:26.04@sha256:513c074113a871b51a8d16ab445c88779d6452d937a164fb5cc479f32668a41d \
+            bash -c 'set -e; apt-get update -qq >/dev/null; DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends /packages/hmailserver_*_amd64.deb >/tmp/install.log 2>&1 || { tail -20 /tmp/install.log; exit 1; }; /usr/bin/hmailserver --version'
 
       # The packaged configuration is EDITED, not replaced, so what starts below is
       # the file the package installs with three sections filled in - which is what an
