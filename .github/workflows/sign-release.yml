@@ -828,7 +828,12 @@ jobs:
     permissions:
       actions: read
       id-token: write
-      contents: read
+      # Read would do - nothing in the generator writes to the repository when
+      # upload-assets is off - but GitHub validates a called workflow's declared
+      # permissions against the caller's at startup, before any `if` is
+      # evaluated, and the generator's (skipped) upload job declares contents:
+      # write. Granting less is a startup failure of this whole workflow.
+      contents: write
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subjects: ${{ needs.sign.outputs.hashes }}
