@@ -241,6 +241,8 @@ namespace HM
          RouteScheduledRun,
          RouteMeFolderExport,
          RouteMeFolderImport,
+         RoutePortalBrandingPut,
+         RouteAccountSupportSession,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -342,6 +344,9 @@ namespace HM
          // mail as the account but does not mint or revoke credentials or
          // end the account holder's browser sessions.
          bool via_app_password = false;
+         // Set when the session was opened by an administrator for support:
+         // who, for the log line every request of it writes.
+         AnsiString support_by;
       };
 
       enum AuthorizationResult
@@ -529,6 +534,13 @@ namespace HM
       static HttpResponse HandlePortalScript_();
       static HttpResponse HandlePortalManifest_();
       static HttpResponse HandlePortalServiceWorker_();
+
+      // What the webmail says it is (RestApiBranding.cpp), and an
+      // administrator opening a mailbox as its user, with consent and a record.
+      static AnsiString BrandingJson_(const String &domain);
+      static HttpResponse HandlePortalBranding_(const AnsiString &query);
+      static HttpResponse HandlePortalBrandingPut_(const AnsiString &requestBody);
+      HttpResponse HandleAccountSupportSession_(const Caller &caller, const AnsiString &address);
       static bool IsDomainAllowed_(const std::vector<String> &domains, const String &domainName);
 
       static Caller Authenticate_(const AnsiString &request, const IPAddress &peer_address);
