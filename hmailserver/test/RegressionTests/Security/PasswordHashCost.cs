@@ -90,10 +90,13 @@ namespace RegressionTests.Security
       [TearDown]
       public void RestoreDefaults()
       {
-         WriteSetting("PasswordHashIterations", "0");
-         WriteSetting("PasswordHashMemoryKB", "0");
-         WriteSetting("PasswordHashTimeCost", "0");
-         WriteSetting("PreferredHashAlgorithm", CryptPbkdf2.ToString());
+         // Removing the keys, not writing the defaults: a key written as its default
+         // is still a key the pre-flight reports as left behind, and it failed the
+         // next pre-flight after every completed run until 11 September 2026.
+         WriteSetting("PasswordHashIterations", null);
+         WriteSetting("PasswordHashMemoryKB", null);
+         WriteSetting("PasswordHashTimeCost", null);
+         WriteSetting("PreferredHashAlgorithm", null);
          Apply();
       }
 
