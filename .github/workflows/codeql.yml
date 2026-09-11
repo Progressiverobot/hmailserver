@@ -241,6 +241,14 @@ jobs:
       # skip every up-to-date file and the analysis failed with "No source code
       # was seen during the build".) build.ps1 disables the pre- and post-build
       # events, so nothing here stops or starts a service.
+      # The ADO 2.8 type library the server #imports is Windows' own file, not in git
+      # (the manifest's "system" kind): placed from the runner's own Windows by the
+      # same script the server build runs, or stdafx.h's #import fails with C1083.
+      - name: Place the system type libraries the server compiles against
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\get-installer-binaries.ps1 -SystemOnly
+          if ($LASTEXITCODE -ne 0) { throw "get-installer-binaries.ps1 -SystemOnly failed with exit code $LASTEXITCODE" }
+
       - name: Build server under CodeQL tracing
         shell: pwsh
         run: |
