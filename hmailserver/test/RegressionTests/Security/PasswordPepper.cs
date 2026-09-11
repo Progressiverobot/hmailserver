@@ -97,9 +97,10 @@ namespace RegressionTests.Security
          }
          finally
          {
-            // Restore defaults so later tests are unaffected.
-            WriteSetting("PasswordPepper", "");
-            WriteSetting("PreferredHashAlgorithm", CryptPbkdf2.ToString());
+            // Restore defaults so later tests are unaffected - by removing the keys,
+            // which is what leaves nothing for the pre-flight to report.
+            WriteSetting("PasswordPepper", null);
+            WriteSetting("PreferredHashAlgorithm", null);
             _application.Reinitialize();
             _settings.ClearLogonFailureList();
          }
