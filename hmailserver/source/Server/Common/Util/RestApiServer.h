@@ -67,6 +67,7 @@
 
 namespace HM
 {
+   class MimeHeader;
    class JsonValue;
 
    class IPAddress;
@@ -438,6 +439,7 @@ namespace HM
       static HttpResponse HandleMeFolderEmpty_(const Caller &caller, __int64 folderId);
       static HttpResponse HandleMeMessageSource_(const Caller &caller, __int64 messageId);
       static AnsiString HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account);
+      static AnsiString OwnAuthenticationResults_(const MimeHeader &mimeHeader);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
