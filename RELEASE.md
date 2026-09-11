@@ -186,15 +186,17 @@ already cost a release cycle or nearly shipped a defect.
    and it must be green **before** the release is published.
 12. **Commit** (as chrisholloway5, no co-author trailers - history has been
     rewritten once to remove them, and will be again). `master` is protected:
-    changes arrive by pull request, force-pushes and deletions are refused, and
-    the maintainer's bypass exists for emergencies, not for the release flow.
-    So push the working branch, open the PR and merge it with a rebase so the
-    history stays linear and the commits keep their own messages:
+    changes arrive by pull request with an approving review from someone other
+    than the last person to push, force-pushes and deletions are refused, and
+    an administrator's bypass exists for emergencies, not for the release flow.
+    So push the working branch, open the PR, have the other maintainer approve
+    it, and merge it with a rebase so the history stays linear and the commits
+    keep their own messages:
 
     ```
     git push origin server-fixes-wave
     gh pr create --base master --head server-fixes-wave --fill
-    gh pr merge --rebase            # self-merge is allowed; no reviewer is required
+    gh pr merge --rebase            # after the other maintainer's approval (GOVERNANCE.md, Review)
     git pull --ff-only origin master
     ```
 
@@ -321,9 +323,9 @@ Authenticode
 
 Every release asset is signed with cosign, keylessly, and that signature is what
 somebody who deliberately checks can verify. It is not what Windows reads.
-SmartScreen and the UAC prompt read **Authenticode**, and until the installer
-carries one they show an unknown publisher - so the two are complementary and
-this one is still owed.
+SmartScreen and the UAC prompt read **Authenticode**, which the Windows
+installer has carried since 6.3.1 (before that they showed an unknown
+publisher) - so the two are complementary.
 
 **Be clear what it buys, because it is not what everybody assumes.** Signing does
 not remove the SmartScreen warning. Microsoft's own comparison puts a signed

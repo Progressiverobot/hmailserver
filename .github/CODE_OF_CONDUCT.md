@@ -62,7 +62,7 @@ requests, discussions, code review and commit messages.
 ## Enforcement
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
-reported to the maintainer, [@chrisholloway5](https://github.com/chrisholloway5)
+reported to [@chrisholloway5](https://github.com/chrisholloway5)
 (Christopher Holloway / Progressive Robot Ltd). Reports can be sent privately
 through GitHub. All complaints will be reviewed and investigated promptly and
 fairly.

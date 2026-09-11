@@ -339,9 +339,13 @@ credible.
   variance of the suite. The executable grew by about 97 KB of guard tables.
   CFG is a mitigation, not a boundary: a defect that overwrites data rather
   than a pointer is unaffected.
-- **Bus factor is 1.** A single maintainer performs security triage and
-  releases. See [GOVERNANCE.md](GOVERNANCE.md) — a slow security response is a
-  realistic failure mode.
+- **Bus factor is still effectively 1.** Since September 2026 the project has
+  two maintainers, both at Progressive Robot Ltd, but until the second has
+  access to private vulnerability reports and a key in
+  `.github/allowed_signers`, security triage and release tagging rest on one
+  person, and so far only one person has a record of changes to the codebase —
+  see [GOVERNANCE.md](GOVERNANCE.md#continuity). A slow security response
+  remains a realistic failure mode.
 - **Administrators are inside the boundary.** Anyone who can administer the
   server can run code on it. Operators must treat administrative credentials
   as equivalent to host credentials.

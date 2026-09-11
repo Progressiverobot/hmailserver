@@ -29,7 +29,9 @@ technical detail — and we will open an advisory and invite you to it.
 | Initial assessment: reproduced or more information requested | 10 working days |
 | Fix released for a confirmed vulnerability | 90 days from the acknowledgement |
 
-This is a small project — a single maintainer, not a staffed security team.
+This is a small project, not a staffed security team: it has two maintainers,
+and one of them currently receives private reports (see
+[GOVERNANCE.md](https://github.com/Progressiverobot/hmailserver/blob/master/GOVERNANCE.md#maintainers)).
 Those are the targets we hold ourselves to, not a contractual commitment. If a
 deadline is going to slip, you will be told before it slips rather than after.
 
@@ -71,21 +73,26 @@ report about them will be closed with a pointer back here:
 - Vulnerabilities in a third-party dependency with no path from hMailServer
   to the affected code. Report those upstream; tell us as well if we ship a
   vulnerable version, and see
-  [ThirdPartyBinaries.md](../hmailserver/docs/ThirdPartyBinaries.md) for what
+  [ThirdPartyBinaries.md](https://github.com/Progressiverobot/hmailserver/blob/master/hmailserver/docs/ThirdPartyBinaries.md) for what
   we ship and where it came from.
 
 ## Supply chain
 
 Every release ships an SBOM (SPDX and CycloneDX) covering both the .NET and
-the native dependencies. Third-party binaries committed to this repository are
-inventoried, checksummed and verified on every build — see
-[hmailserver/docs/ThirdPartyBinaries.md](../hmailserver/docs/ThirdPartyBinaries.md).
+the native dependencies. The third-party executables and libraries the build
+uses are no longer committed to this repository. They are inventoried in
+[hmailserver/docs/ThirdPartyBinaries.md](https://github.com/Progressiverobot/hmailserver/blob/master/hmailserver/docs/ThirdPartyBinaries.md):
+those fetched from the project's `build-inputs-<n>` releases are checked against a
+recorded SHA-256 whenever `build/get-installer-binaries.ps1` places them, the
+MSVC runtime is checked by version, and the ADO type libraries, which are
+Windows' own files, are checked only for presence, with their hash reported.
 
 Two things on a release can be verified independently of GitHub:
 
 - **The release tag** (from `v6.2.23-alpha2` on) is an annotated tag signed
-  with the maintainer's SSH key. The allow list is in the repository, so a
-  clone can check it without trusting anything else:
+  with a maintainer's SSH key listed in `.github/allowed_signers`. That allow
+  list is in the repository, so a clone can check it without trusting
+  anything else:
 
   ```
   git -c gpg.ssh.allowedSignersFile=.github/allowed_signers verify-tag v6.2.23-alpha2
@@ -104,4 +111,5 @@ Two things on a release can be verified independently of GitHub:
   ```
 
 Neither replaces Authenticode: Windows SmartScreen and the UAC prompt do not
-read either signature, and the installer is not Authenticode-signed today.
+read either signature. Since 6.3.1 the Windows installer is also
+Authenticode-signed; the Linux packages are not.
