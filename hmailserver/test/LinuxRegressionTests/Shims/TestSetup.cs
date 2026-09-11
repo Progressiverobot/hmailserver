@@ -621,11 +621,9 @@ namespace RegressionTests.Shared
                answer.Expect(200, "DELETE " + route + "/" + id);
          }
 
-         foreach (var answer in missing.Select(body => ServerApi.Post(route, body)))
-         {
-            if (answer.Status != 201 && answer.Status != 409)
-               answer.Expect(201, "POST " + route + " (putting back a row the run started with)");
-         }
+         foreach (var answer in missing.Select(body => ServerApi.Post(route, body))
+                     .Where(answer => answer.Status != 201 && answer.Status != 409))
+            answer.Expect(201, "POST " + route + " (putting back a row the run started with)");
       }
 
       // ---- The server's ini, put back the way the rows are ----

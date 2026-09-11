@@ -3,6 +3,7 @@
 
 using System.Net;
 using System.Net.Sockets;
+using System.Linq;
 
 namespace RegressionTests.Shared
 {
@@ -82,11 +83,8 @@ namespace RegressionTests.Shared
             if (IPAddress.TryParse(Host, out parsed))
                return parsed;
 
-            foreach (var address in Dns.GetHostAddresses(Host))
-               if (address.AddressFamily == AddressFamily.InterNetwork)
-                  return address;
-
-            throw new SocketException((int) SocketError.HostNotFound);
+            return Dns.GetHostAddresses(Host).FirstOrDefault(address => address.AddressFamily == AddressFamily.InterNetwork)
+               ?? throw new SocketException((int) SocketError.HostNotFound);
          }
       }
    }

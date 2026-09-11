@@ -67,15 +67,11 @@ namespace RegressionTests.Infrastructure
          if (!answer.Ok)
             return null;
 
-         string newest = null;
-         foreach (var name in ServerApi.Array(answer).Select(file => ServerApi.StringOf(file, "name")))
-         {
-            if (name != null && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
-                (newest == null || string.CompareOrdinal(name, newest) > 0))
-               newest = name;
-         }
-
-         return newest;
+         return ServerApi.Array(answer)
+            .Select(file => ServerApi.StringOf(file, "name"))
+            .Where(name => name != null && name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(name => name, StringComparer.Ordinal)
+            .FirstOrDefault();
       }
 
       private static string[] Tail(string name)
