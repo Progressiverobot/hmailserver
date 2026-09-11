@@ -190,6 +190,18 @@ find_package(ZLIB REQUIRED)
 # the server calls. Against 1.90 it links without being named, which is how the
 # first CI build came to fail at the link step on a runner and not on the
 # machine the port was written on.
+# Boost is linked STATICALLY. A Boost library's soname carries its version
+# (libboost_thread.so.1.83.0), so a package built against the Boost of one
+# distribution release installs on that release and no other: the 6.3.1 .deb,
+# built on Ubuntu 24.04, was refused by Ubuntu 26.04 for five Boost sonames and
+# nothing else (11 September 2026). With the archives linked in, dpkg-shlibdeps
+# and rpmbuild's find-requires see no Boost at all and the package depends on
+# what every release ships under a stable soname: libssl3, libpq5, libldap2,
+# libstdc++6. The -dev packages carry the archives on Debian, Ubuntu and Fedora;
+# the AppImage is unaffected (it bundled the shared libraries and now has none
+# to bundle). Boost.Regex's static archive pulls ICU in only where ICU is
+# called, which this code does not, so no libicu soname appears either.
+set(Boost_USE_STATIC_LIBS ON)
 find_package(Boost 1.83 REQUIRED COMPONENTS thread chrono filesystem regex)
 
 # libpq. PGConnection.h and PGRecordset.h include <libpq-fe.h> by that bare name,
