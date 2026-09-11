@@ -8,6 +8,7 @@
 #include "RemoveExpiredRecords.h"
 
 #include "../Persistence/PersistentSecurityRange.h"
+#include "../Util/AutoBanFirewall.h"
 #include "../Persistence/PersistentLogonFailure.h"
 
 #ifdef _DEBUG
@@ -46,6 +47,11 @@ namespace HM
             "Expired IP ranges could not be removed. Any auto-ban that has run out will keep blocking the address until this succeeds on a later run.");
       }
 
+
+      // Whether or not the delete succeeded: what is in the table now is what the
+      // firewall should show, and this pass is what un-bans an address below the
+      // server once its range has gone.
+      AutoBanFirewall::Synchronise(_T("expiry pass"));
 
       if (Configuration::Instance()->GetAutoBanLogonEnabled())
       {

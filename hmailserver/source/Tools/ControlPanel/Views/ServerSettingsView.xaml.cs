@@ -1880,6 +1880,35 @@ namespace hMailServer.ControlPanel.Views
             Blurb = L("0 means the connection is dropped but no range is created, so the address is not actually banned.")
          });
 
+         // What a ban does below the server. Three INI keys, read at start-up;
+         // the checker in CI (build/check-ini-coverage.py) requires every key the
+         // server reads to have an editor here, which is also why they are
+         // findable from the palette.
+         var below = Card(L("Below the server: the firewall"),
+            L("An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart."));
+         below.Settings.Add(new IniBool
+         {
+            Path = "AutoBanFirewall",
+            Label = L("Also block a banned address in the operating system's firewall"),
+            Default = false,
+            Blurb = L("Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first."),
+            IniStore = iniStore_
+         });
+         below.Settings.Add(new IniText
+         {
+            Path = "AutoBanCommand",
+            Label = L("Program to run when an address is banned or unbanned (empty = none)"),
+            Blurb = L("Run as <command> ban <address> <minutes> <ports> when a ban is created and <command> unban <address> when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log."),
+            IniStore = iniStore_
+         });
+         below.Settings.Add(new IniText
+         {
+            Path = "AutoBanNeverBan",
+            Label = L("Never auto-ban these addresses (comma separated; CIDR blocks allowed)"),
+            Blurb = L("Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored."),
+            IniStore = iniStore_
+         });
+
          ban.Settings.Add(new ComAction
          {
             Path = "AutoBanOnLogonFailure",
@@ -1902,6 +1931,7 @@ namespace hMailServer.ControlPanel.Views
             }
          });
          Tab(L("Auto-ban")).Cards.Add(ban);
+         Tab(L("Auto-ban")).Cards.Add(below);
 
          // The other half of the same subject, and the reason it is on this page:
          // auto-ban counts per ADDRESS, so a distributed attack that spends a few

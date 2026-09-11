@@ -492,6 +492,7 @@ EXIT 0
     <ClCompile Include="..\Common\Tracking\NotificationClientSubscription.cpp" />
     <ClCompile Include="..\Common\Tracking\NotificationServer.cpp" />
     <ClCompile Include="..\Common\Util\AccountLogon.cpp" />
+    <ClCompile Include="..\Common\Util\AutoBanFirewall.cpp" />
     <ClCompile Include="..\Common\Util\Assert.cpp" />
     <ClCompile Include="..\Common\Util\AWStats.cpp" />
     <ClCompile Include="..\Common\Util\BlowFish.cpp" />
@@ -1198,6 +1199,7 @@ EXIT 0
     <ClInclude Include="..\Common\Tracking\NotificationClientSubscription.h" />
     <ClInclude Include="..\Common\Tracking\NotificationServer.h" />
     <ClInclude Include="..\Common\Util\AccountLogon.h" />
+    <ClInclude Include="..\Common\Util\AutoBanFirewall.h" />
     <ClInclude Include="..\Common\Util\Assert.h" />
     <ClInclude Include="..\Common\Util\AWStats.h" />
     <ClInclude Include="..\Common\Util\BlowFish.h" />

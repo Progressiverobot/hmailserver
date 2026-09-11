@@ -571,6 +571,11 @@ namespace HM
       String GetDNSServer() const { return dns_server_; }
 
       bool GetMtaStsEnabled() const { return mta_sts_enabled_; }
+
+      // What an auto-ban does below the server - see AutoBanFirewall.h.
+      bool GetAutoBanFirewallEnabled() const { return auto_ban_firewall_enabled_; }
+      String GetAutoBanCommand() const { return auto_ban_command_; }
+      String GetAutoBanNeverBan() const { return auto_ban_never_ban_; }
       bool GetDaneEnabled() const { return dane_enabled_; }
       bool GetDnssecValidationEnabled() const { return dnssec_validation_enabled_; }
       String GetDnssecTrustAnchors() const { return dnssec_trust_anchors_; }
@@ -1156,6 +1161,9 @@ namespace HM
       String dns_server_;
 
       bool mta_sts_enabled_ = true;
+      bool auto_ban_firewall_enabled_ = false;
+      String auto_ban_command_;
+      String auto_ban_never_ban_;
       bool dane_enabled_ = true;
       bool dnssec_validation_enabled_ = true;
       String dnssec_trust_anchors_;

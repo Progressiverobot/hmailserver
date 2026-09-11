@@ -46,7 +46,9 @@ namespace HM
 
    private:
 
-      void CreateIPRange(const IPAddress &ipaddress, const String &username, int minutes);
+      // True if the range was saved, which is the only case in which the address
+      // is actually banned and the firewall may be told.
+      bool CreateIPRange(const IPAddress &ipaddress, const String &username, int minutes);
 
       String GetIPRangeName_(const String &username);
 

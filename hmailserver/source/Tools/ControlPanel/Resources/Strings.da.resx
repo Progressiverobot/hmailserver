@@ -1013,6 +1013,9 @@ Control Panel kan kun læse meddelelsesfiler, når det kører på samme maskine 
   <data name="Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures." xml:space="preserve">
     <value>Tager højde for, at denne servers ur afviger fra signaturgiverens. Uden det gør et ur, der går et par minutter for hurtigt, andres gyldige post til DKIM-fejl.</value>
   </data>
+  <data name="Also block a banned address in the operating system's firewall" xml:space="preserve">
+    <value>Bloker også en udelukket adresse i operativsystemets firewall</value>
+  </data>
   <data name="Also mark accounts _inactive when their directory entry has gone" xml:space="preserve">
     <value>Markér også konti som _inaktive, når deres katalogpost er væk</value>
   </data>
@@ -1048,6 +1051,9 @@ Control Panel kan kun læse meddelelsesfiler, når det kører på samme maskine 
   </data>
   <data name="An authenticated session may only send as an address its account owns or has been granted" xml:space="preserve">
     <value>En godkendt session må kun sende som en adresse, som dens konto ejer eller har fået tildelt</value>
+  </data>
+  <data name="An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart." xml:space="preserve">
+    <value>En automatisk udelukkelse håndhæves af serverens egne lyttere: operativsystemet accepterer adressen, giver den videre til serveren, og serveren afbryder. Disse indstillinger skubber udelukkelsen ned i operativsystemets firewall, giver den til et program efter dit valg og navngiver de adresser, der aldrig må udelukkes. Alle tre gælder efter genstart af tjenesten.</value>
   </data>
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>En hel udgående leveringssession. 0 = ingen grænse.</value>
@@ -1352,6 +1358,9 @@ Vil du genstarte Control Panel nu? Vælg Nej for at forsøge at fortsætte arbej
   </data>
   <data name="Before you copy — " xml:space="preserve">
     <value>Før du kopierer —</value>
+  </data>
+  <data name="Below the server: the firewall" xml:space="preserve">
+    <value>Under serveren: firewallen</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
     <value>Mellem 354 og 250 kører serveren accept-pipelinen - spamtests, meddelelsesændringer, arkivering, OnAcceptMessage-scriptet og databasegemningen - på en afgrænset pulje af tråde og svarer først, når den er færdig. Loggen tager tid på hvert trin. Læs den som en sekvens, og find den sidst skrevne linje: det trin, der sidder fast, er det efter den. To trin annoncerer sig selv med en startlinje (spam-protection og script/save); meddelelsesændringer gør ikke, så et stop dér viser sig som "done spam-protection" efterfulgt af stilhed. Et trin, der tager ti sekunder eller mere, logges på applikationsniveau selv uden debug-logning.</value>
@@ -3097,6 +3106,9 @@ Ingen post røres – indekset er udledt af den – men indtil genopbygningen ha
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Ekstra leveringsforsøg pr. yderligere MX-vært (0 = standard)</value>
   </data>
+  <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
+    <value>Mislykkede logon fra en adresse på listen tælles slet ikke, så den kan aldrig udelukkes. Skriv de adresser, du administrerer fra, her, før du slår firewall-indstillingen til: en udelukkelse, der når firewallen, lukker adressen ude fra alle mailporte på denne maskine. Eksempel: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. En post, der ikke er en adresse, rapporteres ved navn i fejlloggen og ignoreres.</value>
+  </data>
   <data name="Fails when the connecting address has no reverse DNS record." xml:space="preserve">
     <value>Fejler, når den forbindende adresse ikke har nogen omvendt DNS-post.</value>
   </data>
@@ -4395,6 +4407,9 @@ Det verificerede installationsprogram overdrages til opdateringshjælperen: tjen
   <data name="Never" xml:space="preserve">
     <value>Aldrig</value>
   </data>
+  <data name="Never auto-ban these addresses (comma separated; CIDR blocks allowed)" xml:space="preserve">
+    <value>Udeluk aldrig disse adresser automatisk (kommasepareret; CIDR-blokke tilladt)</value>
+  </data>
   <data name="New IMAP folder" xml:space="preserve">
     <value>Ny IMAP-mappe</value>
   </data>
@@ -5369,6 +5384,9 @@ Der accepteres ingen nye forbindelser, og der leveres ingen post, før den genop
   <data name="Profile to scan as (spamd User: header; empty = spamd's global configuration)" xml:space="preserve">
     <value>Profil, der scannes som (spamd User:-header; tomt = spamds globale konfiguration)</value>
   </data>
+  <data name="Program to run when an address is banned or unbanned (empty = none)" xml:space="preserve">
+    <value>Program, der køres, når en adresse udelukkes eller frigives (tomt = intet)</value>
+  </data>
   <data name="Progressive Robot Ltd is a software engineering company that builds and modernizes production software — taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling." xml:space="preserve">
     <value>Progressive Robot Ltd er en softwareudviklingsvirksomhed, der bygger og moderniserer produktionssoftware — tager modne systemer fra den virkelige verden og bringer dem op på nutidens standarder for sikkerhed, pålidelighed og værktøjer.</value>
   </data>
@@ -6002,6 +6020,9 @@ Vil du fortsætte?</value>
   </data>
   <data name="Run anti-virus on downloaded mail" xml:space="preserve">
     <value>Kør antivirus på afhentet post</value>
+  </data>
+  <data name="Run as &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; when a ban is created and &lt;command&gt; unban &lt;address&gt; when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log." xml:space="preserve">
+    <value>Køres som &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt;, når en udelukkelse oprettes, og som &lt;command&gt; unban &lt;address&gt;, når området forsvinder, på Windows såvel som på Linux - til en cloud-firewall, en router eller et SIEM. Sæt programmets sti i anførselstegn, hvis den indeholder mellemrum; serveren tilføjer argumenterne. En afslutningskode forskellig fra nul eller et program, der ikke kan starte, rapporteres én gang i fejlloggen.</value>
   </data>
   <data name="Run script function" xml:space="preserve">
     <value>Kør scriptfunktion</value>
@@ -8556,6 +8577,9 @@ Ingen meddelelse slettes, og ingen konto fjernes. Fortsæt?</value>
   </data>
   <data name="Windows service account - a least-privilege account needs granting outside hMailServer" xml:space="preserve">
     <value>Windows-tjenestekonto - en konto med færrest rettigheder skal tildeles dem uden for hMailServer</value>
+  </data>
+  <data name="Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first." xml:space="preserve">
+    <value>Windows: én indgående blokeringsregel pr. udelukket adresse i Windows Defender Firewall, kun TCP og kun for de porte, denne server lytter på, i en regelgruppe ved navn hMailServer auto-ban; fjernes, når udelukkelsen udløber, eller IP-området slettes. Linux: den medfølgende autoban-hook vedligeholder et nftables-sæt med timeout, og tjenesten har brug for CAP_NET_ADMIN til det - hooken forklarer præcis, hvordan det tildeles. Skriv først de adresser, du administrerer fra, under „udeluk aldrig“.</value>
   </data>
   <data name="With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session." xml:space="preserve">
     <value>Med en moderator sat videresendes en afsender, reglerne ovenfor afviser, til moderatoren i stedet for at blive afvist. Moderatoren godkender ved at sende meddelelsen igen til listen fra en godkendt session.</value>

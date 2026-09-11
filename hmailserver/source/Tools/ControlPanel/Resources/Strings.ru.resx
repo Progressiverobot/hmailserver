@@ -1013,6 +1013,9 @@ Control Panel может читать файлы сообщений только
   <data name="Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures." xml:space="preserve">
     <value>Допускает расхождение часов этого сервера с часами подписавшей стороны. Без него часы, спешащие на несколько минут, превращают чужую действительную почту в отказы DKIM.</value>
   </data>
+  <data name="Also block a banned address in the operating system's firewall" xml:space="preserve">
+    <value>Также блокировать забаненный адрес в межсетевом экране операционной системы</value>
+  </data>
   <data name="Also mark accounts _inactive when their directory entry has gone" xml:space="preserve">
     <value>_Также помечать учётные записи неактивными, когда их запись в каталоге исчезла</value>
   </data>
@@ -1048,6 +1051,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="An authenticated session may only send as an address its account owns or has been granted" xml:space="preserve">
     <value>Сеанс, прошедший аутентификацию, может отправлять только с того адреса, которым владеет его учётная запись или который ей предоставлен</value>
+  </data>
+  <data name="An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart." xml:space="preserve">
+    <value>Автоматический бан применяют слушатели самого сервера: операционная система принимает адрес, передаёт его серверу, а сервер разрывает соединение. Эти параметры опускают бан в межсетевой экран операционной системы, передают его вашей программе и задают адреса, которые нельзя банить никогда. Все три вступают в силу после перезапуска службы.</value>
   </data>
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Весь сеанс исходящей доставки целиком. 0 — без ограничения.</value>
@@ -1352,6 +1358,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Before you copy — " xml:space="preserve">
     <value>Прежде чем копировать — </value>
+  </data>
+  <data name="Below the server: the firewall" xml:space="preserve">
+    <value>Ниже сервера: межсетевой экран</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
     <value>Между ответами 354 и 250 сервер выполняет конвейер приёма — проверки на спам, изменения сообщения, архивирование, сценарий OnAcceptMessage и сохранение в базу данных — на ограниченном пуле потоков и отвечает лишь после того, как закончит. Журнал отмечает время каждого этапа. Читайте его как последовательность и смотрите на последнюю записанную строку: застрял тот этап, который идёт после неё. Два этапа объявляют о себе строкой начала (spam-protection и script/save), а изменения сообщения — нет, поэтому затор на них выглядит как «done spam-protection», за которым следует тишина. Этап, занявший десять секунд или больше, записывается на уровне журнала приложения даже без отладочного журналирования.</value>
@@ -3097,6 +3106,9 @@ Control Panel может читать файлы сообщений только
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Дополнительные попытки доставки на каждый дополнительный узел MX (0 — по умолчанию)</value>
   </data>
+  <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
+    <value>Неудачные входы с адреса из списка не считаются вовсе, поэтому его нельзя забанить никогда. Внесите сюда адреса, с которых вы администрируете, прежде чем включать параметр межсетевого экрана: бан, дошедший до межсетевого экрана, закрывает этому адресу все почтовые порты этой машины. Пример: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Запись, не являющаяся адресом, сообщается по имени в журнале ошибок и пропускается.</value>
+  </data>
   <data name="Fails when the connecting address has no reverse DNS record." xml:space="preserve">
     <value>Не проходит, когда у подключающегося адреса нет обратной записи DNS.</value>
   </data>
@@ -4395,6 +4407,9 @@ Control Panel может читать файлы сообщений только
   <data name="Never" xml:space="preserve">
     <value>Никогда</value>
   </data>
+  <data name="Never auto-ban these addresses (comma separated; CIDR blocks allowed)" xml:space="preserve">
+    <value>Никогда не банить автоматически эти адреса (через запятую; допускаются блоки CIDR)</value>
+  </data>
   <data name="New IMAP folder" xml:space="preserve">
     <value>Новая папка IMAP</value>
   </data>
@@ -5369,6 +5384,9 @@ Control Panel может читать файлы сообщений только
   <data name="Profile to scan as (spamd User: header; empty = spamd's global configuration)" xml:space="preserve">
     <value>Профиль, от имени которого выполняется проверка (заголовок User: для spamd; пусто — глобальная конфигурация spamd)</value>
   </data>
+  <data name="Program to run when an address is banned or unbanned (empty = none)" xml:space="preserve">
+    <value>Программа, запускаемая при бане или разбане адреса (пусто = нет)</value>
+  </data>
   <data name="Progressive Robot Ltd is a software engineering company that builds and modernizes production software — taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling." xml:space="preserve">
     <value>Progressive Robot Ltd — компания-разработчик программного обеспечения, которая создаёт и модернизирует промышленное ПО: берёт зрелые, работающие в реальных условиях системы и приводит их в соответствие с современными стандартами безопасности, надёжности и инструментария.</value>
   </data>
@@ -6002,6 +6020,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Run anti-virus on downloaded mail" xml:space="preserve">
     <value>Проверять скачанную почту антивирусом</value>
+  </data>
+  <data name="Run as &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; when a ban is created and &lt;command&gt; unban &lt;address&gt; when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log." xml:space="preserve">
+    <value>Запускается как &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; при создании бана и как &lt;command&gt; unban &lt;address&gt;, когда диапазон исчезает, одинаково в Windows и в Linux - для облачного межсетевого экрана, маршрутизатора или SIEM. Заключите путь к программе в кавычки, если он содержит пробелы; сервер добавляет аргументы. Ненулевой код выхода или программа, которая не запускается, сообщается один раз в журнале ошибок.</value>
   </data>
   <data name="Run script function" xml:space="preserve">
     <value>Выполнить функцию сценария</value>
@@ -8556,6 +8577,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Windows service account - a least-privilege account needs granting outside hMailServer" xml:space="preserve">
     <value>Учётная запись службы Windows - учётной записи с минимальными правами нужно выдать права вне hMailServer</value>
+  </data>
+  <data name="Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first." xml:space="preserve">
+    <value>Windows: одно входящее правило блокировки на каждый забаненный адрес в Windows Defender Firewall, только TCP и только для портов, которые слушает этот сервер, в группе правил с именем hMailServer auto-ban; удаляется, когда бан истекает или диапазон IP удалён. Linux: входящий в пакет autoban-hook ведёт набор nftables с тайм-аутом, и службе для этого нужен CAP_NET_ADMIN - хук точно описывает, как его выдать. Сначала внесите адреса, с которых вы администрируете, в список «никогда не банить».</value>
   </data>
   <data name="With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session." xml:space="preserve">
     <value>С заданным модератором отправитель, которого правила выше отклоняют, пересылается модератору вместо отказа. Модератор одобряет, отправив сообщение в список заново из аутентифицированной сессии.</value>

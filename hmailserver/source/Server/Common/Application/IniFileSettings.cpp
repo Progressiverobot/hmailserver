@@ -531,6 +531,16 @@ namespace HM
       use_dns_cache_ = ReadIniSettingInteger_("Settings", "UseDNSCache", 1) == 1;
       dns_server_ = ReadIniSettingString_("Settings", "DNSServer", "");
       mta_sts_enabled_ = ReadIniSettingInteger_("Settings", "MtaStsEnabled", 1) == 1;
+
+      // Auto-ban below the server. Off as shipped: a rule in the operating
+      // system's firewall outlives a mistake in a way a row in hm_securityranges
+      // does not, so an administrator turns it on knowing what it does, and lists
+      // their own addresses in AutoBanNeverBan first. AutoBanCommand is any
+      // program, run as "<command> ban <address> <minutes> <ports>" and
+      // "<command> unban <address>", on both platforms. See AutoBanFirewall.h.
+      auto_ban_firewall_enabled_ = ReadIniSettingInteger_("Settings", "AutoBanFirewall", 0) == 1;
+      auto_ban_command_ = ReadIniSettingString_("Settings", "AutoBanCommand", "");
+      auto_ban_never_ban_ = ReadIniSettingString_("Settings", "AutoBanNeverBan", "");
       dane_enabled_ = ReadIniSettingInteger_("Settings", "DaneEnforcementEnabled", 1) == 1;
       dnssec_validation_enabled_ = ReadIniSettingInteger_("Settings", "DnssecValidationEnabled", 1) == 1;
       dnssec_trust_anchors_ = ReadIniSettingString_("Settings", "DnssecTrustAnchors", "");
