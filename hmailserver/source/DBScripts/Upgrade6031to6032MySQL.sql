@@ -8,7 +8,7 @@ create table hm_contacts
 	contactcreated datetime not null
 ) DEFAULT CHARSET=utf8;
 
-CREATE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
+CREATE UNIQUE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
 
 ALTER TABLE hm_contacts ENGINE=InnoDB;
 

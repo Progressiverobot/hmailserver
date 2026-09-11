@@ -1,3 +1,7 @@
+if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
+if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
+if exists (select * from sysobjects where id = object_id('hm_scheduled') and objectproperty(id, 'isusertable') = 1) drop table hm_scheduled
+if exists (select * from sysobjects where id = object_id('hm_files') and objectproperty(id, 'isusertable') = 1) drop table hm_files
 if exists (select * from sysobjects where id = object_id('hm_accounts') and objectproperty(id, 'isusertable') = 1) drop table hm_accounts 
 
 if exists (select * from sysobjects where id = object_id('hm_imapfolders') and objectproperty(id, 'isusertable') = 1) drop table hm_imapfolders 
@@ -40,10 +44,6 @@ if exists (select * from sysobjects where id = object_id('hm_fetchaccounts_uids'
 
 if exists (select * from sysobjects where id = object_id('hm_apppasswords') and objectproperty(id, 'isusertable') = 1) drop table hm_apppasswords
 
-if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
-if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
-if exists (select * from sysobjects where id = object_id('hm_scheduled') and objectproperty(id, 'isusertable') = 1) drop table hm_scheduled
-if exists (select * from sysobjects where id = object_id('hm_files') and objectproperty(id, 'isusertable') = 1) drop table hm_files
 
 if exists (select * from sysobjects where id = object_id('hm_rules') and objectproperty(id, 'isusertable') = 1) drop table hm_rules 
 
@@ -558,7 +558,7 @@ create table hm_contacts
 
 ALTER TABLE hm_contacts ADD CONSTRAINT hm_contacts_pk PRIMARY KEY NONCLUSTERED (contactid)
 
-CREATE CLUSTERED INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress)
+CREATE UNIQUE CLUSTERED INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress)
 
 create table hm_accountprefs
 (
