@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.ComponentModel;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 
@@ -30,11 +31,8 @@ namespace hMailServer.ControlPanel.Services
          void Apply()
          {
             bool any = list.SelectedItem != null;
-            foreach (UIElement target in targets)
-            {
-               if (target != null)
-                  target.IsEnabled = any;
-            }
+            foreach (UIElement target in targets.Where(t => t != null))
+               target.IsEnabled = any;
          }
 
          DependencyPropertyDescriptor
