@@ -58,9 +58,90 @@ namespace HM
       message_state_ = other.message_state_;
       no_of_retries_ = other.no_of_retries_;
       flags_ = other.flags_;
+      keywords_ = other.keywords_;
 
       uid_ = other.uid_;
       message_modseq_ = other.message_modseq_;
+   }
+
+   std::vector<String>
+   Message::GetKeywordList() const
+   {
+      std::vector<String> list;
+      String current;
+      for (int i = 0; i < keywords_.GetLength(); i++)
+      {
+         wchar_t c = keywords_[i];
+         if (c == ' ')
+         {
+            if (!current.IsEmpty())
+               list.push_back(current);
+            current = _T("");
+         }
+         else
+            current += c;
+      }
+      if (!current.IsEmpty())
+         list.push_back(current);
+      return list;
+   }
+
+   void
+   Message::SetKeywordList(const std::vector<String> &keywords)
+   {
+      String joined;
+      for (size_t i = 0; i < keywords.size(); i++)
+      {
+         if (keywords[i].IsEmpty())
+            continue;
+         bool seen = false;
+         for (size_t j = 0; j < i && !seen; j++)
+            seen = keywords[j].CompareNoCase(keywords[i]) == 0;
+         if (seen)
+            continue;
+         String next = joined.IsEmpty() ? keywords[i] : joined + _T(" ") + keywords[i];
+         if (next.GetLength() > KeywordsMaximumLength)
+            break;
+         joined = next;
+      }
+      keywords_ = joined;
+   }
+
+   bool
+   Message::HasKeyword(const String &keyword) const
+   {
+      std::vector<String> list = GetKeywordList();
+      for (size_t i = 0; i < list.size(); i++)
+      {
+         if (list[i].CompareNoCase(keyword) == 0)
+            return true;
+      }
+      return false;
+   }
+
+   bool
+   Message::AddKeyword(const String &keyword)
+   {
+      if (keyword.IsEmpty() || HasKeyword(keyword))
+         return true;
+      String next = keywords_.IsEmpty() ? keyword : keywords_ + _T(" ") + keyword;
+      if (next.GetLength() > KeywordsMaximumLength)
+         return false;
+      keywords_ = next;
+      return true;
+   }
+
+   void
+   Message::RemoveKeyword(const String &keyword)
+   {
+      std::vector<String> list = GetKeywordList();
+      std::vector<String> kept;
+      for (size_t i = 0; i < list.size(); i++)
+      {
+         if (list[i].CompareNoCase(keyword) != 0)
+            kept.push_back(list[i]);
+      }
+      SetKeywordList(kept);
    }
 
 

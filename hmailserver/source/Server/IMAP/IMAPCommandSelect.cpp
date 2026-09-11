@@ -9,6 +9,7 @@
 #include "IMAPSimpleCommandParser.h"
 #include "IMAPConfiguration.h"
 #include "MessagesContainer.h"
+#include <set>
 #include "IMAPFolderView.h"
 
 #include "../Common/Application/ACLManager.h"
@@ -144,7 +145,27 @@ namespace HM
          sResponse += sRespTemp;
       }
 
-      sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)\r\n");
+      // RFC 3501: FLAGS lists the flags a message in the mailbox may carry -
+      // the five system flags and every keyword any message here has.
+      String sKeywordsInUse;
+      {
+         std::set<String> seenLowered;
+         for (int i = 0; messages && i < messages->GetCount(); i++)
+         {
+            std::shared_ptr<Message> pOne = messages->GetItem((unsigned int) i);
+            if (!pOne)
+               continue;
+            std::vector<String> list = pOne->GetKeywordList();
+            for (size_t k = 0; k < list.size(); k++)
+            {
+               String lowered = list[k];
+               lowered.ToLower();
+               if (seenLowered.insert(lowered).second)
+                  sKeywordsInUse += _T(" ") + list[k];
+            }
+         }
+      }
+      sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged") + sKeywordsInUse + _T(")\r\n");
 
       sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());
       sResponse += sRespTemp;
@@ -192,7 +213,7 @@ namespace HM
             if (pDelegateRights->GetAllow(ACLPermission::PermissionWriteSeen))
                sPermanentFlags += sPermanentFlags.IsEmpty() ? _T("\\Seen") : _T(" \\Seen");
             if (pDelegateRights->GetAllow(ACLPermission::PermissionWriteOthers))
-               sPermanentFlags += sPermanentFlags.IsEmpty() ? _T("\\Draft \\Answered \\Flagged") : _T(" \\Draft \\Answered \\Flagged");
+               sPermanentFlags += sPermanentFlags.IsEmpty() ? _T("\\Draft \\Answered \\Flagged \\*") : _T(" \\Draft \\Answered \\Flagged \\*");
          }
 
          sRespTemp.Format(_T("* OK [PERMANENTFLAGS (%s)] limited\r\n"), sPermanentFlags.c_str());
@@ -200,7 +221,8 @@ namespace HM
       }
       else
       {
-         sResponse += _T("* OK [PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)] limited\r\n");
+         // \\*: a client may make keywords of its own here.
+         sResponse += _T("* OK [PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged \\*)] limited\r\n");
       }
 
       // RFC 7162 (QRESYNC): replay flag/MODSEQ changes since the client's mod-sequence.

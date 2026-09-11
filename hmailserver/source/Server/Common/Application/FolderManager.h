@@ -21,6 +21,8 @@ namespace HM
       bool DeleteInboxMessages(int accountID, std::set<int> uids, const std::function<void()> &callbackEvery1000Message);
 
       bool UpdateMessageFlags(int accountID, int folderID, __int64 messageID, int flags);
+      // The flags and the keywords together, one statement, one mod-sequence.
+      bool UpdateMessageFlags(int accountID, int folderID, __int64 messageID, int flags, const String &keywords);
 
    private:
 

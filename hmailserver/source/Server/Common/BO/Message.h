@@ -78,6 +78,20 @@ namespace HM
       short GetFlags() {return flags_; }
       void SetFlags(short iNewVal) {flags_ = iNewVal; }
 
+      // IMAP keywords (RFC 3501 - the flags that are not system flags; the
+      // webmail's labels): atoms, kept space-separated, compared without
+      // case, at most 500 characters together. Persisted as messagekeywords
+      // beside messageflags, written by the same statement.
+      String GetKeywords() const { return keywords_; }
+      void SetKeywords(const String &keywords) { keywords_ = keywords; }
+      std::vector<String> GetKeywordList() const;
+      void SetKeywordList(const std::vector<String> &keywords);
+      bool HasKeyword(const String &keyword) const;
+      // False when the keyword would not fit; the message is then unchanged.
+      bool AddKeyword(const String &keyword);
+      void RemoveKeyword(const String &keyword);
+      static const int KeywordsMaximumLength = 500;
+
       bool GetFlagSeen() const;
       void SetFlagSeen(bool bNewVal);
       bool GetFlagDeleted() const;
@@ -157,6 +171,7 @@ namespace HM
       short message_state_;
       short no_of_retries_;
       short flags_;
+      String keywords_;
 
       // See GetBinaryMime above: in-memory only until messageflags is widened.
 

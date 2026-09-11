@@ -927,21 +927,18 @@ namespace HM
             }
          case IMAPSearchCriteria::CTKeyword:
             {
-               // No keyword can ever be set on a message here - messageflags is a fixed
-               // 8-bit bitmask and PERMANENTFLAGS advertises no \* - so a positive
-               // KEYWORD matches nothing at all, and NOT KEYWORD matches everything.
-               // Before this existed, KEYWORD and its argument were both discarded as
-               // unrecognised words, which left the criteria list empty and reported
-               // every message in the mailbox as a match.
-               if (pCriteria->GetPositive())
+               // The message carries the keyword (compared without case), or,
+               // under NOT, does not.
+               const bool has = pMessage->HasKeyword(pCriteria->GetText());
+               if (has != pCriteria->GetPositive())
                   bMessageIsMatchingCriteria = false;
                break;
             }
          case IMAPSearchCriteria::CTUnkeyword:
             {
-               // The mirror image: no message has the keyword, so UNKEYWORD matches
-               // every message and NOT UNKEYWORD matches none.
-               if (!pCriteria->GetPositive())
+               // The mirror image.
+               const bool has = pMessage->HasKeyword(pCriteria->GetText());
+               if (has == pCriteria->GetPositive())
                   bMessageIsMatchingCriteria = false;
                break;
             }

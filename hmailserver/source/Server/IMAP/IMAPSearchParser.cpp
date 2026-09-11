@@ -527,10 +527,7 @@ namespace HM
       else if (ct == IMAPSearchCriteria::CTKeyword ||
          ct == IMAPSearchCriteria::CTUnkeyword)
       {
-         // The keyword name is consumed but never looked at: no keyword can be stored,
-         // so KEYWORD matches nothing and UNKEYWORD matches everything whatever the name
-         // is. It still has to be consumed, or it would be read as a search key of its
-         // own on the next pass.
+         // The keyword name is the next word.
          iCurrentWord++;
 
          if (iCurrentWord > (int) pSimpleParser->WordCount() - 1)

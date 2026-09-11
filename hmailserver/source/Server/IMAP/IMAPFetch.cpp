@@ -163,6 +163,15 @@ namespace HM
             sTemp += "\\" + (*iter);
          }
 
+         // The keywords after the system flags, as stored.
+         std::vector<String> keywords = pMessage->GetKeywordList();
+         for (size_t i = 0; i < keywords.size(); i++)
+         {
+            if (!setFlags.empty() || i > 0)
+               sTemp += " ";
+            sTemp += keywords[i];
+         }
+
          sTemp += ")";
 
          AppendOutput_(sOutput, sTemp);

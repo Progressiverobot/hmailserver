@@ -99,6 +99,8 @@
 #include "Time.h"
 #include "Encoding/Base64.h"
 #include "Hashing/HashCreator.h"
+#include "../Sieve/SieveParser.h"
+#include "JsonDocument.h"
 
 #include "../BO/Domains.h"
 #include "../BO/Domain.h"
@@ -6120,13 +6122,24 @@ namespace HM
 
       AnsiString FlagsJson(std::shared_ptr<Message> message)
       {
+         // The keywords are IMAP atoms - no quote, no backslash, nothing
+         // above ASCII - so they go into the JSON as they are.
+         AnsiString keywords;
+         std::vector<String> list = message->GetKeywordList();
+         for (size_t i = 0; i < list.size(); i++)
+         {
+            if (i > 0)
+               keywords += ",";
+            keywords += "\"" + AnsiString(list[i]) + "\"";
+         }
          AnsiString flags;
-         flags.Format("{\"seen\":%hs,\"flagged\":%hs,\"answered\":%hs,\"draft\":%hs,\"deleted\":%hs}",
+         flags.Format("{\"seen\":%hs,\"flagged\":%hs,\"answered\":%hs,\"draft\":%hs,\"deleted\":%hs,\"keywords\":[%hs]}",
             message->GetFlagSeen() ? "true" : "false",
             message->GetFlagFlagged() ? "true" : "false",
             message->GetFlagAnswered() ? "true" : "false",
             message->GetFlagDraft() ? "true" : "false",
-            message->GetFlagDeleted() ? "true" : "false");
+            message->GetFlagDeleted() ? "true" : "false",
+            keywords.c_str());
          return flags;
       }
 
@@ -6247,6 +6260,7 @@ namespace HM
          bool wantFlagged;
          bool wantUnflagged;
          bool wantAnswered;
+         std::vector<String> labels;
          String freeText;
 
          SearchQuery() :
@@ -6326,6 +6340,8 @@ namespace HM
                q.wantUnflagged = true;
             else if (key == _T("is") && value == _T("answered"))
                q.wantAnswered = true;
+            else if (key == _T("label") && !value.IsEmpty())
+               q.labels.push_back(value);
             else
             {
                // Each word once, and sixteen at most: every word past the
@@ -6366,6 +6382,11 @@ namespace HM
             return false;
          if (q.wantAnswered && !message->GetFlagAnswered())
             return false;
+         for (size_t i = 0; i < q.labels.size(); i++)
+         {
+            if (!message->HasKeyword(q.labels[i]))
+               return false;
+         }
 
          if (!q.before.IsEmpty() || !q.after.IsEmpty())
          {
@@ -7230,8 +7251,42 @@ namespace HM
          mentioned++;
       }
 
+      // Labels: keywords_add and keywords_remove, each an array of IMAP
+      // keyword atoms; removed first, then added.
+      std::vector<String> keywordsAdd;
+      std::vector<String> keywordsRemove;
+      {
+         JsonValue document;
+         std::string parseError;
+         if (JsonValue::Parse(std::string(requestBody.c_str(), requestBody.size()), document, parseError) && document.IsObject())
+         {
+            const JsonValue *lists[2] = { document.Get("keywords_add"), document.Get("keywords_remove") };
+            for (int l = 0; l < 2; l++)
+            {
+               if (!lists[l] || lists[l]->IsNull())
+                  continue;
+               if (!lists[l]->IsArray())
+                  return BuildResponse_(400, "{\"error\":\"keywords_add and keywords_remove are arrays of keyword names\"}");
+               for (size_t i = 0; i < lists[l]->Size(); i++)
+               {
+                  const JsonValue *item = lists[l]->At(i);
+                  if (!item || !item->IsString())
+                     return BuildResponse_(400, "{\"error\":\"keywords_add and keywords_remove are arrays of keyword names\"}");
+                  String keyword;
+                  Unicode::MultiByteToWide(AnsiString(item->AsString().c_str()), keyword);
+                  keyword.TrimLeft();
+                  keyword.TrimRight();
+                  if (keyword.IsEmpty() || keyword[0] == '\\' || !SieveParser::IsValidFlagName(keyword))
+                     return BuildResponse_(400, "{\"error\":\"a keyword is an IMAP atom: printable ASCII without spaces, parentheses, braces, brackets, quotes, %, * or a backslash\"}");
+                  (l == 0 ? keywordsAdd : keywordsRemove).push_back(keyword);
+               }
+               mentioned++;
+            }
+         }
+      }
+
       if (mentioned == 0)
-         return BuildResponse_(400, "{\"error\":\"no flag named: seen, flagged, answered, draft or deleted\"}");
+         return BuildResponse_(400, "{\"error\":\"no flag named: seen, flagged, answered, draft or deleted; and no keywords_add or keywords_remove\"}");
 
       // The rights STORE asks for. RFC 4314 makes \Seen, \Deleted and the
       // other flags three separate permissions, and they are asked for
@@ -7242,7 +7297,7 @@ namespace HM
       if (named[4] && !RightOn_(account, folder, ACLPermission::PermissionWriteDeleted))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change the deleted flag\"}");
 
-      if ((named[1] || named[2] || named[3]) && !RightOn_(account, folder, ACLPermission::PermissionWriteOthers))
+      if ((named[1] || named[2] || named[3] || !keywordsAdd.empty() || !keywordsRemove.empty()) && !RightOn_(account, folder, ACLPermission::PermissionWriteOthers))
          return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to change flags\"}");
 
       if (named[0])
@@ -7255,10 +7310,17 @@ namespace HM
          message->SetFlagDraft(values[3]);
       if (named[4])
          message->SetFlagDeleted(values[4]);
+      for (size_t i = 0; i < keywordsRemove.size(); i++)
+         message->RemoveKeyword(keywordsRemove[i]);
+      for (size_t i = 0; i < keywordsAdd.size(); i++)
+      {
+         if (!message->AddKeyword(keywordsAdd[i]))
+            return BuildResponse_(400, "{\"error\":\"too many keywords on the message\"}");
+      }
 
       // The path STORE takes: the flags are written with the folder's next
       // mod-sequence, so CONDSTORE and QRESYNC clients see the change.
-      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) folder->GetAccountID(), (int) folder->GetID(), message->GetID(), message->GetFlags()))
+      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) folder->GetAccountID(), (int) folder->GetID(), message->GetID(), message->GetFlags(), message->GetKeywords()))
          return BuildResponse_(500, "{\"error\":\"the flags could not be stored\"}");
 
       std::vector<__int64> changed;
@@ -9276,7 +9338,7 @@ namespace HM
          "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, from (as on a send), and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
-         "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, and from:, to:, subject:, has:attachment, before:YYYY-MM-DD, after:YYYY-MM-DD, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered; a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
+         "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, and from:, to:, subject:, has:attachment, before:YYYY-MM-DD, after:YYYY-MM-DD, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name (an IMAP keyword the message carries; several must all be there); a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"x-body\":\"text and, when given, html (the message goes as multipart/alternative); attachments; from (one of the identities); receipt; in_reply_to, references, answered_id.\",\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
