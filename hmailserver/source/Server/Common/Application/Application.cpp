@@ -67,6 +67,7 @@
 #include "../Persistence/PersistentMessage.h"
 #include "../Persistence/PersistentDomain.h"
 #include "RemoveExpiredRecords.h"
+#include "ScheduledMailTask.h"
 #include "../Util/AutoBanFirewall.h"
 #include "LogRetentionTask.h"
 #include "ArchiveRetentionTask.h"
@@ -654,6 +655,14 @@ namespace HM
       removeExpiredRecordsTask->SetReoccurance(ScheduledTask::RunInfinitely);
       removeExpiredRecordsTask->SetMinutesBetweenRun(1);
       scheduler_->ScheduleTask(removeExpiredRecordsTask);
+
+      // What the webmail put off until later: drafts to send at a time,
+      // snoozed messages to come back. Every minute, since a time is chosen
+      // to the minute.
+      std::shared_ptr<ScheduledMailTask> scheduledMailTask = std::shared_ptr<ScheduledMailTask>(new ScheduledMailTask);
+      scheduledMailTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      scheduledMailTask->SetMinutesBetweenRun(1);
+      scheduler_->ScheduleTask(scheduledMailTask);
 
       // SMTP TLS reporting (RFC 8460). The task always runs so collected
       // statistics are flushed; reports are only sent when TlsRptFromAddress
