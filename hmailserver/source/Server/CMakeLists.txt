@@ -349,6 +349,18 @@ install(FILES
 # One version, one set of packages, built from this one description. CPack makes
 # the .deb and the .rpm; the AppImage and the Arch PKGBUILD are scripts beside
 # this file, because neither is something CPack does well.
+# What auto-ban does below the server on Linux: the hook the server runs when
+# AutoBanFirewall=1 is set, and a fail2ban filter and jail for the other half,
+# which needs no capability at all because fail2ban runs as root and reads the
+# application log. The jail is installed disabled, as Debian asks of a shipped
+# jail; the filter and the jail are configuration, kept on upgrade.
+install(PROGRAMS ${SERVER_DIR}/platform/packaging/autoban-hook
+   DESTINATION lib/hmailserver)
+install(FILES ${SERVER_DIR}/platform/packaging/fail2ban/filter.d/hmailserver.conf
+   DESTINATION /etc/fail2ban/filter.d)
+install(FILES ${SERVER_DIR}/platform/packaging/fail2ban/jail.d/hmailserver.conf
+   DESTINATION /etc/fail2ban/jail.d)
+
 set(CPACK_PACKAGE_NAME hmailserver)
 set(CPACK_PACKAGE_VENDOR "Progressive Robot Ltd")
 set(CPACK_PACKAGE_CONTACT "christopher.j.holloway@outlook.com")
@@ -388,11 +400,15 @@ set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/packaging/conffiles
    "/etc/hmailserver/hMailServer.ini
 /etc/logrotate.d/hmailserver
+/etc/fail2ban/filter.d/hmailserver.conf
+/etc/fail2ban/jail.d/hmailserver.conf
 ")
 
 set(CPACK_RPM_USER_FILELIST
    "%config(noreplace) /etc/hmailserver/hMailServer.ini"
-   "%config(noreplace) /etc/logrotate.d/hmailserver")
+   "%config(noreplace) /etc/logrotate.d/hmailserver"
+   "%config(noreplace) /etc/fail2ban/filter.d/hmailserver.conf"
+   "%config(noreplace) /etc/fail2ban/jail.d/hmailserver.conf")
 
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
    "${SERVER_DIR}/platform/packaging/debian/postinst;${SERVER_DIR}/platform/packaging/debian/prerm;${SERVER_DIR}/platform/packaging/debian/postrm;${CMAKE_CURRENT_BINARY_DIR}/packaging/conffiles")

@@ -67,6 +67,7 @@
 #include "../Persistence/PersistentMessage.h"
 #include "../Persistence/PersistentDomain.h"
 #include "RemoveExpiredRecords.h"
+#include "../Util/AutoBanFirewall.h"
 #include "LogRetentionTask.h"
 #include "ArchiveRetentionTask.h"
 #include "MailboxRetentionTask.h"
@@ -191,6 +192,11 @@ namespace HM
          return false;
 
       LOG_DEBUG("Application::InitInstance - Configuration loaded.");
+
+      // The firewall is made to match the auto-ban ranges before a listener is
+      // open: a rule for a ban that expired while the service was down is removed
+      // here, and one for a ban still in force is put back if it is missing.
+      AutoBanFirewall::Synchronise(_T("start-up"));
 
       // The asynchronous task and name lookup queues are deliberately NOT created
       // here. Their tasks hold live client connections, so they belong to the

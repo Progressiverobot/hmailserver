@@ -11,6 +11,7 @@
 #include "../BO/SecurityRange.h"
 
 #include "../Util/Time.h"
+#include "../Util/AutoBanFirewall.h"
 
 #include "../SQL/IPAddressSQLHelper.h"
 #include "PreSaveLimitationsCheck.h"
@@ -44,6 +45,12 @@ namespace HM
          command.AddParameter("@RANGEID", pSR->GetID());
          
          bResult = Application::Instance()->GetDBManager()->Execute(command);
+
+         // Deleting the range is how an administrator lifts an auto-ban early.
+         // The firewall follows the table, so it is told now rather than on the
+         // next expiry pass.
+         if (bResult)
+            AutoBanFirewall::Synchronise(_T("range deleted"));
       }
 
       return bResult;

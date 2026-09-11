@@ -1013,6 +1013,9 @@ O Control Panel só consegue ler arquivos de mensagens quando roda na mesma máq
   <data name="Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures." xml:space="preserve">
     <value>Tolera diferença entre o relógio deste servidor e o do assinante. Sem isso, um relógio alguns minutos adiantado transforma e-mails válidos de outras pessoas em falhas de DKIM.</value>
   </data>
+  <data name="Also block a banned address in the operating system's firewall" xml:space="preserve">
+    <value>Bloquear também um endereço banido no firewall do sistema operacional</value>
+  </data>
   <data name="Also mark accounts _inactive when their directory entry has gone" xml:space="preserve">
     <value>Também marcar contas como _inativas quando a entrada delas no diretório desapareceu</value>
   </data>
@@ -1048,6 +1051,9 @@ O Control Panel só consegue ler arquivos de mensagens quando roda na mesma máq
   </data>
   <data name="An authenticated session may only send as an address its account owns or has been granted" xml:space="preserve">
     <value>Uma sessão autenticada só pode enviar como um endereço que sua conta possui ou que lhe foi concedido</value>
+  </data>
+  <data name="An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart." xml:space="preserve">
+    <value>Um banimento automático é aplicado pelos próprios listeners do servidor: o sistema operacional aceita o endereço, entrega-o ao servidor e o servidor o descarta. Estas configurações levam o banimento ao firewall do sistema operacional, entregam-no a um programa seu e nomeiam os endereços que nunca devem ser banidos. As três valem após reiniciar o serviço.</value>
   </data>
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Uma sessão inteira de entrega de saída. 0 = sem limite.</value>
@@ -1352,6 +1358,9 @@ Reiniciar o Control Panel agora? Escolha Não para tentar continuar trabalhando.
   </data>
   <data name="Before you copy — " xml:space="preserve">
     <value>Antes de copiar — </value>
+  </data>
+  <data name="Below the server: the firewall" xml:space="preserve">
+    <value>Abaixo do servidor: o firewall</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
     <value>Entre o 354 e o 250 o servidor executa o pipeline de aceitação - testes de spam, modificações da mensagem, arquivamento, o script OnAcceptMessage e a gravação no banco de dados - em um pool limitado de threads, e só responde quando termina. O log cronometra cada etapa. Leia-o como uma sequência e procure a última linha gravada: a etapa travada é a que vem logo depois dela. Duas etapas se anunciam com uma linha de início (spam-protection e script/save); as modificações da mensagem não, então um travamento ali aparece como "done spam-protection" seguido de silêncio. Uma etapa que leva dez segundos ou mais é registrada em nível de aplicação mesmo sem log de depuração.</value>
@@ -3097,6 +3106,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Tentativas de entrega extras por host MX adicional (0 = padrão)</value>
   </data>
+  <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
+    <value>Logons malsucedidos de um endereço listado não são contados de forma alguma, então ele nunca pode ser banido. Coloque aqui os endereços de onde você administra antes de ativar a opção de firewall: um banimento que chega ao firewall bloqueia esse endereço em todas as portas de e-mail desta máquina. Exemplo: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Uma entrada que não é um endereço é relatada pelo nome no log de erros e ignorada.</value>
+  </data>
   <data name="Fails when the connecting address has no reverse DNS record." xml:space="preserve">
     <value>Falha quando o endereço que está conectando não tem registro DNS reverso.</value>
   </data>
@@ -4395,6 +4407,9 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="Never" xml:space="preserve">
     <value>Nunca</value>
   </data>
+  <data name="Never auto-ban these addresses (comma separated; CIDR blocks allowed)" xml:space="preserve">
+    <value>Nunca banir automaticamente estes endereços (separados por vírgula; blocos CIDR permitidos)</value>
+  </data>
   <data name="New IMAP folder" xml:space="preserve">
     <value>Nova pasta IMAP</value>
   </data>
@@ -5369,6 +5384,9 @@ Nenhuma conexão nova será aceita e nenhum e-mail será entregue até que ele s
   <data name="Profile to scan as (spamd User: header; empty = spamd's global configuration)" xml:space="preserve">
     <value>Perfil com o qual verificar (cabeçalho User: do spamd; vazio = configuração global do spamd)</value>
   </data>
+  <data name="Program to run when an address is banned or unbanned (empty = none)" xml:space="preserve">
+    <value>Programa a executar quando um endereço é banido ou desbanido (vazio = nenhum)</value>
+  </data>
   <data name="Progressive Robot Ltd is a software engineering company that builds and modernizes production software — taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling." xml:space="preserve">
     <value>A Progressive Robot Ltd é uma empresa de engenharia de software que constrói e moderniza software de produção — pega sistemas maduros, do mundo real, e os traz aos padrões atuais de segurança, confiabilidade e ferramental.</value>
   </data>
@@ -6002,6 +6020,9 @@ Continuar?</value>
   </data>
   <data name="Run anti-virus on downloaded mail" xml:space="preserve">
     <value>Executar o antivírus nos e-mails baixados</value>
+  </data>
+  <data name="Run as &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; when a ban is created and &lt;command&gt; unban &lt;address&gt; when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log." xml:space="preserve">
+    <value>Executado como &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; quando um banimento é criado e como &lt;command&gt; unban &lt;address&gt; quando a faixa some, tanto no Windows quanto no Linux - para um firewall na nuvem, um roteador ou um SIEM. Coloque o caminho do programa entre aspas se contiver espaços; o servidor acrescenta os argumentos. Um código de saída diferente de zero ou um programa que não inicia é relatado uma vez no log de erros.</value>
   </data>
   <data name="Run script function" xml:space="preserve">
     <value>Executar função de script</value>
@@ -8556,6 +8577,9 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
   </data>
   <data name="Windows service account - a least-privilege account needs granting outside hMailServer" xml:space="preserve">
     <value>Conta de serviço do Windows - uma conta de privilégio mínimo precisa de concessões fora do hMailServer</value>
+  </data>
+  <data name="Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first." xml:space="preserve">
+    <value>Windows: uma regra de bloqueio de entrada por endereço banido no Windows Defender Firewall, somente TCP e restrita às portas em que este servidor escuta, em um grupo de regras chamado hMailServer auto-ban; removida quando o banimento expira ou a faixa de IP é excluída. Linux: o autoban-hook incluído mantém um conjunto nftables com tempo de expiração, e o serviço precisa de CAP_NET_ADMIN para isso - o hook diz exatamente como concedê-lo. Coloque primeiro os endereços de onde você administra em "nunca banir".</value>
   </data>
   <data name="With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session." xml:space="preserve">
     <value>Com um moderador definido, um remetente que as regras acima recusam é encaminhado ao moderador em vez de ser rejeitado. O moderador aprova reenviando a mensagem à lista a partir de uma sessão autenticada.</value>

@@ -1013,6 +1013,9 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   <data name="Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures." xml:space="preserve">
     <value>Houdt rekening met een afwijking tussen de klok van deze server en die van de ondertekenaar. Zonder dit maakt een klok die een paar minuten voorloopt van geldige mail van anderen DKIM-fouten.</value>
   </data>
+  <data name="Also block a banned address in the operating system's firewall" xml:space="preserve">
+    <value>Een geband adres ook blokkeren in de firewall van het besturingssysteem</value>
+  </data>
   <data name="Also mark accounts _inactive when their directory entry has gone" xml:space="preserve">
     <value>Accounts ook als _inactief markeren wanneer hun directoryvermelding is verdwenen</value>
   </data>
@@ -1048,6 +1051,9 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   </data>
   <data name="An authenticated session may only send as an address its account owns or has been granted" xml:space="preserve">
     <value>Een geauthenticeerde sessie mag alleen verzenden als een adres dat het account bezit of toegewezen heeft gekregen</value>
+  </data>
+  <data name="An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart." xml:space="preserve">
+    <value>Een automatische ban wordt afgedwongen door de listeners van de server zelf: het besturingssysteem accepteert het adres, geeft het door aan de server en de server verbreekt de verbinding. Deze instellingen duwen de ban omlaag in de firewall van het besturingssysteem, geven hem door aan een programma naar keuze en noemen de adressen die nooit geband mogen worden. Alle drie gelden na een herstart van de service.</value>
   </data>
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>Een hele uitgaande bezorgsessie. 0 = geen grens.</value>
@@ -1352,6 +1358,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   </data>
   <data name="Before you copy — " xml:space="preserve">
     <value>Voordat u kopieert — </value>
+  </data>
+  <data name="Below the server: the firewall" xml:space="preserve">
+    <value>Onder de server: de firewall</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
     <value>Tussen de 354 en de 250 doorloopt de server de accept-pijplijn - spamtests, berichtwijzigingen, archivering, het OnAcceptMessage-script en het opslaan in de database - op een begrensde pool van threads, en antwoordt hij pas wanneer die klaar is. Het logboek noteert de tijd van elke fase. Lees het als een reeks en zoek de laatst geschreven regel: de fase die vastzit, is de fase daarna. Twee fasen kondigen zichzelf aan met een startregel (spam-protection en script/save); berichtwijzigingen doen dat niet, dus een blokkade daar toont zich als "done spam-protection" gevolgd door stilte. Een fase die tien seconden of langer duurt, wordt op applicatieniveau vastgelegd, ook zonder debuglogboekregistratie.</value>
@@ -3097,6 +3106,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Extra bezorgpogingen per extra MX-host (0 = standaard)</value>
   </data>
+  <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
+    <value>Mislukte aanmeldingen vanaf een vermeld adres worden helemaal niet geteld, dus het kan nooit geband worden. Zet hier de adressen van waaruit u beheert voordat u de firewall-optie inschakelt: een ban die de firewall bereikt sluit dat adres uit van elke mailpoort op deze machine. Voorbeeld: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Een vermelding die geen adres is wordt bij naam in het foutenlogboek gemeld en genegeerd.</value>
+  </data>
   <data name="Fails when the connecting address has no reverse DNS record." xml:space="preserve">
     <value>Mislukt wanneer het verbindende adres geen reverse-DNS-record heeft.</value>
   </data>
@@ -4395,6 +4407,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Never" xml:space="preserve">
     <value>Nooit</value>
   </data>
+  <data name="Never auto-ban these addresses (comma separated; CIDR blocks allowed)" xml:space="preserve">
+    <value>Deze adressen nooit automatisch bannen (door komma's gescheiden; CIDR-blokken toegestaan)</value>
+  </data>
   <data name="New IMAP folder" xml:space="preserve">
     <value>Nieuwe IMAP-map</value>
   </data>
@@ -5369,6 +5384,9 @@ Er worden geen nieuwe verbindingen geaccepteerd en er wordt geen mail bezorgd to
   <data name="Profile to scan as (spamd User: header; empty = spamd's global configuration)" xml:space="preserve">
     <value>Profiel om als te scannen (spamd User:-header; leeg = de globale configuratie van spamd)</value>
   </data>
+  <data name="Program to run when an address is banned or unbanned (empty = none)" xml:space="preserve">
+    <value>Programma dat wordt uitgevoerd wanneer een adres wordt geband of vrijgegeven (leeg = geen)</value>
+  </data>
   <data name="Progressive Robot Ltd is a software engineering company that builds and modernizes production software — taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling." xml:space="preserve">
     <value>Progressive Robot Ltd is een software-engineeringbedrijf dat productiesoftware bouwt en moderniseert — het neemt volgroeide systemen uit de praktijk en brengt ze op het huidige niveau van beveiliging, betrouwbaarheid en gereedschap.</value>
   </data>
@@ -6002,6 +6020,9 @@ Doorgaan?</value>
   </data>
   <data name="Run anti-virus on downloaded mail" xml:space="preserve">
     <value>Antivirus uitvoeren op gedownloade mail</value>
+  </data>
+  <data name="Run as &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; when a ban is created and &lt;command&gt; unban &lt;address&gt; when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log." xml:space="preserve">
+    <value>Wordt uitgevoerd als &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; wanneer een ban ontstaat en als &lt;command&gt; unban &lt;address&gt; wanneer het bereik verdwijnt, op Windows en op Linux - voor een cloudfirewall, een router of een SIEM. Zet het pad van het programma tussen aanhalingstekens als het spaties bevat; de server voegt de argumenten toe. Een exitcode ongelijk aan nul of een programma dat niet start wordt eenmaal in het foutenlogboek gemeld.</value>
   </data>
   <data name="Run script function" xml:space="preserve">
     <value>Scriptfunctie uitvoeren</value>
@@ -8556,6 +8577,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="Windows service account - a least-privilege account needs granting outside hMailServer" xml:space="preserve">
     <value>Windows-serviceaccount - een account met minimale rechten moet buiten hMailServer worden gemachtigd</value>
+  </data>
+  <data name="Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first." xml:space="preserve">
+    <value>Windows: één inkomende blokkeerregel per geband adres in Windows Defender Firewall, alleen TCP en beperkt tot de poorten waarop deze server luistert, in een regelgroep met de naam hMailServer auto-ban; verwijderd wanneer de ban verloopt of het IP-bereik wordt gewist. Linux: de meegeleverde autoban-hook onderhoudt een nftables-set met een time-out, en de service heeft daarvoor CAP_NET_ADMIN nodig - de hook zegt precies hoe u dat toekent. Zet eerst de adressen van waaruit u beheert onder „nooit bannen“.</value>
   </data>
   <data name="With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session." xml:space="preserve">
     <value>Met een ingestelde moderator wordt een afzender die de regels hierboven weigeren, naar de moderator doorgestuurd in plaats van afgewezen. De moderator keurt goed door het bericht vanuit een geauthenticeerde sessie opnieuw naar de lijst te sturen.</value>

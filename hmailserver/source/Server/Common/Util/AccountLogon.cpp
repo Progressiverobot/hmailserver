@@ -7,6 +7,7 @@
 
 #include "AccountLogon.h"
 #include "AccountLockout.h"
+#include "AutoBanFirewall.h"
 #include "../Application/IniFileSettings.h"
 #include "PasswordValidator.h"
 #include "../Persistence/PersistentLogonFailure.h"
@@ -132,9 +133,25 @@ namespace HM
       if (Configuration::Instance()->GetAutoBanLogonEnabled() == false || maxInvalidLogonAttempts == 0)
          return;
 
+      // An address on AutoBanNeverBan is never counted, let alone banned. The
+      // per-connection disconnect after repeated failures still applies - that is
+      // the protocol handler's, not this - so a stuck client from a listed address
+      // still gets dropped; it just never reaches the firewall.
+      if (AutoBanFirewall::IsNeverBanned(ipaddress))
+      {
+         LOG_DEBUG("AccountLogon::RegisterFailedLogin - " + String(ipaddress.ToString()) + " is listed in AutoBanNeverBan; the failure is not counted.");
+         return;
+      }
+
       // Log on has failed.
       PersistentLogonFailure logonFailure;
       int failureCount = logonFailure.GetCurrrentFailureCount(ipaddress) + 1; // +1 because we count the current failure as well.
+
+      // One line per counted failure, in the application log, in a fixed shape:
+      // it is what a fail2ban filter matches, and it does not depend on protocol
+      // logging being on. The address is the last word before " for ".
+      LOG_APPLICATION("Auto-ban: logon failure " + StringParser::IntToString(failureCount) + " of " + StringParser::IntToString(maxInvalidLogonAttempts) +
+         " from " + String(ipaddress.ToString()) + " for " + username);
 
       if (failureCount >= maxInvalidLogonAttempts)
       {
@@ -158,7 +175,8 @@ namespace HM
             return;
          }
 
-         CreateIPRange(ipaddress, username, minutes);
+         if (CreateIPRange(ipaddress, username, minutes))
+            AutoBanFirewall::Banned(ipaddress, minutes, username, failureCount);
 
          disconnect = true;
          return;
@@ -183,7 +201,7 @@ namespace HM
       }
    }
 
-   void
+   bool
    AccountLogon::CreateIPRange(const IPAddress &ipaddress, const String &username, int minutes)
    {
       // Why do we need a lock here? IP ranges requires unique names.
@@ -222,9 +240,10 @@ namespace HM
       {
          ErrorManager::Instance()->ReportError(ErrorManager::High, 6099, "AccountLogon::CreateIPRange",
             "The auto-ban IP range '" + pSecurityRange->GetName() + "' could not be saved, so the address has NOT been blocked despite reaching the failed-logon limit.");
+         return false;
       }
 
-
+      return true;
    }      
 
    String 

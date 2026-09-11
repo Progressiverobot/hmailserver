@@ -1013,6 +1013,9 @@
   <data name="Allows for this server's clock differing from the signer's. Without it, a clock running a few minutes fast turns other people's valid mail into DKIM failures." xml:space="preserve">
     <value>このサーバーの時計が署名者の時計とずれていることを許容します。これがないと、時計が数分進んでいるだけで、他人の正当なメールが DKIM の失敗になります。</value>
   </data>
+  <data name="Also block a banned address in the operating system's firewall" xml:space="preserve">
+    <value>BAN したアドレスを OS のファイアウォールでもブロックする</value>
+  </data>
   <data name="Also mark accounts _inactive when their directory entry has gone" xml:space="preserve">
     <value>ディレクトリのエントリがなくなったアカウントも無効としてマークする(_I)</value>
   </data>
@@ -1048,6 +1051,9 @@
   </data>
   <data name="An authenticated session may only send as an address its account owns or has been granted" xml:space="preserve">
     <value>認証済みのセッションでは、そのアカウントが所有しているか権限を与えられているアドレスとしてのみ送信できる</value>
+  </data>
+  <data name="An auto-ban is enforced by the server's own listeners: the address is accepted by the operating system, handed to the server and dropped. These settings push the ban down into the operating system's firewall, hand it to a program of yours, and name the addresses that must never be banned at all. All three apply after a service restart." xml:space="preserve">
+    <value>自動 BAN はサーバー自身のリスナーが適用します。OS はアドレスからの接続を受け付けてサーバーに渡し、サーバーがそれを切断します。これらの設定は BAN を OS のファイアウォールまで下ろし、任意のプログラムに引き渡し、決して BAN してはならないアドレスを指定します。3 つともサービスの再起動後に有効になります。</value>
   </data>
   <data name="An entire outbound delivery session. 0 = no bound." xml:space="preserve">
     <value>送信配信のセッション全体に対する制限です。0 = 制限なし。</value>
@@ -1352,6 +1358,9 @@
   </data>
   <data name="Before you copy — " xml:space="preserve">
     <value>コピーする前に — </value>
+  </data>
+  <data name="Below the server: the firewall" xml:space="preserve">
+    <value>サーバーの下層: ファイアウォール</value>
   </data>
   <data name="Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as &quot;done spam-protection&quot; followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging." xml:space="preserve">
     <value>354 と 250 の間で、サーバーは受け入れパイプライン (スパム テスト、メッセージの変更、アーカイブ、OnAcceptMessage スクリプト、データベースへの保存) を上限のあるスレッド プールで実行し、完了して初めて応答します。ログには各ステージの所要時間が記録されます。これを順番に読み、最後に書かれた行を探してください。詰まっているステージはその次のものです。2 つのステージ (spam-protection と script/save) は開始行で自らを告げます。メッセージの変更は告げないため、そこでの停滞は "done spam-protection" の後に沈黙が続く形で現れます。10 秒以上かかるステージは、デバッグ ログがなくてもアプリケーション レベルで記録されます。</value>
@@ -3097,6 +3106,9 @@
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>追加の MX ホストごとの追加配信試行回数 (0 = 既定)</value>
   </data>
+  <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
+    <value>登録されたアドレスからのログオン失敗はまったく数えられないため、そのアドレスが BAN されることはありません。ファイアウォールのオプションを有効にする前に、管理に使うアドレスをここに登録してください。ファイアウォールまで届く BAN は、そのアドレスをこのマシンのすべてのメールポートから締め出します。例: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32。アドレスでない項目はエラーログに名前付きで報告され、無視されます。</value>
+  </data>
   <data name="Fails when the connecting address has no reverse DNS record." xml:space="preserve">
     <value>接続元アドレスに逆引き DNS レコードがない場合に失敗します。</value>
   </data>
@@ -4395,6 +4407,9 @@
   <data name="Never" xml:space="preserve">
     <value>なし</value>
   </data>
+  <data name="Never auto-ban these addresses (comma separated; CIDR blocks allowed)" xml:space="preserve">
+    <value>これらのアドレスは決して自動 BAN しない (コンマ区切り。CIDR ブロック可)</value>
+  </data>
   <data name="New IMAP folder" xml:space="preserve">
     <value>新しい IMAP フォルダー</value>
   </data>
@@ -5369,6 +5384,9 @@
   <data name="Profile to scan as (spamd User: header; empty = spamd's global configuration)" xml:space="preserve">
     <value>スキャン時に使用するプロファイル (spamd の User: ヘッダー。空 = spamd のグローバル設定)</value>
   </data>
+  <data name="Program to run when an address is banned or unbanned (empty = none)" xml:space="preserve">
+    <value>アドレスの BAN と解除の際に実行するプログラム (空 = なし)</value>
+  </data>
   <data name="Progressive Robot Ltd is a software engineering company that builds and modernizes production software — taking mature, real-world systems and bringing them up to current standards of security, reliability and tooling." xml:space="preserve">
     <value>Progressive Robot Ltd は、実運用ソフトウェアの構築と近代化を手がけるソフトウェア エンジニアリング企業です。成熟した実世界のシステムを引き受け、セキュリティ、信頼性、ツール群を現在の水準へ引き上げます。</value>
   </data>
@@ -6002,6 +6020,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Run anti-virus on downloaded mail" xml:space="preserve">
     <value>ダウンロードしたメールにウイルス対策を実行する</value>
+  </data>
+  <data name="Run as &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; when a ban is created and &lt;command&gt; unban &lt;address&gt; when the range goes, on Windows and on Linux alike - for a cloud firewall, a router or a SIEM. Quote the program's path if it contains spaces; the server appends the arguments. A non-zero exit or a program that cannot start is reported once in the error log." xml:space="preserve">
+    <value>BAN の作成時に &lt;command&gt; ban &lt;address&gt; &lt;minutes&gt; &lt;ports&gt; として、範囲の消滅時に &lt;command&gt; unban &lt;address&gt; として、Windows でも Linux でも同じ形で実行されます。クラウドのファイアウォール、ルーター、SIEM 向けです。プログラムのパスに空白が含まれる場合は引用符で囲んでください。引数はサーバーが付け加えます。0 以外の終了コード、または起動できないプログラムはエラーログに 1 回報告されます。</value>
   </data>
   <data name="Run script function" xml:space="preserve">
     <value>スクリプト関数を実行</value>
@@ -8556,6 +8577,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Windows service account - a least-privilege account needs granting outside hMailServer" xml:space="preserve">
     <value>Windows サービス アカウント - 最小権限のアカウントには hMailServer の外で権限を付与する必要があります</value>
+  </data>
+  <data name="Windows: an inbound block rule per banned address in Windows Defender Firewall, TCP only and scoped to the ports this server listens on, in a rule group named hMailServer auto-ban; removed when the ban expires or the IP range is deleted. Linux: the packaged autoban-hook keeps an nftables set with a timeout, and the service needs CAP_NET_ADMIN for it - the hook says exactly how to grant it. List the addresses you administer from under never-ban first." xml:space="preserve">
+    <value>Windows: BAN したアドレスごとに Windows Defender Firewall の受信ブロック規則を 1 つ作成します。TCP のみで、このサーバーが待ち受けるポートに限定され、hMailServer auto-ban という規則グループに置かれます。BAN の期限切れまたは IP 範囲の削除で規則は取り除かれます。Linux: 同梱の autoban-hook がタイムアウト付きの nftables セットを維持し、そのためにサービスには CAP_NET_ADMIN が必要です。付与の手順は hook 自体が正確に示します。先に、管理に使うアドレスを「BAN しない」に登録してください。</value>
   </data>
   <data name="With a moderator set, a sender the rules above refuse is forwarded to the moderator instead of being rejected. The moderator approves by resending the message to the list from an authenticated session." xml:space="preserve">
     <value>モデレーターが設定されている場合、上のルールで拒否される送信者は、拒否される代わりにモデレーターに転送されます。モデレーターは、認証済みセッションからメッセージをリストに再送信することで承認します。</value>
