@@ -98,6 +98,11 @@ namespace HM
       // locate the file without duplicating the derivation.
       static String GetApiKeyStoreFile();
 
+      // Files sent as links that have expired, or were never finished, or
+      // whose record is gone: removed. Run by the scheduled task every minute
+      // (RestApiFiles.cpp). Returns how many went.
+      static int SweepExpiredFiles();
+
       // One address the signed-in account may write as (RestApiIdentities.cpp).
       struct Identity
       {
@@ -243,6 +248,13 @@ namespace HM
          RouteMeFolderImport,
          RoutePortalBrandingPut,
          RouteAccountSupportSession,
+         RouteMeFiles,
+         RouteMeFileCreate,
+         RouteMeFileContent,
+         RouteMeFileUpdate,
+         RouteMeFileDelete,
+         RoutePortalFilesPolicy,
+         RoutePortalFilesPolicyPut,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -541,6 +553,16 @@ namespace HM
       static HttpResponse HandlePortalBranding_(const AnsiString &query);
       static HttpResponse HandlePortalBrandingPut_(const AnsiString &requestBody);
       HttpResponse HandleAccountSupportSession_(const Caller &caller, const AnsiString &address);
+
+      // Files sent as links (RestApiFiles.cpp).
+      static HttpResponse HandleMeFiles_(const Caller &caller);
+      static HttpResponse HandleMeFileCreate_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeFileContent_(const Caller &caller, __int64 id, const AnsiString &query, const AnsiString &body);
+      static HttpResponse HandleMeFileUpdate_(const Caller &caller, __int64 id, const AnsiString &requestBody);
+      static HttpResponse HandleMeFileDelete_(const Caller &caller, __int64 id);
+      static HttpResponse HandlePublicFile_(const AnsiString &method, const AnsiString &token, const AnsiString &body);
+      static HttpResponse HandlePortalFilesPolicy_(const AnsiString &query);
+      static HttpResponse HandlePortalFilesPolicyPut_(const AnsiString &requestBody);
       static bool IsDomainAllowed_(const std::vector<String> &domains, const String &domainName);
 
       static Caller Authenticate_(const AnsiString &request, const IPAddress &peer_address);

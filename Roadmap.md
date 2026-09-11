@@ -78,9 +78,9 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 8 | 0 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
-| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 33 | – | 5 | – |
+| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 34 | – | 4 | – |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **856** | **2** | **11** | **33** |
+| **Total** | **857** | **2** | **10** | **33** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -1260,7 +1260,7 @@ What ships today: sign-in, folders, listing with a keyboard cursor and bulk acti
 | ✅ | **Templates and canned responses** | **Shipped 11 September 2026.** Written in a new message and saved from there under a name; kept in the account's preferences (`tpl.<slug>`, 3,000 characters of text each) so they follow the user between browsers; inserted from a picker on the compose form, with {first_name} (the first recipient's first name), {subject} and {date} filled in; listed and removed on the Settings page. |
 | ✅ | **Offline reading and queued sends** | **Shipped 11 September 2026.** The inbox listing and the last thirty opened messages (each under 100 KB of HTML) are kept in the browser's storage while the account is signed in; when a read fails for want of a connection the page shows what it saved, with a note, and a send that fails the same way waits in an outbox and goes when the browser comes back online. Everything is forgotten at sign-out. |
 | ✅ | **Keyboard reference and command palette** | **Shipped 11 September 2026.** `?` opens the shortcut list; Ctrl+K opens a palette that finds an action (write, reply, reply all, forward, read or unread, flag, delete, print, move to a folder, light or dark, sign out), a page, a folder ("go to Receipts") or a contact ("write to Anna", from the address book as you type). Every entry is something the page already has a button for. |
-| ⬜ | **Large attachments as links** | Above a domain-set size the attachment goes to the server's store and the message carries an expiring, optionally password-protected link instead; downloads and expiry visible to the sender; retention deletes the file. The 25 MB message that every relay rejects becomes a 2 KB message that arrives. |
+| ✅ | **Large attachments as links** | **Shipped 11 September 2026.** Above the size the domain sets (`WebmailLinkAboveKB`, 8 MB by default; `WebmailLinkDays`, `WebmailLinkMaxMB` and `WebmailLinkQuotaMB` beside it, each with a `.<domain>` twin, set over `GET/PUT /api/v1/portal/files`) the webmail sends the file to the server's store in chunks (`POST /api/v1/me/files`, then `PUT /api/v1/me/files/{id}/content?offset=`, a chunk lost sent again and one sent twice refused) and the message carries a link (`/files/{token}`, fetched by anyone; a password form first when the sender set one, ten wrong answers pausing the file) instead of the bytes; the sender sees each file's downloads and expiry under Storage, copies the link, sets or removes the password, extends or removes it; the scheduled task removes what has expired, what was never finished, and bytes whose record is gone. Schema 6035 (`hm_files`). Two regression tests. |
 | ⬜ | **Calendar, then tasks** | Phase 6: CalDAV with an iMIP path, and a calendar page - the only part of this list that is a second product. Last, deliberately. |
 
 ### What is still refused, under the higher bar

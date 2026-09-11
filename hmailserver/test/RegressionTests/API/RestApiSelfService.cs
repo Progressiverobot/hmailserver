@@ -1796,6 +1796,153 @@ namespace RegressionTests.API
          Assert.AreEqual(403, again.status, "Body: " + again.body);
       }
 
+      [Test]
+      [Description("A file is recorded, sent in chunks at the offset the record has reached, listed with its downloads, fetched by anyone with the link once they give the password, and removed")]
+      public void AFileIsSentAsALinkInChunksAndFetchedByAnyone()
+      {
+         (int status, string body) made = Http("POST", "/api/v1/me/files", UserHeader(UserPassword),
+            "{\"name\":\"report.bin\",\"type\":\"application/octet-stream\",\"size\":300000,\"password\":\"open-sesame\"}");
+         Assert.AreEqual(201, made.status, "Body: " + made.body);
+         long id = long.Parse(Between(made.body, "\"id\":", ","));
+         string token = Between(made.body, "\"token\":\"", "\"");
+         Assert.AreEqual(64, token.Length, made.body);
+         StringAssert.Contains("\"protected\":true", made.body);
+         StringAssert.Contains("\"complete\":false", made.body);
+         StringAssert.Contains("\"link\":\"/files/" + token + "\"", made.body);
+
+         // Bytes, not text: a run of NULs in the middle, under the content type
+         // a browser's upload declares - the server refuses a NUL in a text body.
+         string first = new string('a', 100000) + new string('\0', 16) + new string('a', 99984);
+         string second = new string('b', 100000);
+         const string Binary = "Content-Type: application/octet-stream\r\n";
+         Response part = Raw("PUT", "/api/v1/me/files/" + id + "/content?offset=0", UserHeader(UserPassword), first, Binary);
+         Assert.AreEqual(200, part.Status, part.Body);
+         StringAssert.Contains("\"stored\":200000,\"size\":300000,\"complete\":false", part.Body);
+
+         Response repeated = Raw("PUT", "/api/v1/me/files/" + id + "/content?offset=0", UserHeader(UserPassword), second, Binary);
+         Assert.AreEqual(409, repeated.Status, repeated.Body);
+         StringAssert.Contains("\"stored\":200000", repeated.Body);
+
+         Response early = Raw("GET", "/files/" + token, null, null);
+         Assert.AreEqual(404, early.Status, "An unfinished file is not served. " + early.Body);
+
+         Response rest = Raw("PUT", "/api/v1/me/files/" + id + "/content?offset=200000", UserHeader(UserPassword), second, Binary);
+         Assert.AreEqual(200, rest.Status, rest.Body);
+         StringAssert.Contains("\"stored\":300000,\"size\":300000,\"complete\":true", rest.Body);
+         Response over = Raw("PUT", "/api/v1/me/files/" + id + "/content?offset=300000", UserHeader(UserPassword), "x", Binary);
+         Assert.AreEqual(409, over.Status, over.Body);
+
+         (int status, string body) list = Http("GET", "/api/v1/me/files", UserHeader(UserPassword));
+         Assert.AreEqual(200, list.status, "Body: " + list.body);
+         StringAssert.Contains("\"name\":\"report.bin\"", list.body);
+         StringAssert.Contains("\"used_bytes\":300000", list.body);
+         StringAssert.Contains("\"downloads\":0", list.body);
+         StringAssert.Contains("\"link_above_kb\":", list.body);
+
+         Response form = Raw("GET", "/files/" + token, null, null);
+         Assert.AreEqual(200, form.Status, form.Body);
+         StringAssert.Contains("text/html", form.Header("Content-Type"));
+         StringAssert.Contains("name=\"password\"", form.Body);
+         StringAssert.Contains("report.bin", form.Body);
+
+         Response wrong = Raw("POST", "/files/" + token, null, "password=nope");
+         Assert.AreEqual(403, wrong.Status, wrong.Body);
+         StringAssert.Contains("not right", wrong.Body);
+
+         Response fetched = Raw("POST", "/files/" + token, null, "password=open-sesame");
+         Assert.AreEqual(200, fetched.Status, fetched.Body.Length > 200 ? fetched.Body.Substring(0, 200) : fetched.Body);
+         Assert.AreEqual(first + second, fetched.Body);
+         StringAssert.Contains("attachment; filename=\"report.bin\"", fetched.Header("Content-Disposition"));
+         StringAssert.Contains("application/octet-stream", fetched.Header("Content-Type"));
+         StringAssert.Contains("nosniff", fetched.Header("X-Content-Type-Options"));
+
+         list = Http("GET", "/api/v1/me/files", UserHeader(UserPassword));
+         StringAssert.Contains("\"downloads\":1", list.body);
+
+         (int status, string body) removed = Http("DELETE", "/api/v1/me/files/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, removed.status, "Body: " + removed.body);
+         Response gone = Raw("GET", "/files/" + token, null, null);
+         Assert.AreEqual(404, gone.Status, gone.Body);
+         (int status, string body) twice = Http("DELETE", "/api/v1/me/files/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(404, twice.status, "Body: " + twice.body);
+      }
+
+      [Test]
+      [Description("A link lives the days it was given and is swept when they are up, an open file needs no password and can be given one later, and the policy is the domain's own over the server's")]
+      public void ALinkExpiresIsSweptAndThePolicyIsTheDomains()
+      {
+         (int status, string body) dead = Http("POST", "/api/v1/me/files", UserHeader(UserPassword), "{\"name\":\"gone.txt\",\"type\":\"text/plain\",\"size\":5,\"days\":0}");
+         Assert.AreEqual(201, dead.status, "Body: " + dead.body);
+         long deadId = long.Parse(Between(dead.body, "\"id\":", ","));
+         string deadToken = Between(dead.body, "\"token\":\"", "\"");
+         StringAssert.Contains("\"expired\":true", dead.body);
+         Response deadBytes = Raw("PUT", "/api/v1/me/files/" + deadId + "/content?offset=0", UserHeader(UserPassword), "hello");
+         Assert.AreEqual(200, deadBytes.Status, deadBytes.Body);
+         Response expired = Raw("GET", "/files/" + deadToken, null, null);
+         Assert.AreEqual(410, expired.Status, expired.Body);
+
+         (int status, string body) swept = Http("POST", "/api/v1/scheduled/run", AdminHeader());
+         Assert.AreEqual(200, swept.status, "Body: " + swept.body);
+         StringAssert.Contains("\"files_removed\":", swept.body);
+         (int status, string body) list = Http("GET", "/api/v1/me/files", UserHeader(UserPassword));
+         Assert.IsFalse(list.body.Contains(deadToken), "The expired file is gone from the list. Body: " + list.body);
+
+         (int status, string body) open = Http("POST", "/api/v1/me/files", UserHeader(UserPassword), "{\"name\":\"notes.txt\",\"type\":\"text/plain\",\"size\":5}");
+         Assert.AreEqual(201, open.status, "Body: " + open.body);
+         long openId = long.Parse(Between(open.body, "\"id\":", ","));
+         string openToken = Between(open.body, "\"token\":\"", "\"");
+         StringAssert.Contains("\"expired\":false", open.body);
+         StringAssert.Contains("\"protected\":false", open.body);
+         try
+         {
+            Response bytes = Raw("PUT", "/api/v1/me/files/" + openId + "/content?offset=0", UserHeader(UserPassword), "hello");
+            Assert.AreEqual(200, bytes.Status, bytes.Body);
+            StringAssert.Contains("\"complete\":true", bytes.Body);
+
+            Response fetched = Raw("GET", "/files/" + openToken, null, null);
+            Assert.AreEqual(200, fetched.Status, fetched.Body);
+            Assert.AreEqual("hello", fetched.Body);
+            StringAssert.Contains("notes.txt", fetched.Header("Content-Disposition"));
+            StringAssert.Contains("text/plain", fetched.Header("Content-Type"));
+            Response posted = Raw("POST", "/files/" + openToken, null, "password=x");
+            Assert.AreEqual(405, posted.Status, posted.Body);
+
+            (int status, string body) locked = Http("PUT", "/api/v1/me/files/" + openId, UserHeader(UserPassword), "{\"password\":\"later\"}");
+            Assert.AreEqual(200, locked.status, "Body: " + locked.body);
+            StringAssert.Contains("\"protected\":true", locked.body);
+            Response form = Raw("GET", "/files/" + openToken, null, null);
+            Assert.AreEqual(200, form.Status, form.Body);
+            StringAssert.Contains("name=\"password\"", form.Body);
+            (int status, string body) unlocked = Http("PUT", "/api/v1/me/files/" + openId, UserHeader(UserPassword), "{\"password\":\"\"}");
+            StringAssert.Contains("\"protected\":false", unlocked.body);
+            Response again = Raw("GET", "/files/" + openToken, null, null);
+            Assert.AreEqual("hello", again.Body);
+
+            (int status, string body) tooBig = Http("POST", "/api/v1/me/files", UserHeader(UserPassword), "{\"name\":\"huge.bin\",\"size\":629145600}");
+            Assert.AreEqual(413, tooBig.status, "Body: " + tooBig.body);
+            (int status, string body) noSize = Http("POST", "/api/v1/me/files", UserHeader(UserPassword), "{\"name\":\"none.bin\"}");
+            Assert.AreEqual(400, noSize.status, "Body: " + noSize.body);
+
+            (int status, string body) set = Http("PUT", "/api/v1/portal/files", AdminHeader(), "{\"domain\":\"" + _domain.Name + "\",\"link_above_kb\":1,\"days\":3}");
+            Assert.AreEqual(200, set.status, "Body: " + set.body);
+            StringAssert.Contains("\"link_above_kb\":1,\"days\":3", set.body);
+            list = Http("GET", "/api/v1/me/files", UserHeader(UserPassword));
+            StringAssert.Contains("\"link_above_kb\":1,\"days\":3", list.body);
+            (int status, string body) servers = Http("GET", "/api/v1/portal/files", AdminHeader());
+            Assert.AreEqual(200, servers.status, "Body: " + servers.body);
+            StringAssert.Contains("\"link_above_kb\":8192,\"days\":14", servers.body);
+            (int status, string body) refused = Http("PUT", "/api/v1/portal/files", UserHeader(UserPassword), "{\"days\":1}");
+            Assert.AreNotEqual(200, refused.status, "An account may not set the policy. Body: " + refused.body);
+            (int status, string body) bad = Http("PUT", "/api/v1/portal/files", AdminHeader(), "{\"days\":365}");
+            Assert.AreEqual(400, bad.status, "Body: " + bad.body);
+         }
+         finally
+         {
+            Http("PUT", "/api/v1/portal/files", AdminHeader(), "{\"domain\":\"" + _domain.Name + "\",\"link_above_kb\":null,\"days\":null}");
+            Http("DELETE", "/api/v1/me/files/" + openId, UserHeader(UserPassword));
+         }
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
@@ -3439,7 +3586,9 @@ namespace RegressionTests.API
                byte[] bodyBytes = requestBody == null ? new byte[0] : Encoding.UTF8.GetBytes(requestBody);
                if (requestBody != null)
                {
-                  headers.Append("Content-Type: application/json\r\n");
+                  // JSON unless the caller named the type itself (a raw chunk).
+                  if (extraHeaders == null || extraHeaders.IndexOf("Content-Type:", StringComparison.OrdinalIgnoreCase) < 0)
+                     headers.Append("Content-Type: application/json\r\n");
                   headers.Append("Content-Length: " + bodyBytes.Length + "\r\n");
                }
 

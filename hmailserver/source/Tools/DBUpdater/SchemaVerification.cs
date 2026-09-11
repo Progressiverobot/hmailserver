@@ -400,7 +400,31 @@ namespace DBUpdater
          new SchemaProbe(6034, "hm_scheduled.schedfolderid",
                          "update hm_scheduled set schedfolderid = schedfolderid where 1 = 0"),
          new SchemaProbe(6034, "hm_scheduled.schedcreated",
-                         "update hm_scheduled set schedcreated = schedcreated where 1 = 0")
+                         "update hm_scheduled set schedcreated = schedcreated where 1 = 0"),
+         // Upgrade6034to6035* - files sent as links (hm_files); the identity
+         // column is not probed.
+         new SchemaProbe(6035, "hm_files.fileaccountid",
+                         "update hm_files set fileaccountid = fileaccountid where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filetoken",
+                         "update hm_files set filetoken = filetoken where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filename",
+                         "update hm_files set filename = filename where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filetype",
+                         "update hm_files set filetype = filetype where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filesize",
+                         "update hm_files set filesize = filesize where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filestored",
+                         "update hm_files set filestored = filestored where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filecomplete",
+                         "update hm_files set filecomplete = filecomplete where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filecreated",
+                         "update hm_files set filecreated = filecreated where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.fileexpires",
+                         "update hm_files set fileexpires = fileexpires where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filepasswordhash",
+                         "update hm_files set filepasswordhash = filepasswordhash where 1 = 0"),
+         new SchemaProbe(6035, "hm_files.filedownloads",
+                         "update hm_files set filedownloads = filedownloads where 1 = 0")
       };
 
       /// <summary>

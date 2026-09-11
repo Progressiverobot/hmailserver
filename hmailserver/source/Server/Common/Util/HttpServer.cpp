@@ -496,7 +496,12 @@ namespace HM
          request_.body.assign(boost::asio::buffers_begin(buffer_.data()), boost::asio::buffers_begin(buffer_.data()) + content_length_);
          buffer_.consume(content_length_);
 
-         if (request_.body.find('\0') != std::string::npos)
+         // A NUL in a body is a text body that is not text, and is refused so
+         // that no handler parses it as a string. A body declared binary -
+         // application/octet-stream, a file's bytes uploaded in pieces - is
+         // taken as it is: every byte value is data there.
+         const AnsiString contentType = ToLower(request_.Header("content-type"));
+         if (!contentType.StartsWith("application/octet-stream") && request_.body.find('\0') != std::string::npos)
          {
             Fail_(400, "malformed request");
             return;
@@ -992,9 +997,36 @@ namespace HM
       case 502: return "Bad Gateway";
       case 503: return "Service Unavailable";
       case 504: return "Gateway Timeout";
+      case 203: return "Non-Authoritative Information";
+      case 205: return "Reset Content";
+      case 206: return "Partial Content";
+      case 303: return "See Other";
+      case 307: return "Temporary Redirect";
+      case 308: return "Permanent Redirect";
+      case 402: return "Payment Required";
+      case 406: return "Not Acceptable";
+      case 408: return "Request Timeout";
+      case 410: return "Gone";
+      case 412: return "Precondition Failed";
+      case 414: return "URI Too Long";
+      case 416: return "Range Not Satisfiable";
+      case 417: return "Expectation Failed";
+      case 422: return "Unprocessable Content";
+      case 423: return "Locked";
+      case 428: return "Precondition Required";
+      case 431: return "Request Header Fields Too Large";
+      case 451: return "Unavailable For Legal Reasons";
+      case 505: return "HTTP Version Not Supported";
       default:
-         status = 500;
-         return "Internal Server Error";
+         // A status this table does not name is still the status the handler
+         // chose: it goes out as that number with its class as the phrase. It
+         // used to become a 500, which is how the files route's 410 and the
+         // unsubscribe route's 502 reached their clients as server errors.
+         if (status >= 500) return "Server Error";
+         if (status >= 400) return "Client Error";
+         if (status >= 300) return "Redirection";
+         if (status >= 200) return "Success";
+         return "Informational";
       }
    }
 

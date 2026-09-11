@@ -329,7 +329,8 @@ namespace HM
    RestApiServer::HandleScheduledRun_()
    {
       int ran = ScheduledMailTask::RunDue();
-      return BuildResponse_(200, "{\"ran\":" + Int64Text(ran) + "}");
+      int files = SweepExpiredFiles();
+      return BuildResponse_(200, "{\"ran\":" + Int64Text(ran) + ",\"files_removed\":" + Int64Text(files) + "}");
    }
 
    // The folder as one mbox: every message with a From_ line before it and a

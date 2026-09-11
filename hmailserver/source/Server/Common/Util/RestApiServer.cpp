@@ -1373,6 +1373,11 @@ namespace HM
       if (method == "GET" && path == "/api/v1/portal/branding")
          return HandlePortalBranding_(query);
 
+      // A file sent as a link: anyone with the link, and the password when
+      // the sender set one (a form, posted back here).
+      if ((method == "GET" || method == "POST") && path.StartsWith("/files/"))
+         return HandlePublicFile_(method, path.Mid(7), GetRequestBody_(request));
+
       if (method == "GET" && path == "/portal-sw.js")
          return HandlePortalServiceWorker_();
 
@@ -1707,6 +1712,27 @@ namespace HM
          case RouteMeAppPasswordDelete:
             return HandleMeAppPasswordDelete_(caller, route.message_id);
 
+         case RouteMeFiles:
+            return HandleMeFiles_(caller);
+
+         case RouteMeFileCreate:
+            return HandleMeFileCreate_(caller, GetRequestBody_(request));
+
+         case RouteMeFileContent:
+            return HandleMeFileContent_(caller, route.message_id, route.query, GetRequestBody_(request));
+
+         case RouteMeFileUpdate:
+            return HandleMeFileUpdate_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeFileDelete:
+            return HandleMeFileDelete_(caller, route.message_id);
+
+         case RoutePortalFilesPolicy:
+            return HandlePortalFilesPolicy_(route.query);
+
+         case RoutePortalFilesPolicyPut:
+            return HandlePortalFilesPolicyPut_(GetRequestBody_(request));
+
          case RouteMeSessions:
             return HandleMeSessions_(caller);
 
@@ -1939,6 +1965,42 @@ namespace HM
       {
          if (method == "GET")
             route.kind = RouteMeStorage;
+
+         return;
+      }
+
+      // The account's files sent as links: the list and a new record, then
+      // the bytes in chunks, the link's life and password, and removal.
+      const AnsiString meFilesPath = "/api/v1/me/files";
+      if (path == meFilesPath)
+      {
+         if (method == "GET")
+            route.kind = RouteMeFiles;
+         else if (method == "POST")
+            route.kind = RouteMeFileCreate;
+
+         return;
+      }
+
+      if (path.StartsWith(meFilesPath + "/"))
+      {
+         AnsiString rest = path.Mid(meFilesPath.GetLength() + 1);
+         const AnsiString contentSuffix = "/content";
+         if (rest.EndsWith(contentSuffix))
+         {
+            if (method == "PUT" && ParseQueueId(rest.Mid(0, rest.GetLength() - contentSuffix.GetLength()), route.message_id))
+               route.kind = RouteMeFileContent;
+
+            return;
+         }
+
+         if (ParseQueueId(rest, route.message_id))
+         {
+            if (method == "PUT")
+               route.kind = RouteMeFileUpdate;
+            else if (method == "DELETE")
+               route.kind = RouteMeFileDelete;
+         }
 
          return;
       }
@@ -2269,6 +2331,17 @@ namespace HM
       if (method == "PUT" && path == "/api/v1/portal/branding")
       {
          route.kind = RoutePortalBrandingPut;
+         return;
+      }
+
+      // The policy for files sent as links, server-wide or a domain's own.
+      if (path == "/api/v1/portal/files")
+      {
+         if (method == "GET")
+            route.kind = RoutePortalFilesPolicy;
+         else if (method == "PUT")
+            route.kind = RoutePortalFilesPolicyPut;
+
          return;
       }
 
@@ -2724,6 +2797,11 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMeFileCreate:
+      case RouteMeFileContent:
+      case RouteMeFileUpdate:
+      case RouteMeFileDelete:
+      case RoutePortalFilesPolicyPut:
       case RoutePortalBrandingPut:
       case RouteAccountSupportSession:
       case RouteMeDraftSchedule:
@@ -5298,6 +5376,11 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeFiles:
+      case RouteMeFileCreate:
+      case RouteMeFileContent:
+      case RouteMeFileUpdate:
+      case RouteMeFileDelete:
       case RouteMeDraftSchedule:
       case RouteMeDraftUnschedule:
       case RouteMeMessageSnooze:
@@ -9081,13 +9164,17 @@ namespace HM
    bool
    RestApiServer::IsLargeRequest_(const AnsiString &method, const AnsiString &target)
    {
-      if (method != "POST")
-         return false;
-
       AnsiString path = target;
       int query = path.Find("?");
       if (query >= 0)
          path = path.Mid(0, query);
+
+      // A chunk of a file sent as a link: raw bytes, up to the large cap.
+      if (method == "PUT")
+         return path.StartsWith("/api/v1/me/files/") && path.EndsWith("/content");
+
+      if (method != "POST")
+         return false;
 
       if (path.StartsWith("/api/v1/me/folders/") && path.EndsWith("/messages"))
          return true;
@@ -9194,6 +9281,11 @@ namespace HM
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
+         "\"/api/v1/me/files\":{\"get\":{\"summary\":\"The signed-in account's files sent as links\",\"description\":\"policy (link_above_kb: the size above which the webmail sends a file as a link; days: how long a link lives by default; max_days; max_mb: the most one file may be; quota_mb: the most the account may keep), used_bytes, count, and files - each with id, token, name, type, size, stored, complete, created and expires (Unix seconds), expired, downloads, protected, link (/files/{token}).\",\"responses\":{\"200\":{\"description\":\"policy, used_bytes, count, files\"}}},\"post\":{\"summary\":\"Record a file to be sent as a link\",\"description\":\"Body: name, type, size (bytes), and days (0 to max_days; the domain's default when absent; 0 makes a link that is dead at once) and password when wanted. The bytes follow with PUT .../{id}/content. At most 200 files an account; a file at most max_mb; the account's files together at most quota_mb.\",\"responses\":{\"201\":{\"description\":\"The record, as the list shows it\"},\"400\":{\"description\":\"A value refused\"},\"413\":{\"description\":\"Too large for the domain's policy, or the account's allowance is used up\"}}}},"
+         "\"/api/v1/me/files/{id}\":{\"put\":{\"summary\":\"Re-time or protect a file\",\"description\":\"Body: days (from now; 0 ends the link) and/or password (a string; empty removes it).\",\"responses\":{\"200\":{\"description\":\"The record\"},\"404\":{\"description\":\"Not this account's file\"}}},\"delete\":{\"summary\":\"Remove a file and its link\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"404\":{\"description\":\"Not this account's file\"}}}},"
+         "\"/api/v1/me/files/{id}/content\":{\"put\":{\"summary\":\"Append a chunk of the file's bytes\",\"description\":\"The body is the chunk, raw (up to the large request cap); offset= is where it starts and must be what the record has stored so far, so a chunk lost is sent again and a chunk sent twice is refused (409, with stored). The record is complete when the declared size is reached.\",\"responses\":{\"200\":{\"description\":\"id, stored, size, complete, link\"},\"409\":{\"description\":\"The offset is not where the file has got to, or the file is complete\"},\"413\":{\"description\":\"More than the size that was declared\"}}}},"
+         "\"/files/{token}\":{\"get\":{\"summary\":\"Fetch a file sent as a link (no credentials)\",\"description\":\"The bytes as a download (Content-Disposition attachment, nosniff, a sandbox policy, no-store), under the declared type unless a browser would render or run it. A file with a password answers a form instead, posted back here as password=; ten wrong answers pause the file for fifteen minutes. An expired link answers 410, an unknown or unfinished one 404.\",\"responses\":{\"200\":{\"description\":\"The bytes, or the password form\"},\"410\":{\"description\":\"Expired\"},\"404\":{\"description\":\"No such file\"}}}},"
+         "\"/api/v1/portal/files\":{\"get\":{\"summary\":\"The policy for files sent as links (administrator)\",\"description\":\"link_above_kb, days, max_days, max_mb, quota_mb - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"The policy\"}}},\"put\":{\"summary\":\"Set the policy (administrator)\",\"description\":\"Body: link_above_kb (0 to 1048576), days (1 to 90), max_mb (1 to 500), quota_mb (1 to 102400) - each written when given a number, removed when given null, left alone when absent; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The policy as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
          "\"/api/v1/portal/branding\":{\"get\":{\"summary\":\"What the webmail says it is\",\"description\":\"Unauthenticated, so the sign-in page can ask: name, logo (an inline image), announcement - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"name, logo, announcement, domain\"}}},\"put\":{\"summary\":\"Set the branding (administrator)\",\"description\":\"Body: name (100), logo (an inline data:image/ under 3,900 characters), announcement (1,000), each written when given and removed when given empty; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The branding as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
          "\"/api/v1/accounts/{address}/support-session\":{\"post\":{\"summary\":\"Open a mailbox as its user, for support (administrator)\",\"description\":\"Refused with 403 unless the user has turned on support access under Security. Answers a session cookie for the account; the moment and the administrator are recorded where the user sees them, every request of the session is written to the application log, and the user's session list shows it and can end it.\",\"responses\":{\"201\":{\"description\":\"support, account, idle_seconds, lifetime_seconds, with the cookie\"},\"403\":{\"description\":\"Not allowed by the user\"},\"404\":{\"description\":\"No such account\"}}}},"
          "\"/api/v1/me/drafts/{id}/schedule\":{\"post\":{\"summary\":\"Send a draft later\",\"description\":\"Body: send_at, YYYY-MM-DD HH:MM in the server's local time, within a year. At that minute the draft is sent as the account would have sent it - its To, Cc and Bcc under the checks a send makes, a copy in the Sent folder - and the draft goes. One schedule per draft; a new one replaces it.\",\"responses\":{\"201\":{\"description\":\"id, message_id, send_at\"},\"400\":{\"description\":\"Not a draft, not a time, in the past or too far\"}}},\"delete\":{\"summary\":\"Do not send it later after all\",\"responses\":{\"200\":{\"description\":\"cancelled\"},\"404\":{\"description\":\"Nothing scheduled for it\"}}}},"
