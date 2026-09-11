@@ -1,5 +1,4 @@
 [Files]
-Source: isxdl.dll; DestDir: {tmp}; Flags: dontcopy
 Source: "License.rtf"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
 ; 3'rd party dependencies. None of these is in git: build\get-installer-binaries.ps1
@@ -21,7 +20,6 @@ Source: "..\source\Addons\Events\*.*"; DestDir: "{app}\Events"; Flags: onlyifdoe
 
 Source: "..\source\Translations\*"; Excludes: "CVS,.cvsignore,.#*"; DestDir: "{app}\Languages"; Components: server admintools;
 
-Source: ISC.dll; Flags: dontcopy
 Source: ".\Extras\tlds.txt"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
 Source: ".\Extras\dh2048.pem"; DestDir: "{app}\Bin";  Flags: ignoreversion; Components: server;
 
