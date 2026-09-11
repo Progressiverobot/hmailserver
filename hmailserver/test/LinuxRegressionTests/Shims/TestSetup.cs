@@ -12,6 +12,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -98,20 +99,16 @@ namespace RegressionTests.Shared
 
          if (ServerApi.HasDomainWriteRoutes)
          {
-            foreach (var domain in ServerApi.Array(ServerApi.Get("/api/v1/domains").Expect(200, "GET /api/v1/domains")))
-            {
-               var name = ServerApi.StringOf(domain, "name");
+            foreach (var name in ServerApi.Array(ServerApi.Get("/api/v1/domains").Expect(200, "GET /api/v1/domains"))
+                        .Select(domain => ServerApi.StringOf(domain, "name")))
                ServerApi.Delete("/api/v1/domains/" + name).Expect(200, "DELETE /api/v1/domains/" + name);
-            }
 
             _domainsMade.Clear();
             return AddDomain(TestDomainName);
          }
 
-         var present = false;
-         foreach (var domain in ServerApi.Array(ServerApi.Get("/api/v1/domains").Expect(200, "GET /api/v1/domains")))
-            if (string.Equals(ServerApi.StringOf(domain, "name"), TestDomainName, StringComparison.OrdinalIgnoreCase))
-               present = true;
+         var present = ServerApi.Array(ServerApi.Get("/api/v1/domains").Expect(200, "GET /api/v1/domains"))
+            .Any(domain => string.Equals(ServerApi.StringOf(domain, "name"), TestDomainName, StringComparison.OrdinalIgnoreCase));
 
          if (!present)
             Assert.Fail("The test domain " + TestDomainName + " does not exist on " + TestTarget.Describe() +
@@ -124,19 +121,13 @@ namespace RegressionTests.Shared
 
       private void EmptyTheTestDomain()
       {
-         foreach (var account in ServerApi.Array(ServerApi.Get("/api/v1/domains/" + TestDomainName + "/accounts")
-                     .Expect(200, "listing the accounts of " + TestDomainName)))
-         {
-            var address = ServerApi.StringOf(account, "address");
+         foreach (var address in ServerApi.Array(ServerApi.Get("/api/v1/domains/" + TestDomainName + "/accounts")
+                     .Expect(200, "listing the accounts of " + TestDomainName)).Select(account => ServerApi.StringOf(account, "address")))
             ServerApi.Delete("/api/v1/accounts/" + address).Expect(200, "DELETE /api/v1/accounts/" + address);
-         }
 
-         foreach (var list in ServerApi.Array(ServerApi.Get("/api/v1/domains/" + TestDomainName + "/lists")
-                     .Expect(200, "listing the distribution lists of " + TestDomainName)))
-         {
-            var address = ServerApi.StringOf(list, "address");
+         foreach (var address in ServerApi.Array(ServerApi.Get("/api/v1/domains/" + TestDomainName + "/lists")
+                     .Expect(200, "listing the distribution lists of " + TestDomainName)).Select(list => ServerApi.StringOf(list, "address")))
             ServerApi.Delete("/api/v1/lists/" + address).Expect(200, "DELETE /api/v1/lists/" + address);
-         }
       }
 
       /// <summary>
@@ -167,11 +158,8 @@ namespace RegressionTests.Shared
 
          _listsMade.Clear();
 
-         foreach (var name in _domainsMade.ToArray())
+         foreach (var name in _domainsMade.ToArray().Where(name => !string.Equals(name, TestDomainName, StringComparison.OrdinalIgnoreCase)))
          {
-            if (string.Equals(name, TestDomainName, StringComparison.OrdinalIgnoreCase))
-               continue;
-
             var answer = ServerApi.Delete("/api/v1/domains/" + name);
             if (answer.Status != 200 && answer.Status != 404)
                Console.WriteLine("Could not delete the domain " + name + " after the test: " + answer.Status + " " + answer.Body);
@@ -255,7 +243,7 @@ namespace RegressionTests.Shared
          // /api/v1/accounts/{address} (wave 162); before that it advertised
          // the field and ignored it, which a test must not mistake for a limit.
          if (maxSize != 0 && !ServerApi.HasAccountUpdateRoute)
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountMaxSize);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountMaxSize);
 
          return CreateAccount_(domain, address, password, maxSize);
       }
@@ -420,11 +408,8 @@ namespace RegressionTests.Shared
          if (!answer.Json.HasValue || answer.Json.Value.ValueKind != JsonValueKind.Object)
             return values;
 
-         foreach (var property in answer.Json.Value.EnumerateObject())
+         foreach (var property in answer.Json.Value.EnumerateObject().Where(property => System.Array.IndexOf(ReadOnlyKeys, property.Name) < 0))
          {
-            if (System.Array.IndexOf(ReadOnlyKeys, property.Name) >= 0)
-               continue;
-
             values[property.Name] = property.Value.ValueKind == JsonValueKind.String
                ? ServerApi.Quote(property.Value.GetString())
                : property.Value.GetRawText();
@@ -456,19 +441,16 @@ namespace RegressionTests.Shared
          if (_baseline == null)
          {
             ApplySuiteDefaults();
-
-            _baseline = new Dictionary<string, Dictionary<string, string>>();
-            foreach (var group in SettingsGroups)
-               _baseline[group] = ReadGroup(group);
-
+            RememberBaseline();
             return;
          }
 
+         var body = new StringBuilder();
          foreach (var group in SettingsGroups)
          {
             var wanted = _baseline[group];
             var current = ReadGroup(group);
-            var body = new StringBuilder();
+            body.Clear();
 
             foreach (var entry in current)
             {
@@ -488,18 +470,26 @@ namespace RegressionTests.Shared
          }
       }
 
+      // The baseline is one per process, hence static; it is written from here
+      // rather than from the instance method that decides when, so that the
+      // static field has one static writer.
+      private static void RememberBaseline()
+      {
+         _baseline = new Dictionary<string, Dictionary<string, string>>();
+         foreach (var group in SettingsGroups)
+            _baseline[group] = ReadGroup(group);
+      }
+
       private static void ApplySuiteDefaults()
       {
+         var body = new StringBuilder();
          foreach (var group in SettingsGroups)
          {
             var current = ReadGroup(group);
-            var body = new StringBuilder();
+            body.Clear();
 
-            foreach (var wanted in SuiteDefaults)
+            foreach (var wanted in SuiteDefaults.Where(wanted => wanted.Group == group))
             {
-               if (wanted.Group != group)
-                  continue;
-
                string now;
                if (!current.TryGetValue(wanted.Key, out now) || now == wanted.Json)
                   continue;
@@ -549,14 +539,12 @@ namespace RegressionTests.Shared
       {
          var body = new StringBuilder("{");
 
-         foreach (var property in element.EnumerateObject())
+         // The id is the server's, and treat_security_as_local_domain is the same
+         // field as treat_recipient_as_local_domain under its older name; sending
+         // both would be sending it twice.
+         foreach (var property in element.EnumerateObject()
+                     .Where(property => property.Name != "id" && property.Name != "treat_security_as_local_domain"))
          {
-            // The id is the server's, and treat_security_as_local_domain is the same
-            // field as treat_recipient_as_local_domain under its older name; sending
-            // both would be sending it twice.
-            if (property.Name == "id" || property.Name == "treat_security_as_local_domain")
-               continue;
-
             if (body.Length > 1)
                body.Append(',');
 
@@ -633,10 +621,8 @@ namespace RegressionTests.Shared
                answer.Expect(200, "DELETE " + route + "/" + id);
          }
 
-         foreach (var body in missing)
+         foreach (var answer in missing.Select(body => ServerApi.Post(route, body)))
          {
-            var answer = ServerApi.Post(route, body);
-
             if (answer.Status != 201 && answer.Status != 409)
                answer.Expect(201, "POST " + route + " (putting back a row the run started with)");
          }
@@ -688,22 +674,16 @@ namespace RegressionTests.Shared
          if (!ServerApi.HasRoute("/api/v1/rules", "post"))
             return;
 
-         foreach (var rule in ServerApi.Array(ServerApi.Get("/api/v1/rules").Expect(200, "GET /api/v1/rules")))
-         {
-            var id = ServerApi.LongOf(rule, "id");
+         foreach (var id in ServerApi.Array(ServerApi.Get("/api/v1/rules").Expect(200, "GET /api/v1/rules")).Select(rule => ServerApi.LongOf(rule, "id")))
             ServerApi.Delete("/api/v1/rules/" + id).Expect(200, "DELETE /api/v1/rules/" + id);
-         }
       }
 
       public void RemoveAllRoutes()
       {
          if (!ServerApi.HasRouteWriteRoutes)
             return;
-         foreach (var route in ServerApi.Array(ServerApi.Get("/api/v1/routes").Expect(200, "GET /api/v1/routes")))
-         {
-            var id = ServerApi.LongOf(route, "id");
+         foreach (var id in ServerApi.Array(ServerApi.Get("/api/v1/routes").Expect(200, "GET /api/v1/routes")).Select(route => ServerApi.LongOf(route, "id")))
             ServerApi.Delete("/api/v1/routes/" + id).Expect(200, "DELETE /api/v1/routes/" + id);
-         }
       }
 
       // ---- The delivery queue, through /api/v1/queue ----
@@ -768,8 +748,7 @@ namespace RegressionTests.Shared
       /// </summary>
       public static string Escape(string input)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDatabaseObject);
-         return input;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDatabaseObject);
       }
 
       public Domain AddDomain(string name, bool active)
@@ -855,17 +834,12 @@ namespace RegressionTests.Shared
 
          var allAddresses = new StringBuilder();
 
-         foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+         foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces()
+                     .Where(candidate => candidate.OperationalStatus == OperationalStatus.Up &&
+                                         candidate.NetworkInterfaceType != NetworkInterfaceType.Loopback))
          {
-            if (networkInterface.OperationalStatus != OperationalStatus.Up)
-               continue;
-
-            if (networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback)
-               continue;
-
-            foreach (var unicastAddress in networkInterface.GetIPProperties().UnicastAddresses)
+            foreach (var address in networkInterface.GetIPProperties().UnicastAddresses.Select(unicast => unicast.Address))
             {
-               var address = unicastAddress.Address;
                allAddresses.AppendLine($"Family: {address.AddressFamily}, Address: {address}");
 
                if (address.AddressFamily != AddressFamily.InterNetwork)
@@ -884,9 +858,8 @@ namespace RegressionTests.Shared
          // TestTarget exists to detect, and a server bound to loopback only - and
          // failing here would fail every test in the run rather than the handful
          // that need to reach the server from outside the "My computer" range.
-         NotOnThisServer.Ignore(NotOnThisServer.NoAddressOutsideMyComputer +
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAddressOutsideMyComputer +
                                 " (addresses seen: " + allAddresses.ToString().Replace("\n", " ").Trim() + ")");
-         return null;
       }
 
       /// <summary>

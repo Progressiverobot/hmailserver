@@ -90,8 +90,9 @@ namespace RegressionTests.Stress
             "silently truncating it loses data, and reporting nothing leaves a REST caller with a 500 for " +
             "their own mistake.");
 
-         Assert.That(refusal.Message, Does.Contain("60"),
-            "The refusal should name the limit it enforced, so a caller can fix the value. Got: " + refusal.Message);
+         string refusalMessage = refusal?.Message ?? "";
+         Assert.That(refusalMessage, Does.Contain("60"),
+            "The refusal should name the limit it enforced, so a caller can fix the value. Got: " + refusalMessage);
 
          // Nothing should have been written to the ERROR log: this is a refused
          // request, not a server fault. AssertDeleteFile is kept because a failure

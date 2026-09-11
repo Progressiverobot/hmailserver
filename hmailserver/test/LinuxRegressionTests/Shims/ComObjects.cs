@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Text.Json;
+using System.Linq;
 using RegressionTests.Shared;
 
 // The hMailServer namespace, as the fixtures compile against it. On Windows these
@@ -66,58 +67,39 @@ namespace hMailServer
 
       public bool Authenticate(string user, string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoComAuthenticate);
-         return false;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoComAuthenticate);
       }
 
       public Database Database
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDatabaseObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDatabaseObject); }
       }
 
       public Diagnostics Diagnostics
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDiagnostics);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDiagnostics); }
       }
 
       public BackupManager BackupManager
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings); }
       }
 
       public GlobalObjects GlobalObjects
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
       }
 
       public bool AuthenticateWithCode(string user, string password, string code)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorTotp);
-         return false;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAdministratorTotp);
       }
 
       public bool AdministratorTOTPEnabled
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorTotp);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAdministratorTotp);
          }
       }
    }
@@ -131,10 +113,7 @@ namespace hMailServer
       {
       }
 
-      public object Add()
-      {
-         return null;
-      }
+      public object Add() { throw NotOnThisServer.Skipped("adds a object, which no REST route carries yet"); }
 
       public object get_ItemByName(string name)
       {
@@ -163,16 +142,14 @@ namespace hMailServer
 
       public string ExecuteSQLWithReturn(string sql)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDatabaseObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDatabaseObject);
       }
 
       public int CurrentVersion
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDatabaseObject);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDatabaseObject);
          }
       }
 
@@ -199,8 +176,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
          }
       }
    }
@@ -212,15 +188,13 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDiagnostics);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDiagnostics);
          }
       }
 
       public object PerformTests()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDiagnostics);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDiagnostics);
       }
 
       public void TriggerAssertion(int which = 0)
@@ -232,18 +206,13 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDiagnostics);
-            return DateTime.MinValue;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDiagnostics);
          }
       }
 
       public string DnssecChainStatus
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDiagnostics);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDiagnostics); }
       }
    }
 
@@ -259,8 +228,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoStatusThreadId);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoStatusThreadId);
          }
       }
 
@@ -279,8 +247,7 @@ namespace hMailServer
             case eSessionType.eSTIMAP: name = "imap"; break;
             case eSessionType.eSTPOP3: name = "pop3"; break;
             default:
-               NotOnThisServer.Ignore(NotOnThisServer.NoClientSessionCount);
-               return 0;
+               throw NotOnThisServer.Skipped(NotOnThisServer.NoClientSessionCount);
          }
 
          var answer = ServerApi.Get("/api/v1/status").Expect(200, "GET /api/v1/status");
@@ -296,8 +263,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerStartTime);
-            return DateTime.MinValue;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoServerStartTime);
          }
       }
 
@@ -308,38 +274,27 @@ namespace hMailServer
 
       public string CheckForUpdate()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUpdateObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUpdateObject);
       }
 
       public string DownloadUpdate()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUpdateObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUpdateObject);
       }
 
       public string UpdateState
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoUpdateObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoUpdateObject); }
       }
 
       public string UpdateLastError
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoUpdateObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoUpdateObject); }
       }
 
       public string InstallUpdate()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUpdateObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUpdateObject);
       }
 
       public eServerState State
@@ -371,7 +326,8 @@ namespace hMailServer
          var answer = ServerApi.Get(group).Expect(200, "GET " + group);
          JsonElement value;
          if (!answer.Json.HasValue || !answer.Json.Value.TryGetProperty(key, out value))
-            NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite + " (" + key + " is not in " + group + ")");
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSettingsWrite + " (" + key + " is not in " + group + ")");
+
          return answer.Json.Value.GetProperty(key);
       }
 
@@ -830,8 +786,7 @@ namespace hMailServer
 
       public string GetIniSetting(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings);
       }
 
       public void SetIniSetting(string name, string value)
@@ -846,30 +801,21 @@ namespace hMailServer
 
       public string IniSettingNames
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings); }
       }
 
       public int CrashSimulationMode
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCrashSimulation);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCrashSimulation);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCrashSimulation); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCrashSimulation, value); }
       }
 
       public string PublicFolderDiskName
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerDirectories);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
       }
 
       public void DisableAdministratorTOTP()
@@ -879,36 +825,28 @@ namespace hMailServer
 
       public string EnrolAdministratorTOTP()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorTotp);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAdministratorTotp);
       }
 
       public string TestLdapDirectory(string a = null, string b = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDirectorySync);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectorySync);
       }
 
       public string PreviewDirectorySync(string a = null, string b = null, string c = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDirectorySync);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectorySync);
       }
 
       public string ApplyDirectorySync(string a = null, string b = null, string c = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDirectorySync);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectorySync);
       }
 
       public string UserInterfaceLanguage
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoUserInterfaceLanguage);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoUserInterfaceLanguage); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoUserInterfaceLanguage); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoUserInterfaceLanguage, value); }
       }
    }
 
@@ -1021,38 +959,31 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoLiveLog);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoLiveLog);
          }
       }
 
       public string LiveLog
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoLiveLog);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoLiveLog); }
       }
 
       public bool MaskPasswordsInLog
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSettingsKey("mask_passwords_in_log", "logging"));
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSettingsKey("mask_passwords_in_log", "logging"));
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsKey("mask_passwords_in_log", "logging")); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsKey("mask_passwords_in_log", "logging"), value); }
       }
 
       public eLogDevice Device
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoLogDeviceWrite);
-            return eLogDevice.hLogDeviceFile;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoLogDeviceWrite);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoLogDeviceWrite); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoLogDeviceWrite, value); }
       }
    }
 
@@ -1068,38 +999,22 @@ namespace hMailServer
 
       public string ProgramDirectory
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerDirectories);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
       }
 
       public string DataDirectory
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerDirectories);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
       }
 
       public string EventDirectory
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerDirectories);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
       }
 
       public string TempDirectory
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoServerDirectories);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
       }
    }
 
@@ -1110,39 +1025,26 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting, value); }
       }
 
       public string Language
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting, value); }
       }
 
       public string CurrentScriptFile
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
       }
 
       public object FileSystemObject
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting, value); }
       }
 
       public void Reload()
@@ -1152,8 +1054,7 @@ namespace hMailServer
 
       public string CheckSyntax()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting);
       }
    }
 
@@ -1161,22 +1062,19 @@ namespace hMailServer
    {
       public IMAPFolder Add(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoPublicFolderWrite);
       }
 
       public IMAPFolder get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoPublicFolderWrite);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoPublicFolderWrite);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoPublicFolderWrite);
          }
       }
 
@@ -1190,61 +1088,49 @@ namespace hMailServer
    {
       public string Destination
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
       }
 
       public string LogFile
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings); }
       }
 
       public bool BackupMessages
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
       }
 
       public bool BackupSettings
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
       }
 
       public bool BackupDomains
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
       }
 
       public bool CompressDestinationFiles
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
       }
    }
 
@@ -1254,18 +1140,16 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
       }
 
       public int DomainCacheSizeKb
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
          }
       }
 
@@ -1273,18 +1157,16 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
       }
 
       public int AccountCacheSizeKb
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
          }
       }
 
@@ -1292,10 +1174,9 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
       }
 
       public void Clear()
@@ -1310,10 +1191,9 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
       }
 
       public BlockedAttachments BlockedAttachments { get; } = new BlockedAttachments();
@@ -1322,46 +1202,41 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return eAntivirusAction.hDeleteEmail;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
       }
 
       public int ScannerFailurePolicy
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
       }
 
       public bool CustomScannerEnabled
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
       }
 
       public string TestClamAVScanner(string host = null, int port = 0)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
       }
 
       public bool ClamAVEnabled
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
       }
    }
 
@@ -1371,8 +1246,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
          }
       }
 
@@ -1380,21 +1254,18 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
          }
       }
 
       public Group Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
       }
 
       public Group get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
       }
 
       public void DeleteByDBID(long id)
@@ -1407,8 +1278,7 @@ namespace hMailServer
    {
       public ServerMessage get_ItemByName(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoServerMessages);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoServerMessages);
       }
    }
 
@@ -1429,10 +1299,9 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing, value); }
       }
 
       public void Index()
@@ -1444,8 +1313,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
          }
       }
 
@@ -1453,8 +1321,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
          }
       }
    }
@@ -1463,16 +1330,14 @@ namespace hMailServer
    {
       public object Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIncomingRelays);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoIncomingRelays);
       }
 
       public int Count
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoIncomingRelays);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoIncomingRelays);
          }
       }
    }
@@ -1692,68 +1557,42 @@ namespace hMailServer
 
       public string TestSpamAssassinConnection(string host, int port, bool useSpamAssassinUser = false)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoSpamAssassinProbe);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoSpamAssassinProbe);
       }
 
       public string DKIMVerify(string rawMessage)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDkimVerifyCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoDkimVerifyCall);
       }
 
       public DNSBlackLists DNSBlackLists
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBlacklistCollections);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBlacklistCollections); }
       }
 
       public SURBLServers SURBLServers
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBlacklistCollections);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBlacklistCollections); }
       }
 
       public BlockedSenders BlockedSenders
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBlacklistCollections);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBlacklistCollections); }
       }
 
       public WhiteListAddresses WhiteListAddresses
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBlacklistCollections);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBlacklistCollections); }
       }
 
       public GreyListingWhiteAddresses GreyListingWhiteAddresses
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoBlacklistCollections);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBlacklistCollections); }
       }
 
       public Quarantine Quarantine
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoQuarantineObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoQuarantineObject); }
       }
    }
 
@@ -1762,10 +1601,7 @@ namespace hMailServer
    // only so that a fixture naming their types compiles.
    public class DNSBlackLists
    {
-      public DNSBlackList Add()
-      {
-         return null;
-      }
+      public DNSBlackList Add() { throw NotOnThisServer.Skipped("adds a DNSBlackList, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public DNSBlackList this[int index] => null;
@@ -1810,10 +1646,7 @@ namespace hMailServer
 
    public class SURBLServers
    {
-      public SURBLServer Add()
-      {
-         return null;
-      }
+      public SURBLServer Add() { throw NotOnThisServer.Skipped("adds a SURBLServer, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public SURBLServer this[int index] => null;
@@ -1858,10 +1691,7 @@ namespace hMailServer
 
    public class BlockedSenders
    {
-      public BlockedSender Add()
-      {
-         return null;
-      }
+      public BlockedSender Add() { throw NotOnThisServer.Skipped("adds a BlockedSender, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public BlockedSender this[int index] => null;
@@ -1907,10 +1737,7 @@ namespace hMailServer
 
    public class WhiteListAddresses
    {
-      public WhiteListAddress Add()
-      {
-         return null;
-      }
+      public WhiteListAddress Add() { throw NotOnThisServer.Skipped("adds a WhiteListAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public WhiteListAddress this[int index] => null;
@@ -1955,10 +1782,7 @@ namespace hMailServer
 
    public class GreyListingWhiteAddresses
    {
-      public GreyListingWhiteAddress Add()
-      {
-         return null;
-      }
+      public GreyListingWhiteAddress Add() { throw NotOnThisServer.Skipped("adds a GreyListingWhiteAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public GreyListingWhiteAddress this[int index] => null;
@@ -2084,32 +1908,27 @@ namespace hMailServer
 
       public string EvaluateSieveScript(string script, string rawMessage)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoSieveEvaluate);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoSieveEvaluate);
       }
 
       public string GetMailServer(string address)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMailServerLookup);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoMailServerLookup);
       }
 
       public string MD5(string text)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string BlowfishEncrypt(string text)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string BlowfishDecrypt(string text)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public void ImportMessageFromFile(string file, long accountId)
@@ -2124,44 +1943,37 @@ namespace hMailServer
 
       public string RunTestSuite(string name = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string SendDmarcReports(string date = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string SendTlsRptReports(string date = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string SearchArchive(string query, string from = null, string to = null)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string ResolveMXRecords(string domain)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string RunMessageRetention()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string PerformMaintenance(eMaintenanceOperation operation)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public void SampleMetricsNow()
@@ -2171,14 +1983,12 @@ namespace hMailServer
 
       public string IsStrongPassword(string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string IsValidEmailAddress(string address)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
    }
 
@@ -2225,8 +2035,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDomainIds);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainIds);
          }
       }
 
@@ -2236,75 +2045,75 @@ namespace hMailServer
       public DomainAliases DomainAliases { get; } = new DomainAliases();
 
       // What the COM object saves and PUT /api/v1/domains/{domain} does not take.
-      public bool DKIMSignEnabled { get { Unsupported("DKIMSignEnabled"); return false; } set { Unsupported("DKIMSignEnabled"); } }
-      public string DKIMSelector { get { Unsupported("DKIMSelector"); return null; } set { Unsupported("DKIMSelector"); } }
-      public string DKIMPrivateKeyFile { get { Unsupported("DKIMPrivateKeyFile"); return null; } set { Unsupported("DKIMPrivateKeyFile"); } }
-      public string DKIMSecondarySelector { get { Unsupported("DKIMSecondarySelector"); return null; } set { Unsupported("DKIMSecondarySelector"); } }
-      public string DKIMSecondaryPrivateKeyFile { get { Unsupported("DKIMSecondaryPrivateKeyFile"); return null; } set { Unsupported("DKIMSecondaryPrivateKeyFile"); } }
-      public int SignatureMethod { get { Unsupported("SignatureMethod"); return 0; } set { Unsupported("SignatureMethod"); } }
-      public bool SignatureEnabled { get { Unsupported("SignatureEnabled"); return false; } set { Unsupported("SignatureEnabled"); } }
-      public string SignaturePlainText { get { Unsupported("SignaturePlainText"); return null; } set { Unsupported("SignaturePlainText"); } }
-      public string SignatureHTML { get { Unsupported("SignatureHTML"); return null; } set { Unsupported("SignatureHTML"); } }
-      public bool AddSignaturesToLocalMail { get { Unsupported("AddSignaturesToLocalMail"); return false; } set { Unsupported("AddSignaturesToLocalMail"); } }
-      public int MaxMessageSize { get { Unsupported("MaxMessageSize"); return 0; } set { Unsupported("MaxMessageSize"); } }
-      public int MaxAccountSize { get { Unsupported("MaxAccountSize"); return 0; } set { Unsupported("MaxAccountSize"); } }
-      public int MaxNumberOfAccounts { get { Unsupported("MaxNumberOfAccounts"); return 0; } set { Unsupported("MaxNumberOfAccounts"); } }
-      public int MaxNumberOfAliases { get { Unsupported("MaxNumberOfAliases"); return 0; } set { Unsupported("MaxNumberOfAliases"); } }
-      public int MaxNumberOfDistributionLists { get { Unsupported("MaxNumberOfDistributionLists"); return 0; } set { Unsupported("MaxNumberOfDistributionLists"); } }
-      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays"); } }
-      public string RelayHost { get { Unsupported("RelayHost"); return null; } set { Unsupported("RelayHost"); } }
-      public int RelayPort { get { Unsupported("RelayPort"); return 0; } set { Unsupported("RelayPort"); } }
-      public bool VacationMessageIsOn { get { Unsupported("VacationMessageIsOn"); return false; } set { Unsupported("VacationMessageIsOn"); } }
-      public string ADDomainName { get { Unsupported("ADDomainName"); return null; } set { Unsupported("ADDomainName"); } }
+      public bool DKIMSignEnabled { get { Unsupported("DKIMSignEnabled"); return false; } set { Unsupported("DKIMSignEnabled", value); } }
+      public string DKIMSelector { get { Unsupported("DKIMSelector"); return null; } set { Unsupported("DKIMSelector", value); } }
+      public string DKIMPrivateKeyFile { get { Unsupported("DKIMPrivateKeyFile"); return null; } set { Unsupported("DKIMPrivateKeyFile", value); } }
+      public string DKIMSecondarySelector { get { Unsupported("DKIMSecondarySelector"); return null; } set { Unsupported("DKIMSecondarySelector", value); } }
+      public string DKIMSecondaryPrivateKeyFile { get { Unsupported("DKIMSecondaryPrivateKeyFile"); return null; } set { Unsupported("DKIMSecondaryPrivateKeyFile", value); } }
+      public int SignatureMethod { get { Unsupported("SignatureMethod"); return 0; } set { Unsupported("SignatureMethod", value); } }
+      public bool SignatureEnabled { get { Unsupported("SignatureEnabled"); return false; } set { Unsupported("SignatureEnabled", value); } }
+      public string SignaturePlainText { get { Unsupported("SignaturePlainText"); return null; } set { Unsupported("SignaturePlainText", value); } }
+      public string SignatureHTML { get { Unsupported("SignatureHTML"); return null; } set { Unsupported("SignatureHTML", value); } }
+      public bool AddSignaturesToLocalMail { get { Unsupported("AddSignaturesToLocalMail"); return false; } set { Unsupported("AddSignaturesToLocalMail", value); } }
+      public int MaxMessageSize { get { Unsupported("MaxMessageSize"); return 0; } set { Unsupported("MaxMessageSize", value); } }
+      public int MaxAccountSize { get { Unsupported("MaxAccountSize"); return 0; } set { Unsupported("MaxAccountSize", value); } }
+      public int MaxNumberOfAccounts { get { Unsupported("MaxNumberOfAccounts"); return 0; } set { Unsupported("MaxNumberOfAccounts", value); } }
+      public int MaxNumberOfAliases { get { Unsupported("MaxNumberOfAliases"); return 0; } set { Unsupported("MaxNumberOfAliases", value); } }
+      public int MaxNumberOfDistributionLists { get { Unsupported("MaxNumberOfDistributionLists"); return 0; } set { Unsupported("MaxNumberOfDistributionLists", value); } }
+      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays", value); } }
+      public string RelayHost { get { Unsupported("RelayHost"); return null; } set { Unsupported("RelayHost", value); } }
+      public int RelayPort { get { Unsupported("RelayPort"); return 0; } set { Unsupported("RelayPort", value); } }
+      public bool VacationMessageIsOn { get { Unsupported("VacationMessageIsOn"); return false; } set { Unsupported("VacationMessageIsOn", value); } }
+      public string ADDomainName { get { Unsupported("ADDomainName"); return null; } set { Unsupported("ADDomainName", value); } }
       public eDKIMAlgorithm DKIMSigningAlgorithm
       {
          get { Unsupported("DKIMSigningAlgorithm"); return eDKIMAlgorithm.eSHA256; }
-         set { Unsupported("DKIMSigningAlgorithm"); }
+         set { Unsupported("DKIMSigningAlgorithm", value); }
       }
       public bool AntiSpamEnableGreylisting
       {
          get { Unsupported("AntiSpamEnableGreylisting"); return false; }
-         set { Unsupported("AntiSpamEnableGreylisting"); }
+         set { Unsupported("AntiSpamEnableGreylisting", value); }
       }
       public bool MaxNumberOfAccountsEnabled
       {
          get { Unsupported("MaxNumberOfAccountsEnabled"); return false; }
-         set { Unsupported("MaxNumberOfAccountsEnabled"); }
+         set { Unsupported("MaxNumberOfAccountsEnabled", value); }
       }
       public bool MaxNumberOfAliasesEnabled
       {
          get { Unsupported("MaxNumberOfAliasesEnabled"); return false; }
-         set { Unsupported("MaxNumberOfAliasesEnabled"); }
+         set { Unsupported("MaxNumberOfAliasesEnabled", value); }
       }
       public bool MaxNumberOfDistributionListsEnabled
       {
          get { Unsupported("MaxNumberOfDistributionListsEnabled"); return false; }
-         set { Unsupported("MaxNumberOfDistributionListsEnabled"); }
+         set { Unsupported("MaxNumberOfDistributionListsEnabled", value); }
       }
       public bool MaxMessageSizeEnabled
       {
          get { Unsupported("MaxMessageSizeEnabled"); return false; }
-         set { Unsupported("MaxMessageSizeEnabled"); }
+         set { Unsupported("MaxMessageSizeEnabled", value); }
       }
       public bool MaxAccountSizeEnabled
       {
          get { Unsupported("MaxAccountSizeEnabled"); return false; }
-         set { Unsupported("MaxAccountSizeEnabled"); }
+         set { Unsupported("MaxAccountSizeEnabled", value); }
       }
       public bool RelayRequiresAuthentication
       {
          get { Unsupported("RelayRequiresAuthentication"); return false; }
-         set { Unsupported("RelayRequiresAuthentication"); }
+         set { Unsupported("RelayRequiresAuthentication", value); }
       }
       public string VacationSubject
       {
          get { Unsupported("VacationSubject"); return null; }
-         set { Unsupported("VacationSubject"); }
+         set { Unsupported("VacationSubject", value); }
       }
       public string VacationMessage
       {
          get { Unsupported("VacationMessage"); return null; }
-         set { Unsupported("VacationMessage"); }
+         set { Unsupported("VacationMessage", value); }
       }
 
       public void DKIMPromoteSecondary()
@@ -2312,9 +2121,9 @@ namespace hMailServer
          Unsupported("DKIMPromoteSecondary");
          SkipIfAnythingUnsupported("PUT /api/v1/domains/{domain}");
       }
-      public bool EnableLimitations { get { Unsupported("EnableLimitations"); return false; } set { Unsupported("EnableLimitations"); } }
-      public bool PlusAddressingEnabled { get { Unsupported("PlusAddressingEnabled"); return false; } set { Unsupported("PlusAddressingEnabled"); } }
-      public string PlusAddressingCharacter { get { Unsupported("PlusAddressingCharacter"); return null; } set { Unsupported("PlusAddressingCharacter"); } }
+      public bool EnableLimitations { get { Unsupported("EnableLimitations"); return false; } set { Unsupported("EnableLimitations", value); } }
+      public bool PlusAddressingEnabled { get { Unsupported("PlusAddressingEnabled"); return false; } set { Unsupported("PlusAddressingEnabled", value); } }
+      public string PlusAddressingCharacter { get { Unsupported("PlusAddressingCharacter"); return null; } set { Unsupported("PlusAddressingCharacter", value); } }
 
       public void Save()
       {
@@ -2376,8 +2185,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAliasIds);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAliasIds);
          }
       }
 
@@ -2415,8 +2223,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListIds);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoListIds);
          }
       }
 
@@ -2424,89 +2231,65 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return eDistributionListMode.eLMPublic;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public string RequireSMTPAuth
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public DistributionListRecipients Recipients
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject); }
       }
 
       public string ModeratorAddress
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public bool RequireSenderAddress
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public bool ModerationEnabled
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public bool AnnouncementsOnly
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public string SenderAddress
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public string Name
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoListObject);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoListObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoListObject, value); }
       }
 
       public void Save()
@@ -2524,10 +2307,7 @@ namespace hMailServer
    {
       public int Count => 0;
 
-      public DistributionListRecipient Add()
-      {
-         return null;
-      }
+      public DistributionListRecipient Add() { throw NotOnThisServer.Skipped("adds a DistributionListRecipient, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public DistributionListRecipient this[int index] => null;
@@ -2637,11 +2417,7 @@ namespace hMailServer
 
       public RouteAddresses Addresses
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoRouteAddresses);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoRouteAddresses); }
       }
    }
 
@@ -2649,10 +2425,7 @@ namespace hMailServer
    {
       public int Count => 0;
 
-      public RouteAddress Add()
-      {
-         return null;
-      }
+      public RouteAddress Add() { throw NotOnThisServer.Skipped("adds a RouteAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public RouteAddress this[int index] => null;
@@ -2844,8 +2617,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountIds);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountIds);
          }
       }
 
@@ -2865,54 +2637,42 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountTotp);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountTotp);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAccountTotp); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoAccountTotp, value); }
       }
 
       public string EnrolTOTP()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAccountTotp);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountTotp);
       }
 
       public bool IsAD
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink);
-            return false;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectoryLink);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink, value); }
       }
 
       public string ADUsername
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectoryLink); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink, value); }
       }
 
       public string ADDomain
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDirectoryLink); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoDirectoryLink, value); }
       }
 
       public DateTime LastLogonTime
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoAccountLastLogon);
-            return DateTime.MinValue;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountLastLogon);
          }
       }
 
@@ -2977,21 +2737,21 @@ namespace hMailServer
       public bool VacationMessageAbortSpamFlagged
       {
          get { Unsupported("VacationMessageAbortSpamFlagged"); return false; }
-         set { Unsupported("VacationMessageAbortSpamFlagged"); }
+         set { Unsupported("VacationMessageAbortSpamFlagged", value); }
       }
 
       public string VacationMessageBeginDate
       {
          get { Unsupported("VacationMessageBeginDate"); return null; }
-         set { Unsupported("VacationMessageBeginDate"); }
+         set { Unsupported("VacationMessageBeginDate", value); }
       }
 
-      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays"); } }
-      public int SpamMarkThreshold { get { Unsupported("SpamMarkThreshold"); return 0; } set { Unsupported("SpamMarkThreshold"); } }
-      public int SpamDeleteThreshold { get { Unsupported("SpamDeleteThreshold"); return 0; } set { Unsupported("SpamDeleteThreshold"); } }
-      public bool PersonalSpamSettingsEnabled { get { Unsupported("PersonalSpamSettingsEnabled"); return false; } set { Unsupported("PersonalSpamSettingsEnabled"); } }
-      public bool AntiSpamEnabled { get { Unsupported("AntiSpamEnabled"); return false; } set { Unsupported("AntiSpamEnabled"); } }
-      public bool AntiVirusEnabled { get { Unsupported("AntiVirusEnabled"); return false; } set { Unsupported("AntiVirusEnabled"); } }
+      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays", value); } }
+      public int SpamMarkThreshold { get { Unsupported("SpamMarkThreshold"); return 0; } set { Unsupported("SpamMarkThreshold", value); } }
+      public int SpamDeleteThreshold { get { Unsupported("SpamDeleteThreshold"); return 0; } set { Unsupported("SpamDeleteThreshold", value); } }
+      public bool PersonalSpamSettingsEnabled { get { Unsupported("PersonalSpamSettingsEnabled"); return false; } set { Unsupported("PersonalSpamSettingsEnabled", value); } }
+      public bool AntiSpamEnabled { get { Unsupported("AntiSpamEnabled"); return false; } set { Unsupported("AntiSpamEnabled", value); } }
+      public bool AntiVirusEnabled { get { Unsupported("AntiVirusEnabled"); return false; } set { Unsupported("AntiVirusEnabled", value); } }
 
       /// <summary>
       ///    PUT /api/v1/accounts/{address} for the fields it takes; a create goes
@@ -3206,11 +2966,10 @@ namespace hMailServer
             var folders = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Get, "/api/v1/me/folders")
                .Expect(200, "GET /api/v1/me/folders as " + _account.Address);
 
-            foreach (var folder in ServerApi.Array(folders, "folders"))
-            {
-               if (string.Equals(ServerApi.StringOf(folder, "name"), "INBOX", StringComparison.OrdinalIgnoreCase))
-                  inboxId = ServerApi.LongOf(folder, "id");
-            }
+            inboxId = ServerApi.Array(folders, "folders")
+               .Where(folder => string.Equals(ServerApi.StringOf(folder, "name"), "INBOX", StringComparison.OrdinalIgnoreCase))
+               .Select(folder => ServerApi.LongOf(folder, "id"))
+               .LastOrDefault();
 
             if (inboxId == 0)
                throw new InvalidOperationException(_account.Address + " has no INBOX in GET /api/v1/me/folders: " + folders.Body);
@@ -3233,16 +2992,12 @@ namespace hMailServer
 
       public Message get_ItemByDBID(long id)
       {
-         foreach (var message in Load())
-            if (message.ID == id)
-               return message;
-         return null;
+         return Load().FirstOrDefault(message => message.ID == id);
       }
 
       public Message Add()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
       }
 
       public void Refresh()
@@ -3279,31 +3034,31 @@ namespace hMailServer
       public string Subject
       {
          get { return ServerApi.StringOf(Read(), "subject"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public string From
       {
          get { return ServerApi.StringOf(Read(), "from"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public string To
       {
          get { return ServerApi.StringOf(Read(), "to"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public string Body
       {
          get { return ServerApi.StringOf(Read(), "text"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public string HTMLBody
       {
          get { return ServerApi.StringOf(Read(), "html"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public long UID => ServerApi.LongOf(Read(), "uid");
@@ -3315,42 +3070,33 @@ namespace hMailServer
       // routes carry none of them.
       public string Filename
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
       }
 
       public MessageHeaders Headers
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
       }
 
       public string FromAddress
       {
          get { return ServerApi.StringOf(Read(), "from"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public int FlagSeen
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public string Date
       {
          get { return ServerApi.StringOf(Read(), "date"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public long FolderID
@@ -3362,8 +3108,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
          }
       }
 
@@ -3371,8 +3116,7 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
          }
       }
 
@@ -3380,10 +3124,9 @@ namespace hMailServer
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return 0;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public void Delete()
@@ -3393,39 +3136,26 @@ namespace hMailServer
 
       public string Charset
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return null;
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
       }
 
       public DateTime InternalDate
       {
          get
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return DateTime.MinValue;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
          }
       }
 
       public MessageRecipients Recipients
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
       }
 
       public Attachments Attachments
       {
-         get
-         {
-            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-            return null;
-         }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
       }
 
       public void set_HeaderValue(string name, string value)
@@ -3435,8 +3165,7 @@ namespace hMailServer
 
       public string get_HeaderValue(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
-         return null;
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
       }
 
       public void RefreshContent()
@@ -3459,10 +3188,7 @@ namespace hMailServer
    {
       public int Count => 0;
 
-      public MessageHeader Add()
-      {
-         return null;
-      }
+      public MessageHeader Add() { throw NotOnThisServer.Skipped("adds a MessageHeader, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public MessageHeader this[int index] => null;
@@ -3500,10 +3226,7 @@ namespace hMailServer
    {
       public int Count => 0;
 
-      public MessageRecipient Add()
-      {
-         return null;
-      }
+      public MessageRecipient Add() { throw NotOnThisServer.Skipped("adds a MessageRecipient, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
       public MessageRecipient this[int index] => null;
@@ -3540,10 +3263,7 @@ namespace hMailServer
          return null;
       }
 
-      public Attachment Add(string filename)
-      {
-         return null;
-      }
+      public Attachment Add(string filename) { throw NotOnThisServer.Skipped("adds a Attachment, which no REST route carries yet"); }
 
       public void Clear()
       {

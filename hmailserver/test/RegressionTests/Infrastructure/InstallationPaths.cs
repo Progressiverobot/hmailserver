@@ -110,7 +110,7 @@ namespace RegressionTests.Infrastructure
       {
          string originalEventFolder = IniFileSetting.Read("Directories", "EventFolder");
          string programDirectory = _settings.Directories.ProgramDirectory;
-         string expected = Path.Combine(programDirectory, "EventScriptsProbe");
+         string expected = Paths.Combine(programDirectory, "EventScriptsProbe");
 
          try
          {

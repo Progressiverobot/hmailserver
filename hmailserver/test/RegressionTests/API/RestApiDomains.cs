@@ -196,7 +196,7 @@ namespace RegressionTests.API
             "The domain's accounts must be gone with it.");
 
          string dataDirectory = _settings.Directories.DataDirectory;
-         Assert.IsFalse(Directory.Exists(Path.Combine(dataDirectory, name)),
+         Assert.IsFalse(Directory.Exists(Paths.Combine(dataDirectory, name)),
             "The domain's data directory must be removed with it, as COM's delete removes it.");
 
          // Deleting it again, and switching it, are 404 - it is not there.

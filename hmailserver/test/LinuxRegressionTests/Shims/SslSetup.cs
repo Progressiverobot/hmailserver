@@ -51,10 +51,10 @@ namespace RegressionTests.SSL
          if (!System.IO.File.Exists(exampleKey))
             Assert.Fail("Private key " + exampleKey + " was not found");
 
-         long certificateId = 0;
-         foreach (var certificate in ServerApi.Array(ServerApi.Get("/api/v1/certificates").Expect(200, "GET /api/v1/certificates")))
-            if (string.Equals(ServerApi.StringOf(certificate, "name"), "Example", StringComparison.OrdinalIgnoreCase))
-               certificateId = ServerApi.LongOf(certificate, "id");
+         long certificateId = ServerApi.Array(ServerApi.Get("/api/v1/certificates").Expect(200, "GET /api/v1/certificates"))
+            .Where(certificate => string.Equals(ServerApi.StringOf(certificate, "name"), "Example", StringComparison.OrdinalIgnoreCase))
+            .Select(certificate => ServerApi.LongOf(certificate, "id"))
+            .LastOrDefault();
 
          if (certificateId == 0)
          {
@@ -69,12 +69,11 @@ namespace RegressionTests.SSL
          foreach (var port in ServerApi.Array(ServerApi.Get("/api/v1/ports").Expect(200, "GET /api/v1/ports")))
          {
             var number = (int) ServerApi.LongOf(port, "port");
-            foreach (var wanted in SslPorts)
-               if (wanted.Port == number)
-               {
-                  var id = ServerApi.LongOf(port, "id");
-                  ServerApi.Delete("/api/v1/ports/" + id).Expect(200, "DELETE /api/v1/ports/" + id);
-               }
+            if (SslPorts.Any(wanted => wanted.Port == number))
+            {
+               var id = ServerApi.LongOf(port, "id");
+               ServerApi.Delete("/api/v1/ports/" + id).Expect(200, "DELETE /api/v1/ports/" + id);
+            }
          }
 
          foreach (var wanted in SslPorts)
