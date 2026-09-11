@@ -4952,7 +4952,7 @@ namespace HM
       - the sender address matches a route address.
    */
    bool
-   SMTPConnection::AuthenticatedSenderPermitted_(const String &sender, String &reason)
+   SMTPConnection::SenderPermittedFor(const String &accountAddress, const String &sender, String &reason)
    //---------------------------------------------------------------------------()
    // DESCRIPTION:
    // Whether the authenticated account may put this address in MAIL FROM. Its own
@@ -4969,7 +4969,7 @@ namespace HM
 
       std::shared_ptr<DomainAliases> domainAliases = ObjectCache::Instance()->GetDomainAliases();
 
-      String account = domainAliases->ApplyAliasesOnAddress(DefaultDomain::ApplyDefaultDomain(username_));
+      String account = domainAliases->ApplyAliasesOnAddress(DefaultDomain::ApplyDefaultDomain(accountAddress));
       String claimed = domainAliases->ApplyAliasesOnAddress(sender);
 
       if (claimed.CompareNoCase(account) == 0)
@@ -5015,6 +5015,12 @@ namespace HM
 
       reason = "the authenticated account " + account + " does not own " + claimed + ", and no account with that address has granted it anything.";
       return false;
+   }
+
+   bool
+   SMTPConnection::AuthenticatedSenderPermitted_(const String &sender, String &reason)
+   {
+      return SenderPermittedFor(username_, sender, reason);
    }
 
    bool

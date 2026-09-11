@@ -55,6 +55,12 @@ namespace HM
          boost::asio::ssl::context& context);
       virtual ~SMTPConnection();
       
+      // Whether an account may put this address in MAIL FROM - its own, an
+      // alias that resolves to it, or one it has been granted the post right
+      // for. The REST send and draft routes ask the same question of a chosen
+      // From, so the rule lives in one place. Public and static for that.
+      static bool SenderPermittedFor(const String &accountAddress, const String &sender, String &reason);
+
    protected:
 
       virtual void OnConnected();

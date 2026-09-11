@@ -377,7 +377,15 @@ namespace DBUpdater
          new SchemaProbe(6032, "hm_contacts.contactsource",
                          "update hm_contacts set contactsource = contactsource where 1 = 0"),
          new SchemaProbe(6032, "hm_contacts.contactcreated",
-                         "update hm_contacts set contactcreated = contactcreated where 1 = 0")
+                         "update hm_contacts set contactcreated = contactcreated where 1 = 0"),
+         // Upgrade6032to6033* - the account's preferences (hm_accountprefs), the
+         // webmail's key/value store; the identity column is not probed.
+         new SchemaProbe(6033, "hm_accountprefs.prefaccountid",
+                         "update hm_accountprefs set prefaccountid = prefaccountid where 1 = 0"),
+         new SchemaProbe(6033, "hm_accountprefs.prefname",
+                         "update hm_accountprefs set prefname = prefname where 1 = 0"),
+         new SchemaProbe(6033, "hm_accountprefs.prefvalue",
+                         "update hm_accountprefs set prefvalue = prefvalue where 1 = 0")
       };
 
       /// <summary>

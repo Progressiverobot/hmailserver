@@ -691,6 +691,177 @@ namespace RegressionTests.API
          StringAssert.Contains("\"name\":\"Mine\"", mine.body);
       }
 
+      [Test]
+      public void PreferencesRoundTrip()
+      {
+         (int status, string body) empty = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         Assert.AreEqual(200, empty.status, "Body: " + empty.body);
+         Assert.AreEqual("{\"preferences\":{}}", empty.body);
+
+         (int status, string body) saved = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword),
+            "{\"theme\":\"light\",\"density\":\"compact\",\"undo_seconds\":\"10\"}");
+         Assert.AreEqual(200, saved.status, "Body: " + saved.body);
+         StringAssert.Contains("\"density\":\"compact\"", saved.body);
+         StringAssert.Contains("\"theme\":\"light\"", saved.body);
+
+         // A later PUT merges: one key changed, one removed, the third untouched.
+         (int status, string body) changed = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword),
+            "{\"theme\":\"dark\",\"density\":null}");
+         Assert.AreEqual(200, changed.status, "Body: " + changed.body);
+         Assert.AreEqual("{\"preferences\":{\"theme\":\"dark\",\"undo_seconds\":\"10\"}}", changed.body);
+
+         (int status, string body) read = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         Assert.AreEqual(changed.body, read.body);
+
+         (int status, string body) badKey = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"bad key!\":\"x\"}");
+         Assert.AreEqual(400, badKey.status, "Body: " + badKey.body);
+         (int status, string body) badValue = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"theme\":1}");
+         Assert.AreEqual(400, badValue.status, "Body: " + badValue.body);
+         (int status, string body) notAnObject = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "[1,2]");
+         Assert.AreEqual(400, notAnObject.status, "Body: " + notAnObject.body);
+         (int status, string body) tooLong = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword),
+            "{\"theme\":\"" + new string('x', 4001) + "\"}");
+         Assert.AreEqual(400, tooLong.status, "Body: " + tooLong.body);
+
+         // A refused body changes nothing.
+         (int status, string body) still = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         Assert.AreEqual(read.body, still.body);
+      }
+
+      [Test]
+      public void PreferencesAreTheAccountsOwn()
+      {
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+
+         (int status, string body) saved = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"theme\":\"light\"}");
+         Assert.AreEqual(200, saved.status, "Body: " + saved.body);
+
+         (int status, string body) theirs = Http("GET", "/api/v1/me/preferences", BasicHeader(other, UserPassword));
+         Assert.AreEqual(200, theirs.status, "Body: " + theirs.body);
+         Assert.AreEqual("{\"preferences\":{}}", theirs.body);
+
+         (int status, string body) theirSave = Http("PUT", "/api/v1/me/preferences", BasicHeader(other, UserPassword), "{\"theme\":\"dark\"}");
+         Assert.AreEqual(200, theirSave.status, "Body: " + theirSave.body);
+
+         (int status, string body) mine = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         Assert.AreEqual("{\"preferences\":{\"theme\":\"light\"}}", mine.body);
+      }
+
+      [Test]
+      [Description("The identities are the account, every alias that resolves to it, and every account whose INBOX grants it the post right - the SMTP rule, listed")]
+      public void IdentitiesListTheAccountItsAliasesAndTheGrants()
+      {
+         string sales = "sales@" + _domain.Name;
+         Alias alias = _domain.Aliases.Add();
+         alias.Name = sales;
+         alias.Value = Address;
+         alias.Active = true;
+         alias.Save();
+
+         string shop = "shop@" + _domain.Name;
+         Alias chained = _domain.Aliases.Add();
+         chained.Name = shop;
+         chained.Value = sales;
+         chained.Active = true;
+         chained.Save();
+
+         string boss = "boss@" + _domain.Name;
+         Account owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, boss, UserPassword);
+         SmtpClientSimulator.StaticSend("seed@example.com", boss, "Seed", "Creates the INBOX.");
+         Pop3ClientSimulator.AssertMessageCount(boss, UserPassword, 1);
+
+         IMAPFolder inbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         IMAPFolderPermission grant = inbox.Permissions.Add();
+         grant.PermissionType = eACLPermissionType.ePermissionTypeUser;
+         grant.PermissionAccountID = _account.ID;
+         grant.set_Permission(eACLPermission.ePermissionPost, true);
+         grant.Save();
+
+         bool enforced = _settings.IMAPACLEnabled;
+         _settings.IMAPACLEnabled = true;
+         try
+         {
+            (int status, string body) listed = Http("GET", "/api/v1/me/identities", UserHeader(UserPassword));
+            Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+            StringAssert.StartsWith("{\"identities\":[{\"address\":\"" + Address + "\",\"name\":\"\",\"kind\":\"account\"", listed.body);
+            StringAssert.Contains("{\"address\":\"" + sales + "\",\"name\":\"\",\"kind\":\"alias\",\"header\":\"" + sales + "\"}", listed.body);
+            StringAssert.Contains("{\"address\":\"" + shop + "\",\"name\":\"\",\"kind\":\"alias\"", listed.body);
+            StringAssert.Contains("{\"address\":\"" + boss + "\",\"name\":\"\",\"kind\":\"granted\"", listed.body);
+
+            // The grant is the owner's, not the grantee's: the owner lists only itself.
+            (int status, string body) theirs = Http("GET", "/api/v1/me/identities", BasicHeader(boss, UserPassword));
+            Assert.AreEqual(200, theirs.status, "Body: " + theirs.body);
+            StringAssert.DoesNotContain(Address, theirs.body);
+            StringAssert.DoesNotContain(sales, theirs.body);
+         }
+         finally
+         {
+            _settings.IMAPACLEnabled = enforced;
+         }
+
+         // With enforcement off nothing is granted, as at MAIL FROM; the aliases stay.
+         _settings.IMAPACLEnabled = false;
+         try
+         {
+            (int status, string body) without = Http("GET", "/api/v1/me/identities", UserHeader(UserPassword));
+            Assert.AreEqual(200, without.status, "Body: " + without.body);
+            StringAssert.DoesNotContain(boss, without.body);
+            StringAssert.Contains(sales, without.body);
+         }
+         finally
+         {
+            _settings.IMAPACLEnabled = enforced;
+         }
+      }
+
+      [Test]
+      [Description("A send or a draft may name one of the identities as its From, with the account's name or one written in the field; anything else is 403, and something that is not an address is 400")]
+      public void SendingAsAnIdentityIsHonouredAndAsAStrangerRefused()
+      {
+         string sales = "sales@" + _domain.Name;
+         Alias alias = _domain.Aliases.Add();
+         alias.Name = sales;
+         alias.Value = Address;
+         alias.Active = true;
+         alias.Save();
+
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+
+         (int status, string body) named = Http("PUT", "/api/v1/me/settings", UserHeader(UserPassword),
+            "{\"name\":{\"first\":\"Sales\",\"last\":\"Desk\"}}");
+         Assert.AreEqual(200, named.status, "Body: " + named.body);
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"" + sales + "\",\"to\":\"" + other + "\",\"subject\":\"As sales\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("From: \"Sales Desk\" <" + sales + ">", received);
+
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"stranger@example.com\",\"to\":\"" + other + "\",\"subject\":\"Not mine\",\"text\":\"Body.\"}");
+         Assert.AreEqual(403, refused.status, "Body: " + refused.body);
+         StringAssert.Contains("stranger@example.com", refused.body);
+
+         (int status, string body) malformed = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"not an address\",\"to\":\"" + other + "\",\"subject\":\"Not one\",\"text\":\"Body.\"}");
+         Assert.AreEqual(400, malformed.status, "Body: " + malformed.body);
+
+         // A draft keeps the chosen From, with the name written in the field.
+         (int status, string body) draft = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
+            "{\"from\":\"The Desk <" + sales + ">\",\"to\":\"" + other + "\",\"subject\":\"Draft as sales\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, draft.status, "Body: " + draft.body);
+         long draftId = long.Parse(Between(draft.body, "\"id\":", ","));
+         (int status, string body) read = Http("GET", "/api/v1/me/messages/" + draftId, UserHeader(UserPassword));
+         Assert.AreEqual(200, read.status, "Body: " + read.body);
+         StringAssert.Contains("\\\"The Desk\\\" <" + sales + ">", read.body);
+
+         (int status, string body) draftRefused = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
+            "{\"from\":\"stranger@example.com\",\"to\":\"" + other + "\",\"subject\":\"Not mine\",\"text\":\"Body.\"}");
+         Assert.AreEqual(403, draftRefused.status, "Body: " + draftRefused.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
