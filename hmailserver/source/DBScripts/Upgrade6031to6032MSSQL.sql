@@ -10,7 +10,7 @@ create table hm_contacts
 
 ALTER TABLE hm_contacts ADD CONSTRAINT hm_contacts_pk PRIMARY KEY NONCLUSTERED (contactid)
 
-CREATE CLUSTERED INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress)
+CREATE UNIQUE CLUSTERED INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress)
 
 ALTER TABLE hm_contacts ADD CONSTRAINT fk_hm_contacts_account FOREIGN KEY (contactaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 

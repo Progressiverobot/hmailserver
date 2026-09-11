@@ -344,10 +344,6 @@ namespace HM
          if (!ValidContactAddress(address) || address == own)
             continue;
 
-         __int64 existing = 0;
-         if (FindContact_(account->GetID(), address, existing))
-            continue;
-
          __int64 id = 0;
          String created;
          InsertContact_(account->GetID(), name, address, 1, id, created);
