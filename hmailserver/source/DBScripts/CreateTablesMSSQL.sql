@@ -43,6 +43,7 @@ if exists (select * from sysobjects where id = object_id('hm_apppasswords') and 
 if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
 if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
 if exists (select * from sysobjects where id = object_id('hm_scheduled') and objectproperty(id, 'isusertable') = 1) drop table hm_scheduled
+if exists (select * from sysobjects where id = object_id('hm_files') and objectproperty(id, 'isusertable') = 1) drop table hm_files
 
 if exists (select * from sysobjects where id = object_id('hm_rules') and objectproperty(id, 'isusertable') = 1) drop table hm_rules 
 
@@ -584,6 +585,28 @@ create table hm_scheduled
 ALTER TABLE hm_scheduled ADD CONSTRAINT hm_scheduled_pk PRIMARY KEY NONCLUSTERED (schedid)
 
 CREATE CLUSTERED INDEX idx_hm_scheduled_account ON hm_scheduled (schedaccountid)
+
+create table hm_files
+(
+	fileid int identity(1,1) not null,
+	fileaccountid int not null,
+	filetoken varchar(64) not null,
+	filename nvarchar(255) not null,
+	filetype varchar(100) not null,
+	filesize bigint not null,
+	filestored bigint not null,
+	filecomplete tinyint not null,
+	filecreated bigint not null,
+	fileexpires bigint not null,
+	filepasswordhash varchar(64) not null,
+	filedownloads int not null
+)
+
+ALTER TABLE hm_files ADD CONSTRAINT hm_files_pk PRIMARY KEY NONCLUSTERED (fileid)
+
+CREATE CLUSTERED INDEX idx_hm_files_account ON hm_files (fileaccountid)
+
+CREATE UNIQUE INDEX idx_hm_files_token ON hm_files (filetoken)
 
 create table hm_rules
 (
@@ -1245,6 +1268,8 @@ ALTER TABLE hm_accountprefs ADD CONSTRAINT fk_hm_accountprefs_account FOREIGN KE
 
 ALTER TABLE hm_scheduled ADD CONSTRAINT fk_hm_scheduled_account FOREIGN KEY (schedaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
+ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
@@ -1261,4 +1286,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6034)
+insert into hm_dbversion values (6035)

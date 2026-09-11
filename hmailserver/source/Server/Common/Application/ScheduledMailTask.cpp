@@ -19,6 +19,7 @@
 #include "../Util/Time.h"
 #include "../Util/FileUtilities.h"
 #include "../Util/MessageUtilities.h"
+#include "../Util/RestApiServer.h"
 #include "../Tracking/ChangeNotification.h"
 #include "../Tracking/NotificationServer.h"
 #include "../../IMAP/IMAPFolderContainer.h"
@@ -100,6 +101,8 @@ namespace HM
    ScheduledMailTask::DoWork()
    {
       RunDue();
+      // Files sent as links that have expired go on the same minute.
+      RestApiServer::SweepExpiredFiles();
    }
 
    int

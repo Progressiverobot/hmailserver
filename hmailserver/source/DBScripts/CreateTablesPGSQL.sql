@@ -443,6 +443,25 @@ create table hm_scheduled
 
 CREATE INDEX idx_hm_scheduled_account ON hm_scheduled (schedaccountid);
 
+create table hm_files
+(
+	fileid bigserial not null primary key,
+	fileaccountid int not null,
+	filetoken varchar(64) not null,
+	filename varchar(255) not null,
+	filetype varchar(100) not null,
+	filesize bigint not null,
+	filestored bigint not null,
+	filecomplete smallint not null,
+	filecreated bigint not null,
+	fileexpires bigint not null,
+	filepasswordhash varchar(64) not null,
+	filedownloads int not null
+);
+
+CREATE INDEX idx_hm_files_account ON hm_files (fileaccountid);
+CREATE UNIQUE INDEX idx_hm_files_token ON hm_files (filetoken);
+
 create table hm_rules
 (
 	ruleid bigserial not null primary key,
@@ -1053,6 +1072,8 @@ ALTER TABLE hm_accountprefs ADD CONSTRAINT fk_hm_accountprefs_account FOREIGN KE
 
 ALTER TABLE hm_scheduled ADD CONSTRAINT fk_hm_scheduled_account FOREIGN KEY (schedaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
+ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
@@ -1069,4 +1090,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6034);
+insert into hm_dbversion values (6035);
