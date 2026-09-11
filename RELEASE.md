@@ -20,11 +20,21 @@ already cost a release cycle or nearly shipped a defect.
    test that passes on both builds proves nothing — one of the 6.2.15 abort
    tests did exactly that until it was strengthened with session-count
    assertions.
-4. **Pre-flight the bench**: `build\preflight-tests.ps1` (add `-Clean` to
-   remove a stale ERROR log). Never skip this after an aborted run — an
-   aborted run leaves a deliberate scanner error in the ERROR log and the
-   next run fails 100% of tests in fixture setup, and it also leaves the
-   TLS fixtures' twelve extra ports behind, which the pre-flight checks.
+4. **Pre-flight the bench**: first `wsl -l --running`, and `wsl --shutdown` if
+   anything is up. With mirrored networking a Linux server or test run left
+   behind inside WSL holds the suite's ports invisibly - the Windows TCP table
+   shows nothing - and the pre-flight probes only the TLS fixtures' twelve, so
+   it passes. An orphaned Linux bench cost the first 6.3.1 assertion gate 24
+   errors this way; the Linux bench is the VM now, not WSL, for this reason.
+   Then `build\preflight-tests.ps1 -Clean` and restart the service, every time:
+   a *completed* suite leaves `PreferredHashAlgorithm=4` in the ini (a fixture
+   restores the default by writing it rather than removing the key), so the
+   next pre-flight fails until it is cleaned, and an aborted run leaves a
+   deliberate scanner error in the ERROR log that fails 100% of the next
+   run's tests in fixture setup, and the TLS fixtures' twelve extra ports
+   behind, which the pre-flight checks. Gate on its exit code rather than
+   reading its output: a chain that started the suite after a failed
+   pre-flight did exactly that once.
 5. **Check the roadmap against itself**: `build\check-roadmap.ps1`. It
    reconciles every tick box in `Roadmap.md` against the per-section counts
    and the contents table, because three hand-edited restatements of the same
@@ -56,8 +66,12 @@ already cost a release cycle or nearly shipped a defect.
      parses the PKGBUILD as a shell script and never runs CMake.
    * `hmailserver/source/Tools/ImportTool.Tests/packages.lock.json` - the entry
      for the project's own version. Regenerate it (`dotnet restore
-     --force-evaluate` on that project) rather than editing it by hand; a stale
-     lock file fails two *required* checks, `Build .NET tools` and `submit-nuget`.
+     --force-evaluate` on that project) rather than editing it by hand.
+     **Nothing enforces this one.** Measured on 10 September 2026: `dotnet
+     restore --locked-mode` with a stale project-reference version exits 0,
+     because locked mode validates the package graph and not project
+     references - so a stale entry ships a lock file that lies about the tree,
+     and this step is the only thing that catches it.
 
    `hmailserver/source/Server/CMakeLists.txt` is **not** on the list, and this
    is the one line of this step worth reading twice: it used to be, and a stamp
@@ -329,8 +343,15 @@ replaces the installer asset, and cosign has to sign the bytes that ship.
   its resource group and its subscription cannot be changed afterwards, so choose
   them as permanent.
 * Repository secrets `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
-  `AZURE_CLIENT_SECRET`, for an app registration holding the *Certificate
-  Profile Signer* role on that profile.
+  `AZURE_CLIENT_SECRET`, for an app registration holding the *Artifact Signing
+  Certificate Profile Signer* role on that profile. The roles were renamed with
+  the service and the old names do not resolve. Two more things the portal
+  does not say: creating the identity validation needs the *Artifact Signing
+  Identity Verifier* role on the account - Owner is not enough, because it is
+  a data action, and without it the portal simply offers nothing to create -
+  and the validation itself has no ARM resource type, so it is portal-only,
+  while the certificate profile *is* scriptable (`certificateProfiles`,
+  api-version 2025-10-13).
 * Repository variables `ARTIFACT_SIGNING_ENDPOINT`, `ARTIFACT_SIGNING_ACCOUNT`,
   `ARTIFACT_SIGNING_PROFILE`. The endpoint is a full URI, not a bare host:
   `https://neu.codesigning.azure.net`, which is the action's own documented
