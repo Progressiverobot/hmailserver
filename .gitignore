@@ -119,6 +119,9 @@ hmailserver/test/LinuxRegressionTests/obj/
 /hmailserver/installation/SQLCE/
 /libraries/mariadb-connector-c-3.4.9/libmysql.dll
 /libraries/mariadb-connector-c-3.4.9/plugin/
+# The ADO 2.8 type libraries the server #imports: Windows' own files, copied
+# from %CommonProgramFiles%\System\ado by the same script (disposition "system").
+/libraries/msado28/*.tlb
 
 # The COM wrapper the .NET tools compile against: TlbImp output from
 # hMailServer.idl, made by build/generate-com-wrapper.ps1 (build.ps1,

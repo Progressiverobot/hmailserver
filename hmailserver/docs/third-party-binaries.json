@@ -532,33 +532,35 @@
     },
     {
       "path": "libraries/msado28/msado28-x32.tlb",
-      "sha256": "bee541383ec2d4df95c986e49fd275b502d483274870d9af5fdc408c0603cacb",
-      "size": 70144,
+      "sha256": "d29fe74b0f7575a4739d9889bf3f95fed01d33f60afa7636f46cd54c82a93625",
+      "size": null,
       "component": "Microsoft ActiveX Data Objects 2.8 Type Library",
-      "version": "6.3.9600.16384 (Windows 8.1 RTM)",
+      "version": "the build machine's Windows (the sha256 above is the Windows 11 26200 copy, reported, not enforced)",
       "publisher": "Microsoft Corporation",
-      "license": "Microsoft Windows operating system component - redistribution terms not established (see the policy note)",
+      "license": "Microsoft Windows operating system component - not redistributed: copied from the build machine's own Windows at build time",
       "upstream": "%CommonProgramFiles%\\System\\ado\\msado28.tlb on Windows 8.1 and later",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "system",
       "used_by": "hmailserver/source/Server/hMailServer/stdafx.h lines 47 and 51 (#import at compile time)",
-      "why": "The server #imports this type library to generate the ADO wrappers it compiles against. Importing the host OS copy instead would make the generated wrappers vary with the build machine Windows version."
+      "why": "The server #imports this type library to generate the ADO wrappers it compiles against. It is Windows' own file, not in git since 11 September 2026: build/get-installer-binaries.ps1 copies it from the build machine (the path in 'source'), and the hosted server build does the same on its runner. The ADO 2.8 type library has been frozen since Windows 7 SP1's back-compatibility fix; the copy on a current Windows differs in bytes from the Windows 8.1 file that was committed, and the regression suite ran against a server compiled from the current copy on 11 September 2026.",
+      "source": "%CommonProgramFiles(x86)%\\System\\ado\\msado28.tlb"
     },
     {
       "path": "libraries/msado28/msado28-x64.tlb",
-      "sha256": "efbd2e9826f76a61ed208dc5b8620200d029d38e1a23de41bffc3afad1442021",
-      "size": 70144,
+      "sha256": "10f86c59f9b90449e145b8ec671a3e5dfadc489c2f4c33474071b8a4b18c187e",
+      "size": null,
       "component": "Microsoft ActiveX Data Objects 2.8 Type Library",
-      "version": "6.3.9600.16384 (Windows 8.1 RTM)",
+      "version": "the build machine's Windows (the sha256 above is the Windows 11 26200 copy, reported, not enforced)",
       "publisher": "Microsoft Corporation",
-      "license": "Microsoft Windows operating system component - redistribution terms not established (see the policy note)",
+      "license": "Microsoft Windows operating system component - not redistributed: copied from the build machine's own Windows at build time",
       "upstream": "%CommonProgramFiles%\\System\\ado\\msado28.tlb on Windows 8.1 and later",
       "authenticode": "NotSigned",
       "authenticode_signer": null,
-      "disposition": "retain",
+      "disposition": "system",
       "used_by": "hmailserver/source/Server/hMailServer/stdafx.h lines 47 and 51 (#import at compile time)",
-      "why": "The server #imports this type library to generate the ADO wrappers it compiles against. Importing the host OS copy instead would make the generated wrappers vary with the build machine Windows version."
+      "why": "The server #imports this type library to generate the ADO wrappers it compiles against. It is Windows' own file, not in git since 11 September 2026: build/get-installer-binaries.ps1 copies it from the build machine (the path in 'source'), and the hosted server build does the same on its runner. The ADO 2.8 type library has been frozen since Windows 7 SP1's back-compatibility fix; the copy on a current Windows differs in bytes from the Windows 8.1 file that was committed, and the regression suite ran against a server compiled from the current copy on 11 September 2026.",
+      "source": "%CommonProgramFiles%\\System\\ado\\msado28.tlb"
     }
   ],
   "build_inputs": [
@@ -585,6 +587,7 @@
     "retain": "committed on purpose, with the reason in 'why'",
     "retain-generated": "generated from this repository's own sources and committed for the build's convenience",
     "gathered": "not in git; copied from the build machine by build/get-installer-binaries.ps1 and verified against 'sha256'",
+    "system": "not in git; a file of the Windows installation, copied from the path in 'source' by build/get-installer-binaries.ps1 (-SystemOnly for a build that needs nothing else); it varies with the Windows build, so 'sha256' is reported, not enforced",
     "generated": "not in git; produced from this repository's own sources by build/generate-com-wrapper.ps1 on every build, with no 'sha256' because the output is not byte-reproducible",
     "fetched": "not in git; downloaded from the build-inputs release named in 'source' by build/get-installer-binaries.ps1 and verified against 'sha256'"
   }

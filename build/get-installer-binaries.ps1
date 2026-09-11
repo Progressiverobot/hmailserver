@@ -37,6 +37,9 @@
 [CmdletBinding()]
 param(
    [switch]$Verify,
+   # Place only the "system" artifacts - Windows' own files the server compiles
+   # against - and stop. What the hosted server build needs, and nothing else.
+   [switch]$SystemOnly,
    [string]$Cache = (Join-Path $env:LOCALAPPDATA 'hmailserver\build-inputs')
 )
 
@@ -56,7 +59,18 @@ function Assert-Matches([string]$path, [string]$expected, [string]$what) {
 
 $fetched = @($manifest.artifacts | Where-Object { $_.disposition -eq 'fetched' })
 $gathered = @($manifest.artifacts | Where-Object { $_.disposition -eq 'gathered' })
-Write-Host ("{0} fetched and {1} gathered artifact(s) in the manifest." -f $fetched.Count, $gathered.Count)
+$system = @($manifest.artifacts | Where-Object { $_.disposition -eq 'system' })
+Write-Host ("{0} fetched, {1} gathered and {2} system artifact(s) in the manifest." -f $fetched.Count, $gathered.Count, $system.Count)
+
+# A system artifact is a file of the Windows installation itself - the ADO type
+# library the server #imports - copied from the path the manifest names. Its
+# bytes vary with the Windows build, so it is verified to exist and its hash is
+# reported; the regression suite is what proves the compiled result.
+function Get-SystemSource($artifact) {
+   $path = [Environment]::ExpandEnvironmentVariables([string]$artifact.source)
+   if (-not (Test-Path -LiteralPath $path)) { throw "$($artifact.path): the Windows installation has no $path" }
+   return $path
+}
 
 # A gathered file comes from the build machine and must match the toolset that
 # built the server, not a byte hash recorded on another day: Visual Studio updates
@@ -84,8 +98,30 @@ if ($Verify) {
       try { Assert-Version (Join-Path $repo $a.path) $a.version $a.path; Write-Host "  OK  $($a.path) (version $($a.version))" }
       catch { Write-Host "  BAD $($_.Exception.Message)"; $bad++ }
    }
+   foreach ($a in $system) {
+      $target = Join-Path $repo $a.path
+      if (Test-Path -LiteralPath $target) { Write-Host ("  OK  {0} (system copy, sha256 {1})" -f $a.path, (Get-Sha256 $target)) }
+      else { Write-Host "  BAD $($a.path) is not in place; run this script to copy it from the Windows installation."; $bad++ }
+   }
    if ($bad) { Write-Host "$bad problem(s)."; exit 1 }
-   Write-Host 'Every fetched and gathered artifact is present and matches the manifest.'
+   Write-Host 'Every fetched, gathered and system artifact is present and matches the manifest.'
+   exit 0
+}
+
+# -------------------------------------------------------------------- system
+foreach ($a in $system) {
+   $source = Get-SystemSource $a
+   $target = Join-Path $repo $a.path
+   New-Item -ItemType Directory -Force (Split-Path $target) | Out-Null
+   Copy-Item -LiteralPath $source -Destination $target -Force
+   # A compile-time input: the copy keeps Windows' own file time (2024 for the ADO
+   # library), which is OLDER than a .tlh the compiler generated last week, so an
+   # incremental build would keep the stale wrapper header. Stamp it now.
+   (Get-Item -LiteralPath $target).LastWriteTime = Get-Date
+   Write-Host ("  system   {0}  (from {1}, sha256 {2})" -f $a.path, $source, (Get-Sha256 $target))
+}
+if ($SystemOnly) {
+   Write-Host 'The system artifacts are in place.'
    exit 0
 }
 
@@ -155,4 +191,4 @@ foreach ($a in $fetched) {
    Write-Host "  placed $($a.path)"
 }
 
-Write-Host 'Every fetched and gathered artifact is in place and matches the manifest.'
+Write-Host 'Every fetched, gathered and system artifact is in place and matches the manifest.'
