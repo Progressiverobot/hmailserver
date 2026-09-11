@@ -105,33 +105,54 @@ external 'OpenSCManagerA@advapi32.dll stdcall';
 function QueryServiceStatus(hService :HANDLE;var ServiceStatus :SERVICE_STATUS) : boolean;
 external 'QueryServiceStatus@advapi32.dll stdcall';
 
+// Ports 25, 110 and 143 in use by something other than hMailServer. A bind test
+// over WinSock, which is what the ISC.DLL this replaced did: a 45 KB unsigned DLL
+// with no version resource and no known upstream, shipped inside the installer
+// for these fifteen lines. AnsiString parameters reach an external function as a
+// pointer to their characters, which is how the WSADATA and sockaddr_in buffers
+// are passed.
+function WSAStartup(wVersionRequired: Word; lpWSAData: AnsiString): Integer;
+external 'WSAStartup@ws2_32.dll stdcall';
+function WSACleanup(): Integer;
+external 'WSACleanup@ws2_32.dll stdcall';
+function WSAGetLastError(): Integer;
+external 'WSAGetLastError@ws2_32.dll stdcall';
+function socket(af, typ, protocol: Integer): Integer;
+external 'socket@ws2_32.dll stdcall';
+function bind(s: Integer; name: AnsiString; namelen: Integer): Integer;
+external 'bind@ws2_32.dll stdcall';
+function closesocket(s: Integer): Integer;
+external 'closesocket@ws2_32.dll stdcall';
+
+function PortIsInUse(Port: Integer): Boolean;
+var
+  s: Integer;
+  addr: AnsiString;
+begin
+  Result := False;
+  s := socket(2, 1, 6);  // AF_INET, SOCK_STREAM, IPPROTO_TCP
+  if s = -1 then
+    exit;
+  // sockaddr_in: family AF_INET (little-endian 2), port in network order, INADDR_ANY, 8 zero bytes
+  addr := Chr(2) + Chr(0) + Chr(Port div 256) + Chr(Port mod 256) + StringOfChar(Chr(0), 12);
+  if bind(s, addr, 16) <> 0 then
+    Result := (WSAGetLastError() = 10048);  // WSAEADDRINUSE
+  closesocket(s);
+end;
+
+// Negative when one of the three classic ports is taken, as the DLL answered.
 function CheckPorts(): Integer;
-external 'CheckPorts@files:ISC.DLL stdcall';
-
-
-function isxdl_Download(hWnd: Integer; URL, Filename: PAnsiChar): Integer;
-external 'isxdl_Download@files:isxdl.dll stdcall';
-
-procedure isxdl_AddFile(URL, Filename: PAnsiChar);
-external 'isxdl_AddFile@files:isxdl.dll stdcall';
-
-procedure isxdl_AddFileSize(URL, Filename: PAnsiChar; Size: Cardinal);
-external 'isxdl_AddFileSize@files:isxdl.dll stdcall';
-
-function isxdl_DownloadFiles(hWnd: Integer): Integer;
-external 'isxdl_DownloadFiles@files:isxdl.dll stdcall';
-
-procedure isxdl_ClearFiles;
-external 'isxdl_ClearFiles@files:isxdl.dll stdcall';
-
-function isxdl_IsConnected: Integer;
-external 'isxdl_IsConnected@files:isxdl.dll stdcall';
-
-function isxdl_SetOption(Option, Value: PAnsiChar): Integer;
-external 'isxdl_SetOption@files:isxdl.dll stdcall';
-
-function isxdl_GetFileName(URL: PAnsiChar): PAnsiChar;
-external 'isxdl_GetFileName@files:isxdl.dll stdcall';
+var
+  wsaData: AnsiString;
+begin
+  Result := 0;
+  wsaData := StringOfChar(Chr(0), 512);
+  if WSAStartup($0202, wsaData) <> 0 then
+    exit;
+  if PortIsInUse(25) or PortIsInUse(110) or PortIsInUse(143) then
+    Result := -1;
+  WSACleanup();
+end;
 
 // get Windows Installer version
 procedure DecodeVersion(const Version: cardinal; var a, b : word);

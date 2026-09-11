@@ -169,10 +169,15 @@ already cost a release cycle or nearly shipped a defect.
    means reproduced-then-fixed or negative-control-tested; anything else is
    described as hardening or diagnostics. Unfixed known issues are named as
    unfixed.
-11. **Installer**: ISCC on `hMailServer64.iss`. Two prerequisites the script
-   does not check: `$env:hMailServerLibs` must point at the library tree, and
+11. **Installer**: ISCC on `hMailServer64.iss`. Three prerequisites the script
+   does not check: `$env:hMailServerLibs` must point at the library tree,
    `build\get-dotnet-runtime.ps1` must have populated `installation\DotNet\`
-   with the desktop runtime the installer carries. Never run the installer on
+   with the desktop runtime the installer carries, and
+   `build\get-installer-binaries.ps1` must have placed the third-party binaries
+   - the MSVC runtime gathered from Visual Studio, and 7-Zip, the MariaDB client
+   and the SQL Server Compact runtime fetched from the `build-inputs-1` release -
+   none of which is in git since 11 September 2026 (run it with `-Verify` to
+   check; every file is matched against `hmailserver/docs/third-party-binaries.json`). Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
    (`installer-smoke.yml`), which installs it on a throwaway runner, and it is
    dispatched by hand: after the draft release exists and its installer asset
