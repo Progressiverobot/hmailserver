@@ -2,6 +2,7 @@ if exists (select * from sysobjects where id = object_id('hm_contacts') and obje
 if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
 if exists (select * from sysobjects where id = object_id('hm_scheduled') and objectproperty(id, 'isusertable') = 1) drop table hm_scheduled
 if exists (select * from sysobjects where id = object_id('hm_files') and objectproperty(id, 'isusertable') = 1) drop table hm_files
+if exists (select * from sysobjects where id = object_id('hm_smimekeys') and objectproperty(id, 'isusertable') = 1) drop table hm_smimekeys
 if exists (select * from sysobjects where id = object_id('hm_accounts') and objectproperty(id, 'isusertable') = 1) drop table hm_accounts 
 
 if exists (select * from sysobjects where id = object_id('hm_imapfolders') and objectproperty(id, 'isusertable') = 1) drop table hm_imapfolders 
@@ -608,6 +609,27 @@ ALTER TABLE hm_files ADD CONSTRAINT hm_files_pk PRIMARY KEY NONCLUSTERED (fileid
 CREATE CLUSTERED INDEX idx_hm_files_account ON hm_files (fileaccountid)
 
 CREATE UNIQUE INDEX idx_hm_files_token ON hm_files (filetoken)
+
+create table hm_smimekeys
+(
+	smimeid int identity(1,1) not null,
+	smimeaccountid int not null,
+	smimekind tinyint not null,
+	smimeaddress nvarchar(255) not null,
+	smimename nvarchar(255) not null,
+	smimefingerprint varchar(64) not null,
+	smimecertificate ntext not null,
+	smimechain ntext not null,
+	smimekey ntext not null,
+	smimenotafter bigint not null,
+	smimecreated bigint not null
+)
+
+ALTER TABLE hm_smimekeys ADD CONSTRAINT hm_smimekeys_pk PRIMARY KEY NONCLUSTERED (smimeid)
+
+CREATE CLUSTERED INDEX idx_hm_smimekeys_account ON hm_smimekeys (smimeaccountid)
+
+CREATE UNIQUE INDEX idx_hm_smimekeys_entry ON hm_smimekeys (smimeaccountid, smimekind, smimefingerprint)
 
 create table hm_rules
 (
@@ -1271,6 +1293,8 @@ ALTER TABLE hm_scheduled ADD CONSTRAINT fk_hm_scheduled_account FOREIGN KEY (sch
 
 ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
+ALTER TABLE hm_smimekeys ADD CONSTRAINT fk_hm_smimekeys_account FOREIGN KEY (smimeaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
@@ -1287,4 +1311,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6036)
+insert into hm_dbversion values (6037)

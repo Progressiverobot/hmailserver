@@ -114,6 +114,10 @@ jobs:
       # is what the generator writes now.
       - name: The self-service portal's catalogues match the page
         run: python3 build/check-portal-languages.py
+      - name: The webmail's S/MIME module, against OpenSSL both ways
+        run: node build/check-portal-smime.js
+      - name: The S/MIME module embedded in the server is current
+        run: python3 build/generate-portal-smime.py --check
 
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged

@@ -5,6 +5,8 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading;
 using hMailServer;
@@ -1306,6 +1308,145 @@ namespace RegressionTests.API
 
          var gone = new ImapClientSimulator();
          Assert.IsFalse(gone.ConnectAndLogon(Address, secret), "A removed app password signs nothing in.");
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/messages with mime: the entity the page built is delivered byte for byte under this server's own headers, and refused when it is not 7-bit or not an entity")]
+      public void AMessageBuiltOnThePageIsDeliveredAsGiven()
+      {
+         string entity = "Content-Type: multipart/signed; protocol=\"application/pkcs7-signature\"; micalg=sha-256; boundary=\"bb\"\r\n\r\n" +
+            "--bb\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\nSigned on the page, caf=C3=A9.\r\n" +
+            "--bb\r\nContent-Type: application/pkcs7-signature; name=\"smime.p7s\"\r\nContent-Transfer-Encoding: base64\r\nContent-Disposition: attachment; filename=\"smime.p7s\"\r\n\r\nAAECAwQFBgc=\r\n--bb--\r\n";
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"Built on the page\",\"mime\":" + JsonText(entity) + "}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) list = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, list.status, "Body: " + list.body);
+         long id = IdBefore(list.body, "\"subject\":\"Built on the page\"");
+
+         (int status, string body) source = Http("GET", "/api/v1/me/messages/" + id + "/source", UserHeader(UserPassword));
+         Assert.AreEqual(200, source.status, "Body: " + source.body);
+         StringAssert.Contains(entity, source.body, "The entity is in the file exactly as given.");
+         StringAssert.Contains("Subject: Built on the page\r\n", source.body);
+         StringAssert.Contains("From: ", source.body);
+         StringAssert.Contains("Date: ", source.body);
+         StringAssert.Contains("Message-ID: <", source.body);
+         StringAssert.Contains("MIME-Version: 1.0\r\n", source.body);
+         Assert.IsTrue(source.body.IndexOf("\r\n\r\n", StringComparison.Ordinal) == source.body.IndexOf("\r\n\r\n--bb", StringComparison.Ordinal),
+            "The first blank line is the entity's own: the server's headers and the entity's Content-Type make one block. Source: " + source.body);
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("Signed on the page, caf", message.body, "The server reads the text out of the multipart/signed entity.");
+
+         (int status, string body) eightBit = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"Not 7-bit\",\"mime\":\"Content-Type: text/plain\\r\\n\\r\\ncaf\u00e9\\r\\n\"}");
+         Assert.AreEqual(400, eightBit.status, "Body: " + eightBit.body);
+         StringAssert.Contains("7-bit", eightBit.body);
+
+         (int status, string body) notAnEntity = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"Not an entity\",\"mime\":\"Hello\\r\\n\"}");
+         Assert.AreEqual(400, notAnEntity.status, "Body: " + notAnEntity.body);
+         StringAssert.Contains("Content-Type", notAnEntity.body);
+      }
+
+      [Test]
+      [Description("The account's S/MIME key store: an own certificate with its wrapped key and chain, a recipient's certificate, each added, replaced by fingerprint, listed and removed, with the shape of each field checked")]
+      public void SmimeKeysAndCertificatesAreKeptForTheAccount()
+      {
+         (int status, string body) empty = Http("GET", "/api/v1/me/smime", UserHeader(UserPassword));
+         Assert.AreEqual(200, empty.status, "Body: " + empty.body);
+         StringAssert.Contains("\"own\":[]", empty.body);
+         StringAssert.Contains("\"recipients\":[]", empty.body);
+
+         string certificate = Convert.ToBase64String(new byte[] { 0x30, 0x03, 0x02, 0x01, 0x01 });
+         string own = new string('a', 64);
+         string key = "{\"kdf\":\"PBKDF2-SHA256\",\"iterations\":600000,\"salt\":\"AAAAAAAAAAAAAAAAAAAAAA==\",\"iv\":\"AAAAAAAAAAAAAAAA\",\"data\":\"AQIDBA==\"}";
+         (int status, string body) added = Http("PUT", "/api/v1/me/smime/own", UserHeader(UserPassword),
+            "{\"address\":\"" + Address + "\",\"name\":\"Me, Myself\",\"fingerprint\":\"" + own + "\",\"certificate\":\"" + certificate + "\",\"chain\":[\"" + certificate + "\"],\"key\":" + key + ",\"not_after\":2000000000}");
+         Assert.AreEqual(201, added.status, "Body: " + added.body);
+         StringAssert.Contains("\"fingerprint\":\"" + own + "\"", added.body);
+         StringAssert.Contains("\"chain\":[\"" + certificate + "\"]", added.body);
+         StringAssert.Contains("\"key\":" + key, added.body);
+         StringAssert.Contains("\"not_after\":2000000000", added.body);
+
+         (int status, string body) replaced = Http("PUT", "/api/v1/me/smime/own", UserHeader(UserPassword),
+            "{\"address\":\"" + Address + "\",\"name\":\"Me again\",\"fingerprint\":\"" + own + "\",\"certificate\":\"" + certificate + "\",\"chain\":[],\"key\":" + key + "}");
+         Assert.AreEqual(200, replaced.status, "Body: " + replaced.body);
+         StringAssert.Contains("\"name\":\"Me again\"", replaced.body);
+         StringAssert.Contains("\"chain\":[]", replaced.body);
+
+         (int status, string body) badFingerprint = Http("PUT", "/api/v1/me/smime/own", UserHeader(UserPassword),
+            "{\"address\":\"" + Address + "\",\"fingerprint\":\"ABC\",\"certificate\":\"" + certificate + "\",\"key\":" + key + "}");
+         Assert.AreEqual(400, badFingerprint.status, "Body: " + badFingerprint.body);
+         (int status, string body) noKey = Http("PUT", "/api/v1/me/smime/own", UserHeader(UserPassword),
+            "{\"address\":\"" + Address + "\",\"fingerprint\":\"" + own + "\",\"certificate\":\"" + certificate + "\"}");
+         Assert.AreEqual(400, noKey.status, "Body: " + noKey.body);
+         (int status, string body) badCertificate = Http("PUT", "/api/v1/me/smime/own", UserHeader(UserPassword),
+            "{\"address\":\"" + Address + "\",\"fingerprint\":\"" + own + "\",\"certificate\":\"not base64!\",\"key\":" + key + "}");
+         Assert.AreEqual(400, badCertificate.status, "Body: " + badCertificate.body);
+
+         string bob = new string('b', 64);
+         (int status, string body) recipient = Http("PUT", "/api/v1/me/smime/recipients", UserHeader(UserPassword),
+            "{\"address\":\"Bob@Example.test\",\"name\":\"Bob\",\"fingerprint\":\"" + bob + "\",\"certificate\":\"" + certificate + "\",\"not_after\":1900000000}");
+         Assert.AreEqual(201, recipient.status, "Body: " + recipient.body);
+         StringAssert.Contains("\"address\":\"bob@example.test\"", recipient.body);
+         Assert.IsFalse(recipient.body.Contains("\"key\""), "A recipient's entry carries no key. Body: " + recipient.body);
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/smime", UserHeader(UserPassword));
+         Assert.AreEqual(1, CountOf(listed.body, "\"fingerprint\":\"" + own + "\""), listed.body);
+         Assert.AreEqual(1, CountOf(listed.body, "\"fingerprint\":\"" + bob + "\""), listed.body);
+         StringAssert.Contains("\"limits\":{\"own\":20,\"recipients\":500}", listed.body);
+
+         (int status, string body) removed = Http("DELETE", "/api/v1/me/smime/own/" + own, UserHeader(UserPassword));
+         Assert.AreEqual(200, removed.status, "Body: " + removed.body);
+         (int status, string body) again = Http("DELETE", "/api/v1/me/smime/own/" + own, UserHeader(UserPassword));
+         Assert.AreEqual(404, again.status, "Body: " + again.body);
+         (int status, string body) recipientGone = Http("DELETE", "/api/v1/me/smime/recipients/" + bob, UserHeader(UserPassword));
+         Assert.AreEqual(200, recipientGone.status, "Body: " + recipientGone.body);
+         (int status, string body) emptyAgain = Http("GET", "/api/v1/me/smime", UserHeader(UserPassword));
+         StringAssert.Contains("\"own\":[]", emptyAgain.body);
+         StringAssert.Contains("\"recipients\":[]", emptyAgain.body);
+      }
+
+      [Test]
+      [Description("POST /api/v1/me/smime/chain: a certificate no trusted root signed is answered untrusted with OpenSSL's reason, the subject read from it and the roots consulted counted; what is not a certificate is refused")]
+      public void TheChainCheckAnswersForACertificateNoRootSigned()
+      {
+         using (RSA rsa = RSA.Create(2048))
+         {
+            var request = new CertificateRequest("CN=Nobody Example, E=nobody@example.test", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            using (X509Certificate2 certificate = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30)))
+            {
+               string der = Convert.ToBase64String(certificate.RawData);
+               (int status, string body) answer = Http("POST", "/api/v1/me/smime/chain", UserHeader(UserPassword), "{\"certificates\":[\"" + der + "\"],\"purpose\":\"sign\"}");
+               Assert.AreEqual(200, answer.status, "Body: " + answer.body);
+               StringAssert.Contains("\"trusted\":false", answer.body);
+               StringAssert.Contains("self", answer.body.ToLowerInvariant());
+               StringAssert.Contains("Nobody Example", answer.body);
+               StringAssert.Contains("\"roots\":", answer.body);
+               Assert.IsFalse(answer.body.Contains("\"roots\":0,"), "The system's roots were consulted. Body: " + answer.body);
+               StringAssert.Contains("\"not_after\":", answer.body);
+            }
+         }
+
+         (int status, string body) notDer = Http("POST", "/api/v1/me/smime/chain", UserHeader(UserPassword), "{\"certificates\":[\"AAECAw==\"]}");
+         Assert.AreEqual(200, notDer.status, "Body: " + notDer.body);
+         StringAssert.Contains("\"trusted\":false", notDer.body);
+         StringAssert.Contains("not X.509 DER", notDer.body);
+         (int status, string body) notBase64 = Http("POST", "/api/v1/me/smime/chain", UserHeader(UserPassword), "{\"certificates\":[\"not base64!\"]}");
+         Assert.AreEqual(400, notBase64.status, "Body: " + notBase64.body);
+         (int status, string body) none = Http("POST", "/api/v1/me/smime/chain", UserHeader(UserPassword), "{\"certificates\":[]}");
+         Assert.AreEqual(400, none.status, "Body: " + none.body);
+      }
+
+      private static string JsonText(string text)
+      {
+         return "\"" + text.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
       }
 
       [Test]

@@ -236,6 +236,12 @@ namespace HM
          RouteMeSessionsEnd,
          RouteMeSessionDelete,
          RouteMeStorage,
+         RouteMeSmime,
+         RouteMeSmimeOwnPut,
+         RouteMeSmimeOwnDelete,
+         RouteMeSmimeRecipientPut,
+         RouteMeSmimeRecipientDelete,
+         RouteMeSmimeChain,
          RouteMeMessageReceipt,
          RouteMeMessageUnsubscribe,
          RouteMeDraftSchedule,
@@ -505,6 +511,16 @@ namespace HM
       static HttpResponse HandleMeSessions_(const Caller &caller);
       static HttpResponse HandleMeSessionsEnd_(const Caller &caller);
       static HttpResponse HandleMeSessionDelete_(const Caller &caller, const AnsiString &id);
+
+      // S/MIME (RestApiSmime.cpp): the key store, the chain check, the module, a page-built send.
+      static HttpResponse HandleMeSmime_(const Caller &caller);
+      static HttpResponse HandleMeSmimeOwnPut_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeSmimeOwnDelete_(const Caller &caller, const AnsiString &fingerprint);
+      static HttpResponse HandleMeSmimeRecipientPut_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeSmimeRecipientDelete_(const Caller &caller, const AnsiString &fingerprint);
+      static HttpResponse HandleMeSmimeChain_(const AnsiString &requestBody);
+      static HttpResponse HandlePortalSmimeScript_();
+      static int WriteMimeEntity_(std::shared_ptr<const Account> account, const String &fromHeader, const String &toHeader, const String &ccHeader, const AnsiString &requestBody, const String &entityText, const String &fileName, AnsiString &problem);
       static HttpResponse HandleMeStorage_(const Caller &caller);
 
       // A read receipt for a message that asked for one, an unsubscribe by the
