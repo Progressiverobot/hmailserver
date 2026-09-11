@@ -67,6 +67,8 @@
 
 namespace HM
 {
+   class JsonValue;
+
    class IPAddress;
    class Account;
    class Domain;
@@ -610,6 +612,7 @@ namespace HM
 
       static AnsiString GetRequestBody_(const AnsiString &request);
       static AnsiString GetJsonStringValue_(const AnsiString &json, const AnsiString &key);
+      static const JsonValue *FindJsonMember_(const JsonValue &object, const std::string &key);
       static AnsiString JsonEscape_(const AnsiString &value);
 
       std::shared_ptr<HttpServer> server_;
