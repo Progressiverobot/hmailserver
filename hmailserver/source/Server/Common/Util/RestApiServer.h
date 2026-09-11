@@ -527,6 +527,8 @@ namespace HM
       static void RevokeSessionsForAccount_(__int64 accountId, const AnsiString &keepTokenHash);
       static void ClearBrowserSessions_();
       static HttpResponse HandlePortalScript_();
+      static HttpResponse HandlePortalManifest_();
+      static HttpResponse HandlePortalServiceWorker_();
       static bool IsDomainAllowed_(const std::vector<String> &domains, const String &domainName);
 
       static Caller Authenticate_(const AnsiString &request, const IPAddress &peer_address);
