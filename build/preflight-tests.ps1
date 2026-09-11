@@ -164,6 +164,24 @@ foreach ($port in 25000, 25001, 25002, 25003, 11000, 11001, 11002, 11003, 14300,
 Report ($reserved.Count -eq 0) 'The SSL fixtures'' twelve ports are bindable' `
     ("{0} of them are not: {1}. Nothing needs to be LISTENING on them - if the service is stopped and they still cannot be bound, something is holding the reservation invisibly. On this bench that is WSL: run ``wsl --shutdown`` (stopping the Linux server is not enough - the reservation belongs to the VM) and check again. See hmailserver/docs/RegressionEnvironment.md." -f $reserved.Count, ($reserved -join ', '))
 
+# 8b. WSL is down. With networkingMode=mirrored the Windows host and every WSL
+#     distribution share one port space, and a Linux server or test run left
+#     behind inside WSL - a killed agent's bench, typically - holds whatever
+#     ports it bound, on Windows too, showing in no Windows TCP table. The
+#     probe above covers twelve ports; the suite allocates hundreds from 20000
+#     up, the same allocator the Linux suite uses, so the collision is exact
+#     and invisible. 24 errors in the first 6.3.1 assertion gate, 11 September
+#     2026. The remedy is the whole VM, not the process: the reservation
+#     outlives the process that made it (RegressionEnvironment.md).
+$wslRunning = @()
+try {
+    $wslRunning = @((& wsl.exe -l --running --quiet 2>$null) | ForEach-Object { ($_ -replace "`0", '').Trim() } | Where-Object { $_ })
+} catch {
+    $wslRunning = @()
+}
+Report ($wslRunning.Count -eq 0) 'WSL is not running' `
+    ("Running: {0}. Run ``wsl --shutdown`` before the suite - a Linux process inside WSL holds the suite's ports on this host invisibly under mirrored networking, and the Linux bench belongs on the VM (192.168.11.154), not in WSL." -f ($wslRunning -join ', '))
+
 # 9. Interference sources that have broken runs before (warn only).
 $vpn = Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.InterfaceDescription -match 'Proton|WireGuard' -and $_.Status -eq 'Up' }
 if ($vpn) { Write-Host ("  WARN  VPN adapter up: {0} - has broken address selection in tests before." -f ($vpn.Name -join ', ')) -ForegroundColor Yellow }
