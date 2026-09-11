@@ -50,39 +50,39 @@ ALTER TABLE hm_messageindexterms ENGINE=InnoDB;
 
 
 
-delete from hm_messageindexterms where mitmessageid not in (select messageid from hm_messages);
-
-delete from hm_imapexpunged where expungedfolderid not in (select folderid from hm_imapfolders);
-
-delete from hm_message_metadata where metadata_messageid not in (select messageid from hm_messages);
-
-delete from hm_messagerecipients where recipientmessageid not in (select messageid from hm_messages);
-
-delete from hm_passwordhistory where phaccountid not in (select accountid from hm_accounts);
-
-delete from hm_group_members where membergroupid not in (select groupid from hm_groups);
-
-delete from hm_rule_actions where actionruleid not in (select ruleid from hm_rules);
-
-delete from hm_rule_criterias where criteriaruleid not in (select ruleid from hm_rules);
-
-delete from hm_apppasswords where apaccountid not in (select accountid from hm_accounts);
-
-delete from hm_fetchaccounts_uids where uidfaid not in (select faid from hm_fetchaccounts);
-
-delete from hm_fetchaccounts where faaccountid not in (select accountid from hm_accounts);
-
-delete from hm_routeaddresses where routeaddressrouteid not in (select routeid from hm_routes);
-
-delete from hm_distributionlistsrecipients where distributionlistrecipientlistid not in (select distributionlistid from hm_distributionlists);
-
-delete from hm_distributionlists where distributionlistdomainid not in (select domainid from hm_domains);
-
-delete from hm_domain_aliases where dadomainid not in (select domainid from hm_domains);
+delete from hm_accounts where accountdomainid not in (select domainid from hm_domains);
 
 delete from hm_aliases where aliasdomainid not in (select domainid from hm_domains);
 
-delete from hm_accounts where accountdomainid not in (select domainid from hm_domains);
+delete from hm_domain_aliases where dadomainid not in (select domainid from hm_domains);
+
+delete from hm_distributionlists where distributionlistdomainid not in (select domainid from hm_domains);
+
+delete from hm_distributionlistsrecipients where distributionlistrecipientlistid not in (select distributionlistid from hm_distributionlists);
+
+delete from hm_routeaddresses where routeaddressrouteid not in (select routeid from hm_routes);
+
+delete from hm_fetchaccounts where faaccountid not in (select accountid from hm_accounts);
+
+delete from hm_fetchaccounts_uids where uidfaid not in (select faid from hm_fetchaccounts);
+
+delete from hm_apppasswords where apaccountid not in (select accountid from hm_accounts);
+
+delete from hm_rule_criterias where criteriaruleid not in (select ruleid from hm_rules);
+
+delete from hm_rule_actions where actionruleid not in (select ruleid from hm_rules);
+
+delete from hm_group_members where membergroupid not in (select groupid from hm_groups);
+
+delete from hm_passwordhistory where phaccountid not in (select accountid from hm_accounts);
+
+delete from hm_messagerecipients where recipientmessageid not in (select messageid from hm_messages);
+
+delete from hm_message_metadata where metadata_messageid not in (select messageid from hm_messages);
+
+delete from hm_imapexpunged where expungedfolderid not in (select folderid from hm_imapfolders);
+
+delete from hm_messageindexterms where mitmessageid not in (select messageid from hm_messages);
 
 
 
