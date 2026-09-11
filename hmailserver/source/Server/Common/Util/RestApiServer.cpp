@@ -36,6 +36,7 @@
 #include "IniFile.h"
 #endif
 #include "../AntiSpam/QuarantineStore.h"
+#include "../AntiSpam/SpamAssassin/SpamAssassinLearner.h"
 #include "../BO/IMAPFolders.h"
 #include "../BO/IMAPFolder.h"
 #include "../BO/Messages.h"
@@ -1667,6 +1668,12 @@ namespace HM
          case RouteMePreferencesPut:
             return HandleMePreferencesPut_(caller, GetRequestBody_(request));
 
+         case RouteMeFolderEmpty:
+            return HandleMeFolderEmpty_(caller, route.folder_id);
+
+         case RouteMeMessageSource:
+            return HandleMeMessageSource_(caller, route.message_id);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1839,6 +1846,15 @@ namespace HM
             return;
          }
 
+         if (method == "POST" && rest.EndsWith("/empty"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/empty").GetLength());
+            if (ParseQueueId(idText, route.folder_id))
+               route.kind = RouteMeFolderEmpty;
+
+            return;
+         }
+
          // The remainder is the folder id itself, with no resource segment after
          // it - which is what ParseQueueId enforces, since an id is digits only.
          if (method == "PUT" && ParseQueueId(rest, route.folder_id))
@@ -1902,6 +1918,14 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/flags").GetLength());
             if (ParseQueueId(idText, route.message_id))
                route.kind = RouteMeMessageFlags;
+            return;
+         }
+
+         if (method == "GET" && rest.EndsWith("/source"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/source").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageSource;
             return;
          }
 
@@ -2455,6 +2479,7 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMeFolderEmpty:
       case RouteMePreferencesPut:
       case RouteMeContactCreate:
       case RouteMeContactUpdate:
@@ -5012,6 +5037,8 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeFolderEmpty:
+      case RouteMeMessageSource:
       case RouteMeIdentities:
       case RouteMePreferences:
       case RouteMePreferencesPut:
@@ -6418,6 +6445,7 @@ namespace HM
          JsonEscape_(from).c_str(),
          JsonEscape_(date).c_str());
       json += ThreadFieldsJson_(fileName) + ",";
+      json += HeaderFieldsJson_(fileName, account) + ",";
 
       if (message->GetSize() > MaxMessageParseBytes)
       {
@@ -6687,15 +6715,44 @@ namespace HM
       if (!message)
          return BuildResponse_(404, "{\"error\":\"message not found\"}");
 
-      __int64 folderId = 0;
-      if (!JsonNumber(requestBody, "folder_id", folderId))
-         return BuildResponse_(400, "{\"error\":\"folder_id is required\"}");
+      // The destination is a folder id, or one of the four the page has a key
+      // for: archive, junk, trash - the folder designated so, made by that
+      // name when the account has none, as Drafts is made - and inbox.
+      std::shared_ptr<IMAPFolder> destination;
+      String to = JsonUtf8Value_(requestBody, "to");
+      to.ToLower();
+      if (!to.IsEmpty())
+      {
+         if (to == _T("archive"))
+            destination = DesignatedFolderOrCreate_(account, IMAPSpecialUse::DesignationArchive, _T("Archive"));
+         else if (to == _T("junk"))
+            destination = DesignatedFolderOrCreate_(account, IMAPSpecialUse::DesignationJunk, _T("Junk"));
+         else if (to == _T("trash"))
+            destination = DesignatedFolderOrCreate_(account, IMAPSpecialUse::DesignationTrash, _T("Trash"));
+         else if (to == _T("inbox"))
+         {
+            std::shared_ptr<IMAPFolders> own = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+            if (own)
+               destination = own->GetFolderByName(_T("INBOX"));
+         }
+         else
+            return BuildResponse_(400, "{\"error\":\"to must be archive, junk, trash or inbox\"}");
 
-      // The destination goes through the same test as any folder id: the
-      // account's own tree, readable. Another account's folder is 404.
-      std::shared_ptr<IMAPFolder> destination = FindReadableFolder_(account, folderId);
-      if (!destination)
-         return BuildResponse_(404, "{\"error\":\"folder not found\"}");
+         if (!destination)
+            return BuildResponse_(500, "{\"error\":\"the folder could not be found or made\"}");
+      }
+      else
+      {
+         __int64 folderId = 0;
+         if (!JsonNumber(requestBody, "folder_id", folderId))
+            return BuildResponse_(400, "{\"error\":\"folder_id or to is required\"}");
+
+         // The destination goes through the same test as any folder id: the
+         // account's own tree, readable. Another account's folder is 404.
+         destination = FindReadableFolder_(account, folderId);
+         if (!destination)
+            return BuildResponse_(404, "{\"error\":\"folder not found\"}");
+      }
 
       if (destination->GetID() == source->GetID())
          return BuildResponse_(400, "{\"error\":\"the message is already in that folder\"}");
@@ -6721,6 +6778,9 @@ namespace HM
 
       if (!DeleteOwnMessage_(account, message, source))
          return BuildResponse_(500, "{\"error\":\"the message was copied to the folder but the original could not be removed\"}");
+
+      // Into or out of Junk teaches spamd, as the same move over IMAP does.
+      LearnAfterMove_(source, destination, newMessageId, account);
 
       AnsiString json;
       json.Format("{\"id\":%I64d,\"folder_id\":%I64d}", newMessageId, destination->GetID());
@@ -6752,7 +6812,7 @@ namespace HM
       // does - and final otherwise, or when the caller says permanent.
       if (!permanent && folder->GetAccountID() == account->GetID())
       {
-         std::shared_ptr<IMAPFolder> trash = FindDesignatedFolder_(account, IMAPSpecialUse::DesignationTrash);
+         std::shared_ptr<IMAPFolder> trash = DesignatedFolderOrCreate_(account, IMAPSpecialUse::DesignationTrash, _T("Trash"));
          if (trash && trash->GetID() != folder->GetID())
          {
             if (!RightOn_(account, trash, ACLPermission::PermissionInsert))
@@ -6775,6 +6835,235 @@ namespace HM
          return BuildResponse_(500, "{\"error\":\"the message could not be deleted\"}");
 
       return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   // The folder designated so, or one made by that name - which earns it the
+   // designation, as "Drafts" does - so the page's Archive, Junk and Trash
+   // keys work on an account that never made those folders.
+   std::shared_ptr<IMAPFolder>
+   RestApiServer::DesignatedFolderOrCreate_(std::shared_ptr<const Account> account, int designation, const String &name)
+   {
+      std::shared_ptr<IMAPFolder> folder = FindDesignatedFolder_(account, designation);
+      if (folder)
+         return folder;
+
+      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+      if (!folders)
+         return std::shared_ptr<IMAPFolder>();
+
+      std::vector<String> path;
+      path.push_back(name);
+      folders->CreatePath(folders, path, true);
+
+      return FindDesignatedFolder_(account, designation);
+   }
+
+   // What an IMAP MOVE into or out of \Junk does after the copy: the learner
+   // decides whether the move is a lesson and queues it off this thread.
+   void
+   RestApiServer::LearnAfterMove_(std::shared_ptr<IMAPFolder> source, std::shared_ptr<IMAPFolder> destination, __int64 newMessageId, std::shared_ptr<const Account> account)
+   {
+      if (!source || !destination || newMessageId <= 0 || !account)
+         return;
+
+      std::shared_ptr<Message> copy = std::shared_ptr<Message>(new Message());
+      if (!PersistentMessage::ReadObject(copy, newMessageId) || copy->GetID() == 0)
+         return;
+
+      SpamAssassinLearner::LearnFromMove(source, destination, copy, account);
+   }
+
+   // Every message in a Junk or Trash folder, gone for good - the one folder
+   // action a mail client offers that is not a move. Any other folder is
+   // refused: emptying is what those two folders are for.
+   HttpResponse
+   RestApiServer::HandleMeFolderEmpty_(const Caller &caller, __int64 folderId)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder = FindReadableFolder_(account, folderId);
+      if (!folder || folder->GetAccountID() != account->GetID())
+         return BuildResponse_(404, "{\"error\":\"folder not found\"}");
+
+      std::shared_ptr<IMAPFolders> folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID());
+      std::map<__int64, int> designations;
+      if (folders)
+         IMAPSpecialUse::Resolve(folders, designations);
+      int designation = designations.count(folder->GetID()) ? designations[folder->GetID()] : 0;
+      if ((designation & (IMAPSpecialUse::DesignationJunk | IMAPSpecialUse::DesignationTrash)) == 0)
+         return BuildResponse_(400, "{\"error\":\"only the Junk and Trash folders can be emptied\"}");
+
+      if (!RightOn_(account, folder, ACLPermission::PermissionWriteDeleted) ||
+          !RightOn_(account, folder, ACLPermission::PermissionExpunge))
+         return BuildResponse_(403, "{\"error\":\"the folder does not allow this account to delete messages\"}");
+
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
+      if (!messages)
+         return BuildResponse_(500, "{\"error\":\"the folder could not be read\"}");
+
+      std::set<__int64> ids;
+      std::vector<std::shared_ptr<Message>> snapshot = messages->GetCopy();
+      for (size_t i = 0; i < snapshot.size(); i++)
+         if (snapshot[i])
+            ids.insert(snapshot[i]->GetID());
+
+      std::vector<__int64> deleted;
+      if (!ids.empty())
+      {
+         deleted = messages->DeleteMessagesById(ids);
+         if (!deleted.empty())
+            NotifyFolder(folder, ChangeNotification::NotificationMessageDeleted, deleted);
+      }
+
+      AnsiString json;
+      json.Format("{\"deleted\":%d,\"folder_id\":%I64d}", (int) deleted.size(), folder->GetID());
+      return BuildResponse_(200, json);
+   }
+
+   // The message as it is on disk, for "view source" and for saving as .eml:
+   // message/rfc822, as a download, under the same right as reading it.
+   HttpResponse
+   RestApiServer::HandleMeMessageSource_(const Caller &caller, __int64 messageId)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+      if (!PersistentMessage::ReadObject(message, messageId) || message->GetID() == 0)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      std::shared_ptr<IMAPFolder> folder = FindReadableFolder_(account, message->GetFolderID());
+      if (!folder || folder->GetAccountID() != message->GetAccountID())
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      String fileName = MessageFile_(message);
+      if (!FileUtilities::Exists(fileName))
+         return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
+
+      const __int64 MaxSourceBytes = 25 * 1024 * 1024;
+      __int64 size = FileUtilities::FileSize(fileName);
+      if (size > MaxSourceBytes)
+         return BuildResponse_(413, "{\"error\":\"the message is larger than 25 MB; fetch it with a mail client\"}");
+
+      AnsiString bytes;
+      {
+         std::ifstream in(fileName.c_str(), std::ios::binary);
+         if (!in)
+            return BuildResponse_(500, "{\"error\":\"the message file could not be read\"}");
+         std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+         bytes = AnsiString(contents);
+      }
+
+      AnsiString fileLabel;
+      fileLabel.Format("message-%I64d.eml", message->GetID());
+
+      HttpResponse response;
+      response.status = 200;
+      response.content_type = "message/rfc822";
+      response.body = bytes;
+      response.extra_headers =
+         "Content-Disposition: attachment; filename=\"" + fileLabel + "\"\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Content-Security-Policy: sandbox\r\n"
+         "Cache-Control: no-store\r\n";
+      return response;
+   }
+
+   namespace
+   {
+      // "spf=pass" inside an Authentication-Results value -> "pass"; the empty
+      // string when the method is not mentioned.
+      AnsiString VerdictOf(const AnsiString &results, const AnsiString &method)
+      {
+         AnsiString lower = results;
+         lower.ToLower();
+         AnsiString needle = method + "=";
+         int at = lower.Find(needle);
+         while (at >= 0)
+         {
+            bool boundary = at == 0 || lower[at - 1] == ' ' || lower[at - 1] == ';' || lower[at - 1] == '\t' || lower[at - 1] == '\r' || lower[at - 1] == '\n';
+            if (boundary)
+            {
+               int start = at + needle.GetLength();
+               int end = start;
+               while (end < lower.GetLength() && ((lower[end] >= 'a' && lower[end] <= 'z') || (lower[end] >= '0' && lower[end] <= '9')))
+                  end++;
+               return lower.Mid(start, end - start);
+            }
+            at = lower.Find(needle, at + 1);
+         }
+         return "";
+      }
+
+      // The domain of the first address in a From header, lower-cased.
+      AnsiString DomainOfFrom(const AnsiString &from)
+      {
+         int at = from.Find("@");
+         if (at < 0)
+            return "";
+         int end = at + 1;
+         while (end < from.GetLength())
+         {
+            char c = from[end];
+            if (c == '>' || c == ' ' || c == ',' || c == ';' || c == '\t' || c == '\r' || c == '\n' || c == '(' || c == '"')
+               break;
+            end++;
+         }
+         AnsiString domain = from.Mid(at + 1, end - at - 1);
+         domain.ToLower();
+         return domain;
+      }
+   }
+
+   // The head of the file as it is, capped; the three verdicts a reader
+   // learns to look at, from the first Authentication-Results header, which
+   // is the one this server wrote on receipt when it wrote one; and whether
+   // the sender's domain is another domain than the account's.
+   AnsiString
+   RestApiServer::HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account)
+   {
+      const int MaxHeaderBytes = 64 * 1024;
+
+      AnsiString header = PersistentMessage::LoadHeader(fileName, false);
+      AnsiString results;
+      AnsiString from;
+      if (!header.IsEmpty())
+      {
+         MimeHeader mimeHeader;
+         mimeHeader.Load(header.c_str(), header.GetLength(), true);
+         const char *value = mimeHeader.GetRawFieldValue("Authentication-Results");
+         results = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("From");
+         from = value ? value : "";
+      }
+      if (header.GetLength() > MaxHeaderBytes)
+         header = header.Mid(0, MaxHeaderBytes);
+
+      // A header block is bytes; the JSON is UTF-8. Decoding and re-encoding
+      // it turns any byte that is not UTF-8 into the replacement character,
+      // so the document stays valid whatever an old client wrote in a header.
+      String headerText;
+      Unicode::MultiByteToWide(header, headerText);
+      String resultsText;
+      Unicode::MultiByteToWide(results, resultsText);
+
+      AnsiString accountDomain = Utf8_(account->GetAddress());
+      accountDomain = DomainOfFrom(accountDomain);
+      AnsiString senderDomain = DomainOfFrom(from);
+      bool external = !senderDomain.IsEmpty() && senderDomain != accountDomain;
+
+      AnsiString json;
+      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs",
+         JsonEscape_(Utf8_(headerText)).c_str(),
+         VerdictOf(results, "spf").c_str(),
+         VerdictOf(results, "dkim").c_str(),
+         VerdictOf(results, "dmarc").c_str(),
+         JsonEscape_(Utf8_(resultsText)).c_str(),
+         external ? "true" : "false");
+      return json;
    }
 
    // A JSON body is UTF-8; the server's strings are wide.
@@ -7788,7 +8077,9 @@ namespace HM
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
-         "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
+         "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
+         "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), folder_id\"},\"400\":{\"description\":\"Not a Junk or Trash folder\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"
+         "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id, or to = archive | junk | trash | inbox - the folder designated so, made by that name when the account has none. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told; a move into or out of Junk teaches spamd when SpamAssassinLearnOnMove is on. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"folder_id\":{\"type\":\"integer\"},\"to\":{\"type\":\"string\",\"enum\":[\"archive\",\"junk\",\"trash\",\"inbox\"]}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
          "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under the very media type that listing reports in content_type - so an img element pointed here renders, with nosniff set - except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream, and a part declaring no usable type, which does too; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
          "\"/api/v1/domains\":{"
          "\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}},"

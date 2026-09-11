@@ -939,6 +939,153 @@ namespace RegressionTests.API
          Assert.AreEqual(403, draftRefused.status, "Body: " + draftRefused.body);
       }
 
+      [Test]
+      [Description("POST /move with to = archive | junk | trash | inbox files the message in the folder designated so, making it by that name when the account has none")]
+      public void FilingByDesignationMakesTheFolderAndMovesTheMessage()
+      {
+         Deliver(Address, "Filed", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         StringAssert.DoesNotContain("\"path\":\"Junk\"", tree.body);
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Filed\"");
+         string movePath = "/api/v1/me/messages/" + messageId + "/move";
+
+         (int status, string body) bogus = Http("POST", movePath, UserHeader(UserPassword), "{\"to\":\"elsewhere\"}");
+         Assert.AreEqual(400, bogus.status, "Body: " + bogus.body);
+
+         (int status, string body) junked = Http("POST", movePath, UserHeader(UserPassword), "{\"to\":\"junk\"}");
+         Assert.AreEqual(200, junked.status, "Body: " + junked.body);
+         long inJunk = long.Parse(Between(junked.body, "\"id\":", ","));
+
+         (int status, string body) after = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         string junk = FolderEntry(after.body, "Junk");
+         StringAssert.Contains("\"special_use\":\"\\\\Junk\"", junk);
+         long junkId = IdBefore(after.body, "\"path\":\"Junk\"");
+         (int status, string body) junkPage = Http("GET", "/api/v1/me/folders/" + junkId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"Filed\"", junkPage.body);
+
+         // Not junk: back to the inbox by name.
+         (int status, string body) back = Http("POST", "/api/v1/me/messages/" + inJunk + "/move", UserHeader(UserPassword), "{\"to\":\"inbox\"}");
+         Assert.AreEqual(200, back.status, "Body: " + back.body);
+         long inInbox = long.Parse(Between(back.body, "\"id\":", ","));
+         StringAssert.Contains("\"folder_id\":" + inboxId, back.body);
+
+         (int status, string body) archived = Http("POST", "/api/v1/me/messages/" + inInbox + "/move", UserHeader(UserPassword), "{\"to\":\"archive\"}");
+         Assert.AreEqual(200, archived.status, "Body: " + archived.body);
+         long inArchive = long.Parse(Between(archived.body, "\"id\":", ","));
+         (int status, string body) trashed = Http("POST", "/api/v1/me/messages/" + inArchive + "/move", UserHeader(UserPassword), "{\"to\":\"trash\"}");
+         Assert.AreEqual(200, trashed.status, "Body: " + trashed.body);
+
+         (int status, string body) all = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"special_use\":\"\\\\Archive\"", FolderEntry(all.body, "Archive"));
+         StringAssert.Contains("\"special_use\":\"\\\\Trash\"", FolderEntry(all.body, "Trash"));
+      }
+
+      [Test]
+      [Description("DELETE on a message with no Trash folder makes one and moves the message there")]
+      public void DeletingWithNoTrashFolderMakesOne()
+      {
+         Deliver(Address, "Binned", "One.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.DoesNotContain("\"path\":\"Trash\"", tree.body);
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long messageId = IdBefore(page.body, "\"subject\":\"Binned\"");
+
+         (int status, string body) deleted = Http("DELETE", "/api/v1/me/messages/" + messageId, UserHeader(UserPassword));
+         Assert.AreEqual(200, deleted.status, "Body: " + deleted.body);
+         StringAssert.Contains("\"deleted\":false,\"moved_to\":", deleted.body);
+
+         (int status, string body) after = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         string trash = FolderEntry(after.body, "Trash");
+         StringAssert.Contains("\"messages\":1,", trash);
+      }
+
+      [Test]
+      [Description("POST /folders/{id}/empty expunges everything in a Junk or Trash folder and refuses any other folder")]
+      public void EmptyingJunkOrTrashRemovesEverythingThere()
+      {
+         Deliver(Address, "Spam one", "One.");
+         Deliver(Address, "Spam two", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         foreach (string subject in new[] { "Spam one", "Spam two" })
+         {
+            long id = IdBefore(page.body, "\"subject\":\"" + subject + "\"");
+            (int status, string body) junked = Http("POST", "/api/v1/me/messages/" + id + "/move", UserHeader(UserPassword), "{\"to\":\"junk\"}");
+            Assert.AreEqual(200, junked.status, "Body: " + junked.body);
+         }
+
+         (int status, string body) refused = Http("POST", "/api/v1/me/folders/" + inboxId + "/empty", UserHeader(UserPassword));
+         Assert.AreEqual(400, refused.status, "Body: " + refused.body);
+
+         (int status, string body) after = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long junkId = IdBefore(after.body, "\"path\":\"Junk\"");
+         StringAssert.Contains("\"messages\":2,", FolderEntry(after.body, "Junk"));
+
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+         (int status, string body) theirs = Http("POST", "/api/v1/me/folders/" + junkId + "/empty", BasicHeader(other, UserPassword));
+         Assert.AreEqual(404, theirs.status, "Body: " + theirs.body);
+
+         (int status, string body) emptied = Http("POST", "/api/v1/me/folders/" + junkId + "/empty", UserHeader(UserPassword));
+         Assert.AreEqual(200, emptied.status, "Body: " + emptied.body);
+         StringAssert.Contains("\"deleted\":2,", emptied.body);
+
+         (int status, string body) empty = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"messages\":0,", FolderEntry(empty.body, "Junk"));
+         (int status, string body) again = Http("POST", "/api/v1/me/folders/" + junkId + "/empty", UserHeader(UserPassword));
+         Assert.AreEqual(200, again.status, "Body: " + again.body);
+         StringAssert.Contains("\"deleted\":0,", again.body);
+      }
+
+      [Test]
+      [Description("A message carries its raw headers, the SPF, DKIM and DMARC verdicts of its Authentication-Results, whether its sender is external, and its source as message/rfc822")]
+      public void AMessageCarriesItsHeadersVerdictsAndSource()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "From outside", "Hello from outside.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         string local = "colleague@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, local, UserPassword);
+         SmtpClientSimulator.StaticSend(local, Address, "From inside", "Hello from inside.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long outside = IdBefore(page.body, "\"subject\":\"From outside\"");
+         long inside = IdBefore(page.body, "\"subject\":\"From inside\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + outside, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"external\":true", message.body);
+         StringAssert.Contains("\"authentication\":{\"spf\":\"", message.body);
+         StringAssert.Contains("Subject: From outside", message.body.Replace("\\r\\n", "\n"));
+         StringAssert.Contains("\"headers\":\"", message.body);
+
+         (int status, string body) colleague = Http("GET", "/api/v1/me/messages/" + inside, UserHeader(UserPassword));
+         Assert.AreEqual(200, colleague.status, "Body: " + colleague.body);
+         StringAssert.Contains("\"external\":false", colleague.body);
+
+         (int status, string body) source = Http("GET", "/api/v1/me/messages/" + outside + "/source", UserHeader(UserPassword));
+         Assert.AreEqual(200, source.status, "Body: " + source.body);
+         StringAssert.Contains("Subject: From outside", source.body);
+         StringAssert.Contains("Hello from outside.", source.body);
+
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+         (int status, string body) theirs = Http("GET", "/api/v1/me/messages/" + outside + "/source", BasicHeader(other, UserPassword));
+         Assert.AreEqual(404, theirs.status, "Body: " + theirs.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
@@ -1226,7 +1373,7 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("DELETE /api/v1/me/messages/{id} moves to the Trash folder when the account has one, and is final otherwise or on request")]
+      [Description("DELETE /api/v1/me/messages/{id} moves to the Trash folder, making one when the account has none; a delete of what is already in Trash, or on request, is final")]
       public void DeleteGoesToTheTrashWhenThereIsOne()
       {
          Deliver(Address, "First", "One.");
@@ -1234,21 +1381,26 @@ namespace RegressionTests.API
 
          (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
          long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         Assert.IsFalse(tree.body.Contains("\"path\":\"Trash\""), "No Trash to begin with. Body: " + tree.body);
          string listPath = "/api/v1/me/folders/" + inboxId + "/messages";
          long first = IdBefore(Http("GET", listPath, UserHeader(UserPassword)).body, "\"subject\":\"First\"");
 
+         // No Trash yet: the delete makes one and moves the message there.
          (int status, string body) gone = Http("DELETE", "/api/v1/me/messages/" + first, UserHeader(UserPassword));
          Assert.AreEqual(200, gone.status, "Body: " + gone.body);
-         StringAssert.Contains("\"deleted\":true", gone.body);
+         StringAssert.Contains("\"deleted\":false,\"moved_to\":", gone.body);
+         long firstInTrash = long.Parse(Between(gone.body, "\"id\":", "}"));
          Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 0);
+         tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         StringAssert.Contains("\"special_use\":\"\\\\Trash\"", FolderEntry(tree.body, "Trash"));
 
-         (int status, string body) again = Http("DELETE", "/api/v1/me/messages/" + first, UserHeader(UserPassword));
+         // In Trash already: the delete is final, and a second one finds nothing.
+         (int status, string body) finalDelete = Http("DELETE", "/api/v1/me/messages/" + firstInTrash, UserHeader(UserPassword));
+         Assert.AreEqual(200, finalDelete.status, "Body: " + finalDelete.body);
+         StringAssert.Contains("\"deleted\":true", finalDelete.body);
+         (int status, string body) again = Http("DELETE", "/api/v1/me/messages/" + firstInTrash, UserHeader(UserPassword));
          Assert.AreEqual(404, again.status, "Body: " + again.body);
-
-         var imap = new ImapClientSimulator();
-         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
-         Assert.IsTrue(imap.CreateFolder("Trash"));
-         imap.Disconnect();
+         ImapClientSimulator imap;
 
          Deliver(Address, "Second", "Two.");
          Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
