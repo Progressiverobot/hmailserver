@@ -41,8 +41,10 @@ namespace RegressionTests.Security
       [TearDown]
       public void RestoreDefaults()
       {
-         WriteSetting("PreferredHashAlgorithm", CryptPbkdf2.ToString());
-         WriteSetting("MinimumAcceptedHashAlgorithm", "0");
+         // Removed rather than written back: a key at its default is still a key
+         // the pre-flight reports as left behind.
+         WriteSetting("PreferredHashAlgorithm", null);
+         WriteSetting("MinimumAcceptedHashAlgorithm", null);
          Apply();
       }
 
