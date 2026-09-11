@@ -231,6 +231,8 @@ namespace HM
          RouteMeSessionsEnd,
          RouteMeSessionDelete,
          RouteMeStorage,
+         RouteMeMessageReceipt,
+         RouteMeMessageUnsubscribe,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -479,6 +481,12 @@ namespace HM
       static HttpResponse HandleMeSessionsEnd_(const Caller &caller);
       static HttpResponse HandleMeSessionDelete_(const Caller &caller, const AnsiString &id);
       static HttpResponse HandleMeStorage_(const Caller &caller);
+
+      // A read receipt for a message that asked for one, an unsubscribe by the
+      // list's own method, and the queueing they share (RestApiMessageReplies.cpp).
+      static HttpResponse HandleMeMessageReceipt_(const Caller &caller, __int64 messageId);
+      static HttpResponse HandleMeMessageUnsubscribe_(const Caller &caller, __int64 messageId);
+      static int QueueRawMessage_(std::shared_ptr<const Account> account, const String &toAddress, const AnsiString &rawText, AnsiString &problem);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);

@@ -1703,6 +1703,12 @@ namespace HM
          case RouteMeStorage:
             return HandleMeStorage_(caller);
 
+         case RouteMeMessageReceipt:
+            return HandleMeMessageReceipt_(caller, route.message_id);
+
+         case RouteMeMessageUnsubscribe:
+            return HandleMeMessageUnsubscribe_(caller, route.message_id);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -2042,6 +2048,22 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/move").GetLength());
             if (ParseQueueId(idText, route.message_id))
                route.kind = RouteMeMessageMove;
+            return;
+         }
+
+         if (method == "POST" && rest.EndsWith("/receipt"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/receipt").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageReceipt;
+            return;
+         }
+
+         if (method == "POST" && rest.EndsWith("/unsubscribe"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/unsubscribe").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageUnsubscribe;
             return;
          }
 
@@ -2570,6 +2592,8 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMeMessageReceipt:
+      case RouteMeMessageUnsubscribe:
       case RouteMeAppPasswordCreate:
       case RouteMeAppPasswordDelete:
       case RouteMeSessionsEnd:
@@ -5134,6 +5158,8 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeMessageReceipt:
+      case RouteMeMessageUnsubscribe:
       case RouteMeAppPasswords:
       case RouteMeAppPasswordCreate:
       case RouteMeAppPasswordDelete:
@@ -7588,6 +7614,9 @@ namespace HM
       AnsiString header = PersistentMessage::LoadHeader(fileName, false);
       AnsiString results;
       AnsiString from;
+      AnsiString listUnsubscribe;
+      AnsiString listUnsubscribePost;
+      AnsiString receiptRequestedBy;
       if (!header.IsEmpty())
       {
          MimeHeader mimeHeader;
@@ -7595,6 +7624,17 @@ namespace HM
          results = OwnAuthenticationResults_(mimeHeader);
          const char *value = mimeHeader.GetRawFieldValue("From");
          from = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("List-Unsubscribe");
+         listUnsubscribe = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("List-Unsubscribe-Post");
+         listUnsubscribePost = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("Disposition-Notification-To");
+         receiptRequestedBy = value ? value : "";
+         listUnsubscribe.TrimLeft();
+         listUnsubscribe.TrimRight();
+         listUnsubscribePost.ToLower();
+         receiptRequestedBy.TrimLeft();
+         receiptRequestedBy.TrimRight();
       }
       if (header.GetLength() > MaxHeaderBytes)
          header = header.Mid(0, MaxHeaderBytes);
@@ -7615,15 +7655,23 @@ namespace HM
       AnsiString senderDomain = DomainOfFrom(Utf8_(DMARC::ExtractAddressFromHeaderValue(String(from))));
       bool external = !senderDomain.IsEmpty() && senderDomain != accountDomain;
 
+      String listText;
+      Unicode::MultiByteToWide(listUnsubscribe, listText);
+      String receiptText;
+      Unicode::MultiByteToWide(receiptRequestedBy, receiptText);
+
       AnsiString json;
-      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dkim_domain\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs",
+      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dkim_domain\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs,\"list_unsubscribe\":\"%hs\",\"list_unsubscribe_post\":%hs,\"receipt_requested_by\":\"%hs\"",
          JsonEscape_(Utf8_(headerText)).c_str(),
          VerdictOf(results, "spf").c_str(),
          VerdictOf(results, "dkim").c_str(),
          JsonEscape_(DkimDomainOf(results)).c_str(),
          VerdictOf(results, "dmarc").c_str(),
          JsonEscape_(Utf8_(resultsText)).c_str(),
-         external ? "true" : "false");
+         external ? "true" : "false",
+         JsonEscape_(Utf8_(listText)).c_str(),
+         listUnsubscribePost.Find("list-unsubscribe=one-click") >= 0 ? "true" : "false",
+         JsonEscape_(Utf8_(receiptText)).c_str());
       return json;
    }
 
@@ -7998,6 +8046,10 @@ namespace HM
          messageData.SetFieldValue(_T("In-Reply-To"), inReplyTo);
       if (!references.IsEmpty())
          messageData.SetFieldValue(_T("References"), references);
+
+      // receipt: true asks the recipient's client to say when it was read.
+      if (GetJsonBoolValue_(requestBody, "receipt", false))
+         messageData.SetFieldValue(_T("Disposition-Notification-To"), fromHeader);
 
       AnsiString attachmentError;
       int attachmentStatus = AddAttachmentsFromJson_(messageData, requestBody, attachmentError);
@@ -8843,6 +8895,8 @@ namespace HM
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
+         "\"/api/v1/me/messages/{id}/receipt\":{\"post\":{\"summary\":\"Send a read receipt\",\"description\":\"For a message that carries Disposition-Notification-To: an RFC 8098 disposition notification (displayed, sent manually) queued from the account to that address, under the recipient checks a send makes. A message that did not ask is 400.\",\"responses\":{\"201\":{\"description\":\"queued, to\"},\"400\":{\"description\":\"No receipt was asked for, or the address is refused\"},\"404\":{\"description\":\"No such message\"}}}},"
+         "\"/api/v1/me/messages/{id}/unsubscribe\":{\"post\":{\"summary\":\"Unsubscribe by the list's own method\",\"description\":\"With List-Unsubscribe-Post: List-Unsubscribe=One-Click and an https address in List-Unsubscribe, the one RFC 8058 POST (method one-click, with the list's status); else a message to the mailto address with its subject (method mail, queued). Neither is 400.\",\"responses\":{\"200\":{\"description\":\"one-click: ok, status\"},\"201\":{\"description\":\"mail: queued, to\"},\"400\":{\"description\":\"No method\"},\"502\":{\"description\":\"The list could not be reached\"}}}},"
          "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
          "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good - or, with older_than_days=N (digits, 0 to 36500; 0 is everything), only what arrived more than N days ago; any other value is refused rather than read as everything. At most 500 go per call: remaining says how many more match, so call again until it is 0. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), remaining, folder_id, older_than_days\"},\"400\":{\"description\":\"Not a Junk or Trash folder, or older_than_days is not a number of days\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id, or to = archive | junk | trash | inbox - the folder designated so, made by that name when the account has none. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told; a move into or out of Junk teaches spamd when SpamAssassinLearnOnMove is on. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"folder_id\":{\"type\":\"integer\"},\"to\":{\"type\":\"string\",\"enum\":[\"archive\",\"junk\",\"trash\",\"inbox\"]}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"

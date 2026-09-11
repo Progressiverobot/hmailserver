@@ -1428,6 +1428,83 @@ namespace RegressionTests.API
          return count;
       }
 
+      [Test]
+      [Description("receipt: true on a send asks for a read receipt; the reader of such a message sends one with POST /receipt, an RFC 8098 notification queued from the account")]
+      public void AReadReceiptIsAskedForAndSent()
+      {
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"Please confirm\",\"text\":\"Did this arrive?\",\"receipt\":true}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long asked = IdBefore(page.body, "\"subject\":\"Please confirm\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + asked, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"receipt_requested_by\":\"", message.body);
+         StringAssert.Contains(Address, Between(message.body, "\"receipt_requested_by\":\"", "\""));
+
+         (int status, string body) receipt = Http("POST", "/api/v1/me/messages/" + asked + "/receipt", UserHeader(UserPassword));
+         Assert.AreEqual(201, receipt.status, "Body: " + receipt.body);
+         StringAssert.Contains("\"queued\":true", receipt.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) again = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long mdn = IdBefore(again.body, "\"subject\":\"Read: Please confirm\"");
+         (int status, string body) source = Http("GET", "/api/v1/me/messages/" + mdn + "/source", UserHeader(UserPassword));
+         Assert.AreEqual(200, source.status, "Body: " + source.body);
+         StringAssert.Contains("report-type=disposition-notification", source.body);
+         StringAssert.Contains("Disposition: manual-action/MDN-sent-manually; displayed", source.body);
+         StringAssert.Contains("Final-Recipient: rfc822;" + Address, source.body);
+
+         // A message that never asked gets no receipt.
+         (int status, string body) none = Http("POST", "/api/v1/me/messages/" + mdn + "/receipt", UserHeader(UserPassword));
+         Assert.AreEqual(400, none.status, "Body: " + none.body);
+      }
+
+      [Test]
+      [Description("POST /unsubscribe writes to the list's mailto with its subject; a message with no List-Unsubscribe is refused; the JSON names the headers")]
+      public void AnUnsubscribeByMailIsQueued()
+      {
+         string leave = "leave@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, leave, UserPassword);
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\nTo: " + Address + "\r\nSubject: Weekly\r\nList-Unsubscribe: <mailto:" + leave + "?subject=Unsubscribe%20me>\r\n\r\nThe weekly letter.\r\n");
+         Deliver(Address, "Plain", "No list here.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long weekly = IdBefore(page.body, "\"subject\":\"Weekly\"");
+         long plain = IdBefore(page.body, "\"subject\":\"Plain\"");
+
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + weekly, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"list_unsubscribe\":\"<mailto:" + leave, message.body);
+         StringAssert.Contains("\"list_unsubscribe_post\":false", message.body);
+
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages/" + plain + "/unsubscribe", UserHeader(UserPassword));
+         Assert.AreEqual(400, refused.status, "Body: " + refused.body);
+
+         (int status, string body) done = Http("POST", "/api/v1/me/messages/" + weekly + "/unsubscribe", UserHeader(UserPassword));
+         Assert.AreEqual(201, done.status, "Body: " + done.body);
+         StringAssert.Contains("\"method\":\"mail\"", done.body);
+         StringAssert.Contains("\"to\":\"" + leave + "\"", done.body);
+
+         string received = Pop3ClientSimulator.AssertGetFirstMessageText(leave, UserPassword);
+         StringAssert.Contains("Subject: Unsubscribe me", received);
+         StringAssert.Contains("Auto-Submitted: auto-generated", received);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
