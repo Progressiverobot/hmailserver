@@ -762,6 +762,83 @@ jobs:
   # and then says plainly in the log what it found and, if it found nothing, exactly
   # what to run by hand. A missing draft is an ordering choice; a failed upload to a
   # release that IS there is a real problem and does fail.
+  # The schema-upgrade gate. Nothing in CI executed a database upgrade before
+  # 11 September 2026: the create script builds the current schema outright, the
+  # suites run against it, and an upgrade script was exercised only on a
+  # developer's machine, on a database with no orphaned rows - which is how the
+  # 6029 -> 6030 step shipped sweeping children before parents (issue #93's report
+  # led to it). This job creates a database at this build's schema with the
+  # binary the build job made, winds it back to 6029, seeds the orphans that
+  # expose the ordering (build/seed-orphans.py, generated from the create script
+  # so it cannot drift), and runs --upgrade-database the way the installer's
+  # post-install step does. It must end at the required schema with all
+  # seventeen foreign keys in place. Both services always start; the matrix
+  # picks the one under test, because a service cannot be conditional.
+  db-upgrade:
+    name: a 6029 database with orphaned rows upgrades on ${{ matrix.backend }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [pgsql, mysql]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hmailserver
+          POSTGRES_PASSWORD: hmtest
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hmailserver"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: hmtest
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install the libraries the server loads, and both clients
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            libboost-thread-dev libboost-chrono-dev libboost-filesystem-dev libboost-regex-dev \
+            libssl-dev zlib1g-dev libpq-dev libldap-dev libmariadb3 \
+            postgresql-client mariadb-client
+
+      - name: Fetch the binary the build job made
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: hmailserver-linux-x86-64
+          path: hmtest/program
+
+      - name: Upgrade a 6029 database that holds orphaned rows
+        env:
+          BACKEND: ${{ matrix.backend }}
+        run: |
+          chmod +x hmtest/program/hmailserver
+          export HM_BIN="$PWD/hmtest/program/hmailserver"
+          export HM_SCRIPTS="$PWD/hmailserver/source/DBScripts"
+          if [ "$BACKEND" = mysql ]; then
+            export DB_USER=root DB_PASSWORD=hmtest
+          else
+            export DB_USER=hmailserver DB_PASSWORD=hmtest
+          fi
+          bash build/db-upgrade-gate.sh "$BACKEND"
+
   publish:
     name: attach the packages to the release
     needs: [ build, package-install, stamps ]
