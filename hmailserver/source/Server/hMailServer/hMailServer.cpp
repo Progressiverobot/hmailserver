@@ -168,6 +168,26 @@ namespace HM
          return S_OK;
       }
 
+      void UnregisterLocalService()
+      //------------------------------------------------------------------------//
+      // Takes the LocalService value off the AppID for the life of this process,
+      // so that a client's CreateObject("hMailServer.Application") reaches the
+      // class objects this process registers instead of asking the service
+      // control manager to start the service. RegisterAppID puts the value back
+      // on the next start of any kind, so nothing is left behind.
+      //------------------------------------------------------------------------//
+      {
+         CRegKey keyAppID;
+         if (keyAppID.Open(HKEY_CLASSES_ROOT, _T("AppID"), KEY_WRITE) != ERROR_SUCCESS)
+            return;
+
+         CRegKey key;
+         if (key.Open(keyAppID, GetAppIdT(), KEY_WRITE) != ERROR_SUCCESS)
+            return;
+
+         key.DeleteValue(_T("LocalService"));
+      }
+
       bool run_as_service_;
    };
 
@@ -322,15 +342,42 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
       //     for debugging purposes.
       DEBUG_MODE = true;
 
+      // A console server is what a debugger or a coverage tool launches, and
+      // the regression suite drives the server over COM. Until 11 September
+      // 2026 a client's CreateObject("hMailServer.Application") could not
+      // reach it: RegisterAppID above had just re-asserted the AppID's
+      // LocalService value, so the COM service control manager started the
+      // service instead of connecting to this process - and this branch
+      // registered no class objects for it to connect to anyway. So, here
+      // only: the LocalService value comes off the AppID for the life of this
+      // process, the class objects are registered before the database is
+      // opened and resumed after it, in the order ServiceMain uses, and the
+      // module does not unload on a client's last release, as the service does
+      // not. The service must be stopped first; the two would share the ports.
+      _AtlModule.run_as_service_ = true;
+      _AtlModule.UnregisterLocalService();
+      _AtlModule.RegisterObjects();
+
       // Connect to the database and create configuration objects.
       InitializeApplication();
 
-      while(true)
+      // Inform the OLE SCM that it can now create objects.
+      _AtlModule.ResumeObjects();
+
+      // The process is a Windows-subsystem one, so there is no console to
+      // close: it ends when a WM_QUIT reaches this thread - posted by whoever
+      // launched it (a coverage run does, once the suite is over) - and stops
+      // the servers and closes the database on the way out, as a service stop
+      // does.
+      MSG msg;
+      while (GetMessage(&msg, 0, 0, 0) > 0)
       {
-         // This thread just sits here and waits
-         // until the debugger is stopped.
-         Sleep(5000);
+         TranslateMessage(&msg);
+         DispatchMessage(&msg);
       }
+
+      HM::Application::Instance()->StopServers();
+      HM::Application::Instance()->ExitInstance();
    }
    else if (sLastParam.CompareNoCase(_T("RunAsService")) == 0)
    {
