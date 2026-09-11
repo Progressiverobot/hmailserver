@@ -219,6 +219,8 @@ namespace HM
          RouteMeIdentities,
          RouteMePreferences,
          RouteMePreferencesPut,
+         RouteMeFolderEmpty,
+         RouteMeMessageSource,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -426,6 +428,16 @@ namespace HM
       static HttpResponse HandleMePreferences_(const Caller &caller);
       static HttpResponse HandleMePreferencesPut_(const Caller &caller, const AnsiString &requestBody);
       static AnsiString PreferencesJson_(__int64 accountId);
+
+      // Archive, Junk and Trash as actions: a designated folder made on demand,
+      // spamd taught by a move into or out of Junk, a Junk or Trash folder
+      // emptied; the message's raw headers, its Authentication-Results
+      // verdicts and whether its sender is external; the file itself.
+      static std::shared_ptr<IMAPFolder> DesignatedFolderOrCreate_(std::shared_ptr<const Account> account, int designation, const String &name);
+      static void LearnAfterMove_(std::shared_ptr<IMAPFolder> source, std::shared_ptr<IMAPFolder> destination, __int64 newMessageId, std::shared_ptr<const Account> account);
+      static HttpResponse HandleMeFolderEmpty_(const Caller &caller, __int64 folderId);
+      static HttpResponse HandleMeMessageSource_(const Caller &caller, __int64 messageId);
+      static AnsiString HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
