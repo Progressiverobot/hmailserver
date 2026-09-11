@@ -126,6 +126,32 @@ namespace HM
       return PersistentMessage::SaveFlags(message);
    }
 
+   bool
+   FolderManager::UpdateMessageFlags(int accountID, int folderID, __int64 messageID, int flags, const String &keywords)
+   {
+      std::shared_ptr<IMAPFolders> folders;
+      if (accountID > 0)
+         folders = IMAPFolderContainer::Instance()->GetFoldersForAccount(accountID);
+      else
+         folders = IMAPFolderContainer::Instance()->GetPublicFolders();
+
+      if (!folders)
+         return false;
+
+      std::shared_ptr<IMAPFolder> folder = folders->GetItemByDBIDRecursive(folderID);
+      if (!folder)
+         return false;
+
+      std::shared_ptr<Message> message = folder->GetMessages()->GetItemByDBID(messageID);
+
+      if (!message)
+         return false;
+
+      message->SetFlags(flags);
+      message->SetKeywords(keywords);
+      return PersistentMessage::SaveFlags(message);
+   }
+
 
 
 }

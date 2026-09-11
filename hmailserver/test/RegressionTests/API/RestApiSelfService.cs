@@ -1943,6 +1943,103 @@ namespace RegressionTests.API
          }
       }
 
+      [Test]
+      [Description("IMAP keywords are stored, shown by FETCH and the STORE reply, listed by SELECT, advertised with \\*, searched, carried by COPY, taken by APPEND, and seen and set over REST")]
+      public void KeywordsAreStoredFetchedSearchedCopiedAndSeenOverRest()
+      {
+         Deliver(Address, "Tagged", "One.");
+         Deliver(Address, "Plain", "Two.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         string selected;
+         Assert.IsTrue(imap.SelectFolder("INBOX", out selected));
+         StringAssert.Contains("PERMANENTFLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged \\*)", selected);
+
+         string stored = imap.SendSingleCommand("A1 STORE 1 +FLAGS ($Label1 Work)");
+         StringAssert.Contains("FLAGS ($Label1 Work)", stored);
+         StringAssert.Contains("A1 OK", stored);
+         Assert.AreEqual("1", imap.Search("KEYWORD Work"));
+         Assert.AreEqual("1", imap.Search("KEYWORD work"));
+         Assert.AreEqual("2", imap.Search("UNKEYWORD Work"));
+         Assert.AreEqual("2", imap.Search("NOT KEYWORD $Label1"));
+         string fetched = imap.Fetch("1 (FLAGS)");
+         StringAssert.Contains("$Label1 Work", fetched);
+
+         string removed = imap.SendSingleCommand("A2 STORE 1 -FLAGS (Work)");
+         StringAssert.Contains("FLAGS ($Label1)", removed);
+         string replaced = imap.SendSingleCommand("A3 STORE 1 FLAGS (\\Seen Home)");
+         StringAssert.Contains("FLAGS (\\Seen Home)", replaced);
+         string refused = imap.SendSingleCommand("A4 STORE 1 +FLAGS (Not(Valid))");
+         StringAssert.Contains("A4 BAD", refused);
+         string reselected;
+         Assert.IsTrue(imap.SelectFolder("INBOX", out reselected));
+         StringAssert.Contains("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged Home)", reselected);
+
+         Assert.IsTrue(imap.CreateFolder("Kept"));
+         Assert.IsTrue(imap.Copy(1, "Kept"));
+         string appended = imap.SendSingleCommandWithLiteral("A5 APPEND Kept (\\Seen Appended) {30}", "Subject: Added\r\n\r\nBy APPEND.\r\n");
+         StringAssert.Contains("A5 OK", appended);
+         Assert.IsTrue(imap.SelectFolder("Kept"));
+         string copied = imap.Fetch("1 (FLAGS)");
+         StringAssert.Contains("Home", copied);
+         string added = imap.Fetch("2 (FLAGS)");
+         StringAssert.Contains("Appended", added);
+         imap.Disconnect();
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) list = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, list.status, "Body: " + list.body);
+         StringAssert.Contains("\"keywords\":[\"Home\"]", list.body);
+         long tagged = IdBefore(list.body, "\"subject\":\"Tagged\"");
+
+         (int status, string body) changed = Http("PUT", "/api/v1/me/messages/" + tagged + "/flags", UserHeader(UserPassword), "{\"keywords_add\":[\"Urgent\"],\"keywords_remove\":[\"Home\"]}");
+         Assert.AreEqual(200, changed.status, "Body: " + changed.body);
+         StringAssert.Contains("\"keywords\":[\"Urgent\"]", changed.body);
+         (int status, string body) found = Http("GET", "/api/v1/me/search?q=label:urgent", UserHeader(UserPassword));
+         Assert.AreEqual(200, found.status, "Body: " + found.body);
+         StringAssert.Contains("\"subject\":\"Tagged\"", found.body);
+         // In the INBOX, where the label came off; the copy in Kept keeps its Home.
+         (int status, string body) none = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=label:home", UserHeader(UserPassword));
+         Assert.AreEqual(200, none.status, "Body: " + none.body);
+         Assert.IsFalse(none.body.Contains("\"subject\":\"Tagged\""), "The label was taken off. Body: " + none.body);
+         (int status, string body) bad = Http("PUT", "/api/v1/me/messages/" + tagged + "/flags", UserHeader(UserPassword), "{\"keywords_add\":[\"two words\"]}");
+         Assert.AreEqual(400, bad.status, "Body: " + bad.body);
+      }
+
+      [Test]
+      [Description("A Sieve addflag at delivery stores a keyword on the message, which IMAP and REST both show")]
+      public void ASieveAddflagStoresAKeywordAtDelivery()
+      {
+         try
+         {
+            (int status, string body) set = Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword),
+               "{\"script\":\"require [\\\"imap4flags\\\"];\\nif header :contains \\\"subject\\\" \\\"invoice\\\" { addflag \\\"Receipts\\\"; }\\n\"}");
+            Assert.AreEqual(200, set.status, "Body: " + set.body);
+
+            Deliver(Address, "Invoice 42", "Pay me.");
+            Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+            var imap = new ImapClientSimulator();
+            Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+            Assert.IsTrue(imap.SelectFolder("INBOX"));
+            string flags = imap.Fetch("1 (FLAGS)");
+            StringAssert.Contains("Receipts", flags);
+            imap.Disconnect();
+
+            (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+            long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+            (int status, string body) list = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+            StringAssert.Contains("\"keywords\":[\"Receipts\"]", list.body);
+         }
+         finally
+         {
+            Http("PUT", "/api/v1/me/filters", UserHeader(UserPassword), "{\"script\":\"\"}");
+         }
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);

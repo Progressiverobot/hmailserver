@@ -8,6 +8,8 @@
 #include "IMAPConnection.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/ACLPermission.h"
+#include "../Common/Sieve/SieveParser.h"
+#include "../Common/Util/Parsing/StringParser.h"
 #include "../Common/BO/Domain.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/IMAPFolders.h"
@@ -599,6 +601,27 @@ namespace HM
       current_message_->SetFlagDraft(bDraft);
       current_message_->SetFlagAnswered(bAnswered);
       current_message_->SetFlagFlagged(bFlagged);
+
+      // Keywords in the flag list are kept too - they are "the other flags"
+      // of RFC 4314, so only where those may be written.
+      if (pConnection->CheckPermission(destination_folder_, ACLPermission::PermissionWriteOthers))
+      {
+         String rest = flags_to_set_;
+         rest.Replace(_T("("), _T(" "));
+         rest.Replace(_T(")"), _T(" "));
+         std::vector<String> atoms = StringParser::SplitString(rest, " ");
+         std::vector<String> keywords;
+         for (size_t i = 0; i < atoms.size(); i++)
+         {
+            String atom = atoms[i];
+            atom.TrimLeft();
+            atom.TrimRight();
+            if (atom.IsEmpty() || atom[0] == '\\' || !SieveParser::IsValidFlagName(atom))
+               continue;
+            keywords.push_back(atom);
+         }
+         current_message_->SetKeywordList(keywords);
+      }
 
       // Set the create time
       if (!create_time_to_set_.IsEmpty())

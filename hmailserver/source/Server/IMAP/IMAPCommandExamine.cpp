@@ -9,6 +9,7 @@
 #include "IMAPSimpleCommandParser.h"
 
 #include "MessagesContainer.h"
+#include <set>
 #include "IMAPFolderView.h"
 
 #include "../Common/BO/ACLPermission.h"
@@ -131,7 +132,27 @@ namespace HM
          sResponse += sRespTemp;
       }
 
-      sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged)\r\n");
+      // RFC 3501: FLAGS lists the flags a message in the mailbox may carry -
+      // the five system flags and every keyword any message here has.
+      String sKeywordsInUse;
+      {
+         std::set<String> seenLowered;
+         for (int i = 0; messages && i < messages->GetCount(); i++)
+         {
+            std::shared_ptr<Message> pOne = messages->GetItem((unsigned int) i);
+            if (!pOne)
+               continue;
+            std::vector<String> list = pOne->GetKeywordList();
+            for (size_t k = 0; k < list.size(); k++)
+            {
+               String lowered = list[k];
+               lowered.ToLower();
+               if (seenLowered.insert(lowered).second)
+                  sKeywordsInUse += _T(" ") + list[k];
+            }
+         }
+      }
+      sResponse += _T("* FLAGS (\\Deleted \\Seen \\Draft \\Answered \\Flagged") + sKeywordsInUse + _T(")\r\n");
 
       sRespTemp.Format(_T("* OK [UIDVALIDITY %d] current uidvalidity\r\n"), pSelectedFolder->GetCreationTime().ToInt());
       sResponse += sRespTemp;

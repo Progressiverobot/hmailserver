@@ -37,6 +37,7 @@
 #include "../Common/Application/IniFileSettings.h"
 #include "../Common/Util/Parsing/StringParser.h"
 #include "../Common/Sieve/SieveStorage.h"
+#include "../Common/Sieve/SieveParser.h"
 #include "../Common/Sieve/SieveScript.h"
 #include "../Common/Sieve/SieveVacationResponder.h"
 #include "../Common/Sieve/SieveDuplicateTracker.h"
@@ -603,33 +604,18 @@ namespace HM
       message->SetFlagDeleted(deleted);
       message->SetFlagDraft(draft);
 
-      // Anything else is a keyword, and this server cannot store one: messageflags is
-      // a fixed 8-bit bitmask and SELECT advertises PERMANENTFLAGS without \*, so
-      // there is nowhere to put it and no way for a client to see it.
-      //
-      // Said out loud rather than dropped. Silently discarding half of what a script
-      // asked for is precisely the failure this whole change exists to end, and an
-      // administrator whose "filed and tagged" rule only files needs to be told which
-      // half worked. One line per delivery that uses keywords, naming them.
-      std::vector<String> unsupported;
-
+      // Anything else is a keyword - the webmail's labels - stored with the
+      // message (messagekeywords) and shown to every IMAP client as a flag of
+      // its own. The parser has already refused anything that is not an atom.
+      std::vector<String> keywords;
       for (const String &flag : sieveFlags)
       {
-         if (flag.Compare(_T("\\Seen")) == 0 || flag.Compare(_T("\\Answered")) == 0 ||
-             flag.Compare(_T("\\Flagged")) == 0 || flag.Compare(_T("\\Deleted")) == 0 ||
-             flag.Compare(_T("\\Draft")) == 0)
+         if (flag.IsEmpty() || flag[0] == '\\')
             continue;
-
-         unsupported.push_back(flag);
+         if (SieveParser::IsValidFlagName(flag))
+            keywords.push_back(flag);
       }
-
-      if (!unsupported.empty())
-      {
-         LOG_APPLICATION(Formatter::Format("SMTPDeliverer - The Sieve script for {0} set the flag(s) {1}, which this "
-            "server cannot store: only \\Seen, \\Answered, \\Flagged, \\Deleted and \\Draft are held against a "
-            "message. The rest of the script was applied.",
-            account->GetAddress(), StringParser::JoinVector(unsupported, _T(" "))));
-      }
+      message->SetKeywordList(keywords);
    }
 
    bool

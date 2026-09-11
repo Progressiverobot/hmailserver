@@ -187,7 +187,8 @@ create table hm_messages
 	messageemailid varchar(48) not null,
 	messagelocked tinyint not null,
    messageuid bigint not null,
-   messagemodseq bigint not null default 1
+   messagemodseq bigint not null default 1,
+   messagekeywords varchar(500) not null default ''
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_messages ON hm_messages (messageaccountid, messagefolderid);
@@ -1134,4 +1135,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6035);
+insert into hm_dbversion values (6036);

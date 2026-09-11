@@ -11,6 +11,8 @@
 #include "../Common/BO/Message.h"
 #include "../Common/BO/IMAPFolder.h"
 #include "../Common/BO/ACLPermission.h"
+#include "../Common/Sieve/SieveParser.h"
+#include "../Common/Util/Parsing/StringParser.h"
 
 #include "../Common/Tracking/ChangeNotification.h"
 #include "../Common/Tracking/NotificationServer.h"
@@ -75,6 +77,49 @@ namespace HM
       bool bDraft = (sCommand.FindNoCase(_T("\\Draft")) >= 0);
       bool bAnswered = (sCommand.FindNoCase(_T("\\Answered")) >= 0);
       bool bFlagged = (sCommand.FindNoCase(_T("\\Flagged")) >= 0);
+
+      // The keywords: every atom of the flag list that is not a system flag.
+      // The list is what follows FLAGS or FLAGS.SILENT, in parentheses or
+      // not; an atom that is not a keyword is a syntax error.
+      std::vector<String> keywordsGiven;
+      {
+         int at = sCommand.FindNoCase(_T("FLAGS"));
+         if (at >= 0)
+         {
+            String rest = sCommand.Mid(at + 5);
+            if (rest.FindNoCase(_T(".SILENT")) == 0)
+               rest = rest.Mid(7);
+            rest.TrimLeft();
+            rest.TrimRight();
+            // RFC 3501: the flag list is one parenthesised list, or bare atoms.
+            // A parenthesis anywhere else - "(Not(Valid))" - is a syntax error,
+            // not two keywords; it used to be read as exactly that.
+            if (!rest.IsEmpty() && rest[0] == '(')
+            {
+               if (rest[rest.GetLength() - 1] != ')')
+                  return IMAPResult(IMAPResult::ResultBad, "Unbalanced flag list");
+               rest = rest.Mid(1, rest.GetLength() - 2);
+            }
+            if (rest.Find(_T("(")) >= 0 || rest.Find(_T(")")) >= 0)
+               return IMAPResult(IMAPResult::ResultBad, "Invalid keyword: a flag is an atom");
+            std::vector<String> atoms = StringParser::SplitString(rest, " ");
+            for (size_t i = 0; i < atoms.size(); i++)
+            {
+               String atom = atoms[i];
+               atom.TrimLeft();
+               atom.TrimRight();
+               if (atom.IsEmpty() || atom[0] == '\\')
+                  continue;
+               if (!SieveParser::IsValidFlagName(atom))
+                  return IMAPResult(IMAPResult::ResultBad, String("Invalid keyword: ") + atom);
+               keywordsGiven.push_back(atom);
+            }
+         }
+      }
+
+      // Keywords are "the other flags" of RFC 4314.
+      if (!keywordsGiven.empty() && !pConnection->CheckPermission(pConnection->GetCurrentFolder(), ACLPermission::PermissionWriteOthers))
+         return IMAPResult(IMAPResult::ResultNo, "ACL: WriteOthers permission denied (Required for STORE command).");
    
       if (bSeen)
       {
@@ -109,6 +154,8 @@ namespace HM
             pMessage->SetFlagAnswered(false);
          if (bFlagged)
             pMessage->SetFlagFlagged(false);
+         for (size_t i = 0; i < keywordsGiven.size(); i++)
+            pMessage->RemoveKeyword(keywordsGiven[i]);
 
 
 
@@ -126,6 +173,11 @@ namespace HM
             pMessage->SetFlagAnswered(true);
          if (bFlagged)
             pMessage->SetFlagFlagged(true);
+         for (size_t i = 0; i < keywordsGiven.size(); i++)
+         {
+            if (!pMessage->AddKeyword(keywordsGiven[i]))
+               return IMAPResult(IMAPResult::ResultNo, "Too many keywords on the message.");
+         }
        
       }
       else if (sCommand.FindNoCase(_T("FLAGS")) >= 0)
@@ -136,12 +188,14 @@ namespace HM
          pMessage->SetFlagDraft(bDraft);
          pMessage->SetFlagAnswered(bAnswered);
          pMessage->SetFlagFlagged(bFlagged);
+         if (pConnection->CheckPermission(pConnection->GetCurrentFolder(), ACLPermission::PermissionWriteOthers))
+            pMessage->SetKeywordList(keywordsGiven);
       }
 
       bool result = Application::Instance()->GetFolderManager()->UpdateMessageFlags(
          (int) pConnection->GetCurrentFolder()->GetAccountID(), 
          (int) pConnection->GetCurrentFolder()->GetID(),
-         pMessage->GetID(), pMessage->GetFlags());
+         pMessage->GetID(), pMessage->GetFlags(), pMessage->GetKeywords());
 
       if (!result)
       {
@@ -221,6 +275,14 @@ namespace HM
          sFlags += "\\Seen";
       }
 
+
+      std::vector<String> keywords = pMessage->GetKeywordList();
+      for (size_t i = 0; i < keywords.size(); i++)
+      {
+         if (!sFlags.IsEmpty())
+            sFlags += " ";
+         sFlags += keywords[i];
+      }
 
       // It really should be FETCH below...
       String sRet;

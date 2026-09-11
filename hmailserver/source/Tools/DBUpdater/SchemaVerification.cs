@@ -424,7 +424,10 @@ namespace DBUpdater
          new SchemaProbe(6035, "hm_files.filepasswordhash",
                          "update hm_files set filepasswordhash = filepasswordhash where 1 = 0"),
          new SchemaProbe(6035, "hm_files.filedownloads",
-                         "update hm_files set filedownloads = filedownloads where 1 = 0")
+                         "update hm_files set filedownloads = filedownloads where 1 = 0"),
+         // Upgrade6035to6036* - IMAP keywords (labels) on a message.
+         new SchemaProbe(6036, "hm_messages.messagekeywords",
+                         "update hm_messages set messagekeywords = messagekeywords where 1 = 0")
       };
 
       /// <summary>

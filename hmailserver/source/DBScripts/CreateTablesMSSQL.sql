@@ -302,7 +302,8 @@ create table hm_messages (
 	messageemailid nvarchar(48) not null,
 	messagelocked tinyint not null,
    messageuid bigint not null,
-   messagemodseq bigint not null
+   messagemodseq bigint not null,
+   messagekeywords nvarchar(500) not null default ''
 ) 
 
 ALTER TABLE hm_messages ADD CONSTRAINT hm_messages_pk PRIMARY KEY NONCLUSTERED (messageid) 
@@ -1286,4 +1287,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6035)
+insert into hm_dbversion values (6036)

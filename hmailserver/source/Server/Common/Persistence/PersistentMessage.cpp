@@ -288,6 +288,7 @@ namespace HM
       pMessage->SetFolderID(pRS->GetLongValue("messagefolderid"));
 
       pMessage->SetFlags((short) pRS->GetLongValue("messageflags"));
+      pMessage->SetKeywords(pRS->GetStringValue("messagekeywords"));
       pMessage->SetUID((unsigned int) pRS->GetLongValue("messageuid"));
       pMessage->SetModSeq(pRS->GetInt64Value("messagemodseq"));
 
@@ -664,6 +665,7 @@ namespace HM
       // now, so a copy of a binary message is still binary without a second
       // statement that could be forgotten.
       pTo->SetFlags(sourceMessage->GetFlags());
+      pTo->SetKeywords(sourceMessage->GetKeywords());
 
       return pTo;
    }
@@ -784,6 +786,7 @@ namespace HM
       oStatement.AddColumn("messagefrom", pMessage->GetFromAddress());
       oStatement.AddColumn("messagesize", pMessage->GetSize());
       oStatement.AddColumn("messageflags", pMessage->GetFlags());
+      oStatement.AddColumn("messagekeywords", pMessage->GetKeywords());
       oStatement.AddColumnInt64("messagefolderid", pMessage->GetFolderID());
     
       LOG_DEBUG("Saving message: " + pMessage->GetPartialFileName());
@@ -1720,10 +1723,13 @@ namespace HM
          message->SetModSeq(newModSeq);
 
       // Create a statement object.
-      String statement = "UPDATE hm_messages SET messageflags = @FLAGS, messagemodseq = @MODSEQ WHERE messageid = @MESSAGEID";
+      // The keywords ride in the same statement: a label is a flag change
+      // to every client, with the same mod-sequence.
+      String statement = "UPDATE hm_messages SET messageflags = @FLAGS, messagekeywords = @KEYWORDS, messagemodseq = @MODSEQ WHERE messageid = @MESSAGEID";
 
       SQLCommand sqlCommand(statement);
       sqlCommand.AddParameter("@FLAGS", message->GetFlags());
+      sqlCommand.AddParameter("@KEYWORDS", message->GetKeywords());
       sqlCommand.AddParameter("@MODSEQ", message->GetModSeq());
       sqlCommand.AddParameter("@MESSAGEID", message->GetID());
 
