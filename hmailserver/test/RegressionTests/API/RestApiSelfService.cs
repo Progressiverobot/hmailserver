@@ -1112,6 +1112,87 @@ namespace RegressionTests.API
          Assert.AreEqual(404, theirs.status, "Body: " + theirs.body);
       }
 
+      [Test]
+      [Description("q takes words, quoted phrases and from:, to:, subject:, has:attachment, before:, after:, in:, is:unread and is:flagged, in the search and in a folder listing")]
+      public void SearchOperatorsNarrowTheHits()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Invoice March", "The March invoice is attached in spirit.");
+         SmtpClientSimulator.StaticSend("bob@example.org", Address, "Invoice April", "The April invoice.");
+         SmtpClientSimulator.StaticSend("carol@example.net", Address, "Holiday plans", "Sun and sand.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"With a file\",\"text\":\"See the file.\",\"attachments\":[{\"name\":\"note.txt\",\"type\":\"text/plain\",\"data\":\"SGVsbG8=\"}]}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 4);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long april = IdBefore(page.body, "\"subject\":\"Invoice April\"");
+         long holiday = IdBefore(page.body, "\"subject\":\"Holiday plans\"");
+         Http("PUT", "/api/v1/me/messages/" + april + "/flags", UserHeader(UserPassword), "{\"seen\":true}");
+         Http("PUT", "/api/v1/me/messages/" + holiday + "/flags", UserHeader(UserPassword), "{\"flagged\":true}");
+
+         Func<string, string> search = (q) =>
+         {
+            (int status, string body) hit = Http("GET", "/api/v1/me/search?q=" + Uri.EscapeDataString(q), UserHeader(UserPassword));
+            Assert.AreEqual(200, hit.status, "q=" + q + " Body: " + hit.body);
+            return hit.body;
+         };
+
+         string byFrom = search("from:alice");
+         StringAssert.Contains("Invoice March", byFrom);
+         StringAssert.DoesNotContain("Invoice April", byFrom);
+
+         string wordAndFrom = search("invoice from:bob");
+         StringAssert.Contains("Invoice April", wordAndFrom);
+         StringAssert.DoesNotContain("Invoice March", wordAndFrom);
+
+         string bySubject = search("subject:holiday");
+         StringAssert.Contains("Holiday plans", bySubject);
+         StringAssert.DoesNotContain("Invoice", bySubject);
+
+         string phrase = search("\"invoice april\"");
+         StringAssert.Contains("Invoice April", phrase);
+         StringAssert.DoesNotContain("Invoice March", phrase);
+
+         string unread = search("is:unread invoice");
+         StringAssert.Contains("Invoice March", unread);
+         StringAssert.DoesNotContain("Invoice April", unread);
+
+         string flagged = search("is:flagged");
+         StringAssert.Contains("Holiday plans", flagged);
+         StringAssert.DoesNotContain("Invoice", flagged);
+
+         string dated = search("before:2000-01-01 invoice");
+         StringAssert.DoesNotContain("Invoice", dated);
+         string since = search("after:2000-01-01 invoice");
+         StringAssert.Contains("Invoice March", since);
+         StringAssert.Contains("Invoice April", since);
+
+         string inFolder = search("in:inbox holiday");
+         StringAssert.Contains("Holiday plans", inFolder);
+         string elsewhere = search("in:nowhere holiday");
+         StringAssert.DoesNotContain("Holiday plans", elsewhere);
+
+         string withFile = search("has:attachment");
+         StringAssert.Contains("With a file", withFile);
+         StringAssert.DoesNotContain("Holiday plans", withFile);
+
+         string toMe = search("to:" + Address + " april");
+         StringAssert.Contains("Invoice April", toMe);
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("from:carol"), UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("Holiday plans", listed.body);
+         StringAssert.DoesNotContain("Invoice", listed.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
