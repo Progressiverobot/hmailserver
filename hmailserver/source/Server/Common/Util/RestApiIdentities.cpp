@@ -19,6 +19,7 @@
 #include "../BO/ACLPermission.h"
 #include "../Application/ACLManager.h"
 #include "../Application/Application.h"
+#include "../Application/Logger.h"
 #include "../Cache/CacheContainer.h"
 #include "../SQL/SQLCommand.h"
 #include "../SQL/DALRecordset.h"
@@ -81,13 +82,35 @@ namespace HM
          return name;
       }
 
+      // Anything below a space, or DEL: a name or an address carrying one
+      // would end or fold a header line.
+      bool HasControlCharacters(const String &text)
+      {
+         for (int i = 0; i < text.GetLength(); i++)
+         {
+            if (text[i] < 0x20 || text[i] == 0x7f)
+               return true;
+         }
+         return false;
+      }
+
       String HeaderFor(const String &name, const String &address)
       {
          if (name.IsEmpty())
             return address;
 
+         // A quoted-string: the two characters that end or escape one are
+         // escaped, so a name is a name however it is spelled.
+         String quoted;
+         for (int i = 0; i < name.GetLength(); i++)
+         {
+            if (name[i] == _T('\\') || name[i] == _T('"'))
+               quoted += _T('\\');
+            quoted += name[i];
+         }
+
          String header = _T("\"");
-         header += name;
+         header += quoted;
          header += _T("\" <");
          header += address;
          header += _T(">");
@@ -236,6 +259,12 @@ namespace HM
       String own = account->GetAddress();
       own.ToLower();
 
+      if (HasControlCharacters(name) || HasControlCharacters(wanted))
+      {
+         problem = "{\"error\":\"from may not contain control characters\"}";
+         return 400;
+      }
+
       if (wanted.IsEmpty())
       {
          address = account->GetAddress();
@@ -254,13 +283,36 @@ namespace HM
          String reason;
          if (!SMTPConnection::SenderPermittedFor(account->GetAddress(), wanted, reason))
          {
-            problem = "{\"error\":\"you may not write as " + JsonEscape_(Utf8_(wanted)) + ": " + JsonEscape_(Utf8_(reason)) + "\"}";
+            // The reason goes to the log, not to the caller: SMTP answers the
+            // same refusal generically, and the reason can say whether a local
+            // account exists.
+            LOG_APPLICATION("REST API: " + account->GetAddress() + " may not write as " + wanted + ": " + reason);
+            problem = "{\"error\":\"you may not write as " + JsonEscape_(Utf8_(wanted)) + "\"}";
             return 403;
          }
       }
 
+      // No name given: the identity's own, as the picker lists it - for a
+      // granted address, its owner's name, not the caller's.
+      String displayName = name;
+      if (displayName.IsEmpty())
+      {
+         std::vector<Identity> identities;
+         IdentitiesFor_(account, identities);
+         for (size_t i = 0; i < identities.size(); i++)
+         {
+            if (identities[i].address.CompareNoCase(wanted) == 0)
+            {
+               displayName = identities[i].name;
+               break;
+            }
+         }
+         if (displayName.IsEmpty())
+            displayName = FullName(account);
+      }
+
       address = wanted;
-      header = HeaderFor(name.IsEmpty() ? FullName(account) : name, wanted);
+      header = HeaderFor(displayName, wanted);
       return 0;
    }
 }

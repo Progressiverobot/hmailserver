@@ -36,7 +36,8 @@ namespace HM
       const int PreferenceKeyMaximum = 64;
       const int PreferenceValueMaximum = 4000;
       const int PreferencesPerAccount = 100;
-      const size_t PreferencesBodyMaximum = 512 * 1024;
+      // The listener already refuses a body above 64 KiB; this is the same figure, stated here.
+      const size_t PreferencesBodyMaximum = 64 * 1024;
 
       AnsiString Int64Text(__int64 value)
       {
@@ -178,6 +179,8 @@ namespace HM
       const std::vector<std::pair<std::string, JsonValue> > &members = document.Members();
       if (members.empty())
          return BuildResponse_(400, "{\"error\":\"nothing to change\"}");
+      if ((int) members.size() > PreferencesPerAccount)
+         return BuildResponse_(400, "{\"error\":\"at most 100 members in one request\"}");
 
       // Everything is checked before anything is written, so a bad member
       // leaves the store as it was.
@@ -197,15 +200,34 @@ namespace HM
             return BuildResponse_(400, "{\"error\":\"a value is at most 4000 characters: " + JsonEscape_(AnsiString(members[i].first.c_str())) + "\"}");
       }
 
+      // The count this request would leave, found before anything is written,
+      // so a request that would pass the cap is refused whole.
       int count = CountPreferences(account->GetID());
+      std::vector<bool> presentBefore(members.size(), false);
+      int resulting = count;
+      for (size_t i = 0; i < members.size(); i++)
+      {
+         String key;
+         Unicode::MultiByteToWide(AnsiString(members[i].first.c_str()), key);
+         __int64 existing = 0;
+         presentBefore[i] = FindPreference(account->GetID(), key, existing);
+         if (members[i].second.IsNull())
+         {
+            if (presentBefore[i])
+               resulting--;
+         }
+         else if (!presentBefore[i])
+            resulting++;
+      }
+      if (resulting > PreferencesPerAccount)
+         return BuildResponse_(400, "{\"error\":\"at most 100 preferences\"}");
+
       for (size_t i = 0; i < members.size(); i++)
       {
          String key;
          Unicode::MultiByteToWide(AnsiString(members[i].first.c_str()), key);
          const JsonValue &value = members[i].second;
-
-         __int64 existing = 0;
-         bool present = FindPreference(account->GetID(), key, existing);
+         bool present = presentBefore[i];
 
          if (value.IsNull())
          {
@@ -213,16 +235,8 @@ namespace HM
             {
                if (!RemovePreference(account->GetID(), key))
                   return BuildResponse_(500, "{\"error\":\"the preference could not be removed\"}");
-               count--;
             }
             continue;
-         }
-
-         if (!present)
-         {
-            if (count >= PreferencesPerAccount)
-               return BuildResponse_(400, "{\"error\":\"at most 100 preferences\"}");
-            count++;
          }
 
          String text;

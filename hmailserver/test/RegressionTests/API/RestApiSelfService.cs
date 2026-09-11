@@ -729,6 +729,37 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("A preferences request with more than a hundred members, or one that would leave more than a hundred keys, is refused before anything is written")]
+      public void PreferencesAreCappedBeforeAnythingIsWritten()
+      {
+         var many = new StringBuilder("{");
+         for (int i = 0; i < 101; i++)
+            many.Append((i > 0 ? "," : "") + "\"k" + i + "\":\"v\"");
+         many.Append("}");
+         (int status, string body) tooMany = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), many.ToString());
+         Assert.AreEqual(400, tooMany.status, "Body: " + tooMany.body);
+         StringAssert.Contains("members", tooMany.body);
+
+         // Ninety-nine keys fit; a request for three more is refused whole,
+         // and the two that would have fitted are not written either.
+         var fill = new StringBuilder("{");
+         for (int i = 0; i < 99; i++)
+            fill.Append((i > 0 ? "," : "") + "\"fill" + i + "\":\"v\"");
+         fill.Append("}");
+         (int status, string body) filled = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), fill.ToString());
+         Assert.AreEqual(200, filled.status, "Body: " + filled.body);
+         (int status, string body) over = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"extra1\":\"v\",\"extra2\":\"v\",\"extra3\":\"v\"}");
+         Assert.AreEqual(400, over.status, "Body: " + over.body);
+         (int status, string body) after = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         Assert.IsFalse(after.body.Contains("\"extra1\""), "Nothing of a refused request is written. Body: " + after.body);
+         Assert.AreEqual(99, after.body.Split(new[] { "\"fill" }, StringSplitOptions.None).Length - 1, after.body);
+
+         // Removing one and adding one in the same request stays within the cap.
+         (int status, string body) swap = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"fill0\":null,\"swapped\":\"v\",\"last\":\"v\"}");
+         Assert.AreEqual(200, swap.status, "Body: " + swap.body);
+      }
+
+      [Test]
       public void PreferencesAreTheAccountsOwn()
       {
          string other = "other@" + _domain.Name;
@@ -848,6 +879,27 @@ namespace RegressionTests.API
             "{\"from\":\"not an address\",\"to\":\"" + other + "\",\"subject\":\"Not one\",\"text\":\"Body.\"}");
          Assert.AreEqual(400, malformed.status, "Body: " + malformed.body);
 
+         // A name with a line break in it would end the From header; refused.
+         (int status, string body) folded = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"Sales\\r\\nBcc: x@example.com <" + sales + ">\",\"to\":\"" + other + "\",\"subject\":\"Folded\",\"text\":\"Body.\"}");
+         Assert.AreEqual(400, folded.status, "Body: " + folded.body);
+         StringAssert.Contains("control characters", folded.body);
+
+         // A name with a quote and a backslash is escaped in the quoted-string.
+         (int status, string body) quoted = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"Say \\\"hi\\\" \\\\ Desk <" + sales + ">\",\"to\":\"" + other + "\",\"subject\":\"Quoted\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, quoted.status, "Body: " + quoted.body);
+         string quotedReceived = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("From: \"Say \\\"hi\\\" \\\\ Desk\" <" + sales + ">", quotedReceived);
+
+         // A subject that spells a key's name is a subject.
+         (int status, string body) spelled = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"subject\":\"from\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, spelled.status, "Body: " + spelled.body);
+         string spelledReceived = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("Subject: from\r\n", spelledReceived);
+         StringAssert.Contains("From: \"Sales Desk\" <" + Address + ">", spelledReceived);
+
          // A draft keeps the chosen From, with the name written in the field.
          (int status, string body) draft = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
             "{\"from\":\"The Desk <" + sales + ">\",\"to\":\"" + other + "\",\"subject\":\"Draft as sales\",\"text\":\"Body.\"}");
@@ -856,6 +908,31 @@ namespace RegressionTests.API
          (int status, string body) read = Http("GET", "/api/v1/me/messages/" + draftId, UserHeader(UserPassword));
          Assert.AreEqual(200, read.status, "Body: " + read.body);
          StringAssert.Contains("\\\"The Desk\\\" <" + sales + ">", read.body);
+
+         // A granted identity: the owner's post right on their INBOX lets this
+         // account send as them, and the From carries the owner's name.
+         Account owner = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "owner@" + _domain.Name, UserPassword);
+         owner.PersonFirstName = "Olive";
+         owner.PersonLastName = "Owner";
+         owner.Save();
+         Deliver(owner.Address, "Seed", "Creates the INBOX.");
+         Pop3ClientSimulator.AssertMessageCount(owner.Address, UserPassword, 1);
+         var inbox = owner.IMAPFolders.get_ItemByName("INBOX");
+         var grant = inbox.Permissions.Add();
+         grant.PermissionType = eACLPermissionType.ePermissionTypeUser;
+         grant.PermissionAccountID = _account.ID;
+         grant.set_Permission(eACLPermission.ePermissionPost, true);
+         grant.Save();
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/identities", UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("\"address\":\"" + owner.Address + "\",\"name\":\"Olive Owner\",\"kind\":\"granted\"", listed.body);
+
+         (int status, string body) asOwner = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"from\":\"" + owner.Address + "\",\"to\":\"" + other + "\",\"subject\":\"As the owner\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, asOwner.status, "Body: " + asOwner.body);
+         string asOwnerReceived = Pop3ClientSimulator.AssertGetFirstMessageText(other, UserPassword);
+         StringAssert.Contains("From: \"Olive Owner\" <" + owner.Address + ">", asOwnerReceived);
 
          (int status, string body) draftRefused = Http("POST", "/api/v1/me/drafts", UserHeader(UserPassword),
             "{\"from\":\"stranger@example.com\",\"to\":\"" + other + "\",\"subject\":\"Not mine\",\"text\":\"Body.\"}");
