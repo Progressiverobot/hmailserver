@@ -6,6 +6,7 @@
 #include "stdafx.h"
 #include "../Common/Application/ACLManager.h"
 #include "IMAPCommandCapability.h"
+#include "../Common/Util/GssapiAcceptor.h"
 #include "IMAPCommandAppend.h"
 #include "IMAPConnection.h"
 #include "../Common/Application/IniFileSettings.h"
@@ -102,6 +103,8 @@ namespace HM
       // per-mechanism; it is not.
       if (pConfig->GetUseIMAPSASLPlain() && authAvailable)
          sResponse += " AUTH=SCRAM-SHA-256";
+      if (pConfig->GetUseIMAPSASLPlain() && authAvailable && GssapiAcceptor::IsEnabled())
+         sResponse += " AUTH=GSSAPI";
 
       // SCRAM-SHA-256-PLUS (RFC 5802/5929) additionally binds the authentication to
       // the TLS channel via the server certificate, so it is only meaningful — and

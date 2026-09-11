@@ -18,6 +18,8 @@
 #include "../Common/Util/Hashing/ScramSha256.h"
 #include "../Common/Util/OAuth2TokenValidator.h"
 #include "../Common/Util/ClientCertificateIdentity.h"
+#include "../Common/Util/GssapiAcceptor.h"
+#include "../Common/Util/Encoding/Base64.h"
 #include "../Common/BO/Account.h"
 #include "../Common/BO/Domain.h"
 #include "../Common/BO/DomainAliases.h"
@@ -65,6 +67,11 @@ namespace HM
       {
          String sClientData = paramcount >= 2 ? pParser->GetParamValue(pArgument, 1) : String();
          return ContinueScram_(pConnection, pArgument, sClientData);
+      }
+      if (pConnection->GetGssapiSession())
+      {
+         String sClientData = paramcount >= 2 ? pParser->GetParamValue(pArgument, 1) : String();
+         return ContinueGssapi_(pConnection, pArgument, sClientData);
       }
 
       if (paramcount < 1 || paramcount > 2)
@@ -180,6 +187,17 @@ namespace HM
          return IMAPResult();
       }
 
+      if (sParam == _T("GSSAPI"))
+      {
+         if (!GssapiAcceptor::IsEnabled())
+            return IMAPResult(IMAPResult::ResultBad, "Unsupported Authenticate mechanism.");
+         pConnection->SetGssapiSession(std::make_shared<GssapiAcceptor>());
+         if (paramcount == 2)
+            return ContinueGssapi_(pConnection, pArgument, pParser->GetParamValue(pArgument, 1));
+         pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE GSSAPI ");
+         pConnection->SendAsciiData("+ \r\n");
+         return IMAPResult();
+      }
       if (sParam == _T("EXTERNAL"))
       {
          // Offered only on a connection whose client certificate verified against the
@@ -414,6 +432,60 @@ namespace HM
       }
 
       return ProcessScramClientFirst_(pConnection, pArgument, sInitialResponse);
+   }
+
+   // RFC 4752 over IMAP AUTHENTICATE: each client line is a token for the
+   // acceptor; its answer goes out as a continuation; Done names the account.
+   IMAPResult
+   IMAPCommandAUTHENTICATE::ContinueGssapi_(std::shared_ptr<IMAPConnection> pConnection, std::shared_ptr<IMAPCommandArgument> pArgument, const String &sClientData)
+   {
+      std::shared_ptr<GssapiAcceptor> session = pConnection->GetGssapiSession();
+      if (!session)
+         return IMAPResult(IMAPResult::ResultBad, "No authentication in progress.");
+      if (sClientData == _T("*"))
+      {
+         pConnection->SetGssapiSession(std::shared_ptr<GssapiAcceptor>());
+         return IMAPResult(IMAPResult::ResultBad, "AUTHENTICATE cancelled.");
+      }
+
+      AnsiString line = sClientData;
+      AnsiString token;
+      if (!line.IsEmpty() && line != "=")
+         token = Base64::Decode(line.c_str(), line.GetLength());
+      AnsiString reply;
+      String failure;
+      const GssapiAcceptor::State state = session->Step(token, reply, failure);
+      if (state == GssapiAcceptor::NeedToken || state == GssapiAcceptor::NeedLayer)
+      {
+         pConnection->SetCommandBuffer(pArgument->Tag() + " AUTHENTICATE GSSAPI ");
+         String reply64 = reply.IsEmpty() ? String() : String(Base64::Encode(reply.c_str(), reply.GetLength()));
+         pConnection->SendAsciiData("+ " + reply64 + "\r\n");
+         return IMAPResult();
+      }
+
+      pConnection->SetGssapiSession(std::shared_ptr<GssapiAcceptor>());
+      String sLoginName = session->GetPrincipal();
+      bool disconnect = false;
+      std::shared_ptr<const Account> pAccount;
+      if (state == GssapiAcceptor::Done)
+         pAccount = GssapiIdentity::Logon(session->GetPrincipal(), session->GetAuthorizationIdentity(), pConnection->GetRemoteEndpointAddress(), sLoginName, disconnect);
+      else
+         LOG_DEBUG("IMAP AUTHENTICATE GSSAPI failed: " + failure);
+      pConnection->FireOnClientLogon(sLoginName, pAccount != nullptr);
+      if (!pAccount)
+      {
+         if (disconnect || pConnection->RegisterAuthenticationFailure())
+         {
+            String sResponse = "* Too many invalid logon attempts.\r\n";
+            sResponse += pArgument->Tag() + " BAD Goodbye\r\n";
+            pConnection->Logout(sResponse);
+            return IMAPResult(IMAPResult::ResultOKSupressRead, "");
+         }
+         return IMAPResult(IMAPResult::ResultNo, state == GssapiAcceptor::Done ? "The Kerberos principal does not identify an account." : "AUTHENTICATE failed.");
+      }
+      pConnection->Login(pAccount);
+      pConnection->SendAsciiData(pArgument->Tag() + " OK AUTHENTICATE completed\r\n");
+      return IMAPResult();
    }
 
    IMAPResult

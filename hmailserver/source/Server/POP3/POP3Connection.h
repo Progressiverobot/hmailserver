@@ -16,6 +16,7 @@ namespace HM
    class ByteBuffer;
    class Account;
    class ScramSha256;
+   class GssapiAcceptor;
 
    class POP3Connection : public TCPConnection
    {
@@ -106,6 +107,7 @@ namespace HM
       ParseResult ProcessAuthBearer_(const String &sBase64);
       ParseResult ProcessAuthExternal_(const String &sBase64);
       ParseResult ContinueScram_(const String &sRequest);
+      ParseResult ContinueGssapi_(const String &sRequest);
       ParseResult ProcessScramClientFirst_(const String &sBase64);
       ParseResult ProcessScramClientFinal_(const String &sBase64);
       ParseResult ProcessScramAck_();
@@ -164,6 +166,7 @@ namespace HM
       bool sasl_bearer_pending_;
       bool sasl_external_pending_;
       std::shared_ptr<ScramSha256> scram_session_;
+      std::shared_ptr<GssapiAcceptor> gssapi_session_;
 
       // RFC 6856 UTF8 mode: set by the UTF8 command, advertised via CAPA.
       bool utf8_enabled_;

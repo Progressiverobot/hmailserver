@@ -506,6 +506,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\DataProtector.cpp" />
     <ClCompile Include="..\Common\Util\OAuth2TokenValidator.cpp" />
     <ClCompile Include="..\Common\Util\ClientCertificateIdentity.cpp" />
+    <ClCompile Include="..\Common\Util\GssapiAcceptor.cpp" />
     <ClCompile Include="..\Common\Util\HttpsClient.cpp" />
     <ClCompile Include="..\Common\Util\JsonDocument.cpp" />
     <ClCompile Include="..\Common\Util\UpdateChecker.cpp" />
