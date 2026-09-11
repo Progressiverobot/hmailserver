@@ -216,7 +216,6 @@ if (!document.body) { throw new Error('the page has no <body>'); }
 
 /* -------------------------------------------------- window, location, timers */
 
-const fired = [];
 const window = new Element('#window');
 const historyStack = [''];
 let historyAt = 0;

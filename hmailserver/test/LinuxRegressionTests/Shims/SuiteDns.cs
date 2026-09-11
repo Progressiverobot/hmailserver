@@ -26,50 +26,42 @@ namespace RegressionTests.Shared
       {
          public Zone_ WithMx(string name, int preference, string exchange)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithA(string name, string address)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithCname(string name, string target)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithTxt(string name, string text)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ ClearQueries()
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithNxDomain(string name)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithPtr(string address, string name)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
 
          public Zone_ WithAaaa(string name, string address)
          {
-            NotOnThisServer.Ignore(NotOnThisServer.NoSuiteDns);
-            return this;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSuiteDns);
          }
       }
    }

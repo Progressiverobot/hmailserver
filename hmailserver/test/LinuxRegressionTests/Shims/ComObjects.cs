@@ -1313,7 +1313,7 @@ namespace hMailServer
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing + " (TotalIndexedCount)");
          }
       }
 
@@ -1321,7 +1321,7 @@ namespace hMailServer
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing + " (TotalMessageCount)");
          }
       }
    }
@@ -1604,7 +1604,7 @@ namespace hMailServer
       public DNSBlackList Add() { throw NotOnThisServer.Skipped("adds a DNSBlackList, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public DNSBlackList this[int index] => null;
+      public DNSBlackList this[int index] => throw NotOnThisServer.Skipped("indexes a DNSBlackList, which no REST route carries yet");
 
       public DNSBlackList get_Item(int index)
       {
@@ -1649,7 +1649,7 @@ namespace hMailServer
       public SURBLServer Add() { throw NotOnThisServer.Skipped("adds a SURBLServer, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public SURBLServer this[int index] => null;
+      public SURBLServer this[int index] => throw NotOnThisServer.Skipped("indexes a SURBLServer, which no REST route carries yet");
 
       public SURBLServer get_Item(int index)
       {
@@ -1694,7 +1694,7 @@ namespace hMailServer
       public BlockedSender Add() { throw NotOnThisServer.Skipped("adds a BlockedSender, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public BlockedSender this[int index] => null;
+      public BlockedSender this[int index] => throw NotOnThisServer.Skipped("indexes a BlockedSender, which no REST route carries yet");
 
       public BlockedSender get_Item(int index)
       {
@@ -1740,7 +1740,7 @@ namespace hMailServer
       public WhiteListAddress Add() { throw NotOnThisServer.Skipped("adds a WhiteListAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public WhiteListAddress this[int index] => null;
+      public WhiteListAddress this[int index] => throw NotOnThisServer.Skipped("indexes a WhiteListAddress, which no REST route carries yet");
 
       public WhiteListAddress get_Item(int index)
       {
@@ -1785,7 +1785,7 @@ namespace hMailServer
       public GreyListingWhiteAddress Add() { throw NotOnThisServer.Skipped("adds a GreyListingWhiteAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public GreyListingWhiteAddress this[int index] => null;
+      public GreyListingWhiteAddress this[int index] => throw NotOnThisServer.Skipped("indexes a GreyListingWhiteAddress, which no REST route carries yet");
 
       public GreyListingWhiteAddress get_Item(int index)
       {
@@ -1836,7 +1836,7 @@ namespace hMailServer
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public QuarantinedMessage this[int index] => null;
+      public QuarantinedMessage this[int index] => throw NotOnThisServer.Skipped("indexes a QuarantinedMessage, which no REST route carries yet");
 
       public QuarantinedMessage get_Item(int index)
       {
@@ -2310,7 +2310,7 @@ namespace hMailServer
       public DistributionListRecipient Add() { throw NotOnThisServer.Skipped("adds a DistributionListRecipient, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public DistributionListRecipient this[int index] => null;
+      public DistributionListRecipient this[int index] => throw NotOnThisServer.Skipped("indexes a DistributionListRecipient, which no REST route carries yet");
 
       public DistributionListRecipient get_Item(int index)
       {
@@ -2428,7 +2428,7 @@ namespace hMailServer
       public RouteAddress Add() { throw NotOnThisServer.Skipped("adds a RouteAddress, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public RouteAddress this[int index] => null;
+      public RouteAddress this[int index] => throw NotOnThisServer.Skipped("indexes a RouteAddress, which no REST route carries yet");
 
       public RouteAddress get_Item(int index)
       {
@@ -3191,7 +3191,7 @@ namespace hMailServer
       public MessageHeader Add() { throw NotOnThisServer.Skipped("adds a MessageHeader, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public MessageHeader this[int index] => null;
+      public MessageHeader this[int index] => throw NotOnThisServer.Skipped("indexes a MessageHeader, which no REST route carries yet");
 
       public MessageHeader get_Item(int index)
       {
@@ -3229,7 +3229,7 @@ namespace hMailServer
       public MessageRecipient Add() { throw NotOnThisServer.Skipped("adds a MessageRecipient, which no REST route carries yet"); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public MessageRecipient this[int index] => null;
+      public MessageRecipient this[int index] => throw NotOnThisServer.Skipped("indexes a MessageRecipient, which no REST route carries yet");
 
       public MessageRecipient get_Item(int index)
       {
@@ -3256,7 +3256,7 @@ namespace hMailServer
       public int Count => 0;
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public Attachment this[int index] => null;
+      public Attachment this[int index] => throw NotOnThisServer.Skipped("indexes a Attachment, which no REST route carries yet");
 
       public Attachment get_Item(int index)
       {

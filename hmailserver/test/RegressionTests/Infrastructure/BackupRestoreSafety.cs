@@ -451,11 +451,16 @@ namespace RegressionTests.Infrastructure
          // Deliberately no assertion inside the delegate. Assert.Catch treats an
          // AssertionException like any other exception, so an assertion in here would
          // let the test pass on the strength of its own failure.
-         Exception thrown = Assert.Catch(() =>
+         Exception thrown = null;
+         try
          {
             var backup = _application.BackupManager.LoadBackup(truncated);
             Console.WriteLine("LoadBackup returned an object for a truncated archive: " + backup);
-         });
+         }
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
+         {
+            thrown = e;
+         }
 
          Assert.IsNotNull(thrown,
             "Opening a truncated archive should have failed. Backup log: " + ReadBackupLog());
@@ -478,11 +483,16 @@ namespace RegressionTests.Infrastructure
 
          CustomAsserts.AssertDeleteFile(_application.Settings.Backup.LogFile);
 
-         Exception thrown = Assert.Catch(() =>
+         Exception thrown = null;
+         try
          {
             var backup = _application.BackupManager.LoadBackup(archive);
             Console.WriteLine("LoadBackup returned an object for a newer archive: " + backup);
-         });
+         }
+         catch (Exception e) when (!ExceptionPolicy.IsFatal(e))
+         {
+            thrown = e;
+         }
 
          Assert.IsNotNull(thrown,
             "An archive from hMailServer 99.0.0 should not have opened. Backup log: " + ReadBackupLog());
