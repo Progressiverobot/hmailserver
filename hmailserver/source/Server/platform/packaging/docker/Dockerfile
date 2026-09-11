@@ -14,7 +14,7 @@
 #      -v /srv/hmailserver/certs:/certs:ro \
 #      -p 25:25 -p 587:587 -p 993:993 -p 8045:8045 \
 #      -v hm-data:/var/lib/hmailserver -v hm-logs:/var/log/hmailserver -v hm-etc:/etc/hmailserver \
-#      ghcr.io/progressiverobot/hmailserver:6.3.2
+#      ghcr.io/progressiverobot/hmailserver:<version>
 #
 # The database is not in the image and never will be: point HM_DB_* at a
 # PostgreSQL or MariaDB server. On first start the entrypoint writes the

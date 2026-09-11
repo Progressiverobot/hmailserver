@@ -393,6 +393,18 @@ create table hm_apppasswords
 
 CREATE INDEX idx_hm_apppasswords ON hm_apppasswords (apaccountid);
 
+create table hm_contacts
+(
+	contactid int auto_increment not null, primary key(`contactid`), unique(`contactid`),
+	contactaccountid int not null,
+	contactname varchar(255) not null,
+	contactaddress varchar(255) not null,
+	contactsource tinyint not null,
+	contactcreated datetime not null
+) DEFAULT CHARSET=utf8;
+
+CREATE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
+
 create table hm_rules
 (
 	ruleid int auto_increment not null, primary key(`ruleid`), unique(`ruleid`),
@@ -1002,6 +1014,8 @@ ALTER TABLE hm_fetchaccounts_uids ENGINE=InnoDB;
 
 ALTER TABLE hm_apppasswords ENGINE=InnoDB;
 
+ALTER TABLE hm_contacts ENGINE=InnoDB;
+
 ALTER TABLE hm_rules ENGINE=InnoDB;
 
 ALTER TABLE hm_rule_criterias ENGINE=InnoDB;
@@ -1048,6 +1062,8 @@ ALTER TABLE hm_fetchaccounts_uids ADD CONSTRAINT fk_hm_fetchaccounts_uids_fa FOR
 
 ALTER TABLE hm_apppasswords ADD CONSTRAINT fk_hm_apppasswords_account FOREIGN KEY (apaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
+ALTER TABLE hm_contacts ADD CONSTRAINT fk_hm_contacts_account FOREIGN KEY (contactaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
@@ -1064,4 +1080,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6031);
+insert into hm_dbversion values (6032);

@@ -202,6 +202,10 @@ namespace HM
          RouteMeFilters,
          RouteMeFiltersPut,
          RouteMeDraftSave,
+         RouteMeContacts,
+         RouteMeContactCreate,
+         RouteMeContactUpdate,
+         RouteMeContactDelete,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -389,6 +393,16 @@ namespace HM
       static HttpResponse HandleMeFiltersPut_(const Caller &caller, const AnsiString &requestBody);
       static AnsiString SettingsJson_(std::shared_ptr<const Account> account);
       static HttpResponse HandleMeDraftSave_(const Caller &caller, const AnsiString &requestBody);
+
+      // The account's address book (RestApiContacts.cpp).
+      static HttpResponse HandleMeContacts_(const Caller &caller, const AnsiString &query);
+      static HttpResponse HandleMeContactCreate_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeContactUpdate_(const Caller &caller, __int64 id, const AnsiString &requestBody);
+      static HttpResponse HandleMeContactDelete_(const Caller &caller, __int64 id);
+      static void CollectContacts_(std::shared_ptr<const Account> account, const std::vector<String> &entries);
+      static AnsiString ContactJson_(__int64 id, const String &name, const String &address, int source, const String &created);
+      static bool FindContact_(__int64 accountId, const String &address, __int64 &contactId);
+      static bool InsertContact_(__int64 accountId, const String &name, const String &address, int source, __int64 &contactId, String &created);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);

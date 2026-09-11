@@ -571,6 +571,126 @@ namespace RegressionTests.API
          return NumberAt(body, idAt + 5);
       }
 
+      [Test]
+      public void ContactsRoundTrip()
+      {
+         (int status, string body) empty = Http("GET", "/api/v1/me/contacts", UserHeader(UserPassword));
+         Assert.AreEqual(200, empty.status, "Body: " + empty.body);
+         StringAssert.Contains("\"contacts\":[]", empty.body);
+
+         (int status, string body) created = Http("POST", "/api/v1/me/contacts", UserHeader(UserPassword),
+            "{\"name\":\"Alice Example\",\"address\":\"Alice@Example.com\"}");
+         Assert.AreEqual(201, created.status, "Body: " + created.body);
+         StringAssert.Contains("\"address\":\"alice@example.com\"", created.body);
+         StringAssert.Contains("\"source\":\"manual\"", created.body);
+         long id = long.Parse(Between(created.body, "\"id\":", ","));
+         Assert.Greater(id, 0);
+
+         (int status, string body) duplicate = Http("POST", "/api/v1/me/contacts", UserHeader(UserPassword),
+            "{\"address\":\"alice@example.com\"}");
+         Assert.AreEqual(409, duplicate.status, "Body: " + duplicate.body);
+
+         (int status, string body) malformed = Http("POST", "/api/v1/me/contacts", UserHeader(UserPassword),
+            "{\"address\":\"not an address\"}");
+         Assert.AreEqual(400, malformed.status, "Body: " + malformed.body);
+
+         (int status, string body) renamed = Http("PUT", "/api/v1/me/contacts/" + id, UserHeader(UserPassword),
+            "{\"name\":\"Alice Renamed\"}");
+         Assert.AreEqual(200, renamed.status, "Body: " + renamed.body);
+         StringAssert.Contains("\"name\":\"Alice Renamed\"", renamed.body);
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/contacts", UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("\"name\":\"Alice Renamed\"", listed.body);
+         StringAssert.Contains("\"count\":1", listed.body);
+
+         (int status, string body) deleted = Http("DELETE", "/api/v1/me/contacts/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, deleted.status, "Body: " + deleted.body);
+
+         (int status, string body) again = Http("DELETE", "/api/v1/me/contacts/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(404, again.status, "Body: " + again.body);
+      }
+
+      [Test]
+      public void ContactsCompletionFiltersByText()
+      {
+         foreach (string entry in new[] { "{\"name\":\"Alice Example\",\"address\":\"alice@example.com\"}",
+                                          "{\"name\":\"Bob Builder\",\"address\":\"bob@example.com\"}",
+                                          "{\"name\":\"Carol\",\"address\":\"carol@somewhere.test\"}" })
+         {
+            (int status, string body) created = Http("POST", "/api/v1/me/contacts", UserHeader(UserPassword), entry);
+            Assert.AreEqual(201, created.status, "Body: " + created.body);
+         }
+
+         (int status, string body) byName = Http("GET", "/api/v1/me/contacts?q=ALI", UserHeader(UserPassword));
+         Assert.AreEqual(200, byName.status, "Body: " + byName.body);
+         StringAssert.Contains("alice@example.com", byName.body);
+         StringAssert.DoesNotContain("bob@example.com", byName.body);
+         StringAssert.Contains("\"count\":1", byName.body);
+
+         (int status, string body) byDomain = Http("GET", "/api/v1/me/contacts?q=example.com&limit=1", UserHeader(UserPassword));
+         Assert.AreEqual(200, byDomain.status, "Body: " + byDomain.body);
+         StringAssert.Contains("\"count\":1", byDomain.body);
+         StringAssert.Contains("\"total\":2", byDomain.body);
+      }
+
+      [Test]
+      public void ContactsAreCollectedFromSentRecipients()
+      {
+         string other = "other@" + _domain.Name;
+         string third = "third@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, third, UserPassword);
+
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"Other Person <" + other + ">\",\"cc\":\"" + third + "\",\"subject\":\"Collected\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+
+         (int status, string body) listed = Http("GET", "/api/v1/me/contacts", UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("\"name\":\"Other Person\",\"address\":\"" + other + "\",\"source\":\"collected\"", listed.body);
+         StringAssert.Contains("\"address\":\"" + third + "\",\"source\":\"collected\"", listed.body);
+         StringAssert.DoesNotContain(Address, listed.body);
+         StringAssert.Contains("\"count\":2", listed.body);
+
+         // Sending again adds nothing: one row per address.
+         (int status, string body) sentAgain = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"subject\":\"Again\",\"text\":\"Body.\"}");
+         Assert.AreEqual(201, sentAgain.status, "Body: " + sentAgain.body);
+         (int status, string body) still = Http("GET", "/api/v1/me/contacts", UserHeader(UserPassword));
+         StringAssert.Contains("\"count\":2", still.body);
+      }
+
+      [Test]
+      public void ContactsAreTheAccountsOwn()
+      {
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+
+         (int status, string body) created = Http("POST", "/api/v1/me/contacts", UserHeader(UserPassword),
+            "{\"name\":\"Mine\",\"address\":\"mine@example.com\"}");
+         Assert.AreEqual(201, created.status, "Body: " + created.body);
+         long id = long.Parse(Between(created.body, "\"id\":", ","));
+
+         (int status, string body) theirs = Http("GET", "/api/v1/me/contacts", BasicHeader(other, UserPassword));
+         Assert.AreEqual(200, theirs.status, "Body: " + theirs.body);
+         StringAssert.DoesNotContain("mine@example.com", theirs.body);
+
+         (int status, string body) theirDelete = Http("DELETE", "/api/v1/me/contacts/" + id, BasicHeader(other, UserPassword));
+         Assert.AreEqual(404, theirDelete.status, "Body: " + theirDelete.body);
+
+         (int status, string body) theirRename = Http("PUT", "/api/v1/me/contacts/" + id, BasicHeader(other, UserPassword), "{\"name\":\"Stolen\"}");
+         Assert.AreEqual(404, theirRename.status, "Body: " + theirRename.body);
+
+         (int status, string body) mine = Http("GET", "/api/v1/me/contacts", UserHeader(UserPassword));
+         StringAssert.Contains("\"name\":\"Mine\"", mine.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);

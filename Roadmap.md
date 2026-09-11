@@ -78,9 +78,9 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 8 | 0 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
-| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | – | – | 38 | – |
+| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 1 | – | 37 | – |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **822** | **2** | **45** | **33** |
+| **Total** | **823** | **2** | **44** | **33** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -1224,7 +1224,7 @@ What ships today: sign-in, folders, listing with a keyboard cursor and bulk acti
 
 | | Feature | What it needs, and why this order |
 |:-:|---|---|
-| ⬜ | **Address book and To-field completion** | The first thing every user notices missing. Phase A, no CardDAV: a per-account contacts store (schema) with `GET/POST/PUT/DELETE /api/v1/me/contacts`, auto-collected from Sent recipients, and a completion popup on To/Cc/Bcc. Phase B is CardDAV over the same store, so a phone syncs it (Phase 6 above). |
+| ✅ | **Address book and To-field completion** | **Phase A shipped 11 September 2026.** A per-account store, `hm_contacts` (schema 6032), with `GET/POST/PUT/DELETE /api/v1/me/contacts` - `q=` and `limit=` for the completion - every recipient of a message the account sends through the API collected once, a Contacts page in the webmail, and a completion popup on To, Cc and Bcc (arrows, Enter, Escape, click). Four regression tests. Phase B is CardDAV over the same store, so a phone syncs it (Phase 6 above). |
 | ⬜ | **Signatures and identities** | An account's signature (plain and HTML, which the server already stores for the Control Panel) written on compose; a From picker over the account's own aliases, since the server knows which addresses the account may send as. `GET/PUT /api/v1/me/identities`. |
 | ⬜ | **Archive, Junk and Trash as first-class actions** | One key each (e, !, #), `\Junk` and `\Trash` special-use folders created on demand as Drafts is, an empty-Trash and empty-Junk action, and "Not junk". Moving to Junk reports the message to the spam training route if one exists. |
 | ⬜ | **Undo send** | A configurable delay (0-30 s) between Send and submission, with a bar that cancels; no server change - the page holds the draft. Costs nothing and saves the email everybody has sent by mistake. |

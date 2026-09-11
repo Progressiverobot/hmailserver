@@ -1645,6 +1645,18 @@ namespace HM
          case RouteMeDraftSave:
             return HandleMeDraftSave_(caller, GetRequestBody_(request));
 
+         case RouteMeContacts:
+            return HandleMeContacts_(caller, route.query);
+
+         case RouteMeContactCreate:
+            return HandleMeContactCreate_(caller, GetRequestBody_(request));
+
+         case RouteMeContactUpdate:
+            return HandleMeContactUpdate_(caller, route.message_id, GetRequestBody_(request));
+
+         case RouteMeContactDelete:
+            return HandleMeContactDelete_(caller, route.message_id);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1714,6 +1726,34 @@ namespace HM
       if (path == "/api/v1/me" && method == "GET")
       {
          route.kind = RouteMe;
+         return;
+      }
+
+      // The account's address book: the list (q= and limit= for the completion
+      // popup), one new contact, and one contact by id.
+      const AnsiString meContactsPath = "/api/v1/me/contacts";
+
+      if (path == meContactsPath)
+      {
+         if (method == "GET")
+            route.kind = RouteMeContacts;
+         else if (method == "POST")
+            route.kind = RouteMeContactCreate;
+
+         return;
+      }
+
+      if (path.StartsWith(meContactsPath + "/"))
+      {
+         AnsiString rest = path.Mid(meContactsPath.GetLength() + 1);
+         if (ParseQueueId(rest, route.message_id))
+         {
+            if (method == "PUT")
+               route.kind = RouteMeContactUpdate;
+            else if (method == "DELETE")
+               route.kind = RouteMeContactDelete;
+         }
+
          return;
       }
 
@@ -2386,6 +2426,9 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMeContactCreate:
+      case RouteMeContactUpdate:
+      case RouteMeContactDelete:
       case RouteApiKeyCreate:
       case RouteApiKeyRevoke:
       case RouteAccountCreate:
@@ -4939,6 +4982,10 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeContacts:
+      case RouteMeContactCreate:
+      case RouteMeContactUpdate:
+      case RouteMeContactDelete:
       case RouteMe:
       case RouteMePassword:
       case RouteMeVacation:
@@ -6945,6 +6992,12 @@ namespace HM
       }
 
       AnsiString json;
+      // Every recipient becomes a contact of the account, once, so the To field
+      // completes from what the account has written to (RestApiContacts.cpp).
+      CollectContacts_(caller.account, toEntries);
+      CollectContacts_(caller.account, ccEntries);
+      CollectContacts_(caller.account, bccEntries);
+
       json.Format("{\"queued\":true,\"recipients\":%d,\"sent_id\":%I64d}", message->GetRecipients()->GetCount(), sentId);
       return BuildResponse_(201, json);
    }
@@ -7670,6 +7723,8 @@ namespace HM
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"
          "\"/api/v1/me/vacation\":{\"put\":{\"summary\":\"Set the signed-in account's automatic reply\",\"description\":\"The whole state at once: enabled (required), subject, message, expires and expires_date (YYYY-MM-DD, required when expires is true).\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"enabled\"],\"properties\":{\"enabled\":{\"type\":\"boolean\"},\"subject\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"},\"expires\":{\"type\":\"boolean\"},\"expires_date\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The state as saved\"},\"400\":{\"description\":\"enabled missing, a field over its length, or a malformed expires_date\"}}}},"
          "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account, or for the administrator\",\"description\":\"HTTP Basic, once: an account's address and password, or the administrator's name and password - and, when a second factor is enrolled on the administrator credential, the one-time code in X-hMailServer-OTP (without it the answer is 401 with X-hMailServer-OTP: required). Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates as the credential itself would - an account reaches the /api/v1/me endpoints, the administrator reaches everything but them - without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions, and a change of the administrator password ends every administrator session. An API key cannot start one.\",\"responses\":{\"201\":{\"description\":\"address (an account) or administrator true, with idle_seconds and lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's or the administrator's credentials\"},\"403\":{\"description\":\"A session cookie or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
+         "\"/api/v1/me/contacts\":{\"get\":{\"summary\":\"The signed-in account's address book\",\"description\":\"q= narrows to names and addresses containing the text, case-insensitively, which is what the To field's completion asks; limit= caps the answer (200 by default). Recipients of what the account sends through the API are added on their own, marked collected.\",\"responses\":{\"200\":{\"description\":\"contacts (id, name, address, source manual|collected, created), count, total\"}}},\"post\":{\"summary\":\"Add a contact\",\"description\":\"Body: address (one e-mail address, or Name <address>), name (optional). One row per address per account.\",\"responses\":{\"201\":{\"description\":\"The contact\"},\"400\":{\"description\":\"Not one address\"},\"409\":{\"description\":\"That address is already a contact; id says which\"}}}},"
+         "\"/api/v1/me/contacts/{id}\":{\"put\":{\"summary\":\"Change a contact's name or address\",\"description\":\"Body: name and/or address. Another account's contact is 404.\",\"responses\":{\"200\":{\"description\":\"The contact\"},\"404\":{\"description\":\"No such contact\"},\"409\":{\"description\":\"The new address is already a contact\"}}},\"delete\":{\"summary\":\"Remove a contact\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"404\":{\"description\":\"No such contact\"}}}},"
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
