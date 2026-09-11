@@ -25,13 +25,13 @@
                 </ui:TextBox>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button Content="{loc:L '_View source'}" Click="View_Click" Margin="0,0,8,0">
+                <ui:Button x:Name="ViewButton" Content="{loc:L '_View source'}" Click="View_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="{loc:L '_Deliver now'}" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
+                <ui:Button x:Name="RetryButton" Content="{loc:L '_Deliver now'}" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
                 </ui:Button>
-                <ui:Button Content="{loc:L '_Remove'}" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
+                <ui:Button x:Name="RemoveButton" Content="{loc:L '_Remove'}" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
                     <ui:Button.Icon><ui:SymbolIcon Symbol="Delete24" /></ui:Button.Icon>
                 </ui:Button>
                 <ui:Button Content="{loc:L 'Re_fresh'}" Click="Refresh_Click">

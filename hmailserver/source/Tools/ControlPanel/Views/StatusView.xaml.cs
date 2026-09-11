@@ -293,7 +293,7 @@ namespace hMailServer.ControlPanel.Views
             case 3: return outcome + F("{0} is downloaded and verified", version) + when + L("; Install update applies it");
             case 4: return outcome + F("Installing {0}: the service will stop and start", version);
             case 5: return outcome + F("The last update step failed: {0}", error);
-            default: return outcome + L("Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)");
+            default: return outcome + L("Not checked yet (Check for updates, or turn on the daily check under Updates on the API & monitoring page)");
          }
       }
 

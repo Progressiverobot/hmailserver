@@ -31,6 +31,15 @@ namespace hMailServer.ControlPanel.Views
    {
       private int depth_;
 
+      public PasswordField()
+      {
+         // An implicit style is keyed by the exact type, so a derived control
+         // does not receive the one WPF-UI defines for PasswordBox and rendered
+         // as a bare WPF PasswordBox - a white box on the dark theme, on the
+         // Domains page and the sign-in card. Ask for the base type's style.
+         SetResourceReference(StyleProperty, typeof(Wpf.Ui.Controls.PasswordBox));
+      }
+
       protected override void OnTextChanged(TextChangedEventArgs e)
       {
          depth_++;

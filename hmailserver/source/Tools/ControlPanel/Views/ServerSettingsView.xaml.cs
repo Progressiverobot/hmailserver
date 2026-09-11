@@ -2735,6 +2735,12 @@ namespace hMailServer.ControlPanel.Views
          if (SettingsTabs.Items.Count > 0)
             SettingsTabs.SelectedIndex = 0;
 
+         // A page with one tab is a page, not a tab: the strip with a single
+         // underlined header is hidden. Collapsing the item hides its header
+         // only; the TabControl still presents the selected item's content.
+         if (SettingsTabs.Items.Count == 1 && SettingsTabs.Items[0] is TabItem only)
+            only.Visibility = Visibility.Collapsed;
+
          StatusText.Text = failedReads_ == 0
             ? L("Values read from the server.")
             : F("{0} setting(s) could not be read — {1}", failedReads_, diag_);

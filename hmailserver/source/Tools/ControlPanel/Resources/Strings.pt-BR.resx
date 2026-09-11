@@ -2917,8 +2917,8 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Informe um número de porta válido.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Informe um endereço e busque. O rastreamento não registra absolutamente nada a menos que MessageTraceEnabled esteja definido em hMailServer.ini - vem desligado por padrão porque armazena quem se corresponde com quem.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Digite um endereço e pesquise. O rastreamento não registra nada até que o rastreamento de mensagens seja ativado na página Registro em log – está desativado por padrão porque armazena quem se corresponde com quem.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Informe parte de um nome e pressione Buscar, ou busque com a caixa vazia para listar todos os usuários.</value>
@@ -3438,6 +3438,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Host/Nome:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Domínio hospedado</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Horas entre verificações (1 a 168)</value>
@@ -4554,8 +4557,8 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Nenhuma criptografia está disponível nesta porta. E-mails de entrada de outros servidores normalmente já vêm sem criptografia, mas esta porta também aceita AUTH, e um cliente que a usa envia a senha dele em texto claro.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Nenhum evento para esse endereço. Ou nada aconteceu com ele, ou o rastreamento estava desligado na ocasião - ele só grava enquanto MessageTraceEnabled estiver definido.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Nenhum evento para esse endereço. Ou nada aconteceu com ele, ou o rastreamento estava desativado na época – ele só registra enquanto o rastreamento de mensagens está ativado (página Registro em log).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Nenhum evento para essa mensagem.</value>
@@ -4710,8 +4713,8 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Sinceramente, não é verificado daqui: verificar o PTR exige o endereço IP PÚBLICO do servidor, que este painel não consegue determinar (atrás de NAT a máquina também não o conhece), e o verificador desta página lê apenas registros TXT. Em vez disso, teste de fora: nslookup &lt;your public IP&gt; mostra o PTR; ele deve nomear o host acima.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Ainda não verificado (Verificar atualizações, ou UpdateCheckEnabled=1 no hMailServer.INI para uma verificação diária)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Ainda não verificado (Verificar atualizações, ou ative a verificação diária em Atualizações na página API e monitoramento)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Ainda não verificado. Publique o registro, dê tempo para a propagação e então pressione "Verificar DNS".</value>
@@ -4758,11 +4761,14 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Nada aqui exige uma decisão: nenhuma caixa está sendo pulada e nenhuma está sendo desativada.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Nada aqui ainda – Adicionar cria a primeira entrada.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Nada é jamais marcado como spam: a marcação exige um limiar de marcação acima de 0, e um 0 ali significa "nunca", não "sempre". Mensagens que alcançam {0} continuam sendo recusadas.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Nada é retido. A quarentena fica desligada a menos que QuarantineEnabled esteja definido no hMailServer.ini - até lá, spam acima do limiar de exclusão é recusado durante a conversa SMTP em vez de armazenado.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Nada está retido. A quarentena está desativada – ative-a em Configurações antispam – e, até que esteja ativada, o spam acima do limite de exclusão é recusado durante a conversa SMTP em vez de armazenado.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Nada correspondeu a "{0}". Tente aquilo que você está tentando alcançar ("parar spam", "permitir que um dispositivo envie e-mails"), o nome de uma página, ou uma chave do hMailServer.INI.</value>
@@ -5749,6 +5755,9 @@ Execute isto se os clientes relatarem mensagens aparecendo com o UID errado, ou 
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Lembrar esta quantidade de senhas anteriores (0 = sem histórico)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Domínio remoto</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>_Remover os expirados</value>
   </data>
@@ -6708,12 +6717,6 @@ Continuar?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Defina TlsRptFromAddress na seção [Settings] do hMailServer.ini como a caixa a partir da qual os relatórios devem ser enviados. Deixá-lo vazio é uma escolha válida - significa apenas que as estatísticas coletadas são descartadas e nenhum relatório é enviado.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Defina WebServicesHttpPort e/ou WebServicesHttpsPort em hMailServer.ini para que as URLs respondam, depois publique registros DNS autoconfig.&lt;domain&gt; e autodiscover.&lt;domain&gt; para cada domínio de e-mail, apontando para este servidor. São registros de endereço, e esta página verifica apenas registros TXT, então eles não podem ser confirmados daqui.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Defina WebServicesHttpsPort em hMailServer.ini (a RFC 8461 exige a política por HTTPS), dê ao ouvinte um certificado que cubra mta-sts.&lt;domain&gt;, depois, para cada domínio, publique um registro A/AAAA (ou CNAME) para mta-sts.&lt;domain&gt; apontando para este servidor e um registro TXT em _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Esta página verifica o registro TXT; o registro de endereço e a cobertura de nome do certificado não podem ser verificados daqui.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Defina uma nova senha de administração do servidor.</value>
   </data>
@@ -6725,6 +6728,12 @@ Continuar?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Definir o valor do cabeçalho</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Defina a porta HTTP ou HTTPS na página Serviços web e autoconfiguração para que as URLs respondam, depois publique registros DNS autoconfig.&lt;domain&gt; e autodiscover.&lt;domain&gt; para cada domínio de e-mail, apontando para este servidor. São registros de endereço, e esta página verifica apenas registros TXT, então eles não podem ser confirmados daqui.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Defina a porta HTTPS na página Serviços web e autoconfiguração (a RFC 8461 exige a política por HTTPS), dê ao ouvinte um certificado que cubra mta-sts.&lt;domain&gt;, depois, para cada domínio, publique um registro A/AAAA (ou CNAME) para mta-sts.&lt;domain&gt; apontando para este servidor e um registro TXT em _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Esta página verifica o registro TXT; o registro de endereço e a cobertura de nome do certificado não podem ser verificados daqui.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Defina o relay SMTP e suas credenciais, se o provedor precisar delas.</value>

@@ -29,6 +29,11 @@ namespace hMailServer.ControlPanel.Views
       private const string GuideUrl =
          "https://github.com/Progressiverobot/hmailserver/blob/master/hmailserver/docs/DiagnosingStalledMail.md";
 
+      // The two buttons of the debug-logging card: the one that would change
+      // nothing is disabled, so the state reads off the buttons as well as the line.
+      private Wpf.Ui.Controls.Button debugOn_;
+      private Wpf.Ui.Controls.Button debugOff_;
+
       private readonly TextBlock loggingStatus_ = new()
       {
          FontSize = Typography.Caption,
@@ -102,7 +107,7 @@ namespace hMailServer.ControlPanel.Views
          var content = (StackPanel)card.Child;
 
          var row = new StackPanel { Orientation = Orientation.Horizontal };
-         var enable = new Wpf.Ui.Controls.Button
+         var enable = debugOn_ = new Wpf.Ui.Controls.Button
          {
             Content = L("_Turn on debug logging now"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
@@ -112,7 +117,7 @@ namespace hMailServer.ControlPanel.Views
          enable.Click += (s, e) => SetDebugLogging(true);
          row.Children.Add(enable);
 
-         var disable = new Wpf.Ui.Controls.Button { Content = L("Turn it _off again"), Margin = new Thickness(0, 4, 8, 0) };
+         var disable = debugOff_ = new Wpf.Ui.Controls.Button { Content = L("Turn it _off again"), Margin = new Thickness(0, 4, 8, 0) };
          AutomationProperties.SetName(disable, L("Turn debug logging off again"));
          disable.Click += (s, e) => SetDebugLogging(false);
          row.Children.Add(disable);
@@ -248,6 +253,10 @@ namespace hMailServer.ControlPanel.Views
                : debug
                   ? L("Debug logging is ON. The stage timings and the DNS lines are being written; turn it off again when you have what you need.")
                   : L("Debug logging is off. Application logging still records any stage that takes ten seconds or more.");
+            if (debugOn_ != null)
+               debugOn_.IsEnabled = !(enabled && debug);
+            if (debugOff_ != null)
+               debugOff_.IsEnabled = enabled && debug;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

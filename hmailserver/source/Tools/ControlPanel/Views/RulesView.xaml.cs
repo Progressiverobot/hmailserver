@@ -49,6 +49,10 @@ namespace hMailServer.ControlPanel.Views
       public RulesView()
       {
          InitializeComponent();
+         // Every button here acts on a selected rule, criterion or action.
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(RuleGrid, MoveUpButton, MoveDownButton, ToggleButton, DeleteRuleButton);
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(CriteriaGrid, EditCriterionButton, RemoveCriterionButton);
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(ActionsGrid, EditActionButton, RemoveActionButton, ActionUpButton, ActionDownButton);
 
          suppressMatchMode_ = true;
          MatchMode.Items.Add(L("Match ALL criteria (AND)"));

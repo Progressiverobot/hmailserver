@@ -2917,8 +2917,8 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Zadejte platné číslo portu.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Zadejte adresu a hledejte. Trasování nezaznamenává vůbec nic, dokud není v hMailServer.ini nastaveno MessageTraceEnabled - ve výchozím stavu je vypnuté, protože ukládá, kdo si s kým dopisuje.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Zadejte adresu a vyhledejte. Trasování nezaznamenává vůbec nic, dokud není trasování zpráv zapnuto na stránce Logování – ve výchozím nastavení je vypnuto, protože ukládá, kdo si s kým dopisuje.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Zadejte část jména a stiskněte Hledat, nebo hledejte s prázdným polem pro výpis všech uživatelů.</value>
@@ -3438,6 +3438,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Hostitel/Název:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Hostovaná doména</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Hodiny mezi kontrolami (1 až 168)</value>
@@ -4554,8 +4557,8 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Na tomto portu není k dispozici žádné šifrování. Příchozí pošta z jiných serverů beztak obvykle šifrovaná není, ale tento port přijímá i AUTH a klient, který jej použije, posílá své heslo v otevřeném textu.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Pro tuto adresu nejsou žádné události. Buď se s ní nic nestalo, nebo bylo v té době trasování vypnuté – zaznamenává se jen tehdy, když je nastaveno MessageTraceEnabled.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Pro tuto adresu nejsou žádné události. Buď se s ní nic nestalo, nebo bylo trasování v té době vypnuté – zaznamenává pouze tehdy, když je trasování zpráv zapnuté (stránka Logování).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Pro tuto zprávu nejsou žádné události.</value>
@@ -4710,8 +4713,8 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Odsud se to upřímně řečeno nekontroluje: ověření PTR vyžaduje VEŘEJNOU IP adresu serveru, kterou tento panel nedokáže zjistit (za NATem ji nezná ani samotný počítač), a kontrola na této stránce čte pouze TXT záznamy. Otestujte to místo toho zvenčí: nslookup &lt;your public IP&gt; zobrazí PTR; měl by uvádět hostitele výše.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Zatím nezkontrolováno (Zkontrolovat aktualizace, nebo UpdateCheckEnabled=1 v hMailServer.INI pro denní kontrolu)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Zatím nezkontrolováno (klikněte na Zkontrolovat aktualizace nebo zapněte denní kontrolu v části Aktualizace na stránce API a monitorování)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Zatím nezkontrolováno. Publikujte záznam, dejte čas na jeho rozšíření a poté stiskněte „Zkontrolovat DNS“.</value>
@@ -4758,11 +4761,14 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Nic zde nevyžaduje rozhodnutí: žádná poštovní schránka se nepřeskakuje a žádná se nezakazuje.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Zatím tu nic není – tlačítko Přidat vytvoří první položku.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Nic se nikdy neoznačí jako spam: označování vyžaduje práh pro označení vyšší než 0 a 0 tam znamená „nikdy“, ne „vždy“. Zprávy dosahující {0} jsou i tak odmítnuty.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Nic se nepozdržuje. Karanténa je vypnutá, dokud se v hMailServer.ini nenastaví QuarantineEnabled – do té doby je spam nad prahem pro smazání odmítnut už během SMTP konverzace, místo aby se ukládal.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Nic není zadrženo. Karanténa je vypnutá – zapněte ji v Nastavení antispamu – a dokud není zapnutá, spam nad prahem pro smazání je odmítnut během konverzace SMTP místo uložení.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Dotazu „{0}“ nic neodpovídalo. Zkuste popsat, čeho chcete dosáhnout („zastavit spam“, „nechat zařízení odesílat poštu“), název stránky, nebo klíč z hMailServer.INI.</value>
@@ -5749,6 +5755,9 @@ Spusťte to, pokud klienti hlásí zprávy pod špatným UID, nebo po obnovení 
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Pamatovat si tento počet předchozích hesel (0 = žádná historie)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Vzdálená doména</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Odstranit _vypršelé</value>
   </data>
@@ -6708,12 +6717,6 @@ Pokračovat?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>V sekci [Settings] souboru hMailServer.ini nastavte TlsRptFromAddress na poštovní schránku, ze které se mají hlášení odesílat. Ponechat je prázdné je platná volba – znamená to jen, že se sesbírané statistiky zahazují a žádná hlášení se nikdy neodešlou.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Nastavte v hMailServer.ini WebServicesHttpPort a/nebo WebServicesHttpsPort, aby URL odpovídaly, a poté pro každou poštovní doménu publikujte DNS záznamy autoconfig.&lt;domain&gt; a autodiscover.&lt;domain&gt; ukazující na tento server. Jde o adresní záznamy a tato stránka kontroluje pouze TXT záznamy, takže je odsud potvrdit nelze.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Nastavte v hMailServer.ini WebServicesHttpsPort (RFC 8461 vyžaduje politiku přes HTTPS), přiřaďte listeneru certifikát, který pokrývá mta-sts.&lt;domain&gt;, a poté pro každou doménu publikujte záznam A/AAAA (nebo CNAME) pro mta-sts.&lt;domain&gt; ukazující na tento server a TXT záznam na _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Tato stránka kontroluje TXT záznam; adresní záznam ani to, zda certifikát daný název pokrývá, odsud zkontrolovat nelze.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Nastavte nové heslo pro správu serveru.</value>
   </data>
@@ -6725,6 +6728,12 @@ Pokračovat?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Nastavit hodnotu hlavičky</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Nastavte port HTTP nebo HTTPS na stránce Webové služby a autokonfigurace WebServicesHttpPort a/nebo WebServicesHttpsPort, aby URL odpovídaly, a poté pro každou poštovní doménu publikujte DNS záznamy autoconfig.&lt;domain&gt; a autodiscover.&lt;domain&gt; ukazující na tento server. Jde o adresní záznamy a tato stránka kontroluje pouze TXT záznamy, takže je odsud potvrdit nelze.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Nastavte port HTTPS na stránce Webové služby a autokonfigurace WebServicesHttpsPort (RFC 8461 vyžaduje politiku přes HTTPS), přiřaďte listeneru certifikát, který pokrývá mta-sts.&lt;domain&gt;, a poté pro každou doménu publikujte záznam A/AAAA (nebo CNAME) pro mta-sts.&lt;domain&gt; ukazující na tento server a TXT záznam na _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Tato stránka kontroluje TXT záznam; adresní záznam ani to, zda certifikát daný název pokrývá, odsud zkontrolovat nelze.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Nastavte SMTP relay a jeho přihlašovací údaje, pokud je poskytovatel vyžaduje.</value>

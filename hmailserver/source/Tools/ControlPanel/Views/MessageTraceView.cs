@@ -74,7 +74,7 @@ namespace hMailServer.ControlPanel.Views
       public MessageTraceView()
       {
          Build();
-         status_.Text = L("Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom.");
+         status_.Text = L("Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom.");
       }
 
       private dynamic OpenTrace()
@@ -156,7 +156,7 @@ namespace hMailServer.ControlPanel.Views
             try
             {
                trace.Search(address_.Text.Trim());
-               Fill(trace, L("No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set."));
+               Fill(trace, L("No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)."));
             }
             finally
             {
@@ -259,7 +259,9 @@ namespace hMailServer.ControlPanel.Views
          address_.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Search(); };
          toolbar.Children.Add(address_);
          toolbar.Children.Add(MakeButton(L("_Search"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
-         toolbar.Children.Add(MakeButton(L("_Follow this message"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected()));
+         var follow = MakeButton(L("_Follow this message"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected());
+         toolbar.Children.Add(follow);
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(list_, follow);
          toolbar.Children.Add(MakeButton(L("_Remove expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
          root.Children.Add(toolbar);
 

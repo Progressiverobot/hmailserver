@@ -443,8 +443,16 @@ namespace hMailServer.ControlPanel.Views
          TextWrapping = TextWrapping.Wrap,
          Margin = new Thickness(0, 0, 0, 10)
       };
-      private readonly ListView consistencyList_ = new()
+      // A DataGrid rather than a ListView with a GridView: the application's
+      // implicit DataGrid styles theme it, and nothing themes a GridView, whose
+      // white header and system-hyperlink text were unreadable on the dark theme.
+      private readonly DataGrid consistencyList_ = new()
       {
+         AutoGenerateColumns = false,
+         IsReadOnly = true,
+         HeadersVisibility = DataGridHeadersVisibility.Column,
+         GridLinesVisibility = DataGridGridLinesVisibility.None,
+         SelectionMode = DataGridSelectionMode.Single,
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent,
          // A badly damaged store can list thousands of messages; cap the section
@@ -489,11 +497,16 @@ namespace hMailServer.ControlPanel.Views
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          localDomain_.Margin = new Thickness(0, 0, 8, 0);
-         inputRow.Children.Add(localDomain_);
+         // Two unlabelled boxes read as one question; a caption over each says
+         // which domain is which. The captions double as the accessible names.
+         System.Windows.Automation.AutomationProperties.SetName(localDomain_, L("Hosted domain"));
+         System.Windows.Automation.AutomationProperties.SetName(testDomain_, L("Remote domain"));
+         inputRow.Children.Add(Captioned(L("Hosted domain"), localDomain_));
          testDomain_.Margin = new Thickness(0, 0, 8, 0);
          Grid.SetColumn(testDomain_, 1);
-         inputRow.Children.Add(testDomain_);
-         var actions = new StackPanel { Orientation = Orientation.Horizontal };
+         inputRow.Children.Add(Captioned(L("Remote domain"), testDomain_));
+         // Bottom-aligned, level with the two captioned inputs' boxes.
+         var actions = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom };
          var run = new Wpf.Ui.Controls.Button { Content = L("_Run diagnostics"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await Run();
          actions.Children.Add(run);
@@ -550,30 +563,43 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(consistencyStatus_, 1);
          section.Children.Add(consistencyStatus_);
 
-         var columns = new GridView();
-         columns.Columns.Add(new GridViewColumn
+         consistencyList_.Columns.Add(new DataGridTextColumn
          {
             Header = L("Message ID"),
-            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.MessageId)),
+            Binding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.MessageId)),
             Width = 110
          });
-         columns.Columns.Add(new GridViewColumn
+         consistencyList_.Columns.Add(new DataGridTextColumn
          {
             Header = L("Account"),
-            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.Account)),
+            Binding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.Account)),
             Width = 220
          });
-         columns.Columns.Add(new GridViewColumn
+         consistencyList_.Columns.Add(new DataGridTextColumn
          {
             Header = L("Expected file"),
-            DisplayMemberBinding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.ExpectedPath)),
-            Width = 480
+            Binding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.ExpectedPath)),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
-         consistencyList_.View = columns;
          Grid.SetRow(consistencyList_, 2);
          section.Children.Add(consistencyList_);
 
          return section;
+      }
+
+      /// <summary>A small caption above an input, in the secondary text colour.</summary>
+      private static StackPanel Captioned(string caption, FrameworkElement input)
+      {
+         var label = new TextBlock { Text = caption, FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 4) };
+         label.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         // The panel takes the input's place in its grid: its column, and its margin.
+         var panel = new StackPanel { Margin = input.Margin };
+         Grid.SetColumn(panel, Grid.GetColumn(input));
+         Grid.SetRow(panel, Grid.GetRow(input));
+         input.Margin = new Thickness(0);
+         panel.Children.Add(label);
+         panel.Children.Add(input);
+         return panel;
       }
 
       public void OnEnter()

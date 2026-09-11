@@ -2917,8 +2917,8 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Enter a valid port number.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Enter part of a name and press Search, or search with an empty box to list all users.</value>
@@ -3438,6 +3438,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Host/Name:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Hosted domain</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Hours between checks (1 to 168)</value>
@@ -4554,8 +4557,8 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>No events for that message.</value>
@@ -4710,8 +4713,8 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Not checked yet. Publish the record, allow time for propagation, then press "Check DNS".</value>
@@ -4758,11 +4761,14 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Nothing here needs a decision: no mailbox is being skipped and none is being disabled.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Nothing here yet - Add creates the first entry.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means "never" rather than "always". Messages reaching {0} are still refused.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Nothing matched "{0}". Try what you are trying to achieve ("stop spam", "let a device send mail"), a page name, or an hMailServer.INI key.</value>
@@ -5749,6 +5755,9 @@ Run this if clients report messages appearing under the wrong UID, or after rest
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Remember this many previous passwords (0 = no history)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Remote domain</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Remove _expired</value>
   </data>
@@ -6708,12 +6717,6 @@ Continue?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Set a new server administration password.</value>
   </data>
@@ -6725,6 +6728,12 @@ Continue?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Set header value</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Set the SMTP relayer, and its credentials if the provider needs them.</value>

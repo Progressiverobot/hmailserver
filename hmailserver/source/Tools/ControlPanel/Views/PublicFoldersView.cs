@@ -51,8 +51,11 @@ namespace hMailServer.ControlPanel.Views
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 12) };
          Grid.SetRow(toolbar, 1);
          toolbar.Children.Add(MakeButton(L("_Add folder"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
-         toolbar.Children.Add(MakeButton(L("_Permissions"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions()));
-         toolbar.Children.Add(MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder()));
+         var permissions = MakeButton(L("_Permissions"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions());
+         toolbar.Children.Add(permissions);
+         var delete = MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder());
+         toolbar.Children.Add(delete);
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(list_, permissions, delete);
          toolbar.Children.Add(MakeButton(L("_Refresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
 

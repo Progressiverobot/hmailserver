@@ -91,6 +91,7 @@ namespace hMailServer.ControlPanel.Views
       public SslCertificatesView()
       {
          InitializeComponent();
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(CertGrid, DeleteButton);
       }
 
       public void OnEnter() => Reload();

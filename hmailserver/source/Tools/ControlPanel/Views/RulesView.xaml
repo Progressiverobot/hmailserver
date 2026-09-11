@@ -41,10 +41,10 @@
         </Border>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,12">
-            <ui:Button Content="{loc:L 'Move _up'}" Click="MoveUp_Click" Margin="0,0,8,0" />
-            <ui:Button Content="{loc:L 'Move _down'}" Click="MoveDown_Click" Margin="0,0,8,0" />
-            <ui:Button Content="{loc:L 'Ena_ble / disable'}" Click="Toggle_Click" Margin="0,0,8,0" />
-            <ui:Button Content="{loc:L 'De_lete rule'}" Appearance="Danger" Click="Delete_Click" Margin="0,0,24,0" />
+            <ui:Button x:Name="MoveUpButton" Content="{loc:L 'Move _up'}" Click="MoveUp_Click" Margin="0,0,8,0" />
+            <ui:Button x:Name="MoveDownButton" Content="{loc:L 'Move _down'}" Click="MoveDown_Click" Margin="0,0,8,0" />
+            <ui:Button x:Name="ToggleButton" Content="{loc:L 'Ena_ble / disable'}" Click="Toggle_Click" Margin="0,0,8,0" />
+            <ui:Button x:Name="DeleteRuleButton" Content="{loc:L 'De_lete rule'}" Appearance="Danger" Click="Delete_Click" Margin="0,0,24,0" />
             <ui:TextBox x:Name="NewRuleName" PlaceholderText="{loc:L 'New rule name'}" AutomationProperties.Name="{loc:L 'New rule name'}" Width="180" Margin="0,0,8,0" />
             <ui:Button Content="{loc:L '_Add rule'}" Appearance="Primary" Click="AddRule_Click" />
         </StackPanel>
@@ -65,7 +65,7 @@
                     </Grid.RowDefinitions>
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
                         <TextBlock Text="{loc:L 'IF'}" FontWeight="SemiBold" FontSize="14" VerticalAlignment="Center" Margin="0,0,12,0" />
-                        <ComboBox x:Name="MatchMode" FontSize="12" Width="180"
+                        <ComboBox x:Name="MatchMode" FontSize="12" MinWidth="230"
                                   SelectionChanged="MatchMode_SelectionChanged" />
                     </StackPanel>
                     <DataGrid Grid.Row="1" x:Name="CriteriaGrid" AutoGenerateColumns="False" IsReadOnly="True"
@@ -78,8 +78,8 @@
                     </DataGrid>
                     <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
                         <ui:Button Content="{loc:L 'Add _criterion…'}" Appearance="Primary" Click="AddCriterion_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="{loc:L '_Edit criterion…'}" Click="EditCriterion_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="{loc:L '_Remove criterion'}" Appearance="Danger" Click="RemoveCriterion_Click" />
+                        <ui:Button x:Name="EditCriterionButton" Content="{loc:L '_Edit criterion…'}" Click="EditCriterion_Click" Margin="0,0,8,0" />
+                        <ui:Button x:Name="RemoveCriterionButton" Content="{loc:L '_Remove criterion'}" Appearance="Danger" Click="RemoveCriterion_Click" />
                     </StackPanel>
                 </Grid>
             </Border>
@@ -101,13 +101,16 @@
                             <DataGridTextColumn Binding="{Binding Description}" Width="*" />
                         </DataGrid.Columns>
                     </DataGrid>
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
-                        <ui:Button Content="{loc:L 'Add ac_tion…'}" Appearance="Primary" Click="AddAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="{loc:L 'Ed_it action…'}" Click="EditAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="{loc:L 'Re_move action'}" Appearance="Danger" Click="RemoveAction_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="U_p" Click="ActionUp_Click" Margin="0,0,8,0" />
-                        <ui:Button Content="{loc:L 'Dow_n'}" Click="ActionDown_Click" />
-                    </StackPanel>
+                    <!-- A WrapPanel, not a StackPanel: five buttons do not fit one row of
+                         the half-width card at 1920 wide, and a StackPanel clips the last
+                         one rather than wrapping it. -->
+                    <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,8,0,0">
+                        <ui:Button Content="{loc:L 'Add ac_tion…'}" Appearance="Primary" Click="AddAction_Click" Margin="0,0,8,8" />
+                        <ui:Button x:Name="EditActionButton" Content="{loc:L 'Ed_it action…'}" Click="EditAction_Click" Margin="0,0,8,8" />
+                        <ui:Button x:Name="RemoveActionButton" Content="{loc:L 'Re_move action'}" Appearance="Danger" Click="RemoveAction_Click" Margin="0,0,8,8" />
+                        <ui:Button x:Name="ActionUpButton" Content="U_p" Click="ActionUp_Click" Margin="0,0,8,8" />
+                        <ui:Button x:Name="ActionDownButton" Content="{loc:L 'Dow_n'}" Click="ActionDown_Click" Margin="0,0,8,8" />
+                    </WrapPanel>
                 </Grid>
             </Border>
         </Grid>

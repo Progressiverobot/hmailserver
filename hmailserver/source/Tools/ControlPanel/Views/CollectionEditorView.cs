@@ -161,14 +161,23 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(actions, 1);
          if (spec_.CanAdd)
             actions.Children.Add(MakeButton(L("_Add"), ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
-         actions.Children.Add(MakeButton(L("_Edit"), ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected()));
+         var edit = MakeButton(L("_Edit"), ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected());
+         actions.Children.Add(edit);
+         Wpf.Ui.Controls.Button del = null;
          if (spec_.CanDelete)
          {
-            var del = MakeButton(L("_Delete"), ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
+            del = MakeButton(L("_Delete"), ControlAppearance.Secondary, SymbolRegular.Delete24, (_, _) => DeleteSelected());
             del.Foreground = Services.ThemeTokens.Danger;
             actions.Children.Add(del);
          }
          actions.Children.Add(MakeButton(L("_Refresh"), ControlAppearance.Secondary, SymbolRegular.ArrowSync24, (_, _) => Reload()));
+         // Edit and Delete act on the selected row, so they are enabled only
+         // while there is one; with nothing selected they used to answer a click
+         // with "Select a row first." in the status line.
+         if (del != null)
+            Services.SelectionGate.Bind(grid_, edit, del);
+         else
+            Services.SelectionGate.Bind(grid_, edit);
          toolbar.Children.Add(actions);
          Grid.SetRow(toolbar, 1);
          root.Children.Add(toolbar);
@@ -260,7 +269,10 @@ namespace hMailServer.ControlPanel.Views
                rows_.Add(row);
                ServerSession.Release(item);
             }
-            status_.Text = L("Loaded from server.");
+            // An empty list is a state to name, not a blank to stare at.
+            status_.Text = rows_.Count == 0 && spec_.CanAdd
+               ? L("Nothing here yet - Add creates the first entry.")
+               : L("Loaded from server.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

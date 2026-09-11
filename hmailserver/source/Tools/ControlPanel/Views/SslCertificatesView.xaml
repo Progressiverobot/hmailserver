@@ -114,7 +114,7 @@
                                AutomationProperties.Name="{loc:L 'Browse for the private key file'}" />
                     <ui:Button Grid.Column="5" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="{loc:L 'Add the certificate'}" />
-                    <ui:Button Grid.Column="6" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click"
+                    <ui:Button x:Name="DeleteButton" Grid.Column="6" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click"
                                AutomationProperties.Name="{loc:L 'Delete the selected certificate'}" />
                 </Grid>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">

@@ -2917,8 +2917,8 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Ange ett giltigt portnummer.</value>
   </data>
-  <data name="Enter an address and search. The trace records nothing at all unless MessageTraceEnabled is set in hMailServer.ini - it is off by default because it stores who corresponds with whom." xml:space="preserve">
-    <value>Ange en adress och sök. Spårningen registrerar ingenting alls om inte MessageTraceEnabled är satt i hMailServer.ini - den är av som standard eftersom den lagrar vem som brevväxlar med vem.</value>
+  <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
+    <value>Ange en adress och sök. Spårningen registrerar ingenting förrän meddelandespårning slås på på sidan Loggning – den är av som standard eftersom den lagrar vem som brevväxlar med vem.</value>
   </data>
   <data name="Enter part of a name and press Search, or search with an empty box to list all users." xml:space="preserve">
     <value>Ange en del av ett namn och tryck på Sök, eller sök med tom ruta för att lista alla användare.</value>
@@ -3438,6 +3438,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   </data>
   <data name="Host/Name:  {0}" xml:space="preserve">
     <value>Värd/Namn:  {0}</value>
+  </data>
+  <data name="Hosted domain" xml:space="preserve">
+    <value>Hostad domän</value>
   </data>
   <data name="Hours between checks (1 to 168)" xml:space="preserve">
     <value>Timmar mellan kontroller (1 till 168)</value>
@@ -4554,8 +4557,8 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="No encryption is available on this port. Inbound mail from other servers is normally unencrypted anyway, but this port also accepts AUTH, and a client using it sends its password in the clear." xml:space="preserve">
     <value>Ingen kryptering är tillgänglig på den här porten. Inkommande post från andra servrar är normalt okrypterad ändå, men den här porten godtar också AUTH, och en klient som använder den skickar sitt lösenord i klartext.</value>
   </data>
-  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while MessageTraceEnabled is set." xml:space="preserve">
-    <value>Inga händelser för den adressen. Antingen har inget hänt med den, eller så var spårningen avstängd vid tillfället - den registrerar bara medan MessageTraceEnabled är satt.</value>
+  <data name="No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)." xml:space="preserve">
+    <value>Inga händelser för den adressen. Antingen har inget hänt med den, eller så var spårningen avstängd vid den tidpunkten – den registrerar bara medan meddelandespårning är på (sidan Loggning).</value>
   </data>
   <data name="No events for that message." xml:space="preserve">
     <value>Inga händelser för det meddelandet.</value>
@@ -4710,8 +4713,8 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Not checked from here, honestly: verifying the PTR needs the server's PUBLIC IP address, which this panel cannot determine (behind NAT the machine does not know it either), and this page's checker reads TXT records only. Test from outside instead: nslookup &lt;your public IP&gt; shows the PTR; it should name the host above." xml:space="preserve">
     <value>Kontrolleras ärligt talat inte härifrån: att verifiera PTR-posten kräver serverns PUBLIKA IP-adress, som den här panelen inte kan avgöra (bakom NAT vet datorn den inte heller), och den här sidans kontroll läser bara TXT-poster. Testa från utsidan i stället: nslookup &lt;din publika IP&gt; visar PTR-posten; den ska namnge värden ovan.</value>
   </data>
-  <data name="Not checked yet (Check for updates, or UpdateCheckEnabled=1 in hMailServer.INI for a daily check)" xml:space="preserve">
-    <value>Inte kontrollerad ännu (Sök efter uppdateringar, eller UpdateCheckEnabled=1 i hMailServer.INI för en daglig kontroll)</value>
+  <data name="Not checked yet (Check for updates, or turn on the daily check under Updates on the API &amp; monitoring page)" xml:space="preserve">
+    <value>Inte kontrollerat ännu (Sök efter uppdateringar, eller slå på den dagliga kontrollen under Uppdateringar på sidan API &amp; övervakning)</value>
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Inte kontrollerad ännu. Publicera posten, ge tid för spridning, och tryck sedan på "Kontrollera DNS".</value>
@@ -4758,11 +4761,14 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Nothing here needs a decision: no mailbox is being skipped and none is being disabled." xml:space="preserve">
     <value>Inget här kräver ett beslut: ingen brevlåda hoppas över och ingen inaktiveras.</value>
   </data>
+  <data name="Nothing here yet - Add creates the first entry." xml:space="preserve">
+    <value>Inget här ännu – Lägg till skapar den första posten.</value>
+  </data>
   <data name="Nothing is ever marked as spam: marking needs a mark threshold above 0, and a 0 there means &quot;never&quot; rather than &quot;always&quot;. Messages reaching {0} are still refused." xml:space="preserve">
     <value>Inget markeras någonsin som skräppost: markering kräver en markeringströskel över 0, och en 0 där betyder "aldrig" snarare än "alltid". Meddelanden som når {0} avvisas ändå.</value>
   </data>
-  <data name="Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
-    <value>Inget är kvarhållet. Karantän är av om inte QuarantineEnabled är satt i hMailServer.ini - fram till dess avvisas skräppost över borttagningströskeln under SMTP-konversationen i stället för att lagras.</value>
+  <data name="Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored." xml:space="preserve">
+    <value>Inget hålls kvar. Karantän är avstängd – slå på den under Skräppostinställningar – och tills den är på avvisas skräppost över raderingströskeln under SMTP-konversationen i stället för att lagras.</value>
   </data>
   <data name="Nothing matched &quot;{0}&quot;. Try what you are trying to achieve (&quot;stop spam&quot;, &quot;let a device send mail&quot;), a page name, or an hMailServer.INI key." xml:space="preserve">
     <value>Inget matchade "{0}". Prova det du försöker uppnå ("stoppa skräppost", "låt en enhet skicka post"), ett sidnamn, eller en hMailServer.INI-nyckel.</value>
@@ -5749,6 +5755,9 @@ Kör detta om klienter rapporterar meddelanden som dyker upp under fel UID, elle
   <data name="Remember this many previous passwords (0 = no history)" xml:space="preserve">
     <value>Kom ihåg så här många tidigare lösenord (0 = ingen historik)</value>
   </data>
+  <data name="Remote domain" xml:space="preserve">
+    <value>Fjärrdomän</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Ta bort _utgångna</value>
   </data>
@@ -6708,12 +6717,6 @@ Fortsätt?</value>
   <data name="Set TlsRptFromAddress in the [Settings] section of hMailServer.ini to a mailbox reports should be sent from. Leaving it empty is a valid choice - it just means the collected statistics are discarded and no reports are ever sent." xml:space="preserve">
     <value>Sätt TlsRptFromAddress i sektionen [Settings] i hMailServer.ini till en brevlåda rapporter ska skickas från. Att lämna den tom är ett giltigt val - det betyder bara att den insamlade statistiken kastas och inga rapporter någonsin skickas.</value>
   </data>
-  <data name="Set WebServicesHttpPort and/or WebServicesHttpsPort in hMailServer.ini so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
-    <value>Sätt WebServicesHttpPort och/eller WebServicesHttpsPort i hMailServer.ini så att URL:erna svarar, och publicera sedan DNS-posterna autoconfig.&lt;domain&gt; och autodiscover.&lt;domain&gt; för varje e-postdomän, pekande på den här servern. Det är adressposter, och den här sidan kontrollerar bara TXT-poster, så de kan inte bekräftas härifrån.</value>
-  </data>
-  <data name="Set WebServicesHttpsPort in hMailServer.ini (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
-    <value>Sätt WebServicesHttpsPort i hMailServer.ini (RFC 8461 kräver policyn över HTTPS), ge lyssnaren ett certifikat som täcker mta-sts.&lt;domain&gt;, och publicera sedan för varje domän en A-/AAAA-post (eller CNAME) för mta-sts.&lt;domain&gt; som pekar på den här servern och en TXT-post på _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Den här sidan kontrollerar TXT-posten; adressposten och certifikatets namntäckning kan inte kontrolleras härifrån.</value>
-  </data>
   <data name="Set a new server administration password." xml:space="preserve">
     <value>Sätt ett nytt administrationslösenord för servern.</value>
   </data>
@@ -6725,6 +6728,12 @@ Fortsätt?</value>
   </data>
   <data name="Set header value" xml:space="preserve">
     <value>Sätt rubrikvärde</value>
+  </data>
+  <data name="Set the HTTP or HTTPS port on the Web services &amp; autoconfiguration page so the URLs answer, then publish autoconfig.&lt;domain&gt; and autodiscover.&lt;domain&gt; DNS records for each mail domain, pointing at this server. These are address records, and this page checks TXT records only, so they cannot be confirmed from here." xml:space="preserve">
+    <value>Ange HTTP- eller HTTPS-porten på sidan Webbtjänster &amp; automatisk konfiguration så att URL:erna svarar, och publicera sedan DNS-posterna autoconfig.&lt;domain&gt; och autodiscover.&lt;domain&gt; för varje e-postdomän, pekande på den här servern. Det är adressposter, och den här sidan kontrollerar bara TXT-poster, så de kan inte bekräftas härifrån.</value>
+  </data>
+  <data name="Set the HTTPS port on the Web services &amp; autoconfiguration page (RFC 8461 requires the policy over HTTPS), give the listener a certificate that covers mta-sts.&lt;domain&gt;, then for each domain publish an A/AAAA (or CNAME) record for mta-sts.&lt;domain&gt; pointing at this server and a TXT record at _mta-sts.&lt;domain&gt; (v=STSv1; id=...). This page checks the TXT record; the address record and the certificate's name coverage cannot be checked from here." xml:space="preserve">
+    <value>Ange HTTPS-porten på sidan Webbtjänster &amp; automatisk konfiguration (RFC 8461 kräver policyn över HTTPS), ge lyssnaren ett certifikat som täcker mta-sts.&lt;domain&gt;, och publicera sedan för varje domän en A-/AAAA-post (eller CNAME) för mta-sts.&lt;domain&gt; som pekar på den här servern och en TXT-post på _mta-sts.&lt;domain&gt; (v=STSv1; id=...). Den här sidan kontrollerar TXT-posten; adressposten och certifikatets namntäckning kan inte kontrolleras härifrån.</value>
   </data>
   <data name="Set the SMTP relayer, and its credentials if the provider needs them." xml:space="preserve">
     <value>Sätt SMTP-reläet, och dess inloggningsuppgifter om leverantören behöver dem.</value>

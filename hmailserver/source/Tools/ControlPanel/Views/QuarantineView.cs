@@ -144,7 +144,7 @@ namespace hMailServer.ControlPanel.Views
 
                if (total == 0)
                {
-                  status_.Text = L("Nothing is held. Quarantining is off unless QuarantineEnabled is set in hMailServer.ini - until then, spam over the delete threshold is refused during the SMTP conversation rather than stored.");
+                  status_.Text = L("Nothing is held. Quarantining is switched off - turn it on under Anti-spam settings - and until it is on, spam over the delete threshold is refused during the SMTP conversation rather than stored.");
                }
                else if (listed < total)
                {
@@ -390,8 +390,11 @@ namespace hMailServer.ControlPanel.Views
          root.Children.Add(hint);
 
          var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-         toolbar.Children.Add(MakeButton(L("_Release"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected()));
-         toolbar.Children.Add(MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected()));
+         var release = MakeButton(L("_Release"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => ReleaseSelected());
+         toolbar.Children.Add(release);
+         var delete = MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteSelected());
+         toolbar.Children.Add(delete);
+         hMailServer.ControlPanel.Services.SelectionGate.Bind(list_, release, delete);
          toolbar.Children.Add(MakeButton(L("Remove _expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
          toolbar.Children.Add(MakeButton(L("Re_fresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
          root.Children.Add(toolbar);
