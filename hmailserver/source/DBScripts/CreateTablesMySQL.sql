@@ -4,6 +4,8 @@ drop table if exists hm_settings;
 
 drop table if exists hm_inisettings;
 
+drop table if exists hm_contacts;
+
 drop table if exists hm_accounts;
 
 drop table if exists hm_aliases;
