@@ -839,6 +839,159 @@ jobs:
           fi
           bash build/db-upgrade-gate.sh "$BACKEND"
 
+  # The container image. The x86-64 .deb the build job made, installed on the
+  # distribution release it was built for, run as its own user - see
+  # platform/packaging/docker/Dockerfile. Pushed to GHCR on a v* tag only, as
+  # <version> and as latest for a stable release; a pre-release tag gets its
+  # version only, so that :latest never points at an alpha. This is also what the
+  # OpenSSF Scorecard Packaging check looks for: a publishing workflow.
+  image:
+    name: the container image, from the amd64 package
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fetch the amd64 packages the build job made
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: linux-packages-x86-64
+          path: hmailserver/source/Server/platform/packaging/docker/packages
+
+      - name: The .deb is there, and its version is the tag's
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          cd hmailserver/source/Server/platform/packaging/docker
+          deb=$(ls packages/hmailserver_*_amd64.deb)
+          echo "package: $deb"
+          version="${REF_NAME#v}"
+          case "$deb" in
+            *"hmailserver_${version}_amd64.deb") echo "matches ${version}" ;;
+            *) echo "::error::the .deb is not ${version}'s: ${deb}"; exit 1 ;;
+          esac
+          # only that one goes into the image; the AppImage and the .rpm are not for it
+          find packages -type f ! -name 'hmailserver_*_amd64.deb' -delete
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags and labels from the git tag
+        id: meta
+        uses: docker/metadata-action@8e5442c4ef9f78752691e2d8f8d19755c6f78e81 # v5.5.1
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/hmailserver
+          # v6.3.2 -> 6.3.2 and latest; v6.4.0-alpha1 -> 6.4.0-alpha1 only
+          tags: |
+            type=semver,pattern={{version}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=hMailServer
+            org.opencontainers.image.description=hMailServer, a mail server for SMTP, IMAP and POP3, on Linux
+            org.opencontainers.image.licenses=AGPL-3.0-or-later
+            org.opencontainers.image.vendor=Progressive Robot Ltd
+
+      - name: Build and push
+        uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6.9.0
+        with:
+          context: hmailserver/source/Server/platform/packaging/docker
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          sbom: false
+
+      - name: The pushed image starts, listens, and is administrable
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/hmailserver:${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The real first start, the way the Dockerfile's own example runs it: a
+          # bridge network with a PostgreSQL container beside the image, the
+          # entrypoint writing [Database], the REST listener and the administrator
+          # password from the environment, creating the database, and the server
+          # coming up on 25 and on 8045 over TLS. Not host networking: on a host
+          # with a mail server of its own, the image's HEALTHCHECK against
+          # 127.0.0.1:25 would be answered by that server and pass for the wrong
+          # reason (seen on the lab VM, whose Postfix answered for it). On the
+          # bridge, 127.0.0.1 inside the container is the container's own
+          # loopback, and nothing but hmailserver can answer there.
+          docker network create hm-smoke-net
+          docker run -d --name hm-smoke-pg --network hm-smoke-net \
+            -e POSTGRES_USER=hmailserver -e POSTGRES_PASSWORD=hmtest -e POSTGRES_DB=postgres \
+            postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
+          for i in $(seq 1 40); do
+            docker exec hm-smoke-pg pg_isready -U hmailserver >/dev/null 2>&1 && break
+            sleep 2
+          done
+          docker exec hm-smoke-pg pg_isready -U hmailserver
+          # The server requires TLS on a REST listener bound off loopback; a
+          # throwaway certificate, readable by the container's user.
+          mkdir -p rest
+          openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
+            -keyout rest/rest.key -out rest/rest.pem -subj /CN=hm-smoke -days 2 >/dev/null 2>&1
+          chmod 0644 rest/rest.key rest/rest.pem
+          docker run -d --name hm-smoke --network hm-smoke-net \
+            -p 127.0.0.1:2525:25 -p 127.0.0.1:8045:8045 \
+            -v "$PWD/rest:/certs:ro" \
+            -e HM_DB_TYPE=PostgreSQL -e HM_DB_HOST=hm-smoke-pg -e HM_DB_NAME=hmsmoke \
+            -e HM_DB_USER=hmailserver -e HM_DB_PASSWORD=hmtest \
+            -e HM_ADMIN_PASSWORD=smoke-secret -e HM_REST_PORT=8045 -e HM_REST_BIND_ADDRESS=0.0.0.0 \
+            -e HM_REST_CERTIFICATE_FILE=/certs/rest.pem -e HM_REST_PRIVATE_KEY_FILE=/certs/rest.key \
+            "$IMAGE"
+          state=starting
+          for i in $(seq 1 45); do
+            state=$(docker inspect --format '{{.State.Health.Status}}' hm-smoke 2>/dev/null || echo starting)
+            [ "$state" = healthy ] && break
+            [ "$(docker inspect --format '{{.State.Running}}' hm-smoke 2>/dev/null)" = false ] && break
+            sleep 2
+          done
+          docker logs hm-smoke | tail -20
+          [ "$state" = healthy ] || { echo "::error::the image did not become healthy (state: ${state})"; exit 1; }
+          # Healthy means the container's own port 25 accepted a connection. So
+          # that this cannot pass for the wrong reason: the listeners are inside
+          # the container (LISTEN rows for 0x19 and 0x1F6D in its /proc/net/tcp),
+          # what answers through the published port is hMailServer's banner, and
+          # the API answers as configured - 200 to the administrator, 401 to a
+          # wrong password, 201 to a domain created through it.
+          listening=$(docker exec hm-smoke sh -c 'grep -cE ":(0019|1F6D) 00000000:0000 0A" /proc/net/tcp' || true)
+          [ "${listening}" -ge 2 ] || { echo "::error::expected listeners on 25 and 8045 inside the container, found ${listening}."; exit 1; }
+          banner=$(timeout 5 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2525; head -c 120 <&3' | head -1 | tr -d '\r')
+          echo "banner: ${banner}"
+          case "$banner" in
+            220\ *\ ESMTP*) echo "the banner is hMailServer's" ;;
+            *) echo "::error::the banner through the published port is not hMailServer's: '${banner}'"; exit 1 ;;
+          esac
+          code=$(curl -sk -o status.json -w '%{http_code}' -u Administrator:smoke-secret https://127.0.0.1:8045/api/v1/status)
+          echo "status: HTTP ${code} $(head -c 200 status.json)"
+          [ "$code" = 200 ] || { echo "::error::GET /api/v1/status as Administrator answered ${code}, not 200."; exit 1; }
+          code=$(curl -sk -o /dev/null -w '%{http_code}' -u Administrator:wrong https://127.0.0.1:8045/api/v1/status)
+          [ "$code" = 401 ] || { echo "::error::a wrong password answered ${code}, not 401."; exit 1; }
+          code=$(curl -sk -o domain.json -w '%{http_code}' -u Administrator:smoke-secret \
+            -H 'Content-Type: application/json' -d '{"name":"smoke.example"}' https://127.0.0.1:8045/api/v1/domains)
+          echo "domain: HTTP ${code} $(head -c 200 domain.json)"
+          [ "$code" = 201 ] || { echo "::error::POST /api/v1/domains answered ${code}, not 201."; exit 1; }
+          # The password is in the file as a hash, not as itself.
+          if docker exec hm-smoke grep -q 'smoke-secret' /etc/hmailserver/hMailServer.ini; then
+            echo "::error::the administrator password is in hMailServer.ini in clear."; exit 1
+          fi
+          docker rm -f hm-smoke hm-smoke-pg >/dev/null
+          docker network rm hm-smoke-net >/dev/null
+
   publish:
     name: attach the packages to the release
     needs: [ build, package-install, stamps ]
