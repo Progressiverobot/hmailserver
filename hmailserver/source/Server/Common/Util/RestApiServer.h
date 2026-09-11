@@ -77,6 +77,7 @@ namespace HM
    class IMAPFolder;
    class IMAPFolders;
    class Message;
+   class AppPassword;
    class MessageData;
 
    // The server-wide settings group as one JSON object, from the table in
@@ -223,6 +224,13 @@ namespace HM
          RouteMeFolderEmpty,
          RouteMeMessageSource,
          RouteMeMessageHtml,
+         RouteMeAppPasswords,
+         RouteMeAppPasswordCreate,
+         RouteMeAppPasswordDelete,
+         RouteMeSessions,
+         RouteMeSessionsEnd,
+         RouteMeSessionDelete,
+         RouteMeStorage,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -437,12 +445,23 @@ namespace HM
       // verdicts and whether its sender is external; the file itself.
       static std::shared_ptr<IMAPFolder> DesignatedFolderOrCreate_(std::shared_ptr<const Account> account, int designation, const String &name);
       static void LearnAfterMove_(std::shared_ptr<IMAPFolder> source, std::shared_ptr<IMAPFolder> destination, __int64 newMessageId, std::shared_ptr<const Account> account);
-      static HttpResponse HandleMeFolderEmpty_(const Caller &caller, __int64 folderId);
+      static HttpResponse HandleMeFolderEmpty_(const Caller &caller, __int64 folderId, const AnsiString &query);
       static HttpResponse HandleMeMessageSource_(const Caller &caller, __int64 messageId);
       static HttpResponse HandleMeMessageHtml_(const Caller &caller, __int64 messageId, const AnsiString &query);
       static bool HtmlNamesRemoteContent_(const AnsiString &html);
       static AnsiString HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account);
       static AnsiString OwnAuthenticationResults_(const MimeHeader &mimeHeader);
+
+      // The account's app passwords (RestApiAppPasswords.cpp), its browser
+      // sessions, and what its mailbox holds by folder and by message.
+      static HttpResponse HandleMeAppPasswords_(const Caller &caller);
+      static HttpResponse HandleMeAppPasswordCreate_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeAppPasswordDelete_(const Caller &caller, __int64 id);
+      static AnsiString AppPasswordJson_(std::shared_ptr<AppPassword> password, const String &clearText);
+      static HttpResponse HandleMeSessions_(const Caller &caller);
+      static HttpResponse HandleMeSessionsEnd_(const Caller &caller);
+      static HttpResponse HandleMeSessionDelete_(const Caller &caller, const AnsiString &id);
+      static HttpResponse HandleMeStorage_(const Caller &caller);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
