@@ -82,11 +82,8 @@ namespace hMailServer
 
       public Domain get_ItemByName(string name)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
       }
 
       public Domain Add()
@@ -168,11 +165,8 @@ namespace hMailServer
 
       public Account get_ItemByAddress(string address)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "address"), address, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + address);
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "address"), address, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + address);
       }
 
       public Account Add()
@@ -249,11 +243,8 @@ namespace hMailServer
 
       public Alias get_ItemByName(string name)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
       }
 
       public Alias Add()
@@ -309,11 +300,8 @@ namespace hMailServer
 
       public DistributionList get_ItemByAddress(string address)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "address"), address, StringComparison.OrdinalIgnoreCase))
-               return new DistributionList { Address = address, Active = true };
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + address);
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "address"), address, StringComparison.OrdinalIgnoreCase)).Select(element => new DistributionList { Address = address, Active = true }).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + address);
       }
 
       public DistributionList Add()
@@ -475,11 +463,8 @@ namespace hMailServer
 
       public TCPIPPort get_ItemByDBID(long id)
       {
-         foreach (var element in All())
-            if (ServerApi.LongOf(element, "id") == id)
-               return From(element);
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
+         return All().Where(element => ServerApi.LongOf(element, "id") == id).Select(element => From(element)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
       }
 
       public TCPIPPort Add()
@@ -671,11 +656,7 @@ namespace hMailServer
 
       public SecurityRange get_ItemByName(string name)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         return null;
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault();
       }
 
       public SecurityRange Add()
@@ -834,11 +815,7 @@ namespace hMailServer
 
       public SSLCertificate get_ItemByName(string name)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         return null;
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault();
       }
 
       private static SSLCertificate From(JsonElement element)
@@ -873,12 +850,10 @@ namespace hMailServer
 
       public void Clear()
       {
-         foreach (var id in All().Select(element => ServerApi.LongOf(element, "id")))
+         // A certificate a listener is bound to cannot go; the Windows Clear has
+         // the same constraint and the fixtures clear the ports first.
+         foreach (var answer in All().Select(element => ServerApi.Delete("/api/v1/certificates/" + ServerApi.LongOf(element, "id"))))
          {
-            var answer = ServerApi.Delete("/api/v1/certificates/" + id);
-
-            // A certificate a listener is bound to cannot go; the Windows Clear has
-            // the same constraint and the fixtures clear the ports first.
             if (answer.Status != 200 && answer.Status != 404)
                throw new System.Runtime.InteropServices.COMException("Failed to delete object. " + answer.Error);
          }
@@ -970,11 +945,7 @@ namespace hMailServer
 
       public Route get_ItemByName(string domainName)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "domain_name"), domainName, StringComparison.OrdinalIgnoreCase))
-               return From(element);
-
-         return null;
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "domain_name"), domainName, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault();
       }
 
       public Route ItemByName(string domainName)
@@ -1026,11 +997,7 @@ namespace hMailServer
 
       public Rule get_ItemByName(string name)
       {
-         foreach (var element in All())
-            if (string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.Ordinal))
-               return Rule.From(element);
-
-         return null;
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.Ordinal)).Select(element => Rule.From(element)).FirstOrDefault();
       }
 
       public Rule Add()
@@ -1043,11 +1010,7 @@ namespace hMailServer
 
       public Rule get_ItemByDBID(long id)
       {
-         foreach (var element in All())
-            if (ServerApi.LongOf(element, "id") == id)
-               return Rule.From(element);
-
-         return null;
+         return All().Where(element => ServerApi.LongOf(element, "id") == id).Select(element => Rule.From(element)).FirstOrDefault();
       }
 
       public void DeleteByDBID(long id)
@@ -1503,11 +1466,8 @@ namespace hMailServer
 
       public IMAPFolder get_ItemByName(string name)
       {
-         foreach (var folder in All())
-            if (string.Equals(ServerApi.StringOf(folder, "name"), name, StringComparison.OrdinalIgnoreCase))
-               return From(folder);
-
-         throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
+         return All().Where(folder => string.Equals(ServerApi.StringOf(folder, "name"), name, StringComparison.OrdinalIgnoreCase)).Select(folder => From(folder)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
       }
 
       private IMAPFolder From(JsonElement element)

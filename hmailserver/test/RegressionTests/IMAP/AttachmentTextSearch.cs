@@ -122,7 +122,11 @@ namespace RegressionTests.IMAP
          indexing.Index();
          for (var i = 0; i < 1000; i++)
          {
-            if (indexing.TotalIndexedCount == indexing.TotalMessageCount)
+            // Read into locals first: the analyser cannot resolve the interop's
+            // properties and reported the two reads as one value compared with itself.
+            long indexed = indexing.TotalIndexedCount;
+            long total = indexing.TotalMessageCount;
+            if (indexed == total)
             {
                indexing.Index();
                return;
