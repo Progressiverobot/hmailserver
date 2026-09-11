@@ -94,6 +94,14 @@ namespace HM
       // locate the file without duplicating the derivation.
       static String GetApiKeyStoreFile();
 
+      // One address the signed-in account may write as (RestApiIdentities.cpp).
+      struct Identity
+      {
+         String address;
+         String name;
+         AnsiString kind;
+      };
+
    private:
 
       // Which credential a request presented. Used to keep key management off
@@ -206,6 +214,9 @@ namespace HM
          RouteMeContactCreate,
          RouteMeContactUpdate,
          RouteMeContactDelete,
+         RouteMeIdentities,
+         RouteMePreferences,
+         RouteMePreferencesPut,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -403,6 +414,16 @@ namespace HM
       static AnsiString ContactJson_(__int64 id, const String &name, const String &address, int source, const String &created);
       static bool FindContact_(__int64 accountId, const String &address, __int64 &contactId);
       static bool InsertContact_(__int64 accountId, const String &name, const String &address, int source, __int64 &contactId, String &created);
+
+      // Who the account may write as, and the From a send or draft asked for (RestApiIdentities.cpp).
+      static HttpResponse HandleMeIdentities_(const Caller &caller);
+      static void IdentitiesFor_(std::shared_ptr<const Account> account, std::vector<Identity> &identities);
+      static int ResolveSender_(std::shared_ptr<const Account> account, const String &requested, String &address, String &header, AnsiString &problem);
+
+      // The account's preferences, a key/value store (RestApiPreferences.cpp).
+      static HttpResponse HandleMePreferences_(const Caller &caller);
+      static HttpResponse HandleMePreferencesPut_(const Caller &caller, const AnsiString &requestBody);
+      static AnsiString PreferencesJson_(__int64 accountId);
       static AnsiString ThreadFieldsJson_(const String &fileName);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);

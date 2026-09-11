@@ -1657,6 +1657,15 @@ namespace HM
          case RouteMeContactDelete:
             return HandleMeContactDelete_(caller, route.message_id);
 
+         case RouteMeIdentities:
+            return HandleMeIdentities_(caller);
+
+         case RouteMePreferences:
+            return HandleMePreferences_(caller);
+
+         case RouteMePreferencesPut:
+            return HandleMePreferencesPut_(caller, GetRequestBody_(request));
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1753,6 +1762,25 @@ namespace HM
             else if (method == "DELETE")
                route.kind = RouteMeContactDelete;
          }
+
+         return;
+      }
+
+      // Who the account may write as, and its preferences.
+      if (path == "/api/v1/me/identities")
+      {
+         if (method == "GET")
+            route.kind = RouteMeIdentities;
+
+         return;
+      }
+
+      if (path == "/api/v1/me/preferences")
+      {
+         if (method == "GET")
+            route.kind = RouteMePreferences;
+         else if (method == "PUT")
+            route.kind = RouteMePreferencesPut;
 
          return;
       }
@@ -2426,6 +2454,7 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RouteMePreferencesPut:
       case RouteMeContactCreate:
       case RouteMeContactUpdate:
       case RouteMeContactDelete:
@@ -4982,6 +5011,9 @@ namespace HM
    {
       switch (kind)
       {
+      case RouteMeIdentities:
+      case RouteMePreferences:
+      case RouteMePreferencesPut:
       case RouteMeContacts:
       case RouteMeContactCreate:
       case RouteMeContactUpdate:
@@ -6814,7 +6846,16 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
-      const String from = account->GetAddress();
+      // The envelope sender and the From header: the account itself unless the
+      // body names one of the account's identities (RestApiIdentities.cpp).
+      String from;
+      String fromHeader;
+      {
+         AnsiString problem;
+         int refused = ResolveSender_(account, JsonUtf8Value_(requestBody, "from"), from, fromHeader, problem);
+         if (refused != 0)
+            return BuildResponse_(refused, problem);
+      }
 
       std::vector<String> toAddresses, toEntries, ccAddresses, ccEntries, bccAddresses, bccEntries;
       SplitAddressList(JsonUtf8Value_(requestBody, "to"), toAddresses, toEntries);
@@ -6883,11 +6924,9 @@ namespace HM
       if (message->GetRecipients()->GetCount() == 0)
          return BuildResponse_(400, "{\"error\":\"no address resolved to a recipient\"}");
 
-      // The message: the account's name and address, the lists as written,
+      // The message: the sender's name and address, the lists as written,
       // a Date and a Message-ID, the text as UTF-8. Bcc goes to the envelope
       // and nowhere else.
-      String fromHeader = FromHeader_(account);
-
       const String fileName = PersistentMessage::GetFileName(message);
 
       MessageData messageData;
@@ -7422,6 +7461,16 @@ namespace HM
       if (!RightOn_(account, drafts, ACLPermission::PermissionInsert))
          return BuildResponse_(403, "{\"error\":\"the Drafts folder does not allow this account to add messages\"}");
 
+      // A draft may carry a chosen From too, under the same rule as a send.
+      String draftFrom;
+      String draftFromHeader;
+      {
+         AnsiString problem;
+         int refused = ResolveSender_(account, JsonUtf8Value_(requestBody, "from"), draftFrom, draftFromHeader, problem);
+         if (refused != 0)
+            return BuildResponse_(refused, problem);
+      }
+
       // Written as the send route writes a message, and kept instead of
       // queued: Bcc stays in the draft, since nothing is sent.
       std::shared_ptr<Message> draft = std::shared_ptr<Message>(new Message());
@@ -7433,7 +7482,7 @@ namespace HM
       MessageData messageData;
       messageData.LoadFromMessage(fileName, draft);
       messageData.SetCharset(_T("utf-8"));
-      messageData.SetFrom(FromHeader_(account));
+      messageData.SetFrom(draftFromHeader);
       messageData.SetTo(JsonUtf8Value_(requestBody, "to"));
       String cc = JsonUtf8Value_(requestBody, "cc");
       if (!cc.IsEmpty())
@@ -7725,6 +7774,8 @@ namespace HM
          "\"/api/v1/session\":{\"post\":{\"summary\":\"Start a browser session for the signed-in account, or for the administrator\",\"description\":\"HTTP Basic, once: an account's address and password, or the administrator's name and password - and, when a second factor is enrolled on the administrator credential, the one-time code in X-hMailServer-OTP (without it the answer is 401 with X-hMailServer-OTP: required). Answers 201 with a Set-Cookie (hmailsession; HttpOnly, SameSite=Strict, Secure over TLS). The cookie then authenticates as the credential itself would - an account reaches the /api/v1/me endpoints, the administrator reaches everything but them - without a password, for 30 minutes of idleness and 12 hours at most; a request that changes something must also carry X-Requested-With: hMailServer. A password change ends the account's other sessions, and a change of the administrator password ends every administrator session. An API key cannot start one.\",\"responses\":{\"201\":{\"description\":\"address (an account) or administrator true, with idle_seconds and lifetime_seconds; the cookie in Set-Cookie\"},\"401\":{\"description\":\"Not an account's or the administrator's credentials\"},\"403\":{\"description\":\"A session cookie or an API key was presented\"}}},\"delete\":{\"summary\":\"End the browser session the request came with\",\"responses\":{\"200\":{\"description\":\"Ended; the cookie is cleared\"},\"400\":{\"description\":\"The request carried a password, not a session\"}}}},"
          "\"/api/v1/me/contacts\":{\"get\":{\"summary\":\"The signed-in account's address book\",\"description\":\"q= narrows to names and addresses containing the text, case-insensitively, which is what the To field's completion asks; limit= caps the answer (200 by default). Recipients of what the account sends through the API are added on their own, marked collected.\",\"responses\":{\"200\":{\"description\":\"contacts (id, name, address, source manual|collected, created), count, total\"}}},\"post\":{\"summary\":\"Add a contact\",\"description\":\"Body: address (one e-mail address, or Name <address>), name (optional). One row per address per account.\",\"responses\":{\"201\":{\"description\":\"The contact\"},\"400\":{\"description\":\"Not one address\"},\"409\":{\"description\":\"That address is already a contact; id says which\"}}}},"
          "\"/api/v1/me/contacts/{id}\":{\"put\":{\"summary\":\"Change a contact's name or address\",\"description\":\"Body: name and/or address. Another account's contact is 404.\",\"responses\":{\"200\":{\"description\":\"The contact\"},\"404\":{\"description\":\"No such contact\"},\"409\":{\"description\":\"The new address is already a contact\"}}},\"delete\":{\"summary\":\"Remove a contact\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"404\":{\"description\":\"No such contact\"}}}},"
+         "\"/api/v1/me/identities\":{\"get\":{\"summary\":\"The addresses the signed-in account may write as\",\"description\":\"The account's own address (kind account), every active alias that resolves to it (alias), and every account whose INBOX grants this one the post right (granted) - the rule SMTP submission applies to MAIL FROM. Each carries the From header the page would send. A send or a draft names one in its from field; anything else is refused with 403.\",\"responses\":{\"200\":{\"description\":\"identities (address, name, kind, header)\"}}}},"
+         "\"/api/v1/me/preferences\":{\"get\":{\"summary\":\"The signed-in account's preferences\",\"description\":\"A key/value store the webmail keeps its choices in (theme, density, undo-send delay, notifications) so they follow the account between browsers. The server attaches no meaning to a key.\",\"responses\":{\"200\":{\"description\":\"preferences: an object of string values\"}}},\"put\":{\"summary\":\"Change preferences\",\"description\":\"Body: an object. Each string member is written, each null member removed, anything else refused. Keys are 1-64 letters, digits, dots, dashes or underscores; values at most 4000 characters; at most 100 keys per account.\",\"responses\":{\"200\":{\"description\":\"The preferences after the change\"},\"400\":{\"description\":\"Not an object of strings, a bad key, a long value, or too many keys\"}}}},"
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"

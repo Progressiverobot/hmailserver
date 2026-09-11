@@ -41,6 +41,7 @@ if exists (select * from sysobjects where id = object_id('hm_fetchaccounts_uids'
 if exists (select * from sysobjects where id = object_id('hm_apppasswords') and objectproperty(id, 'isusertable') = 1) drop table hm_apppasswords
 
 if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
+if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
 
 if exists (select * from sysobjects where id = object_id('hm_rules') and objectproperty(id, 'isusertable') = 1) drop table hm_rules 
 
@@ -555,6 +556,18 @@ create table hm_contacts
 ALTER TABLE hm_contacts ADD CONSTRAINT hm_contacts_pk PRIMARY KEY NONCLUSTERED (contactid)
 
 CREATE CLUSTERED INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress)
+
+create table hm_accountprefs
+(
+	prefid int identity(1,1) not null,
+	prefaccountid int not null,
+	prefname nvarchar(64) not null,
+	prefvalue nvarchar(4000) not null
+)
+
+ALTER TABLE hm_accountprefs ADD CONSTRAINT hm_accountprefs_pk PRIMARY KEY NONCLUSTERED (prefid)
+
+CREATE UNIQUE CLUSTERED INDEX idx_hm_accountprefs_name ON hm_accountprefs (prefaccountid, prefname)
 
 create table hm_rules
 (
@@ -1212,6 +1225,8 @@ ALTER TABLE hm_apppasswords ADD CONSTRAINT fk_hm_apppasswords_account FOREIGN KE
 
 ALTER TABLE hm_contacts ADD CONSTRAINT fk_hm_contacts_account FOREIGN KEY (contactaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
+ALTER TABLE hm_accountprefs ADD CONSTRAINT fk_hm_accountprefs_account FOREIGN KEY (prefaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
@@ -1228,4 +1243,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6032)
+insert into hm_dbversion values (6033)
