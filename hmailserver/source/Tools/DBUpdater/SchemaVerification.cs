@@ -242,7 +242,7 @@ namespace DBUpdater
          // "Server message 'QUOTA_WARNING' could not be found" to the one user whose
          // mailbox filled up.
          new SchemaProbe(6022, "hm_servermessages.QUOTA_WARNING",
-                         "update hm_servermessages set smtext = smtext where smname = 'QUOTA_WARNING' and 1 = 0"),
+                         "select 1 / (case when exists (select 1 from hm_servermessages where smname = 'QUOTA_WARNING') then 1 else 0 end)"),
 
          // Upgrade6022to6023* - the full-text index. One probe per column across
          // both tables: a half-applied step here leaves a server that starts, indexes

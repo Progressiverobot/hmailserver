@@ -95,6 +95,27 @@ namespace RegressionTests.Infrastructure
       }
 
       [Test]
+      [Description("The quota warning probe fails when QUOTA_WARNING is absent, proving it checks row presence rather than statement shape.")]
+      public void TheQuotaWarningProbeFailsForAnAbsentRow()
+      {
+         SchemaProbe probe = SchemaVerification.GetProbesFor(6022).First(p => p.Describes == "hm_servermessages.QUOTA_WARNING");
+         string absent = probe.Statement.Replace("smname = 'QUOTA_WARNING'", "smname = 'NO_SUCH_SERVER_MESSAGE'");
+         Assert.AreNotEqual(probe.Statement, absent, "The probe no longer names QUOTA_WARNING the way this test rewrites it.");
+
+         Database database = Database;
+         int before = database.CurrentVersion;
+
+         var refused = Assert.Throws<COMException>(() => database.ExecuteSQL(absent),
+            "The probe succeeded for a row that does not exist; it would pass an upgrade that failed to insert QUOTA_WARNING.");
+
+         StringAssert.Contains("HM10044", refused.Message, "The probe failed for a reason other than the backend evaluating it.");
+         StringAssert.DoesNotContain("HM10045", refused.Message);
+         Assert.AreEqual(before, database.CurrentVersion, "A failed probe must not have written hm_dbversion.");
+
+         LogHandler.ReadAndDeleteErrorLog();
+      }
+
+      [Test]
       [Description("The probe distinguishes a foreign key from a primary key of the same name: the constraint type is part of what it asks.")]
       public void TheConstraintProbeAsksForTheType()
       {
