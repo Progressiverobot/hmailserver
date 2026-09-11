@@ -28,20 +28,27 @@ on:
         required: false
 
 permissions:
-  # write, not read, and only so that a DRAFT release can be read. GitHub shows
-  # an unpublished release to a token with push access and to nobody else, so
-  # with contents: read this job answered "release not found" for a draft and
-  # threw - which made RELEASE.md's ordering impossible to follow: it requires
-  # this test to be green BEFORE the release is published, and immutable
-  # releases mean publishing first to make the test pass is not a fallback but a
-  # one-way door. Found cutting 6.3.0, on the last gate before publication.
-  contents: write
+  # The workflow as a whole reads. The one job that needs more asks for it
+  # itself, below: a write permission declared at the top level covers every
+  # job, and is what OpenSSF Scorecard's Token-Permissions check scores as zero.
+  contents: read
   actions: read
 
 jobs:
   smoke:
     name: Install on a throwaway runner and verify
     runs-on: windows-latest
+    permissions:
+      # write, not read, and only so that a DRAFT release can be read. GitHub shows
+      # an unpublished release to a token with push access and to nobody else, so
+      # with contents: read this job answered "release not found" for a draft and
+      # threw - which made RELEASE.md's ordering impossible to follow: it requires
+      # this test to be green BEFORE the release is published, and immutable
+      # releases mean publishing first to make the test pass is not a fallback but a
+      # one-way door. Found cutting 6.3.0, on the last gate before publication.
+      # Job-level, so that the grant is scoped to the one job that downloads.
+      contents: write
+      actions: read
     steps:
       - name: Fetch the installer from the release
         if: ${{ inputs.release_tag != '' }}
