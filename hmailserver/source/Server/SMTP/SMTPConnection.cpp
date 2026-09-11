@@ -18,6 +18,8 @@
 #include "../Common/AntiSpam/QuarantineStore.h"
 #include "../Common/Util/OAuth2TokenValidator.h"
 #include "../Common/Util/ClientCertificateIdentity.h"
+#include "../Common/Util/GssapiAcceptor.h"
+#include "../Common/Util/Encoding/Base64.h"
 #include "../Common/Util/Crypt.h"
 #include "../Common/Util/Hashing/ScramSha256.h"
 #include "../Common/Persistence/PersistentMessage.h"
@@ -482,7 +484,7 @@ namespace HM
       const bool saslLine =
          current_state_ == SMTPUSERNAME || current_state_ == SMTPUPASSWORD ||
          current_state_ == SMTPSCRAMFIRST || current_state_ == SMTPSCRAMFINAL || current_state_ == SMTPSCRAMACK ||
-         current_state_ == SMTPBEARERRESPONSE || current_state_ == SMTPEXTERNALRESPONSE ||
+         current_state_ == SMTPBEARERRESPONSE || current_state_ == SMTPEXTERNALRESPONSE || current_state_ == SMTPGSSAPIRESPONSE ||
          (sRequest.GetLength() >= 5 && sRequest.Left(5).CompareNoCase("AUTH ") == 0);
       const int maxLength = saslLine ? 12288 : 510;
 
@@ -624,6 +626,11 @@ namespace HM
          case SMTPEXTERNALRESPONSE:
             {
                AuthenticateUsingExternal_(sRequest);
+               break;
+            }
+         case SMTPGSSAPIRESPONSE:
+            {
+               ProtocolGssapiToken_(sRequest);
                break;
             }
          default:
@@ -2686,6 +2693,8 @@ namespace HM
          // nobody else - there is nothing they could answer with.
          if (!GetVerifiedClientCertificateIdentities().empty())
             sAuth += " EXTERNAL";
+         if (GssapiAcceptor::IsEnabled())
+            sAuth += " GSSAPI";
 
          sData += sAuth;
       }
@@ -3851,7 +3860,94 @@ namespace HM
          return;
       }
 
+      if (sAuthenticationType == _T("GSSAPI"))
+      {
+         if (!GssapiAcceptor::IsEnabled())
+         {
+            SendErrorResponse_(504, "Authentication mechanism not supported.");
+            return;
+         }
+         requestedAuthenticationType_ = AUTH_GSSAPI;
+         gssapi_session_ = std::make_shared<GssapiAcceptor>();
+         if (vecParams.size() >= 3 && vecParams[2] != _T("="))
+         {
+            ProtocolGssapiToken_(vecParams[2]);
+         }
+         else
+         {
+            EnqueueWrite_("334 ");
+            current_state_ = SMTPGSSAPIRESPONSE;
+         }
+         return;
+      }
       SendErrorResponse_(504, "Authentication mechanism not supported.");
+   }
+
+   // RFC 4752 over SMTP AUTH (RFC 4954): each client token, base64 in a line,
+   // goes to the acceptor; what it answers goes back in a 334; Done names the
+   // principal and the account it is, and the rest is the same as any other
+   // successful or failed AUTH.
+   void
+   SMTPConnection::ProtocolGssapiToken_(const String &sLine)
+   {
+      if (sLine == _T("*"))
+      {
+         gssapi_session_.reset();
+         ResetLoginCredentials_();
+         SendErrorResponse_(501, "Authentication cancelled.");
+         return;
+      }
+      if (!gssapi_session_)
+      {
+         SendErrorResponse_(503, "No authentication in progress.");
+         return;
+      }
+
+      AnsiString line = sLine;
+      AnsiString token;
+      if (!line.IsEmpty() && line != "=")
+         token = Base64::Decode(line.c_str(), line.GetLength());
+      AnsiString reply;
+      String failure;
+      const GssapiAcceptor::State state = gssapi_session_->Step(token, reply, failure);
+      if (state == GssapiAcceptor::NeedToken || state == GssapiAcceptor::NeedLayer)
+      {
+         String reply64 = reply.IsEmpty() ? String() : String(Base64::Encode(reply.c_str(), reply.GetLength()));
+         EnqueueWrite_("334 " + reply64);
+         current_state_ = SMTPGSSAPIRESPONSE;
+         return;
+      }
+
+      String sLoginName = gssapi_session_->GetPrincipal();
+      bool disconnect = false;
+      std::shared_ptr<const Account> pAccount;
+      if (state == GssapiAcceptor::Done)
+         pAccount = GssapiIdentity::Logon(gssapi_session_->GetPrincipal(), gssapi_session_->GetAuthorizationIdentity(), GetRemoteEndpointAddress(), sLoginName, disconnect);
+      else
+         LOG_DEBUG("SMTP AUTH GSSAPI failed: " + failure);
+      gssapi_session_.reset();
+
+      username_ = sLoginName;
+      isAuthenticated_ = pAccount != nullptr;
+      FireOnClientLogon_(sLoginName, isAuthenticated_);
+
+      if (pAccount)
+      {
+         SendResponse_(235, _T("2.7.0"), _T("authenticated."));
+         current_state_ = HEADER;
+         return;
+      }
+
+      authentication_failure_count_++;
+      TarpitFailedLogon_();
+      if (disconnect || authentication_failure_count_ >= 10)
+      {
+         SendErrorResponse_(535, "Authentication failed. Too many invalid logon attempts.");
+         pending_disconnect_ = true;
+         EnqueueDisconnect();
+         return;
+      }
+      RestartAuthentication_();
    }
 
    void 

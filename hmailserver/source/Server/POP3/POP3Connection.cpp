@@ -18,6 +18,8 @@
 #include "../Common/Util/Parsing/StringParser.h"
 #include "../Common/Util/OAuth2TokenValidator.h"
 #include "../Common/Util/ClientCertificateIdentity.h"
+#include "../Common/Util/GssapiAcceptor.h"
+#include "../Common/Util/Encoding/Base64.h"
 #include "../Common/Application/IniFileSettings.h"
 #include "../Common/Application/TimeoutCalculator.h"
 
@@ -294,7 +296,7 @@ namespace HM
       // protected the parser from an evil user also refused every such token with
       // "Line too long". RFC 5034 section 4 puts the AUTH line at up to 12288 octets,
       // which is what an AUTH command or a pending SASL exchange gets here.
-      const bool saslLine = scram_session_ || sasl_plain_pending_ || sasl_bearer_pending_ || sasl_external_pending_ ||
+      const bool saslLine = scram_session_ || gssapi_session_ || sasl_plain_pending_ || sasl_bearer_pending_ || sasl_external_pending_ ||
          (Request.GetLength() >= 5 && Request.Left(5).CompareNoCase("AUTH ") == 0);
       const int maxLength = saslLine ? 12288 : 500;
 
@@ -309,6 +311,8 @@ namespace HM
       // rather than as a POP3 command.
       if (scram_session_)
          return ContinueScram_(Request);
+      if (gssapi_session_)
+         return ContinueGssapi_(Request);
 
       if (sasl_plain_pending_)
       {
@@ -863,6 +867,8 @@ namespace HM
          // RFC 5034: list the supported SASL mechanisms. SCRAM-SHA-256-PLUS is only
          // offered on a TLS connection, where channel binding is meaningful.
          String sMechanisms = "PLAIN\r\nSCRAM-SHA-256\r\n";
+         if (GssapiAcceptor::IsEnabled())
+            sMechanisms += "GSSAPI\r\n";
          if (IsSSLConnection())
             sMechanisms += "SCRAM-SHA-256-PLUS\r\n";
 
@@ -893,6 +899,19 @@ namespace HM
       if (hasInitialResponse && parts[1] != _T("="))
          initialResponse = parts[1];
 
+      if (mechanism == _T("GSSAPI"))
+      {
+         if (!GssapiAcceptor::IsEnabled())
+         {
+            EnqueueWrite_("-ERR Unsupported SASL mechanism.");
+            return ResultNormalResponse;
+         }
+         gssapi_session_ = std::make_shared<GssapiAcceptor>();
+         if (!initialResponse.IsEmpty())
+            return ContinueGssapi_(initialResponse);
+         EnqueueWrite_("+ ");
+         return ResultNormalResponse;
+      }
       if (mechanism == _T("PLAIN"))
       {
          if (hasInitialResponse)
@@ -1128,6 +1147,62 @@ namespace HM
          }
 
          EnqueueWrite_("-ERR [AUTH] The client certificate does not identify an account.");
+         return ResultNormalResponse;
+      }
+
+      account_ = pAccount;
+      return HandleSuccessfulLogin_();
+   }
+
+   // RFC 4752 over POP3 AUTH (RFC 5034): each client line is a token for the
+   // acceptor; its answer goes out as a "+ " continuation; Done names the
+   // account, and the rest is the same as any other logon.
+   POP3Connection::ParseResult
+   POP3Connection::ContinueGssapi_(const String &sRequest)
+   {
+      if (sRequest == _T("*"))
+      {
+         gssapi_session_.reset();
+         EnqueueWrite_("-ERR Authentication cancelled.");
+         return ResultNormalResponse;
+      }
+
+      AnsiString line = sRequest;
+      AnsiString token;
+      if (!line.IsEmpty() && line != "=")
+         token = Base64::Decode(line.c_str(), line.GetLength());
+      AnsiString reply;
+      String failure;
+      const GssapiAcceptor::State state = gssapi_session_->Step(token, reply, failure);
+      if (state == GssapiAcceptor::NeedToken || state == GssapiAcceptor::NeedLayer)
+      {
+         String reply64 = reply.IsEmpty() ? String() : String(Base64::Encode(reply.c_str(), reply.GetLength()));
+         EnqueueWrite_("+ " + reply64);
+         return ResultNormalResponse;
+      }
+
+      std::shared_ptr<GssapiAcceptor> session = gssapi_session_;
+      gssapi_session_.reset();
+      String sLoginName = session->GetPrincipal();
+      bool disconnect = false;
+      std::shared_ptr<const Account> pAccount;
+      if (state == GssapiAcceptor::Done)
+         pAccount = GssapiIdentity::Logon(session->GetPrincipal(), session->GetAuthorizationIdentity(), GetRemoteEndpointAddress(), sLoginName, disconnect);
+      else
+         LOG_DEBUG("POP3 AUTH GSSAPI failed: " + failure);
+
+      username_ = sLoginName;
+      FireOnClientLogon_(sLoginName, pAccount != nullptr);
+      if (!pAccount)
+      {
+         authentication_failure_count_++;
+         TarpitFailedLogon_();
+         if (disconnect || authentication_failure_count_ >= 10)
+         {
+            EnqueueWrite_("-ERR [AUTH] Authentication failed. Too many invalid logon attempts.");
+            return ResultDisconnect;
+         }
+         EnqueueWrite_("-ERR [AUTH] Authentication failed.");
          return ResultNormalResponse;
       }
 

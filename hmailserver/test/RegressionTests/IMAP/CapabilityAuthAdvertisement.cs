@@ -193,6 +193,76 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("SASL GSSAPI is offered by EHLO, CAPABILITY and the POP3 AUTH list only when GssapiEnabled is 1, is " +
+                   "refused as an unsupported mechanism otherwise, and once offered a token that is not Kerberos is " +
+                   "refused without ending the connection.")]
+      public void GssapiIsOfferedOnlyWhenEnabledAndRefusesAStrayToken()
+      {
+         var originalSasl = _settings.IMAPSASLPlainEnabled;
+         _settings.IMAPSASLPlainEnabled = true;
+         // Through COM, which writes the database mirror of [Settings] as well as the
+         // file: the server reads the mirror first, so a file written behind it is
+         // not seen once any test has put the key there.
+         _settings.SetIniSetting("GssapiEnabled", "0");
+         try
+         {
+            var smtp = new TcpConnection();
+            ClassicAssert.IsTrue(smtp.Connect(25), "Could not connect to the SMTP server on port 25.");
+            StringAssert.StartsWith("220", smtp.Receive());
+            smtp.Send("EHLO test.example.test\r\n");
+            var ehlo = smtp.ReadUntil("250 HELP");
+            ClassicAssert.IsFalse(ehlo.Contains("GSSAPI"), "EHLO must not offer GSSAPI until it is enabled. Got: " + ehlo);
+            smtp.Send("AUTH GSSAPI\r\n");
+            StringAssert.StartsWith("504", smtp.Receive(), "AUTH GSSAPI is refused while the mechanism is off.");
+
+            _settings.SetIniSetting("GssapiEnabled", "1");
+            smtp.Send("EHLO test.example.test\r\n");
+            ehlo = smtp.ReadUntil("250 HELP");
+            StringAssert.Contains("GSSAPI", ehlo, "EHLO offers GSSAPI once it is enabled. Got: " + ehlo);
+            smtp.Send("AUTH GSSAPI\r\n");
+            StringAssert.StartsWith("334", smtp.Receive(), "The server asks for the client's first token.");
+            smtp.Send("bm90LWEta2VyYmVyb3MtdG9rZW4=\r\n");
+            StringAssert.StartsWith("535", smtp.Receive(), "A token that is not Kerberos is refused.");
+            smtp.Send("NOOP\r\n");
+            StringAssert.StartsWith("250", smtp.Receive(), "The connection is still usable after the refusal.");
+            smtp.Disconnect();
+
+            var imap = new TcpConnection();
+            ClassicAssert.IsTrue(imap.Connect(143), "Could not connect to the IMAP server on port 143.");
+            imap.ReadUntil("* OK");
+            imap.Send("A01 CAPABILITY\r\n");
+            var capabilities = imap.ReadUntil("A01 OK");
+            StringAssert.Contains("AUTH=GSSAPI", capabilities, "CAPABILITY offers GSSAPI once it is enabled. Got: " + capabilities);
+            imap.Send("A02 AUTHENTICATE GSSAPI\r\n");
+            StringAssert.StartsWith("+", imap.Receive(), "The server asks for the client's first token.");
+            imap.Send("bm90LWEta2VyYmVyb3MtdG9rZW4=\r\n");
+            StringAssert.Contains("A02 NO", imap.ReadUntil("A02 "), "A token that is not Kerberos is refused.");
+            imap.Send("A03 NOOP\r\n");
+            StringAssert.Contains("A03 OK", imap.ReadUntil("A03 "), "The connection is still usable after the refusal.");
+            imap.Disconnect();
+
+            var pop = new TcpConnection();
+            ClassicAssert.IsTrue(pop.Connect(110), "Could not connect to the POP3 server on port 110.");
+            StringAssert.StartsWith("+OK", pop.Receive());
+            pop.Send("AUTH\r\n");
+            var mechanisms = pop.ReadUntil(".\r\n");
+            StringAssert.Contains("GSSAPI", mechanisms, "The POP3 AUTH list offers GSSAPI once it is enabled. Got: " + mechanisms);
+            pop.Send("AUTH GSSAPI\r\n");
+            StringAssert.StartsWith("+ ", pop.Receive(), "The server asks for the client's first token.");
+            pop.Send("bm90LWEta2VyYmVyb3MtdG9rZW4=\r\n");
+            StringAssert.StartsWith("-ERR", pop.Receive(), "A token that is not Kerberos is refused.");
+            pop.Send("CAPA\r\n");
+            StringAssert.StartsWith("+OK", pop.ReadUntil(".\r\n"), "The connection is still usable after the refusal.");
+            pop.Disconnect();
+         }
+         finally
+         {
+            _settings.SetIniSetting("GssapiEnabled", "0");
+            _settings.IMAPSASLPlainEnabled = originalSasl;
+         }
+      }
+
+      [Test]
       [Description("The negative control for the SMTP half: with the default IP range, EHLO advertises AUTH.")]
       public void EhloStillAdvertisesAuthOnAnOrdinaryConnection()
       {

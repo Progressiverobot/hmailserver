@@ -25,6 +25,7 @@ namespace HM
    class AuthenticationResults;
    class Account;
    class ScramSha256;
+   class GssapiAcceptor;
 
    enum eSMTPCommandTypes
    {
@@ -227,6 +228,7 @@ namespace HM
 
       void AuthenticateUsingBearer_(const String &sLine);
       void AuthenticateUsingExternal_(const String &sLine);
+      void ProtocolGssapiToken_(const String &sLine);
       // Authenticates using a SASL XOAUTH2 / OAUTHBEARER (RFC 7628) client response.
 
       std::shared_ptr<const Account> LookupActiveAccount_(const String &sAddress);
@@ -305,7 +307,8 @@ namespace HM
          SMTPSCRAMACK = 10,    // awaiting the empty ack after the server-final message
          SMTPBEARERRESPONSE = 11, // awaiting the SASL XOAUTH2 / OAUTHBEARER client response
          BDATDATA = 12,        // RFC 3030: receiving the octets of a BDAT chunk
-         SMTPEXTERNALRESPONSE = 13 // awaiting the SASL EXTERNAL authorization identity
+         SMTPEXTERNALRESPONSE = 13, // awaiting the SASL EXTERNAL authorization identity
+         SMTPGSSAPIRESPONSE = 14   // awaiting the next SASL GSSAPI token
       };
   
       enum AuthenticationType
@@ -316,6 +319,7 @@ namespace HM
          AUTH_SCRAM_SHA256 = 4,
          AUTH_BEARER = 5,
          AUTH_EXTERNAL = 6,
+         AUTH_GSSAPI = 7,
       };
 
       
@@ -341,6 +345,7 @@ namespace HM
       AuthenticationType requestedAuthenticationType_;
 
       std::shared_ptr<ScramSha256> scram_session_;
+      std::shared_ptr<GssapiAcceptor> gssapi_session_;
       
       DWORD message_start_tc_;
 
