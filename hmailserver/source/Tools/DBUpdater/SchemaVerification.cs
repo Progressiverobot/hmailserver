@@ -362,7 +362,22 @@ namespace DBUpdater
          // Upgrade6030to6031* - the fetch account's mirror switch: every folder of a
          // remote IMAP account collected into a local folder of the same name.
          new SchemaProbe(6031, "hm_fetchaccounts.famirrorfolders",
-                         "update hm_fetchaccounts set famirrorfolders = famirrorfolders where 1 = 0")
+                         "update hm_fetchaccounts set famirrorfolders = famirrorfolders where 1 = 0"),
+         // Upgrade6031to6032* - the account's address book (hm_contacts): one
+         // probe per column, since Compact Edition commits each statement as it
+         // goes and a half-applied table must be seen as such. The identity
+         // column is not probed: Compact Edition refuses to update one even
+         // where 1 = 0, and the other columns cannot exist without it.
+         new SchemaProbe(6032, "hm_contacts.contactaccountid",
+                         "update hm_contacts set contactaccountid = contactaccountid where 1 = 0"),
+         new SchemaProbe(6032, "hm_contacts.contactname",
+                         "update hm_contacts set contactname = contactname where 1 = 0"),
+         new SchemaProbe(6032, "hm_contacts.contactaddress",
+                         "update hm_contacts set contactaddress = contactaddress where 1 = 0"),
+         new SchemaProbe(6032, "hm_contacts.contactsource",
+                         "update hm_contacts set contactsource = contactsource where 1 = 0"),
+         new SchemaProbe(6032, "hm_contacts.contactcreated",
+                         "update hm_contacts set contactcreated = contactcreated where 1 = 0")
       };
 
       /// <summary>
