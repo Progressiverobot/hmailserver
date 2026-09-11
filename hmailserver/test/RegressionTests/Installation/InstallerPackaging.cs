@@ -345,6 +345,23 @@ namespace RegressionTests.Installation
       }
 
       [Test]
+      [Description("PostgreSQL fresh-schema reset drops hm_contacts before hm_accounts to avoid FK-blocked resets from schema 6032 databases.")]
+      public void TestPgsqlCreateScriptDropsContactsBeforeAccounts()
+      {
+         string create = ReadRepositoryFile(@"hmailserver\source\DBScripts\CreateTablesPGSQL.sql");
+
+         int contactsDrop = create.IndexOf("select hm_drop_table('hm_contacts');", StringComparison.Ordinal);
+         int accountsDrop = create.IndexOf("select hm_drop_table('hm_accounts');", StringComparison.Ordinal);
+
+         Assert.GreaterOrEqual(contactsDrop, 0, "CreateTablesPGSQL.sql no longer drops hm_contacts.");
+         Assert.GreaterOrEqual(accountsDrop, 0, "CreateTablesPGSQL.sql no longer drops hm_accounts.");
+         Assert.IsTrue(contactsDrop < accountsDrop,
+            "CreateTablesPGSQL.sql drops hm_accounts before hm_contacts. A database recreated from schema 6032 leaves " +
+            "hm_contacts referencing hm_accounts, so dropping hm_accounts first fails and a later create table hm_contacts " +
+            "also fails because the old table remains.");
+      }
+
+      [Test]
       [Description("An installation that collected no administrator password must not write one.")]
       public void TestAdministratorPasswordIsOnlyWrittenWhenOneWasCollected()
       {

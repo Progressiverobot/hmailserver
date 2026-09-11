@@ -15,6 +15,8 @@ select hm_drop_table('hm_settings');
 
 select hm_drop_table('hm_inisettings');
 
+select hm_drop_table('hm_contacts');
+
 select hm_drop_table('hm_accounts');
 
 select hm_drop_table('hm_aliases');
