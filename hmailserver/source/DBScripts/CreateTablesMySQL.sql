@@ -4,6 +4,14 @@ drop table if exists hm_settings;
 
 drop table if exists hm_inisettings;
 
+drop table if exists hm_contacts;
+
+drop table if exists hm_accountprefs;
+
+drop table if exists hm_scheduled;
+
+drop table if exists hm_files;
+
 drop table if exists hm_accounts;
 
 drop table if exists hm_aliases;
@@ -404,7 +412,7 @@ create table hm_contacts
 	contactcreated datetime not null
 ) DEFAULT CHARSET=utf8;
 
-CREATE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
+CREATE UNIQUE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
 
 create table hm_accountprefs
 (

@@ -15,6 +15,14 @@ select hm_drop_table('hm_settings');
 
 select hm_drop_table('hm_inisettings');
 
+select hm_drop_table('hm_contacts');
+
+select hm_drop_table('hm_accountprefs');
+
+select hm_drop_table('hm_scheduled');
+
+select hm_drop_table('hm_files');
+
 select hm_drop_table('hm_accounts');
 
 select hm_drop_table('hm_aliases');
@@ -419,7 +427,7 @@ create table hm_contacts
 	contactcreated timestamp not null
 );
 
-CREATE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
+CREATE UNIQUE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
 
 create table hm_accountprefs
 (
