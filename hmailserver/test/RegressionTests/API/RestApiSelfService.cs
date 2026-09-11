@@ -1660,6 +1660,63 @@ namespace RegressionTests.API
          Assert.AreEqual(400, notOne.status, "Body: " + notOne.body);
       }
 
+      [Test]
+      [Description("html beside text on a send goes as multipart/alternative, and the message JSON carries both parts")]
+      public void AMessageSentWithHtmlCarriesBothParts()
+      {
+         string other = "other@" + _domain.Name;
+         SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         Assert.IsTrue(imap.CreateFolder("Sent"));
+         imap.Disconnect();
+
+         (int status, string body) sent = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + other + "\",\"subject\":\"Formatted\",\"text\":\"Hello there\",\"html\":\"<p>Hello <b>there</b></p>\"}");
+         Assert.AreEqual(201, sent.status, "Body: " + sent.body);
+         // Counted over POP3, read over REST: the POP3 helper that returns the text
+         // deletes the message it read, and the listing below would find nothing.
+         Pop3ClientSimulator.AssertMessageCount(other, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", BasicHeader(other, UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", BasicHeader(other, UserPassword));
+         long id = IdBefore(page.body, "\"subject\":\"Formatted\"");
+         (int status, string body) source = Http("GET", "/api/v1/me/messages/" + id + "/source", BasicHeader(other, UserPassword));
+         Assert.AreEqual(200, source.status, "Body: " + source.body);
+         StringAssert.Contains("multipart/alternative", source.body);
+         StringAssert.Contains("text/html", source.body);
+         StringAssert.Contains("<b>there</b>", source.body);
+         StringAssert.Contains("Hello there", source.body);
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + id, BasicHeader(other, UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"text\":\"Hello there", message.body);
+         StringAssert.Contains("<b>there</b>", message.body);
+      }
+
+      [Test]
+      [Description("The web app manifest and the service worker are served beside the page, under its policy")]
+      public void TheManifestAndTheServiceWorkerAreServed()
+      {
+         Response manifest = Raw("GET", "/portal.webmanifest", null, null);
+         Assert.AreEqual(200, manifest.Status, manifest.Body);
+         StringAssert.StartsWith("application/manifest+json", manifest.Header("Content-Type"));
+         StringAssert.Contains("\"start_url\":\"/portal\"", manifest.Body);
+         StringAssert.Contains("\"display\":\"standalone\"", manifest.Body);
+
+         Response worker = Raw("GET", "/portal-sw.js", null, null);
+         Assert.AreEqual(200, worker.Status, worker.Body);
+         StringAssert.StartsWith("text/javascript", worker.Header("Content-Type"));
+         Assert.AreEqual("/", worker.Header("Service-Worker-Allowed"));
+         StringAssert.Contains("addEventListener('fetch'", worker.Body);
+         StringAssert.Contains("hm-portal-shell", worker.Body);
+
+         Response page = Raw("GET", "/portal", null, null);
+         StringAssert.Contains("<link rel=\"manifest\" href=\"/portal.webmanifest\">", page.Body);
+         StringAssert.Contains("manifest-src 'self'", page.Header("Content-Security-Policy"));
+         StringAssert.Contains("worker-src 'self'", page.Header("Content-Security-Policy"));
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
