@@ -5853,26 +5853,194 @@ namespace HM
       // from the head of the file; failing that in its To, Cc, text and
       // HTML, for a message small enough to read whole and not ruled out by
       // the index.
-      bool MessageMatches(const String &fileName, std::shared_ptr<Message> message, const String &needleLower, const SearchIndexPrune &prune)
+      // A search as a reader writes it: words, "quoted phrases", and the
+      // operators every webmail has taught - from:, to:, subject:,
+      // has:attachment, before:YYYY-MM-DD, after:, in:folder, is:unread,
+      // is:read, is:flagged, is:unflagged, is:answered. Every word must be
+      // found; the operators narrow further.
+      struct SearchQuery
       {
+         std::vector<String> terms;
+         String from;
+         String to;
+         String subject;
+         String inFolder;
+         String before;
+         String after;
+         bool hasAttachment;
+         bool wantUnread;
+         bool wantRead;
+         bool wantFlagged;
+         bool wantUnflagged;
+         bool wantAnswered;
+         String freeText;
+
+         SearchQuery() :
+            hasAttachment(false), wantUnread(false), wantRead(false), wantFlagged(false), wantUnflagged(false), wantAnswered(false)
+         {
+         }
+      };
+
+      bool IsDay(const String &value)
+      {
+         if (value.GetLength() != 10 || value[4] != '-' || value[7] != '-')
+            return false;
+         for (int i = 0; i < 10; i++)
+            if (i != 4 && i != 7 && (value[i] < '0' || value[i] > '9'))
+               return false;
+         return true;
+      }
+
+      SearchQuery ParseSearchQuery(const String &text)
+      {
+         SearchQuery q;
+         std::vector<String> tokens;
+
+         // Whitespace separates tokens; a quoted stretch, on its own or after
+         // an operator, is one token with its spaces.
+         String current;
+         bool quoted = false;
+         for (int i = 0; i < text.GetLength(); i++)
+         {
+            wchar_t c = text[i];
+            if (c == '"')
+            {
+               quoted = !quoted;
+               continue;
+            }
+            if (!quoted && (c == ' ' || c == '\t' || c == '\r' || c == '\n'))
+            {
+               if (!current.IsEmpty())
+                  tokens.push_back(current);
+               current = _T("");
+               continue;
+            }
+            current += c;
+         }
+         if (!current.IsEmpty())
+            tokens.push_back(current);
+
+         for (size_t i = 0; i < tokens.size(); i++)
+         {
+            String token = tokens[i];
+            String lower = ToLowerCopy(token);
+            int colon = lower.Find(_T(":"));
+            String key = colon > 0 ? lower.Mid(0, colon) : String();
+            String value = colon > 0 ? lower.Mid(colon + 1) : String();
+
+            if (key == _T("from") && !value.IsEmpty())
+               q.from = value;
+            else if (key == _T("to") && !value.IsEmpty())
+               q.to = value;
+            else if (key == _T("subject") && !value.IsEmpty())
+               q.subject = value;
+            else if (key == _T("in") && !value.IsEmpty())
+               q.inFolder = value;
+            else if (key == _T("has") && value == _T("attachment"))
+               q.hasAttachment = true;
+            else if (key == _T("before") && IsDay(value))
+               q.before = value;
+            else if (key == _T("after") && IsDay(value))
+               q.after = value;
+            else if (key == _T("is") && value == _T("unread"))
+               q.wantUnread = true;
+            else if (key == _T("is") && value == _T("read"))
+               q.wantRead = true;
+            else if (key == _T("is") && value == _T("flagged"))
+               q.wantFlagged = true;
+            else if (key == _T("is") && value == _T("unflagged"))
+               q.wantUnflagged = true;
+            else if (key == _T("is") && value == _T("answered"))
+               q.wantAnswered = true;
+            else
+            {
+               q.terms.push_back(lower);
+               if (!q.freeText.IsEmpty())
+                  q.freeText += _T(" ");
+               q.freeText += token;
+            }
+         }
+
+         return q;
+      }
+
+      // Whether one message answers the query. What the head of the file
+      // says is asked first; the body is read only when a word was not in
+      // the subject or the sender, or to: is asked, and only within the size
+      // the listing reads bodies at all. The folder path is empty in a folder
+      // listing, where in: has nothing to narrow.
+      bool MessageMatchesQuery(const String &fileName, std::shared_ptr<Message> message, const String &folderPathLower, const SearchQuery &q, const SearchIndexPrune &prune)
+      {
+         if (!q.inFolder.IsEmpty() && !folderPathLower.IsEmpty() && folderPathLower.Find(q.inFolder) < 0)
+            return false;
+         if (q.wantUnread && message->GetFlagSeen())
+            return false;
+         if (q.wantRead && !message->GetFlagSeen())
+            return false;
+         if (q.wantFlagged && !message->GetFlagFlagged())
+            return false;
+         if (q.wantUnflagged && message->GetFlagFlagged())
+            return false;
+         if (q.wantAnswered && !message->GetFlagAnswered())
+            return false;
+
+         if (!q.before.IsEmpty() || !q.after.IsEmpty())
+         {
+            String day = message->GetCreateTime().Mid(0, 10);
+            if (!q.before.IsEmpty() && day >= q.before)
+               return false;
+            if (!q.after.IsEmpty() && day <= q.after)
+               return false;
+         }
+
          String subject, from, date;
          DescribeHeaderWide(fileName, subject, from, date);
 
-         if (ContainsNoCase(subject, needleLower) || ContainsNoCase(from, needleLower))
+         if (!q.from.IsEmpty() && !ContainsNoCase(from, q.from))
+            return false;
+         if (!q.subject.IsEmpty() && !ContainsNoCase(subject, q.subject))
+            return false;
+
+         if (q.hasAttachment)
+         {
+            // What the head of the file says: a mixed multipart, or a part
+            // declared an attachment, is what a mail client shows a clip for.
+            AnsiString header = PersistentMessage::LoadHeader(fileName, false);
+            header.ToLower();
+            if (header.Find("multipart/mixed") < 0 && header.Find("attachment") < 0)
+               return false;
+         }
+
+         std::vector<String> pending;
+         for (size_t i = 0; i < q.terms.size(); i++)
+            if (!ContainsNoCase(subject, q.terms[i]) && !ContainsNoCase(from, q.terms[i]))
+               pending.push_back(q.terms[i]);
+
+         if (pending.empty() && q.to.IsEmpty())
             return true;
 
          if (message->GetSize() > MaxMessageBodyBytes)
             return false;
 
-         if (prune.CannotContain(message->GetID()))
+         if (!pending.empty() && prune.CannotContain(message->GetID()))
             return false;
 
          MessageData data;
          if (!data.LoadFromMessage(fileName, message))
             return false;
 
-         return ContainsNoCase(data.GetTo(), needleLower) || ContainsNoCase(data.GetCC(), needleLower) ||
-                ContainsNoCase(data.GetBody(), needleLower) || ContainsNoCase(data.GetHTMLBody(), needleLower);
+         if (!q.to.IsEmpty() && !ContainsNoCase(data.GetTo(), q.to) && !ContainsNoCase(data.GetCC(), q.to))
+            return false;
+
+         for (size_t i = 0; i < pending.size(); i++)
+         {
+            const String &term = pending[i];
+            if (!ContainsNoCase(data.GetTo(), term) && !ContainsNoCase(data.GetCC(), term) &&
+                !ContainsNoCase(data.GetBody(), term) && !ContainsNoCase(data.GetHTMLBody(), term))
+               return false;
+         }
+
+         return true;
       }
    }
 
@@ -6173,9 +6341,9 @@ namespace HM
       Unicode::MultiByteToWide(QueryParameter_(query, "q"), text);
       text.TrimLeft();
       text.TrimRight();
-      const String needleLower = ToLowerCopy(text);
+      const SearchQuery searchQuery = ParseSearchQuery(text);
       const bool searching = !text.IsEmpty();
-      SearchIndexPrune prune(account->GetID(), text);
+      SearchIndexPrune prune(account->GetID(), searchQuery.freeText);
 
       // A snapshot, walked newest UID first: the collection is shared with
       // every IMAP session on the mailbox, and a copy is what lets this read
@@ -6229,7 +6397,7 @@ namespace HM
             scanned++;
             lastUid = message->GetUID();
 
-            if (!MessageMatches(fileName, message, needleLower, prune))
+            if (!MessageMatchesQuery(fileName, message, String(), searchQuery, prune))
                continue;
          }
 
@@ -6313,8 +6481,8 @@ namespace HM
             limit = MaxMessagesPerPage;
       }
 
-      const String needleLower = ToLowerCopy(text);
-      SearchIndexPrune prune(account->GetID(), text);
+      const SearchQuery searchQuery = ParseSearchQuery(text);
+      SearchIndexPrune prune(account->GetID(), searchQuery.freeText);
 
       String delimiter = Configuration::Instance()->GetIMAPConfiguration()->GetHierarchyDelimiter();
 
@@ -6340,6 +6508,7 @@ namespace HM
          if (!messages)
             continue;
 
+         const String pathLower = ToLowerCopy(DecodeFolderName_(folders[f].second));
          std::vector<std::shared_ptr<Message>> snapshot = messages->GetCopy();
          for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend(); ++it)
          {
@@ -6355,7 +6524,7 @@ namespace HM
 
             scanned++;
 
-            if (!MessageMatches(MessageFile_(message), message, needleLower, prune))
+            if (!MessageMatchesQuery(MessageFile_(message), message, pathLower, searchQuery, prune))
                continue;
 
             Hit hit;
@@ -8163,7 +8332,7 @@ namespace HM
          "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, from (as on a send), and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
-         "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
+         "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, and from:, to:, subject:, has:attachment, before:YYYY-MM-DD, after:YYYY-MM-DD, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered; a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
