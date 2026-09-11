@@ -12,8 +12,9 @@
    binaries.json, but a binary in a repository is still a binary nobody can read,
    and OpenSSF Scorecard scores every one of them. This script is the other half
    of that manifest: for every artifact whose disposition is "fetched" or
-   "gathered" it obtains the file, verifies it against the recorded SHA-256, and
-   places it at the manifest's path. The paths are ignored by git.
+   "gathered" it obtains the file, verifies fetched artifacts against recorded
+   SHA-256, checks gathered artifacts for version compatibility, and places files
+   at the manifest's path. The paths are ignored by git.
 
      gathered  copied from the build machine's Visual Studio: the MSVC runtime,
                %VCToolsRedistDir%\x64\Microsoft.VC145.CRT, the same DLLs the
@@ -23,7 +24,8 @@
                provenance in its notes. A release rather than the vendor's URL
                because two of the three have no stable first-party download left.
 
-   Every placed file is verified against the manifest before the script reports
+   Fetched files are verified against the manifest hashes, and gathered files are
+   checked for compatible Visual Studio runtime version before the script reports
    success, so a wrong Visual Studio version or a tampered download is a refusal,
    not an installer with the wrong runtime in it.
 
@@ -90,13 +92,15 @@ function Assert-Version([string]$path, [string]$expectedVersion, [string]$what) 
 
 if ($Verify) {
    $bad = 0
-   foreach ($a in $fetched) {
-      try { Assert-Matches (Join-Path $repo $a.path) $a.sha256 $a.path; Write-Host "  OK  $($a.path)" }
-      catch { Write-Host "  BAD $($_.Exception.Message)"; $bad++ }
-   }
-   foreach ($a in $gathered) {
-      try { Assert-Version (Join-Path $repo $a.path) $a.version $a.path; Write-Host "  OK  $($a.path) (version $($a.version))" }
-      catch { Write-Host "  BAD $($_.Exception.Message)"; $bad++ }
+   if (-not $SystemOnly) {
+      foreach ($a in $fetched) {
+         try { Assert-Matches (Join-Path $repo $a.path) $a.sha256 $a.path; Write-Host "  OK  $($a.path)" }
+         catch { Write-Host "  BAD $($_.Exception.Message)"; $bad++ }
+      }
+      foreach ($a in $gathered) {
+         try { Assert-Version (Join-Path $repo $a.path) $a.version $a.path; Write-Host "  OK  $($a.path) (version $($a.version))" }
+         catch { Write-Host "  BAD $($_.Exception.Message)"; $bad++ }
+      }
    }
    foreach ($a in $system) {
       $target = Join-Path $repo $a.path
