@@ -41,7 +41,7 @@ than a wording problem.
 
 ### Contents and totals
 
-861 items. The counts are the point of this table — they say where the fork is
+862 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -64,7 +64,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [IMAP](#imap) | 72 | – | 0 | 6 |
 | [POP3](#pop3) | 27 | – | 0 | 1 |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 65 | – | 0 | – |
-| [Authentication and cryptography](#authentication-and-cryptography) | 71 | – | 1 | 6 |
+| [Authentication and cryptography](#authentication-and-cryptography) | 72 | – | 1 | 6 |
 | [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 61 | – | 0 | 5 |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 96 | – | 1 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 24 | – | 0 | 1 |
@@ -79,7 +79,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 8 | 0 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
 | [Linux and AArch64](#linux-and-aarch64) | 13 | 1 | 0 | – |
-| **Total** | **818** | **2** | **8** | **33** |
+| **Total** | **819** | **2** | **8** | **33** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -620,7 +620,7 @@ the source, not from documentation.
 
 ### Authentication and cryptography
 
-71 shipped · 0 underway · 1 not started · 6 deferred
+72 shipped · 0 underway · 1 not started · 6 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -638,6 +638,7 @@ the source, not from documentation.
 | ✅ | AUTHENTICATE SCRAM-SHA-256 / -PLUS | Advertised as `AUTH=SCRAM-SHA-256` and (TLS only) `AUTH=SCRAM-SHA-256-PLUS`. Caveat: both share the same `EnableImapSASLPlain` gate as PLAIN, so turning SASL PLAIN off also turns SCRAM off on IMAP. |
 | ✅ | Authentication outcome metrics | `hmailserver_auth_success_total` and `hmailserver_auth_failures_total` counters exposed on the Prometheus listener, incremented centrally in `AccountLogon::Logon`. |
 | ✅ | Auto-ban on repeated authentication failure | AutoBanLogonEnabled + MaxInvalidLogonAttempts + AutoBanMinutes create a temporary blocking IP range from every failed-login path (POP3 PASS, SCRAM, bearer, IMAP LOGIN, SMTP AUTH)… |
+| ✅ | **Auto-ban reaches the operating system's firewall** | **Shipped 11 September 2026, for 6.3.2.** An auto-ban was a `SecurityRange` row the listeners consult at accept time: the operating system accepted the address, handed it to the server, and the server dropped it - a socket, a thread's attention and a log line per attempt, and nothing else on the machine knew. Three `[Settings]` keys, all off as shipped and all with Control Panel editors on the Auto-ban page: **`AutoBanFirewall=1`** - on Windows an inbound block rule per banned address in Windows Defender Firewall, TCP only, scoped to the ports the server listens on, in a rule group of its own; on Linux the packaged `/usr/lib/hmailserver/autoban-hook`, which keeps an nftables set with a timeout (iptables where there is no nft) and says exactly which capability the service lacks when it cannot act. **`AutoBanCommand`** - any program, run as `<command> ban <address> <minutes> <ports>` and `<command> unban <address>` on both platforms, for a cloud firewall, a router or a SIEM. **`AutoBanNeverBan`** - addresses and CIDR blocks whose failed logons are not counted at all: it did not exist, and once a ban can reach the firewall the administrator's own address being banned is a lockout rather than an inconvenience; an entry that is not an address is reported by name (6524), because a list the administrator believes protects them and does not is worse than no list. The design is a reconciliation, not an event stream: `AutoBanFirewall::Synchronise()` reads the ranges and makes the firewall match at start-up, when a ban is created, when a range is deleted and on the once-a-minute expiry pass, so a rule for a ban that expired while the service was down is removed and one that went missing is put back. The application log gains two fixed-shape lines - one per counted failure, one per ban - which is what the **fail2ban** filter the packages install matches without depending on protocol logging; the jail is installed disabled, as Debian asks of a shipped jail. Verified on Windows by four regression tests (the rule follows the range in both directions, read back through the firewall's own COM API; a never-ban block is honoured; an unreadable entry is named; the hook is told about both events) and on the Ubuntu VM: the hook creates, updates and removes v4 and v6 entries under nft 1.1.6, refuses a hostile address and `reset` removes its table; `fail2ban-regex` matches the two lines and not a delivery line; `fail2ban-client -t` accepts the jail disabled and enabled. Errors 6521-6525. |
 | ✅ | Blowfish reversible account passwords accepted | Scheme 1 decrypts and compares case-insensitively. Reversible storage, retained only for legacy rows; not offered as a preferred choice in the Control Panel except as "Blowfish (legacy)". |
 | ✅ | Claim validation | `exp` is required and checked with a clock-skew allowance; `nbf` checked when present; `iss` and `aud` checked only when configured (aud supports array form); the login identity comes from `OAuth2UsernameClaim` (default `email`)… |
 | ✅ | Constant-time hash comparison throughout | PBKDF2, Argon2id, legacy SHA-256/MD5 and the SCRAM proof all compare with OpenSSL `CRYPTO_memcmp`, and derived keys are wiped with `OPENSSL_cleanse`. |
