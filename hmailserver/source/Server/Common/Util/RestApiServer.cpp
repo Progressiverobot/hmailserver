@@ -51,6 +51,8 @@
 #include "../../SMTP/RecipientParser.h"
 #include "../Persistence/PersistentMessageIndex.h"
 #include "../Cache/CacheContainer.h"
+#include "../AntiSpam/AuthenticationResults.h"
+#include "../AntiSpam/DMARC/DMARC.h"
 #include "../Sieve/SieveStorage.h"
 #include "../Sieve/SieveScript.h"
 #include "GUIDCreator.h"
@@ -6870,7 +6872,11 @@ namespace HM
       if (!PersistentMessage::ReadObject(copy, newMessageId) || copy->GetID() == 0)
          return;
 
-      SpamAssassinLearner::LearnFromMove(source, destination, copy, account);
+      // Learned for the destination folder's owner, as IMAP MOVE does: a
+      // delegate filing into a shared mailbox is a lesson about that mailbox,
+      // and the message's file is in that owner's store.
+      std::shared_ptr<const Account> owner = CacheContainer::Instance()->GetAccount(destination->GetAccountID());
+      SpamAssassinLearner::LearnFromMove(source, destination, copy, owner ? owner : account);
    }
 
    // Every message in a Junk or Trash folder, gone for good - the one folder
@@ -6950,7 +6956,14 @@ namespace HM
 
       AnsiString bytes;
       {
+#ifdef HM_PLATFORM_POSIX
+         // As the other reads in this unit: a narrow path, because libstdc++
+         // has no wide-path constructor.
+         const AnsiString narrowFileName = fileName.c_str();
+         std::ifstream in(narrowFileName.c_str(), std::ios::binary);
+#else
          std::ifstream in(fileName.c_str(), std::ios::binary);
+#endif
          if (!in)
             return BuildResponse_(500, "{\"error\":\"the message file could not be read\"}");
          std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
@@ -6998,6 +7011,27 @@ namespace HM
          return "";
       }
 
+      // The domain a DKIM verdict was for: header.d in the dkim clause.
+      AnsiString DkimDomainOf(const AnsiString &results)
+      {
+         AnsiString lower = results;
+         lower.ToLower();
+         int at = lower.Find("dkim=");
+         if (at < 0)
+            return "";
+         int clauseEnd = lower.Find(";", at);
+         if (clauseEnd < 0)
+            clauseEnd = lower.GetLength();
+         int d = lower.Find("header.d=", at);
+         if (d < 0 || d >= clauseEnd)
+            return "";
+         int start = d + 9;
+         int end = start;
+         while (end < clauseEnd && lower[end] != ' ' && lower[end] != '\t' && lower[end] != '\r' && lower[end] != '\n')
+            end++;
+         return lower.Mid(start, end - start);
+      }
+
       // The domain of the first address in a From header, lower-cased.
       AnsiString DomainOfFrom(const AnsiString &from)
       {
@@ -7022,6 +7056,59 @@ namespace HM
    // learns to look at, from the first Authentication-Results header, which
    // is the one this server wrote on receipt when it wrote one; and whether
    // the sender's domain is another domain than the account's.
+   // The Authentication-Results field this server wrote, and only that: the
+   // one whose authserv-id is this server's own, read the way the strip on
+   // receipt reads it (unfolded; the first token before ';', unquoted, a
+   // version number dropped), and only while the server writes one at all -
+   // with AuthenticationResultsEnabled off nothing is stripped on receipt, so
+   // a sender's own "spf=pass; dkim=pass" would otherwise draw three green
+   // badges. Empty when there is none, and the page then shows nothing.
+   AnsiString
+   RestApiServer::OwnAuthenticationResults_(const MimeHeader &mimeHeader)
+   {
+      if (!IniFileSettings::Instance()->GetAuthenticationResultsEnabled())
+         return "";
+
+      AnsiString ours = AuthenticationResults::GetAuthservId();
+      ours.MakeLower();
+      if (ours.IsEmpty())
+         return "";
+
+      const std::vector<MimeField> &fields = const_cast<MimeHeader &>(mimeHeader).Fields();
+      for (size_t i = 0; i < fields.size(); i++)
+      {
+         AnsiString name = fields[i].GetName();
+         if (name.CompareNoCase("Authentication-Results") != 0)
+            continue;
+
+         AnsiString value = fields[i].GetValue();
+         value.Replace("\r", "");
+         value.Replace("\n", " ");
+
+         AnsiString id = value;
+         int semicolon = id.Find(";");
+         if (semicolon >= 0)
+            id = id.Mid(0, semicolon);
+         id.Trim();
+         if (id.GetLength() >= 2 && id[0] == '"')
+         {
+            int closing = id.Find("\"", 1);
+            if (closing > 0)
+               id = id.Mid(1, closing - 1);
+         }
+         // "authserv-id 1": the version number after the identity is not part of it.
+         int space = id.Find(" ");
+         if (space > 0)
+            id = id.Mid(0, space);
+         id.MakeLower();
+
+         if (id == ours)
+            return value;
+      }
+
+      return "";
+   }
+
    AnsiString
    RestApiServer::HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account)
    {
@@ -7034,9 +7121,8 @@ namespace HM
       {
          MimeHeader mimeHeader;
          mimeHeader.Load(header.c_str(), header.GetLength(), true);
-         const char *value = mimeHeader.GetRawFieldValue("Authentication-Results");
-         results = value ? value : "";
-         value = mimeHeader.GetRawFieldValue("From");
+         results = OwnAuthenticationResults_(mimeHeader);
+         const char *value = mimeHeader.GetRawFieldValue("From");
          from = value ? value : "";
       }
       if (header.GetLength() > MaxHeaderBytes)
@@ -7052,14 +7138,18 @@ namespace HM
 
       AnsiString accountDomain = Utf8_(account->GetAddress());
       accountDomain = DomainOfFrom(accountDomain);
-      AnsiString senderDomain = DomainOfFrom(from);
+      // The sender's domain from the address the header names, parsed as the
+      // DMARC check parses it - not from the first @ in the header, which a
+      // display name can carry.
+      AnsiString senderDomain = DomainOfFrom(Utf8_(DMARC::ExtractAddressFromHeaderValue(String(from))));
       bool external = !senderDomain.IsEmpty() && senderDomain != accountDomain;
 
       AnsiString json;
-      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs",
+      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dkim_domain\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs",
          JsonEscape_(Utf8_(headerText)).c_str(),
          VerdictOf(results, "spf").c_str(),
          VerdictOf(results, "dkim").c_str(),
+         JsonEscape_(DkimDomainOf(results)).c_str(),
          VerdictOf(results, "dmarc").c_str(),
          JsonEscape_(Utf8_(resultsText)).c_str(),
          external ? "true" : "false");
@@ -8075,7 +8165,7 @@ namespace HM
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
          "\"/api/v1/me/search\":{\"get\":{\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
-         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; final otherwise, or with ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
          "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), folder_id\"},\"400\":{\"description\":\"Not a Junk or Trash folder\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"

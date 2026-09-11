@@ -548,6 +548,32 @@ namespace RegressionTests.API
 
       // ------------------------------------------------------- the mailbox ---
 
+      [Test]
+      [Description("A forged Authentication-Results field draws no verdict: only a field carrying this server's own authserv-id is read, and only while the server writes one")]
+      public void AForgedAuthenticationResultsFieldShowsNoVerdict()
+      {
+         // With AuthenticationResultsEnabled off (the default), nothing is
+         // stripped on receipt and nothing is written; a sender's own field
+         // arrives intact - and must not be believed.
+         string ownId = Environment.MachineName.ToLowerInvariant();
+         var client = new SmtpClientSimulator();
+         client.SendRaw("forger@example.com", Address,
+            "From: forger@example.com\r\nTo: " + Address + "\r\nSubject: Forged verdicts\r\n" +
+            "Authentication-Results: " + ownId + "; spf=pass smtp.mailfrom=example.com; dkim=pass header.d=example.com; dmarc=pass\r\n" +
+            "Authentication-Results: other.example; spf=pass\r\n\r\nTrust me.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long id = IdBefore(page.body, "\"subject\":\"Forged verdicts\"");
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"authentication\":{\"spf\":\"\",\"dkim\":\"\",\"dkim_domain\":\"\",\"dmarc\":\"\",\"results\":\"\"}", message.body);
+         // The sender's display name does not decide the External badge.
+         StringAssert.Contains("\"external\":true", message.body);
+      }
+
       private static void Deliver(string to, string subject, string body)
       {
          SmtpClientSimulator.StaticSend("sender@example.com", to, subject, body);
