@@ -82,6 +82,14 @@ jobs:
           libs-path: ${{ env.hMailServerLibs }}
           runner-image: ${{ matrix.image }}
 
+      # The ADO 2.8 type library the server #imports is Windows' own file, not in git:
+      # the runner's copy is placed from %CommonProgramFiles%\System\ado by the same
+      # script that places the installer's binaries (the manifest's "system" kind).
+      - name: Place the system type libraries the server compiles against
+        run: |
+          powershell.exe -NoProfile -ExecutionPolicy Bypass -File build\get-installer-binaries.ps1 -SystemOnly
+          if ($LASTEXITCODE -ne 0) { throw "get-installer-binaries.ps1 -SystemOnly failed with exit code $LASTEXITCODE" }
+
       # build.ps1 disables the pre- and post-build events, so the runner is spared the
       # 'NET STOP hMailServer' and the DLL copies of a developer machine. Warnings are
       # errors in the project itself (TreatWarningAsError), so a new warning fails here.

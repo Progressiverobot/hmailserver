@@ -72,7 +72,7 @@ jobs:
           foreach ($artifact in $manifest.artifacts) {
              $listed[$artifact.path] = $true
 
-             if ($artifact.disposition -in @('fetched', 'gathered', 'generated')) {
+             if ($artifact.disposition -in @('fetched', 'gathered', 'generated', 'system')) {
                 # Not in git by design: build/get-installer-binaries.ps1 puts a
                 # fetched or gathered file in place and verifies it, and
                 # build/generate-com-wrapper.ps1 makes a generated one. Here the
@@ -83,7 +83,9 @@ jobs:
                 }
                 # A generated file has no hash to check: TlbImp output carries a
                 # fresh module id on every run. Not tracked is the whole rule.
-                if ($artifact.disposition -eq 'generated') { continue }
+                # A system file is Windows' own and varies with the Windows build;
+                # its hash is recorded for reference only.
+                if ($artifact.disposition -in @('generated', 'system')) { continue }
                 if (Test-Path -LiteralPath $artifact.path -PathType Leaf) {
                    $actual = (Get-FileHash -LiteralPath $artifact.path -Algorithm SHA256).Hash.ToLower()
                    if ($actual -ne ([string]$artifact.sha256).ToLower()) {

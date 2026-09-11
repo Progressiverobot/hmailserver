@@ -174,8 +174,9 @@ already cost a release cycle or nearly shipped a defect.
    `build\get-dotnet-runtime.ps1` must have populated `installation\DotNet\`
    with the desktop runtime the installer carries, and
    `build\get-installer-binaries.ps1` must have placed the third-party binaries
-   - the MSVC runtime gathered from Visual Studio, and 7-Zip, the MariaDB client
-   and the SQL Server Compact runtime fetched from the `build-inputs-1` release -
+   - the MSVC runtime gathered from Visual Studio, the ADO type libraries copied
+   from Windows, and 7-Zip, the MariaDB client and the SQL Server Compact
+   runtime fetched from the `build-inputs-1` release -
    none of which is in git since 11 September 2026 (run it with `-Verify` to
    check; every file is matched against `hmailserver/docs/third-party-binaries.json`). Never run the installer on
    the dev machine — validation is the CI smoke-test workflow
