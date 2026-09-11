@@ -360,6 +360,10 @@ namespace HM
 
          ULONGLONG created_at;
          ULONGLONG last_seen_at;
+
+         // Empty for the account's own sessions; the administrator's identity
+         // when the session was opened for support.
+         AnsiString support_by;
       };
 
       const char *SessionCookieName = "hmailsession";
@@ -1365,6 +1369,10 @@ namespace HM
       if (method == "GET" && path == "/portal.webmanifest")
          return HandlePortalManifest_();
 
+      // What the page says it is, for the sign-in page, which has no account yet.
+      if (method == "GET" && path == "/api/v1/portal/branding")
+         return HandlePortalBranding_(query);
+
       if (method == "GET" && path == "/portal-sw.js")
          return HandlePortalServiceWorker_();
 
@@ -1734,6 +1742,12 @@ namespace HM
 
          case RouteScheduledRun:
             return HandleScheduledRun_();
+
+         case RoutePortalBrandingPut:
+            return HandlePortalBrandingPut_(GetRequestBody_(request));
+
+         case RouteAccountSupportSession:
+            return HandleAccountSupportSession_(caller, route.identifier);
 
          case RouteMeFolderExport:
             return HandleMeFolderExport_(caller, route.folder_id);
@@ -2252,7 +2266,25 @@ namespace HM
       }
 
       // /api/v1/accounts/<address>
+      if (method == "PUT" && path == "/api/v1/portal/branding")
+      {
+         route.kind = RoutePortalBrandingPut;
+         return;
+      }
+
       const AnsiString accountsPrefix = "/api/v1/accounts/";
+
+      // An administrator opens a mailbox as its user, for support.
+      if (method == "POST" && path.StartsWith(accountsPrefix) && path.EndsWith("/support-session"))
+      {
+         AnsiString address = path.Mid(accountsPrefix.GetLength(), path.GetLength() - accountsPrefix.GetLength() - AnsiString("/support-session").GetLength());
+         if (!address.IsEmpty() && address.Find("/") < 0)
+         {
+            route.kind = RouteAccountSupportSession;
+            route.identifier = address;
+            return;
+         }
+      }
 
       if ((method == "DELETE" || method == "PUT") && path.StartsWith(accountsPrefix))
       {
@@ -2692,6 +2724,8 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      case RoutePortalBrandingPut:
+      case RouteAccountSupportSession:
       case RouteMeDraftSchedule:
       case RouteMeDraftUnschedule:
       case RouteMeMessageSnooze:
@@ -5554,6 +5588,7 @@ namespace HM
       bool administrator = false;
       bool viaAppPassword = false;
       AnsiString credentialStamp;
+      AnsiString supportBy;
       {
          std::lock_guard<std::mutex> guard(browser_sessions_mutex);
 
@@ -5580,6 +5615,7 @@ namespace HM
             administrator = it->administrator;
             credentialStamp = it->credential_stamp;
             viaAppPassword = it->via_app_password;
+            supportBy = it->support_by;
             break;
          }
       }
@@ -5632,6 +5668,13 @@ namespace HM
       caller.session_hash = presentedHash;
       caller.via_app_password = viaAppPassword;
 
+      if (!supportBy.IsEmpty())
+      {
+         // Every request of a support session is on the record: who, as whom,
+         // from where, what.
+         caller.support_by = supportBy;
+         LOG_APPLICATION("REST API: support session: " + String(supportBy) + " acting as " + account->GetAddress() + " from " + String(caller.peer.ToString()) + ".");
+      }
       return true;
    }
 
@@ -7814,11 +7857,12 @@ namespace HM
                json += ",";
             first = false;
             AnsiString entry;
-            entry.Format("{\"id\":\"%hs\",\"created_seconds_ago\":%I64u,\"idle_seconds\":%I64u,\"current\":%hs}",
+            entry.Format("{\"id\":\"%hs\",\"created_seconds_ago\":%I64u,\"idle_seconds\":%I64u,\"current\":%hs,\"support\":%hs}",
                it->token_hash.Mid(0, 12).c_str(),
                (unsigned __int64) ((now - it->created_at) / 1000),
                (unsigned __int64) ((now - it->last_seen_at) / 1000),
-               (caller.via_session && ConstantTimeEquals(it->token_hash, caller.session_hash)) ? "true" : "false");
+               (caller.via_session && ConstantTimeEquals(it->token_hash, caller.session_hash)) ? "true" : "false",
+               it->support_by.IsEmpty() ? "false" : "true");
             json += entry;
          }
       }
@@ -7985,6 +8029,103 @@ namespace HM
       }
       json += "]}";
       return BuildResponse_(200, json);
+   }
+
+   namespace
+   {
+      String PreferenceOf(__int64 accountId, const String &name)
+      {
+         SQLCommand command("select prefvalue from hm_accountprefs where prefaccountid = @ACCOUNTID and prefname = @NAME");
+         command.AddParameter("@ACCOUNTID", accountId);
+         command.AddParameter("@NAME", name);
+         std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
+         if (!recordset || recordset->IsEOF())
+            return String();
+         return recordset->GetStringValue("prefvalue");
+      }
+
+      void RecordPreference(__int64 accountId, const String &name, const String &value)
+      {
+         SQLCommand find("select prefid from hm_accountprefs where prefaccountid = @ACCOUNTID and prefname = @NAME");
+         find.AddParameter("@ACCOUNTID", accountId);
+         find.AddParameter("@NAME", name);
+         std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(find);
+         SQLStatement statement;
+         statement.SetTable("hm_accountprefs");
+         if (recordset && !recordset->IsEOF())
+         {
+            AnsiString id;
+            id.Format("%I64d", recordset->GetInt64Value("prefid"));
+            statement.SetStatementType(SQLStatement::STUpdate);
+            statement.AddColumn("prefvalue", value);
+            statement.SetWhereClause("prefid = " + id);
+            Application::Instance()->GetDBManager()->Execute(statement);
+            return;
+         }
+         statement.SetStatementType(SQLStatement::STInsert);
+         statement.SetIdentityColumn("prefid");
+         statement.AddColumnInt64("prefaccountid", accountId);
+         statement.AddColumn("prefname", name);
+         statement.AddColumn("prefvalue", value);
+         __int64 prefId = 0;
+         Application::Instance()->GetDBManager()->Execute(statement, &prefId);
+      }
+   }
+
+   // A session for the account, opened by the administrator - only when the
+   // account has said so (its support_allowed preference), and never quietly:
+   // the moment and who are written where the user sees them, every request
+   // of the session goes to the application log, and the user's own session
+   // list shows it and can end it.
+   HttpResponse
+   RestApiServer::HandleAccountSupportSession_(const Caller &caller, const AnsiString &address)
+   {
+      String wanted;
+      Unicode::MultiByteToWide(address, wanted);
+      wanted.ToLower();
+      std::shared_ptr<const Account> account = CacheContainer::Instance()->GetAccount(wanted);
+      if (!account || account->GetID() == 0)
+         return BuildResponse_(404, "{\"error\":\"no such account\"}");
+      if (!account->GetActive())
+         return BuildResponse_(400, "{\"error\":\"the account is not active\"}");
+
+      if (PreferenceOf(account->GetID(), _T("support_allowed")) != _T("1"))
+         return BuildResponse_(403, "{\"error\":\"the account has not allowed support access; the user turns it on under Security in the webmail\"}");
+
+      unsigned char secret[SessionTokenBytes];
+      if (RAND_bytes(secret, sizeof(secret)) != 1)
+         return BuildResponse_(500, "{\"error\":\"no entropy for a session token\"}");
+      AnsiString token = BytesToLowerHex(secret, SessionTokenBytes);
+      AnsiString tokenHash = HashApiKeyToken(token);
+      if (tokenHash.IsEmpty())
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      {
+         std::lock_guard<std::mutex> guard(browser_sessions_mutex);
+         const ULONGLONG now = GetTickCount64();
+         if (browser_sessions.size() >= MaxBrowserSessions)
+            return BuildResponse_(503, "{\"error\":\"the session table is full\"}");
+         BrowserSession session;
+         session.token_hash = tokenHash;
+         session.account_id = account->GetID();
+         session.administrator = false;
+         session.support_by = caller.identity;
+         session.created_at = now;
+         session.last_seen_at = now;
+         browser_sessions.push_back(session);
+      }
+
+      String stamp = Time::GetCurrentDateTime() + _T(" by ") + String(caller.identity);
+      RecordPreference(account->GetID(), _T("support_last"), stamp);
+      LOG_APPLICATION("REST API: " + String(caller.identity) + " opened a support session as " + account->GetAddress() + " from " + String(caller.peer.ToString()) + ".");
+
+      AnsiString cookie;
+      cookie.Format("Set-Cookie: %hs=%hs; Path=/; HttpOnly; SameSite=Strict; Max-Age=%d%hs\r\n",
+         SessionCookieName, token.c_str(), (int) (SessionAbsoluteMilliseconds / 1000), use_tls_ ? "; Secure" : "");
+      AnsiString body;
+      body.Format("{\"support\":true,\"account\":\"%hs\",\"idle_seconds\":%d,\"lifetime_seconds\":%d}",
+         JsonEscape_(Utf8_(account->GetAddress())).c_str(), (int) (SessionIdleMilliseconds / 1000), (int) (SessionAbsoluteMilliseconds / 1000));
+      return BuildResponse_(201, body, cookie);
    }
 
    // A JSON body is UTF-8; the server's strings are wide.
@@ -8970,7 +9111,12 @@ namespace HM
    {
       HttpResponse response;
       response.content_type = "text/html; charset=utf-8";
-      response.body = PortalHtml;
+      // The server-wide branding rides in the page as data, not as script:
+      // a JSON block the policy does not run and the script reads for the
+      // first paint. A domain's own arrives after sign-in.
+      AnsiString page = PortalHtml;
+      page.Replace("<!--hm-branding-->", ("<script type=\"application/json\" id=\"branding-data\">" + BrandingJson_(String()) + "</script>").c_str());
+      response.body = page;
       response.extra_headers = PortalHeaders;
       return response;
    }
@@ -9048,6 +9194,8 @@ namespace HM
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
+         "\"/api/v1/portal/branding\":{\"get\":{\"summary\":\"What the webmail says it is\",\"description\":\"Unauthenticated, so the sign-in page can ask: name, logo (an inline image), announcement - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"name, logo, announcement, domain\"}}},\"put\":{\"summary\":\"Set the branding (administrator)\",\"description\":\"Body: name (100), logo (an inline data:image/ under 3,900 characters), announcement (1,000), each written when given and removed when given empty; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The branding as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
+         "\"/api/v1/accounts/{address}/support-session\":{\"post\":{\"summary\":\"Open a mailbox as its user, for support (administrator)\",\"description\":\"Refused with 403 unless the user has turned on support access under Security. Answers a session cookie for the account; the moment and the administrator are recorded where the user sees them, every request of the session is written to the application log, and the user's session list shows it and can end it.\",\"responses\":{\"201\":{\"description\":\"support, account, idle_seconds, lifetime_seconds, with the cookie\"},\"403\":{\"description\":\"Not allowed by the user\"},\"404\":{\"description\":\"No such account\"}}}},"
          "\"/api/v1/me/drafts/{id}/schedule\":{\"post\":{\"summary\":\"Send a draft later\",\"description\":\"Body: send_at, YYYY-MM-DD HH:MM in the server's local time, within a year. At that minute the draft is sent as the account would have sent it - its To, Cc and Bcc under the checks a send makes, a copy in the Sent folder - and the draft goes. One schedule per draft; a new one replaces it.\",\"responses\":{\"201\":{\"description\":\"id, message_id, send_at\"},\"400\":{\"description\":\"Not a draft, not a time, in the past or too far\"}}},\"delete\":{\"summary\":\"Do not send it later after all\",\"responses\":{\"200\":{\"description\":\"cancelled\"},\"404\":{\"description\":\"Nothing scheduled for it\"}}}},"
          "\"/api/v1/me/messages/{id}/snooze\":{\"post\":{\"summary\":\"Snooze a message\",\"description\":\"Body: until, YYYY-MM-DD HH:MM. The message waits in a folder named Snoozed, made when the account has none, and comes back to the folder it left - or the inbox - unread, at that minute.\",\"responses\":{\"200\":{\"description\":\"id, message_id (its new id), until, folder_id (Snoozed)\"},\"400\":{\"description\":\"Not a time, in the past, too far, or snoozed already\"}}}},"
          "\"/api/v1/me/scheduled\":{\"get\":{\"summary\":\"What the signed-in account has put off\",\"responses\":{\"200\":{\"description\":\"scheduled: id, action (send | return), message_id, at, folder_id, subject\"}}}},"

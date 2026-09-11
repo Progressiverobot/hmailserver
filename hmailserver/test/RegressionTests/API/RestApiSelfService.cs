@@ -1717,6 +1717,85 @@ namespace RegressionTests.API
          StringAssert.Contains("worker-src 'self'", page.Header("Content-Security-Policy"));
       }
 
+      [Test]
+      [Description("The branding an administrator sets is read by anyone, a domain's own overrides the server's, and the page carries the server's for its first paint")]
+      public void BrandingIsServedPubliclyAndPerDomain()
+      {
+         try
+         {
+            (int status, string body) set = Http("PUT", "/api/v1/portal/branding", AdminHeader(),
+               "{\"name\":\"Acme Mail\",\"announcement\":\"Maintenance at nine.\",\"logo\":\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E\"}");
+            Assert.AreEqual(200, set.status, "Body: " + set.body);
+
+            Response open = Raw("GET", "/api/v1/portal/branding", null, null);
+            Assert.AreEqual(200, open.Status, open.Body);
+            StringAssert.Contains("\"name\":\"Acme Mail\"", open.Body);
+            StringAssert.Contains("\"announcement\":\"Maintenance at nine.\"", open.Body);
+
+            Response page = Raw("GET", "/portal", null, null);
+            StringAssert.Contains("id=\"branding-data\">{\"name\":\"Acme Mail\"", page.Body);
+
+            (int status, string body) own = Http("PUT", "/api/v1/portal/branding", AdminHeader(),
+               "{\"domain\":\"" + _domain.Name + "\",\"name\":\"Our Mail\"}");
+            Assert.AreEqual(200, own.status, "Body: " + own.body);
+            Response theirs = Raw("GET", "/api/v1/portal/branding?domain=" + _domain.Name, null, null);
+            StringAssert.Contains("\"name\":\"Our Mail\"", theirs.Body);
+            StringAssert.Contains("\"announcement\":\"Maintenance at nine.\"", theirs.Body);
+            Response others = Raw("GET", "/api/v1/portal/branding?domain=elsewhere.example", null, null);
+            StringAssert.Contains("\"name\":\"Acme Mail\"", others.Body);
+
+            (int status, string body) bad = Http("PUT", "/api/v1/portal/branding", AdminHeader(), "{\"logo\":\"https://example.com/logo.png\"}");
+            Assert.AreEqual(400, bad.status, "Body: " + bad.body);
+            (int status, string body) user = Http("PUT", "/api/v1/portal/branding", UserHeader(UserPassword), "{\"name\":\"Mine\"}");
+            Assert.AreNotEqual(200, user.status, "An account may not set the branding. Body: " + user.body);
+         }
+         finally
+         {
+            Http("PUT", "/api/v1/portal/branding", AdminHeader(), "{\"name\":\"\",\"announcement\":\"\",\"logo\":\"\"}");
+            Http("PUT", "/api/v1/portal/branding", AdminHeader(), "{\"domain\":\"" + _domain.Name + "\",\"name\":\"\"}");
+         }
+      }
+
+      [Test]
+      [Description("An administrator's support session needs the user's consent, acts as the user, is recorded for the user, is marked in the session list and can be ended by the user")]
+      public void SupportAccessNeedsConsentAndIsRecorded()
+      {
+         (int status, string body) refused = Http("POST", "/api/v1/accounts/" + Address + "/support-session", AdminHeader());
+         Assert.AreEqual(403, refused.status, "Body: " + refused.body);
+         (int status, string body) nobody = Http("POST", "/api/v1/accounts/nobody@" + _domain.Name + "/support-session", AdminHeader());
+         Assert.AreEqual(404, nobody.status, "Body: " + nobody.body);
+
+         (int status, string body) allowed = Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"support_allowed\":\"1\"}");
+         Assert.AreEqual(200, allowed.status, "Body: " + allowed.body);
+
+         Response opened = Raw("POST", "/api/v1/accounts/" + Address + "/support-session", AdminHeader(), null);
+         Assert.AreEqual(201, opened.Status, opened.Body);
+         StringAssert.Contains("\"support\":true", opened.Body);
+         string cookie = CookieOf(opened.Header("Set-Cookie"));
+         Assert.AreEqual(64, cookie.Length, opened.Header("Set-Cookie"));
+
+         Response asUser = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(200, asUser.Status, asUser.Body);
+         StringAssert.Contains("\"address\":\"" + Address + "\"", asUser.Body);
+
+         (int status, string body) prefs = Http("GET", "/api/v1/me/preferences", UserHeader(UserPassword));
+         StringAssert.Contains("\"support_last\":\"", prefs.body);
+         StringAssert.Contains(" by administrator", prefs.body);
+
+         (int status, string body) sessions = Http("GET", "/api/v1/me/sessions", UserHeader(UserPassword));
+         Assert.AreEqual(200, sessions.status, "Body: " + sessions.body);
+         StringAssert.Contains("\"support\":true", sessions.body);
+
+         (int status, string body) ended = Http("DELETE", "/api/v1/me/sessions", UserHeader(UserPassword));
+         Assert.AreEqual(200, ended.status, "Body: " + ended.body);
+         Response gone = Raw("GET", "/api/v1/me", null, null, "Cookie: hmailsession=" + cookie + "\r\n");
+         Assert.AreEqual(401, gone.Status, gone.Body);
+
+         Http("PUT", "/api/v1/me/preferences", UserHeader(UserPassword), "{\"support_allowed\":null}");
+         (int status, string body) again = Http("POST", "/api/v1/accounts/" + Address + "/support-session", AdminHeader());
+         Assert.AreEqual(403, again.status, "Body: " + again.body);
+      }
+
       private static string Between(string body, string after, string until)
       {
          int start = body.IndexOf(after, StringComparison.Ordinal);
