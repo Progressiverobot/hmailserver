@@ -254,5 +254,10 @@ Honest list of what this document does not cover.
   Windows operating-system components copied out of `%CommonProgramFiles%`.
   Committing them is normal industry practice and has been done here since the
   upstream project; whether it is *licensed* has not been checked.
-- **CI does not re-verify Authenticode signatures**, only hashes. Doing it
-  needs a Windows runner and belongs in the release workflow.
+- **CI re-verifies Authenticode only for the fetched files.** The Binary
+  provenance workflow's Windows job downloads the build inputs, checks their
+  hashes, and for every fetched file the manifest records as signed (the SQL
+  CE runtime) checks that the signature is valid and the signer is the one
+  recorded. The ten MSVC runtime files are gathered from the build machine's
+  own Visual Studio, which a hosted runner does not have at the tree's
+  version, so their signer is recorded in the manifest and checked there.

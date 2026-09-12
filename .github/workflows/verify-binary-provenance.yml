@@ -188,3 +188,61 @@ jobs:
           }
 
           Write-Host "Every committed binary is accounted for and unchanged."
+
+  # The signatures the manifest records, checked on a Windows runner - the one
+  # kind of runner that can. Only the fetched files: the ten MSVC runtime
+  # files are gathered from the build machine's own Visual Studio, which a
+  # hosted runner does not have at the tree's version, so their signer stays
+  # recorded in the manifest and checked by hand there.
+  authenticode:
+    name: Verify the Authenticode signatures the manifest records
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Fetch the build inputs and check every signature the manifest claims
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $manifest = Get-Content -LiteralPath 'hmailserver/docs/third-party-binaries.json' -Raw | ConvertFrom-Json
+          $cache = Join-Path $env:RUNNER_TEMP 'build-inputs'
+          New-Item -ItemType Directory -Force -Path $cache | Out-Null
+          foreach ($input in $manifest.build_inputs) {
+             gh release download $input.release -R $env:REPOSITORY --pattern $input.asset --dir $cache --clobber
+             if ($LASTEXITCODE -ne 0) { Write-Host "::error::$($input.asset) could not be fetched from $($input.release)."; exit 1 }
+             $actual = (Get-FileHash -LiteralPath (Join-Path $cache $input.asset) -Algorithm SHA256).Hash.ToLower()
+             if ($actual -ne ([string]$input.sha256).ToLower()) {
+                Write-Host "::error::$($input.asset): SHA-256 $actual on the release, $($input.sha256) in the manifest."
+                exit 1
+             }
+          }
+          $checked = 0
+          $problems = 0
+          foreach ($artifact in $manifest.artifacts) {
+             if ($artifact.disposition -ne 'fetched' -or $artifact.authenticode -ne 'Valid') { continue }
+             $source = [string]$artifact.source
+             if ($source.Contains('#')) { continue }   # a member of an archive is not a signed file of its own
+             $asset = $source.Substring($source.IndexOf('/') + 1)
+             $path = Join-Path $cache $asset
+             $signature = Get-AuthenticodeSignature -LiteralPath $path
+             $checked++
+             if ($signature.Status -ne 'Valid') {
+                Write-Host "::error::$asset - signature status $($signature.Status); the manifest records Valid."
+                $problems++
+                continue
+             }
+             $subject = $signature.SignerCertificate.Subject
+             if ($subject -ne [string]$artifact.authenticode_signer) {
+                Write-Host "::error::$asset - signed by '$subject'; the manifest records '$($artifact.authenticode_signer)'."
+                $problems++
+                continue
+             }
+             Write-Host "$asset - Valid, $subject"
+          }
+          Write-Host "Checked $checked fetched, signed file(s) against the manifest."
+          if ($checked -eq 0) { Write-Host "::error::The manifest records no fetched signed file; this job would check nothing."; exit 1 }
+          if ($problems -ne 0) { exit 1 }
