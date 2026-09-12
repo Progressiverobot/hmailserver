@@ -165,6 +165,9 @@ already cost a release cycle or nearly shipped a defect.
    with no `-StopOnError`) — every test, nothing skipped. If *anything* changes after this run, the run is void: rebuild
    and re-run. Never abort a run; if one must be stopped, expect step 4 to
    fail and clean up before trusting any result.
+   At this point the Code Scanning and Dependabot alert pages show no open
+   high or critical finding - the thresholds in `.github/SECURITY.md` - or the
+   release waits.
 10. **README release notes** — every claim checked against the diff. "Fixed"
    means reproduced-then-fixed or negative-control-tested; anything else is
    described as hardening or diagnostics. Unfixed known issues are named as
