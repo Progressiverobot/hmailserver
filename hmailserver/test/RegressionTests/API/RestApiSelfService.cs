@@ -2202,8 +2202,15 @@ namespace RegressionTests.API
          Response page = Raw("GET", "/portal", null, null, "Accept-Language: de-DE,de;q=0.9,en;q=0.5\r\n");
          Assert.AreEqual(200, page.Status, page.Body.Length > 200 ? page.Body.Substring(0, 200) : page.Body);
          StringAssert.Contains("id=\"lang-data\" data-lang=\"de\"", page.Body);
+         // A catalogue of its own since 12 September 2026: pt-PT is pt-PT. A
+         // Portuguese the page lacks still falls back to Brazil, and zh-TW to
+         // zh-Hans.
          Response regional = Raw("GET", "/portal", null, null, "Accept-Language: pt-PT, zh-TW;q=0.8\r\n");
-         StringAssert.Contains("data-lang=\"pt-BR\"", regional.Body);
+         StringAssert.Contains("data-lang=\"pt-PT\"", regional.Body);
+         Response fallback = Raw("GET", "/portal", null, null, "Accept-Language: pt-AO, zh-TW;q=0.8\r\n");
+         StringAssert.Contains("data-lang=\"pt-BR\"", fallback.Body);
+         Response chinese = Raw("GET", "/portal", null, null, "Accept-Language: zh-TW\r\n");
+         StringAssert.Contains("data-lang=\"zh-Hans\"", chinese.Body);
          Response plain = Raw("GET", "/portal", null, null);
          Assert.IsFalse(plain.Body.Contains("id=\"lang-data\""), "No catalogue for English.");
          Response englishFirst = Raw("GET", "/portal", null, null, "Accept-Language: en-GB,de;q=0.7\r\n");
