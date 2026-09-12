@@ -691,6 +691,7 @@ create table hm_surblservers
 	surblactive tinyint not null,
 	surblhost nvarchar(255) not null,
 	surblrejectmessage nvarchar(255) not null,
+	surblresult nvarchar(255) not null default '',
 	surblscore int not null
 ) 
 
@@ -1311,4 +1312,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6037)
+insert into hm_dbversion values (6038)

@@ -28,6 +28,13 @@ namespace HM
       String GetDNSHost() const  {return dnshost_; }
       void SetDNSHost(const String &sNewVal) {dnshost_ = sNewVal;}
 
+      // The answers that mean listed, in the DNSBL syntax - 127.0.1.0-255 or
+      // 127.0.0.2*, ranges and wildcards joined by |. Empty means any answer
+      // but the codes in 127.255.255.0/24, with which the Spamhaus zones refuse
+      // the query itself rather than answer it.
+      String GetExpectedResult() const {return expected_result_; }
+      void SetExpectedResult(const String &sNewVal) {expected_result_ = sNewVal;}
+
       bool XMLStore(XNode *pNode, int iOptions);
       bool XMLLoad(XNode *pNode, int iOptions);
       bool XMLLoadSubItems (XNode *pNode, int iOptions) {return true;};
@@ -37,6 +44,7 @@ namespace HM
       
       String dnshost_;
       String reject_message_;
+      String expected_result_;
 
       int score_;
    };

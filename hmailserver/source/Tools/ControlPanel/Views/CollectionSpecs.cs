@@ -53,6 +53,7 @@ namespace hMailServer.ControlPanel.Views
             new FieldSpec { Prop = "Active", Label = L("Active"), Kind = FieldKind.Bool, GridWidth = 70 },
             new FieldSpec { Prop = "DNSHost", Label = L("DNS host") },
             new FieldSpec { Prop = "RejectMessage", Label = L("Reject message") },
+            new FieldSpec { Prop = "ExpectedResult", Label = L("Expected result"), GridWidth = 130 },
             new FieldSpec { Prop = "Score", Label = L("Score"), Kind = FieldKind.Number, GridWidth = 80, Default = 5 }
          }
       });
