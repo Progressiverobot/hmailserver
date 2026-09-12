@@ -136,7 +136,12 @@ namespace HM
 
       bool ReadWholeFile(const String &fileName, AnsiString &bytes)
       {
+#ifdef HM_PLATFORM_POSIX
+         const AnsiString narrowPath(fileName);
+         std::ifstream in(narrowPath.c_str(), std::ios::binary);
+#else
          std::ifstream in(fileName.c_str(), std::ios::binary);
+#endif
          if (!in)
             return false;
          std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
