@@ -15,6 +15,7 @@ create table hm_files
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_files_account ON hm_files (fileaccountid);
+
 CREATE UNIQUE INDEX idx_hm_files_token ON hm_files (filetoken);
 
 ALTER TABLE hm_files ENGINE=InnoDB;

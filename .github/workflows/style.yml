@@ -93,6 +93,8 @@ jobs:
       # missing after the feature had shipped.
       - name: Every INI setting can be set from the Control Panel
         run: python3 build/check-ini-coverage.py
+      - name: Every statement in a MySQL script ends with a blank line
+        run: python3 build/check-sql-separators.py
 
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.

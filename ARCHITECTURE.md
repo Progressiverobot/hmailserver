@@ -120,7 +120,13 @@ in `Tools/DBUpdater/formMain.cs`, a probe statement DBUpdater runs after the ste
 the bump in `Constants.h`; `build/check-schema-versions.ps1` reconciles them and
 `build/check-db-scripts.ps1` builds a database from the create script and executes
 every probe through the SQL Server Compact provider, with a negative control — a probe
-the provider could not run took the service down with it once (#114, 6.2.26).
+the provider could not run took the service down with it once (#114, 6.2.26). One rule
+of the scripts' text: `SQLScriptParser` splits a script into commands on a *blank line*
+and sends each command as one query, and MySQL refuses a command holding two
+statements, so every statement in a MySQL script is followed by a blank line -
+`build/check-sql-separators.py` enforces it on every push, after two `CREATE INDEX`
+lines written together left the MySQL create script unable to run from 12 September
+2026's tenth webmail wave until the Linux build's database gate said so the same day.
 
 **Server-wide optional features are INI settings, not database settings.** MTA-STS,
 DANE, ARC, TLS-RPT, ACME, the REST API, web services, metrics and JSON logging are
