@@ -113,3 +113,90 @@ Two things on a release can be verified independently of GitHub:
 Neither replaces Authenticode: Windows SmartScreen and the UAC prompt do not
 read either signature. Since 6.3.1 the Windows installer is also
 Authenticode-signed; the Linux packages are not.
+
+## Vulnerability management policy
+
+What is checked, on what, and what happens when it finds something. The
+checks are automatic and blocking; the thresholds below are the policy they
+enforce, and a finding that is not fixed is suppressed only with a written
+reason.
+
+### Dependencies (software composition analysis)
+
+- **What runs.** Every pull request against `master` runs GitHub's
+  dependency review (`.github/workflows/dependency-review.yml`), which
+  compares the dependency graph before and after the change against the
+  GitHub Advisory Database, including its malware advisories. It is a
+  required status check: a change that adds a dependency with a known
+  vulnerability of severity **high or critical**, or a package flagged as
+  malicious, cannot be merged. Dependabot opens a pull request for every
+  advisory that touches a dependency already in use, and for every new
+  version of a GitHub Action the workflows pin. The NuGet lock files and the
+  SHA-pinned actions mean a dependency cannot change under a build without a
+  reviewed commit.
+- **Remediation thresholds.** A high or critical advisory in a dependency is
+  fixed, or the dependency replaced, **before the next release** and within
+  14 days of the advisory; moderate within 30 days; low within 90 days or
+  with the next dependency refresh. A license finding (a dependency whose
+  license is not compatible with AGPL-3.0-or-later) is treated as high.
+- **Before a release.** A release is not cut while a dependency-review or
+  Dependabot finding of high or critical severity is open. The release
+  checklist in `RELEASE.md` says so, and the SBOMs attached to the release
+  (`hmailserver.spdx.json`, `hmailserver.cyclonedx.json`) are what a reader
+  checks the shipped versions against.
+- **Not affected.** A finding in a component that does not affect this
+  project - the vulnerable code is not reached, the feature is not built, the
+  platform is not one the server runs on - is recorded as a statement in the
+  project's VEX document, [`.github/hmailserver.openvex.json`](hmailserver.openvex.json)
+  (OpenVEX), with the reason, when it is dismissed. An empty statement list
+  means every advisory raised against a component has been fixed rather than
+  dismissed.
+
+### Source code (static analysis)
+
+- **What runs.** CodeQL analyses the C#, C++, JavaScript and Python in the
+  repository on every pull request and on every push to `master`
+  (`.github/workflows/codeql.yml`). The `master` ruleset requires the CodeQL
+  results: a pull request that introduces an alert of **error** level, or a
+  security alert of **high or critical** severity, cannot be merged until it
+  is fixed or dismissed with a reason. The C++ server is compiled with the
+  toolchain's own warnings-as-errors set, and the regression suite runs the
+  server under its crash oracle before every release, so a fault the analysis
+  would not see still fails the gate.
+- **Remediation thresholds.** An error-level or high/critical security alert
+  is fixed before merge. A medium alert is fixed within 30 days; a low or
+  note-level alert with the next change to that file, or dismissed with a
+  reason written on the alert. The Code Quality dashboard and the Code
+  Scanning page are kept at zero open CodeQL alerts between releases; a release is
+  not cut with an open error-level alert.
+- **Suppressions.** A finding is dismissed only on the alert itself, with a
+  reason that says why it is a false positive or not exploitable, so the
+  reason is on the record beside the finding.
+
+### Secrets and credentials
+
+- The repository holds no credential that opens anything: no token, no
+  password, no signing key. The certificates and private keys under
+  `hmailserver/test/SSL examples` are throwaway fixtures the regression suite
+  uses to exercise TLS, trusted by nothing outside it. GitHub's secret scanning
+  with push protection is on, so a push that carries a real secret is refused
+  before it lands.
+- Credentials the automation needs live only in GitHub Actions secrets and
+  variables: the Azure identity that Authenticode-signs the installer, and
+  nothing else. Release signatures are keyless (Sigstore, bound to the
+  workflow's own identity), so there is no signing key to protect. Release
+  tags are signed with a maintainer's SSH key, whose public half is in
+  `.github/allowed_signers`.
+- A secret is rotated when a maintainer leaves, when the workflow that uses
+  it changes hands, or on any suspicion of exposure; the Azure identity's
+  secret has an expiry and is replaced before it.
+- Test environments use throwaway credentials that the suite creates and
+  destroys; none of them is a real account.
+
+### Branch names in the pipelines
+
+No workflow interpolates a branch or tag name into a shell command. Where a
+name is needed (`sign-release.yml`, `attest-release.yml`), it is passed
+through an environment variable, and the release tag is checked for the
+exact form `vX.Y.Z` and for a signature by an allowed signer before it is
+used for anything.

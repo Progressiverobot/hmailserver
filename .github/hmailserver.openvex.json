@@ -1,0 +1,10 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/Progressiverobot/hmailserver/blob/master/.github/hmailserver.openvex.json",
+  "author": "The hMailServer maintainers, Progressive Robot Ltd",
+  "role": "Project maintainers",
+  "timestamp": "2026-09-12T03:00:00Z",
+  "version": 1,
+  "tooling": "Written by hand; one statement per advisory dismissed as not affecting the project, as .github/SECURITY.md (Vulnerability management policy) requires. No statements means every advisory raised against a component of this project has been fixed rather than dismissed.",
+  "statements": []
+}
