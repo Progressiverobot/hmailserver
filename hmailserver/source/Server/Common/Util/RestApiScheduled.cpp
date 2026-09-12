@@ -75,8 +75,8 @@ namespace HM
             if (pattern[i] == '0' ? !(c >= '0' && c <= '9') : c != pattern[i])
                return String();
          }
-         int month = _wtoi(text.Mid(5, 2).c_str()), day = _wtoi(text.Mid(8, 2).c_str());
-         int hour = _wtoi(text.Mid(11, 2).c_str()), minute = _wtoi(text.Mid(14, 2).c_str()), second = _wtoi(text.Mid(17, 2).c_str());
+         int month = _ttoi(text.Mid(5, 2).c_str()), day = _ttoi(text.Mid(8, 2).c_str());
+         int hour = _ttoi(text.Mid(11, 2).c_str()), minute = _ttoi(text.Mid(14, 2).c_str()), second = _ttoi(text.Mid(17, 2).c_str());
          if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59 || second > 59)
             return String();
          return text;
@@ -86,7 +86,7 @@ namespace HM
       String AYearFromNow()
       {
          String now = Time::GetCurrentDateTime();
-         int year = _wtoi(now.Mid(0, 4).c_str()) + 1;
+         int year = _ttoi(now.Mid(0, 4).c_str()) + 1;
          String text;
          text.Format(_T("%04d%s"), year, now.Mid(4).c_str());
          return text;
