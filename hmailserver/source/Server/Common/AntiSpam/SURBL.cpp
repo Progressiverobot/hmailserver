@@ -10,6 +10,7 @@
 #include "../../Common/BO/MessageData.h"
 #include "../../Common/BO/SURBLServer.h"
 #include "../../Common/TCPIP/DNSResolver.h"
+#include "../../SMTP/BLCheck.h"
 
 #include "../../Common/Util/TLD.h"
 #include <boost/regex.hpp>
@@ -197,7 +198,36 @@ namespace HM
             return true;
          }
 
-         if (saFoundNames.size() > 0)
+         // What an answer means is the server's to say, as it is for a DNSBL.
+         // With an expected result set - the DNSBL syntax, 127.0.1.0-255 or
+         // 127.0.0.2*, ranges and wildcards joined by | - only an answer it names
+         // is a listing. With none set, any answer is, except the codes in
+         // 127.255.255.0/24: the Spamhaus zones answer those to refuse the query
+         // itself - a public resolver (.254), too many queries (.255), a mistyped
+         // zone (.252) - and, taken as listings, they tagged every message with a
+         // link as spam on a server that resolves through 8.8.8.8 (discussion
+         // #167). Until 12 September 2026 any answer at all was a listing.
+         bool listed = false;
+         const std::set<String> expected = BLCheck::ExpandAddresses(pSURBLServer->GetExpectedResult());
+         for (const String &found : saFoundNames)
+         {
+            if (expected.empty())
+            {
+               if (found.Left(12).Compare(_T("127.255.255.")) != 0)
+                  listed = true;
+            }
+            else
+            {
+               for (const String &wanted : expected)
+                  if (StringParser::WildcardMatch(wanted, found))
+                     listed = true;
+            }
+         }
+
+         LOG_DEBUG(Formatter::Format(_T("SURBL: {0} answered {1}: {2}"), sHostToLookup,
+            StringParser::JoinVector(saFoundNames, ", "), listed ? _T("listed") : _T("not a listing")));
+
+         if (listed)
          {
             LOG_DEBUG("SURBL: Match found");
             return false;

@@ -64,6 +64,9 @@ public:
    STDMETHOD(get_Score)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_Score)(/*[in]*/ long newVal);
 
+   STDMETHOD(get_ExpectedResult)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_ExpectedResult)(/*[in]*/ BSTR newVal);
+
 };
 
 OBJECT_ENTRY_AUTO(__uuidof(SURBLServer), InterfaceSURBLServer)

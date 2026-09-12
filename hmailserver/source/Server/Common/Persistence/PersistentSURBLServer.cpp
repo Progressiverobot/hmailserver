@@ -42,6 +42,7 @@ namespace HM
       pObject->SetDNSHost(pRS->GetStringValue("surblhost"));
       pObject->SetRejectMessage(pRS->GetStringValue("surblrejectmessage"));
       pObject->SetScore(pRS->GetLongValue("surblscore"));
+      pObject->SetExpectedResult(pRS->GetStringValue("surblresult"));
 
 
       return true;
@@ -78,6 +79,7 @@ namespace HM
       oStatement.AddColumn("surblhost", pObject->GetDNSHost());
       oStatement.AddColumn("surblrejectmessage", pObject->GetRejectMessage());
       oStatement.AddColumn("surblscore", pObject->GetScore());
+      oStatement.AddColumn("surblresult", pObject->GetExpectedResult());
 
       bool bNewObject = pObject->GetID() == 0;
 

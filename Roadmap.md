@@ -41,7 +41,7 @@ than a wording problem.
 
 ### Contents and totals
 
-903 items. The counts are the point of this table — they say where the fork is
+904 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -65,7 +65,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [POP3](#pop3) | 27 | – | 0 | 1 |
 | [Sieve, ManageSieve and rules](#sieve-managesieve-and-rules) | 65 | – | 0 | – |
 | [Authentication and cryptography](#authentication-and-cryptography) | 73 | – | – | 6 |
-| [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 61 | – | 0 | 5 |
+| [Anti-spam, anti-virus and content control](#anti-spam-anti-virus-and-content-control) | 62 | – | 0 | 5 |
 | [Storage, accounts and data model](#storage-accounts-and-data-model) | 97 | – | 0 | – |
 | [Routing, queue and delivery](#routing-queue-and-delivery) | 24 | – | 0 | 1 |
 | [Administration, API and Control Panel](#administration-api-and-control-panel) | 70 | 0 | 0 | – |
@@ -80,7 +80,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
 | [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 37 | – | 1 | 1 |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **861** | **2** | **6** | **34** |
+| **Total** | **862** | **2** | **6** | **34** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -708,7 +708,7 @@ the source, not from documentation.
 
 ### Anti-spam, anti-virus and content control
 
-61 shipped · 0 underway · 0 not started · 5 deferred
+62 shipped · 0 underway · 0 not started · 5 deferred
 
 | | Capability | Detail |
 |:-:|---|---|
@@ -730,6 +730,7 @@ the source, not from documentation.
 | ✅ | Custom-scanner presets in the Control Panel | One-click command lines and exit codes for Microsoft Defender (MpCmdRun), Sophos savscan, ESET ecls, Bitdefender bdscan and Kaspersky avp.com, plus Test buttons for all three scanner types and ClamWin auto-detect |
 | ✅ | DKIM and DMARC as scored tests | DKIM permfail and DMARC reject/quarantine each contribute their configured failure score; a DMARC p=quarantine verdict is scored exactly like p=reject — the quarantine store exists now, but nothing routes a DMARC verdict into it, so the two policies remain indistinguishable in effect and wiring them apart is a real item rather than a wording one — and p=none is logged only |
 | ✅ | Custom DNS server for all lookups | `[Settings] DNSServer` sends every DNSBL, SURBL, SPF, DKIM, DMARC, MX, PTR and host lookup to one nominated IPv4 resolver instead of the system's, which is what makes a DMZ mail server usable when the host's own resolver cannot see the internal zones. Bounded since 6.2.17 by `DNSQueryTimeout` (default 10s), so an unresponsive resolver can no longer hold a delivery thread. **Documented here for the first time on 13 August 2026, after it spent a morning broken by a one-line "improvement" of mine and being fixed again.** 6.2.17 moved from the classic `DnsQuery` - which took a bare `PIP4_ARRAY` of addresses with no port field - to `DnsQueryEx`, whose `DNS_ADDR_ARRAY` carries a full `SOCKADDR` per server. A `SOCKADDR` with a zero port reads like an oversight, so it was "corrected" to 53; the DNS client supplies the port itself and **rejects** an entry that specifies one, returning `ERROR_INVALID_PARAMETER` for every query before a packet leaves the machine. Every lookup then fails, and because DNSBL, SURBL, SPF and DMARC all fail open and silently, the only visible symptom is SpamAssassin - one of the few callers that reports a failed lookup - while the spam filtering quietly stops. Measured both ways against a real DNS server before and after. The port is now zero with a comment at the line saying not to change it, and `Infrastructure/CustomDnsServer.cs` covers it, marked explicit because the setting only takes effect on a service restart and that invalidates the COM object the fixture base caches. |
+| ✅ | SURBL answers judged like DNSBL answers | **Shipped 12 September 2026.** A SURBL server has an expected result (`SURBLServer.ExpectedResult`, the DNSBL syntax: `127.0.1.0-255`, `127.0.0.2*`, ranges and wildcards joined by `|`), and only an answer it names is a listing; with none set, any answer is - except the codes in 127.255.255.0/24, which the Spamhaus zones answer to refuse the query itself (a public resolver, too many queries, a mistyped zone) and which were taken as listings until now, so a server resolving through 8.8.8.8 tagged every message carrying a link (discussion #167). Schema 6038 (`hm_surblservers.surblresult`); the Control Panel's SURBL editor has the field. |
 | ✅ | DNS results are traceable | A `DNS - Result.` debug line for every query records the name, record type, the raw status, how many records came back, whether the nominated server was used, and how the status was classified. Added because the absence of it is what hid the defect above through three wrong theories: a status the resolver treats as benign - "no such name", "no records" - returned success with an empty list and logged nothing at all, so a lookup that quietly found nothing was indistinguishable from one that was never made. Debug level, so it costs nothing until somebody is diagnosing resolution, which is a recurring support question. |
 | ✅ | DNSBL / RBL checking | Multiple configurable lists, each with its own DNS host, expected-result expression, score and rejection text. Expected results support pipe-separated alternatives, last-octet ranges (127.0.0.1-5) and wildcards… |
 | ✅ | DNSBL check timing | [Settings] DNSBLChecksAfterMailFrom (default 1) moves the pre-transmission checks from connect time to after MAIL FROM; hosts listed as incoming relays are switched to post-transmission scoring instead of pre-transmission rejection. |

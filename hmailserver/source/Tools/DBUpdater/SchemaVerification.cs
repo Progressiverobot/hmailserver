@@ -449,7 +449,10 @@ namespace DBUpdater
          new SchemaProbe(6037, "hm_smimekeys.smimenotafter",
                          "update hm_smimekeys set smimenotafter = smimenotafter where 1 = 0"),
          new SchemaProbe(6037, "hm_smimekeys.smimecreated",
-                         "update hm_smimekeys set smimecreated = smimecreated where 1 = 0")
+                         "update hm_smimekeys set smimecreated = smimecreated where 1 = 0"),
+         // Upgrade6037to6038* - a SURBL server's expected result, judged like a DNSBL's.
+         new SchemaProbe(6038, "hm_surblservers.surblresult",
+                         "update hm_surblservers set surblresult = surblresult where 1 = 0")
       };
 
       /// <summary>

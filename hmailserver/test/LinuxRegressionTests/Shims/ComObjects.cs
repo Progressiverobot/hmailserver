@@ -1681,6 +1681,7 @@ namespace hMailServer
       public long ID { get; set; }
       public string DNSHost { get; set; }
       public string RejectMessage { get; set; }
+      public string ExpectedResult { get; set; }
       public int Score { get; set; }
       public bool Active { get; set; }
 

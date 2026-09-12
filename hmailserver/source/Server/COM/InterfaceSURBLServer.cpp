@@ -209,3 +209,34 @@ STDMETHODIMP InterfaceSURBLServer::Delete()
    }
 }
 
+STDMETHODIMP InterfaceSURBLServer::put_ExpectedResult(BSTR newVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      object_->SetExpectedResult(newVal);
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP InterfaceSURBLServer::get_ExpectedResult(BSTR *pVal)
+{
+   try
+   {
+      if (!object_)
+         return GetAccessDenied();
+
+      *pVal = object_->GetExpectedResult().AllocSysString();
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}

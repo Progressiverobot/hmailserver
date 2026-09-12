@@ -33,6 +33,10 @@ namespace RegressionTests.AntiSpam
       {
          SuiteDns.Zone
             .WithA(SurblTestPoint, "127.0.0.2")
+            // What the Spamhaus zones answer a public resolver - a refusal of the
+            // query, not a listing - and a DBL-style listing in 127.0.1.0/24.
+            .WithA("open-resolver-code.test.multi.surbl.org", "127.255.255.254")
+            .WithA("dbl-listed.test.multi.surbl.org", "127.0.1.2")
             // TestMissingMXRecord needs one domain that HAS an MX and one that does
             // not, and it uses microsoft.com for the first. Served, because the
             // negative half of that test only means something if the positive half
@@ -312,6 +316,63 @@ namespace RegressionTests.AntiSpam
          var sMessageContents = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
          Assert.IsFalse(sMessageContents.Contains("X-hMailServer-Spam"), "Non-spam message detected as spam");
 
+         surblServer.Active = false;
+         surblServer.Save();
+      }
+
+      // The SURBL server armed the way the tests above arm it, with an expected
+      // result of the caller's, so that a test says what an answer must be.
+      private hMailServer.SURBLServer ArmSurbl_(string expectedResult)
+      {
+         _antiSpam.SpamMarkThreshold = 1;
+         _antiSpam.SpamDeleteThreshold = 100;
+         _antiSpam.AddHeaderReason = true;
+         _antiSpam.AddHeaderSpam = true;
+         _antiSpam.PrependSubject = true;
+         _antiSpam.PrependSubjectText = "ThisIsSpam";
+         var surblServer = _antiSpam.SURBLServers[0];
+         surblServer.Active = true;
+         surblServer.Score = 5;
+         surblServer.ExpectedResult = expectedResult;
+         surblServer.Save();
+         return surblServer;
+      }
+
+      [Test]
+      public void SurblResolverRefusalCodeIsNotAListing()
+      {
+         // 127.255.255.254 is what the Spamhaus zones answer a query made through a
+         // public resolver: the query was refused, the name is not listed. Taken as
+         // a listing it tagged every message with a link (discussion #167).
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "surbl-refusal@example.test", "test");
+         var surblServer = ArmSurbl_("");
+         new SmtpClientSimulator().Send("surbl-refusal@example.test", "surbl-refusal@example.test", "SURBL-Refusal",
+            "A link: http://open-resolver-code.test/ here");
+         var contents = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, "test");
+         Assert.IsFalse(contents.Contains("X-hMailServer-Spam"), "A resolver's refusal code was taken as a listing.");
+         surblServer.Active = false;
+         surblServer.Save();
+      }
+
+      [Test]
+      public void SurblExpectedResultDecidesWhatCounts()
+      {
+         // With 127.0.1.0-255 expected, the permanent test point's 127.0.0.2 is not a
+         // listing and a DBL-style 127.0.1.2 is - the same rule a DNSBL applies.
+         var outside = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "surbl-outside@example.test", "test");
+         var inside = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "surbl-inside@example.test", "test");
+         var surblServer = ArmSurbl_("127.0.1.0-255");
+         Assert.AreEqual("127.0.1.0-255", _antiSpam.SURBLServers[0].ExpectedResult, "The expected result did not round-trip.");
+         var smtp = new SmtpClientSimulator();
+         smtp.Send("surbl-outside@example.test", "surbl-outside@example.test", "SURBL-Outside",
+            "A link: http://surbl-org-permanent-test-point.com/ here");
+         var outsideText = Pop3ClientSimulator.AssertGetFirstMessageText(outside.Address, "test");
+         Assert.IsFalse(outsideText.Contains("X-hMailServer-Spam"), "An answer outside the expected result counted as a listing.");
+         smtp.Send("surbl-inside@example.test", "surbl-inside@example.test", "SURBL-Inside",
+            "A link: http://dbl-listed.test/ here");
+         var insideText = Pop3ClientSimulator.AssertGetFirstMessageText(inside.Address, "test");
+         Assert.IsTrue(insideText.Contains("X-hMailServer-Spam"), "An answer inside the expected result was not a listing.");
+         surblServer.ExpectedResult = "";
          surblServer.Active = false;
          surblServer.Save();
       }
