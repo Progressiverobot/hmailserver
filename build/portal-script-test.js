@@ -328,6 +328,7 @@ const WITH_IMAGE = {
    id: 102, folder_id: 1, uid: 12, subject: 'Second', from: 'Bee <b@example.net>', to: 'user@example.com', cc: '',
    date: '2026-09-08 09:00', size: 800, message_id: '<two@example.net>', references: '', in_reply_to: '<one@example.net>',
    text: '', html: '<p>Hello</p><img src="cid:logo@example.net" alt="logo"><img src="cid:chart@example.net" alt="chart"><img src="https://tracker.example.org/pixel.gif">',
+   html_remote: true,
    flags: { seen: false, flagged: false, draft: false },
    attachments: [
       { index: 0, name: 'notes.txt', size: 12, content_type: 'text/plain', content_id: '' },
@@ -525,24 +526,24 @@ async function main() {
    check('the attachment names its type', document.getElementById('message-attachments').textContent.indexOf('image/png') >= 0,
       document.getElementById('message-attachments').textContent);
 
-   // ---- a cid: reference resolves to the attachment download route
+   // ---- the HTML part is the server's document, in a frame with a policy of its own
    document.getElementById('message-html-toggle').dispatchEvent(makeEvent('click'));
    await flush();
    const frame = document.getElementById('message-html');
-   const doc = String(frame.srcdoc || '');
-   check('the HTML part is shown in the frame', frame.hidden === false && doc.length > 0);
-   check('a cid: image becomes the bytes themselves, fetched by the page',
-      doc.indexOf('data:image/png;base64,') >= 0, doc);
-   check('and no cid: is left for that one', doc.indexOf('cid:logo') < 0, doc);
-   check('the page, not the frame, fetched it', called(beforeOpen, 'GET', '/api/v1/me/messages/102/attachments/1'));
-   check('the frame is pointed at no URL on this server at all',
-      doc.indexOf('/api/v1/me/messages/') < 0, doc);
-   check('a remote image is left as it was, and the policy blocks it',
-      doc.indexOf('https://tracker.example.org/pixel.gif') >= 0 && /img-src data:"/.test(doc), doc);
-   check('an inline part the download route will not serve as an image is left alone',
-      doc.indexOf('cid:chart@example.net') >= 0, doc);
-   check('and its bytes were not put in the page either', doc.indexOf('data:application/octet-stream') < 0, doc);
-   check('the frame allows no script and no other source', doc.indexOf("default-src 'none'") >= 0);
+   const src = String(frame.getAttribute('src') || '');
+   check('the HTML part is shown in the frame', frame.hidden === false && src.length > 0, src);
+   check('the frame points at the message\'s own document on this server, without remote content',
+      src === '/api/v1/me/messages/102/html', src);
+   check('nothing is built here: the frame carries no srcdoc', !frame.srcdoc, String(frame.srcdoc || ''));
+   check('the page fetched no attachment for it - the server inlines what the document embeds',
+      !called(beforeOpen, 'GET', '/api/v1/me/messages/102/attachments/1'));
+   check('a message that names remote content shows the note while the reader has not allowed it',
+      document.getElementById('message-remote').hidden === false);
+   document.getElementById('remote-once').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('allowing it for this message points the frame at the document with its remote content',
+      String(frame.getAttribute('src') || '') === '/api/v1/me/messages/102/html?remote=1', String(frame.getAttribute('src') || ''));
+   check('and the note goes', document.getElementById('message-remote').hidden === true);
    check('the frame is still sandboxed', frame.getAttribute('sandbox') === 'allow-popups allow-popups-to-escape-sandbox',
       frame.getAttribute('sandbox'));
 

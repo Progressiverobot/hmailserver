@@ -1676,6 +1676,9 @@ namespace HM
          case RouteMeMessageSource:
             return HandleMeMessageSource_(caller, route.message_id);
 
+         case RouteMeMessageHtml:
+            return HandleMeMessageHtml_(caller, route.message_id, route.query);
+
          case RouteSessionCreate:
             return HandleSessionCreate_(caller);
 
@@ -1928,6 +1931,14 @@ namespace HM
             AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/source").GetLength());
             if (ParseQueueId(idText, route.message_id))
                route.kind = RouteMeMessageSource;
+            return;
+         }
+
+         if (method == "GET" && rest.EndsWith("/html"))
+         {
+            AnsiString idText = rest.Mid(0, rest.GetLength() - AnsiString("/html").GetLength());
+            if (ParseQueueId(idText, route.message_id))
+               route.kind = RouteMeMessageHtml;
             return;
          }
 
@@ -5041,6 +5052,7 @@ namespace HM
       {
       case RouteMeFolderEmpty:
       case RouteMeMessageSource:
+      case RouteMeMessageHtml:
       case RouteMeIdentities:
       case RouteMePreferences:
       case RouteMePreferencesPut:
@@ -5849,9 +5861,11 @@ namespace HM
          std::set<__int64> candidates_;
       };
 
-      // Whether one message contains the text: in its Subject or From, read
-      // from the head of the file; failing that in its To, Cc, text and
-      // HTML, for a message small enough to read whole and not ruled out by
+      // Whether one message matches the query: the operators first (from:,
+      // subject:, has:attachment and the rest) against what the head of the
+      // file says, then the free words in its Subject or From; a word found
+      // in neither, or a to:, has the message read whole - once, each part
+      // lower-cased once - for a message small enough and not ruled out by
       // the index.
       // A search as a reader writes it: words, "quoted phrases", and the
       // operators every webmail has taught - from:, to:, subject:,
@@ -5954,10 +5968,19 @@ namespace HM
                q.wantAnswered = true;
             else
             {
-               q.terms.push_back(lower);
-               if (!q.freeText.IsEmpty())
-                  q.freeText += _T(" ");
-               q.freeText += token;
+               // Each word once, and sixteen at most: every word past the
+               // subject and the sender costs a read of the message, and a
+               // request head holds thirty thousand of them.
+               bool seen = false;
+               for (size_t k = 0; k < q.terms.size() && !seen; k++)
+                  seen = q.terms[k] == lower;
+               if (!seen && q.terms.size() < 16)
+               {
+                  q.terms.push_back(lower);
+                  if (!q.freeText.IsEmpty())
+                     q.freeText += _T(" ");
+                  q.freeText += token;
+               }
             }
          }
 
@@ -6007,7 +6030,7 @@ namespace HM
             // declared an attachment, is what a mail client shows a clip for.
             AnsiString header = PersistentMessage::LoadHeader(fileName, false);
             header.ToLower();
-            if (header.Find("multipart/mixed") < 0 && header.Find("attachment") < 0)
+            if (header.Find("multipart/mixed") < 0 && header.Find("content-disposition: attachment") < 0)
                return false;
          }
 
@@ -6029,14 +6052,21 @@ namespace HM
          if (!data.LoadFromMessage(fileName, message))
             return false;
 
-         if (!q.to.IsEmpty() && !ContainsNoCase(data.GetTo(), q.to) && !ContainsNoCase(data.GetCC(), q.to))
+         // Each part decoded and lower-cased once, however many words ask.
+         const String to = ToLowerCopy(data.GetTo());
+         const String cc = ToLowerCopy(data.GetCC());
+         if (!q.to.IsEmpty() && to.Find(q.to) < 0 && cc.Find(q.to) < 0)
             return false;
 
+         if (pending.empty())
+            return true;
+
+         const String body = ToLowerCopy(data.GetBody());
+         const String html = ToLowerCopy(data.GetHTMLBody());
          for (size_t i = 0; i < pending.size(); i++)
          {
             const String &term = pending[i];
-            if (!ContainsNoCase(data.GetTo(), term) && !ContainsNoCase(data.GetCC(), term) &&
-                !ContainsNoCase(data.GetBody(), term) && !ContainsNoCase(data.GetHTMLBody(), term))
+            if (to.Find(term) < 0 && cc.Find(term) < 0 && body.Find(term) < 0 && html.Find(term) < 0)
                return false;
          }
 
@@ -6509,6 +6539,10 @@ namespace HM
             continue;
 
          const String pathLower = ToLowerCopy(DecodeFolderName_(folders[f].second));
+         // in:folder: a folder whose path does not match is skipped whole,
+         // before its messages count against the budget.
+         if (!searchQuery.inFolder.IsEmpty() && pathLower.Find(searchQuery.inFolder) < 0)
+            continue;
          std::vector<std::shared_ptr<Message>> snapshot = messages->GetCopy();
          for (std::vector<std::shared_ptr<Message>>::reverse_iterator it = snapshot.rbegin(); it != snapshot.rend(); ++it)
          {
@@ -6620,7 +6654,7 @@ namespace HM
 
       if (message->GetSize() > MaxMessageParseBytes)
       {
-         json += "\"truncated\":true,\"to\":\"\",\"cc\":\"\",\"text\":\"\",\"html\":\"\",\"attachments\":[]}";
+         json += "\"truncated\":true,\"to\":\"\",\"cc\":\"\",\"text\":\"\",\"html\":\"\",\"html_remote\":false,\"attachments\":[]}";
          return BuildResponse_(200, json);
       }
 
@@ -6680,13 +6714,15 @@ namespace HM
       AnsiString tail;
       AnsiString text = bodyTooLarge ? AnsiString() : JsonEscape_(Utf8_(messageData.GetBody()));
       AnsiString html = bodyTooLarge ? AnsiString() : JsonEscape_(Utf8_(messageData.GetHTMLBody()));
+      bool htmlRemote = !bodyTooLarge && HtmlNamesRemoteContent_(Utf8_(messageData.GetHTMLBody()));
 
-      tail.Format("\"truncated\":%hs,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"attachments\":%hs}",
+      tail.Format("\"truncated\":%hs,\"to\":\"%hs\",\"cc\":\"%hs\",\"text\":\"%hs\",\"html\":\"%hs\",\"html_remote\":%hs,\"attachments\":%hs}",
          bodyTooLarge ? "true" : "false",
          JsonEscape_(Utf8_(messageData.GetTo())).c_str(),
          JsonEscape_(Utf8_(messageData.GetCC())).c_str(),
          text.c_str(),
          html.c_str(),
+         htmlRemote ? "true" : "false",
          attachments.c_str());
       json += tail;
 
@@ -7276,6 +7312,112 @@ namespace HM
       }
 
       return "";
+   }
+
+   // Whether an HTML part names anything a browser would fetch from the
+   // network: an src= or a url() with an http(s) address, or a stylesheet
+   // link. A plain href is a link the reader may click, not a request.
+   bool
+   RestApiServer::HtmlNamesRemoteContent_(const AnsiString &html)
+   {
+      AnsiString lower = html;
+      lower.ToLower();
+      lower.Replace("\r", " ");
+      lower.Replace("\n", " ");
+      lower.Replace("\t", " ");
+      static const char *const needles[] = { "src=\"http", "src='http", "src=http", "src= \"http", "src= 'http", "url(http", "url('http", "url(\"http", "url( http", "<link ", "@import" };
+      for (size_t i = 0; i < sizeof(needles) / sizeof(needles[0]); i++)
+         if (lower.Find(needles[i]) >= 0)
+            return true;
+      return false;
+   }
+
+   // The message's HTML part as a document of its own, for the page's frame:
+   // a frame with a src has the policy this answer carries, where a srcdoc
+   // frame would inherit the page's, which allows no remote image at all -
+   // so remote images and styles are blocked here unless the reader asked for
+   // them with ?remote=1, nothing runs, no form is submitted and no address is
+   // rewritten. Images the message embeds (cid:) are put in as data: URLs
+   // under the same budget the page gives inline images.
+   HttpResponse
+   RestApiServer::HandleMeMessageHtml_(const Caller &caller, __int64 messageId, const AnsiString &query)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+         return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> message = FindOwnMessage_(account, messageId, folder);
+      if (!message)
+         return BuildResponse_(404, "{\"error\":\"message not found\"}");
+
+      if (message->GetSize() > MaxMessageParseBytes)
+         return BuildResponse_(413, "{\"error\":\"the message is too large to read here\"}");
+
+      String fileName = MessageFile_(message);
+      if (!FileUtilities::Exists(fileName))
+         return BuildResponse_(404, "{\"error\":\"the message file is missing\"}");
+
+      MessageData messageData;
+      if (!messageData.LoadFromMessage(fileName, message))
+         return BuildResponse_(500, "{\"error\":\"the message could not be parsed\"}");
+
+      AnsiString html = Utf8_(messageData.GetHTMLBody());
+      if (html.IsEmpty())
+         return BuildResponse_(404, "{\"error\":\"the message has no HTML part\"}");
+
+      // cid: references, resolved to the parts they name - image types only,
+      // 4 MB each, 12 MB and twelve parts together.
+      const __int64 InlineEach = 4 * 1024 * 1024;
+      const __int64 InlineTogether = 12 * 1024 * 1024;
+      const int InlineMost = 12;
+      std::shared_ptr<Attachments> attachments = messageData.GetAttachments();
+      std::list<std::shared_ptr<MimeBody>> parts;
+      std::shared_ptr<MimeBody> mimeMessage = messageData.GetMimeMessage();
+      if (mimeMessage)
+         mimeMessage->GetAttachmentList(mimeMessage, parts);
+      std::vector<std::shared_ptr<MimeBody>> partList(parts.begin(), parts.end());
+      __int64 budget = InlineTogether;
+      int inlined = 0;
+      if (attachments)
+      {
+         for (size_t i = 0; i < attachments->GetCount() && i < partList.size() && inlined < InlineMost; i++)
+         {
+            std::shared_ptr<Attachment> attachment = attachments->GetItem((unsigned int) i);
+            if (!attachment)
+               continue;
+            AnsiString contentId = ContentId(partList[i]);
+            AnsiString type = MediaType(attachment->GetContentType());
+            if (contentId.IsEmpty() || type.Find("image/") != 0)
+               continue;
+            if (html.Find("cid:" + contentId) < 0)
+               continue;
+            AnsiString bytes;
+            if (!attachment->GetContent(bytes) || bytes.GetLength() > InlineEach || bytes.GetLength() > budget)
+               continue;
+            budget -= bytes.GetLength();
+            inlined++;
+            AnsiString dataUrl = "data:" + type + ";base64," + Base64::Encode(bytes.c_str(), bytes.GetLength());
+            html.Replace("cid:" + contentId, dataUrl);
+         }
+      }
+
+      bool remote = QueryParameter_(query, "remote") == "1";
+      AnsiString document =
+         "<!doctype html><html><head><meta charset=\"utf-8\"><base target=\"_blank\" rel=\"noopener noreferrer\">"
+         "<style>body{font-family:system-ui,sans-serif;margin:.5rem;word-break:break-word}img{max-width:100%}</style></head><body>" + html + "</body></html>";
+
+      HttpResponse response;
+      response.status = 200;
+      response.content_type = "text/html; charset=utf-8";
+      response.body = document;
+      response.extra_headers =
+         AnsiString("Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; img-src data:") + (remote ? " https: http:" : "") +
+         (remote ? "; font-src https: http:" : "") + "; sandbox allow-popups allow-popups-to-escape-sandbox; form-action 'none'; base-uri 'none'; frame-ancestors 'self'\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Referrer-Policy: no-referrer\r\n"
+         "Cache-Control: no-store\r\n";
+      return response;
    }
 
    AnsiString
@@ -8336,6 +8478,7 @@ namespace HM
          "\"/api/v1/me/messages\":{\"post\":{\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
+         "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
          "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
          "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), folder_id\"},\"400\":{\"description\":\"Not a Junk or Trash folder\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id, or to = archive | junk | trash | inbox - the folder designated so, made by that name when the account has none. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told; a move into or out of Junk teaches spamd when SpamAssassinLearnOnMove is on. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"folder_id\":{\"type\":\"integer\"},\"to\":{\"type\":\"string\",\"enum\":[\"archive\",\"junk\",\"trash\",\"inbox\"]}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"

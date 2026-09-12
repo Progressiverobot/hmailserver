@@ -222,6 +222,7 @@ namespace HM
          RouteMePreferencesPut,
          RouteMeFolderEmpty,
          RouteMeMessageSource,
+         RouteMeMessageHtml,
          RouteSessionCreate,
          RouteSessionDelete,
          // Wave 162: the write surface. Server-wide ones are refused for
@@ -438,6 +439,8 @@ namespace HM
       static void LearnAfterMove_(std::shared_ptr<IMAPFolder> source, std::shared_ptr<IMAPFolder> destination, __int64 newMessageId, std::shared_ptr<const Account> account);
       static HttpResponse HandleMeFolderEmpty_(const Caller &caller, __int64 folderId);
       static HttpResponse HandleMeMessageSource_(const Caller &caller, __int64 messageId);
+      static HttpResponse HandleMeMessageHtml_(const Caller &caller, __int64 messageId, const AnsiString &query);
+      static bool HtmlNamesRemoteContent_(const AnsiString &html);
       static AnsiString HeaderFieldsJson_(const String &fileName, std::shared_ptr<const Account> account);
       static AnsiString OwnAuthenticationResults_(const MimeHeader &mimeHeader);
       static AnsiString ThreadFieldsJson_(const String &fileName);
