@@ -130,19 +130,112 @@ namespace HM
          return true;
       }
 
+      // An IPv4 address a request made on an outsider's behalf may reach: not
+      // this host, not this network, not a range nobody routes.
+      bool IsPublicV4(unsigned long v)
+      {
+         const unsigned a = (v >> 24) & 0xff, b = (v >> 16) & 0xff, c = (v >> 8) & 0xff;
+         if (a == 0 || a == 10 || a == 127)                   // this network, RFC 1918, loopback
+            return false;
+         if (a == 100 && (b & 0xc0) == 64)                    // 100.64/10, carrier NAT
+            return false;
+         if (a == 169 && b == 254)                            // link-local, the metadata address among them
+            return false;
+         if (a == 172 && (b & 0xf0) == 16)                    // 172.16/12
+            return false;
+         if (a == 192 && b == 168)                            // 192.168/16
+            return false;
+         if (a == 192 && b == 0 && (c == 0 || c == 2))        // 192.0.0/24 protocol assignments, TEST-NET-1
+            return false;
+         if (a == 198 && (b == 18 || b == 19))                // 198.18/15 benchmarking
+            return false;
+         if ((a == 198 && b == 51 && c == 100) || (a == 203 && b == 0 && c == 113))   // TEST-NET-2, TEST-NET-3
+            return false;
+         if (a >= 224)                                        // multicast, reserved, broadcast
+            return false;
+         return true;
+      }
+
+      // The same for either family. An IPv6 address that carries an IPv4 one -
+      // ::ffff:a.b.c.d, ::a.b.c.d, NAT64's 64:ff9b::/96, 6to4's 2002::/16 - is
+      // judged as that IPv4 address, since that is where it leads.
+      bool IsPublicAddress(const boost::asio::ip::address &address)
+      {
+         if (address.is_v4())
+            return IsPublicV4(address.to_v4().to_uint());
+
+         const boost::asio::ip::address_v6::bytes_type b = address.to_v6().to_bytes();
+         const auto v4At = [&b](size_t at)
+         {
+            return ((unsigned long) b[at] << 24) | ((unsigned long) b[at + 1] << 16) | ((unsigned long) b[at + 2] << 8) | b[at + 3];
+         };
+         bool zeroTo10 = true;
+         for (size_t i = 0; i < 10; i++)
+            zeroTo10 = zeroTo10 && b[i] == 0;
+         if (zeroTo10 && ((b[10] == 0xff && b[11] == 0xff) || (b[10] == 0 && b[11] == 0)))
+            return IsPublicV4(v4At(12));                      // v4-mapped, v4-compatible, ::1 and :: among them
+         bool nat64 = b[0] == 0 && b[1] == 0x64 && b[2] == 0xff && b[3] == 0x9b;
+         for (size_t i = 4; nat64 && i < 12; i++)
+            nat64 = b[i] == 0;
+         if (nat64)
+            return IsPublicV4(v4At(12));
+         if (b[0] == 0x20 && b[1] == 0x02)
+            return IsPublicV4(v4At(2));
+         if (b[0] == 0xff)                                    // multicast
+            return false;
+         if (b[0] == 0xfe && (b[1] & 0xc0) == 0x80)           // fe80::/10 link-local
+            return false;
+         if (b[0] == 0xfe && (b[1] & 0xc0) == 0xc0)           // fec0::/10 site-local
+            return false;
+         if ((b[0] & 0xfe) == 0xfc)                           // fc00::/7 unique local
+            return false;
+         if (b[0] == 0x20 && b[1] == 0x01 && b[2] == 0x0d && b[3] == 0xb8)   // 2001:db8::/32 documentation
+            return false;
+         return true;
+      }
+
       // Connects socket to host:port - directly, or through the proxy when one is
       // configured. For an https target the proxy is asked to CONNECT and the TLS
       // handshake then runs inside the tunnel, so the proxy sees the name it was
       // asked for and nothing of what follows. For plain http the caller has put
       // the absolute URL in its request line and the proxy forwards it.
+      //
+      // public_only (RequestPublic): the name is resolved here, every address it
+      // gave is judged, and the connection is made to the addresses that passed
+      // and to no other - so a name that answers a public address to one lookup
+      // and a private one to the next gains nothing. Never through the proxy,
+      // which would resolve the name itself, out of sight of this.
       bool Connect_(boost::asio::io_context &io, boost::asio::ip::tcp::socket &socket, const AnsiString &host,
-                    const AnsiString &port, bool https, int timeout_seconds, String &error)
+                    const AnsiString &port, bool https, int timeout_seconds, String &error, bool public_only = false)
       {
+         boost::asio::ip::tcp::resolver resolver(io);
+
+         if (public_only)
+         {
+            std::vector<boost::asio::ip::tcp::endpoint> vetted;
+            std::string refused;
+            for (const auto &entry : resolver.resolve(std::string(host.c_str()), std::string(port.c_str())))
+            {
+               const boost::asio::ip::tcp::endpoint endpoint = entry.endpoint();
+               if (IsPublicAddress(endpoint.address()))
+                  vetted.push_back(endpoint);
+               else if (refused.empty())
+                  refused = endpoint.address().to_string();
+            }
+            if (vetted.empty())
+            {
+               error = Formatter::Format(_T("{0} is not a public address (loopback, private, link-local or reserved), and this request reaches only public ones."),
+                  refused.empty() ? String(host) : String(refused.c_str()));
+               return false;
+            }
+            boost::asio::connect(socket, vetted);
+            SetSocketTimeouts_(socket, timeout_seconds);
+            return true;
+         }
+
          std::string proxyHost, proxyPort;
          if (!ProxySetting_(proxyHost, proxyPort, error))
             return false;
-
-         boost::asio::ip::tcp::resolver resolver(io);
 
          if (proxyHost.empty())
          {
@@ -304,6 +397,22 @@ namespace HM
                         const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
                         int timeout_seconds, size_t max_response_bytes)
    {
+      return Request_(method, url, extra_headers, content_type, body, response, error, timeout_seconds, max_response_bytes, false);
+   }
+
+   bool
+   HttpsClient::RequestPublic(const AnsiString &method, const AnsiString &url, const std::vector<AnsiString> &extra_headers,
+                              const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
+                              int timeout_seconds, size_t max_response_bytes)
+   {
+      return Request_(method, url, extra_headers, content_type, body, response, error, timeout_seconds, max_response_bytes, true);
+   }
+
+   bool
+   HttpsClient::Request_(const AnsiString &method, const AnsiString &url, const std::vector<AnsiString> &extra_headers,
+                         const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
+                         int timeout_seconds, size_t max_response_bytes, bool public_only)
+   {
       bool https = false;
       AnsiString host, port, path;
       if (!ParseUrl(url, https, host, port, path))
@@ -321,11 +430,12 @@ namespace HM
       std::string proxyHost, proxyPort;
       if (!ProxySetting_(proxyHost, proxyPort, error))
          return false;
+      const bool viaProxy = !proxyHost.empty() && !public_only;
 
       AnsiString request;
       request.append(method);
       request.append(" ");
-      request.append(RequestTarget_(host, port, path, https, !proxyHost.empty()));
+      request.append(RequestTarget_(host, port, path, https, viaProxy));
       request.append(" HTTP/1.0\r\nHost: ");
       request.append(host);
       request.append("\r\nUser-Agent: hMailServer\r\nAccept: application/json\r\n");
@@ -367,7 +477,7 @@ namespace HM
             SslContextInitializer::InitClient(sslContext, false);
 
             boost::asio::ssl::stream<boost::asio::ip::tcp::socket> stream(ioContext, sslContext);
-            if (!Connect_(ioContext, stream.next_layer(), host, port, true, timeout_seconds, error))
+            if (!Connect_(ioContext, stream.next_layer(), host, port, true, timeout_seconds, error, public_only))
                return false;
 
             stream.set_verify_mode(boost::asio::ssl::verify_peer);
@@ -391,7 +501,7 @@ namespace HM
          else
          {
             boost::asio::ip::tcp::socket socket(ioContext);
-            if (!Connect_(ioContext, socket, host, port, false, timeout_seconds, error))
+            if (!Connect_(ioContext, socket, host, port, false, timeout_seconds, error, public_only))
                return false;
 
             boost::asio::write(socket, boost::asio::buffer(request.c_str(), request.GetLength()));

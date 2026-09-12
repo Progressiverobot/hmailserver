@@ -44,6 +44,20 @@ namespace HM
                           const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
                           int timeout_seconds = 20, size_t max_response_bytes = 1024 * 1024);
 
+      // Request, for a URL an outsider chose (a List-Unsubscribe address): the host
+      // is reached only if it is public, judged by the ADDRESSES it resolves to and
+      // not by its name - loopback, RFC 1918, 169.254/16, 100.64/10, ::1, fc00::/7,
+      // fe80::/10, multicast, unspecified and the reserved blocks are refused, an
+      // IPv4 address carried inside an IPv6 one judged as the IPv4 - and the
+      // connection is made to the addresses that passed, so a second lookup cannot
+      // answer differently. Not through HttpProxy: the proxy would resolve the name
+      // itself, out of sight of this. Shorter deadline and cap than Request's, since
+      // the caller is a REST worker with a request of its own to answer. Otherwise
+      // the server could be made to reach what only it can reach.
+      static bool RequestPublic(const AnsiString &method, const AnsiString &url, const std::vector<AnsiString> &extra_headers,
+                                const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
+                                int timeout_seconds = 10, size_t max_response_bytes = 32 * 1024);
+
       // GET url to a file, following up to five redirects (to https, or to plain http
       // on a loopback address, as Request accepts), the body streamed to the file
       // rather than held. True when a 200 response was written to path in full and
@@ -59,5 +73,10 @@ namespace HM
 
       // application/x-www-form-urlencoded, one value.
       static AnsiString FormEncode(const AnsiString &value);
+
+   private:
+      static bool Request_(const AnsiString &method, const AnsiString &url, const std::vector<AnsiString> &extra_headers,
+                           const AnsiString &content_type, const AnsiString &body, Response &response, String &error,
+                           int timeout_seconds, size_t max_response_bytes, bool public_only);
    };
 }

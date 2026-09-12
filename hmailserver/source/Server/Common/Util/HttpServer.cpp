@@ -989,7 +989,9 @@ namespace HM
       case 429: return "Too Many Requests";
       case 500: return "Internal Server Error";
       case 501: return "Not Implemented";
+      case 502: return "Bad Gateway";
       case 503: return "Service Unavailable";
+      case 504: return "Gateway Timeout";
       default:
          status = 500;
          return "Internal Server Error";

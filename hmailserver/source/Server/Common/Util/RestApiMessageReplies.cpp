@@ -123,6 +123,20 @@ namespace HM
 
       // A header line that is safe as one line: no CR or LF from the message
       // it came from can start a header of its own.
+      // A CR, LF, NUL or any other control character: in an address that is
+      // written into a header it would end the line and begin another.
+      bool HasControlCharacters(const AnsiString &text)
+      {
+         const char *at = text.c_str();
+         for (size_t i = 0; i < text.size(); i++)
+         {
+            const unsigned char c = (unsigned char) at[i];
+            if (c < 0x20 || c == 0x7f)
+               return true;
+         }
+         return false;
+      }
+
       AnsiString OneLine(const AnsiString &text)
       {
          AnsiString out = text;
@@ -210,6 +224,8 @@ namespace HM
       if (wanted.IsEmpty())
          return BuildResponse_(400, "{\"error\":\"the message did not ask for a receipt\"}");
       AnsiString to = FirstAddressIn(wanted);
+      if (HasControlCharacters(to))
+         return BuildResponse_(400, "{\"error\":\"the address asking for the receipt carries control characters and is not written into a header\"}");
 
       String subject = mimeHeader.GetUnicodeFieldValue("Subject");
       AnsiString subjectUtf8 = Utf8_(subject);
@@ -284,10 +300,15 @@ namespace HM
          AnsiString host, port, path;
          if (HttpsClient::ParseUrl(https, isHttps, host, port, path) && isHttps && !HttpsClient::IsLoopbackHost(host))
          {
+            // An address an outsider chose, so it is reached only if it is
+            // public - judged by the addresses the name resolves to, and
+            // connected to those very addresses (HttpsClient::RequestPublic)
+            // - and with a short deadline and a small cap, since this runs
+            // on a REST worker: a slow list must not hold one for long.
             HttpsClient::Response response;
             String error;
-            bool ok = HttpsClient::Request("POST", https, std::vector<AnsiString>(), "application/x-www-form-urlencoded",
-                                           "List-Unsubscribe=One-Click", response, error, 20, 64 * 1024);
+            bool ok = HttpsClient::RequestPublic("POST", https, std::vector<AnsiString>(), "application/x-www-form-urlencoded",
+                                                 "List-Unsubscribe=One-Click", response, error, 10, 32 * 1024);
             AnsiString json;
             json.Format("{\"method\":\"one-click\",\"ok\":%hs,\"status\":%d,\"error\":\"%hs\"}",
                (ok && response.status_code >= 200 && response.status_code < 300) ? "true" : "false",
@@ -320,6 +341,11 @@ namespace HM
          address = PercentDecode(address);
          address.TrimLeft();
          address.TrimRight();
+         // Percent-decoding can put a CR or LF into the address, and a quoted
+         // local part carries one past IsValidEmailAddress; written into To:
+         // it would end the header and begin another. Refused whole.
+         if (HasControlCharacters(address))
+            return BuildResponse_(400, "{\"error\":\"the list's mailto address carries control characters and is not used\"}");
          if (!IsAscii(subject))
             subject = "Unsubscribe";
 

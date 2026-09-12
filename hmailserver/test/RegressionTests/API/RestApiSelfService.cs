@@ -1471,6 +1471,34 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("A one-click unsubscribe is refused when the list's https address is not a public one, and a mailto address carrying control characters is refused rather than written into a header")]
+      public void AnUnsubscribeToAPrivateAddressOrWithControlCharactersIsRefused()
+      {
+         // The list's address is inside somebody's network: the POST is not made.
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\nTo: " + Address + "\r\nSubject: Inside\r\nList-Unsubscribe: <https://10.0.0.1/leave?u=1>\r\nList-Unsubscribe-Post: List-Unsubscribe=One-Click\r\n\r\nA list on a private address.\r\n");
+         // Percent-decoded, the mailto address would carry a line break into To:.
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\nTo: " + Address + "\r\nSubject: Crafted\r\nList-Unsubscribe: <mailto:leave%0D%0ABcc:%20victim@" + _domain.Name + ">\r\n\r\nA crafted address.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long inside = IdBefore(page.body, "\"subject\":\"Inside\"");
+         long crafted = IdBefore(page.body, "\"subject\":\"Crafted\"");
+
+         (int status, string body) refused = Http("POST", "/api/v1/me/messages/" + inside + "/unsubscribe", UserHeader(UserPassword));
+         Assert.AreEqual(502, refused.status, "Body: " + refused.body);
+         StringAssert.Contains("\"method\":\"one-click\",\"ok\":false,\"status\":0,", refused.body);
+         StringAssert.Contains("is not a public address", refused.body);
+
+         (int status, string body) notWritten = Http("POST", "/api/v1/me/messages/" + crafted + "/unsubscribe", UserHeader(UserPassword));
+         Assert.AreEqual(400, notWritten.status, "Body: " + notWritten.body);
+         StringAssert.Contains("control characters", notWritten.body);
+      }
+
+      [Test]
       [Description("POST /unsubscribe writes to the list's mailto with its subject; a message with no List-Unsubscribe is refused; the JSON names the headers")]
       public void AnUnsubscribeByMailIsQueued()
       {
