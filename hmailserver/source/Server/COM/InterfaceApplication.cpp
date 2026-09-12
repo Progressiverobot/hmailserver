@@ -166,6 +166,10 @@ STDMETHODIMP InterfaceApplication::get_GlobalObjects(IInterfaceGlobalObjects **p
 {
    try
    {
+      HRESULT hResult = EnsureDatabaseConnectivity_();
+      if (hResult != S_OK)
+         return hResult;
+
       CComObject<InterfaceGlobalObjects>* pInterfaceGlobalObjects = new CComObject<InterfaceGlobalObjects>;
       
       pInterfaceGlobalObjects->SetAuthentication(authentication_);
@@ -503,6 +507,24 @@ InterfaceApplication::EnsureDatabaseConnectivity_()
       return COMError::GenerateError("The connection to the database is not available. Please check the hMailServer error log for details.");
    }
 
+   // Connected is not enough. A database this server opened and then refused -
+   // its schema older or newer than this build requires (HM5011), or its
+   // version unreadable (HM5010) - stays open for hMailServer.Database, which
+   // is how DBUpdater brings it up to date, and nothing else was loaded:
+   // Configuration::Load never ran. The objects the getters hand out read the
+   // configuration's property set on every call, and until 12 September 2026
+   // that was an access violation inside the call, reported to the client as
+   // "an error occurred processing the request" and to the crash oracle as a
+   // memory fault. The refusal's own message says what to do instead.
+   if (!HM::Application::Instance()->IsInitialized())
+   {
+      HM::String reason = HM::Application::Instance()->GetLastErrorMessage();
+      if (reason.IsEmpty())
+         reason = "The server has not finished starting.";
+
+      return COMError::GenerateError(HM::String("The server has not loaded its configuration. ") + reason);
+   }
+
    return S_OK;
 }
 
@@ -537,6 +559,10 @@ STDMETHODIMP InterfaceApplication::get_Diagnostics(IInterfaceDiagnostics **pVal)
       if (!authentication_->GetIsServerAdmin())
          return authentication_->GetAccessDenied();
    
+      HRESULT hResult = EnsureDatabaseConnectivity_();
+      if (hResult != S_OK)
+         return hResult;
+
       CComObject<InterfaceDiagnostics>* pInterfaceDiagnostics = new CComObject<InterfaceDiagnostics>;
    
       pInterfaceDiagnostics->SetAuthentication(authentication_);

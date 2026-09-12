@@ -97,7 +97,8 @@ namespace HM
       maintenance_queue_("Maintenance queue"),
       asynchronous_tasks_queue_("Asynchronous task queue"),
       name_lookup_queue_("Name lookup queue"),
-      unique_id_(0)
+      unique_id_(0),
+      initialized_(false)
    {
       version_ = Formatter::Format("{0}-B{1}", HMAILSERVER_VERSION, HMAILSERVER_BUILD);
       start_time_ = Time::GetCurrentDateTime();
@@ -131,6 +132,8 @@ namespace HM
    // Application initializing stuff.
    //---------------------------------------------------------------------------()
    {
+      initialized_ = false;
+
       VirusScanner::ResetCounter();
 
       OutOfMemoryHandler::Initialize();
@@ -203,6 +206,7 @@ namespace HM
       // here. Their tasks hold live client connections, so they belong to the
       // servers, not to the process - see CreateSessionWorkQueues_.
 
+      initialized_ = true;
       return true;
    }
 
@@ -303,6 +307,8 @@ namespace HM
    // Do uninitialization.
    //---------------------------------------------------------------------------()
    {
+      initialized_ = false;
+
       // Close work queue
       WorkQueueManager::Instance()->RemoveQueue(maintenance_queue_);
 
