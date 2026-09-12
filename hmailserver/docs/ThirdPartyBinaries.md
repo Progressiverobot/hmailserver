@@ -214,24 +214,45 @@ deletion, and the tooling would stop mentioning them. The annotation becomes
 true — and should be added — once the `remove-unused` and `remove-duplicate`
 entries above are gone.
 
+Provenance established for the Connector/C files
+------------------------------------------------
+
+On 12 September 2026 the ten files in `build-inputs-1/mariadb-connector-c-3.4.9-win64-client.zip`
+were traced to the archive MariaDB published. They are not from the Connector/C
+3.4.9 Windows installer (`mariadb-connector-c-3.4.9-win64.msi`, SHA-256
+`9e1f530a34f2c2f3a2fc963ffe9d38f2399791ed3ff559fbbc815d92bd9b79b3`), whose
+`libmariadb.dll` and plugins are a different, statically linked build. They are
+the client files of **MariaDB Server 12.3.2 for Windows x64**:
+
+- Archive: <https://dlm.mariadb.com/4716004/MariaDB/mariadb-12.3.2/winx64-packages/mariadb-12.3.2-winx64.zip>
+  (103,730,527 bytes), SHA-256
+  `67347c129eb9c5923d002ea34fbfa27c60eb95d36dd73b85af2651cdeceecac5`, which is
+  the value MariaDB publishes beside it in
+  <https://dlm.mariadb.com/4716014/MariaDB/mariadb-12.3.2/winx64-packages/sha256sums.txt>
+  (the archive also carries a detached `.asc` signature there).
+- `libmysql.dll` is that archive's `lib/libmariadb.dll`, byte for byte (SHA-256
+  `fba94855d8b5373eb63772aca9473bb201d772bb286fd2be9b910d8a51057f76`); its
+  version resource says so too (OriginalFilename `libmariadb.dll`, product
+  MariaDB Connector/C 3.4.9). It is renamed because `MySQLInterface.cpp` loads
+  `libmysql.dll` beside the executable on Windows, as it always has.
+- The nine `plugin/*.dll` are that archive's `lib/plugin/` files of the same
+  names, byte for byte; `authentication_windows_client.dll` carries the server's
+  own version (12.3.2.0), the eight others the connector's (3.4.9).
+
+So the chain of custody now starts at the archive MariaDB published, checked
+against MariaDB's own checksum file, and every hash in
+`third-party-binaries.json` follows from it. The LGPL-2.1 text the connector's
+licence requires to accompany a distribution is in
+`Licenses/License - MariaDB Connector C.txt`.
+
 Not yet done
 ------------
 
 Honest list of what this document does not cover.
 
-- **No LGPL text for MariaDB Connector/C.** Twenty committed files and the
-  shipped installer include it, `hmailserver/docs/Licenses/` has texts for
-  7-Zip, SQL CE, OpenSSL, Boost and others — and nothing for Connector/C, whose
-  licence requires the text to accompany the distribution. This is a licence
-  compliance gap, not a security one, and it needs the real LGPL-2.1 text
-  added rather than a summary.
 - **`msado28*.tlb` redistribution terms are not established.** They are
   Windows operating-system components copied out of `%CommonProgramFiles%`.
   Committing them is normal industry practice and has been done here since the
   upstream project; whether it is *licensed* has not been checked.
-- **The MariaDB Connector/C 3.4.9 upstream archive URL is not pinned.** The
-  vendor's browse page is recorded; the exact Windows archive filename and its
-  hash were not confirmed. Until they are, the chain of custody starts at "the
-  files in this tree" rather than at "the archive MariaDB published".
 - **CI does not re-verify Authenticode signatures**, only hashes. Doing it
   needs a Windows runner and belongs in the release workflow.
