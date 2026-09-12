@@ -354,6 +354,10 @@ namespace HM
          bool administrator;
          AnsiString credential_stamp;
 
+         // The session was started with one of the account's app passwords:
+         // every request it carries is as limited as that password is.
+         bool via_app_password = false;
+
          ULONGLONG created_at;
          ULONGLONG last_seen_at;
       };
@@ -1682,7 +1686,7 @@ namespace HM
             return HandleMeAppPasswords_(caller);
 
          case RouteMeAppPasswordCreate:
-            return HandleMeAppPasswordCreate_(caller, GetRequestBody_(request));
+            return HandleMeAppPasswordCreate_(caller, request);
 
          case RouteMeAppPasswordDelete:
             return HandleMeAppPasswordDelete_(caller, route.message_id);
@@ -5101,7 +5105,8 @@ namespace HM
       // AccountLogon::Logon. A second implementation here would be a second
       // place for them to drift apart.
       bool disconnect = false;
-      std::shared_ptr<const Account> account = AccountLogon().Logon(peer_address, username, password, disconnect);
+      bool viaAppPassword = false;
+      std::shared_ptr<const Account> account = AccountLogon().Logon(peer_address, username, password, disconnect, &viaAppPassword);
 
       if (!account)
       {
@@ -5119,6 +5124,7 @@ namespace HM
       caller.read_only = false;
       caller.identity = AnsiString("account:") + AnsiString(account->GetAddress());
       caller.account = account;
+      caller.via_app_password = viaAppPassword;
 
       return true;
    }
@@ -5407,6 +5413,7 @@ namespace HM
 
       __int64 accountId = 0;
       bool administrator = false;
+      bool viaAppPassword = false;
       AnsiString credentialStamp;
       {
          std::lock_guard<std::mutex> guard(browser_sessions_mutex);
@@ -5433,6 +5440,7 @@ namespace HM
             accountId = it->account_id;
             administrator = it->administrator;
             credentialStamp = it->credential_stamp;
+            viaAppPassword = it->via_app_password;
             break;
          }
       }
@@ -5483,6 +5491,7 @@ namespace HM
       caller.account = account;
       caller.via_session = true;
       caller.session_hash = presentedHash;
+      caller.via_app_password = viaAppPassword;
 
       return true;
    }
@@ -5553,6 +5562,7 @@ namespace HM
          session.account_id = administrator ? 0 : account->GetID();
          session.administrator = administrator;
          session.credential_stamp = credentialStamp;
+         session.via_app_password = caller.via_app_password;
          session.created_at = now;
          session.last_seen_at = now;
 
@@ -7176,7 +7186,8 @@ namespace HM
       time_t LocalTimeOf(const String &stamp)
       {
          int year = 0, month = 0, day = 0, hour = 0, minute = 0, second = 0;
-         if (swscanf_s(stamp.c_str(), L"%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) != 6)
+         const AnsiString text(stamp);
+         if (sscanf_s(text.c_str(), "%d-%d-%d %d:%d:%d", &year, &month, &day, &hour, &minute, &second) != 6)
             return 0;
          struct tm parts = { 0 };
          parts.tm_year = year - 1900;
@@ -7223,17 +7234,34 @@ namespace HM
       if (!messages)
          return BuildResponse_(500, "{\"error\":\"the folder could not be read\"}");
 
+      // Digits, and a number of days a calendar holds. A value this route
+      // cannot read is refused, never read as "everything": with the filter
+      // off the whole folder goes, so the one mistake that must not be made
+      // is to take a typo for that. 0 is the filter off, as the page sends
+      // for "everything"; more than a hundred years is nobody's clean-up.
       int olderThanDays = 0;
       AnsiString olderText = QueryParameter_(query, "older_than_days");
       if (!olderText.IsEmpty())
       {
+         bool digits = olderText.size() <= 5;
+         for (size_t i = 0; digits && i < olderText.size(); i++)
+            digits = olderText.c_str()[i] >= '0' && olderText.c_str()[i] <= '9';
+         if (!digits)
+            return BuildResponse_(400, "{\"error\":\"older_than_days is a number of days, 0 to 36500\"}");
          olderThanDays = atoi(olderText.c_str());
-         if (olderThanDays < 0)
-            olderThanDays = 0;
+         if (olderThanDays > 36500)
+            return BuildResponse_(400, "{\"error\":\"older_than_days is a number of days, 0 to 36500\"}");
       }
       const time_t cutoff = olderThanDays > 0 ? time(nullptr) - (time_t) olderThanDays * 86400 : 0;
+      if (olderThanDays > 0 && cutoff <= 0)
+         return BuildResponse_(400, "{\"error\":\"older_than_days reaches before this clock began\"}");
 
+      // At most this many go in one request: every delete happens under the
+      // folder's lock and the request has a deadline, so a Junk folder of
+      // years is emptied by asking again while remaining says there is more.
+      const size_t MaxDeletesPerCall = 500;
       std::set<__int64> ids;
+      size_t matched = 0;
       std::vector<std::shared_ptr<Message>> snapshot = messages->GetCopy();
       for (size_t i = 0; i < snapshot.size(); i++)
       {
@@ -7245,7 +7273,9 @@ namespace HM
             if (created == 0 || created >= cutoff)
                continue;
          }
-         ids.insert(snapshot[i]->GetID());
+         matched++;
+         if (ids.size() < MaxDeletesPerCall)
+            ids.insert(snapshot[i]->GetID());
       }
 
       std::vector<__int64> deleted;
@@ -7256,8 +7286,10 @@ namespace HM
             NotifyFolder(folder, ChangeNotification::NotificationMessageDeleted, deleted);
       }
 
+      const size_t remaining = matched > ids.size() ? matched - ids.size() : 0;
       AnsiString json;
-      json.Format("{\"deleted\":%d,\"folder_id\":%I64d,\"older_than_days\":%d}", (int) deleted.size(), folder->GetID(), olderThanDays);
+      json.Format("{\"deleted\":%d,\"remaining\":%d,\"folder_id\":%I64d,\"older_than_days\":%d}",
+         (int) deleted.size(), (int) remaining, folder->GetID(), olderThanDays);
       return BuildResponse_(200, json);
    }
 
@@ -7642,6 +7674,10 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
+      HttpResponse refusal;
+      if (RefuseAppPasswordCaller_(caller, "ending the account's sessions", refusal))
+         return refusal;
+
       int ended = 0;
       {
          std::lock_guard<std::mutex> guard(browser_sessions_mutex);
@@ -7671,6 +7707,10 @@ namespace HM
       std::shared_ptr<const Account> account = caller.account;
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
+
+      HttpResponse refusal;
+      if (RefuseAppPasswordCaller_(caller, "ending one of the account's sessions", refusal))
+         return refusal;
 
       if (!IsLowerHex(id, 12))
          return BuildResponse_(400, "{\"error\":\"a session id is twelve hex digits\"}");
@@ -7710,13 +7750,18 @@ namespace HM
       std::vector<std::pair<std::shared_ptr<IMAPFolder>, String>> folders;
       CollectReadableFolders_(account, IMAPFolderContainer::Instance()->GetFoldersForAccount(account->GetID()), String(), delimiter, folders, 0);
 
+      // The twenty largest, and never more than twenty held: each folder's
+      // messages are looked at a folder at a time, and a message is kept only
+      // while it is among the largest seen so far. The folder is an index
+      // into the list above, not a copy of its path per message.
       struct Held
       {
          std::shared_ptr<Message> message;
-         std::shared_ptr<IMAPFolder> folder;
-         String path;
+         size_t folder;
       };
-      std::vector<Held> held;
+      const size_t LargestCount = 20;
+      std::vector<Held> largest;
+      const auto larger = [](const Held &a, const Held &b) { return a.message->GetSize() > b.message->GetSize(); };
 
       AnsiString json;
       json.Format("{\"used_bytes\":%I64d,\"limit_mb\":%d,\"folders\":[",
@@ -7742,11 +7787,15 @@ namespace HM
                continue;
             count++;
             bytes += snapshot[i]->GetSize();
-            Held one;
-            one.message = snapshot[i];
-            one.folder = folder;
-            one.path = folders[f].second;
-            held.push_back(one);
+            if (largest.size() < LargestCount || snapshot[i]->GetSize() > largest.back().message->GetSize())
+            {
+               Held one;
+               one.message = snapshot[i];
+               one.folder = f;
+               largest.insert(std::upper_bound(largest.begin(), largest.end(), one, larger), one);
+               if (largest.size() > LargestCount)
+                  largest.pop_back();
+            }
          }
 
          if (!first)
@@ -7758,23 +7807,19 @@ namespace HM
          json += entry;
       }
 
-      const size_t largestCount = held.size() < 20 ? held.size() : 20;
-      std::partial_sort(held.begin(), held.begin() + largestCount, held.end(),
-         [](const Held &a, const Held &b) { return a.message->GetSize() > b.message->GetSize(); });
-
       json += "],\"largest\":[";
-      for (size_t i = 0; i < largestCount; i++)
+      for (size_t i = 0; i < largest.size(); i++)
       {
          AnsiString subject, from, date;
-         DescribeHeader(MessageFile_(held[i].message), subject, from, date);
+         DescribeHeader(MessageFile_(largest[i].message), subject, from, date);
          if (i > 0)
             json += ",";
          AnsiString entry;
          entry.Format("{\"id\":%I64d,\"folder_id\":%I64d,\"folder\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"size\":%d}",
-            held[i].message->GetID(), held[i].folder->GetID(),
-            JsonEscape_(Utf8_(DecodeFolderName_(held[i].path))).c_str(),
+            largest[i].message->GetID(), folders[largest[i].folder].first->GetID(),
+            JsonEscape_(Utf8_(DecodeFolderName_(folders[largest[i].folder].second))).c_str(),
             JsonEscape_(subject).c_str(), JsonEscape_(from).c_str(), JsonEscape_(date).c_str(),
-            held[i].message->GetSize());
+            largest[i].message->GetSize());
          json += entry;
       }
       json += "]}";
@@ -8781,8 +8826,8 @@ namespace HM
          "\"/api/v1/me/contacts/{id}\":{\"put\":{\"summary\":\"Change a contact's name or address\",\"description\":\"Body: name and/or address. Another account's contact is 404.\",\"responses\":{\"200\":{\"description\":\"The contact\"},\"404\":{\"description\":\"No such contact\"},\"409\":{\"description\":\"The new address is already a contact\"}}},\"delete\":{\"summary\":\"Remove a contact\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"404\":{\"description\":\"No such contact\"}}}},"
          "\"/api/v1/me/identities\":{\"get\":{\"summary\":\"The addresses the signed-in account may write as\",\"description\":\"The account's own address (kind account), every active alias that resolves to it (alias), and every account whose INBOX grants this one the post right (granted) - the rule SMTP submission applies to MAIL FROM. Each carries the From header the page would send. A send or a draft names one in its from field; anything else is refused with 403.\",\"responses\":{\"200\":{\"description\":\"identities (address, name, kind, header)\"}}}},"
          "\"/api/v1/me/preferences\":{\"get\":{\"summary\":\"The signed-in account's preferences\",\"description\":\"A key/value store the webmail keeps its choices in (theme, density, undo-send delay, notifications) so they follow the account between browsers. The server attaches no meaning to a key.\",\"responses\":{\"200\":{\"description\":\"preferences: an object of string values\"}}},\"put\":{\"summary\":\"Change preferences\",\"description\":\"Body: an object. Each string member is written, each null member removed, anything else refused. Keys are 1-64 letters, digits, dots, dashes or underscores; values at most 4000 characters; at most 100 keys per account.\",\"responses\":{\"200\":{\"description\":\"The preferences after the change\"},\"400\":{\"description\":\"Not an object of strings, a bad key, a long value, or too many keys\"}}}},"
-         "\"/api/v1/me/app-passwords\":{\"get\":{\"summary\":\"The signed-in account's app passwords\",\"description\":\"id, name, created, last_used, active - never the password.\",\"responses\":{\"200\":{\"description\":\"app_passwords\"}}},\"post\":{\"summary\":\"Make an app password\",\"description\":\"Body: name (what it is for). The answer carries the password in clear text, the only time it exists outside the caller; at most 20 per account.\",\"responses\":{\"201\":{\"description\":\"id, name, created, active, password\"},\"400\":{\"description\":\"No name, or twenty already\"}}}},"
-         "\"/api/v1/me/app-passwords/{id}\":{\"delete\":{\"summary\":\"Remove an app password\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"404\":{\"description\":\"No such app password of this account\"}}}},"
+         "\"/api/v1/me/app-passwords\":{\"get\":{\"summary\":\"The signed-in account's app passwords\",\"description\":\"id, name, created, last_used, active - never the password.\",\"responses\":{\"200\":{\"description\":\"app_passwords\"}}},\"post\":{\"summary\":\"Make an app password\",\"description\":\"Body: name (what it is for) and password - the account's own password, proving it is the account holder asking; never an app password. An account with a second factor enrolled sends the code in X-hMailServer-OTP, and the 401 that asks for it says X-hMailServer-OTP: required. Refused (403) to a request that was itself authenticated with an app password, or by a session started with one. The answer carries the password in clear text, the only time it exists outside the caller; at most 20 per account. Logged, with the caller's address.\",\"responses\":{\"201\":{\"description\":\"id, name, created, active, password\"},\"400\":{\"description\":\"No name, no password, or twenty already\"},\"401\":{\"description\":\"The one-time code is missing or wrong\"},\"403\":{\"description\":\"The password is not the account's own, or the request came in on an app password\"}}}},"
+         "\"/api/v1/me/app-passwords/{id}\":{\"delete\":{\"summary\":\"Remove an app password\",\"description\":\"Refused to a request authenticated with an app password. Logged, with the caller's address.\",\"responses\":{\"200\":{\"description\":\"Removed\"},\"403\":{\"description\":\"The request came in on an app password\"},\"404\":{\"description\":\"No such app password of this account\"}}}},"
          "\"/api/v1/me/sessions\":{\"get\":{\"summary\":\"The signed-in account's browser sessions\",\"description\":\"Each: id (twelve hex digits of the token's hash), created_seconds_ago, idle_seconds, current.\",\"responses\":{\"200\":{\"description\":\"sessions\"}}},\"delete\":{\"summary\":\"End every other session\",\"description\":\"The session asking stays; a caller on a password ends them all.\",\"responses\":{\"200\":{\"description\":\"ended (how many)\"}}}},"
          "\"/api/v1/me/sessions/{id}\":{\"delete\":{\"summary\":\"End one session\",\"responses\":{\"200\":{\"description\":\"Ended\"},\"404\":{\"description\":\"No such session of this account\"}}}},"
          "\"/api/v1/me/storage\":{\"get\":{\"summary\":\"What the mailbox holds\",\"description\":\"used_bytes and limit_mb (0 = no limit); folders, each with id, path, messages and bytes; largest, the twenty biggest messages with id, folder_id, folder, subject, from, date and size.\",\"responses\":{\"200\":{\"description\":\"The storage view\"}}}},"
@@ -8799,7 +8844,7 @@ namespace HM
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/html\":{\"get\":{\"summary\":\"The message's HTML part as a document for a frame\",\"description\":\"text/html under a policy of its own: nothing runs, no form is submitted, no address is rewritten, and remote images and styles are blocked unless ?remote=1 is given - which the page does when the reader allowed this message or this sender. Images the message embeds (cid:) are inlined as data: URLs under the inline budget. The message JSON's html_remote says whether the part names anything remote at all. 404 when the message has no HTML part.\",\"responses\":{\"200\":{\"description\":\"The document\"},\"404\":{\"description\":\"No such message, or no HTML part\"}}}},"
          "\"/api/v1/me/messages/{id}/source\":{\"get\":{\"summary\":\"The message as it is on disk\",\"description\":\"message/rfc822, as a download named message-{id}.eml, under the same right as reading the message. Larger than 25 MB is 413.\",\"responses\":{\"200\":{\"description\":\"The file\"},\"404\":{\"description\":\"No such message\"},\"413\":{\"description\":\"Too large for this route\"}}}},"
-         "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good - or, with older_than_days=N, only what arrived more than N days ago. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), folder_id\"},\"400\":{\"description\":\"Not a Junk or Trash folder\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"
+         "\"/api/v1/me/folders/{id}/empty\":{\"post\":{\"summary\":\"Empty a Junk or Trash folder\",\"description\":\"Every message in the folder is expunged for good - or, with older_than_days=N (digits, 0 to 36500; 0 is everything), only what arrived more than N days ago; any other value is refused rather than read as everything. At most 500 go per call: remaining says how many more match, so call again until it is 0. Any other folder is 400: emptying is what those two are for.\",\"responses\":{\"200\":{\"description\":\"deleted (how many), remaining, folder_id, older_than_days\"},\"400\":{\"description\":\"Not a Junk or Trash folder, or older_than_days is not a number of days\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"No such folder\"}}}},"
          "\"/api/v1/me/messages/{id}/move\":{\"post\":{\"summary\":\"Move one message to another of the account's folders\",\"description\":\"Body: folder_id, or to = archive | junk | trash | inbox - the folder designated so, made by that name when the account has none. As MOVE does: a copy with a new UID in the destination, then the original expunged, every session on either folder told; a move into or out of Junk teaches spamd when SpamAssassinLearnOnMove is on. Another account's folder is 404.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"folder_id\":{\"type\":\"integer\"},\"to\":{\"type\":\"string\",\"enum\":[\"archive\",\"junk\",\"trash\",\"inbox\"]}}}}}},\"responses\":{\"200\":{\"description\":\"id (the new one), folder_id\"},\"400\":{\"description\":\"folder_id missing, or the same folder\"},\"403\":{\"description\":\"A folder does not allow it\"},\"404\":{\"description\":\"Not this account's message or folder\"}}}},"
          "\"/api/v1/me/messages/{id}/attachments/{index}\":{\"get\":{\"summary\":\"One attachment, decoded, as a download\",\"description\":\"index is the attachment's position in the message's attachments list. Served under the very media type that listing reports in content_type - so an img element pointed here renders, with nosniff set - except the types a browser would run or render (HTML, SVG, XML, script), which go out as application/octet-stream, and a part declaring no usable type, which does too; with Content-Disposition attachment (the name in both filename and RFC 8187 filename*), nosniff, a sandbox policy and no-store. A message over 32 MB is not parsed.\",\"responses\":{\"200\":{\"description\":\"The attachment's bytes\"},\"404\":{\"description\":\"Not this account's message, or no such attachment\"},\"413\":{\"description\":\"The message is too large to read here\"}}}},"
          "\"/api/v1/domains\":{"

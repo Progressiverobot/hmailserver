@@ -1089,9 +1089,8 @@ namespace RegressionTests.API
          (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
          long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
          (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
-         foreach (string subject in new[] { "Spam one", "Spam two" })
+         foreach (long id in new[] { "Spam one", "Spam two" }.Select(subject => IdBefore(page.body, "\"subject\":\"" + subject + "\"")))
          {
-            long id = IdBefore(page.body, "\"subject\":\"" + subject + "\"");
             (int status, string body) junked = Http("POST", "/api/v1/me/messages/" + id + "/move", UserHeader(UserPassword), "{\"to\":\"junk\"}");
             Assert.AreEqual(200, junked.status, "Body: " + junked.body);
          }
@@ -1240,17 +1239,27 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("An app password is made once with its clear text, listed without it, signs in, and is removed")]
+      [Description("An app password is made once with its clear text - the account's own password proving who asks - listed without it, signs in, may not mint or revoke another or end the account's sessions, and is removed")]
       public void AppPasswordsAreMadeListedAndRemoved()
       {
          (int status, string body) none = Http("GET", "/api/v1/me/app-passwords", UserHeader(UserPassword));
          Assert.AreEqual(200, none.status, "Body: " + none.body);
          Assert.AreEqual("{\"app_passwords\":[]}", none.body);
 
-         (int status, string body) unnamed = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"  \"}");
+         (int status, string body) unnamed = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"  \",\"password\":\"" + UserPassword + "\"}");
          Assert.AreEqual(400, unnamed.status, "Body: " + unnamed.body);
 
-         (int status, string body) made = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"Phone\"}");
+         // Minting a credential asks for the account's own password again,
+         // whatever authenticated the request: none is 400, a wrong one 403.
+         (int status, string body) unproven = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"Phone\"}");
+         Assert.AreEqual(400, unproven.status, "Body: " + unproven.body);
+         StringAssert.Contains("password is required", unproven.body);
+         (int status, string body) wrong = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"Phone\",\"password\":\"not-the-one\"}");
+         Assert.AreEqual(403, wrong.status, "Body: " + wrong.body);
+         (int status, string body) stillNone = Http("GET", "/api/v1/me/app-passwords", UserHeader(UserPassword));
+         Assert.AreEqual("{\"app_passwords\":[]}", stillNone.body);
+
+         (int status, string body) made = Http("POST", "/api/v1/me/app-passwords", UserHeader(UserPassword), "{\"name\":\"Phone\",\"password\":\"" + UserPassword + "\"}");
          Assert.AreEqual(201, made.status, "Body: " + made.body);
          StringAssert.Contains("\"name\":\"Phone\"", made.body);
          string secret = Between(made.body, "\"password\":\"", "\"");
@@ -1267,6 +1276,23 @@ namespace RegressionTests.API
          var imap = new ImapClientSimulator();
          Assert.IsTrue(imap.ConnectAndLogon(Address, secret), "The app password signs in over IMAP.");
          imap.Disconnect();
+
+         // And for the mailbox only. A request it authenticates reads as the
+         // account, but may not mint another - not even with the account's
+         // own password in the body - nor revoke one, nor end the account
+         // holder's browser sessions: a leaked phone password must not be
+         // able to replace itself and lock the owner out.
+         (int status, string body) asProgram = Http("GET", "/api/v1/me/app-passwords", BasicHeader(Address, secret));
+         Assert.AreEqual(200, asProgram.status, "Body: " + asProgram.body);
+         (int status, string body) mint = Http("POST", "/api/v1/me/app-passwords", BasicHeader(Address, secret), "{\"name\":\"Another\",\"password\":\"" + UserPassword + "\"}");
+         Assert.AreEqual(403, mint.status, "Body: " + mint.body);
+         (int status, string body) revoke = Http("DELETE", "/api/v1/me/app-passwords/" + id, BasicHeader(Address, secret));
+         Assert.AreEqual(403, revoke.status, "Body: " + revoke.body);
+         (int status, string body) endAll = Http("DELETE", "/api/v1/me/sessions", BasicHeader(Address, secret));
+         Assert.AreEqual(403, endAll.status, "Body: " + endAll.body);
+         (int status, string body) unchanged = Http("GET", "/api/v1/me/app-passwords", UserHeader(UserPassword));
+         Assert.AreEqual(1, CountOf(unchanged.body, "\"name\":\""), "One app password, the first: " + unchanged.body);
+         StringAssert.Contains("\"name\":\"Phone\"", unchanged.body);
 
          string other = "other@" + _domain.Name;
          SingletonProvider<TestSetup>.Instance.AddAccount(_domain, other, UserPassword);
@@ -1312,9 +1338,9 @@ namespace RegressionTests.API
          Response two = Raw("GET", "/api/v1/me/sessions", null, null, "Cookie: hmailsession=" + first + "\r\n");
          Assert.AreEqual(2, CountOf(two.Body, "\"created_seconds_ago\""), two.Body);
          string otherId = "";
-         foreach (string part in two.Body.Split(new[] { "{\"id\":\"" }, StringSplitOptions.RemoveEmptyEntries))
+         foreach (string part in two.Body.Split(new[] { "{\"id\":\"" }, StringSplitOptions.RemoveEmptyEntries).Where(part => part.Contains("\"current\":false")))
          {
-            if (part.Contains("\"current\":false")) { otherId = part.Substring(0, 12); }
+            otherId = part.Substring(0, 12);
          }
          Assert.AreEqual(12, otherId.Length, two.Body);
 
@@ -1329,7 +1355,7 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("GET /api/v1/me/storage lists the quota, each folder's count and bytes, and the largest messages; emptying with older_than_days keeps the recent")]
+      [Description("GET /api/v1/me/storage lists the quota, each folder's count and bytes, and the largest messages; emptying with older_than_days keeps the recent, deletes the old, and refuses a value it cannot read")]
       public void StorageListsFoldersAndTheLargestMessages()
       {
          Deliver(Address, "Small", "Tiny.");
@@ -1351,18 +1377,48 @@ namespace RegressionTests.API
          long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
          (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
          long small = IdBefore(page.body, "\"subject\":\"Small\"");
-         (int status, string body) junked = Http("POST", "/api/v1/me/messages/" + small + "/move", UserHeader(UserPassword), "{\"to\":\"trash\"}");
-         Assert.AreEqual(200, junked.status, "Body: " + junked.body);
+         long medium = IdBefore(page.body, "\"subject\":\"Medium\"");
+         foreach (long id in new[] { small, medium })
+         {
+            (int status, string body) junked = Http("POST", "/api/v1/me/messages/" + id + "/move", UserHeader(UserPassword), "{\"to\":\"trash\"}");
+            Assert.AreEqual(200, junked.status, "Body: " + junked.body);
+         }
          (int status, string body) after = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
          long trashId = IdBefore(after.body, "\"path\":\"Trash\"");
+         // A move gives a message a new id: the one to age is the Trash's.
+         (int status, string body) inTrash = Http("GET", "/api/v1/me/folders/" + trashId + "/messages", UserHeader(UserPassword));
+         small = IdBefore(inTrash.body, "\"subject\":\"Small\"");
 
+         // Nothing is a week old yet.
          (int status, string body) kept = Http("POST", "/api/v1/me/folders/" + trashId + "/empty?older_than_days=7", UserHeader(UserPassword));
          Assert.AreEqual(200, kept.status, "Body: " + kept.body);
-         StringAssert.Contains("\"deleted\":0,", kept.body);
+         StringAssert.Contains("\"deleted\":0,\"remaining\":0,", kept.body);
          StringAssert.Contains("\"older_than_days\":7", kept.body);
+
+         // A value the route cannot read is refused - never taken as "everything",
+         // which is what the filter being off would mean.
+         foreach (string bad in new[] { "abc", "-1", "7x", "99999", "1e3" })
+         {
+            (int status, string body) refused = Http("POST", "/api/v1/me/folders/" + trashId + "/empty?older_than_days=" + bad, UserHeader(UserPassword));
+            Assert.AreEqual(400, refused.status, "older_than_days=" + bad + " Body: " + refused.body);
+         }
+         (int status, string body) untouched = Http("GET", "/api/v1/me/folders/" + trashId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(2, CountOf(untouched.body, "\"subject\":\""), "Both still in Trash: " + untouched.body);
+
+         // Small arrived years ago, says the store; the cache is emptied so
+         // the route reads that afresh. Then a week's clean-up takes it and
+         // leaves Medium, and "everything" takes Medium.
+         SingletonProvider<TestSetup>.Instance.GetApp().Database.ExecuteSQL("update hm_messages set messagecreatetime = '2020-01-01 00:00:00' where messageid = " + small);
+         SingletonProvider<TestSetup>.Instance.GetApp().Settings.Cache.Clear();
+         (int status, string body) aged = Http("POST", "/api/v1/me/folders/" + trashId + "/empty?older_than_days=7", UserHeader(UserPassword));
+         Assert.AreEqual(200, aged.status, "Body: " + aged.body);
+         StringAssert.Contains("\"deleted\":1,\"remaining\":0,", aged.body);
+         (int status, string body) left = Http("GET", "/api/v1/me/folders/" + trashId + "/messages", UserHeader(UserPassword));
+         StringAssert.Contains("\"subject\":\"Medium\"", left.body);
+         StringAssert.DoesNotContain("\"subject\":\"Small\"", left.body);
          (int status, string body) all = Http("POST", "/api/v1/me/folders/" + trashId + "/empty?older_than_days=0", UserHeader(UserPassword));
          Assert.AreEqual(200, all.status, "Body: " + all.body);
-         StringAssert.Contains("\"deleted\":1,", all.body);
+         StringAssert.Contains("\"deleted\":1,\"remaining\":0,", all.body);
       }
 
       private static int CountOf(string body, string needle)

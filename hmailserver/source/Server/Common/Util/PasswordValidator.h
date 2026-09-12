@@ -24,7 +24,17 @@ namespace HM
       // COM path needs the TOTP secret in order to check the code that decides whether
       // the password may be tried at all.
       static std::shared_ptr<const Account> LookupAccount(const String &sUsername);
-      static std::shared_ptr<const Account> ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword);
+      static std::shared_ptr<const Account> ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword,
+                                                             bool *matchedAppPassword = nullptr);
+
+      // The account's own password and nothing else: never an app password,
+      // whatever credential the request that carries it came in on. For a
+      // route that has to know the person is the account holder rather than
+      // a program the holder once gave a password to - making an app
+      // password, above all. A directory-linked account is asked of the
+      // directory, as at logon. No script hook, no expiry check: this is a
+      // proof, not a logon.
+      static bool ValidateAccountPasswordOnly(std::shared_ptr<const Account> pAccount, const String &sPassword);
 
       // Validates the user password. Return the account if validation is OK. 
 
@@ -33,8 +43,13 @@ namespace HM
       // nowhere to type one - so it defaults to false and every protocol leaves it
       // alone: an account with a second factor enrolled authenticates in a mail
       // client through an app password and not through its own password.
+      //
+      // matchedAppPassword, when given, is set to whether it was one of the
+      // account's app passwords that matched rather than the account's own -
+      // a caller that must treat the two differently learns it here, from
+      // the one comparison, instead of paying for a second.
       static bool ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword,
-                                   bool secondFactorSatisfied = false);
+                                   bool secondFactorSatisfied = false, bool *matchedAppPassword = nullptr);
 
       // Validates the user password. Return true if the password is correct.
 

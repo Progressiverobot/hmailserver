@@ -325,6 +325,13 @@ namespace HM
          // to change anything, and may end the session it came with.
          bool via_session = false;
          AnsiString session_hash;
+
+         // True when the password the request came in on - or the password
+         // that started the session it came in on - was one of the account's
+         // app passwords: a credential for a program, which reads and sends
+         // mail as the account but does not mint or revoke credentials or
+         // end the account holder's browser sessions.
+         bool via_app_password = false;
       };
 
       enum AuthorizationResult
@@ -455,7 +462,17 @@ namespace HM
       // The account's app passwords (RestApiAppPasswords.cpp), its browser
       // sessions, and what its mailbox holds by folder and by message.
       static HttpResponse HandleMeAppPasswords_(const Caller &caller);
-      static HttpResponse HandleMeAppPasswordCreate_(const Caller &caller, const AnsiString &requestBody);
+      static HttpResponse HandleMeAppPasswordCreate_(const Caller &caller, const AnsiString &request);
+
+      // The account holder, proven again for a route that mints or revokes a
+      // credential: the account's own password in the body's "password" -
+      // never an app password - and, when a second factor is enrolled, the
+      // code in X-hMailServer-OTP, as HandleMePassword_ asks. False with the
+      // refusal in failure. RefuseAppPasswordCaller_ is the first of its
+      // checks on its own, for the routes that ask no password but must not
+      // be reached on one that was issued to a program.
+      static bool ConfirmAccountPassword_(const Caller &caller, const AnsiString &request, HttpResponse &failure);
+      static bool RefuseAppPasswordCaller_(const Caller &caller, const char *what, HttpResponse &failure);
       static HttpResponse HandleMeAppPasswordDelete_(const Caller &caller, __int64 id);
       static AnsiString AppPasswordJson_(std::shared_ptr<AppPassword> password, const String &clearText);
       static HttpResponse HandleMeSessions_(const Caller &caller);

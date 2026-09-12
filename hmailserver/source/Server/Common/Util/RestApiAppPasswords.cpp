@@ -7,11 +7,24 @@
 // preferred hash), reached by the account itself for its own mailbox: a
 // password for a phone or a program that is not the account's own, revocable
 // on its own. The clear text exists in the answer to the POST and nowhere else.
+//
+// Minting a credential is proven by the person, not by the request: the POST
+// carries the account's own password (and the one-time code when a second
+// factor is enrolled), checked here against the account and never against
+// an app password - and neither the POST nor the DELETE is reachable on a
+// request that was itself authenticated with an app password, or by a
+// session one started. Otherwise a leaked phone password could mint its own
+// replacement and revoke the others before the owner did, and a stolen
+// cookie would turn a session with a ceiling into a mailbox credential
+// without one. Both are logged with the caller's address.
 
 #include "StdAfx.h"
 #include "RestApiServer.h"
 #include "HttpServer.h"
 #include "Time.h"
+#include "Totp.h"
+#include "PasswordValidator.h"
+#include "../Application/Logger.h"
 #include "../BO/Account.h"
 #include "../BO/AppPassword.h"
 #include "../BO/AppPasswords.h"
@@ -73,13 +86,78 @@ namespace HM
       return BuildResponse_(200, json);
    }
 
+   bool
+   RestApiServer::RefuseAppPasswordCaller_(const Caller &caller, const char *what, HttpResponse &failure)
+   {
+      if (!caller.via_app_password)
+         return false;
+
+      LOG_APPLICATION("REST API: " + String(what) + " for " + (caller.account ? caller.account->GetAddress() : String()) +
+         " was refused from " + String(caller.peer.ToString()) + " - the request was authenticated with an app password.");
+      failure = BuildResponse_(403, "{\"error\":\"not for an app password: sign in with the account's own password\"}");
+      return true;
+   }
+
+   bool
+   RestApiServer::ConfirmAccountPassword_(const Caller &caller, const AnsiString &request, HttpResponse &failure)
+   {
+      std::shared_ptr<const Account> account = caller.account;
+      if (!account)
+      {
+         failure = BuildResponse_(500, "{\"error\":\"internal error\"}");
+         return false;
+      }
+
+      if (RefuseAppPasswordCaller_(caller, "making an app password", failure))
+         return false;
+
+      const String password = JsonUtf8Value_(GetRequestBody_(request), "password");
+      if (password.IsEmpty())
+      {
+         failure = BuildResponse_(400, "{\"error\":\"password is required: the account's own password, to prove it is the account holder asking\"}");
+         return false;
+      }
+
+      // The account's own password, whatever authenticated the request: a
+      // session cookie proves the browser, and an app password would prove
+      // only that a program has one. Never an app password here.
+      if (!PasswordValidator::ValidateAccountPasswordOnly(account, password))
+      {
+         LOG_APPLICATION("REST API: making an app password for " + account->GetAddress() + " was refused from " +
+            String(caller.peer.ToString()) + " - the password did not match.");
+         RegisterAuthenticationFailure_(caller.peer);
+         failure = BuildResponse_(403, "{\"error\":\"the password is not correct\"}");
+         return false;
+      }
+
+      // An account with a second factor proves it as HandleMePassword_ asks:
+      // the code travels in X-hMailServer-OTP, and the 401 names the header.
+      const String secret = account->GetTotpSecret();
+      if (!secret.IsEmpty())
+      {
+         const AnsiString code = GetHeader_(request, "x-hmailserver-otp");
+         if (code.IsEmpty() || !Totp::VerifyCode(AnsiString(secret), code))
+         {
+            failure = BuildUnauthorizedResponse_(true, IsPageScriptRequest_(request));
+            return false;
+         }
+      }
+
+      return true;
+   }
+
    HttpResponse
-   RestApiServer::HandleMeAppPasswordCreate_(const Caller &caller, const AnsiString &requestBody)
+   RestApiServer::HandleMeAppPasswordCreate_(const Caller &caller, const AnsiString &request)
    {
       std::shared_ptr<const Account> account = caller.account;
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
+      HttpResponse refusal;
+      if (!ConfirmAccountPassword_(caller, request, refusal))
+         return refusal;
+
+      const AnsiString requestBody = GetRequestBody_(request);
       String name = JsonUtf8Value_(requestBody, "name");
       name.TrimLeft();
       name.TrimRight();
@@ -112,6 +190,9 @@ namespace HM
       }
       PersistentAppPassword::InvalidateExistenceCache();
 
+      LOG_APPLICATION("REST API: app password \"" + name + "\" made for " + account->GetAddress() + " from " +
+         String(caller.peer.ToString()) + ".");
+
       return BuildResponse_(201, AppPasswordJson_(password, clearText));
    }
 
@@ -122,6 +203,10 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
+      HttpResponse refusal;
+      if (RefuseAppPasswordCaller_(caller, "removing an app password", refusal))
+         return refusal;
+
       AppPasswords list;
       list.Refresh(account->GetID());
       std::shared_ptr<AppPassword> password = list.GetItemByDBID((unsigned __int64) id);
@@ -131,6 +216,9 @@ namespace HM
       if (!PersistentAppPassword::DeleteObject(password))
          return BuildResponse_(500, "{\"error\":\"the app password could not be removed\"}");
       PersistentAppPassword::InvalidateExistenceCache();
+
+      LOG_APPLICATION("REST API: app password \"" + password->GetName() + "\" removed for " + account->GetAddress() + " from " +
+         String(caller.peer.ToString()) + ".");
 
       return BuildResponse_(200, "{\"deleted\":true}");
    }
