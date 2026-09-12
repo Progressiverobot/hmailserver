@@ -3,6 +3,7 @@
 
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -245,8 +246,8 @@ namespace RegressionTests.API
          StringAssert.StartsWith("text/javascript", script.Header("Content-Type"));
          StringAssert.Contains("/api/v1/me", script.Body);
          StringAssert.Contains("/api/v1/me/folders", script.Body);
-         StringAssert.Contains("srcdoc", script.Body);
-         StringAssert.Contains("img-src data:", script.Body);
+         StringAssert.Contains("'/html' + (allowed ? '?remote=1' : '')", script.Body, "The HTML part is the server's own document, pointed at by src; nothing is built into a srcdoc here.");
+         StringAssert.DoesNotContain("frame.srcdoc", script.Body);
          StringAssert.Contains("carryAttachments", script.Body);
          StringAssert.Contains("before_uid", script.Body);
       }
@@ -572,6 +573,51 @@ namespace RegressionTests.API
          StringAssert.Contains("\"authentication\":{\"spf\":\"\",\"dkim\":\"\",\"dkim_domain\":\"\",\"dmarc\":\"\",\"results\":\"\"}", message.body);
          // The sender's display name does not decide the External badge.
          StringAssert.Contains("\"external\":true", message.body);
+      }
+
+      [Test]
+      [Description("The HTML part is served as a document under its own policy: remote images blocked unless ?remote=1, an embedded image inlined, the message JSON saying whether anything remote is named; a search with a word repeated thirty times is the search with it once")]
+      public void TheHtmlDocumentIsServedUnderItsOwnPolicy()
+      {
+         string pixel = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+         var client = new SmtpClientSimulator();
+         client.SendRaw("sender@example.com", Address,
+            "From: sender@example.com\r\nTo: " + Address + "\r\nSubject: Pictures\r\nMIME-Version: 1.0\r\n" +
+            "Content-Type: multipart/related; boundary=\"rel\"\r\n\r\n--rel\r\nContent-Type: text/html; charset=utf-8\r\n\r\n" +
+            "<p>Embedded: <img src=\"cid:one@example.com\"> Remote: <img src=\"https://tracker.example.org/pixel.gif\"></p>\r\n" +
+            "--rel\r\nContent-Type: image/png\r\nContent-ID: <one@example.com>\r\nContent-Transfer-Encoding: base64\r\n\r\n" + pixel + "\r\n--rel--\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long id = IdBefore(page.body, "\"subject\":\"Pictures\"");
+         (int status, string body) message = Http("GET", "/api/v1/me/messages/" + id, UserHeader(UserPassword));
+         Assert.AreEqual(200, message.status, "Body: " + message.body);
+         StringAssert.Contains("\"html_remote\":true", message.body);
+
+         Response blocked = Raw("GET", "/api/v1/me/messages/" + id + "/html", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, blocked.Status, blocked.Body);
+         StringAssert.StartsWith("text/html", blocked.Header("Content-Type"));
+         string policy = blocked.Header("Content-Security-Policy");
+         StringAssert.Contains("img-src data:;", policy);
+         StringAssert.Contains("sandbox", policy);
+         StringAssert.Contains("frame-ancestors 'self'", policy);
+         StringAssert.Contains("data:image/png;base64," + pixel, blocked.Body);
+         StringAssert.Contains("https://tracker.example.org/pixel.gif", blocked.Body);
+         Assert.AreEqual("nosniff", blocked.Header("X-Content-Type-Options"));
+
+         Response allowed = Raw("GET", "/api/v1/me/messages/" + id + "/html?remote=1", UserHeader(UserPassword), null);
+         Assert.AreEqual(200, allowed.Status, allowed.Body);
+         StringAssert.Contains("img-src data: https: http:", allowed.Header("Content-Security-Policy"));
+
+         (int status, string body) once = Http("GET", "/api/v1/me/search?q=Embedded", UserHeader(UserPassword));
+         Assert.AreEqual(200, once.status, "Body: " + once.body);
+         StringAssert.Contains("\"subject\":\"Pictures\"", once.body);
+         string repeated = string.Join("+", Enumerable.Repeat("Embedded", 30));
+         (int status, string body) many = Http("GET", "/api/v1/me/search?q=" + repeated, UserHeader(UserPassword));
+         Assert.AreEqual(200, many.status, "Body: " + many.body);
+         StringAssert.Contains("\"subject\":\"Pictures\"", many.body);
       }
 
       private static void Deliver(string to, string subject, string body)
