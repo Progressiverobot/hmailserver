@@ -834,6 +834,12 @@ jobs:
       # evaluated, and the generator's (skipped) upload job declares contents:
       # write. Granting less is a startup failure of this whole workflow.
       contents: write
+    # By tag, and deliberately the one action reference here not pinned by hash:
+    # slsa-verifier checks the builder identity recorded in the provenance
+    # against the generator's release tag and refuses a workflow reached by
+    # commit hash, so the tag is the pin. Scorecard's Pinned-Dependencies check
+    # deducts for it (its alert on this line is dismissed as won't fix, citing
+    # this); that point is the price of provenance that verifies.
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
     with:
       base64-subjects: ${{ needs.sign.outputs.hashes }}
