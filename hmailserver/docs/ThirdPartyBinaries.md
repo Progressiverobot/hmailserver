@@ -111,9 +111,11 @@ files cannot carry an Authenticode signature at all — a type library is not a
 signable image format — so their entry is a hash and nothing else by necessity.
 
 For the twelve that *are* signed, a signature check is stronger than a hash pin
-and survives a legitimate vendor patch bump. The CI job here does not do it,
-because it runs on Linux in seconds and `Get-AuthenticodeSignature` is
-Windows-only; see "Not yet done" below.
+and survives a legitimate vendor patch bump. The Linux CI job here does not do
+it, because `Get-AuthenticodeSignature` is Windows-only; since 12 September 2026
+a Windows job of the same workflow checks every *fetched* signed file against
+the signer the manifest records, and the gathered MSVC runtime files stay a
+hash and a recorded signer - see "Not yet done" below.
 
 The inventory
 -------------
@@ -140,7 +142,7 @@ Grouped by component. Per-file hashes are in
 | Component | Files | Why it stays |
 |---|---|---|
 | MariaDB Connector/C 3.4.9 (`libraries/mariadb-connector-c-3.4.9/`) | 10 | The MySQL/MariaDB client. `MySQLInterface.cpp` builds a path beside the running executable and loads `libmysql.dll` from there at runtime, together with the nine authentication plugins found through `MYSQL_PLUGIN_DIR`. Without the full plugin set, common MySQL 8 and MariaDB account types cannot authenticate. This *could* be fetched from the vendor at build time with a hash check; the argument against is that it would put a network dependency in the path of every build for a file that changes once a year. Recorded provenance is the better trade. |
-| ADO 2.8 type libraries (`libraries/msado28/`) | 0 | `#import`ed at compile time by `stdafx.h` to generate the ADO wrappers the server compiles against. Not in git since 11 September 2026: they are Windows' own files, and `build/get-installer-binaries.ps1` copies them from `%CommonProgramFiles%\System\ado` (the manifest's `system` kind; `-SystemOnly` is what the hosted server build runs). The copy varies with the Windows build, so the manifest records a hash for reference and the regression suite is the proof. |
+| ADO 2.8 type libraries (`libraries/msado28/`) | 0 | `#import`ed at compile time by `stdafx.h` to generate the ADO wrappers the server compiles against. Not in git since 11 September 2026: they are Windows' own files, and `build/get-installer-binaries.ps1` copies them from `%CommonProgramFiles%\System\ado` (the manifest's `system` kind; `-SystemOnly` is what the hosted server build runs). The copy varies with the Windows build, so the manifest records a hash for reference and the regression suite is the proof. Nothing of them is redistributed: no ADO type library is in git or in the installer (the only `.tlb` the installer carries is the server's own `hMailServer.tlb`), and what the server carries is the interface definitions `#import` generated from the build machine's own copy of a Windows component, as any program built against ADO does. |
 | SQL Server Compact 4.0 SP1 x64 (`installation/SQLCE/`) | 1 | The built-in database backend. Identity read from the MSI itself: "Microsoft SQL Server Compact 4.0 SP1 x64 ENU", Microsoft Corporation, built 2012-04-06, validly signed. **Microsoft has withdrawn the download**, so this copy is the archive of record — there is no upstream left to fetch it from. This is the clearest case in the list for a committed binary. |
 
 ### Required today, but review them
@@ -250,10 +252,6 @@ Not yet done
 
 Honest list of what this document does not cover.
 
-- **`msado28*.tlb` redistribution terms are not established.** They are
-  Windows operating-system components copied out of `%CommonProgramFiles%`.
-  Committing them is normal industry practice and has been done here since the
-  upstream project; whether it is *licensed* has not been checked.
 - **CI re-verifies Authenticode only for the fetched files.** The Binary
   provenance workflow's Windows job downloads the build inputs, checks their
   hashes, and for every fetched file the manifest records as signed (the SQL
