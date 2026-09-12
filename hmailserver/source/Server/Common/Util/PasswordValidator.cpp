@@ -74,9 +74,12 @@ namespace HM
    }
 
    std::shared_ptr<const Account>
-   PasswordValidator::ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword)
+   PasswordValidator::ValidatePassword(const String &sMasqname, const String &sUsername, const String &sPassword,
+                                       bool *matchedAppPassword)
    {
       std::shared_ptr<Account> pEmpty;
+      if (matchedAppPassword)
+         *matchedAppPassword = false;
 
       // Apply domain name aliases to this domain name.
       std::shared_ptr<DomainAliases> pDA = ObjectCache::Instance()->GetDomainAliases();
@@ -104,7 +107,7 @@ namespace HM
       if (!pDomain->GetIsActive())
          return pEmpty;
 
-      if (!ValidatePassword(pAccount, sPassword))
+      if (!ValidatePassword(pAccount, sPassword, false, matchedAppPassword))
          return pEmpty;
 
       if (sMasqname.GetLength() == 0)
@@ -143,8 +146,12 @@ namespace HM
    }
 
    bool 
-   PasswordValidator::ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword, bool secondFactorSatisfied)
+   PasswordValidator::ValidatePassword(std::shared_ptr<const Account> pAccount, const String &sPassword, bool secondFactorSatisfied,
+                                       bool *matchedAppPassword)
    {
+      if (matchedAppPassword)
+         *matchedAppPassword = false;
+
       // Let a script override the password validation
       auto eventResult = Events::FireOnClientValidatePassword(pAccount, sPassword);
 
@@ -225,7 +232,19 @@ namespace HM
       // but an app password is local by definition, which is exactly what makes
       // second-factor policy possible for a directory account whose clients cannot
       // present a code.
-      return ValidateAppPassword_(pAccount, sPassword);
+      const bool viaAppPassword = ValidateAppPassword_(pAccount, sPassword);
+      if (viaAppPassword && matchedAppPassword)
+         *matchedAppPassword = true;
+      return viaAppPassword;
+   }
+
+   bool
+   PasswordValidator::ValidateAccountPasswordOnly(std::shared_ptr<const Account> pAccount, const String &sPassword)
+   {
+      if (!pAccount || sPassword.IsEmpty())
+         return false;
+
+      return ValidateAccountPassword_(pAccount, sPassword);
    }
 
    bool
