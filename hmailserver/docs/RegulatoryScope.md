@@ -156,8 +156,8 @@ changed:
 * Static analysis, CodeQL and OpenSSF Scorecard in CI; a full regression suite
   gating every release.
 * Release notes that name unfixed known issues rather than omitting them.
-* Security-update distribution with integrity verification, in the tree after
-  6.2.27 (not yet in a published release): the server can check the release feed,
+* Security-update distribution with integrity verification, shipped in 6.2.28
+  (8 September 2026): the server can check the release feed,
   fetch a newer installer with its Sigstore bundle, verify the bundle in-process
   against the repository's release-workflow identity, and apply it inside a
   configured window after a backup. The Roadmap's Product Liability Directive row
