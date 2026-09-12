@@ -106,9 +106,15 @@ need something they do not express, that is a design conversation, not a place t
 special-case.
 
 **The schema is pinned, one way.** `REQUIRED_DB_VERSION` in
-`Common/Application/Constants.h` (6031 today) must equal `hm_dbversion.value`; the
-server refuses to start on an older *or* newer database (error 5011; 5010 when the
-version cannot be read). A schema change is four
+`Common/Application/Constants.h` (6037 on 12 September 2026) must equal
+`hm_dbversion.value`; the server refuses to start on an older *or* newer database
+(error 5011; 5010 when the version cannot be read). The refused database stays open
+for `hMailServer.Database`, which is how DBUpdater brings it up to date; every other
+object `hMailServer.Application` hands out - `Settings`, `Domains`, `Rules`, `Links`,
+`BackupManager`, `GlobalObjects`, `Diagnostics` - is refused with the 5011 text until
+a `Reinitialize` or a restart succeeds, because the configuration they read was never
+loaded (`Application::IsInitialized`; before 12 September 2026 a call into `Settings`
+on such a server was an access violation inside the COM call). A schema change is four
 `DBScripts/Upgrade<from>to<to><backend>.sql` files, a `new UpgradeScript(from, to)` row
 in `Tools/DBUpdater/formMain.cs`, a probe statement DBUpdater runs after the step, and
 the bump in `Constants.h`; `build/check-schema-versions.ps1` reconciles them and

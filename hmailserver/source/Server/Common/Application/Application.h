@@ -53,6 +53,14 @@ namespace HM
       
       String GetLastErrorMessage() {return last_connect_error_message_; }; 
 
+      // True from the end of a successful InitInstance until ExitInstance: the
+      // database open, its schema the one this build requires, Configuration
+      // loaded. False while a database this server refused stays open for
+      // hMailServer.Database - the state DBUpdater works in - when nothing
+      // that reads the configuration exists yet and a COM call into it must be
+      // refused rather than made.
+      bool IsInitialized() const { return initialized_; }
+
       bool StartServers();
       void StopServers();
       void SubmitPendingEmail();
@@ -103,6 +111,7 @@ namespace HM
       String start_time_;
       
       String last_connect_error_message_;
+      bool initialized_;
 
       std::shared_ptr<DatabaseConnectionManager> db_manager_;
    
