@@ -649,7 +649,13 @@ namespace HM
 
       const String path = PathOf(row.token);
       {
+         // A narrow path on POSIX: libstdc++'s streams take no wide one.
+#ifdef HM_PLATFORM_POSIX
+         const AnsiString narrowPath(path);
+         std::ofstream out(narrowPath.c_str(), std::ios::binary | std::ios::app);
+#else
          std::ofstream out(path.c_str(), std::ios::binary | std::ios::app);
+#endif
          if (!out)
             return BuildResponse_(500, "{\"error\":\"the file could not be written\"}");
          out.write(body.c_str(), body.GetLength());
@@ -784,7 +790,12 @@ namespace HM
          return BuildResponse_(405, "{\"error\":\"GET fetches the file\"}");
       }
 
+#ifdef HM_PLATFORM_POSIX
+      const AnsiString narrowPath(PathOf(token));
+      std::ifstream in(narrowPath.c_str(), std::ios::binary);
+#else
       std::ifstream in(PathOf(token).c_str(), std::ios::binary);
+#endif
       if (!in)
          return Page(404, "No such file", "<h1>No such file</h1><p>There is no file at this address, or it has been removed.</p>");
       std::string bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
