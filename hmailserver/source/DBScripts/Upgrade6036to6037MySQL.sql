@@ -14,6 +14,7 @@ create table hm_smimekeys
 );
 
 CREATE INDEX idx_hm_smimekeys_account ON hm_smimekeys (smimeaccountid);
+
 CREATE UNIQUE INDEX idx_hm_smimekeys_entry ON hm_smimekeys (smimeaccountid, smimekind, smimefingerprint);
 
 ALTER TABLE hm_smimekeys ENGINE=InnoDB;

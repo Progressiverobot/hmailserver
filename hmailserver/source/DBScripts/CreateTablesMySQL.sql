@@ -11,6 +11,7 @@ drop table if exists hm_accountprefs;
 drop table if exists hm_scheduled;
 
 drop table if exists hm_files;
+
 drop table if exists hm_smimekeys;
 
 drop table if exists hm_accounts;
@@ -455,6 +456,7 @@ create table hm_files
 ) DEFAULT CHARSET=utf8;
 
 CREATE INDEX idx_hm_files_account ON hm_files (fileaccountid);
+
 CREATE UNIQUE INDEX idx_hm_files_token ON hm_files (filetoken);
 
 create table hm_smimekeys
@@ -473,6 +475,7 @@ create table hm_smimekeys
 );
 
 CREATE INDEX idx_hm_smimekeys_account ON hm_smimekeys (smimeaccountid);
+
 CREATE UNIQUE INDEX idx_hm_smimekeys_entry ON hm_smimekeys (smimeaccountid, smimekind, smimefingerprint);
 
 create table hm_rules
@@ -1091,6 +1094,7 @@ ALTER TABLE hm_accountprefs ENGINE=InnoDB;
 ALTER TABLE hm_scheduled ENGINE=InnoDB;
 
 ALTER TABLE hm_files ENGINE=InnoDB;
+
 ALTER TABLE hm_smimekeys ENGINE=InnoDB;
 
 ALTER TABLE hm_rules ENGINE=InnoDB;
