@@ -290,6 +290,16 @@ already cost a release cycle or nearly shipped a defect.
     before publication, because nothing can be added afterwards. 6.2.22-pre4 was
     published straight away and ended up with an installer and no SBOM at all.
 
+    **A release published before the twin and the provenance existed** - 6.3.1
+    and earlier, and the `build-inputs-1` release every build fetches from - is
+    brought up to the same state by `attest-release.yml`, run by hand with the
+    tag: every `.cosign.bundle` it finds is verified and copied to its
+    `.sigstore.json` twin, an asset with no bundle at all is signed keylessly by
+    that workflow's own identity, and the SLSA provenance is generated and
+    attached for the assets as they are attached. The bundles an installation in
+    the field verifies are never replaced. OpenSSF Scorecard judges the five
+    latest releases, so run it once for each of those that predates the twins.
+
     **The two `gh workflow run` lines are required, not belt-and-braces.** Saving a
     draft does not start a workflow: GitHub does not deliver `release` events for
     draft releases, which was measured here rather than assumed - creating the pre5
