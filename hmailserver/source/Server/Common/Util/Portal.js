@@ -4091,7 +4091,8 @@
       b.setAttribute('aria-selected', tab === activeTab ? 'true' : 'false');
       if (tab === activeTab) { b.classList.add('on'); }
       b.appendChild(icon(TAB_ICONS[tab]));
-      b.appendChild(node('span', tabName(tab)));
+      b.setAttribute('title', tabName(tab));
+      b.appendChild(node('span', tabName(tab), 'lbl'));
       if (unseen[tab]) { var n = node('span', String(unseen[tab]), 'n'); n.setAttribute('title', tf('{0} unread', unseen[tab])); b.appendChild(n); }
       b.addEventListener('click', function () { activeTab = tab; if (lastPage) { renderMessages(lastPage); } });
       bar.appendChild(b);

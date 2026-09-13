@@ -221,6 +221,7 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .inbox-tabs button{display:flex;align-items:center;gap:8px;padding:11px 16px;font-size:13.5px;white-space:nowrap;margin-bottom:-1px}
 .inbox-tabs button svg.i{width:18px;height:18px;flex:none}
 .inbox-tabs .n{font-size:11px;font-weight:600;background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;line-height:16px;min-width:16px;text-align:center}
+@container (max-width:640px){.inbox-tabs button{padding:11px 12px}.inbox-tabs button:not(.on) .lbl{display:none}}
 #select-note{background:var(--surface-2);color:var(--text-2);font-size:13px;padding:8px 16px;text-align:center;border-bottom:1px solid var(--line);flex:none}
 .linkbtn{all:unset;cursor:pointer;color:var(--accent-text);font-weight:500;padding:0 4px}
 .linkbtn:hover{text-decoration:underline}
