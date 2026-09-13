@@ -98,6 +98,7 @@
     <Compile Include="..\RegressionTests\API\RestApiDomains.cs" Link="API\RestApiDomains.cs" />
     <Compile Include="..\RegressionTests\API\RestApiQueue.cs" Link="API\RestApiQueue.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSelfService.cs" Link="API\RestApiSelfService.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiFetchAccounts.cs" Link="API\RestApiFetchAccounts.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSettings.cs" Link="API\RestApiSettings.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSrvRecords.cs" Link="API\RestApiSrvRecords.cs" />
     <Compile Include="..\RegressionTests\API\ScriptObjectPolicy.cs" Link="API\ScriptObjectPolicy.cs" />
