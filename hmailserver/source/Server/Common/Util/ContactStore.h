@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The account's address book, hm_contacts (schema 6032): one row per account
 // and address, with a name, a source (0 = added by the user, 1 = collected
 // from a message the account sent) and a creation time. Two surfaces read and

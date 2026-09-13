@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // See CardDavServer.h for the shape of the tree. This file is the request
 // side of it: a small namespace-aware XML reader for the PROPFIND and REPORT
 // bodies (XMLite is neither namespace-aware nor meant for input off the wire),

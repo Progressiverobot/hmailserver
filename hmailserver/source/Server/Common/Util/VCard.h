@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // vCard, as far as this server's address book needs it: a reader for the
 // content lines of a vCard 3.0 (RFC 2426) or 4.0 (RFC 6350) card, the escaping
 // and folding rules the two share, and the two operations CardDAV performs on
