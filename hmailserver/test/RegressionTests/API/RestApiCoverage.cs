@@ -420,6 +420,23 @@ namespace RegressionTests.API
          Assert.AreEqual(42, range.Priority);
          Assert.IsFalse(range.AllowIMAPConnections);
 
+         // Changed: what the body names changes, what it leaves out stays, and COM agrees.
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/ipranges/" + id, "{\"priority\":43,\"allow_imap\":true,\"upper\":\"10.99.1.200\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"priority\":43", putBody);
+         StringAssert.Contains("\"allow_imap\":true", putBody);
+         StringAssert.Contains("\"upper\":\"10.99.1.200\"", putBody);
+         StringAssert.Contains("\"allow_pop3\":false", putBody, "Left out, so left alone.");
+         range = _settings.SecurityRanges.get_ItemByName("rest-range");
+         Assert.AreEqual(43, range.Priority);
+         Assert.IsTrue(range.AllowIMAPConnections);
+         Assert.IsFalse(range.AllowPOP3Connections);
+         Assert.AreEqual("10.99.1.200", range.UpperIP);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"lower\":\"not-an-address\"}").status);
+         Assert.AreEqual(404, Http("PUT", "/api/v1/ipranges/999999999", "{\"priority\":1}").status);
+         Assert.AreEqual(43, _settings.SecurityRanges.get_ItemByName("rest-range").Priority, "A refused change changes nothing.");
+
          Assert.AreEqual(200, Http("DELETE", "/api/v1/ipranges/" + id).status);
          Assert.AreEqual(404, Http("DELETE", "/api/v1/ipranges/" + id).status);
          StringAssert.DoesNotContain("rest-range", Http("GET", "/api/v1/ipranges").body);

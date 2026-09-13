@@ -343,6 +343,134 @@ namespace RegressionTests.API
          return match.Groups[1].Value;
       }
 
+      [Test]
+      [Description("PUT /api/v1/domains/{name} takes the whole domain - limits, plus addressing, greylisting, signature, DKIM algorithm, retention, relay and automatic reply - with COM reading every value the API set, the listing showing them, the relay password never emitted, and a refused field changing nothing.")]
+      public void DomainFieldsRoundTripThroughCom()
+      {
+         string name = UniqueDomainName();
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + name + "\"}").status);
+
+         (int status, string body) = Http("PUT", "/api/v1/domains/" + name,
+            "{\"active\":true,\"max_size_mb\":123,\"max_message_size_kb\":456,\"max_account_size_mb\":78,\"max_accounts\":7,\"max_accounts_enabled\":true," +
+            "\"max_aliases\":8,\"max_lists\":9,\"plus_addressing_enabled\":true,\"plus_addressing_character\":\"-\",\"use_greylisting\":false," +
+            "\"signature_enabled\":true,\"signature_method\":\"overwrite\",\"signature_plain_text\":\"Regards\",\"signature_html\":\"<b>Regards</b>\"," +
+            "\"signature_add_to_replies\":true,\"signature_add_to_local_mail\":true,\"dkim_signing_algorithm\":\"sha1\",\"message_retention_days\":30," +
+            "\"relay_host\":\"relay.example\",\"relay_port\":2525,\"relay_requires_auth\":true,\"relay_username\":\"relayuser\",\"relay_password\":\"relaysecret\"," +
+            "\"relay_connection_security\":\"starttls_required\",\"vacation_enabled\":true,\"vacation_subject\":\"Away\",\"vacation_message\":\"Back soon\"}");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"max_size_mb\":123", body);
+         StringAssert.Contains("\"signature_method\":\"overwrite\"", body);
+         StringAssert.Contains("\"relay_connection_security\":\"starttls_required\"", body);
+         StringAssert.Contains("\"dkim_signing_algorithm\":\"sha1\"", body);
+         StringAssert.DoesNotContain("relaysecret", body, "The relay password is write-only.");
+         StringAssert.DoesNotContain("\"relay_password\"", body);
+
+         Domain domain = DomainOverCom(name);
+         Assert.AreEqual(123, domain.MaxSize);
+         Assert.AreEqual(456, domain.MaxMessageSize);
+         Assert.AreEqual(78, domain.MaxAccountSize);
+         Assert.AreEqual(7, domain.MaxNumberOfAccounts);
+         Assert.IsTrue(domain.MaxNumberOfAccountsEnabled);
+         Assert.AreEqual(8, domain.MaxNumberOfAliases);
+         Assert.AreEqual(9, domain.MaxNumberOfDistributionLists);
+         Assert.IsFalse(domain.MaxNumberOfAliasesEnabled, "Left out, so left alone.");
+         Assert.IsTrue(domain.PlusAddressingEnabled);
+         Assert.AreEqual("-", domain.PlusAddressingCharacter);
+         Assert.IsFalse(domain.AntiSpamEnableGreylisting);
+         Assert.IsTrue(domain.SignatureEnabled);
+         Assert.AreEqual(eDomainSignatureMethod.eSMOverwriteAccountSignature, domain.SignatureMethod);
+         Assert.AreEqual("Regards", domain.SignaturePlainText);
+         Assert.AreEqual("<b>Regards</b>", domain.SignatureHTML);
+         Assert.IsTrue(domain.AddSignaturesToReplies);
+         Assert.IsTrue(domain.AddSignaturesToLocalMail);
+         Assert.AreEqual(eDKIMAlgorithm.eSHA1, domain.DKIMSigningAlgorithm);
+         Assert.AreEqual(30, domain.MessageRetentionDays);
+         Assert.AreEqual("relay.example", domain.RelayHost);
+         Assert.AreEqual(2525, domain.RelayPort);
+         Assert.IsTrue(domain.RelayRequiresAuthentication);
+         Assert.AreEqual("relayuser", domain.RelayUsername);
+         Assert.AreEqual(eConnectionSecurity.eCSSTARTTLSRequired, domain.RelayConnectionSecurity);
+         Assert.IsTrue(domain.VacationMessageIsOn);
+         Assert.AreEqual("Away", domain.VacationSubject);
+         Assert.AreEqual("Back soon", domain.VacationMessage);
+
+         // The listing carries the same fields.
+         string list = Http("GET", "/api/v1/domains").body;
+         StringAssert.Contains("\"name\":\"" + name + "\",\"active\":true,\"postmaster\":\"\",\"max_message_size_kb\":456,\"max_size_mb\":123", list);
+
+         // Refused, and nothing changed.
+         foreach (string refused in new[]
+         {
+            "{\"active\":true,\"signature_method\":\"maybe\"}", "{\"active\":true,\"bogus\":1}", "{\"active\":true,\"relay_port\":70000}",
+            "{\"active\":true,\"plus_addressing_character\":\"--\"}", "{\"active\":true,\"max_size_mb\":\"lots\"}", "{\"max_size_mb\":1}", "{\"active\":true,\"name\":\"\"}"
+         })
+         {
+            (int refusedStatus, string refusedBody) = Http("PUT", "/api/v1/domains/" + name, refused);
+            Assert.AreEqual(400, refusedStatus, refused + " -> " + refusedBody);
+         }
+         domain = DomainOverCom(name);
+         Assert.AreEqual(123, domain.MaxSize);
+         Assert.AreEqual(2525, domain.RelayPort);
+         Assert.AreEqual("-", domain.PlusAddressingCharacter);
+      }
+
+      [Test]
+      [Description("A new name in PUT /api/v1/domains/{name} renames the domain as the Control Panel does: the old name is gone, the new one is there through COM and over the API, and the account in it answers to the new name.")]
+      public void DomainRenameFollowsEveryAddress()
+      {
+         string oldName = UniqueDomainName();
+         string newName = UniqueDomainName();
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + oldName + "\"}").status);
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains/" + oldName + "/accounts",
+            "{\"address\":\"first@" + oldName + "\",\"password\":\"S0me-Long-Passphrase\"}").status);
+
+         (int status, string body) = Http("PUT", "/api/v1/domains/" + oldName, "{\"active\":true,\"name\":\"" + newName + "\"}");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"name\":\"" + newName + "\"", body);
+
+         Assert.IsNull(DomainOverCom(oldName), "The old name is gone.");
+         Domain renamed = DomainOverCom(newName);
+         Assert.IsNotNull(renamed, "The domain exists under the new name through COM.");
+         Assert.IsNotNull(renamed.Accounts.get_ItemByAddress("first@" + newName), "The account followed the domain.");
+
+         Assert.AreEqual(404, Http("GET", "/api/v1/domains/" + oldName + "/accounts").status);
+         StringAssert.Contains("first@" + newName, Http("GET", "/api/v1/domains/" + newName + "/accounts").body);
+      }
+
+      [Test]
+      [Description("A domain alias is added over the route, listed, seen by COM, refused as a duplicate, deleted with COM agreeing, and not found afterwards.")]
+      public void DomainAliasesRoundTripThroughCom()
+      {
+         string name = UniqueDomainName();
+         string alias = UniqueDomainName();
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + name + "\"}").status);
+
+         (int status, string body) created = Http("POST", "/api/v1/domains/" + name + "/domain-aliases", "{\"name\":\"" + alias + "\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         StringAssert.Contains("\"name\":\"" + alias + "\"", created.body);
+         StringAssert.Contains("\"id\":", created.body);
+
+         (int listStatus, string list) = Http("GET", "/api/v1/domains/" + name + "/domain-aliases");
+         Assert.AreEqual(200, listStatus, list);
+         StringAssert.Contains("\"name\":\"" + alias + "\"", list);
+
+         DomainAliases overCom = DomainOverCom(name).DomainAliases;
+         Assert.AreEqual(1, overCom.Count);
+         Assert.AreEqual(alias, overCom[0].AliasName);
+
+         (int duplicateStatus, string duplicateBody) = Http("POST", "/api/v1/domains/" + name + "/domain-aliases", "{\"name\":\"" + alias + "\"}");
+         Assert.AreEqual(400, duplicateStatus, duplicateBody);
+         Assert.AreEqual(400, Http("POST", "/api/v1/domains/" + name + "/domain-aliases", "{\"name\":\"\"}").status);
+         Assert.AreEqual(404, Http("POST", "/api/v1/domains/nobody-" + name + "/domain-aliases", "{\"name\":\"x.test\"}").status);
+
+         (int deleteStatus, string deleteBody) = Http("DELETE", "/api/v1/domains/" + name + "/domain-aliases/" + alias);
+         Assert.AreEqual(200, deleteStatus, deleteBody);
+         StringAssert.Contains("\"deleted\":true", deleteBody);
+         Assert.AreEqual(0, DomainOverCom(name).DomainAliases.Count);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/domains/" + name + "/domain-aliases/" + alias).status);
+         Assert.AreEqual("[]", Http("GET", "/api/v1/domains/" + name + "/domain-aliases").body);
+      }
+
       private static (int status, string body) Http(string method, string path, string requestBody = null)
       {
          string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("Administrator:" + AdminPassword));

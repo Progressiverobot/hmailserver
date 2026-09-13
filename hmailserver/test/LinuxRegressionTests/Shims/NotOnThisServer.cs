@@ -76,7 +76,7 @@ namespace RegressionTests.Shared
          "needs an account with a maximum size, which POST /api/v1/domains/{domain}/accounts does not set";
 
       public const string NoSieveEvaluate =
-         "needs Utilities.EvaluateSieveScript, a COM-only call with no REST equivalent";
+         "needs Utilities.EvaluateSieveScript, and this server's REST API has no POST /api/v1/sieve/evaluate (it arrived after 6.3.2)";
 
       public const string NoMailServerLookup =
          "needs Utilities.GetMailServer, a COM-only call with no REST equivalent";
@@ -102,7 +102,7 @@ namespace RegressionTests.Shared
          "needs Settings.SetSMTPRelayerPassword, and PUT /api/v1/settings does not take the relayer password";
 
       public const string NoScripting =
-         "needs the server's event-handler scripting (Settings.Scripting), which no REST route configures, reloads or checks";
+         "needs the server's event-handler scripting (Settings.Scripting), and this server's REST API has no /api/v1/settings/scripting (it arrived after 6.3.2)";
 
       public const string NoCrashSimulation =
          "needs Settings.CrashSimulationMode, the COM-only switch that makes the server fault on purpose";
@@ -123,10 +123,10 @@ namespace RegressionTests.Shared
          "needs the live log, a COM callback the server pushes to the Control Panel, which HTTP has no equivalent of";
 
       public const string NoLogDeviceWrite =
-         "sets Logging.Device, and PUT /api/v1/settings/logging does not take the log device";
+         "sets Logging.Device, and this server's PUT /api/v1/settings/logging does not take the log device";
 
       public const string NoBackupSettings =
-         "needs the backup settings written (Settings.Backup), and the REST API only reports a backup through GET /api/v1/backup";
+         "needs the backup settings (Settings.Backup) or the backup run, and this server's REST API has no /api/v1/settings/backup (it arrived after 6.3.2) - the run itself is POST /api/v1/backup";
 
       public const string NoCacheControl =
          "needs Settings.Cache - the server's domain and account caches - which no REST route reads or clears";
@@ -138,7 +138,7 @@ namespace RegressionTests.Shared
          "needs Settings.Groups, and no REST route carries the account groups";
 
       public const string NoServerMessages =
-         "needs Settings.ServerMessages, and no REST route carries the server's message texts";
+         "needs Settings.ServerMessages, and this server's REST API has no /api/v1/settings/messages (it arrived after 6.3.2)";
 
       public const string NoMessageIndexing =
          "needs Settings.MessageIndexing, and no REST route switches indexing on or runs it";
@@ -180,7 +180,7 @@ namespace RegressionTests.Shared
          "names a file with a backslash in its path, which is a directory separator only on Windows";
 
       public const string NoDomainRename =
-         "renames a domain, and PUT /api/v1/domains/{domain} takes active and postmaster only - the route says of itself that the name cannot be changed there";
+         "renames a domain, and this server's PUT /api/v1/domains/{domain} takes active and postmaster only (the name arrived after 6.3.2)";
 
       public const string NoAccountUpdate =
          "changes an account, and this server's REST API has no PUT /api/v1/accounts/{address}";
@@ -192,7 +192,7 @@ namespace RegressionTests.Shared
          "needs a distribution list as an object - its mode, its authentication requirement or its recipients - and the REST API creates and deletes a list but carries none of those";
 
       public const string NoDomainAliases =
-         "needs a domain alias, and no REST route lists, creates or deletes one";
+         "needs a domain alias, and this server's REST API has no /api/v1/domains/{domain}/domain-aliases (it arrived after 6.3.2)";
 
       public const string NoPortCreate =
          "needs a TCP/IP port, and this server's REST API has no POST /api/v1/ports";
@@ -204,7 +204,7 @@ namespace RegressionTests.Shared
          "needs an IP range, and this server's REST API has no POST /api/v1/ipranges";
 
       public const string NoIpRangeUpdate =
-         "changes an IP range that already exists, and the REST API has GET, POST and DELETE for /api/v1/ipranges but no PUT";
+         "changes an IP range that already exists, and this server's REST API has no PUT /api/v1/ipranges/{id} (it arrived after 6.3.2)";
 
       public const string NoIpRangeDefaults =
          "needs SecurityRanges.SetDefault, which no REST route does";
@@ -216,7 +216,7 @@ namespace RegressionTests.Shared
          "changes a certificate that already exists, and the REST API has POST and DELETE for certificates but no PUT";
 
       public const string NoRouteAddresses =
-         "needs a route's address list as an object, and the REST API takes the addresses only in the body that creates or replaces the route";
+         "needs a route's address list as an object, and this server's REST API has no route write surface to carry it";
 
       public const string NoRuleCreate =
          "needs a global rule, and this server's REST API has no POST /api/v1/rules";
@@ -350,9 +350,6 @@ namespace RegressionTests.Shared
       {
          { "RegressionTests.Infrastructure.ListenerIpv6", RebindsTheRestListener },
          { "RegressionTests.SSL.ListenerTlsConfiguration", RebindsTheRestListener },
-         { "RegressionTests.Sieve.SieveEvaluation", NoSieveEvaluate },
-         { "RegressionTests.Sieve.SieveExtensionActions", NoSieveEvaluate },
-         { "RegressionTests.Sieve.SieveVacation", NoSieveEvaluate },
          { "RegressionTests.SMTP.OutboundSize", NoRouteCreate },
          { "RegressionTests.SSL.SmtpDeliverySslTests", NoRouteCreate },
          { "RegressionTests.SMTP.BinaryMime.TestAuthenticatedBinarySubmissionIsRelayedViaBdat", NoRouteCreate },

@@ -62,12 +62,9 @@ namespace hMailServer
 
       private static Domain From(JsonElement element)
       {
-         return new Domain
-         {
-            Name = ServerApi.StringOf(element, "name"),
-            Active = element.TryGetProperty("active", out var active) && active.ValueKind == JsonValueKind.True,
-            Postmaster = ServerApi.StringOf(element, "postmaster") ?? string.Empty
-         };
+         var domain = new Domain();
+         domain.Read(element);
+         return domain;
       }
 
       public int Count => All().Count;
@@ -329,47 +326,92 @@ namespace hMailServer
    ///    A domain's aliases-of-the-domain (example.org delivering as example.com).
    ///    The REST API has no route for them at all: not a listing, not a create.
    /// </summary>
+   /// <summary>Domain.DomainAliases over /api/v1/domains/{domain}/domain-aliases.</summary>
    public class DomainAliases
    {
-      public int Count
+      private readonly string _domainName;
+
+      internal DomainAliases(string domainName)
       {
-         get
-         {
+         _domainName = domainName;
+      }
+
+      private string Base => "/api/v1/domains/" + _domainName + "/domain-aliases";
+
+      private List<DomainAlias> Load()
+      {
+         if (!ServerApi.HasRoute("/api/v1/domains/{domain}/domain-aliases", "get"))
             throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
-         }
+         return ServerApi.Array(ServerApi.Get(Base).Expect(200, "GET " + Base))
+            .Select(element => new DomainAlias(_domainName) { ID = ServerApi.LongOf(element, "id"), AliasName = ServerApi.StringOf(element, "name"), DomainName = _domainName })
+            .ToList();
+      }
+
+      public int Count => Load().Count;
+
+      [System.Runtime.CompilerServices.IndexerName("At")]
+      public DomainAlias this[int index] => Load()[index];
+
+      public DomainAlias get_Item(int index)
+      {
+         return Load()[index];
       }
 
       public DomainAlias Add()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
+         if (!ServerApi.HasRoute("/api/v1/domains/{domain}/domain-aliases", "post"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
+         return new DomainAlias(_domainName) { DomainName = _domainName };
       }
 
       public DomainAlias get_ItemByName(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainAliases);
+         return Load().FirstOrDefault(alias => string.Equals(alias.AliasName, name, StringComparison.OrdinalIgnoreCase));
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
+         var alias = Load().FirstOrDefault(a => a.ID == id);
+         if (alias != null)
+            alias.Delete();
       }
    }
 
    public class DomainAlias
    {
+      private readonly string _ownerDomain;
+
+      internal DomainAlias(string ownerDomain)
+      {
+         _ownerDomain = ownerDomain;
+      }
+
       public long ID { get; set; }
       public string AliasName { get; set; }
-      public long DomainID { get; set; }
+      public long DomainID
+      {
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainIds); }
+         set { }
+      }
       public string DomainName { get; set; }
 
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
+         if (ID != 0)
+            NotOnThisServer.Ignore("changes an existing domain alias, and the REST API has POST and DELETE for domain aliases but no PUT");
+         var path = "/api/v1/domains/" + _ownerDomain + "/domain-aliases";
+         var answer = ServerApi.Post(path, "{\"name\":" + ServerApi.Quote(AliasName ?? string.Empty) + "}");
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+         answer.Expect(201, "POST " + path);
+         ID = ServerApi.LongOf(answer.Json.Value, "id");
       }
 
       public void Delete()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDomainAliases);
+         var path = "/api/v1/domains/" + _ownerDomain + "/domain-aliases/" + AliasName;
+         ServerApi.Delete(path).Expect(200, "DELETE " + path);
+         ID = 0;
       }
    }
 
@@ -749,7 +791,7 @@ namespace hMailServer
 
       public void Save()
       {
-         if (Existing)
+         if (Existing && !ServerApi.HasRoute("/api/v1/ipranges/{id}", "put"))
             NotOnThisServer.Ignore(NotOnThisServer.NoIpRangeUpdate);
 
          var body = new StringBuilder("{");
@@ -773,12 +815,14 @@ namespace hMailServer
          Add(body, "virus_protection", VirusProtection);
          body.Append('}');
 
-         var answer = ServerApi.Post("/api/v1/ipranges", body.ToString());
+         var answer = Existing
+            ? ServerApi.Put("/api/v1/ipranges/" + ID, body.ToString())
+            : ServerApi.Post("/api/v1/ipranges", body.ToString());
 
          if (answer.Status == 400)
             throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
 
-         answer.Expect(201, "POST /api/v1/ipranges " + Name);
+         answer.Expect(Existing ? 200 : 201, (Existing ? "PUT /api/v1/ipranges/" + ID + " " : "POST /api/v1/ipranges ") + Name);
          ID = ServerApi.LongOf(answer.Json.Value, "id");
          Existing = true;
       }
@@ -925,6 +969,7 @@ namespace hMailServer
             NumberOfTries = (int) ServerApi.LongOf(element, "number_of_tries"),
             MinutesBetweenTry = (int) ServerApi.LongOf(element, "minutes_between_try"),
             AllAddresses = element.TryGetProperty("all_addresses", out var all) && all.ValueKind == JsonValueKind.True,
+            AddressList = ServerApi.Array(element, "addresses").Select(a => a.GetString()).ToList(),
             TreatRecipientAsLocalDomain = element.TryGetProperty("treat_recipient_as_local_domain", out var r) &&
                                           r.ValueKind == JsonValueKind.True,
             TreatSenderAsLocalDomain = element.TryGetProperty("treat_sender_as_local_domain", out var s) &&
