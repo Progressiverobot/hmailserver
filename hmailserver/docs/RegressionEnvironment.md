@@ -238,6 +238,7 @@ is through the environment, read once when the assembly loads:
 | `HMTEST_REST_PORT` | `8045` |
 | `HMTEST_ADMIN_PASSWORD` | `testar` |
 | `HMTEST_SERVER_INI` | *unset; the ini is searched for* |
+| `HMTEST_NO_FAKE_DNS` | *unset; set to `1` where loopback UDP to port 53 does not arrive (WSL2 in mirrored networking), so the DNS fixtures skip instead of hanging* |
 
 `HMTEST_SERVER_INI` is the one that is not a port. A few fixtures write a
 setting the COM API does not carry - an account-lockout threshold, a DNS
