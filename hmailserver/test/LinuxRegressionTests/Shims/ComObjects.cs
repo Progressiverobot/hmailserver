@@ -772,9 +772,18 @@ namespace hMailServer
 
       // ---- What no route offers ----
 
+      /// <summary>
+      ///    The REST fixtures set the password every request of this run already
+      ///    carries, in their SetUp, so that the bench is in the state they assume;
+      ///    here that state is proven by every request that has succeeded, and
+      ///    setting it to what it is is nothing to do. Any other value is a change
+      ///    no route makes.
+      /// </summary>
       public void SetAdministratorPassword(string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorPassword);
+         if (password == TestTarget.AdminPassword)
+            return;
+         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorPassword, password);
       }
 
       public void SetSMTPRelayerPassword(string password)

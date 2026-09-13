@@ -40,7 +40,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class RestApiRoutesAndAliases : TestFixtureBase
    {
-      private const int RestPort = 9123;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9123;
       private const string AdminPassword = "testar";
       private const string RoutePrefix = "restroute-";
       private const string AliasPrefix = "restalias-";
@@ -87,8 +89,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          _application.Reinitialize();
 
@@ -127,7 +128,7 @@ namespace RegressionTests.API
          }
          finally
          {
-            WriteSetting("RestApiPort", "0");
+            RestListener.Stop();
             _application.Reinitialize();
          }
       }

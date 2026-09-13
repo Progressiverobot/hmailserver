@@ -64,7 +64,9 @@ namespace RegressionTests.API
       // Fixed loopback port for the API under test. The listener refuses to run
       // without TLS unless it is bound to 127.0.0.1, which is why this test can
       // speak plain HTTP to it.
-      private const int RestPort = 9510;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9510;
 
       // TestSetup.Authenticate() already expects this to be the administrator
       // password, and the REST API authenticates against the same credential.
@@ -276,8 +278,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          // Explicitly plaintext. These are ini settings, so they survive a run
          // and another fixture (SSL/ListenerTlsConfiguration) sets them; if one
@@ -311,7 +312,7 @@ namespace RegressionTests.API
          {
             DeleteKeyStore();
 
-            IniFileSetting.Write("RestApiPort", "0");
+            RestListener.Stop();
             _application.Reinitialize();
          }
          finally
