@@ -936,6 +936,7 @@ namespace HM
       String GetWebServicesBindAddress() const { return web_services_bind_address_; }
       String GetWebServicesCertificateFile() const { return web_services_certificate_file_; }
       String GetWebServicesPrivateKeyFile() const { return web_services_private_key_file_; }
+      String GetWebServicesTrustedProxies() const { return web_services_trusted_proxies_; }
       bool GetMtaStsHostingEnabled() const { return mta_sts_hosting_enabled_; }
       String GetMtaStsPolicyMode() const { return mta_sts_policy_mode_; }
       int GetMtaStsPolicyMaxAge() const { return mta_sts_policy_max_age_; }
@@ -1258,6 +1259,7 @@ namespace HM
       String web_services_bind_address_;
       String web_services_certificate_file_;
       String web_services_private_key_file_;
+      String web_services_trusted_proxies_;
       bool mta_sts_hosting_enabled_ = true;
       String mta_sts_policy_mode_;
       int mta_sts_policy_max_age_ = 604800;

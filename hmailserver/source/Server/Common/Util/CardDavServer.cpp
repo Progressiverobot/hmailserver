@@ -417,7 +417,10 @@ namespace HM
                   else
                      code = strtol(entity.c_str() + 1, nullptr, 10);
 
-                  if (code <= 0 || code > 0x10ffff)
+                  // Not a character: the surrogate range and the two non-characters
+                  // at the end of the BMP would be invalid UTF-8 reflected into
+                  // the 207, which a strict parser rejects whole.
+                  if (code <= 0 || code > 0x10ffff || (code >= 0xd800 && code <= 0xdfff) || code == 0xfffe || code == 0xffff)
                   {
                      result += c;
                      continue;
@@ -711,6 +714,7 @@ namespace HM
          ResourceKind kind;
          AnsiString href;        // the canonical href, percent-encoded
          ContactRecord contact;  // KindContact only
+         AnsiString slotName;    // KindContactSlot only: the name, decoded
       };
 
       // A member of the address book as the responses see it: the row, the
@@ -744,14 +748,21 @@ namespace HM
          std::vector<Member> members;
       };
 
-      // A stable UID for a contact: a name-based UUID of the account's address
-      // and the row id, marked as version 8 (RFC 9562 section 5.8) because its
-      // bits come from SHA-256. The store has no column for a client's UID, so
-      // the row is what the UID is derived from; the same row gives the same
-      // UID for as long as the account keeps its address.
+      // A name-based UUID of a seed, marked as version 8 (RFC 9562 section 5.8)
+      // because its bits come from SHA-256: the same seed gives the same UID.
+      AnsiString StableUidFromSeed_(const AnsiString &seed);
+
+      // The UID of a contact the webmail made, which has no card and so no UID
+      // of its own: derived from the account's address and the row id, so the
+      // same row gives the same UID for as long as the account keeps its
+      // address. A card a client sent carries its own UID, kept in the row.
       AnsiString StableUid_(const AnsiString &addressUtf8, __int64 id)
       {
-         AnsiString seed = "hMailServer.carddav.contact:" + addressUtf8 + ":" + Int64Text(id);
+         return StableUidFromSeed_("hMailServer.carddav.contact:" + addressUtf8 + ":" + Int64Text(id));
+      }
+
+      AnsiString StableUidFromSeed_(const AnsiString &seed)
+      {
 
          unsigned char digest[SHA256_DIGEST_LENGTH] = {};
          SHA256(reinterpret_cast<const unsigned char *>(seed.c_str()), static_cast<size_t>(seed.GetLength()), digest);
@@ -770,9 +781,24 @@ namespace HM
          return result;
       }
 
-      AnsiString ContactHref(const Context &context, __int64 id)
+      // The resource name a client created the contact under, or <id>.vcf for
+      // a contact the webmail made.
+      AnsiString ContactHref(const Context &context, const ContactRecord &record)
       {
-         return context.bookHref + Int64Text(id) + ".vcf";
+         if (record.uri.IsEmpty())
+            return context.bookHref + Int64Text(record.id) + ".vcf";
+         return context.bookHref + PercentEncodeSegment(Utf8(record.uri));
+      }
+
+      // A username as a log line may carry it: no control characters (a CR
+      // or LF in a Base64-decoded credential would start a line of the
+      // attacker's choosing), and not longer than a name can be.
+      String LogSafe(const String &value)
+      {
+         String text;
+         for (int i = 0; i < value.GetLength() && i < 200; i++)
+            text += value[i] < 32 ? _T('?') : value[i];
+         return text;
       }
 
       AnsiString EtagOf(const AnsiString &card)
@@ -783,10 +809,17 @@ namespace HM
       void FillMember(const Context &context, const ContactRecord &record, Member &member)
       {
          member.record = record;
-         member.uid = StableUid_(context.addressUtf8, record.id);
-         member.card = VCard::Generate(member.uid, Utf8(record.name), Utf8(record.address));
+         member.uid = record.uid.IsEmpty() ? StableUid_(context.addressUtf8, record.id) : Utf8(record.uid);
+
+         // A card a client sent is served as it came, byte for byte, so the
+         // ETag the client was given for it is the ETag of what it reads back
+         // (RFC 9110 section 8.8.3); a row that never came from a client - the
+         // webmail's - is served as a card made from its name and address.
+         member.card = record.vcard.IsEmpty()
+            ? VCard::Generate(member.uid, Utf8(record.name), Utf8(record.address))
+            : Utf8(record.vcard);
          member.etag = EtagOf(member.card);
-         member.href = ContactHref(context, record.id);
+         member.href = ContactHref(context, record);
       }
 
       bool EnsureListed(Context &context)
@@ -939,9 +972,19 @@ namespace HM
             if (segments.size() != 5 || trailingSlash || segments[4].IsEmpty())
                return false;
 
-            // <id>.vcf names a contact of this account; any other name is a
-            // slot a PUT may fill, under the server's name.
+            // The name a client created a contact under names that contact;
+            // <id>.vcf names a contact the webmail made, which has no name of
+            // its own; any other name is a slot a PUT may fill.
             AnsiString name = segments[4];
+            ContactRecord named;
+            if (ContactStore::FindByUri(context.account->GetID(), Wide(name), named))
+            {
+               resource.kind = KindContact;
+               resource.contact = named;
+               resource.href = ContactHref(context, named);
+               return true;
+            }
+
             if (name.EndsWith(".vcf"))
             {
                AnsiString idText = name.Mid(0, name.GetLength() - 4);
@@ -956,11 +999,11 @@ namespace HM
                      id = id * 10 + (idText[i] - '0');
 
                   ContactRecord record;
-                  if (id > 0 && ContactStore::Get(context.account->GetID(), id, record))
+                  if (id > 0 && ContactStore::Get(context.account->GetID(), id, record) && record.uri.IsEmpty())
                   {
                      resource.kind = KindContact;
                      resource.contact = record;
-                     resource.href = ContactHref(context, id);
+                     resource.href = ContactHref(context, record);
                      return true;
                   }
                }
@@ -968,6 +1011,7 @@ namespace HM
 
             resource.kind = KindContactSlot;
             resource.href = context.bookHref + PercentEncodeSegment(name);
+            resource.slotName = name;
             return true;
          }
 
@@ -1453,7 +1497,7 @@ namespace HM
          account = AccountLogon().Logon(request.peer, username, password, disconnect, &viaAppPassword);
          if (!account)
          {
-            LOG_APPLICATION("CardDAV: account authentication failed for " + username + " from " + String(request.peer.ToString()) + ".");
+            LOG_APPLICATION("CardDAV: account authentication failed for " + LogSafe(username) + " from " + String(request.peer.ToString()) + ".");
             return false;
          }
 
@@ -1744,6 +1788,12 @@ namespace HM
          if (!VCard::Parse(request.body, properties, problem))
             return DavError(403, "<C:valid-address-data/>", "The body is not one vCard: " + problem + ".");
 
+         AnsiString legacy;
+         if (VCard::UsesLegacyEncoding(properties, legacy))
+            return DavError(403, "<C:valid-address-data/>",
+               "The card uses a vCard 2.1 encoding this server does not decode (" + legacy +
+               "); send vCard 3.0 or 4.0, UTF-8 throughout.");
+
          AnsiString nameUtf8;
          AnsiString addressUtf8;
          if (!VCard::ExtractNameAndAddress(properties, nameUtf8, addressUtf8))
@@ -1763,6 +1813,23 @@ namespace HM
 
          __int64 accountId = context.account->GetID();
 
+         // The card's own UID is kept; a card without one gets a stable one -
+         // for an existing contact the one it had, for a new one derived from
+         // the name it was created under - so the same card always carries the
+         // same UID and a client never sees a contact change identity.
+         AnsiString uid = VCard::UidOf(properties);
+         if (uid.IsEmpty())
+         {
+            uid = resource.kind == KindContact
+               ? (resource.contact.uid.IsEmpty() ? StableUid_(context.addressUtf8, resource.contact.id) : Utf8(resource.contact.uid))
+               : StableUidFromSeed_("hMailServer.carddav.resource:" + context.addressUtf8 + ":" + resource.slotName);
+         }
+
+         // The card is kept as sent: what a GET returns is what the client
+         // wrote, so the ETag answered here is the ETag of the stored
+         // representation, as RFC 9110 section 9.3.4 requires of a PUT.
+         const AnsiString &card = request.body;
+
          if (resource.kind == KindContact)
          {
             Member current;
@@ -1776,15 +1843,21 @@ namespace HM
             // one address, which the table refuses.
             __int64 other = 0;
             if (ContactStore::FindByAddress(accountId, address, other) && other != resource.contact.id)
+            {
+               ContactRecord otherRecord;
+               AnsiString otherHref = ContactStore::Get(accountId, other, otherRecord) ? ContactHref(context, otherRecord) : AnsiString("");
                return Text(409, "another contact of this address book already has the address " + addressUtf8 +
-                  " (" + ContactHref(context, other) + "); a contact is one address here");
+                  " (" + otherHref + "); a contact is one address here");
+            }
 
-            if (!ContactStore::Update(accountId, resource.contact.id, name, address))
+            if (!ContactStore::UpdateCard(accountId, resource.contact.id, name, address, Wide(uid), Wide(card)))
                return Text(500, "the contact could not be saved");
 
             ContactRecord updated = resource.contact;
             updated.name = name;
             updated.address = address;
+            updated.uid = Wide(uid);
+            updated.vcard = Wide(card);
             Member written;
             FillMember(context, updated, written);
             LOG_DEBUG("CardDAV: " + String(context.addressUtf8) + " updated contact " + StringParser::IntToString(updated.id) + ".");
@@ -1796,19 +1869,33 @@ namespace HM
          if (!PreconditionsHold(request, ""))
             return Text(412, "precondition failed: nothing exists at this URL for If-Match to match");
 
-         // The address may already be a contact of this account - one the
-         // account wrote to, collected by the webmail, or one a client sent
-         // before under another name. That row IS the contact for this
-         // address, so the card becomes its name and the answer points at it.
+         // A contact is one address here. A card for an address the book
+         // already holds - a contact the webmail collected, or one a client
+         // created before under another name - is not a second contact and is
+         // not this one either: the client asked to create, and rewriting the
+         // other contact under its name would leave the client with two copies
+         // of one row. 409 names the contact that has the address.
          __int64 existing = 0;
          ContactRecord record;
          if (ContactStore::FindByAddress(accountId, address, existing))
          {
-            if (!ContactStore::Update(accountId, existing, name, address) || !ContactStore::Get(accountId, existing, record))
-               return Text(500, "the contact could not be saved");
+            ContactRecord existingRecord;
+            AnsiString existingHref = ContactStore::Get(accountId, existing, existingRecord) ? ContactHref(context, existingRecord) : AnsiString("");
+            return Text(409, "this address book already has a contact with the address " + addressUtf8 +
+               " (" + existingHref + "); a contact is one address here - update that one, or delete it first");
          }
-         else if (!ContactStore::Insert(accountId, name, address, ContactStore::SourceManual, record))
+
+         if (!ContactStore::InsertCard(accountId, name, address, Wide(resource.slotName), Wide(uid), Wide(card), record))
          {
+            // Two clients creating the same address at once: the second insert
+            // is refused by the table's unique index, and the answer is the same
+            // 409 as if the first had come a moment earlier.
+            if (ContactStore::FindByAddress(accountId, address, existing))
+            {
+               ContactRecord existingRecord;
+               AnsiString existingHref = ContactStore::Get(accountId, existing, existingRecord) ? ContactHref(context, existingRecord) : AnsiString("");
+               return Text(409, "this address book already has a contact with the address " + addressUtf8 + " (" + existingHref + ")");
+            }
             return Text(500, "the contact could not be saved");
          }
 
@@ -1816,8 +1903,8 @@ namespace HM
          FillMember(context, record, created);
          LOG_DEBUG("CardDAV: " + String(context.addressUtf8) + " created contact " + StringParser::IntToString(record.id) + " at " + String(created.href) + ".");
 
-         // The Location says where the contact lives: the store names its
-         // members by row, and a client that honours it keeps one copy.
+         // The contact lives where the client put it: the Location is the
+         // request's own URL, canonically encoded.
          return Respond(201, "text/plain", "", "ETag: " + created.etag + "\r\nLocation: " + created.href + "\r\n");
       }
 
@@ -1879,15 +1966,15 @@ namespace HM
                href = slash >= 0 ? href.Mid(slash) : AnsiString("/");
             }
 
-            Resource resource;
+            // Matched against the members already in memory, decoded on both
+            // sides so a client's own encoding of the address still matches;
+            // no lookup in the store per href.
+            AnsiString wanted = PercentDecode(href);
             const Member *found = nullptr;
-            if (Resolve(context, href, resource) && resource.kind == KindContact)
+            for (size_t j = 0; !found && j < context.members.size(); j++)
             {
-               for (size_t j = 0; !found && j < context.members.size(); j++)
-               {
-                  if (context.members[j].record.id == resource.contact.id)
-                     found = &context.members[j];
-               }
+               if (PercentDecode(context.members[j].href) == wanted)
+                  found = &context.members[j];
             }
 
             if (found)
@@ -2220,7 +2307,11 @@ namespace HM
       if (!Authenticate(request, context.account, disconnect))
       {
          HttpResponse refusal = Unauthorized();
-         refusal.close = disconnect;
+         // The connection closes with the refusal, whatever the lockout said:
+         // IMAP delays a wrong password before answering (the tarpit), and this
+         // listener has no delay, so a guess costs a new connection instead of
+         // running at wire speed down one kept-alive socket.
+         refusal.close = true;
          return refusal;
       }
 

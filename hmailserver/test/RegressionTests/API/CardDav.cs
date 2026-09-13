@@ -43,7 +43,9 @@ namespace RegressionTests.API
    public class CardDav : TestFixtureBase
    {
       private const int WebServicesPort = 9105;
-      private const int RestPort = 9535;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9535;
       private const string UserPassword = "Original-Passw0rd!";
 
       private const string NsDav = "DAV:";
@@ -83,8 +85,7 @@ namespace RegressionTests.API
          IniFileSetting.Write("WebServicesHttpPort", WebServicesPort.ToString());
          IniFileSetting.Write("WebServicesHttpsPort", "0");
 
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          IniFileSetting.Write("RestApiCertificateFile", "");
          IniFileSetting.Write("RestApiPrivateKeyFile", "");
 
@@ -101,7 +102,7 @@ namespace RegressionTests.API
       public void StopListeners()
       {
          IniFileSetting.Write("WebServicesHttpPort", "0");
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 
@@ -172,11 +173,12 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("PUT with If-None-Match: * creates a contact the REST contacts route then shows; GET returns the same card with the same strong ETag, and the listing carries it")]
+      [Description("PUT with If-None-Match: * creates a contact the REST contacts route then shows; GET under the client's own name returns the card as sent, byte for byte, with the same strong ETag, and the listing carries it")]
       public void PutCreatesAContactTheRestRouteShows()
       {
          string clientName = Book + "6f2c1e2a-3b0c-4d1e-9f7a-0123456789ab.vcf";
-         Response created = Put(clientName, Card("Alice Example", "Example;Alice;;;", "Alice@Example.com"), "If-None-Match: *\r\n");
+         string sent = Card("Alice Example", "Example;Alice;;;", "Alice@Example.com");
+         Response created = Put(clientName, sent, "If-None-Match: *\r\n");
 
          Assert.AreEqual(201, created.Status, "Body: " + created.Body);
 
@@ -184,10 +186,10 @@ namespace RegressionTests.API
          Assert.IsNotNull(etag, "A PUT must answer with the new ETag. Headers: " + created.HeaderText);
          Assert.IsTrue(etag.StartsWith("\"") && etag.EndsWith("\"") && etag.Length > 8, "A strong, quoted ETag: " + etag);
 
-         // The store names its members; the Location says where this one is.
+         // The contact lives where the client put it: the Location is the
+         // request's own URL.
          string location = created.Header("Location");
-         Assert.IsNotNull(location, "Headers: " + created.HeaderText);
-         Assert.IsTrue(location.StartsWith(Book) && location.EndsWith(".vcf"), "Location: " + location);
+         Assert.AreEqual(clientName, location, "Headers: " + created.HeaderText);
 
          // The other surface sees it: the webmail's contacts route.
          Response rest = Rest("GET", "/api/v1/me/contacts");
@@ -202,12 +204,11 @@ namespace RegressionTests.API
          Assert.AreEqual(200, card.Status, "Body: " + card.Body);
          Assert.AreEqual(etag, card.Header("ETag"), "Headers: " + card.HeaderText);
          StringAssert.StartsWith("text/vcard", card.Header("Content-Type"));
-         StringAssert.Contains("BEGIN:VCARD\r\nVERSION:3.0\r\n", card.Body);
-         StringAssert.Contains("\r\nFN:Alice Example\r\n", card.Body);
-         StringAssert.Contains("\r\nN:Example;Alice;;;\r\n", card.Body);
-         StringAssert.Contains("\r\nEMAIL;TYPE=INTERNET,PREF:alice@example.com\r\n", card.Body);
-         StringAssert.Contains("\r\nUID:", card.Body);
-         StringAssert.Contains("\r\nEND:VCARD\r\n", card.Body);
+
+         // Byte for byte what was sent: the client's PRODID, its UID, its
+         // casing of the address - so the ETag the PUT answered is the ETag
+         // of what a GET returns (RFC 9110 section 9.3.4).
+         Assert.AreEqual(sent, card.Body);
 
          // A conditional GET on the ETag is 304.
          Response unchanged = Dav("GET", location, Auth(Address, UserPassword), null, "If-None-Match: " + etag + "\r\n");
@@ -220,9 +221,9 @@ namespace RegressionTests.API
          Assert.AreEqual(etag, PropText(listing, location, "D:getetag"), "Body: " + listing.Body);
          StringAssert.StartsWith("text/vcard", PropText(listing, location, "D:getcontenttype"));
 
-         // The UID is the same on every read: derived from the row, not minted.
+         // The UID is the card's own, on every read.
          Response again = Dav("GET", location, Auth(Address, UserPassword));
-         Assert.AreEqual(Between(card.Body, "\r\nUID:", "\r\n"), Between(again.Body, "\r\nUID:", "\r\n"));
+         Assert.AreEqual(Between(sent, "\r\nUID:", "\r\n"), Between(again.Body, "\r\nUID:", "\r\n"));
       }
 
       [Test]
@@ -457,22 +458,148 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("A create whose address the book already has becomes that contact: the name is taken, the Location names the existing row, and there is still one contact")]
-      public void ACreateOnAnAddressTheBookAlreadyHasBecomesThatContact()
+      [Description("A create for an address the book already has is 409 naming that contact, and changes nothing: the client asked to create, and a contact is one address here")]
+      public void ACreateForAnAddressTheBookAlreadyHasIsRefusedNamingTheContact()
       {
          long id = RestCreate("dave", "dave@example.com");
 
-         Response created = Put(Book + "phone-chosen-name.vcf", Card("David Example", "Example;David;;;", "DAVE@example.com"), "If-None-Match: *\r\n");
-         Assert.AreEqual(201, created.Status, "Body: " + created.Body);
-         Assert.AreEqual(Book + id + ".vcf", created.Header("Location"), "Headers: " + created.HeaderText);
+         Response refused = Put(Book + "phone-chosen-name.vcf", Card("David Example", "Example;David;;;", "DAVE@example.com"), "If-None-Match: *\r\n");
+         Assert.AreEqual(409, refused.Status, "Body: " + refused.Body);
+         StringAssert.Contains(Book + id + ".vcf", refused.Body);
 
+         // Nothing changed: the one contact keeps its name, and the client's
+         // name is not a resource.
          Response rest = Rest("GET", "/api/v1/me/contacts");
-         StringAssert.Contains("\"name\":\"David Example\"", rest.Body);
+         StringAssert.Contains("\"name\":\"dave\"", rest.Body);
          StringAssert.Contains("\"count\":1", rest.Body);
-
-         // The name a client chose is not a resource: the store names its rows.
          Response clientName = Dav("GET", Book + "phone-chosen-name.vcf", Auth(Address, UserPassword));
          Assert.AreEqual(404, clientName.Status, "Body: " + clientName.Body);
+
+         // The existing contact can be given the card, under its own name.
+         Response updated = Put(Book + id + ".vcf", Card("David Example", "Example;David;;;", "dave@example.com"));
+         Assert.AreEqual(204, updated.Status, "Body: " + updated.Body);
+         StringAssert.Contains("\"name\":\"David Example\"", Rest("GET", "/api/v1/me/contacts").Body);
+      }
+
+      [Test]
+      [Description("A card is kept as sent: a phone's TEL, ADR and NOTE survive the round trip under the client's name, a second PUT with the ETag updates it in place, and DELETE under that name removes it")]
+      public void ACardIsKeptAsSentUnderTheClientsName()
+      {
+         string name = Book + "5d2a0f6e-7b1c-4e3d-8a9f-abcdef012345.vcf";
+         string first = string.Join("\r\n", new[]
+         {
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            "PRODID:-//A phone//EN",
+            "UID:5d2a0f6e-7b1c-4e3d-8a9f-abcdef012345",
+            "FN:Frank Example",
+            "N:Example;Frank;;;",
+            "EMAIL;TYPE=INTERNET,PREF:frank@example.com",
+            "TEL;TYPE=CELL:+44 7700 900123",
+            "ADR;TYPE=HOME:;;1 Example Street;Exampletown;;EX1 2MP;GB",
+            "NOTE:Met at the conference.",
+            "END:VCARD",
+            ""
+         });
+
+         Response created = Put(name, first, "If-None-Match: *\r\n");
+         Assert.AreEqual(201, created.Status, "Body: " + created.Body);
+         Assert.AreEqual(name, created.Header("Location"), "Headers: " + created.HeaderText);
+         string etag = created.Header("ETag");
+
+         Response read = Dav("GET", name, Auth(Address, UserPassword));
+         Assert.AreEqual(200, read.Status, "Body: " + read.Body);
+         Assert.AreEqual(first, read.Body, "The card comes back as it was sent, TEL, ADR and NOTE included.");
+         Assert.AreEqual(etag, read.Header("ETag"));
+
+         // The webmail sees the name and address the card carries.
+         Response rest = Rest("GET", "/api/v1/me/contacts");
+         StringAssert.Contains("\"name\":\"Frank Example\"", rest.Body);
+         StringAssert.Contains("\"address\":\"frank@example.com\"", rest.Body);
+
+         // A second PUT with the ETag replaces the card in place: the same name,
+         // a new ETag, the new TEL.
+         string second = first.Replace("+44 7700 900123", "+44 7700 900999");
+         Response updated = Put(name, second, "If-Match: " + etag + "\r\n");
+         Assert.AreEqual(204, updated.Status, "Body: " + updated.Body);
+         Assert.AreNotEqual(etag, updated.Header("ETag"));
+         Response reread = Dav("GET", name, Auth(Address, UserPassword));
+         Assert.AreEqual(second, reread.Body);
+         Assert.AreEqual(updated.Header("ETag"), reread.Header("ETag"));
+
+         // The listing names it by the client's name, and the multiget answers it there.
+         Response listing = Propfind(Book, "1", "<D:getetag/>");
+         CollectionAssert.Contains(Hrefs(listing), name, "Body: " + listing.Body);
+         Response multiget = Report(Book, "<C:addressbook-multiget xmlns:D=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:carddav\"><D:prop><D:getetag/><C:address-data/></D:prop><D:href>" + name + "</D:href></C:addressbook-multiget>");
+         Assert.AreEqual(207, multiget.Status, "Body: " + multiget.Body);
+         StringAssert.Contains("TEL;TYPE=CELL:+44 7700 900999", PropText(multiget, name, "C:address-data"));
+
+         Response deleted = Dav("DELETE", name, Auth(Address, UserPassword));
+         Assert.AreEqual(204, deleted.Status, "Body: " + deleted.Body);
+         Assert.AreEqual(404, Dav("GET", name, Auth(Address, UserPassword)).Status);
+         StringAssert.Contains("\"contacts\":[]", Rest("GET", "/api/v1/me/contacts").Body);
+      }
+
+      [Test]
+      [Description("A change made in the webmail is written into the stored card: the FN and EMAIL follow, the TEL and UID stay, and the ETag changes")]
+      public void AWebmailEditIsWrittenIntoTheStoredCard()
+      {
+         string name = Book + "grace.vcf";
+         string sent = string.Join("\r\n", new[]
+         {
+            "BEGIN:VCARD",
+            "VERSION:3.0",
+            "UID:grace-0001",
+            "FN:Grace Example",
+            "N:Example;Grace;;;",
+            "EMAIL;TYPE=INTERNET,PREF:grace@example.com",
+            "TEL;TYPE=CELL:+44 7700 900456",
+            "END:VCARD",
+            ""
+         });
+         Response created = Put(name, sent, "If-None-Match: *\r\n");
+         Assert.AreEqual(201, created.Status, "Body: " + created.Body);
+
+         Response listing = Rest("GET", "/api/v1/me/contacts");
+         long id = long.Parse(Between(listing.Body, "\"id\":", ","));
+
+         Response renamed = Rest("PUT", "/api/v1/me/contacts/" + id, "{\"name\":\"Grace Renamed\",\"address\":\"grace.renamed@example.com\"}");
+         Assert.AreEqual(200, renamed.Status, "Body: " + renamed.Body);
+
+         Response read = Dav("GET", name, Auth(Address, UserPassword));
+         Assert.AreEqual(200, read.Status, "Body: " + read.Body);
+         Assert.AreNotEqual(created.Header("ETag"), read.Header("ETag"), "A card that changed has a new ETag.");
+         StringAssert.Contains("\r\nFN:Grace Renamed\r\n", read.Body);
+         StringAssert.Contains("\r\nN:Renamed;Grace;;;\r\n", read.Body);
+         StringAssert.Contains("\r\nEMAIL;TYPE=INTERNET,PREF:grace.renamed@example.com\r\n", read.Body);
+         StringAssert.Contains("\r\nTEL;TYPE=CELL:+44 7700 900456\r\n", read.Body);
+         StringAssert.Contains("\r\nUID:grace-0001\r\n", read.Body);
+         StringAssert.StartsWith("BEGIN:VCARD\r\nVERSION:3.0\r\n", read.Body);
+      }
+
+      [Test]
+      [Description("A vCard 2.1 encoding is refused with CARDDAV:valid-address-data naming it, rather than stored as it would be read; a numeric character reference to a surrogate in a report is not reflected into the 207")]
+      public void LegacyEncodingsAreRefusedAndBadReferencesAreNotReflected()
+      {
+         string legacy = string.Join("\r\n", new[]
+         {
+            "BEGIN:VCARD",
+            "VERSION:2.1",
+            "FN;ENCODING=QUOTED-PRINTABLE:Ren=C3=A9",
+            "EMAIL;INTERNET:rene@example.com",
+            "END:VCARD",
+            ""
+         });
+         Response refused = Put(Book + "rene.vcf", legacy, "If-None-Match: *\r\n");
+         Assert.AreEqual(403, refused.Status, "Body: " + refused.Body);
+         StringAssert.Contains("valid-address-data", refused.Body);
+         StringAssert.Contains("QUOTED-PRINTABLE", refused.Body);
+         StringAssert.Contains("\"contacts\":[]", Rest("GET", "/api/v1/me/contacts").Body);
+
+         RestCreate("Alice Example", "alice@example.com");
+         Response multiget = Report(Book, "<C:addressbook-multiget xmlns:D=\"DAV:\" xmlns:C=\"urn:ietf:params:xml:ns:carddav\"><D:prop><D:getetag/></D:prop><D:href>" + Book + "&#xD800;&#xFFFE;no-such.vcf</D:href></C:addressbook-multiget>");
+         Assert.AreEqual(207, multiget.Status, "Body: " + multiget.Body);
+         Assert.DoesNotThrow(() => Parse(multiget), "The 207 must stay well-formed XML whatever the client put in an href.");
       }
 
       [Test]

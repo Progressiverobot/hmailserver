@@ -517,4 +517,170 @@ namespace HM
       card += "END:VCARD\r\n";
       return card;
    }
+
+   AnsiString
+   VCard::Serialize(const std::vector<VCardProperty> &properties)
+   {
+      AnsiString card = "BEGIN:VCARD\r\n";
+
+      // VERSION comes straight after BEGIN in both 3.0 (RFC 2426 section 3.6.9)
+      // and 4.0 (RFC 6350 section 6.7.9), wherever the client had it.
+      const VCardProperty *version = nullptr;
+      for (size_t i = 0; !version && i < properties.size(); i++)
+         if (properties[i].name == "VERSION")
+            version = &properties[i];
+
+      card += Fold("VERSION:" + (version ? Trimmed(version->value) : AnsiString("3.0"))) + "\r\n";
+
+      for (size_t i = 0; i < properties.size(); i++)
+      {
+         const VCardProperty &property = properties[i];
+         if (&property == version)
+            continue;
+
+         AnsiString line = property.group.IsEmpty() ? property.name : property.group + "." + property.name;
+         for (size_t j = 0; j < property.parameters.size(); j++)
+         {
+            const AnsiString &value = property.parameters[j].second;
+            // The parser took the quotes off; a value with a delimiter in it gets them back.
+            bool quote = value.Find(";") >= 0 || value.Find(":") >= 0 || value.Find(",") >= 0;
+            line += ";" + property.parameters[j].first + "=" + (quote ? "\"" + value + "\"" : value);
+         }
+         line += ":" + property.value;
+         card += Fold(line) + "\r\n";
+      }
+
+      card += "END:VCARD\r\n";
+      return card;
+   }
+
+   AnsiString
+   VCard::UidOf(const std::vector<VCardProperty> &properties)
+   {
+      for (size_t i = 0; i < properties.size(); i++)
+         if (properties[i].name == "UID")
+            return Trimmed(Unescape(properties[i].value));
+      return "";
+   }
+
+   bool
+   VCard::UsesLegacyEncoding(const std::vector<VCardProperty> &properties, AnsiString &which)
+   {
+      for (size_t i = 0; i < properties.size(); i++)
+      {
+         const VCardProperty &property = properties[i];
+         for (size_t j = 0; j < property.parameters.size(); j++)
+         {
+            AnsiString value = property.parameters[j].second;
+            value.ToUpper();
+            if (property.parameters[j].first == "ENCODING" && value == "QUOTED-PRINTABLE")
+            {
+               which = property.name + ";ENCODING=QUOTED-PRINTABLE";
+               return true;
+            }
+            if (property.parameters[j].first == "CHARSET")
+            {
+               which = property.name + ";CHARSET=" + property.parameters[j].second;
+               return true;
+            }
+         }
+      }
+      return false;
+   }
+
+   AnsiString
+   VCard::WithNameAndAddress(const AnsiString &card, const AnsiString &uid, const AnsiString &name, const AnsiString &address)
+   {
+      std::vector<VCardProperty> properties;
+      AnsiString problem;
+      if (!Parse(card, properties, problem))
+         return Generate(uid, name, address);
+
+      AnsiString family;
+      AnsiString given;
+      SplitName(name, family, given);
+      AnsiString formattedName = Trimmed(name).IsEmpty() ? address : Trimmed(name);
+
+      VCardProperty *fn = nullptr;
+      VCardProperty *n = nullptr;
+      VCardProperty *email = nullptr;
+      bool emailPreferred = false;
+      int emailPreference = NoPreference;
+      bool hasUid = false;
+
+      for (size_t i = 0; i < properties.size(); i++)
+      {
+         VCardProperty &property = properties[i];
+         if (property.name == "FN" && !fn)
+            fn = &property;
+         else if (property.name == "N" && !n)
+            n = &property;
+         else if (property.name == "UID")
+            hasUid = true;
+         else if (property.name == "EMAIL")
+         {
+            // The same choice ExtractNameAndAddress makes, so the address the
+            // row holds is the one the card's preferred EMAIL carries.
+            bool preferred = false;
+            int preference = NoPreference;
+            if (property.HasParameter("TYPE", "PREF"))
+            {
+               preferred = true;
+               preference = 0;
+            }
+            AnsiString prefValue = property.Parameter("PREF");
+            if (!prefValue.IsEmpty())
+            {
+               preferred = true;
+               int parsed = atoi(prefValue.c_str());
+               preference = parsed < 1 ? 1 : parsed;
+            }
+            if (!email || (preferred && (!emailPreferred || preference < emailPreference)))
+            {
+               email = &property;
+               emailPreference = preference;
+               emailPreferred = preferred;
+            }
+         }
+      }
+
+      if (fn)
+         fn->value = Escape(formattedName);
+      if (n)
+         n->value = Escape(family) + ";" + Escape(given) + ";;;";
+      if (email)
+         email->value = Escape(address);
+
+      if (!fn)
+      {
+         VCardProperty property;
+         property.name = "FN";
+         property.value = Escape(formattedName);
+         properties.push_back(property);
+      }
+      if (!n)
+      {
+         VCardProperty property;
+         property.name = "N";
+         property.value = Escape(family) + ";" + Escape(given) + ";;;";
+         properties.push_back(property);
+      }
+      if (!email)
+      {
+         VCardProperty property;
+         property.name = "EMAIL";
+         property.parameters.push_back(std::make_pair(AnsiString("TYPE"), AnsiString("INTERNET,PREF")));
+         property.value = Escape(address);
+         properties.push_back(property);
+      }
+      if (!hasUid && !uid.IsEmpty())
+      {
+         VCardProperty property;
+         property.name = "UID";
+         property.value = uid;
+         properties.push_back(property);
+      }
+
+      return Serialize(properties);
+   }
 }

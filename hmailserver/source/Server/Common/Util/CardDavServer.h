@@ -22,14 +22,18 @@
 // over plain HTTP, with no proxy saying X-Forwarded-Proto: https, the answer is
 // 403 with the reason, because Basic puts the password on the wire.
 //
-// What the store cannot hold is refused, never silently dropped: a card with no
-// EMAIL is answered 403, since a contact here is a name and one address; the
-// other properties a client sends (TEL, ADR, ORG, NOTE, PHOTO) are not kept,
-// and the card the server returns says so by not carrying them. A client that
-// creates a contact under a name of its own choosing gets the contact back
-// under the server's name, <id>.vcf, in the Location header of the 201 - the
-// store has no column for a client's resource name or UID, so both are derived
-// from the row: see StableUid_ and CardDavServer.cpp.
+// A card is kept as the client sent it (hm_contacts.contactvcard, schema
+// 6040), under the resource name the client chose (contacturi) and with its
+// own UID (contactuid), and is served back byte for byte - so the ETag a PUT
+// answers is the ETag of what a GET returns, and a phone that stored TEL and
+// PHOTO reads them back. The row's name and address are taken from the card
+// (FN, N, the preferred EMAIL) for the webmail's address book, and a change
+// the webmail makes to them is written back into the card. What the store
+// cannot hold is refused, never silently dropped: a card with no EMAIL is
+// answered 403, since a contact here has one address, and a card whose address
+// another contact of the book already has is answered 409 naming that contact.
+// A contact the webmail made has no name of its own and is served as <id>.vcf,
+// with a UID derived from the row (StableUid_).
 
 #pragma once
 

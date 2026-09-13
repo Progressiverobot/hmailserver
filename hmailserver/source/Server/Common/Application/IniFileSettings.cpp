@@ -777,6 +777,7 @@ namespace HM
       web_services_bind_address_ = ReadIniSettingString_("Settings", "WebServicesBindAddress", "0.0.0.0");
       web_services_certificate_file_ = ReadIniSettingString_("Settings", "WebServicesCertificateFile", "");
       web_services_private_key_file_ = ReadIniSettingString_("Settings", "WebServicesPrivateKeyFile", "");
+      web_services_trusted_proxies_ = ReadIniSettingString_("Settings", "WebServicesTrustedProxies", "");
       mta_sts_hosting_enabled_ = ReadIniSettingInteger_("Settings", "MtaStsHostingEnabled", 1) == 1;
       mta_sts_policy_mode_ = ReadIniSettingString_("Settings", "MtaStsPolicyMode", "enforce");
       mta_sts_policy_max_age_ = ReadIniSettingInteger_("Settings", "MtaStsPolicyMaxAge", 604800);

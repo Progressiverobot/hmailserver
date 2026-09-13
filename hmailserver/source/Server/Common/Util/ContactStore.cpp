@@ -6,6 +6,8 @@
 
 #include "StdAfx.h"
 #include "ContactStore.h"
+#include "VCard.h"
+#include "Unicode.h"
 #include "Time.h"
 #include "../SQL/SQLCommand.h"
 #include "../SQL/SQLStatement.h"
@@ -39,6 +41,9 @@ namespace HM
          contact.address = recordset->GetStringValue("contactaddress");
          contact.source = (int) recordset->GetLongValue("contactsource");
          contact.created = recordset->GetStringValue("contactcreated");
+         contact.uri = recordset->GetStringValue("contacturi");
+         contact.uid = recordset->GetStringValue("contactuid");
+         contact.vcard = recordset->GetStringValue("contactvcard");
       }
    }
 
@@ -47,7 +52,7 @@ namespace HM
    {
       contacts.clear();
 
-      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated from hm_contacts where contactaccountid = @ACCOUNTID order by contactname asc, contactaddress asc");
+      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated, contacturi, contactuid, contactvcard from hm_contacts where contactaccountid = @ACCOUNTID order by contactname asc, contactaddress asc");
       command.AddParameter("@ACCOUNTID", accountId);
 
       std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
@@ -68,7 +73,7 @@ namespace HM
    bool
    ContactStore::Get(__int64 accountId, __int64 id, ContactRecord &contact)
    {
-      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated from hm_contacts where contactid = @ID and contactaccountid = @ACCOUNTID");
+      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated, contacturi, contactuid, contactvcard from hm_contacts where contactid = @ID and contactaccountid = @ACCOUNTID");
       command.AddParameter("@ID", id);
       command.AddParameter("@ACCOUNTID", accountId);
 
@@ -115,6 +120,9 @@ namespace HM
       statement.AddColumn("contactaddress", address);
       statement.AddColumnInt64("contactsource", source);
       statement.AddColumnDate("contactcreated", Time::GetDateFromSystemDate(inserted.created));
+      statement.AddColumn("contacturi", String());
+      statement.AddColumn("contactuid", String());
+      statement.AddColumn("contactvcard", String());
 
       __int64 id = 0;
       if (!Application::Instance()->GetDBManager()->Execute(statement, &id) || id <= 0)
@@ -132,6 +140,94 @@ namespace HM
       statement.SetStatementType(SQLStatement::STUpdate);
       statement.AddColumn("contactname", name);
       statement.AddColumn("contactaddress", address);
+
+      // A card a client stored for this contact follows the change: the name
+      // and address the webmail wrote become its FN, N and preferred EMAIL, and
+      // everything else in it stays. Left as it was, the next sync would hand
+      // the client a card that contradicts the row.
+      ContactRecord current;
+      if (Get(accountId, id, current) && !current.vcard.IsEmpty())
+      {
+         AnsiString card, uid, nameUtf8, addressUtf8;
+         Unicode::WideToMultiByte(current.vcard, card);
+         Unicode::WideToMultiByte(current.uid, uid);
+         Unicode::WideToMultiByte(name, nameUtf8);
+         Unicode::WideToMultiByte(address, addressUtf8);
+
+         String rewritten;
+         if (!Unicode::MultiByteToWide(VCard::WithNameAndAddress(card, uid, nameUtf8, addressUtf8), rewritten))
+            rewritten = String();
+         statement.AddColumn("contactvcard", rewritten);
+      }
+
+      statement.SetWhereClause("contactid = " + Int64Text(id) + " and contactaccountid = " + Int64Text(accountId));
+
+      return Application::Instance()->GetDBManager()->Execute(statement);
+   }
+
+   bool
+   ContactStore::FindByUri(__int64 accountId, const String &uri, ContactRecord &contact)
+   {
+      if (uri.IsEmpty())
+         return false;
+
+      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated, contacturi, contactuid, contactvcard from hm_contacts where contactaccountid = @ACCOUNTID and contacturi = @URI");
+      command.AddParameter("@ACCOUNTID", accountId);
+      command.AddParameter("@URI", uri);
+
+      std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
+      if (!recordset || recordset->IsEOF())
+         return false;
+
+      ReadRecord(recordset, contact);
+      return true;
+   }
+
+   bool
+   ContactStore::InsertCard(__int64 accountId, const String &name, const String &address, const String &uri,
+                            const String &uid, const String &vcard, ContactRecord &inserted)
+   {
+      inserted = ContactRecord();
+      inserted.name = name;
+      inserted.address = address;
+      inserted.source = SourceManual;
+      inserted.created = Time::GetCurrentDateTime();
+      inserted.uri = uri;
+      inserted.uid = uid;
+      inserted.vcard = vcard;
+
+      SQLStatement statement;
+      statement.SetTable("hm_contacts");
+      statement.SetStatementType(SQLStatement::STInsert);
+      statement.SetIdentityColumn("contactid");
+      statement.AddColumnInt64("contactaccountid", accountId);
+      statement.AddColumn("contactname", name);
+      statement.AddColumn("contactaddress", address);
+      statement.AddColumnInt64("contactsource", SourceManual);
+      statement.AddColumnDate("contactcreated", Time::GetDateFromSystemDate(inserted.created));
+      statement.AddColumn("contacturi", uri);
+      statement.AddColumn("contactuid", uid);
+      statement.AddColumn("contactvcard", vcard);
+
+      __int64 id = 0;
+      if (!Application::Instance()->GetDBManager()->Execute(statement, &id) || id <= 0)
+         return false;
+
+      inserted.id = id;
+      return true;
+   }
+
+   bool
+   ContactStore::UpdateCard(__int64 accountId, __int64 id, const String &name, const String &address,
+                            const String &uid, const String &vcard)
+   {
+      SQLStatement statement;
+      statement.SetTable("hm_contacts");
+      statement.SetStatementType(SQLStatement::STUpdate);
+      statement.AddColumn("contactname", name);
+      statement.AddColumn("contactaddress", address);
+      statement.AddColumn("contactuid", uid);
+      statement.AddColumn("contactvcard", vcard);
       statement.SetWhereClause("contactid = " + Int64Text(id) + " and contactaccountid = " + Int64Text(accountId));
 
       return Application::Instance()->GetDBManager()->Execute(statement);

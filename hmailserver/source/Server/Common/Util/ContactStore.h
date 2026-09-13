@@ -24,6 +24,15 @@ namespace HM
       String address;   // lower-cased
       int source;
       String created;   // hMailServer system date, YYYY-MM-DD HH:MM:SS
+
+      // What CardDAV keeps beside the name and address (schema 6040): the
+      // resource name a client created the contact under - empty for a row the
+      // webmail made, which CardDAV serves as <id>.vcf - the card's UID, and the
+      // card as the client sent it, empty for a row that never came from a
+      // client, for which CardDAV makes a card from the name and address.
+      String uri;
+      String uid;
+      String vcard;
    };
 
    class ContactStore
@@ -45,7 +54,23 @@ namespace HM
       static bool FindByAddress(__int64 accountId, const String &address, __int64 &id);
 
       static bool Insert(__int64 accountId, const String &name, const String &address, int source, ContactRecord &inserted);
+
+      // A new name and address for a contact. A card stored for it follows:
+      // its FN, N and preferred EMAIL become the name and address, and the
+      // rest of the card - the properties this store has no columns for - stays
+      // as the client sent it.
       static bool Update(__int64 accountId, __int64 id, const String &name, const String &address);
+
+      // The contact a CardDAV client created under this resource name, if any.
+      static bool FindByUri(__int64 accountId, const String &uri, ContactRecord &contact);
+
+      // A contact from a CardDAV client: the card is kept as sent, under the
+      // client's resource name and UID; and a card sent for an existing contact,
+      // whose name and address it also carries.
+      static bool InsertCard(__int64 accountId, const String &name, const String &address, const String &uri,
+                             const String &uid, const String &vcard, ContactRecord &inserted);
+      static bool UpdateCard(__int64 accountId, __int64 id, const String &name, const String &address,
+                             const String &uid, const String &vcard);
 
       // False when there was no such contact of this account.
       static bool Delete(__int64 accountId, __int64 id);

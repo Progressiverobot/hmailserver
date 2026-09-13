@@ -22,6 +22,7 @@
 #include "../BO/TCPIPPorts.h"
 #include "../BO/SSLCertificate.h"
 #include "../TCPIP/DNSResolver.h"
+#include "../TCPIP/ProxyProtocol.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
@@ -653,7 +654,7 @@ namespace HM
          // account, over HTTPS. CardDavServer answers the plain-HTTP case
          // itself, with the reason, rather than this dispatch hiding it.
          if (CardDavServer::IsDavTarget(path))
-            return CardDavServer::Handle(httpRequest, RequestArrivedOverHttps_(request, over_tls));
+            return CardDavServer::Handle(httpRequest, RequestArrivedOverHttps_(request, over_tls, httpRequest.peer));
 
          // ACME http-01 challenges.
          AnsiString challengePrefix = "/.well-known/acme-challenge/";
@@ -681,7 +682,7 @@ namespace HM
          if (path == "/.well-known/caldav" || path == "/.well-known/carddav")
          {
             bool calendar = path == "/.well-known/caldav";
-            return HandleWellKnownDavRedirect_(calendar, calendar ? AnsiString("") : BuiltInCardDavUrl_(request, over_tls));
+            return HandleWellKnownDavRedirect_(calendar, calendar ? AnsiString("") : BuiltInCardDavUrl_(request, over_tls, httpRequest.peer));
          }
 
          if (IniFileSettings::Instance()->GetAutoconfigEnabled())
@@ -705,7 +706,7 @@ namespace HM
                // X-Forwarded-Proto; without either, the request is sent on to the
                // HTTPS listener when one is configured and refused with the reason
                // when none is.
-               if (!RequestArrivedOverHttps_(request, over_tls))
+               if (!RequestArrivedOverHttps_(request, over_tls, httpRequest.peer))
                   return RefusePlainHttpProfile_(host, path, query);
 
                return HandleAppleProfile_(host, query);
@@ -796,10 +797,21 @@ namespace HM
    }
 
    bool
-   WebServicesServer::RequestArrivedOverHttps_(const AnsiString &request, bool over_tls)
+   WebServicesServer::RequestArrivedOverHttps_(const AnsiString &request, bool over_tls, const IPAddress &peer)
    {
       if (over_tls)
          return true;
+
+      // Only a proxy this server was told to trust may say the client came over
+      // HTTPS: the header travels in clear, and anyone who can reach the plain
+      // listener can write it. Loopback is trusted as it is - a proxy on the
+      // same machine is the common arrangement - and any other address has to
+      // be named in [Settings] WebServicesTrustedProxies. From anyone else the
+      // header is ignored and the request is what it is: plain HTTP.
+      AnsiString peerText = peer.ToString();
+      bool loopback = peerText == "::1" || peerText.StartsWith("127.");
+      if (!loopback && !TrustedProxyList::Matches(IniFileSettings::Instance()->GetWebServicesTrustedProxies(), peer))
+         return false;
 
       // X-Forwarded-Proto is the de facto header for this (RFC 7239's Forwarded
       // is rarer in practice); the first value is the protocol the client used,
@@ -1247,7 +1259,7 @@ namespace HM
    }
 
    AnsiString
-   WebServicesServer::BuiltInCardDavUrl_(const AnsiString &request, bool over_tls)
+   WebServicesServer::BuiltInCardDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer)
    {
       AnsiString hostWithPort = GetRequestHostHeader_(request);
       if (hostWithPort.IsEmpty())
@@ -1257,7 +1269,7 @@ namespace HM
          return CardDavServer::ContextPath;
       }
 
-      if (RequestArrivedOverHttps_(request, over_tls))
+      if (RequestArrivedOverHttps_(request, over_tls, peer))
          return "https://" + hostWithPort + CardDavServer::ContextPath;
 
       // Over plain HTTP, /dav/ refuses Basic with the reason. When an HTTPS

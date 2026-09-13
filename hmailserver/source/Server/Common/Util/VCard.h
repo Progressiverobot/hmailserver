@@ -70,5 +70,22 @@ namespace HM
       // The N derived from a display name: "Family, Given" splits on the comma,
       // "Given Family" on the last space, a single word is a given name.
       static void SplitName(const AnsiString &name, AnsiString &family, AnsiString &given);
+
+      // The card as text again: BEGIN, VERSION first (3.0 unless the card says
+      // otherwise), every property as it is, END.
+      static AnsiString Serialize(const std::vector<VCardProperty> &properties);
+
+      // The UID property's value, unescaped and trimmed, or empty.
+      static AnsiString UidOf(const std::vector<VCardProperty> &properties);
+
+      // Whether the card uses a vCard 2.1 encoding this server does not decode -
+      // ENCODING=QUOTED-PRINTABLE, or a CHARSET parameter - and on which
+      // property. Such a card is refused rather than stored as it would be read.
+      static bool UsesLegacyEncoding(const std::vector<VCardProperty> &properties, AnsiString &which);
+
+      // The stored card with its FN, N and preferred EMAIL replaced by a name and
+      // an address, everything else kept; a UID added when the card has none; a
+      // card that does not parse replaced by a generated one.
+      static AnsiString WithNameAndAddress(const AnsiString &card, const AnsiString &uid, const AnsiString &name, const AnsiString &address);
    };
 }

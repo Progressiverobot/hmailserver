@@ -425,7 +425,10 @@ create table hm_contacts
 	contactname varchar(255) not null,
 	contactaddress varchar(255) not null,
 	contactsource smallint not null,
-	contactcreated timestamp not null
+	contactcreated timestamp not null,
+	contacturi varchar(255) not null default '',
+	contactuid varchar(255) not null default '',
+	contactvcard text not null default ''
 );
 
 CREATE UNIQUE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);
@@ -1121,4 +1124,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6039);
+insert into hm_dbversion values (6040);

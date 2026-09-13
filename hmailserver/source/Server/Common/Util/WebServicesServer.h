@@ -115,7 +115,7 @@ namespace HM
 
       // True when the request reached this listener over TLS, or a proxy that
       // terminated TLS on the client's behalf says so in X-Forwarded-Proto.
-      static bool RequestArrivedOverHttps_(const AnsiString &request, bool over_tls);
+      static bool RequestArrivedOverHttps_(const AnsiString &request, bool over_tls, const IPAddress &peer);
       // The answer to a configuration profile asked for over plain HTTP: the same
       // URL on the HTTPS listener when one is configured, otherwise 403 with the
       // reason.
@@ -142,7 +142,7 @@ namespace HM
       // the client used and over HTTPS: the HTTPS listener's port when the
       // request came over plain HTTP and one is configured. Relative when the
       // request named no host.
-      static AnsiString BuiltInCardDavUrl_(const AnsiString &request, bool over_tls);
+      static AnsiString BuiltInCardDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer);
 
       // The Host header as sent, port included, lower-cased; empty when
       // absent or not printable US-ASCII without spaces. GetRequestHost_

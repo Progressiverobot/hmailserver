@@ -554,7 +554,10 @@ create table hm_contacts
 	contactname nvarchar(255) not null,
 	contactaddress nvarchar(255) not null,
 	contactsource tinyint not null,
-	contactcreated datetime not null
+	contactcreated datetime not null,
+	contacturi nvarchar(255) not null default '',
+	contactuid nvarchar(255) not null default '',
+	contactvcard ntext not null default ''
 )
 
 ALTER TABLE hm_contacts ADD CONSTRAINT hm_contacts_pk PRIMARY KEY NONCLUSTERED (contactid)
@@ -1312,4 +1315,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6039)
+insert into hm_dbversion values (6040)

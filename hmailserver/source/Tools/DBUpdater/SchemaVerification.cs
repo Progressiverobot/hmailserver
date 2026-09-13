@@ -459,7 +459,15 @@ namespace DBUpdater
          // DPAPI envelope for an eleven-character password is 314 characters, and
          // the column was 255 (probing proves the column exists, not its width).
          new SchemaProbe(6039, "hm_domains.domainrelaypassword",
-                         "update hm_domains set domainrelaypassword = domainrelaypassword where 1 = 0")
+                         "update hm_domains set domainrelaypassword = domainrelaypassword where 1 = 0"),
+         // Upgrade6039to6040* - a contact's CardDAV resource name, its UID, and the
+         // card as the client sent it, so a sync round-trips the whole card.
+         new SchemaProbe(6040, "hm_contacts.contacturi",
+                         "update hm_contacts set contacturi = contacturi where 1 = 0"),
+         new SchemaProbe(6040, "hm_contacts.contactuid",
+                         "update hm_contacts set contactuid = contactuid where 1 = 0"),
+         new SchemaProbe(6040, "hm_contacts.contactvcard",
+                         "update hm_contacts set contactvcard = contactvcard where 1 = 0")
       };
 
       /// <summary>
