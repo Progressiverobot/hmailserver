@@ -199,7 +199,7 @@ namespace RegressionTests.AntiSpam
          var sMessageContents = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, "test");
          if (sMessageContents.Contains("X-hMailServer-Spam") ||
              sMessageContents.Contains("ThisIsSpam"))
-            throw new Exception("Spam message etected as spam even though it's larger than max spam size.");
+            throw new Exception("Spam message detected as spam even though it's larger than max spam size.");
 
          surblServer.Active = false;
          surblServer.Save();
@@ -286,7 +286,7 @@ namespace RegressionTests.AntiSpam
       }
 
       [Test]
-      public void TestMultiLineSurblImproperlyTerminaetdLine()
+      public void TestMultiLineSurblImproperlyTerminatedLine()
       {
          // Create a test account
          // Fetch the default domain
