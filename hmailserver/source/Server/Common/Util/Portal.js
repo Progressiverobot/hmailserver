@@ -712,7 +712,7 @@
     renderBulk();
     renderCount(page);
     renderSearchNote(list, page);
-    if (current) { renderConversation(current); }
+    if (current) { renderConversation(current, page); }
     if (current) { listRows.forEach(function (r) { r.row.classList.toggle('open', r.id === current.id || (r.ids || []).indexOf(current.id) >= 0); }); }
   };
   var listingKey = function () { return state.everywhere + '|' + state.folderId + '|' + state.query + '|' + state.before; };
@@ -3913,12 +3913,13 @@
 
   // ---- The rest of a conversation, above the message opened ---------------
   var conversationOpen = {};
-  var renderConversation = function (m) {
+  var renderConversation = function (m, page) {
     var box = el('conversation');
     clear(box);
-    if (!lastListing || !lastListing.page || pref('view') !== 'threads' || lastListing.page.query) { return; }
+    page = page || (lastListing && lastListing.page);
+    if (!page || pref('view') !== 'threads' || page.query) { return; }
     var key = threadKey(m);
-    var others = lastListing.page.messages.filter(function (x) { return x.id !== m.id && threadKey(x) === key; });
+    var others = page.messages.filter(function (x) { return x.id !== m.id && threadKey(x) === key; });
     if (!others.length) { return; }
     others.sort(function (a, b) { var da = dateOf(a), db = dateOf(b); return (da ? da.getTime() : 0) - (db ? db.getTime() : 0); });
     box.appendChild(node('div', tf('{0} earlier messages in this conversation', others.length), 'count'));
