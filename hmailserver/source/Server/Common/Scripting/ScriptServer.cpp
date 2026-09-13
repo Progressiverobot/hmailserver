@@ -420,6 +420,16 @@ namespace HM
          return "";
 
 #ifdef HM_PLATFORM_POSIX
+      // With scripting switched off, a script file is left alone: no handler
+      // would run whether it compiled or not, so nothing is lost by installing
+      // nothing, and the report below - which the message tells the operator
+      // is stopped by switching scripting off - is not made. LoadScripts runs
+      // at every reload regardless of the switch, so without this a file left
+      // behind by a test, or by an install migrated from Windows, was reported
+      // as an error at every reinitialise for as long as it existed.
+      if (!Configuration::Instance()->GetUseScriptServer())
+         return "";
+
       // A script exists and this platform has no engine to compile it in. The
       // caller treats a non-empty return as "the load failed", which is exactly
       // right: nothing is installed, no handler flag is set, and LoadScripts

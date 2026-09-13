@@ -55,7 +55,7 @@ namespace RegressionTests.Security
       [Test]
       public void AnRs256TokenIsVerifiedWithTheKeyTheJwkSetPublishesUnderItsKid()
       {
-         using (var rsa = new RSACng(2048))
+         using (var rsa = RSA.Create(2048))
          using (var provider = new FakeHttpEndpoint(200, JwkSet(RsaJwk(rsa, "key-1"))))
          {
             EnableJwks(provider.UrlFor("/.well-known/jwks.json"), "RS256");
@@ -74,7 +74,7 @@ namespace RegressionTests.Security
       [Test]
       public void AnEs256TokenIsVerifiedWithTheP256KeyTheJwkSetPublishes()
       {
-         using (var ecdsa = new ECDsaCng(ECCurve.NamedCurves.nistP256))
+         using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
          using (var provider = new FakeHttpEndpoint(200, JwkSet(EcJwk(ecdsa, "ec-1"))))
          {
             EnableJwks(provider.UrlFor("/jwks"), "ES256");
@@ -87,8 +87,8 @@ namespace RegressionTests.Security
       [Test]
       public void AKeyRotationIsPickedUpWhenATokenNamesAKidTheCacheDoesNotHold()
       {
-         using (var oldKey = new RSACng(2048))
-         using (var newKey = new RSACng(2048))
+         using (var oldKey = RSA.Create(2048))
+         using (var newKey = RSA.Create(2048))
          using (var provider = new FakeHttpEndpoint(200, JwkSet(RsaJwk(oldKey, "key-1"))))
          {
             EnableJwks(provider.UrlFor("/jwks"), "RS256");
@@ -113,8 +113,8 @@ namespace RegressionTests.Security
       [Test]
       public void ATokenSignedWithAKeyOfTheWrongKindIsRefusedWhateverItsKid()
       {
-         using (var rsa = new RSACng(2048))
-         using (var ecdsa = new ECDsaCng(ECCurve.NamedCurves.nistP256))
+         using (var rsa = RSA.Create(2048))
+         using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
          using (var provider = new FakeHttpEndpoint(200, JwkSet(EcJwk(ecdsa, "shared-kid"))))
          {
             EnableJwks(provider.UrlFor("/jwks"), "RS256,ES256");
@@ -128,7 +128,7 @@ namespace RegressionTests.Security
       [Test]
       public void AJwkSetThatCannotBeFetchedRefusesTheTokenWhenNoPemFileIsConfigured()
       {
-         using (var rsa = new RSACng(2048))
+         using (var rsa = RSA.Create(2048))
          using (var provider = new FakeHttpEndpoint(500, "provider down"))
          {
             EnableJwks(provider.UrlFor("/jwks"), "RS256");
@@ -144,7 +144,7 @@ namespace RegressionTests.Security
          // longer than the 510-octet command line SMTP otherwise allows, and the 500
          // POP3 allows - and both used to refuse it with "Line too long" for exactly that
          // reason. The POP3 tests above cover the other protocol; this is the SMTP half.
-         using (var rsa = new RSACng(2048))
+         using (var rsa = RSA.Create(2048))
          using (var provider = new FakeHttpEndpoint(200, JwkSet(RsaJwk(rsa, "key-1"))))
          {
             EnableJwks(provider.UrlFor("/jwks"), "RS256");
@@ -159,7 +159,7 @@ namespace RegressionTests.Security
       [Test]
       public void AJwkSetUrlOffTheLoopbackAddressMustBeHttps()
       {
-         using (var rsa = new RSACng(2048))
+         using (var rsa = RSA.Create(2048))
          {
             // No listener is needed: the URL is refused before a connection is attempted.
             EnableJwks("http://192.0.2.10/jwks", "RS256");

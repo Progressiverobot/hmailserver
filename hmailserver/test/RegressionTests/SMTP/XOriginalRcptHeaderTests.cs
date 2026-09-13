@@ -52,7 +52,7 @@ namespace RegressionTests.SMTP
          SmtpClientSimulator.StaticSend(account.Address, account.Address, "Test", "Test");
 
          var text = Pop3ClientSimulator.AssertGetFirstMessageText(account.Address, Password);
-         StringAssert.Contains("X-Original-Rcpt-To: test@example.test" + Environment.NewLine, text);
+         StringAssert.Contains("X-Original-Rcpt-To: test@example.test" + "\r\n", text);
       }
 
       [Test]
@@ -70,7 +70,7 @@ namespace RegressionTests.SMTP
          SmtpClientSimulator.StaticSend(account1.Address, recipients, "Test", "Test");
 
          var text = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, Password);
-         StringAssert.Contains("X-Original-Rcpt-To: test1@example.test,test2@example.test" + Environment.NewLine, text);
+         StringAssert.Contains("X-Original-Rcpt-To: test1@example.test,test2@example.test" + "\r\n", text);
       }
 
       [Test]
@@ -122,7 +122,7 @@ namespace RegressionTests.SMTP
          SmtpClientSimulator.StaticSend(account1.Address, distributionList.Address, "Test", "Test");
 
          var text = Pop3ClientSimulator.AssertGetFirstMessageText(account1.Address, Password);
-         StringAssert.Contains("X-Original-Rcpt-To: my-list@example.test" + Environment.NewLine, text);
+         StringAssert.Contains("X-Original-Rcpt-To: my-list@example.test" + "\r\n", text);
       }
 
       [Test]
@@ -155,10 +155,10 @@ namespace RegressionTests.SMTP
 
          var expected =
             "X-Original-Rcpt-To: a-very-very-very-very-very-very-very-very-very-long-address-1@example.test," +
-            Environment.NewLine +
-            "\ta-very-very-very-very-very-very-very-very-very-long-address-2@example.test," + Environment.NewLine +
-            "\tshort-1@example.test,short-2@example.test,short-3@example.test," + Environment.NewLine +
-            "\tz-very-very-very-very-very-very-very-very-very-long-address-3@example.test" + Environment.NewLine;
+            "\r\n" +
+            "\ta-very-very-very-very-very-very-very-very-very-long-address-2@example.test," + "\r\n" +
+            "\tshort-1@example.test,short-2@example.test,short-3@example.test," + "\r\n" +
+            "\tz-very-very-very-very-very-very-very-very-very-long-address-3@example.test" + "\r\n";
 
          StringAssert.Contains(expected, text);
       }

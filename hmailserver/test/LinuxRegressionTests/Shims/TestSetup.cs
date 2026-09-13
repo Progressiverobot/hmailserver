@@ -350,6 +350,10 @@ namespace RegressionTests.Shared
       private static readonly (string Group, string Key, string Json)[] SuiteDefaults =
       {
          ("/api/v1/settings", "verify_remote_ssl_certificate", "false"),
+         // The tarpit and lockout fixtures speak AUTH PLAIN on the plain port; the
+         // Windows bench's database has carried this switch on for years, and a
+         // fresh --create-database leaves it off.
+         ("/api/v1/settings", "allow_smtp_auth_plain", "true"),
          ("/api/v1/settings", "auto_ban_on_logon_failure", "false"),
          ("/api/v1/settings", "smtp_no_of_tries", "0"),
          ("/api/v1/settings", "smtp_minutes_between_try", "60"),
@@ -385,14 +389,24 @@ namespace RegressionTests.Shared
          ("/api/v1/settings/antispam", "use_spf", "false"),
          ("/api/v1/settings/antispam", "check_ptr", "false"),
          ("/api/v1/settings/antispam", "maximum_message_size_kb", "1024"),
+         // The Windows PerformBasicSetup switches scripting off before every test;
+         // here a fixture that switched it on over REST (the settings-group
+         // fixture does) would otherwise leave it on for the rest of the run,
+         // and on a server without a script engine a script file any later
+         // fixture writes is then reported at every reload.
+         ("/api/v1/settings/scripting", "enabled", "false"),
       };
 
       private static readonly string[] SettingsGroups =
-         { "/api/v1/settings", "/api/v1/settings/logging", "/api/v1/settings/antispam" };
+         { "/api/v1/settings", "/api/v1/settings/logging", "/api/v1/settings/antispam", "/api/v1/settings/scripting" };
 
-      /// <summary>The five keys GET /api/v1/settings/logging reports and PUT refuses: they describe the files, they do not set them.</summary>
+      /// <summary>
+      ///    The keys GET reports and PUT refuses: the logging group's five describe
+      ///    the files, they do not set them, and the scripting group's two say where
+      ///    the script is.
+      /// </summary>
       private static readonly string[] ReadOnlyKeys =
-         { "directory", "current_default_log", "current_error_log", "current_event_log", "current_awstats_log" };
+         { "directory", "current_default_log", "current_error_log", "current_event_log", "current_awstats_log", "current_script_file" };
 
       /// <summary>
       ///    Every key of the three groups as they stood when the run began, with the

@@ -375,7 +375,15 @@ namespace hMailServer
       {
          if (!ServerApi.HasSettingsWriteRoutes)
             NotOnThisServer.Ignore(NotOnThisServer.NoSettingsWrite);
-         ServerApi.Put(group, "{" + ServerApi.Quote(key) + ":" + jsonValue + "}").Expect(200, "PUT " + group + " " + key);
+
+         var answer = ServerApi.Put(group, "{" + ServerApi.Quote(key) + ":" + jsonValue + "}");
+
+         // A value the server refuses is the COMException the COM property would
+         // have thrown, in the route's own words.
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+
+         answer.Expect(200, "PUT " + group + " " + key);
       }
 
       public static void Put(string group, string key, string value, bool asString)
@@ -1104,7 +1112,17 @@ namespace hMailServer
       public bool Enabled
       {
          get { return SettingsApi.ReadOrSkip(SettingsApi.Scripting, "enabled", NotOnThisServer.NoScripting).GetBoolean(); }
-         set { SettingsApi.PutOrSkip(SettingsApi.Scripting, "enabled", value ? "true" : "false", NotOnThisServer.NoScripting); }
+         set
+         {
+            // On a server without a script engine, scripting switched on makes
+            // every later reload report HM5710 - and that error log fails every
+            // test after this one. The test that wanted the handlers to run is
+            // skipped here with the reason, before anything is written.
+            if (value && !ServerApi.Capability("script_engine"))
+               throw NotOnThisServer.Skipped(NotOnThisServer.NoScriptEngine);
+
+            SettingsApi.PutOrSkip(SettingsApi.Scripting, "enabled", value ? "true" : "false", NotOnThisServer.NoScripting);
+         }
       }
 
       public string Language
@@ -2906,49 +2924,57 @@ namespace hMailServer
       private string _vacationExpiresDate = string.Empty;
       private bool _vacationTouched;
 
+      // Read back only what this object was given: an account loaded from the
+      // listing knows nothing of its vacation message, because no route reports
+      // one (PUT /api/v1/me/vacation writes it and nothing reads it), and a
+      // getter that answered the shim's own default would let a test pass, or
+      // fail, on a value the server never said. Until an account-read route
+      // exists, such a read is skipped with the reason.
+      private void RequireVacation(string comName)
+      {
+         if (!_vacationTouched)
+            Require("vacation_enabled", comName);
+      }
+
       public bool VacationMessageIsOn
       {
-         get { return _vacationOn; }
+         get { RequireVacation("VacationMessageIsOn"); return _vacationOn; }
          set
          {
             _vacationOn = value;
             _vacationTouched = true;
          }
       }
-
       public string VacationSubject
       {
-         get { return _vacationSubject; }
+         get { RequireVacation("VacationSubject"); return _vacationSubject; }
          set
          {
             _vacationSubject = value;
             _vacationTouched = true;
          }
       }
-
       public string VacationMessage
       {
-         get { return _vacationMessage; }
+         get { RequireVacation("VacationMessage"); return _vacationMessage; }
          set
          {
             _vacationMessage = value;
             _vacationTouched = true;
          }
       }
-
       public bool VacationMessageExpires
       {
-         get { return _vacationExpires; }
+         get { RequireVacation("VacationMessageExpires"); return _vacationExpires; }
          set
          {
             _vacationExpires = value;
             _vacationTouched = true;
          }
       }
-
       public string VacationMessageExpiresDate
       {
-         get { return _vacationExpiresDate; }
+         get { RequireVacation("VacationMessageExpiresDate"); return _vacationExpiresDate; }
          set
          {
             _vacationExpiresDate = value;

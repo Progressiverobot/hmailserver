@@ -436,8 +436,15 @@ namespace HM
       oStatement.AddColumn("accountvacationmessage", pAccount->GetVacationMessage());
       oStatement.AddColumn("accountvacationsubject", pAccount->GetVacationSubject());
       oStatement.AddColumn("accountvacationexpires", pAccount->GetVacationExpires());
-      oStatement.AddColumn("accountvacationexpiredate", pAccount->GetVacationExpiresDate());
-      oStatement.AddColumn("accountvacationbegindate", pAccount->GetVacationBeginDate());
+      // A timestamp column takes a timestamp: PostgreSQL refuses "" where SQL
+      // Server and SQL CE read it as their zero date, and both the COM property
+      // and the self-service route hand over "" for a vacation date that is not
+      // set. The epoch stands in for it - read back as a date that nothing
+      // consults while the switch beside it is off. Seen on the Linux bench as
+      // "the account could not be saved" for every vacation change.
+      auto dateOrEpoch = [](const String &date) { return date.IsEmpty() ? String(_T("1970-01-01 00:00:00")) : date; };
+      oStatement.AddColumn("accountvacationexpiredate", dateOrEpoch(pAccount->GetVacationExpiresDate()));
+      oStatement.AddColumn("accountvacationbegindate", dateOrEpoch(pAccount->GetVacationBeginDate()));
       oStatement.AddColumn("accountvacationabortspamflagged", pAccount->GetVacationAbortSpamFlagged());
 
       oStatement.AddColumn("accountpwencryption", pAccount->GetPasswordEncryption());

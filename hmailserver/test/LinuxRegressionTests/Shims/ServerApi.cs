@@ -317,6 +317,34 @@ namespace RegressionTests.Shared
          return answer.Ok ? answer.Body : string.Empty;
       });
 
+      // The "build" object of GET /api/v1/status, read once: what this build of
+      // the server can do, settled when it was compiled.
+      private static readonly Lazy<JsonElement?> Build = new Lazy<JsonElement?>(() =>
+      {
+         var answer = TryGet("/api/v1/status");
+         JsonElement build;
+
+         if (answer == null || answer.Status != 200 || !answer.Json.HasValue ||
+             answer.Json.Value.ValueKind != JsonValueKind.Object ||
+             !answer.Json.Value.TryGetProperty("build", out build))
+            return null;
+
+         return build;
+      });
+
+      /// <summary>
+      ///    Whether this build of the server has the named capability - script_engine,
+      ///    argon2id or post_quantum_key_exchange - as GET /api/v1/status reports under
+      ///    "build". A server that reports no build object (one built before 6.3.3)
+      ///    is taken to have none of them.
+      /// </summary>
+      public static bool Capability(string name)
+      {
+         var build = Build.Value;
+         JsonElement value;
+         return build.HasValue && build.Value.TryGetProperty(name, out value) && value.ValueKind == JsonValueKind.True;
+      }
+
       /// <summary>
       ///    Whether POST /api/v1/domains and DELETE /api/v1/domains/{domain} exist on this
       ///    server. They were added after the account routes and a server built from an
