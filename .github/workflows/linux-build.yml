@@ -609,10 +609,11 @@ jobs:
     name: regression suite against the Linux server
     needs: build
     runs-on: ubuntu-latest
-    # A local run takes about fifteen minutes; a server that stops answering costs
-    # two minutes per test (TestPorts.ReceiveTimeoutMilliseconds), so this is the
-    # backstop, not the budget.
-    timeout-minutes: 60
+    # A local run took about fifteen minutes while two thirds of the suite was
+    # skipped; with the route backlog waves most of it runs, and a server that
+    # stops answering costs two minutes per test (TestPorts.ReceiveTimeoutMilliseconds),
+    # so this is the backstop, not the budget.
+    timeout-minutes: 90
     services:
       postgres:
         image: postgres:16@sha256:f1c3376c26f2609ab9f29f71f824103fe2fcd8ee0346485cb6122a4f93df6f94
@@ -632,6 +633,7 @@ jobs:
       HMTEST_SMTP_PORT: '2525'
       HMTEST_POP3_PORT: '1110'
       HMTEST_IMAP_PORT: '1143'
+      HMTEST_SUBMISSION_PORT: '5870'
       HMTEST_REST_PORT: '8045'
       HMTEST_ADMIN_PASSWORD: testar
       # github.workspace rather than runner.temp: the runner context is not one a
@@ -762,11 +764,16 @@ jobs:
         run: dotnet restore hmailserver/test/LinuxRegressionTests/LinuxRegressionTests.csproj --locked-mode
 
       - name: Let the suite's fake DNS zone bind port 53
-        # The suite serves one fake zone on 127.0.0.1:53 for the whole run and
-        # points the server's DNSServer at it (Shims/SuiteDns.cs), from the
-        # unprivileged test process; 53 is a privileged port until this says
-        # otherwise. systemd-resolved listens on 127.0.0.53, not 127.0.0.1.
-        run: sudo sysctl -w net.ipv4.ip_unprivileged_port_start=53
+        # The suite serves one fake zone on port 53 of a loopback address for the
+        # whole run and points the server's DNSServer at it (Shims/SuiteDns.cs),
+        # from the unprivileged test process; 53 is a privileged port until this
+        # says otherwise. Which address: harden-runner's agent runs its DNS proxy
+        # on 127.0.0.1:53 (and systemd-resolved its stub on 127.0.0.53), so the
+        # suite finds 127.0.0.1 taken and serves the zone on 127.0.53.53. The
+        # listing is here so a run that skipped the DNS fixtures says why.
+        run: |
+          sudo sysctl -w net.ipv4.ip_unprivileged_port_start=53
+          sudo ss -lunp | grep -E ':53 ' || echo "nothing on UDP 53"
 
       - name: Run the fixtures against the server
         run: |

@@ -201,6 +201,17 @@ namespace RegressionTests.SSL
       /// </summary>
       internal static void WaitForTheUsualListeners()
       {
+         // A server that could not read its port table - which is what the
+         // database-failure fixture simulates for one test - starts with no mail
+         // listeners at all, and says so: GET /api/v1/ports lists nothing. Twenty
+         // seconds of waiting for a listener the server never meant to open would
+         // fail a test that is about to prove something else, so there is nothing
+         // to wait for when the listing is empty or refused.
+         var listing = ServerApi.TryGet("/api/v1/ports");
+
+         if (listing == null || listing.Status != 200 || ServerApi.Array(listing).Count == 0)
+            return;
+
          WaitForListeners(new[] { TestPorts.Smtp, TestPorts.Pop3, TestPorts.Imap });
       }
 

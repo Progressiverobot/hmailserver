@@ -57,8 +57,16 @@ namespace RegressionTests.Infrastructure
       [OneTimeTearDown]
       public void ListenerIpv6FixtureTearDown()
       {
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", "0");
+         // Not where the listener is the suite's own (RestListener): the tests
+         // that would have moved it are skipped there, and this teardown still
+         // runs - turning that listener off took every later fixture down with
+         // it on the Linux bench.
+         if (RestListener.Provided == 0)
+         {
+            IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
+            IniFileSetting.Write("RestApiPort", "0");
+         }
+
          IniFileSetting.Write("MetricsServerBindAddress", "127.0.0.1");
          IniFileSetting.Write("MetricsServerPort", "0");
          IniFileSetting.Write("MetricsServerAuthToken", "");
