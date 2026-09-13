@@ -8113,6 +8113,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Vertrouwde ARC-verzegelaardomeinen</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Vertrouwde proxy's waarvan X-Forwarded-Proto: https wordt geloofd (adressen, door komma's gescheiden; loopback altijd)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Debuglogging weer uitzetten</value>
   </data>

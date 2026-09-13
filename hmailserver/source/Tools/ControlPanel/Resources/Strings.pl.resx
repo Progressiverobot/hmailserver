@@ -8113,6 +8113,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Zaufane domeny pieczętujące ARC</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Zaufane serwery proxy, których X-Forwarded-Proto: https jest honorowane (adresy rozdzielone przecinkami; loopback zawsze)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Wyłącz ponownie dziennik diagnostyczny</value>
   </data>

@@ -8113,6 +8113,9 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Güvenilen ARC mühürleyici etki alanları</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>X-Forwarded-Proto: https değerine inanılan güvenilir proxy'ler (adresler, virgülle ayrılmış; loopback her zaman)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Hata ayıklama günlüğünü yeniden kapat</value>
   </data>

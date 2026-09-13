@@ -8113,6 +8113,9 @@ Es wird keine Nachricht gelöscht und kein Konto entfernt. Fortfahren?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Vertrauenswürdige ARC-Siegler-Domänen</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Vertrauenswürdige Proxys, deren X-Forwarded-Proto: https geglaubt wird (Adressen, durch Komma getrennt; loopback immer)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Debug-Protokollierung wieder abschalten</value>
   </data>

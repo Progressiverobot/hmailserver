@@ -8113,6 +8113,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Luotetut ARC-sinetöijäverkkotunnukset</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Luotetut välityspalvelimet, joiden X-Forwarded-Proto: https uskotaan (osoitteet pilkuin eroteltuina; loopback aina)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Kytke vianjäljityslokitus taas pois päältä</value>
   </data>

@@ -8113,6 +8113,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Довірені домени запечатувачів ARC</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Довірені проксі, чий X-Forwarded-Proto: https приймається (адреси через кому; loopback завжди)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Вимкнути журнал налагодження назад</value>
   </data>

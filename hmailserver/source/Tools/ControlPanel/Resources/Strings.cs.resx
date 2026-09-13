@@ -8113,6 +8113,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Důvěryhodné domény pečetitelů ARC</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Důvěryhodné proxy, jejichž X-Forwarded-Proto: https se přijímá (adresy oddělené čárkami; loopback vždy)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Ladicí logování zase vypnout</value>
   </data>

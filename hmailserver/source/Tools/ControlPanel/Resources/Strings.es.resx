@@ -8113,6 +8113,9 @@ No se borra ningún mensaje ni se elimina ninguna cuenta. ¿Continuar?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Dominios de selladores ARC de confianza</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Proxies de confianza cuyo X-Forwarded-Proto: https se acepta (direcciones separadas por comas; loopback siempre)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Volver a desactivar el registro de depuración</value>
   </data>

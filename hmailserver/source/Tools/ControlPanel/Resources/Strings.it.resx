@@ -8113,6 +8113,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Domini dei sigillatori ARC fidati</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Proxy attendibili il cui X-Forwarded-Proto: https viene creduto (indirizzi separati da virgole; loopback sempre)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Disattiva di nuovo il registro di debug</value>
   </data>

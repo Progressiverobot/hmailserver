@@ -2522,6 +2522,7 @@ namespace hMailServer.ControlPanel.Views
                      new TextSetting { Key = "WebServicesHttpPort", Default = "0", Label = L("HTTP port (80 to enable, 0 = disabled)") },
                      new TextSetting { Key = "WebServicesHttpsPort", Default = "0", Label = L("HTTPS port (443 to enable, 0 = disabled)") },
                      new TextSetting { Key = "WebServicesBindAddress", Default = "0.0.0.0", Label = L("Bind address") },
+                     new TextSetting { Key = "WebServicesTrustedProxies", Label = L("Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)") },
                      new PathSetting { Key = "WebServicesCertificateFile", FileFilter = L("PEM/certificate files (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*"), Label = L("TLS certificate file (PEM, optional)"), Placeholder = L("Falls back to the ACME certificate") },
                      new PathSetting { Key = "WebServicesPrivateKeyFile", FileFilter = L("PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*"), Label = L("TLS private key file (PEM, optional)") }
                   }

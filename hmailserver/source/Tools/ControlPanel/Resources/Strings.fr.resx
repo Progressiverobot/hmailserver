@@ -8113,6 +8113,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Domaines de scelleurs ARC de confiance</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Proxys de confiance dont le X-Forwarded-Proto: https est cru (adresses séparées par des virgules ; loopback toujours)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Désactiver à nouveau la journalisation de débogage</value>
   </data>

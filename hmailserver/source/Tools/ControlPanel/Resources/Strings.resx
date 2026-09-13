@@ -8113,6 +8113,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Trusted ARC sealer domains</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Turn debug logging off again</value>
   </data>

@@ -406,6 +406,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Thunderbird autoconfig + Outlook autodiscover", "AutoconfigEnabled", "webservices"),
          new SettingEntry("TLS certificate file (PEM, optional)", "WebServicesCertificateFile", "webservices"),
          new SettingEntry("TLS private key file (PEM, optional)", "WebServicesPrivateKeyFile", "webservices"),
+         new SettingEntry("Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)", "WebServicesTrustedProxies", "webservices"),
       };
    }
 }

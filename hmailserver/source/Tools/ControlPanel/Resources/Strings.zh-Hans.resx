@@ -8113,6 +8113,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>受信任的 ARC 密封者域</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>信任其 X-Forwarded-Proto: https 的代理（地址，逗号分隔；loopback 始终信任）</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>重新关闭调试日志</value>
   </data>

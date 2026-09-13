@@ -8113,6 +8113,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   <data name="Trusted ARC sealer domains" xml:space="preserve">
     <value>Betrodde ARC-forseglerdomener</value>
   </data>
+  <data name="Trusted proxies whose X-Forwarded-Proto: https is believed (addresses, comma-separated; loopback always is)" xml:space="preserve">
+    <value>Klarerte proxyer hvis X-Forwarded-Proto: https tros (adresser, kommaseparert; loopback alltid)</value>
+  </data>
   <data name="Turn debug logging off again" xml:space="preserve">
     <value>Slå feilsøkingslogging av igjen</value>
   </data>
