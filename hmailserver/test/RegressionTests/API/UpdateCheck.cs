@@ -31,7 +31,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class UpdateCheck : TestFixtureBase
    {
-      private const int RestPort = 9104;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9104;
       private const string AdminPassword = "testar";
       private const string LatestPath = "/repos/Progressiverobot/hmailserver/releases/latest";
       private const string ListPath = "/repos/Progressiverobot/hmailserver/releases";
@@ -48,8 +50,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateCheckEnabled", "0");
          WriteSetting("UpdateChannel", "stable");
          WriteSetting("UpdateFeedUrl", _feed.UrlFor(LatestPath));
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          // Reinitialize rather than Stop/Start: the settings are read by InitInstance.
          _application.Reinitialize();
@@ -62,7 +63,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateChannel", "stable");
          WriteSetting("UpdateFeedUrl", "");
          WriteSetting("HttpProxy", "");
-         WriteSetting("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
          _feed.Dispose();
       }

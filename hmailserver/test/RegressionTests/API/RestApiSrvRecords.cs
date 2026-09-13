@@ -38,7 +38,9 @@ namespace RegressionTests.API
       // From the 11420-11429 range reserved for this work; every other REST
       // fixture uses 9098 and both can never run at once, but a distinct port
       // means a leaked listener from either fixture cannot fail the other.
-      private const int RestPort = 11420;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 11420;
 
       // TestSetup.Authenticate() already expects this to be the administrator
       // password, and the REST API authenticates against the same credential.
@@ -112,8 +114,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          // Reinitialize (not Stop/Start): RestApiPort is cached in
          // IniFileSettings, which is only re-read by InitInstance().
@@ -126,7 +127,7 @@ namespace RegressionTests.API
       [TearDown]
       public void StopRestApi()
       {
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 

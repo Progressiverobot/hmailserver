@@ -70,6 +70,7 @@
     <Compile Include="..\RegressionTests\Shared\IMAPClientSimulator.cs" Link="Shared\IMAPClientSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\IniFile.cs" Link="Shared\IniFile.cs" />
     <Compile Include="..\RegressionTests\Shared\IniFileSetting.cs" Link="Shared\IniFileSetting.cs" />
+    <Compile Include="..\RegressionTests\Shared\RestListener.cs" Link="Shared\RestListener.cs" />
     <Compile Include="..\RegressionTests\Shared\POP3ClientSimulator.cs" Link="Shared\POP3ClientSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\Paths.cs" Link="Shared\Paths.cs" />
     <Compile Include="..\RegressionTests\Shared\Pop3ServerSimulator.cs" Link="Shared\Pop3ServerSimulator.cs" />

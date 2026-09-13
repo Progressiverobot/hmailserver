@@ -39,7 +39,9 @@ namespace RegressionTests.Security
    public class AdministratorTwoFactor : TestFixtureBase
    {
       private const string AdminPassword = "testar";
-      private const int RestPort = 9512;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9512;
 
       [SetUp]
       public new void SetUp()
@@ -158,8 +160,7 @@ namespace RegressionTests.Security
 
       private void EnableRest()
       {
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          IniFileSetting.Write("RestApiCertificateFile", "");
          IniFileSetting.Write("RestApiPrivateKeyFile", "");
 
@@ -171,7 +172,7 @@ namespace RegressionTests.Security
 
       private void RestoreRest()
       {
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 
