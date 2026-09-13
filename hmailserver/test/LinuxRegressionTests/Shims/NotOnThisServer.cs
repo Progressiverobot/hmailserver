@@ -75,6 +75,17 @@ namespace RegressionTests.Shared
       public const string NoAccountMaxSize =
          "needs an account with a maximum size, which POST /api/v1/domains/{domain}/accounts does not set";
 
+      /// <summary>
+      ///    The event handlers are VBScript or JScript, run by Windows Active
+      ///    Scripting; this build has no script engine and says so when a script
+      ///    is loaded. A test that needs a handler to run cannot run here.
+      /// </summary>
+      public const string NoScriptEngine =
+         "needs the event-handler script to run, and this build has no script engine - VBScript and JScript are Windows Active Scripting engines with no equivalent on this platform";
+
+      public const string NoGssapi =
+         "needs SASL GSSAPI, which is SSPI on Windows and is not offered by this build";
+
       public const string NoSieveEvaluate =
          "needs Utilities.EvaluateSieveScript, and this server's REST API has no POST /api/v1/sieve/evaluate (it arrived after 6.3.2)";
 
@@ -350,6 +361,14 @@ namespace RegressionTests.Shared
       {
          { "RegressionTests.Infrastructure.ListenerIpv6", RebindsTheRestListener },
          { "RegressionTests.SSL.ListenerTlsConfiguration", RebindsTheRestListener },
+         { "RegressionTests.API.ScriptObjectPolicy", NoScriptEngine },
+         { "RegressionTests.API.ScriptReload", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.DeletedHeaderObjectCannotWriteOntoAnotherHeader", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.HeaderObjectStillNamesItsOwnHeaderAfterAnEarlierOneIsDeleted", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.RenamingAHeaderReachesTheSavedMessage", NoScriptEngine },
+         { "RegressionTests.API.Message.TestUpdateSubjectOnMessageWithNoMessageWideCharacterSet", NoScriptEngine },
+         { "RegressionTests.Infrastructure.ErrorManagerDiagnosticsTests.MultiLineErrorDescriptionShouldStillReachTheOnErrorHandler", NoScriptEngine },
+         { "RegressionTests.IMAP.CapabilityAuthAdvertisement.GssapiIsOfferedOnlyWhenEnabledAndRefusesAStrayToken", NoGssapi },
          { "RegressionTests.SMTP.OutboundSize", NoRouteCreate },
          { "RegressionTests.SSL.SmtpDeliverySslTests", NoRouteCreate },
          { "RegressionTests.SMTP.BinaryMime.TestAuthenticatedBinarySubmissionIsRelayedViaBdat", NoRouteCreate },
