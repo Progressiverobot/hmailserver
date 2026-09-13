@@ -571,6 +571,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiSettings.cpp" />
     <ClCompile Include="..\Common\Util\RestApiRules.cpp" />
     <ClCompile Include="..\Common\Util\RestApiCertificates.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiAdministration.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFetchAccounts.cpp" />
     <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMailbox.cpp" />

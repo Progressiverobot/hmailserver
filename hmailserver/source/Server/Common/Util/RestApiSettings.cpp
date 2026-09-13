@@ -44,6 +44,13 @@
 #include "Unicode.h"
 #include "Utilities.h"
 #include "../Application/IniSettingStore.h"
+#include "../Application/Backup.h"
+#include "../BO/ServerMessages.h"
+#include "../BO/ServerMessage.h"
+#include "../Persistence/PersistentServerMessage.h"
+#include "../Scripting/ScriptServer.h"
+#include "../Sieve/SieveScript.h"
+#include "FileUtilities.h"
 #include "../Persistence/PersistentIMAPFolder.h"
 #include "../Persistence/PersistentRuleAction.h"
 #include "../../SMTP/SMTPConfiguration.h"
@@ -690,6 +697,62 @@ namespace
         ROW_TEXT(IniFileSettings::GetInitializationFile()), nullptr, ROW_NO_CHECK },
    };
 
+   // The backup log lives beside the other logs, as InterfaceBackupSettings
+   // says: <log directory>/hmailserver_backup.log.
+   String BackupLogFile()
+   {
+      String directory = Ini()->GetLogDirectory();
+      if (directory.Right(1) != FileUtilities::PathSeparator)
+         directory += FileUtilities::PathSeparator;
+      return directory + "hmailserver_backup.log";
+   }
+
+   // InterfaceScripting::put_Language's rule: two languages, and a name that
+   // is neither is refused rather than stored, because an unrecognised name
+   // turns every event handler off in silence.
+   const char *ScriptLanguageRefusalHead = "The script language '";
+   const char *ScriptLanguageRefusalTail = "' is not supported. hMailServer can run VBScript or JScript.";
+
+   const Row ScriptingRows[] =
+   {
+      { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the event handlers run at all.",
+        ROW_FLAG(Config()->GetUseScriptServer()), ROW_SET(Config()->SetUseScriptServer(v.flag)), ROW_NO_CHECK },
+      { "language", KindString, ReadWrite, EffectNow, nullptr,
+        "VBScript or JScript, the language the event handlers are written in; any other name is refused.",
+        ROW_TEXT(Config()->GetScriptLanguage()),
+        [] (const Value &v) { AnsiString word = v.text; Config()->SetScriptLanguage(word.CompareNoCase("JScript") == 0 ? String("JScript") : String("VBScript")); return Applied(); },
+        [] (const Value &v) -> String { AnsiString word = v.text; if (word.CompareNoCase("VBScript") == 0 || word.CompareNoCase("JScript") == 0) return String(); return String(ScriptLanguageRefusalHead) + v.text + ScriptLanguageRefusalTail; } },
+      { "current_script_file", KindString, ReadOnly, EffectNow, nullptr,
+        "The event-handler file the server is running, in the event directory.",
+        ROW_TEXT(ScriptServer::Instance()->GetCurrentScriptFile()), nullptr, ROW_NO_CHECK },
+      { "directory", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the event-handler scripts live.",
+        ROW_TEXT(Ini()->GetEventDirectory()), nullptr, ROW_NO_CHECK },
+   };
+
+   const Row BackupRows[] =
+   {
+      { "destination", KindString, ReadWrite, EffectNow, nullptr,
+        "The directory a backup is written to.",
+        ROW_TEXT(Config()->GetBackupDestination()), ROW_SET(Config()->SetBackupDestination(v.text)), ROW_NO_CHECK },
+      { "backup_domains", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the domains, accounts, aliases and lists are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BODomains)), ROW_SET(Config()->SetBackupOption(Backup::BODomains, v.flag)), ROW_NO_CHECK },
+      { "backup_messages", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the message files are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOMessages)), ROW_SET(Config()->SetBackupOption(Backup::BOMessages, v.flag)), ROW_NO_CHECK },
+      { "backup_settings", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the server settings are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOSettings)), ROW_SET(Config()->SetBackupOption(Backup::BOSettings, v.flag)), ROW_NO_CHECK },
+      { "compress", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the backup is compressed into one file.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOCompression)), ROW_SET(Config()->SetBackupOption(Backup::BOCompression, v.flag)), ROW_NO_CHECK },
+      { "log_file", KindString, ReadOnly, EffectNow, nullptr,
+        "The full path of the backup log, beside the other logs.",
+        ROW_TEXT(BackupLogFile()), nullptr, ROW_NO_CHECK },
+   };
+
 #undef ROW_TEXT
 #undef ROW_NUMBER
 #undef ROW_FLAG
@@ -700,6 +763,8 @@ namespace
    const Group AntiSpamGroup = { "antispam", "/api/v1/settings/antispam", AntiSpamRows, sizeof(AntiSpamRows) / sizeof(AntiSpamRows[0]) };
    const Group LoggingGroup = { "logging", "/api/v1/settings/logging", LoggingRows, sizeof(LoggingRows) / sizeof(LoggingRows[0]) };
    const Group DirectoriesGroup = { "directories", "/api/v1/settings/directories", DirectoriesRows, sizeof(DirectoriesRows) / sizeof(DirectoriesRows[0]) };
+   const Group ScriptingGroup = { "scripting", "/api/v1/settings/scripting", ScriptingRows, sizeof(ScriptingRows) / sizeof(ScriptingRows[0]) };
+   const Group BackupGroup = { "backup", "/api/v1/settings/backup", BackupRows, sizeof(BackupRows) / sizeof(BackupRows[0]) };
 
    // ---------------------------------------------------------------------
    // The two private helpers of RestApiServer these functions need, handed
@@ -1246,8 +1311,127 @@ namespace
       return bridge.respond(200, IniSettingJson(name, bridge), "");
    }
 
+   // ---------------------------------------------------------------------
+   // The server's message texts: Settings.ServerMessages over COM, the
+   // texts the server puts in the mail it writes itself (a virus notice, an
+   // undeliverable-message notice). The collection is the one Configuration
+   // holds and the server reads from, so a changed text is used at once.
+   // ---------------------------------------------------------------------
+
+   AnsiString ServerMessageJson(std::shared_ptr<ServerMessage> message, const Bridge &bridge)
+   {
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"name\":\"%hs\",\"text\":\"%hs\"}",
+         message->GetID(),
+         bridge.escape(Utf8(message->GetName())).c_str(),
+         bridge.escape(Utf8(message->GetText())).c_str());
+      return json;
+   }
+
+   HttpResponse ServerMessagesList(const Bridge &bridge)
+   {
+      std::shared_ptr<ServerMessages> messages = Config()->GetServerMessages();
+      if (!messages)
+         return Refusal(bridge, 503, "the server messages are not loaded");
+
+      AnsiString json = "[";
+      int count = 0;
+      for (std::shared_ptr<ServerMessage> message : messages->GetSnapshot())
+      {
+         if (!message)
+            continue;
+         if (count > 0)
+            json += ",";
+         json += ServerMessageJson(message, bridge);
+         count++;
+      }
+      json += "]";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse ServerMessagePut(const AnsiString &rawName, const AnsiString &requestBody, const Bridge &bridge)
+   {
+      std::shared_ptr<ServerMessages> messages = Config()->GetServerMessages();
+      if (!messages)
+         return Refusal(bridge, 503, "the server messages are not loaded");
+
+      String name;
+      if (!Unicode::MultiByteToWide(rawName, name))
+         return Refusal(bridge, 400, "the name is not valid UTF-8");
+
+      std::shared_ptr<ServerMessage> message = messages->GetItemByName(name);
+      if (!message)
+         return Refusal(bridge, 404, "server message not found");
+
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *member = document.Get("text");
+      if (!member || !member->IsString())
+         return Refusal(bridge, 400, "text must be a string");
+
+      String text;
+      if (!Unicode::MultiByteToWide(AnsiString(member->AsString().c_str()), text))
+         return Refusal(bridge, 400, "text is not valid UTF-8");
+
+      // The object is the one the server reads, so the new text is in use the
+      // moment it is set; the row is what InterfaceServerMessage::Save writes.
+      String before = message->GetText();
+      message->SetText(text);
+      if (!PersistentServerMessage::SaveObject(message))
+      {
+         message->SetText(before);
+         return Refusal(bridge, 500, "the server message could not be saved; see the error log");
+      }
+
+      LOG_APPLICATION("RestApi: Server message " + name + " changed.");
+
+      return bridge.respond(200, ServerMessageJson(message, bridge), "");
+   }
+
+   // ---------------------------------------------------------------------
+   // Sieve, evaluated and not delivered: Utilities.EvaluateSieveScript over
+   // COM. The summary is the action list the script decided on for the
+   // message - "keep", "fileinto:Folder", "discard", "redirect:..." - or
+   // "error: ..." when the script does not parse; nothing is sent, filed or
+   // recorded, which is what makes this a safe way to try a script.
+   // ---------------------------------------------------------------------
+
+   HttpResponse SieveEvaluate(const AnsiString &requestBody, const Bridge &bridge)
+   {
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *script = document.Get("script");
+      const JsonValue *message = document.Get("message");
+      if (!script || !script->IsString())
+         return Refusal(bridge, 400, "script must be a string");
+      if (!message || !message->IsString())
+         return Refusal(bridge, 400, "message must be a string");
+
+      String scriptText, messageText;
+      if (!Unicode::MultiByteToWide(AnsiString(script->AsString().c_str()), scriptText) ||
+          !Unicode::MultiByteToWide(AnsiString(message->AsString().c_str()), messageText))
+         return Refusal(bridge, 400, "script and message must be valid UTF-8");
+
+      String result = SieveScript::Evaluate(scriptText, messageText);
+
+      return bridge.respond(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}", "");
+   }
+
    // The hand-written paths beside the generated groups: the INI routes and
    // the logon-failure clear, each beginning with a comma as OpenApiPath's do.
+   const char *ScriptingMessagesAndSievePaths =
+      ",\"/api/v1/settings/scripting/reload\":{\"post\":{\"summary\":\"Load the event-handler script again\",\"description\":\"What Scripting.Reload does over COM: the script file is read again and the handlers it defines take over from the next event. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{reloaded: true}\"}}}},"
+      "\"/api/v1/settings/scripting/check\":{\"post\":{\"summary\":\"Check the event-handler script's syntax\",\"description\":\"What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser's message otherwise. Nothing is changed. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{result: the parser's message, or empty}\"}}}},"
+      "\"/api/v1/settings/messages\":{\"get\":{\"summary\":\"The server's message texts\",\"description\":\"The texts the server puts in the mail it writes itself - Settings.ServerMessages over COM. Each entry: id, name, text. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of {id, name, text}\"}}}},"
+      "\"/api/v1/settings/messages/{name}\":{\"put\":{\"summary\":\"Change one server message text\",\"description\":\"Body: text. The name is the table's own, as the listing shows it. In use at once. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"text\"],\"properties\":{\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{id, name, text} as saved\"},\"400\":{\"description\":\"text missing or not a string\"},\"404\":{\"description\":\"No message of that name\"}}}},"
+      "\"/api/v1/sieve/evaluate\":{\"post\":{\"summary\":\"Try a Sieve script against a message, without delivering anything\",\"description\":\"Body: script (RFC 5228 Sieve) and message (the raw message, headers and body). result is the action list the script decided on - keep, fileinto:Folder, discard, redirect:address, and so on - or error: followed by the parser's message. What Utilities.EvaluateSieveScript does over COM: nothing is filed, sent or recorded. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\",\"message\"],\"properties\":{\"script\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{result}\"},\"400\":{\"description\":\"script or message missing\"}}}}";
+
    const char *IniAndLogonFailurePaths =
       ",\"/api/v1/settings/ini\":{\"get\":{\"summary\":\"The keys in hMailServer.ini's [Settings] section\",\"description\":\"names: every key the section holds, in file order - what Settings.IniSettingNames lists over COM. The values are read one at a time. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{names: [...]}\"}}}},"
       "\"/api/v1/settings/ini/{name}\":{"
@@ -1284,6 +1468,9 @@ namespace HM
       paths += OpenApiReadOnlyPath(DirectoriesGroup, "The directories the server runs in",
          "What Settings.Directories reports over COM, and the hMailServer.ini the settings came from. Facts about the installation, set when it was made; nothing here is written. Server-wide; refused for domain-restricted keys.", bridge);
       paths += IniAndLogonFailurePaths;
+      paths += OpenApiPath(ScriptingGroup, "The event-handler scripting settings", "Change the scripting settings", bridge);
+      paths += OpenApiPath(BackupGroup, "The backup settings", "Change the backup settings", bridge);
+      paths += ScriptingMessagesAndSievePaths;
       return paths;
    }
 
@@ -1355,6 +1542,71 @@ namespace HM
    {
       Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
       return IniDelete(name, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsScripting_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(ScriptingGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsScriptingPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(ScriptingGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleScriptingReload_()
+   {
+      ScriptServer::Instance()->LoadScripts();
+      LOG_APPLICATION("RestApi: the event-handler script was loaded again.");
+      return BuildResponse_(200, "{\"reloaded\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleScriptingCheck_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      String result = ScriptServer::Instance()->CheckSyntax();
+      return BuildResponse_(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsBackup_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(BackupGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsBackupPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(BackupGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleServerMessageList_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return ServerMessagesList(bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleServerMessagePut_(const AnsiString &name, const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return ServerMessagePut(name, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSieveEvaluate_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return SieveEvaluate(requestBody, bridge);
    }
 
    HttpResponse
