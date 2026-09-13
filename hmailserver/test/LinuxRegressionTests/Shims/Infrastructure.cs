@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.IO;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -199,7 +200,32 @@ namespace RegressionTests.Infrastructure
       ///    paths, which a test can open only when the server is this machine - which
       ///    is what TestTarget.IsLocal says and what this environment is.
       /// </summary>
+      /// <summary>
+      ///    On the Windows bench the ERROR log is deleted before every test, so that
+      ///    the file exists exactly when the test under way caused an error, and a
+      ///    fixture asserts on File.Exists of this name. Here the file is the
+      ///    server's own and holds the whole run, so the name answered is a scratch
+      ///    file that holds the lines written since the mark - present when there
+      ///    are any, absent when there are none - which is the same fact.
+      /// </summary>
       public static string GetErrorLogFileName()
+      {
+         var scratch = Path.Combine(Path.GetTempPath(), "hmtest-error-log-since-mark.log");
+         var fresh = ErrorLogLinesSinceMark();
+         if (fresh.Length == 0)
+         {
+            if (File.Exists(scratch))
+               File.Delete(scratch);
+         }
+         else
+         {
+            File.WriteAllText(scratch, string.Join(Environment.NewLine, fresh) + Environment.NewLine);
+         }
+         return scratch;
+      }
+
+      /// <summary>The server's own ERROR log file, for what needs the real one.</summary>
+      public static string GetServerErrorLogFileName()
       {
          return hMailServer.SettingsApi.GetString(hMailServer.SettingsApi.Logging, "current_error_log");
       }
