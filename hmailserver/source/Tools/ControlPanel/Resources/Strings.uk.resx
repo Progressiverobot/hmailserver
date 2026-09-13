@@ -4683,8 +4683,8 @@
   <data name="None" xml:space="preserve">
     <value>Немає</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Немає — без шифрування (порт 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Немає — без шифрування</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Жоден із вибраних облікових записів не має поштової адреси.</value>
@@ -6138,8 +6138,8 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS — зашифровано від першого байта (порт 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS — зашифровано від першого байта</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (необов’язковий)</value>
@@ -6159,11 +6159,11 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>STARTTLS необов’язковий на {0}. Клієнт, який ніколи його не просить, або той, чию пропозицію STARTTLS зрізано в дорозі, продовжує без шифрування, і жодній зі сторін про це не повідомляють. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, необов'язково - перейти на шифрування, якщо його запропоновано, інакше продовжити відкритим текстом (порт 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, необов'язково - перейти на шифрування, якщо його запропоновано, інакше продовжити відкритим текстом</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, обов'язково - відмовитися завантажувати, якщо перехід не вдався (порт 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, обов'язково - відмовитися завантажувати, якщо перехід не вдався</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>Сервер SURBL</value>

@@ -4683,8 +4683,8 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="None" xml:space="preserve">
     <value>Geen</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Geen - geen versleuteling (poort 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Geen - geen versleuteling</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Geen van de geselecteerde accounts heeft een e-mailadres.</value>
@@ -6138,8 +6138,8 @@ Doorgaan?</value>
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS - versleuteld vanaf de eerste byte (poort 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS - versleuteld vanaf de eerste byte</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (optioneel)</value>
@@ -6159,11 +6159,11 @@ Doorgaan?</value>
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>STARTTLS is optioneel op {0}. Een client die er nooit om vraagt, of waarvan het STARTTLS-aanbod onderweg wordt weggehaald, gaat onversleuteld verder en geen van beide kanten krijgt dat te horen. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, optioneel - upgraden als het wordt aangeboden, anders onversleuteld doorgaan (poort 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, optioneel - upgraden als het wordt aangeboden, anders onversleuteld doorgaan</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, vereist - niet downloaden tenzij de upgrade slaagt (poort 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, vereist - niet downloaden tenzij de upgrade slaagt</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>SURBL-server</value>

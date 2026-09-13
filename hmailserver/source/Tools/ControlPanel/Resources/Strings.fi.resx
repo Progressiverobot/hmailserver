@@ -4683,8 +4683,8 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="None" xml:space="preserve">
     <value>Ei mitään</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Ei mitään - ei salausta (portti 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Ei mitään - ei salausta</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Yhdelläkään valituista tileistä ei ole sähköpostiosoitetta.</value>
@@ -6138,8 +6138,8 @@ Jatketaanko?</value>
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS - salattu ensimmäisestä tavusta alkaen (portti 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS - salattu ensimmäisestä tavusta alkaen</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (valinnainen)</value>
@@ -6159,11 +6159,11 @@ Jatketaanko?</value>
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>STARTTLS on valinnainen kohteessa {0}. Asiakas, joka ei koskaan pyydä sitä, tai jonka STARTTLS-tarjous riisutaan matkalla, jatkaa salaamattomana, eikä kummallekaan päälle kerrota. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, valinnainen - siirry salattuun, jos sitä tarjotaan, muuten jatka selväkielisenä (portti 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, valinnainen - siirry salattuun, jos sitä tarjotaan, muuten jatka selväkielisenä</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, pakollinen - kieltäydy lataamasta, ellei siirtyminen onnistu (portti 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, pakollinen - kieltäydy lataamasta, ellei siirtyminen onnistu</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>SURBL-palvelin</value>

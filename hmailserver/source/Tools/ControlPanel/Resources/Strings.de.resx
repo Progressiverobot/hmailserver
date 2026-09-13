@@ -4683,8 +4683,8 @@ Der geprüfte Installer wird dem Update-Helfer übergeben: der Dienst stoppt, di
   <data name="None" xml:space="preserve">
     <value>Keine</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Keine - keine Verschlüsselung (Port 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Keine - keine Verschlüsselung</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Keines der ausgewählten Konten hat eine E-Mail-Adresse.</value>
@@ -6138,8 +6138,8 @@ Fortfahren?</value>
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS - ab dem ersten Byte verschlüsselt (Port 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS - ab dem ersten Byte verschlüsselt</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (optional)</value>
@@ -6159,11 +6159,11 @@ Fortfahren?</value>
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>STARTTLS ist auf {0} optional. Ein Client, der nie danach fragt, oder einer, dessen STARTTLS-Angebot unterwegs entfernt wird, macht unverschlüsselt weiter, und keine der beiden Seiten erfährt davon. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, optional - hochstufen, wenn es angeboten wird, sonst unverschlüsselt weiter (Port 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, optional - hochstufen, wenn es angeboten wird, sonst unverschlüsselt weiter</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, erforderlich - das Abholen verweigern, wenn die Hochstufung nicht gelingt (Port 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, erforderlich - das Abholen verweigern, wenn die Hochstufung nicht gelingt</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>SURBL-Server</value>

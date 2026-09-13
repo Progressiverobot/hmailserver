@@ -4683,8 +4683,8 @@ Det verificerede installationsprogram overdrages til opdateringshjælperen: tjen
   <data name="None" xml:space="preserve">
     <value>Ingen</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Ingen - ingen kryptering (port 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Ingen - ingen kryptering</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Ingen af de valgte konti har en e-mailadresse.</value>
@@ -6138,8 +6138,8 @@ Vil du fortsætte?</value>
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS - krypteret fra den første byte (port 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS - krypteret fra den første byte</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (valgfri)</value>
@@ -6159,11 +6159,11 @@ Vil du fortsætte?</value>
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>STARTTLS er valgfri på {0}. En klient, der aldrig beder om det, eller en, hvis STARTTLS-tilbud fjernes undervejs, fortsætter ukrypteret, og ingen af enderne får det at vide. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, valgfri - opgradér hvis det tilbydes, fortsæt i klartekst hvis ikke (port 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, valgfri - opgradér hvis det tilbydes, fortsæt i klartekst hvis ikke</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, påkrævet - nægt at hente, medmindre opgraderingen lykkes (port 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, påkrævet - nægt at hente, medmindre opgraderingen lykkes</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>SURBL-server</value>

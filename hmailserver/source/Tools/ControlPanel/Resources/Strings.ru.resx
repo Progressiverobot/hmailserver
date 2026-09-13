@@ -4683,8 +4683,8 @@ Control Panel может читать файлы сообщений только
   <data name="None" xml:space="preserve">
     <value>Нет</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>Нет — без шифрования (порт 110)</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>Нет — без шифрования</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>Ни у одной из выбранных учётных записей нет адреса электронной почты.</value>
@@ -6138,8 +6138,8 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS — шифрование с первого байта (порт 995)</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS — шифрование с первого байта</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS (необязательный)</value>
@@ -6159,11 +6159,11 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>На {0} STARTTLS необязателен. Клиент, который его никогда не запрашивает, или клиент, чьё предложение STARTTLS вырезали по пути, продолжает работать без шифрования, и ни одна из сторон об этом не узнаёт. {1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS, необязательно — перейти на шифрование, если оно предлагается, и продолжить открытым текстом, если нет (порт 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS, необязательно — перейти на шифрование, если оно предлагается, и продолжить открытым текстом, если нет</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS, обязательно — не загружать почту, если перейти на шифрование не удалось (порт 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS, обязательно — не загружать почту, если перейти на шифрование не удалось</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>Сервер SURBL</value>

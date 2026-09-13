@@ -4683,8 +4683,8 @@
   <data name="None" xml:space="preserve">
     <value>无</value>
   </data>
-  <data name="None - no encryption (port 110)" xml:space="preserve">
-    <value>无 - 不加密（端口 110）</value>
+  <data name="None - no encryption" xml:space="preserve">
+    <value>无 - 不加密</value>
   </data>
   <data name="None of the selected accounts have an e-mail address." xml:space="preserve">
     <value>所选账户都没有电子邮件地址。</value>
@@ -6138,8 +6138,8 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="SSL/TLS" xml:space="preserve">
     <value>SSL/TLS</value>
   </data>
-  <data name="SSL/TLS - encrypted from the first byte (port 995)" xml:space="preserve">
-    <value>SSL/TLS - 从第一个字节起即加密（端口 995）</value>
+  <data name="SSL/TLS - encrypted from the first byte" xml:space="preserve">
+    <value>SSL/TLS - 从第一个字节起即加密</value>
   </data>
   <data name="STARTTLS (optional)" xml:space="preserve">
     <value>STARTTLS（可选）</value>
@@ -6159,11 +6159,11 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="STARTTLS is optional on {0}. A client that never asks for it, or one whose STARTTLS offer is stripped in transit, carries on unencrypted and neither end is told. {1}" xml:space="preserve">
     <value>在 {0} 上 STARTTLS 是可选的。从不请求它的客户端，或者其 STARTTLS 提供在传输途中被剥离的客户端，会继续以不加密的方式通信，而且两端都不会得到任何提示。{1}</value>
   </data>
-  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)" xml:space="preserve">
-    <value>STARTTLS，可选 - 如果对方提供则升级，否则以明文继续 (端口 110)</value>
+  <data name="STARTTLS, optional - upgrade if offered, continue in the clear if not" xml:space="preserve">
+    <value>STARTTLS，可选 - 如果对方提供则升级，否则以明文继续</value>
   </data>
-  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)" xml:space="preserve">
-    <value>STARTTLS，必需 - 除非升级成功，否则拒绝下载 (端口 110)</value>
+  <data name="STARTTLS, required - refuse to download unless the upgrade succeeds" xml:space="preserve">
+    <value>STARTTLS，必需 - 除非升级成功，否则拒绝下载</value>
   </data>
   <data name="SURBL server" xml:space="preserve">
     <value>SURBL 服务器</value>
