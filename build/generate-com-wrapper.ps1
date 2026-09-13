@@ -116,9 +116,16 @@ function Invoke-Midl
    $idlDir = Split-Path -Parent $idl
    $command = "call `"$vcVars`" >nul 2>&1 && cd /d `"$idlDir`" && midl /nologo /env x64 /Oicf /D OPENSSL_NO_FILENAMES /D NDEBUG " +
       "/tlb `"$work\hMailServer.tlb`" /h `"$work\hMailServer.h`" /iid `"$work\hMailServer_i.c`" " +
-      "/proxy `"$work\hMailServer_p.c`" /dlldata `"$work\dlldata.c`" hMailServer.idl"
+      "/proxy `"$work\hMailServer_p.c`" /dlldata `"$work\dlldata.c`" hMailServer.idl 2>&1"
    Write-Host ("  MIDL over {0} (in {1})" -f $idlRelative, (Split-Path -Leaf (Split-Path -Parent $vcVars)))
-   $output = & cmd.exe /d /c $command 2>&1
+   # MIDL names each file it processes on stderr. When the stream is redirected
+   # here, Windows PowerShell turns every such line into an error record, and
+   # under $ErrorActionPreference = 'Stop' the first of them ends the script:
+   # build.ps1, run by powershell.exe as the gates and the build workflows run
+   # it, died on the line "hMailServer.idl" the first time this path was taken
+   # after a rebase had made the IDL's last commit newer than the built type
+   # library. So cmd merges the two streams before PowerShell sees either.
+   $output = & cmd.exe /d /c $command
    if ($LASTEXITCODE -ne 0)
    {
       $output | ForEach-Object { Write-Host "    $_" }
