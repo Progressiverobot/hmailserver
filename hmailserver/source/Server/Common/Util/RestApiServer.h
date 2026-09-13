@@ -308,6 +308,7 @@ namespace HM
          RouteAliasCreate,
          RouteAliasDelete,
          RouteAccountUpdate,
+         RouteAccountGet,
          RouteFetchAccountList,
          RouteFetchAccountCreate,
          RouteFetchAccountGet,
@@ -786,6 +787,7 @@ namespace HM
       HttpResponse HandleCreateAlias_(const String &domainName, const AnsiString &requestBody);
       HttpResponse HandleDeleteAlias_(const String &address);
       HttpResponse HandleUpdateAccount_(const Caller &caller, const String &address, const AnsiString &requestBody);
+      HttpResponse HandleGetAccount_(const String &address);
       // The external (fetch) accounts of an account, under its address
       // (RestApiFetchAccounts.cpp): what Account.FetchAccounts does over COM.
       HttpResponse HandleListFetchAccounts_(const String &address);

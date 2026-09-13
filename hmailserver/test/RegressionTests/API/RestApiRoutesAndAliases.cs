@@ -679,6 +679,77 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("GET /api/v1/accounts/<address> reads the account whole - the listing's two fields first, then everything PUT accepts, the vacation message and the retention included, never a password; 404 for an address that is not an account; scoped to the address's domain, and open to a read-only key")]
+      public void AccountRead()
+      {
+         Account account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "tux@example.test", "test");
+         account.PersonFirstName = "Tux";
+         account.PersonLastName = "Linux";
+         account.MaxSize = 77;
+         account.ForwardEnabled = true;
+         account.ForwardAddress = "boss@example.test";
+         account.ForwardKeepOriginal = true;
+         account.SignatureEnabled = true;
+         account.SignaturePlainText = "-- Tux";
+         account.SignatureHTML = "<b>Tux</b>";
+         account.VacationMessageIsOn = true;
+         account.VacationSubject = "Away";
+         account.VacationMessage = "Back on Monday.";
+         account.VacationMessageExpires = true;
+         account.VacationMessageExpiresDate = "2030-01-31";
+         account.MessageRetentionDays = 30;
+         account.Save();
+
+         (int status, string body) read = Http("GET", "/api/v1/accounts/" + account.Address);
+         Assert.AreEqual(200, read.status, read.body);
+         StringAssert.StartsWith("{\"address\":\"" + account.Address + "\",\"active\":true,", read.body,
+            "The listing's fields first, in its order.");
+         StringAssert.Contains("\"max_size_mb\":77", read.body);
+         StringAssert.Contains("\"first_name\":\"Tux\"", read.body);
+         StringAssert.Contains("\"last_name\":\"Linux\"", read.body);
+         StringAssert.Contains("\"forward_enabled\":true", read.body);
+         StringAssert.Contains("\"forward_address\":\"boss@example.test\"", read.body);
+         StringAssert.Contains("\"forward_keep_original\":true", read.body);
+         StringAssert.Contains("\"signature_enabled\":true", read.body);
+         StringAssert.Contains("\"signature_plain_text\":\"-- Tux\"", read.body);
+         StringAssert.Contains("\"signature_html\":\"<b>Tux</b>\"", read.body);
+         StringAssert.Contains("\"vacation_enabled\":true", read.body);
+         StringAssert.Contains("\"vacation_subject\":\"Away\"", read.body);
+         StringAssert.Contains("\"vacation_message\":\"Back on Monday.\"", read.body);
+         StringAssert.Contains("\"vacation_expires\":true", read.body);
+         StringAssert.Contains("\"vacation_expires_date\":\"2030-01-31", read.body);
+         StringAssert.Contains("\"message_retention_days\":30", read.body);
+         StringAssert.Contains("\"admin_level\":\"user\"", read.body);
+         StringAssert.DoesNotContain("password", read.body, "No password, hashed or otherwise.");
+
+         Assert.AreEqual(404, Http("GET", "/api/v1/accounts/nobody@example.test").status);
+
+         // What the read reports, the update accepts: the vacation message off
+         // again, and a retention of a year, read back through COM.
+         (int status, string body) off = Http("PUT", "/api/v1/accounts/" + account.Address,
+            "{\"vacation_enabled\":false,\"vacation_expires\":false,\"message_retention_days\":365}");
+         Assert.AreEqual(200, off.status, off.body);
+         StringAssert.Contains("\"vacation_enabled\":false", off.body);
+         Account reread = AccountOverCom(account.Address);
+         Assert.IsFalse(reread.VacationMessageIsOn);
+         Assert.AreEqual("Away", reread.VacationSubject, "A body naming the switch leaves the subject as it was.");
+         Assert.AreEqual(365, reread.MessageRetentionDays);
+
+         (int status, string body) badDate = Http("PUT", "/api/v1/accounts/" + account.Address,
+            "{\"vacation_expires\":true,\"vacation_expires_date\":\"next week\"}");
+         Assert.AreEqual(400, badDate.status, badDate.body);
+         StringAssert.Contains("YYYY-MM-DD", badDate.body);
+
+         (string otherId, string otherKey) = CreateKey("restaccount - read other domain", "full", "restother.test");
+         (string ownId, string ownKey) = CreateKey("restaccount - read own domain", "full", "example.test");
+         (string readOnlyId, string readOnlyKey) = CreateKey("restaccount - read only", "readonly", null);
+         Assert.AreEqual(403, Bearer("GET", "/api/v1/accounts/" + account.Address, otherKey).status);
+         Assert.AreEqual(200, Bearer("GET", "/api/v1/accounts/" + account.Address, ownKey).status);
+         Assert.AreEqual(200, Bearer("GET", "/api/v1/accounts/" + account.Address, readOnlyKey).status, "A read is what a read-only key is for.");
+         Assert.AreEqual(401, Http("GET", "/api/v1/accounts/" + account.Address, null, null).status);
+      }
+
+      [Test]
       [Description("The account update is scoped to the address's domain: a key for another domain is refused, a key for this one is allowed, a read-only key changes nothing, and no credential is 401. A domain-restricted key carries the domain administrator's authority: it may set admin_level user or domain, is refused server, and may not touch an account that is a server administrator - while an unrestricted key may do all of it.")]
       public void AccountUpdateAuthorisation()
       {

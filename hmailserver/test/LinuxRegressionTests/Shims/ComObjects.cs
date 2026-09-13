@@ -2739,10 +2739,78 @@ namespace hMailServer
       private void Require(string field, string comName)
       {
          if (!_known.Contains(field))
+            LoadWhole();
+
+         if (!_known.Contains(field))
             NotOnThisServer.Ignore("reads Account." + comName + " of " + Address +
                                    ", and GET /api/v1/domains/{domain}/accounts reports an account's address " +
-                                   "and active flag only - no route reports the rest of an account");
+                                   "and active flag only; this server's REST API has no GET /api/v1/accounts/{address}, " +
+                                   "which reports the rest and arrived after 6.3.2");
       }
+
+      // GET /api/v1/accounts/{address}: the account whole, read once, on the
+      // first field the run asks for and does not know. A field the test set
+      // itself before saving keeps the test's value - the server's copy is the
+      // older one. Done here rather than in Seed so that a listing of a
+      // thousand accounts costs one request, not a thousand and one.
+      private bool _loaded;
+
+      private void LoadWhole()
+      {
+         if (_loaded || string.IsNullOrEmpty(Address) || !ServerApi.HasRoute("/api/v1/accounts/{address}", "get"))
+            return;
+
+         _loaded = true;
+         var answer = ServerApi.TryGet("/api/v1/accounts/" + Address);
+         if (answer == null || answer.Status != 200 || !answer.Json.HasValue)
+            return;
+
+         var e = answer.Json.Value;
+         Take("active", () => _active = ServerApi.FlagOf(e, "active"));
+         Take("max_size_mb", () => _maxSize = (int) ServerApi.LongOf(e, "max_size_mb"));
+         Take("first_name", () => _firstName = ServerApi.StringOf(e, "first_name") ?? string.Empty);
+         Take("last_name", () => _lastName = ServerApi.StringOf(e, "last_name") ?? string.Empty);
+         Take("forward_enabled", () => _forwardEnabled = ServerApi.FlagOf(e, "forward_enabled"));
+         Take("forward_address", () => _forwardAddress = ServerApi.StringOf(e, "forward_address") ?? string.Empty);
+         Take("forward_keep_original", () => _forwardKeepOriginal = ServerApi.FlagOf(e, "forward_keep_original"));
+         Take("signature_enabled", () => _signatureEnabled = ServerApi.FlagOf(e, "signature_enabled"));
+         Take("signature_plain_text", () => _signaturePlain = ServerApi.StringOf(e, "signature_plain_text") ?? string.Empty);
+         Take("signature_html", () => _signatureHtml = ServerApi.StringOf(e, "signature_html") ?? string.Empty);
+         Take("admin_level", () => _adminLevel = AdminLevelOf(ServerApi.StringOf(e, "admin_level")));
+         Take("message_retention_days", () => _retentionDays = (int) ServerApi.LongOf(e, "message_retention_days"));
+
+         if (!_vacationTouched)
+         {
+            _vacationOn = ServerApi.FlagOf(e, "vacation_enabled");
+            _vacationSubject = ServerApi.StringOf(e, "vacation_subject") ?? string.Empty;
+            _vacationMessage = ServerApi.StringOf(e, "vacation_message") ?? string.Empty;
+            _vacationExpires = ServerApi.FlagOf(e, "vacation_expires");
+            _vacationExpiresDate = ServerApi.StringOf(e, "vacation_expires_date") ?? string.Empty;
+            _known.Add("vacation_enabled");
+         }
+      }
+
+      private void Take(string field, Action read)
+      {
+         if (_known.Contains(field))
+            return;
+         read();
+         _known.Add(field);
+      }
+
+      private static eAdminLevel AdminLevelOf(string word)
+      {
+         switch (word)
+         {
+            case "domain": return eAdminLevel.hAdminLevelDomainAdmin;
+            case "server": return eAdminLevel.hAdminLevelServerAdmin;
+            default: return eAdminLevel.hAdminLevelNormal;
+         }
+      }
+
+      // Written through PUT /api/v1/accounts/{address}, read back through the
+      // account whole.
+      private int _retentionDays;
 
       /// <summary>
       ///    Fills in what the account already is, without counting any of it as a
@@ -2995,7 +3063,11 @@ namespace hMailServer
          set { Unsupported("VacationMessageBeginDate", value); }
       }
 
-      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays", value); } }
+      public int MessageRetentionDays
+      {
+         get { Require("message_retention_days", "MessageRetentionDays"); return _retentionDays; }
+         set { _retentionDays = value; Set("message_retention_days", value.ToString(System.Globalization.CultureInfo.InvariantCulture)); }
+      }
       public int SpamMarkThreshold { get { Unsupported("SpamMarkThreshold"); return 0; } set { Unsupported("SpamMarkThreshold", value); } }
       public int SpamDeleteThreshold { get { Unsupported("SpamDeleteThreshold"); return 0; } set { Unsupported("SpamDeleteThreshold", value); } }
       public bool PersonalSpamSettingsEnabled { get { Unsupported("PersonalSpamSettingsEnabled"); return false; } set { Unsupported("PersonalSpamSettingsEnabled", value); } }

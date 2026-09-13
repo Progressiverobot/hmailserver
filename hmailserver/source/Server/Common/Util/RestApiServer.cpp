@@ -1640,6 +1640,8 @@ namespace HM
             return HandleDeleteAlias_(String(route.identifier));
          case RouteAccountUpdate:
             return HandleUpdateAccount_(caller, String(route.identifier), GetRequestBody_(request));
+         case RouteAccountGet:
+            return HandleGetAccount_(String(route.identifier));
          case RouteFetchAccountList:
             return HandleListFetchAccounts_(String(route.identifier));
          case RouteFetchAccountCreate:
@@ -2523,13 +2525,13 @@ namespace HM
          }
       }
 
-      if ((method == "DELETE" || method == "PUT") && path.StartsWith(accountsPrefix))
+      if ((method == "DELETE" || method == "PUT" || method == "GET") && path.StartsWith(accountsPrefix))
       {
          AnsiString address = path.Mid(accountsPrefix.GetLength());
 
          if (!address.IsEmpty() && address.Find("/") < 0)
          {
-            route.kind = method == "DELETE" ? RouteAccountDelete : RouteAccountUpdate;
+            route.kind = method == "DELETE" ? RouteAccountDelete : method == "PUT" ? RouteAccountUpdate : RouteAccountGet;
             route.identifier = address;
             return;
          }
@@ -3387,6 +3389,7 @@ namespace HM
       case RouteListDelete:
       case RouteAliasDelete:
       case RouteAccountUpdate:
+      case RouteAccountGet:
       case RouteFetchAccountList:
       case RouteFetchAccountCreate:
       case RouteFetchAccountGet:

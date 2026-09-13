@@ -553,6 +553,14 @@ namespace HM
          flag("signature_enabled", account->GetEnableSignature());
          entry += ",\"signature_plain_text\":\"" + quote(account->GetSignaturePlainText()) + "\"";
          entry += ",\"signature_html\":\"" + quote(account->GetSignatureHTML()) + "\"";
+         flag("vacation_enabled", account->GetVacationMessageIsOn());
+         entry += ",\"vacation_subject\":\"" + quote(account->GetVacationSubject()) + "\"";
+         entry += ",\"vacation_message\":\"" + quote(account->GetVacationMessage()) + "\"";
+         flag("vacation_expires", account->GetVacationExpires());
+         entry += ",\"vacation_expires_date\":\"" + quote(account->GetVacationExpiresDate()) + "\"";
+         AnsiString retention;
+         retention.Format("%d", account->GetMessageRetentionDays());
+         entry += ",\"message_retention_days\":" + retention;
          entry += ",\"admin_level\":\"";
          entry += AdminLevelWord(account->GetAdminLevel());
          entry += "\"}";
@@ -580,8 +588,26 @@ namespace HM
          "\"post\":{\"summary\":\"Create an alias\",\"description\":\"Body: name (the alias address, in this domain), value (the e-mail address it delivers to) and active (default true). Judged as the Control Panel judges an alias - a name an account or a distribution list already has, or a domain at its alias limit, is refused with the same sentence - and in effect for the next message to the name. Scoped to the domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"value\"],\"properties\":{\"name\":{\"type\":\"string\"},\"value\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: name, value, active\"},\"400\":{\"description\":\"name or value missing or not an address, name outside the domain, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"An alias with that name exists\"}}}}"
          ",\"/api/v1/aliases/{address}\":{\"delete\":{\"summary\":\"Delete an alias\",\"description\":\"Scoped to the address's domain.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown alias\"}}}}"
          ",\"/api/v1/accounts/{address}\":{"
+         "\"get\":{\"summary\":\"Read an account\",\"description\":\"The account whole, as the update answers it: address and active first, then max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date, message_retention_days and admin_level - what InterfaceAccount reports over COM, less the password, the hash and the TOTP secret. Scoped to the address's domain.\",\"responses\":{\"200\":{\"description\":\"The account\"},\"404\":{\"description\":\"Unknown account\"}}},"
          "\"delete\":{\"summary\":\"Delete an account\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown account\"}}},"
-         "\"put\":{\"summary\":\"Update an account\",\"description\":\"Any subset of active, password, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html and admin_level (user, domain or server); a field the body does not name is left as it is, and an unknown field is refused by name. A password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it. Who is asking decides what admin_level may become, as over COM: the administrator password or a key issued for every domain may set all three levels and may update an account that is a server administrator; a key restricted to named domains may set user or domain only, and may not touch an account that is a server administrator. Scoped to the address's domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"active\":{\"type\":\"boolean\"},\"password\":{\"type\":\"string\"},\"max_size_mb\":{\"type\":\"integer\"},\"first_name\":{\"type\":\"string\"},\"last_name\":{\"type\":\"string\"},\"forward_enabled\":{\"type\":\"boolean\"},\"forward_address\":{\"type\":\"string\"},\"forward_keep_original\":{\"type\":\"boolean\"},\"signature_enabled\":{\"type\":\"boolean\"},\"signature_plain_text\":{\"type\":\"string\"},\"signature_html\":{\"type\":\"string\"},\"admin_level\":{\"type\":\"string\",\"enum\":[\"user\",\"domain\",\"server\"]}}}}}},\"responses\":{\"200\":{\"description\":\"The account as saved: address, active, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level\"},\"400\":{\"description\":\"Nothing to update, an unknown field, a field of the wrong type, an admin_level that is not user, domain or server, a password the policy refuses, or the save refused (the reason is in error)\"},\"403\":{\"description\":\"A domain-restricted key naming admin_level server, or updating an account that is a server administrator\"},\"404\":{\"description\":\"Unknown account\"},\"409\":{\"description\":\"The password was used recently on this account\"}}}}";
+         "\"put\":{\"summary\":\"Update an account\",\"description\":\"Any subset of active, password, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date (YYYY-MM-DD, required when vacation_expires is true), message_retention_days (0: the domain's policy applies; -1: this account keeps everything whatever the domain says; days otherwise) and admin_level (user, domain or server); a field the body does not name is left as it is, and an unknown field is refused by name. A password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it. Who is asking decides what admin_level may become, as over COM: the administrator password or a key issued for every domain may set all three levels and may update an account that is a server administrator; a key restricted to named domains may set user or domain only, and may not touch an account that is a server administrator. Scoped to the address's domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"active\":{\"type\":\"boolean\"},\"password\":{\"type\":\"string\"},\"max_size_mb\":{\"type\":\"integer\"},\"first_name\":{\"type\":\"string\"},\"last_name\":{\"type\":\"string\"},\"forward_enabled\":{\"type\":\"boolean\"},\"forward_address\":{\"type\":\"string\"},\"forward_keep_original\":{\"type\":\"boolean\"},\"signature_enabled\":{\"type\":\"boolean\"},\"signature_plain_text\":{\"type\":\"string\"},\"signature_html\":{\"type\":\"string\"},\"admin_level\":{\"type\":\"string\",\"enum\":[\"user\",\"domain\",\"server\"]}}}}}},\"responses\":{\"200\":{\"description\":\"The account as saved: address, active, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level\"},\"400\":{\"description\":\"Nothing to update, an unknown field, a field of the wrong type, an admin_level that is not user, domain or server, a password the policy refuses, or the save refused (the reason is in error)\"},\"403\":{\"description\":\"A domain-restricted key naming admin_level server, or updating an account that is a server administrator\"},\"404\":{\"description\":\"Unknown account\"},\"409\":{\"description\":\"The password was used recently on this account\"}}}}";
+   }
+
+   // The account whole, as the update answers it - what InterfaceAccount
+   // reports over COM less the password, the hash and the TOTP secret. The
+   // listing beside it reports an address and whether it is active, and
+   // nothing else; a client (and the Linux suite's fixture layer) that wants
+   // the rest reads it here. Scoped to the address's domain like the update.
+   HttpResponse
+   RestApiServer::HandleGetAccount_(const String &address)
+   {
+      Quote quote = [](const String &value) { return JsonEscape_(Utf8_(value)); };
+
+      std::shared_ptr<Account> account = std::shared_ptr<Account>(new Account());
+      if (!PersistentAccount::ReadObject(account, address) || account->GetID() == 0)
+         return BuildResponse_(404, "{\"error\":\"account not found\"}");
+
+      return BuildResponse_(200, AccountEntryJson(account, quote));
    }
 
    // ------------------------------------------------------------------------
@@ -970,7 +996,8 @@ namespace HM
       {
          "active", "password", "max_size_mb", "first_name", "last_name", "forward_enabled",
          "forward_address", "forward_keep_original", "signature_enabled", "signature_plain_text",
-         "signature_html", "admin_level"
+         "signature_html", "admin_level", "vacation_enabled", "vacation_subject", "vacation_message",
+         "vacation_expires", "vacation_expires_date", "message_retention_days"
       };
 
       std::string unknown = FirstUnknownKey(body, knownKeys, sizeof(knownKeys) / sizeof(knownKeys[0]));
@@ -1033,6 +1060,12 @@ namespace HM
       bool signatureEnabled = account->GetEnableSignature();
       String signaturePlainText = account->GetSignaturePlainText();
       String signatureHtml = account->GetSignatureHTML();
+      bool vacationEnabled = account->GetVacationMessageIsOn();
+      String vacationSubject = account->GetVacationSubject();
+      String vacationMessage = account->GetVacationMessage();
+      bool vacationExpires = account->GetVacationExpires();
+      String vacationExpiresDate = account->GetVacationExpiresDate();
+      long retentionDays = account->GetMessageRetentionDays();
       String password;
 
       if (!ReadBool(body, "active", active, error) ||
@@ -1045,9 +1078,32 @@ namespace HM
           !ReadBool(body, "signature_enabled", signatureEnabled, error) ||
           !ReadString(body, "signature_plain_text", signaturePlainText, error) ||
           !ReadString(body, "signature_html", signatureHtml, error) ||
+          !ReadBool(body, "vacation_enabled", vacationEnabled, error) ||
+          !ReadString(body, "vacation_subject", vacationSubject, error) ||
+          !ReadString(body, "vacation_message", vacationMessage, error) ||
+          !ReadBool(body, "vacation_expires", vacationExpires, error) ||
+          !ReadString(body, "vacation_expires_date", vacationExpiresDate, error) ||
+          !ReadInteger(body, "message_retention_days", -1, 36500L, retentionDays, error) ||
           !ReadString(body, "password", password, error))
       {
          return BuildResponse_(400, ErrorBody(quote, String(error)));
+      }
+
+      // The expiry date, as PUT /api/v1/me/vacation takes it: YYYY-MM-DD, and
+      // only looked at when the message expires. Checked only when the body
+      // touches the expiry, so that an account whose date was left odd over COM
+      // can still have its name changed.
+      if (HasMember(body, "vacation_expires") || HasMember(body, "vacation_expires_date"))
+      {
+         vacationExpiresDate.Trim();
+         if (vacationExpiresDate.GetLength() > 10)
+            vacationExpiresDate = vacationExpiresDate.Mid(0, 10);
+         bool wellFormed = vacationExpiresDate.GetLength() == 10 && vacationExpiresDate[4] == '-' && vacationExpiresDate[7] == '-';
+         for (int i = 0; wellFormed && i < 10; i++)
+            if (i != 4 && i != 7 && (vacationExpiresDate[i] < '0' || vacationExpiresDate[i] > '9'))
+               wellFormed = false;
+         if (vacationExpires && !wellFormed)
+            return BuildResponse_(400, "{\"error\":\"vacation_expires_date must be YYYY-MM-DD when vacation_expires is true\"}");
       }
 
       forwardAddress.Trim();
@@ -1103,6 +1159,12 @@ namespace HM
       account->SetEnableSignature(signatureEnabled);
       account->SetSignaturePlainText(signaturePlainText);
       account->SetSignatureHTML(signatureHtml);
+      account->SetVacationMessageIsOn(vacationEnabled);
+      account->SetVacationSubject(vacationSubject);
+      account->SetVacationMessage(vacationMessage);
+      account->SetVacationExpires(vacationExpires);
+      account->SetVacationExpiresDate(vacationExpiresDate);
+      account->SetMessageRetentionDays((int) retentionDays);
 
       String saveError;
 
