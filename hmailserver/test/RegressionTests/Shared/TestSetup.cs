@@ -62,8 +62,26 @@ namespace RegressionTests.Shared
       ///    [Parallelizable], so NUnit runs one fixture at a time whatever the worker count
       ///    says. If that ever changes, this becomes unsafe and every caller with it.
       /// </summary>
+      /// <summary>
+      /// True when the server under test is a console server - hMailServer.exe /Debug,
+      /// launched by a coverage tool with the service stopped - which HM_CONSOLE_SERVER=1
+      /// in the environment says. Such a server answers COM and the protocols like the
+      /// service, but no service command can restart it, so the fixtures and tests that
+      /// need a restart are skipped, with the reason, rather than left to stop a server
+      /// that will not come back (the coverage run of 13 September 2026: the first
+      /// restart-needing fixture ended the measurement for everything after it).
+      /// </summary>
+      public static bool ConsoleServer =>
+         Environment.GetEnvironmentVariable("HM_CONSOLE_SERVER") == "1";
+
       public void RestartServiceAndReacquire()
       {
+         if (ConsoleServer)
+         {
+            Assert.Ignore("Needs a service restart, and the server under test is a console server " +
+                          "(HM_CONSOLE_SERVER=1), which no service command can restart.");
+         }
+
          RunServiceCommand("stop");
 
          // Wait for the OLD process to actually exit before starting the new one.
