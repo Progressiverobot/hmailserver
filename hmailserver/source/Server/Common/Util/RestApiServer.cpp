@@ -1590,6 +1590,20 @@ namespace HM
             return HandleScriptingReload_();
          case RouteScriptingCheck:
             return HandleScriptingCheck_();
+         case RouteSettingsCacheGet:
+            return HandleSettingsCache_();
+         case RouteSettingsCachePut:
+            return HandleSettingsCachePut_(GetRequestBody_(request));
+         case RouteCacheClear:
+            return HandleCacheClear_();
+         case RouteSettingsIndexingGet:
+            return HandleSettingsIndexing_();
+         case RouteSettingsIndexingPut:
+            return HandleSettingsIndexingPut_(GetRequestBody_(request));
+         case RouteIndexingIndex:
+            return HandleIndexingIndex_();
+         case RouteIndexingClear:
+            return HandleIndexingClear_();
          case RouteSettingsBackupGet:
             return HandleSettingsBackup_();
          case RouteSettingsBackupPut:
@@ -2987,6 +3001,36 @@ namespace HM
          return;
       }
 
+      if (path == "/api/v1/settings/cache" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsCacheGet : RouteSettingsCachePut;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/cache/clear")
+      {
+         route.kind = RouteCacheClear;
+         return;
+      }
+
+      if (path == "/api/v1/settings/indexing" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsIndexingGet : RouteSettingsIndexingPut;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/indexing/index")
+      {
+         route.kind = RouteIndexingIndex;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/indexing/clear")
+      {
+         route.kind = RouteIndexingClear;
+         return;
+      }
+
       if (path == "/api/v1/settings/backup" && (method == "GET" || method == "PUT"))
       {
          route.kind = method == "GET" ? RouteSettingsBackupGet : RouteSettingsBackupPut;
@@ -3138,6 +3182,11 @@ namespace HM
       case RouteLogonFailuresClear:
       case RouteSettingsScriptingPut:
       case RouteScriptingReload:
+      case RouteSettingsCachePut:
+      case RouteCacheClear:
+      case RouteSettingsIndexingPut:
+      case RouteIndexingIndex:
+      case RouteIndexingClear:
       case RouteSettingsBackupPut:
       case RouteServerMessagePut:
       case RouteIpRangeUpdate:
@@ -3335,6 +3384,13 @@ namespace HM
       case RouteSettingsScriptingPut:
       case RouteScriptingReload:
       case RouteScriptingCheck:
+      case RouteSettingsCacheGet:
+      case RouteSettingsCachePut:
+      case RouteCacheClear:
+      case RouteSettingsIndexingGet:
+      case RouteSettingsIndexingPut:
+      case RouteIndexingIndex:
+      case RouteIndexingClear:
       case RouteSettingsBackupGet:
       case RouteSettingsBackupPut:
       case RouteServerMessageList:

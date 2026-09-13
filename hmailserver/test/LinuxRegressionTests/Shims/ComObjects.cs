@@ -326,6 +326,8 @@ namespace hMailServer
       public const string LogonFailuresClear = "/api/v1/settings/logon-failures/clear";
       public const string Scripting = "/api/v1/settings/scripting";
       public const string Backup = "/api/v1/settings/backup";
+      public const string Cache = "/api/v1/settings/cache";
+      public const string Indexing = "/api/v1/settings/indexing";
       public const string Messages = "/api/v1/settings/messages";
       public const string SieveEvaluate = "/api/v1/sieve/evaluate";
 
@@ -817,9 +819,13 @@ namespace hMailServer
          NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorPassword, password);
       }
 
+      /// <summary>
+      ///    PUT /api/v1/settings smtp_relayer_password, a write-only key: written,
+      ///    never read back, which is what the COM call is too.
+      /// </summary>
       public void SetSMTPRelayerPassword(string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoRelayerPassword);
+         SettingsApi.Put(SettingsApi.Server, "smtp_relayer_password", ServerApi.Quote(password ?? string.Empty));
       }
 
       /// <summary>
@@ -1224,54 +1230,57 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    Settings.Cache over GET/PUT /api/v1/settings/cache and POST .../clear: the
+   ///    switch is written and read there, the sizes, ceilings, lives and hit rates
+   ///    are read there (the ceilings and lives are ini keys, read-only over REST),
+   ///    and a clear is the POST.
+   /// </summary>
    public class Cache
    {
-      public bool Enabled
+      private static System.Text.Json.JsonElement Read(string key)
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
+         return SettingsApi.ReadOrSkip(SettingsApi.Cache, key, NotOnThisServer.NoCacheControl);
       }
 
-      public int DomainCacheSizeKb
+      public bool Enabled
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
-         }
+         get { return Read("enabled").GetBoolean(); }
+         set { SettingsApi.PutOrSkip(SettingsApi.Cache, "enabled", value ? "true" : "false", NotOnThisServer.NoCacheControl); }
       }
+
+      public int DomainCacheSizeKb => (int) Read("domain_cache_size_kb").GetInt64();
+      public int DomainCacheTTL => (int) Read("domain_cache_ttl").GetInt64();
+      public int DomainHitRate => (int) Read("domain_hit_rate").GetInt64();
+      public int AccountCacheSizeKb => (int) Read("account_cache_size_kb").GetInt64();
+      public int AccountCacheTTL => (int) Read("account_cache_ttl").GetInt64();
+      public int AccountHitRate => (int) Read("account_hit_rate").GetInt64();
+      public int AliasCacheSizeKb => (int) Read("alias_cache_size_kb").GetInt64();
+      public int AliasCacheMaxSizeKb => (int) Read("alias_cache_max_size_kb").GetInt64();
+      public int AliasCacheTTL => (int) Read("alias_cache_ttl").GetInt64();
+      public int AliasHitRate => (int) Read("alias_hit_rate").GetInt64();
+      public int DistributionListCacheSizeKb => (int) Read("distribution_list_cache_size_kb").GetInt64();
+      public int DistributionListCacheMaxSizeKb => (int) Read("distribution_list_cache_max_size_kb").GetInt64();
+      public int DistributionListCacheTTL => (int) Read("distribution_list_cache_ttl").GetInt64();
+      public int DistributionListHitRate => (int) Read("distribution_list_hit_rate").GetInt64();
 
       public int DomainCacheMaxSizeKb
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
-      }
-
-      public int AccountCacheSizeKb
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
-         }
+         get { return (int) Read("domain_cache_max_size_kb").GetInt64(); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl + " (the ceiling is an ini key, read-only over REST)", value); }
       }
 
       public int AccountCacheMaxSizeKb
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoCacheControl);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl, value); }
+         get { return (int) Read("account_cache_max_size_kb").GetInt64(); }
+         set { NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl + " (the ceiling is an ini key, read-only over REST)", value); }
       }
 
       public void Clear()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
+         if (!ServerApi.HasRoute(SettingsApi.Cache + "/clear", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoCacheControl);
+         ServerApi.Post(SettingsApi.Cache + "/clear", "{}").Expect(200, "POST " + SettingsApi.Cache + "/clear");
       }
    }
 
@@ -1420,36 +1429,38 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    Settings.MessageIndexing over GET/PUT /api/v1/settings/indexing and the
+   ///    POSTs beside it: the switch, the two counts, a run now and a clear.
+   /// </summary>
    public class MessageIndexing
    {
+      private static System.Text.Json.JsonElement Read(string key)
+      {
+         return SettingsApi.ReadOrSkip(SettingsApi.Indexing, key, NotOnThisServer.NoMessageIndexing);
+      }
+
       public bool Enabled
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing, value); }
+         get { return Read("enabled").GetBoolean(); }
+         set { SettingsApi.PutOrSkip(SettingsApi.Indexing, "enabled", value ? "true" : "false", NotOnThisServer.NoMessageIndexing); }
       }
+
+      public long TotalIndexedCount => Read("total_indexed_count").GetInt64();
+      public long TotalMessageCount => Read("total_message_count").GetInt64();
 
       public void Index()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
+         if (!ServerApi.HasRoute(SettingsApi.Indexing + "/index", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
+         ServerApi.Post(SettingsApi.Indexing + "/index", "{}").Expect(200, "POST " + SettingsApi.Indexing + "/index");
       }
 
-      public long TotalIndexedCount
+      public void Clear()
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing + " (TotalIndexedCount)");
-         }
-      }
-
-      public long TotalMessageCount
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageIndexing + " (TotalMessageCount)");
-         }
+         if (!ServerApi.HasRoute(SettingsApi.Indexing + "/clear", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageIndexing);
+         ServerApi.Post(SettingsApi.Indexing + "/clear", "{}").Expect(200, "POST " + SettingsApi.Indexing + "/clear");
       }
    }
 

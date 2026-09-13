@@ -285,6 +285,13 @@ namespace HM
          RouteScriptingCheck,
          RouteSettingsBackupGet,
          RouteSettingsBackupPut,
+         RouteSettingsCacheGet,
+         RouteSettingsCachePut,
+         RouteCacheClear,
+         RouteSettingsIndexingGet,
+         RouteSettingsIndexingPut,
+         RouteIndexingIndex,
+         RouteIndexingClear,
          RouteServerMessageList,
          RouteServerMessagePut,
          RouteSieveEvaluate,
@@ -761,6 +768,14 @@ namespace HM
       HttpResponse HandleSettingsScriptingPut_(const AnsiString &requestBody);
       HttpResponse HandleScriptingReload_();
       HttpResponse HandleScriptingCheck_();
+      // Settings.Cache and Settings.MessageIndexing over REST (RestApiSettings.cpp).
+      HttpResponse HandleSettingsCache_();
+      HttpResponse HandleSettingsCachePut_(const AnsiString &requestBody);
+      HttpResponse HandleCacheClear_();
+      HttpResponse HandleSettingsIndexing_();
+      HttpResponse HandleSettingsIndexingPut_(const AnsiString &requestBody);
+      HttpResponse HandleIndexingIndex_();
+      HttpResponse HandleIndexingClear_();
       HttpResponse HandleSettingsBackup_();
       HttpResponse HandleSettingsBackupPut_(const AnsiString &requestBody);
       HttpResponse HandleServerMessageList_();

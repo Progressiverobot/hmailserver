@@ -722,6 +722,81 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("GET and PUT /api/v1/settings/cache are Settings.Cache: the switch written and read back through COM, the four caches' sizes, ceilings, lives and hit rates read-only, and POST /clear empties them as Cache.Clear does")]
+      public void CacheGroupRoundTripsThroughCom()
+      {
+         var cache = _settings.Cache;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/cache");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"enabled\":" + (cache.Enabled ? "true" : "false"), body);
+         StringAssert.Contains("\"domain_cache_max_size_kb\":" + cache.DomainCacheMaxSizeKb, body);
+         StringAssert.Contains("\"account_cache_max_size_kb\":" + cache.AccountCacheMaxSizeKb, body);
+         StringAssert.Contains("\"domain_cache_ttl\":" + cache.DomainCacheTTL, body);
+         StringAssert.Contains("\"account_cache_ttl\":" + cache.AccountCacheTTL, body);
+         StringAssert.Contains("\"domain_hit_rate\":", body);
+         StringAssert.Contains("\"distribution_list_hit_rate\":", body);
+
+         bool was = cache.Enabled;
+         try
+         {
+            (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/cache", "{\"enabled\":" + (was ? "false" : "true") + "}");
+            Assert.AreEqual(200, putStatus, putBody);
+            Assert.AreEqual(!was, cache.Enabled, "The switch is the COM property.");
+
+            (int readOnlyStatus, string readOnlyBody) = Http("PUT", "/api/v1/settings/cache", "{\"domain_hit_rate\":5}");
+            Assert.AreEqual(400, readOnlyStatus, readOnlyBody);
+            StringAssert.Contains("is read-only", readOnlyBody);
+         }
+         finally
+         {
+            cache.Enabled = was;
+         }
+
+         (int clearStatus, string clearBody) = Http("POST", "/api/v1/settings/cache/clear");
+         Assert.AreEqual(200, clearStatus, clearBody);
+         StringAssert.Contains("\"cleared\":true", clearBody);
+      }
+
+      [Test]
+      [Description("GET and PUT /api/v1/settings/indexing are Settings.MessageIndexing: the switch written and read back through COM, the two counts read-only, POST /clear empties the index and POST /index runs the indexer now, as the COM calls do")]
+      public void IndexingGroupRoundTripsThroughCom()
+      {
+         var indexing = _settings.MessageIndexing;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/indexing");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"enabled\":" + (indexing.Enabled ? "true" : "false"), body);
+         StringAssert.Contains("\"total_indexed_count\":" + indexing.TotalIndexedCount, body);
+         StringAssert.Contains("\"total_message_count\":" + indexing.TotalMessageCount, body);
+
+         bool was = indexing.Enabled;
+         try
+         {
+            (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/indexing", "{\"enabled\":" + (was ? "false" : "true") + "}");
+            Assert.AreEqual(200, putStatus, putBody);
+            Assert.AreEqual(!was, indexing.Enabled, "The switch is the COM property.");
+
+            (int readOnlyStatus, string readOnlyBody) = Http("PUT", "/api/v1/settings/indexing", "{\"total_indexed_count\":5}");
+            Assert.AreEqual(400, readOnlyStatus, readOnlyBody);
+            StringAssert.Contains("is read-only", readOnlyBody);
+         }
+         finally
+         {
+            indexing.Enabled = was;
+         }
+
+         (int clearStatus, string clearBody) = Http("POST", "/api/v1/settings/indexing/clear");
+         Assert.AreEqual(200, clearStatus, clearBody);
+         StringAssert.Contains("\"cleared\":true", clearBody);
+         Assert.AreEqual(0, indexing.TotalIndexedCount, "Nothing indexed after a clear.");
+
+         (int indexStatus, string indexBody) = Http("POST", "/api/v1/settings/indexing/index");
+         Assert.AreEqual(200, indexStatus, indexBody);
+         StringAssert.Contains("\"started\":true", indexBody);
+      }
+
+      [Test]
       [Description("GET and PUT /api/v1/settings/scripting are Settings.Scripting: the switch and the language written and read back through COM, a language that is neither refused in COM's words, the script checked and loaded again over the two POSTs.")]
       public void ScriptingGroupRoundTripsThroughCom()
       {

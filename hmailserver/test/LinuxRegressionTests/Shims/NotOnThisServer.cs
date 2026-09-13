@@ -141,7 +141,7 @@ namespace RegressionTests.Shared
          "needs the backup settings (Settings.Backup) or the backup run, and this server's REST API has no /api/v1/settings/backup (it arrived after 6.3.2) - the run itself is POST /api/v1/backup";
 
       public const string NoCacheControl =
-         "needs Settings.Cache - the server's domain and account caches - which no REST route reads or clears";
+         "needs Settings.Cache - the server's domain and account caches - and this server's REST API has no /api/v1/settings/cache (it arrived after 6.3.2)";
 
       public const string NoAntiVirusSettings =
          "needs Settings.AntiVirus, and no REST route carries the anti-virus settings or the blocked-attachment list";
@@ -153,7 +153,7 @@ namespace RegressionTests.Shared
          "needs Settings.ServerMessages, and this server's REST API has no /api/v1/settings/messages (it arrived after 6.3.2)";
 
       public const string NoMessageIndexing =
-         "needs Settings.MessageIndexing, and no REST route switches indexing on or runs it";
+         "needs Settings.MessageIndexing, and this server's REST API has no /api/v1/settings/indexing (it arrived after 6.3.2)";
 
       public const string NoIncomingRelays =
          "needs Settings.IncomingRelays, and no REST route carries the incoming relays";

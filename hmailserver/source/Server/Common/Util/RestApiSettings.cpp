@@ -58,6 +58,18 @@
 #include "../../SMTP/SMTPConfiguration.h"
 #include "../../IMAP/IMAPConfiguration.h"
 #include "../../POP3/POP3Configuration.h"
+#include "../Cache/Cache.h"
+#include "../Cache/CacheConfiguration.h"
+#include "../Cache/CacheContainer.h"
+#include "../BO/Domain.h"
+#include "../BO/Account.h"
+#include "../BO/Alias.h"
+#include "../BO/DistributionList.h"
+#include "../../IMAP/MessagesContainer.h"
+#include "../Persistence/PersistentMessage.h"
+#include "../Persistence/PersistentMessageMetaData.h"
+#include "../Persistence/PersistentMessageIndex.h"
+#include "../Application/MessageIndexer.h"
 
 #include <climits>
 #include <string>
@@ -733,6 +745,80 @@ namespace
         ROW_TEXT(Ini()->GetEventDirectory()), nullptr, ROW_NO_CHECK },
    };
 
+   // Settings.Cache over COM: the switch, and for each of the four caches what
+   // it holds, its ceiling, its time to live and its hit rate - read-only, as
+   // they are there; the ceilings and lives are the [Settings] keys of
+   // hMailServer.ini, and a clear is a POST beside the group.
+   const Row CacheRows[] =
+   {
+      { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the domain, account, alias and distribution-list caches are used at all.",
+        ROW_FLAG(Config()->GetCacheConfiguration()->GetUseCache()), ROW_SET(Config()->GetCacheConfiguration()->SetUseCache(v.flag)), ROW_NO_CHECK },
+      { "domain_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "What the domain cache holds now, in kilobytes.",
+        ROW_NUMBER(CacheContainer::Instance()->GetDomainCacheSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "domain_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "The domain cache's ceiling, in kilobytes (DomainCacheMaxSizeKb in hMailServer.ini).",
+        ROW_NUMBER(CacheContainer::Instance()->GetDomainCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "domain_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Seconds a domain stays cached.",
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDomainCacheTTL()), nullptr, ROW_NO_CHECK },
+      { "domain_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Of the domain lookups since the cache was last cleared, the percentage the cache answered.",
+        ROW_NUMBER(Cache<Domain>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
+      { "account_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "What the account cache holds now, in kilobytes.",
+        ROW_NUMBER(CacheContainer::Instance()->GetAccountCacheSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "account_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "The account cache's ceiling, in kilobytes (AccountCacheMaxSizeKb in hMailServer.ini).",
+        ROW_NUMBER(CacheContainer::Instance()->GetAccountCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "account_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Seconds an account stays cached.",
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAccountCacheTTL()), nullptr, ROW_NO_CHECK },
+      { "account_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Of the account lookups since the cache was last cleared, the percentage the cache answered.",
+        ROW_NUMBER(Cache<Account>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
+      { "alias_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "What the alias cache holds now, in kilobytes.",
+        ROW_NUMBER(CacheContainer::Instance()->GetAliasCacheSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "alias_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "The alias cache's ceiling, in kilobytes (AliasCacheMaxSizeKb in hMailServer.ini).",
+        ROW_NUMBER(CacheContainer::Instance()->GetAliasCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "alias_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Seconds an alias stays cached.",
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAliasCacheTTL()), nullptr, ROW_NO_CHECK },
+      { "alias_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Of the alias lookups since the cache was last cleared, the percentage the cache answered.",
+        ROW_NUMBER(Cache<Alias>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
+      { "distribution_list_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "What the distribution-list cache holds now, in kilobytes.",
+        ROW_NUMBER(CacheContainer::Instance()->GetDistributionListCacheSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "distribution_list_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
+        "The distribution-list cache's ceiling, in kilobytes (DistributionListCacheMaxSizeKb in hMailServer.ini).",
+        ROW_NUMBER(CacheContainer::Instance()->GetDistributionListCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
+      { "distribution_list_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Seconds a distribution list stays cached.",
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDistributionListCacheTTL()), nullptr, ROW_NO_CHECK },
+      { "distribution_list_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
+        "Of the distribution-list lookups since the cache was last cleared, the percentage the cache answered.",
+        ROW_NUMBER(Cache<DistributionList>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
+   };
+
+   // Settings.MessageIndexing over COM: the switch, and the two counts the
+   // Control Panel shows; a run and a clear are POSTs beside the group.
+   const Row IndexingRows[] =
+   {
+      { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether delivered messages are indexed for search.",
+        ROW_FLAG(Config()->GetMessageIndexing()), ROW_SET(Config()->SetMessageIndexing(v.flag)), ROW_NO_CHECK },
+      { "total_indexed_count", KindInteger, ReadOnly, EffectNow, nullptr,
+        "How many messages the index holds.",
+        [] { PersistentMessageMetaData metaData; return Number((long) metaData.GetTotalMessageCount()); }, nullptr, ROW_NO_CHECK },
+      { "total_message_count", KindInteger, ReadOnly, EffectNow, nullptr,
+        "How many delivered messages there are to index.",
+        ROW_NUMBER(PersistentMessage::GetTotalMessageCountDelivered()), nullptr, ROW_NO_CHECK },
+   };
+
    const Row BackupRows[] =
    {
       { "destination", KindString, ReadWrite, EffectNow, nullptr,
@@ -767,6 +853,8 @@ namespace
    const Group DirectoriesGroup = { "directories", "/api/v1/settings/directories", DirectoriesRows, sizeof(DirectoriesRows) / sizeof(DirectoriesRows[0]) };
    const Group ScriptingGroup = { "scripting", "/api/v1/settings/scripting", ScriptingRows, sizeof(ScriptingRows) / sizeof(ScriptingRows[0]) };
    const Group BackupGroup = { "backup", "/api/v1/settings/backup", BackupRows, sizeof(BackupRows) / sizeof(BackupRows[0]) };
+   const Group CacheGroup = { "cache", "/api/v1/settings/cache", CacheRows, sizeof(CacheRows) / sizeof(CacheRows[0]) };
+   const Group IndexingGroup = { "indexing", "/api/v1/settings/indexing", IndexingRows, sizeof(IndexingRows) / sizeof(IndexingRows[0]) };
 
    // ---------------------------------------------------------------------
    // The two private helpers of RestApiServer these functions need, handed
@@ -1434,6 +1522,11 @@ namespace
       "\"/api/v1/settings/messages/{name}\":{\"put\":{\"summary\":\"Change one server message text\",\"description\":\"Body: text. The name is the table's own, as the listing shows it. In use at once. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"text\"],\"properties\":{\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{id, name, text} as saved\"},\"400\":{\"description\":\"text missing or not a string\"},\"404\":{\"description\":\"No message of that name\"}}}},"
       "\"/api/v1/sieve/evaluate\":{\"post\":{\"summary\":\"Try a Sieve script against a message, without delivering anything\",\"description\":\"Body: script (RFC 5228 Sieve) and message (the raw message, headers and body). result is the action list the script decided on - keep, fileinto:Folder, discard, redirect:address, and so on - or error: followed by the parser's message. What Utilities.EvaluateSieveScript does over COM: nothing is filed, sent or recorded. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\",\"message\"],\"properties\":{\"script\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{result}\"},\"400\":{\"description\":\"script or message missing\"}}}}";
 
+   const char *CacheAndIndexingPaths =
+      ",\"/api/v1/settings/cache/clear\":{\"post\":{\"summary\":\"Empty the caches\",\"description\":\"What Settings.Cache.Clear does over COM: the domain, account, alias and distribution-list caches are emptied, and the open-message container with them, so the next lookup of each reads the database. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{cleared: true}\"}}}},"
+      "\"/api/v1/settings/indexing/index\":{\"post\":{\"summary\":\"Index the messages not yet indexed, now\",\"description\":\"What Settings.MessageIndexing.Index does over COM: the indexer runs at once rather than at its next tick; the answer does not wait for it. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{started: true}\"}}}},"
+      "\"/api/v1/settings/indexing/clear\":{\"post\":{\"summary\":\"Empty the message index\",\"description\":\"What Settings.MessageIndexing.Clear does over COM: every indexed message's metadata, the full-text terms and the backfill cursor go, so the indexer starts again from the first message when it next runs. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{cleared: true}\"}}}}";
+
    const char *IniAndLogonFailurePaths =
       ",\"/api/v1/settings/ini\":{\"get\":{\"summary\":\"The keys in hMailServer.ini's [Settings] section\",\"description\":\"names: every key the section holds, in file order - what Settings.IniSettingNames lists over COM. The values are read one at a time. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{names: [...]}\"}}}},"
       "\"/api/v1/settings/ini/{name}\":{"
@@ -1473,6 +1566,9 @@ namespace HM
       paths += OpenApiPath(ScriptingGroup, "The event-handler scripting settings", "Change the scripting settings", bridge);
       paths += OpenApiPath(BackupGroup, "The backup settings", "Change the backup settings", bridge);
       paths += ScriptingMessagesAndSievePaths;
+      paths += OpenApiPath(CacheGroup, "The cache settings and counters", "Change the cache settings", bridge);
+      paths += OpenApiPath(IndexingGroup, "The message indexing settings and counts", "Change the indexing settings", bridge);
+      paths += CacheAndIndexingPaths;
       return paths;
    }
 
@@ -1574,6 +1670,69 @@ namespace HM
       Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
       String result = ScriptServer::Instance()->CheckSyntax();
       return BuildResponse_(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsCache_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(CacheGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsCachePut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(CacheGroup, requestBody, bridge);
+   }
+
+   // As InterfaceCache::Clear: the four object caches and the container of
+   // open messages, so that nothing read before the clear is answered after it.
+   HttpResponse
+   RestApiServer::HandleCacheClear_()
+   {
+      Cache<Account>::Instance()->Clear();
+      Cache<Domain>::Instance()->Clear();
+      Cache<Alias>::Instance()->Clear();
+      Cache<DistributionList>::Instance()->Clear();
+      MessagesContainer::Instance()->Clear();
+      LOG_APPLICATION("RestApi: the caches were cleared.");
+      return BuildResponse_(200, "{\"cleared\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsIndexing_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(IndexingGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsIndexingPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(IndexingGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleIndexingIndex_()
+   {
+      MessageIndexer::Instance()->IndexNow();
+      LOG_APPLICATION("RestApi: the message indexer was asked to run now.");
+      return BuildResponse_(200, "{\"started\":true}");
+   }
+
+   // As InterfaceMessageIndexing::Clear: the metadata, the full-text terms and
+   // the backfill cursor together - a cursor left behind would clear the terms
+   // and then never rebuild them.
+   HttpResponse
+   RestApiServer::HandleIndexingClear_()
+   {
+      PersistentMessageMetaData metaData;
+      metaData.Clear();
+      PersistentMessageIndex::Clear();
+      LOG_APPLICATION("RestApi: the message index was cleared.");
+      return BuildResponse_(200, "{\"cleared\":true}");
    }
 
    HttpResponse
