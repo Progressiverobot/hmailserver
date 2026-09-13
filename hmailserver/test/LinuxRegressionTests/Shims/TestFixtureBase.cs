@@ -146,11 +146,25 @@ namespace RegressionTests.Shared
       ///
       ///    Matched on the code and on the sentence that names the cause, so that an
       ///    HM6406 raised for some other reason still fails the test.
+      ///
+      ///    Two more, each only where the server's build object says the gap is real:
+      ///    HM5607, PreferredHashAlgorithm asks for Argon2id and the build's OpenSSL
+      ///    (below 3.2) has no such KDF, so scrypt is used - written at every reload
+      ///    while the hash-policy fixtures have the setting at 5, and blamed on
+      ///    whichever test was running, a skipped one included; and HM5720, the
+      ///    hybrid key exchange groups refused by an OpenSSL below 3.5 and the
+      ///    classical ones used - what the fall-back test asserts happens. The tests
+      ///    that need the feature itself are skipped by name in NotOnThisServer; these
+      ///    lines are the server saying, in its log, what that registry says.
       /// </summary>
       private static string[] WithoutKnownPlatformGaps(string[] errorLines)
       {
+         var noArgon2id = !ServerApi.Capability("argon2id");
+         var classicalOnly = !ServerApi.Capability("post_quantum_key_exchange");
          return errorLines
             .Where(line => !(line.Contains("HM6406") && line.Contains("resolves names through the Windows DNS client")))
+            .Where(line => !(noArgon2id && line.Contains("HM5607") && line.Contains("has no Argon2id KDF")))
+            .Where(line => !(classicalOnly && line.Contains("HM5720") && line.Contains("Failed to set the TLS key exchange groups")))
             .ToArray();
       }
    }
