@@ -7147,7 +7147,7 @@ namespace HM
             json += ",";
 
          AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs}",
+         entry.Format("{\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs,%hs}",
             message->GetID(),
             message->GetUID(),
             message->GetSize(),
@@ -7156,7 +7156,8 @@ namespace HM
             JsonEscape_(from).c_str(),
             JsonEscape_(date).c_str(),
             FlagsJson(message).c_str(),
-            ThreadFieldsJson_(MessageFile_(message)).c_str());
+            ThreadFieldsJson_(MessageFile_(message)).c_str(),
+            ListingExtrasJson_(MessageFile_(message), message).c_str());
          json += entry;
          written++;
          lastUid = message->GetUID();
@@ -7300,7 +7301,7 @@ namespace HM
             json += ",";
 
          AnsiString entry;
-         entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs}",
+         entry.Format("{\"folder_id\":%I64d,\"folder\":\"%hs\",\"id\":%I64d,\"uid\":%u,\"size\":%d,\"received\":\"%hs\",\"subject\":\"%hs\",\"from\":\"%hs\",\"date\":\"%hs\",\"flags\":%hs,%hs,%hs}",
             hits[i].folder->GetID(),
             // Decoded, as the folder listing decodes it: the path is stored
             // names joined, and a stored name is modified UTF-7.
@@ -7313,7 +7314,8 @@ namespace HM
             JsonEscape_(from).c_str(),
             JsonEscape_(date).c_str(),
             FlagsJson(message).c_str(),
-            ThreadFieldsJson_(MessageFile_(message)).c_str());
+            ThreadFieldsJson_(MessageFile_(message)).c_str(),
+            ListingExtrasJson_(MessageFile_(message), message).c_str());
          json += entry;
       }
 
@@ -9259,6 +9261,150 @@ namespace HM
       AnsiString json;
       json.Format("\"message_id\":\"%hs\",\"in_reply_to\":\"%hs\",\"references\":\"%hs\"",
          JsonEscape_(messageId).c_str(), JsonEscape_(inReplyTo).c_str(), JsonEscape_(references).c_str());
+      return json;
+   }
+
+   // What a mail client's list shows beside the subject, from the file: the
+   // recipients (a Sent folder lists who a message went to), whether the
+   // message carries attachments (what the search's has:attachment reads: a
+   // mixed multipart or a part declared one), and a snippet of the text - the
+   // first hundred and sixty characters that are not a quotation, or the
+   // text of an HTML-only message with its markup removed. The text needs the
+   // message parsed, which MessageData caps by size; a message over the cap
+   // has no snippet. Kept per message id, since a folder is listed again at
+   // every change the probe reports and a message file does not change.
+   namespace
+   {
+      struct ListingExtras
+      {
+         AnsiString json;
+      };
+
+      boost::mutex listingExtrasLock;
+      std::map<__int64, ListingExtras> listingExtras;
+      const size_t ListingExtrasKept = 4000;
+      const int SnippetLength = 160;
+
+      String TextWithoutMarkup(const String &html)
+      {
+         String out;
+         out.reserve(html.GetLength());
+         bool inTag = false;
+         bool inStyle = false;
+         const String lower = html.ToLower();
+         for (int i = 0; i < html.GetLength(); i++)
+         {
+            const wchar_t c = html[i];
+            if (c == '<')
+            {
+               inTag = true;
+               if (lower.Mid(i, 6) == _T("<style") || lower.Mid(i, 7) == _T("<script"))
+                  inStyle = true;
+               else if (lower.Mid(i, 8) == _T("</style>") || lower.Mid(i, 9) == _T("</script>"))
+                  inStyle = false;
+               continue;
+            }
+            if (c == '>')
+            {
+               inTag = false;
+               out += ' ';
+               continue;
+            }
+            if (!inTag && !inStyle)
+               out += c;
+         }
+         out.Replace(_T("&nbsp;"), _T(" "));
+         out.Replace(_T("&amp;"), _T("&"));
+         out.Replace(_T("&lt;"), _T("<"));
+         out.Replace(_T("&gt;"), _T(">"));
+         out.Replace(_T("&quot;"), _T("\""));
+         out.Replace(_T("&#39;"), _T("'"));
+         return out;
+      }
+
+      String SnippetOf(const String &text)
+      {
+         // Lines that quote an earlier message are not the message.
+         String kept;
+         std::vector<String> lines = StringParser::SplitString(text, _T("\n"));
+         for (size_t i = 0; i < lines.size(); i++)
+         {
+            String line = lines[i];
+            line.TrimLeft();
+            if (line.IsEmpty() || line[0] == '>')
+               continue;
+            if (line == _T("-- "))
+               break;
+            kept += line + _T(" ");
+            if (kept.GetLength() > SnippetLength * 3)
+               break;
+         }
+         String out;
+         bool space = true;
+         for (int i = 0; i < kept.GetLength() && out.GetLength() < SnippetLength; i++)
+         {
+            const wchar_t c = kept[i];
+            const bool blank = c == ' ' || c == '\t' || c == '\r' || c == '\n';
+            if (blank)
+            {
+               if (!space)
+                  out += ' ';
+               space = true;
+               continue;
+            }
+            out += c;
+            space = false;
+         }
+         out.TrimRight();
+         return out;
+      }
+   }
+
+   AnsiString
+   RestApiServer::ListingExtrasJson_(const String &fileName, std::shared_ptr<Message> message)
+   {
+      const __int64 id = message->GetID();
+      {
+         boost::lock_guard<boost::mutex> guard(listingExtrasLock);
+         std::map<__int64, ListingExtras>::const_iterator known = listingExtras.find(id);
+         if (known != listingExtras.end())
+            return known->second.json;
+      }
+
+      String to;
+      bool attachments = false;
+      AnsiString header = PersistentMessage::LoadHeader(fileName, false);
+      if (!header.IsEmpty())
+      {
+         MimeHeader mimeHeader;
+         mimeHeader.Load(header.c_str(), header.GetLength(), true);
+         to = mimeHeader.GetUnicodeFieldValue("To");
+
+         AnsiString lower = header;
+         lower.ToLower();
+         attachments = lower.Find("multipart/mixed") >= 0 || lower.Find("content-disposition: attachment") >= 0;
+      }
+
+      String snippet;
+      MessageData data;
+      if (data.LoadFromMessage(fileName, message))
+      {
+         String text = data.GetBody();
+         if (text.IsEmpty())
+            text = TextWithoutMarkup(data.GetHTMLBody());
+         snippet = SnippetOf(text);
+      }
+
+      AnsiString json;
+      json.Format("\"to\":\"%hs\",\"has_attachments\":%hs,\"snippet\":\"%hs\"",
+         JsonEscape_(Utf8_(to)).c_str(),
+         attachments ? "true" : "false",
+         JsonEscape_(Utf8_(snippet)).c_str());
+
+      boost::lock_guard<boost::mutex> guard(listingExtrasLock);
+      if (listingExtras.size() >= ListingExtrasKept)
+         listingExtras.clear();
+      listingExtras[id].json = json;
       return json;
    }
 

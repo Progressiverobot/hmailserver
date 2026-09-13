@@ -5,7 +5,7 @@ The webmail at `/portal` has a keyboard map (press `?` in it) and a search
 syntax (the search box lists it in its tooltip). This page is the same two
 lists, for anyone who reads before they click. The page itself is the source:
 the keyboard map is the `keys-overlay` in
-`hmailserver/source/Server/Common/Util/Portal.js`, the search syntax
+`hmailserver/source/Server/Common/Util/Portal.html`, the search syntax
 is the `x-operators` line of `/api/v1/me/search` in `RestApiServer.cpp` and
 the OpenAPI document at `/api/v1/openapi.json`.
 
@@ -20,12 +20,17 @@ use.
 | --- | --- |
 | `j` or `↓` | Next message |
 | `k` or `↑` | Previous message |
-| `Enter` | Open the message under the cursor |
+| `Enter` or `o` | Open the message under the cursor - beside the list when the reading pane is on, in its place when it is off |
+| `u` or `Esc` | Back to the list |
 | `x` | Tick or untick the message under the cursor |
+| `s` | Star or unstar the message |
 | `e` | Archive the message |
 | `!` | File the message as junk, or as not junk from the Junk folder |
 | `#` | Delete the message (to Trash) |
 | `l` | Label the message (the Label menu of the open message) |
+| `c` | Write a new message |
+| `r` `a` `f` | Reply, reply to all, forward the open message |
+| `/` | Search |
 | `Ctrl` + `K` | The palette: an action, a page, a folder or a contact |
 | `?` | The list of shortcuts |
 | `Esc` | Close the list or the palette |
@@ -34,9 +39,10 @@ use.
 Search operators
 ----------------
 
-The search box on the mailbox page searches every folder the account may
-read; the same syntax works in a folder listing's search, without `in:`.
-Words must all be found; the order does not matter.
+The search box searches the folder shown; the options panel beside it (the
+sliders icon) builds the same syntax from fields - from, to, subject, words,
+label, dates, attachments, unread, starred - and can search every folder the
+account may read. Words must all be found; the order does not matter.
 
 | Operator | What it matches |
 | --- | --- |

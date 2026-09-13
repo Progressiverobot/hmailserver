@@ -389,6 +389,8 @@ function answer(method, path) {
       return json(200, { id: 3, name: 'Renamed' });
    }
    if (/^\/api\/v1\/me\/folders\/\d+$/.test(path) && method === 'DELETE') { return json(200, { deleted: true }); }
+   // A move answers with the id the message has where it went, and the folder.
+   if (/\/messages\/\d+\/move$/.test(path) && method === 'POST') { return json(200, { id: 202, folder_id: 4 }); }
    return json(404, { error: 'No such route: ' + path });
 }
 
@@ -479,8 +481,16 @@ async function main() {
 
    // ---- the app shell: folders in the sidebar, with their unseen counts
    const nav = document.getElementById('folder-nav');
-   check('every folder is in the sidebar', nav.children.length === 3, nav.children.length + ' entries');
-   check('a subfolder is under its parent', nav.children[1].getAttribute('data-route') === '/f/3', nav.children[1].getAttribute('data-route'));
+   // The navigation carries the folders, a Starred view and a heading; the folders are the /f/ entries.
+   const folderRoutes = [];
+   for (let i = 0; i < nav.children.length; i++) {
+      const route = nav.children[i].getAttribute && nav.children[i].getAttribute('data-route');
+      if (route && route.indexOf('/f/') === 0) { folderRoutes.push(route); }
+   }
+   check('every folder is in the sidebar', folderRoutes.length === 3, folderRoutes.length + ' entries');
+   check('the inbox is first', folderRoutes[0] === '/f/1', folderRoutes[0]);
+   check('the inbox\'s subfolder is listed with the folders', folderRoutes.indexOf('/f/3') > 0, folderRoutes.join(' '));
+   check('the Starred view is in the sidebar', nav.children[1].getAttribute('data-route') === '/starred', nav.children[1].getAttribute('data-route'));
    check('the unseen count is shown', nav.children[0].children[2].textContent === '2', nav.children[0].children[2].textContent);
 
    // ---- a folder has an address, and clicking one goes to it
@@ -491,9 +501,10 @@ async function main() {
       document.getElementById('message-list').children.length + ' rows');
    check('an unseen message is marked', document.getElementById('message-list').children[0].className.indexOf('unseen') >= 0,
       document.getElementById('message-list').children[0].className);
-   check('a reply is set in from the left', document.getElementById('message-list').children[1].className.indexOf('msg-reply') >= 0,
-      document.getElementById('message-list').children[1].className);
-   check('the view is titled by the folder', document.getElementById('view-title').textContent === 'INBOX',
+   const rowNames = (row) => { const out = []; for (let i = 0; i < row.childNodes.length; i++) { const c = row.childNodes[i]; if (c.className === 'who') { out.push(c.textContent); } } return out; };
+   check('a row names its sender', rowNames(document.getElementById('message-list').children[1]).length === 1 && rowNames(document.getElementById('message-list').children[1])[0].length > 0,
+      JSON.stringify(rowNames(document.getElementById('message-list').children[1])));
+   check('the view is titled by the folder', document.getElementById('view-title').textContent === 'Inbox',
       document.getElementById('view-title').textContent);
 
    // ---- the keyboard moves a cursor
@@ -515,14 +526,58 @@ async function main() {
    document.dispatchEvent(typing);
    check('a keystroke in a text box is not a shortcut', onCursor() === 1 && typing.defaultPrevented === false, 'at ' + onCursor());
 
+   // ---- e archives the row under the cursor, and the toast's Undo moves it back
+   const beforeArchive = requests.length;
+   const timersBefore = timers.length;
+   document.dispatchEvent(makeEvent('keydown', { key: 'e', target: document.body }));
+   await flush();
+   await flush();
+   const archiveCall = since(beforeArchive).filter((r) => r.method === 'POST' && /\/messages\/102\/move$/.test(r.path))[0];
+   check('e archives the message under the cursor', !!archiveCall && JSON.parse(archiveCall.body).to === 'archive', archiveCall ? archiveCall.body : 'no move');
+   const toasts = document.getElementById('toasts');
+   check('a toast says so and offers Undo', toasts.children.length === 1 && toasts.textContent.indexOf('Archived') >= 0 && toasts.textContent.indexOf('Undo') >= 0,
+      toasts.textContent);
+   const undoButtons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.textContent === 'Undo') { undoButtons.push(c); } walk(c); } })(toasts);
+   const beforeUndo = requests.length;
+   if (undoButtons.length) { undoButtons[0].dispatchEvent(makeEvent('click')); }
+   await flush();
+   await flush();
+   const undoCall = since(beforeUndo).filter((r) => r.method === 'POST' && /\/messages\/202\/move$/.test(r.path))[0];
+   check('Undo moves it back where it was, by the id the move gave it', !!undoCall && JSON.parse(undoCall.body).folder_id === 1, undoCall ? undoCall.body : 'no move back');
+   check('and the toast is gone with its timer', toasts.children.length === 0 && timers.length === timersBefore, toasts.children.length + ' toasts, ' + timers.length + ' timers (' + timersBefore + ' before)');
+   check('the cursor is still on a row', onCursor() >= 0, 'at ' + onCursor());
+
+   // ---- the star toggles the flag in place
+   const starOf = (row) => { for (let i = 0; i < row.childNodes.length; i++) { if (row.childNodes[i].className && row.childNodes[i].className.indexOf('star') === 0) { return row.childNodes[i]; } } return null; };
+   const beforeStar = requests.length;
+   starOf(rows()[0]).dispatchEvent(makeEvent('click'));
+   await flush();
+   const starCall = since(beforeStar).filter((r) => r.method === 'PUT' && /\/flags$/.test(r.path))[0];
+   check('the star sets the flag', !!starCall && JSON.parse(starCall.body).flagged === true, starCall ? starCall.body : 'no flags call');
+   check('and shows it', starOf(rows()[0]).className.indexOf('on') >= 0, starOf(rows()[0]).className);
+
+   // ---- the select menu picks by state
+   document.getElementById('select-menu-btn').dispatchEvent(makeEvent('click'));
+   check('the select menu opens', document.getElementById('select-menu').hidden === false);
+   const picks = document.getElementById('select-menu').children;
+   let unreadPick = null; for (let i = 0; i < picks.length; i++) { if (picks[i].getAttribute('data-pick') === 'unread') { unreadPick = picks[i]; } }
+   unreadPick.dispatchEvent(makeEvent('click', { target: unreadPick }));
+   check('Unread ticks the unread rows', document.getElementById('bulk-count').textContent === '2 selected', document.getElementById('bulk-count').textContent);
+   document.getElementById('bulk-clear').dispatchEvent(makeEvent('click'));
+   check('Clear unticks them', document.getElementById('bulk-bar').hidden === true);
+   document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body }));
+   while (onCursor() < 1) { document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body })); }
+   while (onCursor() > 1) { document.dispatchEvent(makeEvent('keydown', { key: 'k', target: document.body })); }
+
    // ---- Enter opens the message under the cursor, and it has an address
    const beforeOpen = requests.length;
    document.dispatchEvent(makeEvent('keydown', { key: 'Enter', target: document.body }));
    await flush();
    check('Enter opens the message under the cursor', location.hash === '#/m/102', location.hash);
    check('which is read from the server', called(beforeOpen, 'GET', '/api/v1/me/messages/102'));
-   check('the message is shown and the list is not', document.getElementById('message-view').hidden === false &&
-      document.getElementById('message-list').hidden === true);
+   check('the message is shown beside the list, in the reading pane', document.getElementById('message-view').hidden === false &&
+      document.getElementById('message-list').hidden === false && document.getElementById('mail-section').className.indexOf('has-message') >= 0,
+      document.getElementById('mail-section').className);
    check('an unread message is marked read on opening', called(beforeOpen, 'PUT', /\/messages\/102\/flags$/));
    check('the attachment names its type', document.getElementById('message-attachments').textContent.indexOf('image/png') >= 0,
       document.getElementById('message-attachments').textContent);

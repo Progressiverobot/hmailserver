@@ -575,6 +575,7 @@ namespace HM
       static HttpResponse HandleMeFolderExport_(const Caller &caller, __int64 folderId);
       static HttpResponse HandleMeFolderImport_(const Caller &caller, __int64 folderId, const AnsiString &requestBody);
       static AnsiString ThreadFieldsJson_(const String &fileName);
+      static AnsiString ListingExtrasJson_(const String &fileName, std::shared_ptr<Message> message);
       static String FromHeader_(std::shared_ptr<const Account> account);
       static int AddAttachmentsFromJson_(MessageData &messageData, const AnsiString &requestBody, AnsiString &error);
       static bool IsLargeRequest_(const AnsiString &method, const AnsiString &target);

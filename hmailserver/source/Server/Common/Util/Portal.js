@@ -206,18 +206,24 @@
   var quarantineOn = true;
 
   // ---- The app shell ------------------------------------------------------
-  var panels = ['mail-section', 'compose-section', 'quarantine-section', 'folders-section', 'settings-section', 'filter-section', 'contacts-section', 'away-section', 'storage-section', 'security-section', 'password-section'];
+  var panels = ['mail-section', 'compose-section', 'quarantine-section', 'folders-section', 'settings-section', 'filter-section', 'contacts-section', 'away-section', 'storage-section', 'security-section', 'password-section', 'scheduled-section'];
+  var SETTINGS_PANELS = ['settings-section', 'away-section', 'filter-section', 'folders-section', 'storage-section', 'security-section', 'password-section'];
   var showPanel = function (id, title) {
-    panels.forEach(function (p) { el(p).hidden = p !== id; });
+    panels.forEach(function (p) { var e = el(p); if (e) { e.hidden = p !== id; } });
+    el('settings-head').hidden = SETTINGS_PANELS.indexOf(id) < 0;
     el('view-title').textContent = title;
-    el('mail-search-form').hidden = id !== 'mail-section';
-    el('content').scrollTop = 0;
+    var section = el(id);
+    if (section && section.scrollTop) { section.scrollTop = 0; }
+    if (id === 'mail-section') { applyPane(); }
+    closeMenus();
+    el('account').classList.remove('nav-open');
   };
   var markNav = function (hash) {
-    [el('folder-nav'), el('view-nav')].forEach(function (nav) {
+    [el('folder-nav'), el('view-nav'), el('side-nav')].forEach(function (nav) {
+      if (!nav) { return; }
       var children = nav.children;
       for (var i = 0; i < children.length; i++) {
-        children[i].classList.toggle('on', children[i].getAttribute('data-route') === hash);
+        children[i].classList.toggle('on', !!hash && children[i].getAttribute('data-route') === hash);
       }
     });
   };
@@ -234,7 +240,7 @@
     list.forEach(function (f) { f.depth = depth; into.push(f); flatten(f.subfolders || [], into, depth + 1); });
     return into;
   };
-  var folderName = function (id) { var f = foldersById[id]; return f ? f.path : 'Mail'; };
+  var folderName = function (id) { var f = foldersById[id]; return f ? (f.path.toUpperCase() === 'INBOX' ? t('Inbox') : f.path) : 'Mail'; };
   var fillFolderSelect = function (select, homeId) {
     clear(select);
     var home = foldersById[homeId];
@@ -258,28 +264,62 @@
     inboxId = inbox ? inbox.id : (folders.length ? folders[0].id : 0);
     var nav = el('folder-nav');
     clear(nav);
+    var special = function (f, use) { return String(f.special_use || '').indexOf(String.fromCharCode(92) + use) >= 0; };
+    // One entry: an icon, the name, the count - the third child, which the
+    // change probe updates in place.
+    var entry = function (f, iconName, route, label, count, cls) {
+      var b = node('button', undefined, cls || '');
+      b.type = 'button';
+      b.setAttribute('data-route', route);
+      var ico = node('span', undefined, 'ico'); ico.appendChild(icon(iconName)); b.appendChild(ico);
+      b.appendChild(node('span', label, 'nm'));
+      b.appendChild(node('span', count ? String(count) : '', 'ct'));
+      if (count && !(f && special(f, 'Drafts'))) { b.classList.add('unread'); }
+      b.addEventListener('click', function () { go(route); });
+      nav.appendChild(b);
+      return b;
+    };
+    // The system folders first, in the order every mail client uses, then
+    // the reader's own, then what others share. The Snoozed folder is the
+    // server's waiting room, not a place to file things: it stays out.
+    var order = { Sent: 2, Drafts: 3, Archive: 4, Junk: 5, Trash: 6 };
+    var icons = { inbox: 'inbox', sent: 'send', drafts: 'draft', archive: 'archive', junk: 'junk', trash: 'trash' };
+    var system = [], rest = [];
+    folders.filter(function (f) { return !f.owner && f.path !== 'Snoozed'; }).forEach(function (f) {
+      if (f.id === inboxId) { system.push([f, 'inbox', 0]); return; }
+      var found = null;
+      Object.keys(order).forEach(function (use) { if (!found && special(f, use)) { found = [f, use.toLowerCase(), order[use]]; } });
+      if (found) { system.push(found); } else { rest.push(f); }
+    });
+    system.sort(function (a, b) { return a[2] - b[2]; });
+    system.forEach(function (s) {
+      var f = s[0];
+      entry(f, icons[s[1]], '/f/' + f.id, s[1] === 'inbox' ? t('Inbox') : (f.name || f.path), s[1] === 'drafts' ? f.count : f.unseen, '');
+      if (s[2] === 0) { entry(null, 'star', '/starred', t('Starred'), 0, ''); }
+    });
+    if (rest.length) {
+      var head = node('div', t('Folders'), 'navhead');
+      head.appendChild(node('span', undefined, 'grow'));
+      var add = iconButton('plus', t('New folder'));
+      add.addEventListener('click', function () { go('/folders'); });
+      head.appendChild(add);
+      nav.appendChild(head);
+      // A folder under INBOX - the shape some clients make every folder in -
+      // is listed as one of the reader's own, not as the inbox's child.
+      rest.forEach(function (f) {
+        var indent = f.path.toUpperCase().indexOf('INBOX' + delimiter.toUpperCase()) === 0 ? f.depth - 1 : f.depth;
+        entry(f, 'folder', '/f/' + f.id, f.name || f.path, f.unseen, indent > 0 ? (indent > 1 ? 'child2' : 'child') : '');
+      });
+    }
     var lastOwner = '';
-    folders.forEach(function (f) {
-      // The Snoozed folder is the server's waiting room, not a place to file
-      // things: it stays out of the list, and comes back in Storage.
-      if (!f.owner && f.path === 'Snoozed') { return; }
-      // Another account's folders, and the public ones, under a heading of
-      // their own, so a reader knows whose mail they are looking at.
-      if (f.owner && f.owner !== lastOwner) {
+    folders.filter(function (f) { return f.owner; }).forEach(function (f) {
+      if (f.owner !== lastOwner) {
         nav.appendChild(node('div', f.owner.charAt(0) === '#' ? t('Public folders') : t('Shared by ') + f.owner, 'navhead'));
         lastOwner = f.owner;
       }
-      var b = button('', '');
-      b.setAttribute('data-route', '/f/' + f.id);
-      var icon = node('span', f.depth ? '↳' : '▢', 'ico');
-      var name = node('span', f.name || f.path, 'nm');
-      if (f.depth) { name.style.paddingLeft = (f.depth * 10) + 'px'; }
-      b.appendChild(icon); b.appendChild(name);
-      b.appendChild(node('span', f.unseen ? String(f.unseen) : '', 'ct'));
-      b.addEventListener('click', function () { go('/f/' + f.id); });
-      nav.appendChild(b);
+      entry(f, 'folder', '/f/' + f.id, f.name || f.path, f.unseen, f.depth ? 'child' : '');
     });
-    markNav(state.folderId ? '/f/' + state.folderId : '');
+    markNav(currentNavHash());
     updateTitle();
     renderNotifyFolders();
     fillFolderSelect(el('rule-folder'), 0);
@@ -303,18 +343,20 @@
   // the scroll offset, the message the cursor was on, and the ticked boxes.
   var rememberPlace = function () {
     if (!lastListing || el('mail-section').hidden || el('message-list').hidden) { return; }
-    lastListing.scroll = el('content').scrollTop;
+    lastListing.scroll = el('message-list').scrollTop;
     lastListing.cursorId = cursor >= 0 && listRows[cursor] ? listRows[cursor].id : 0;
     lastListing.selected = selected;
   };
   // The list and one message share a panel, so what belongs to the list -
   // the mailbox card above it and the keyboard hint - goes with it.
   var showList = function () {
-    el('message-view').hidden = true;
     el('message-list').hidden = false;
     el('list-tools').hidden = false;
-    el('quota-card').hidden = false;
-    el('list-hint').hidden = false;
+    if (!current) {
+      el('message-view').hidden = true;
+      el('pane-empty').hidden = false;
+      el('mail-section').classList.remove('has-message');
+    }
   };
   var setCursor = function (index, silent) {
     if (!listRows.length) { cursor = -1; return; }
@@ -327,8 +369,14 @@
   var renderBulk = function () {
     var ids = selectedIds();
     el('bulk-bar').hidden = ids.length === 0;
-    el('bulk-count').textContent = ids.length + ' selected';
+    el('bulk-count').textContent = ids.length ? tf('{0} selected', ids.length) : '';
     fillFolderSelect(el('bulk-move'), state.folderId);
+    var all = el('select-all');
+    if (all) {
+      all.checked = listRows.length > 0 && listRows.every(function (r) { return !!selected[r.id]; });
+      all.indeterminate = ids.length > 0 && !all.checked;
+    }
+    listRows.forEach(function (r) { r.row.classList.toggle('selected', !!selected[r.id]); });
   };
   var clearSelection = function () { selected = {}; renderBulk(); };
   var renderSearchNote = function (list, page) {
@@ -342,7 +390,7 @@
       row.appendChild(older);
     }
     list.appendChild(row);
-    list.appendChild(node('div', t('Narrow a search with from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name, and "quoted phrases".'), 'note'));
+    if (false) list.appendChild(node('div', t('Narrow a search with from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name, and "quoted phrases".'), 'note'));
   };
   // ---- Archive, Junk and Trash, and conversations ---------------------------
   var folderIs = function (folderId, use) {
@@ -369,14 +417,11 @@
   // as its tick box selects it whole.
   var fileRow = function (row, to) {
     if (!row) { return; }
-    var ids = row.ids || [row.id];
-    var last = null;
-    var chain = Promise.resolve();
-    ids.forEach(function (id) { chain = chain.then(function () { return fileMessage(id, to).then(function (r) { last = r; }); }); });
-    chain.then(function () {
-      var result = last;
-      if (!afterFiling(result, filingLabel(to, result))) { return; }
-      var at = cursor;
+    var entries = (row.ids || [row.id]).map(function (id) { return { id: id, folderId: row.folderId || state.folderId }; });
+    var at = cursor;
+    fileMany(entries, to).then(function (ok) {
+      if (!ok) { return; }
+      if (current && entries.some(function (e) { return e.id === current.id; })) { closeMessage(true); }
       var reloaded = loadMessages();
       if (reloaded && reloaded.then) { reloaded.then(function () { setCursor(Math.min(at, listRows.length - 1), true); }); }
     });
@@ -514,17 +559,41 @@
   el('message-label').addEventListener('click', toggleLabelMenu);
 
   var messageRow = function (m, inThread) {
-    var row = node('div', undefined, (m.flags.seen ? 'msg' : 'msg unseen') + (inThread ? ' msg-reply' : ''));
+    var row = node('div', undefined, 'msg' + (m.flags.seen ? '' : ' unseen') + (inThread ? ' in-thread' : ''));
     row.setAttribute('role', 'listitem');
+    var folderId = m.folder_id || state.folderId;
+    var entry = { id: m.id, row: row, m: m, folderId: folderId };
+    var cb = node('span', undefined, 'cb');
     var box = document.createElement('input'); box.type = 'checkbox'; box.checked = !!selected[m.id]; box.setAttribute('aria-label', t('Select'));
     box.addEventListener('click', function (event) { event.stopPropagation(); selected[m.id] = box.checked; renderBulk(); });
-    var body = node('div', undefined, 'msg-body');
-    var subjectLine = node('div', m.subject || t('(no subject)'), 'msg-subject');
-    if (m.flags && m.flags.keywords && m.flags.keywords.length) { subjectLine.appendChild(chipsFor(m.flags.keywords)); }
-    body.appendChild(subjectLine);
-    body.appendChild(node('div', (m.from || '?') + ' - ' + (m.date || m.received) + ' - ' + format(m.size) + (m.folder ? t(' - in ') + m.folder : ''), 'msg-detail'));
-    row.appendChild(box); row.appendChild(body);
-    body.addEventListener('click', function () { go('/m/' + m.id); });
+    cb.appendChild(box);
+    row.appendChild(cb);
+    entry.box = box;
+    if (box.checked) { row.classList.add('selected'); }
+    entry.star = starButton(m);
+    row.appendChild(entry.star);
+    row.appendChild(avatarFor(m.from));
+    var outgoing = folderIs(folderId, 'Sent') || folderIs(folderId, 'Drafts');
+    var who = node('div', outgoing ? t('To: ') + (recipientsOf(m.to).slice(0, 2).join(', ') || '?') : nameOf(m.from), 'who');
+    who.setAttribute('title', (outgoing ? m.to : m.from) || '');
+    row.appendChild(who);
+    var what = node('div', undefined, 'what');
+    what.appendChild(node('span', m.subject || t('(no subject)'), 'subject'));
+    if (m.flags && m.flags.keywords && m.flags.keywords.length) { what.appendChild(chipsFor(m.flags.keywords)); }
+    if (m.folder && state.everywhere) { what.appendChild(node('span', m.folder, 'badge')); }
+    what.appendChild(node('span', m.snippet || '', 'snip'));
+    row.appendChild(what);
+    var meta = node('div', undefined, 'meta');
+    if (m.has_attachments) { var clip = node('span', undefined, 'clip'); clip.setAttribute('title', t('Has attachments')); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
+    var when = node('span', whenText(m), 'when'); when.setAttribute('title', fullDate(m)); meta.appendChild(when);
+    row.appendChild(meta);
+    var acts = node('div', undefined, 'acts');
+    var act = function (name, title, fn) { var b = iconButton(name, title); b.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); acts.appendChild(b); };
+    act('archive', t('Archive'), function () { fileRow(entry, 'archive'); });
+    act('trash', t('Delete'), function () { fileRow(entry, 'delete'); });
+    act(m.flags.seen ? 'mail' : 'mail-open', m.flags.seen ? t('Mark as unread') : t('Mark as read'), function () { markRows([entry], !m.flags.seen); });
+    row.appendChild(acts);
+    row.addEventListener('click', function () { go('/m/' + m.id); });
     // On a touch screen: a swipe to the right archives, to the left deletes.
     var touchX = null;
     row.addEventListener('touchstart', function (e) { touchX = e.touches && e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
@@ -532,11 +601,9 @@
       if (touchX === null || !e.changedTouches || !e.changedTouches.length) { return; }
       var dx = e.changedTouches[0].clientX - touchX;
       touchX = null;
-      var entry = null;
-      listRows.forEach(function (r) { if (r.id === m.id) { entry = r; } });
       if (dx > 90) { fileRow(entry, 'archive'); } else if (dx < -90) { fileRow(entry, 'delete'); }
     }, { passive: true });
-    listRows.push({ id: m.id, row: row, box: box });
+    listRows.push(entry);
     return row;
   };
   // A folder of thousands: the first chunk is on the screen at once, the rest
@@ -555,9 +622,7 @@
   var renderRows = function (page, list, shown) {
     if (pref('view') !== 'threads' || page.query) {
       page.messages.forEach(function (m) { shown[m.id] = true; });
-      // A reply is indented under what it answers. The list is newest
-      // first, so 'the root was seen already' would indent the original.
-      chunkedAppend(page.messages, list, function (m) { return messageRow(m, !!(m.in_reply_to || (m.references || '').trim())); });
+      chunkedAppend(page.messages, list, function (m) { return messageRow(m, false); });
       return;
     }
     // A null prototype: a References header spelling 'constructor' is a key, not a property.
@@ -574,40 +639,69 @@
       var unseen = g.messages.some(function (m) { return !m.flags.seen; });
       var row = node('div', undefined, 'msg thread' + (unseen ? ' unseen' : ''));
       row.setAttribute('role', 'listitem');
+      var folderId = newest.folder_id || state.folderId;
+      var entry = { id: newest.id, ids: g.messages.map(function (m) { return m.id; }), ms: g.messages, row: row, m: newest, folderId: folderId };
+      var cb = node('span', undefined, 'cb');
       var box = document.createElement('input'); box.type = 'checkbox'; box.setAttribute('aria-label', t('Select the conversation'));
       box.checked = g.messages.every(function (m) { return !!selected[m.id]; });
       box.addEventListener('click', function (event) { event.stopPropagation(); g.messages.forEach(function (m) { selected[m.id] = box.checked; }); renderBulk(); });
-      var body = node('div', undefined, 'msg-body');
-      var subject = node('div', undefined, 'msg-subject');
-      subject.appendChild(node('span', String(g.messages.length), 'thread-count'));
-      subject.appendChild(node('span', newest.subject || t('(no subject)')));
-      body.appendChild(subject);
+      cb.appendChild(box); row.appendChild(cb);
+      entry.box = box;
+      entry.star = starButton(newest);
+      row.appendChild(entry.star);
+      row.appendChild(avatarFor(newest.from));
       var senders = [];
-      g.messages.forEach(function (m) { var s = (m.from || '?').replace(/<.*$/, '').trim() || m.from; if (senders.indexOf(s) < 0) { senders.push(s); } });
-      body.appendChild(node('div', senders.slice(0, 3).join(', ') + (senders.length > 3 ? ', ...' : '') + ' - ' + (newest.date || newest.received), 'msg-detail'));
-      row.appendChild(box); row.appendChild(body);
+      g.messages.forEach(function (m) { var s = nameOf(m.from); if (senders.indexOf(s) < 0) { senders.push(s); } });
+      var who = node('div', senders.slice(0, 3).join(', ') + (senders.length > 3 ? ', ...' : ''), 'who');
+      var count = node('span', String(g.messages.length), 'tc');
+      count.setAttribute('title', t('Show every message of the conversation'));
+      who.appendChild(count);
+      row.appendChild(who);
+      var what = node('div', undefined, 'what');
+      what.appendChild(node('span', newest.subject || t('(no subject)'), 'subject'));
+      var keywords = [];
+      g.messages.forEach(function (m) { (m.flags.keywords || []).forEach(function (k) { if (keywords.indexOf(k) < 0) { keywords.push(k); } }); });
+      if (keywords.length) { what.appendChild(chipsFor(keywords)); }
+      what.appendChild(node('span', newest.snippet || '', 'snip'));
+      row.appendChild(what);
+      var meta = node('div', undefined, 'meta');
+      if (g.messages.some(function (m) { return m.has_attachments; })) { var clip = node('span', undefined, 'clip'); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
+      var when = node('span', whenText(newest), 'when'); when.setAttribute('title', fullDate(newest)); meta.appendChild(when);
+      row.appendChild(meta);
+      var acts = node('div', undefined, 'acts');
+      var act = function (name, title, fn) { var b = iconButton(name, title); b.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); acts.appendChild(b); };
+      act('archive', t('Archive'), function () { fileRow(entry, 'archive'); });
+      act('trash', t('Delete'), function () { fileRow(entry, 'delete'); });
+      act(unseen ? 'mail-open' : 'mail', unseen ? t('Mark as read') : t('Mark as unread'), function () { markRows([entry], unseen); });
+      row.appendChild(acts);
       var toggle = function () {
         expandedThreads[g.key] = !expandedThreads[g.key];
         if (!lastListing) { return; }
         renderMessages(lastListing.page);
         listRows.forEach(function (r, i) { if (r.toggle && r.id === newest.id) { setCursor(i, true); } });
       };
-      body.addEventListener('click', toggle);
-      listRows.push({ id: newest.id, ids: g.messages.map(function (m) { return m.id; }), row: row, box: box, toggle: toggle });
+      count.addEventListener('click', function (event) { event.stopPropagation(); toggle(); });
+      row.addEventListener('click', function () { go('/m/' + newest.id); });
+      entry.toggle = toggle;
+      listRows.push(entry);
       list.appendChild(row);
       if (expandedThreads[g.key]) {
         // Oldest first inside the conversation, newest last, as it is read.
-        g.messages.slice().reverse().forEach(function (m) { var sub = messageRow(m, false); sub.className += ' in-thread'; list.appendChild(sub); });
+        g.messages.slice().reverse().forEach(function (m) { list.appendChild(messageRow(m, true)); });
       }
     });
   };
   var renderMessages = function (page) {
     var list = el('message-list');
     clear(list);
+    list.classList.remove('skeleton');
     listRows = []; cursor = -1;
     if (!page.messages.length) {
-      selected = {}; renderBulk();
-      list.appendChild(node('div', page.query ? t('Nothing matched.') : t('This folder is empty.'), 'empty'));
+      selected = {}; renderBulk(); renderCount(page);
+      var empty = node('div', undefined, 'empty');
+      empty.appendChild(icon('empty'));
+      empty.appendChild(node('div', page.query ? t('Nothing matched.') : t('This folder is empty.')));
+      list.appendChild(empty);
       renderSearchNote(list, page);
       return;
     }
@@ -616,15 +710,9 @@
     Object.keys(selected).forEach(function (k) { if (!shown[k]) { delete selected[k]; } });
     setCursor(0, true);
     renderBulk();
-    if (!page.query && page.total > page.messages.length && page.messages.length) {
-      var last = page.messages[page.messages.length - 1];
-      var older = button(t('Older messages'));
-      older.addEventListener('click', function () { state.before = last.uid; go(listHash()); });
-      var note = node('div', (state.before ? t('Older than message ') + state.before + ': ' : t('The newest ')) + page.messages.length + t(' of ') + page.total + t(' are shown. '), 'listfoot');
-      note.appendChild(older);
-      list.appendChild(note);
-    }
+    renderCount(page);
     renderSearchNote(list, page);
+    if (current) { listRows.forEach(function (r) { r.row.classList.toggle('open', r.id === current.id || (r.ids || []).indexOf(current.id) >= 0); }); }
   };
   var listingKey = function () { return state.everywhere + '|' + state.folderId + '|' + state.query + '|' + state.before; };
   var loadMessagesOffline = function (result) {
@@ -663,7 +751,7 @@
   var reloadKeepingPlace = function () {
     var onId = cursor >= 0 && listRows[cursor] ? listRows[cursor].id : 0;
     var ticked = selected;
-    var scroll = el('content').scrollTop;
+    var scroll = el('message-list').scrollTop;
     return loadMessages().then(function () {
       selected = {};
       Object.keys(ticked).forEach(function (k) { if (ticked[k] && listRows.filter(function (r) { return String(r.id) === String(k); }).length) { selected[k] = true; } });
@@ -672,7 +760,7 @@
       var at = -1;
       listRows.forEach(function (r, i) { if (r.id === onId) { at = i; } });
       if (at >= 0) { setCursor(at, true); }
-      el('content').scrollTop = scroll;
+      el('message-list').scrollTop = scroll;
     });
   };
 
@@ -770,22 +858,50 @@
   };
   var renderActions = function () {
     if (!current) { return; }
-    el('message-unread').textContent = current.flags.seen ? 'Mark as unread' : 'Mark as read';
-    el('message-flag').textContent = current.flags.flagged ? 'Remove flag' : 'Flag';
+    var seen = current.flags.seen;
+    var unread = el('message-unread');
+    unread.setAttribute('title', seen ? t('Mark as unread') : t('Mark as read'));
+    unread.setAttribute('aria-label', seen ? t('Mark as unread') : t('Mark as read'));
+    setIcon(unread, seen ? 'mail' : 'mail-open');
+    var flag = el('message-flag');
+    flag.classList.toggle('on', !!current.flags.flagged);
+    flag.setAttribute('title', current.flags.flagged ? t('Unstar') : t('Star'));
+    flag.setAttribute('aria-label', current.flags.flagged ? t('Unstar') : t('Star'));
     el('label-menu').hidden = true;
     renderMessageLabels();
     el('message-edit').hidden = !current.flags.draft;
-    el('message-junk').textContent = folderIs(current.folder_id, 'Junk') ? 'Not junk' : 'Junk';
+    var junk = el('message-junk');
+    var isJunk = folderIs(current.folder_id, 'Junk');
+    junk.setAttribute('title', isJunk ? t('Not junk') : t('Junk'));
+    junk.setAttribute('aria-label', isJunk ? t('Not junk') : t('Junk'));
     fillFolderSelect(el('message-move'), current.folder_id);
+    listRows.forEach(function (r) { r.row.classList.toggle('open', r.id === current.id || (r.ids || []).indexOf(current.id) >= 0); });
   };
   var renderMessage = function (m) {
-    el('message-list').hidden = true;
-    el('list-tools').hidden = true;
+    el('mail-section').classList.add('has-message');
     el('message-view').hidden = false;
-    el('quota-card').hidden = true;
-    el('list-hint').hidden = true;
-    el('message-subject').textContent = m.subject || '(no subject)';
+    el('pane-empty').hidden = true;
+    closeMenus();
+    el('message-subject').textContent = m.subject || t('(no subject)');
+    var avatar = el('message-avatar');
+    avatar.textContent = initialsOf(m.from);
+    if (avatar.style) { avatar.style.background = avatarColour(addressOf(m.from)); }
+    el('message-from-name').textContent = nameOf(m.from);
+    var address = addressOf(m.from);
+    el('message-from-address').textContent = address && address !== nameOf(m.from) ? '<' + address + '>' : '';
+    var to = recipientsOf(m.to);
+    el('message-to-line').textContent = t('to ') + (to.length ? to.slice(0, 3).join(', ') + (to.length > 3 ? ', ...' : '') : t('me'));
+    el('message-date').textContent = fullDate(m);
     el('message-meta').textContent = 'From ' + (m.from || '?') + (m.to ? ' to ' + m.to : '') + (m.cc ? ', cc ' + m.cc : '') + ' - ' + (m.date || m.received);
+    var details = el('message-details');
+    clear(details);
+    details.hidden = true;
+    el('message-details-toggle').setAttribute('aria-expanded', 'false');
+    [['From', m.from], ['To', m.to], ['Cc', m.cc], ['Date', m.date || m.received], ['Message-ID', m.message_id]].forEach(function (pair) {
+      if (!pair[1]) { return; }
+      details.appendChild(node('span', t(pair[0])));
+      details.appendChild(node('span', pair[1]));
+    });
     // The verdicts a reader learns to look at, the sender's domain against
     // the account's, the headers on request, and the file itself.
     var badges = el('message-badges');
@@ -803,7 +919,7 @@
     previewAttachments(m);
     el('message-headers').textContent = m.headers || '';
     el('message-headers').hidden = true;
-    el('message-headers-toggle').textContent = 'Headers';
+    el('message-headers-toggle').textContent = t('Headers');
     el('message-headers-toggle').hidden = !m.headers;
     el('message-receipt').hidden = !(m.receipt_requested_by && pref('receipts') !== 'never');
     el('snooze-menu').hidden = true;
@@ -816,27 +932,28 @@
       // shown: nothing in it runs, loads or renders.
       text = new DOMParser().parseFromString(m.html, 'text/html').body.textContent || '';
     }
-    if (m.truncated) { text = 'This message is too large to show here; open it in your mail program.' + ((m.attachments || []).length ? ' Its attachments can be downloaded below.' : ''); }
-    el('message-text').textContent = text || '(no text)';
+    if (m.truncated) { text = t('This message is too large to show here; open it in your mail program.') + ((m.attachments || []).length ? t(' Its attachments can be downloaded below.') : ''); }
+    el('message-text').textContent = text || t('(no text)');
     var attachments = el('message-attachments');
     clear(attachments);
-    if ((m.attachments || []).length) {
-      attachments.appendChild(node('span', t('Attachments: ')));
-      m.attachments.forEach(function (a, i) {
-        var what = a.content_type ? a.content_type + ', ' : '';
-        var link = node('a', a.name + ' (' + what + format(a.size) + ')');
-        link.href = '/api/v1/me/messages/' + m.id + '/attachments/' + a.index;
-        link.setAttribute('download', a.name);
-        if (i > 0) { attachments.appendChild(node('span', ', ')); }
-        attachments.appendChild(link);
-        if (a.content_id) { attachments.appendChild(node('span', ' ')); attachments.appendChild(node('span', t('in the message'), 'badge info')); }
-      });
-    }
+    (m.attachments || []).forEach(function (a) {
+      var link = node('a', undefined, 'att');
+      link.href = '/api/v1/me/messages/' + m.id + '/attachments/' + a.index;
+      link.setAttribute('download', a.name);
+      link.setAttribute('title', a.name + ' (' + (a.content_type ? a.content_type + ', ' : '') + format(a.size) + ')');
+      link.appendChild(icon('file'));
+      var words = node('div');
+      words.appendChild(node('div', a.name, 'n'));
+      words.appendChild(node('div', format(a.size) + (a.content_type ? ' \u00b7 ' + a.content_type : '') + (a.content_id ? ' \u00b7 ' + t('in the message') : ''), 's'));
+      link.appendChild(words);
+      attachments.appendChild(link);
+    });
     current = m;
     renderActions();
     smimeInspect(m);
     el('message-html-toggle').hidden = !m.html || m.truncated;
     renderHtml();
+    if (el('message-body').scrollTop) { el('message-body').scrollTop = 0; }
   };
   // The message after the cursor is fetched while the reader is still on
   // this one, when the browser has an idle moment for it; opening it then
@@ -1247,7 +1364,11 @@
       var id = Number(route.replace('/f/', ''));
       var folder = foldersById[id];
       var count = children[i].children[2];
-      if (folder && count) { count.textContent = folder.unseen ? String(folder.unseen) : ''; }
+      if (folder && count) {
+        var shown = folderIs(id, 'Drafts') ? folder.count : folder.unseen;
+        count.textContent = shown ? String(shown) : '';
+        children[i].classList.toggle('unread', !!folder.unseen && !folderIs(id, 'Drafts'));
+      }
     }
     return false;
   };
@@ -1273,7 +1394,7 @@
         setProbeState('Watching for new mail', false);
         if (had && (result.data.changed || unknown)) {
           loadFolders().then(function () {
-            if (!el('mail-section').hidden && el('message-view').hidden) { reloadKeepingPlace(); }
+            if (!el('mail-section').hidden && !el('message-list').hidden) { reloadKeepingPlace(); }
           });
         }
       } else if (result.status === 404 || result.status === 403) {
@@ -1303,6 +1424,7 @@
     state.before = Number(params.before || 0);
     el('mail-search').value = state.query;
     el('mail-search-everywhere').checked = false;
+    dropMessage();
     showPanel('mail-section', folderName(folderId) + (state.query ? ' - \'' + state.query + '\'' : ''));
     markNav('/f/' + folderId);
     showList();
@@ -1313,7 +1435,7 @@
       var back = -1;
       listRows.forEach(function (r, i) { if (r.id === lastListing.cursorId) { back = i; } });
       if (back >= 0) { setCursor(back, true); }
-      el('content').scrollTop = lastListing.scroll || 0;
+      el('message-list').scrollTop = lastListing.scroll || 0;
       reloadKeepingPlace();
       return;
     }
@@ -1325,6 +1447,7 @@
     state.before = 0;
     el('mail-search').value = state.query;
     el('mail-search-everywhere').checked = true;
+    dropMessage();
     showPanel('mail-section', 'Search - \'' + state.query + '\'');
     markNav('');
     showList();
@@ -1333,9 +1456,20 @@
   };
   var showMessage = function (id) {
     showPanel('mail-section', folderName(state.folderId));
-    markNav(state.everywhere ? '' : '/f/' + state.folderId);
+    markNav(currentNavHash());
+    showList();
+    if (!lastListing && state.folderId && !state.query) { loadMessages(); }
     openMessage(id).then(function (m) {
-      if (m && m.folder_id) { markNav(state.everywhere ? '' : '/f/' + state.folderId); }
+      if (!m) { return; }
+      if (!state.folderId && m.folder_id) {
+        state.folderId = m.folder_id;
+        el('view-title').textContent = folderName(m.folder_id);
+        markNav('/f/' + m.folder_id);
+        loadMessages();
+      }
+      var index = -1;
+      listRows.forEach(function (r, i) { if (r.id === m.id || (r.ids || []).indexOf(m.id) >= 0) { index = i; } });
+      if (index >= 0) { setCursor(index, true); }
     });
   };
   var showCompose = function (params) {
@@ -1347,7 +1481,7 @@
     var key = mode + ':' + id;
     if (composeKey === key) { el('compose-to').focus(); return; }
     composeKey = key;
-    if (mode === 'new' || !id) { blankCompose(); addSignature(); el('compose-to').focus(); return; }
+    if (mode === 'new' || !id) { blankCompose(); addSignature(); syncComposeRows(); el('compose-to').focus(); return; }
     if (current && current.id === id) { var was = current; prime(mode, was).then(function () { afterPrime(mode, was); }); return; }
     call('GET', '/api/v1/me/messages/' + id).then(function (result) {
       if (result.status === 200 && result.data) { prime(mode, result.data).then(function () { afterPrime(mode, result.data); }); return; }
@@ -1365,6 +1499,8 @@
     if (head === 'f' && r.parts[1]) { cameFromList = true; showMail(Number(r.parts[1]), r.params); return; }
     if (head === 'search') { cameFromList = true; showSearch(r.params); return; }
     if (head === 'm' && r.parts[1]) { showMessage(Number(r.parts[1])); return; }
+    if (head === 'starred') { cameFromList = true; showSearch({ q: 'is:flagged' }); el('view-title').textContent = t('Starred'); markNav('/starred'); return; }
+    if (head === 'scheduled') { showPanel('scheduled-section', t('Scheduled')); markNav('/scheduled'); loadScheduled(); return; }
     if (head === 'compose') { showCompose(r.params); return; }
     if (head === 'held') { showPanel('quarantine-section', 'Held as suspected spam'); markNav('/held'); loadQuarantine(); return; }
     if (head === 'folders') { showPanel('folders-section', 'Manage folders'); markNav('/folders'); renderFolderAdmin(); return; }
@@ -1434,6 +1570,8 @@
   };
   var render = function (account) {
     el('who').textContent = account.address;
+    el('account-avatar').textContent = initialsOf(account.address);
+    if (el('account-avatar').style) { el('account-avatar').style.background = avatarColour(account.address); }
     el('password-user').value = account.address;
     var used = account.quota.used_bytes, limit = account.quota.limit_mb * 1048576;
     if (limit > 0) {
@@ -1443,7 +1581,7 @@
       el('quota').textContent = format(used) + ' used, no limit';
       el('quota-bar').style.width = '0';
     }
-    el('password-changed').textContent = account.password_changed ? 'Password last changed ' + account.password_changed : '';
+    el('password-changed').textContent = account.password_changed ? t('Password last changed ') + account.password_changed : '';
     el('vacation-enabled').checked = !!account.vacation.enabled;
     el('vacation-subject').value = account.vacation.subject || '';
     el('vacation-message').value = account.vacation.message || '';
@@ -1533,24 +1671,10 @@
       (function (b) { b.addEventListener('click', function () { go(b.getAttribute('data-route')); }); })(nav[i]);
     }
   })();
-  el('message-back').addEventListener('click', function () {
-    if (cameFromList && history.length > 1) { history.back(); return; }
-    go(listHash());
-  });
+  el('message-back').addEventListener('click', function () { closeMessage(false); });
   el('message-unread').addEventListener('click', function () { if (current) { setFlags({ seen: !current.flags.seen }, false); } });
   el('message-flag').addEventListener('click', function () { if (current) { setFlags({ flagged: !current.flags.flagged }, false); } });
-  el('message-delete').addEventListener('click', function () {
-    if (!current) { return; }
-    call('DELETE', '/api/v1/me/messages/' + current.id).then(function (result) {
-      if (result.status === 200) {
-        say('mail-status', result.data && result.data.deleted ? t('Deleted.') : t('Moved to the trash folder.'), true);
-        current = null; lastListing = null;
-        loadFolders(); go(listHash());
-        return;
-      }
-      say('mail-status', describe(result, t('Could not delete')), false);
-    });
-  });
+  el('message-delete').addEventListener('click', function () { fileCurrent('delete'); });
   var remoteAllowed = { id: 0 };
   var remoteSenders = function () { return String(pref('remote_senders') || '').toLowerCase().split(',').filter(Boolean); };
   el('remote-once').addEventListener('click', function () { if (current) { remoteAllowed = { id: current.id }; renderHtml(); } });
@@ -1660,8 +1784,11 @@
   };
   var fileCurrent = function (to) {
     if (!current) { return; }
-    fileMessage(current.id, to).then(function (result) {
-      if (afterFiling(result, filingLabel(to, result))) { current = null; go(listHash()); }
+    var was = current;
+    fileMany([{ id: was.id, folderId: was.folder_id }], to).then(function (ok) {
+      if (!ok) { return; }
+      if (current === was) { closeMessage(true); }
+      loadMessages();
     });
   };
   el('message-archive').addEventListener('click', function () { fileCurrent('archive'); });
@@ -1683,11 +1810,18 @@
   el('message-move-go').addEventListener('click', function () {
     var target = el('message-move').value;
     if (!current || !target) { return; }
-    call('POST', '/api/v1/me/messages/' + current.id + '/move', { folder_id: Number(target) }).then(function (result) {
+    var was = current;
+    var back = was.folder_id;
+    call('POST', '/api/v1/me/messages/' + was.id + '/move', { folder_id: Number(target) }).then(function (result) {
       if (result.status === 200) {
-        say('mail-status', t('Moved.'), true);
-        current = null; lastListing = null;
-        loadFolders(); go(listHash());
+        lastListing = null;
+        loadFolders();
+        if (current === was) { closeMessage(true); }
+        loadMessages();
+        var moved = result.data && result.data.id;
+        toast(t('Moved to ') + folderName(Number(target)), moved && back ? function () {
+          call('POST', '/api/v1/me/messages/' + moved + '/move', { folder_id: back }).then(function () { lastListing = null; loadFolders(); loadMessages(); });
+        } : null);
         return;
       }
       say('mail-status', describe(result, t('Could not move')), false);
@@ -2861,9 +2995,9 @@
   });
   el('bulk-read').addEventListener('click', function () { eachSelected(function (id) { return call('PUT', '/api/v1/me/messages/' + id + '/flags', { seen: true }); }); });
   el('bulk-unread').addEventListener('click', function () { eachSelected(function (id) { return call('PUT', '/api/v1/me/messages/' + id + '/flags', { seen: false }); }); });
-  el('bulk-archive').addEventListener('click', function () { eachSelected(function (id) { return fileMessage(id, 'archive'); }); });
-  el('bulk-junk').addEventListener('click', function () { var to = junkTargetFor(state.folderId); eachSelected(function (id) { return fileMessage(id, to); }); });
-  el('bulk-delete').addEventListener('click', function () { eachSelected(function (id) { return call('DELETE', '/api/v1/me/messages/' + id); }); });
+  el('bulk-archive').addEventListener('click', function () { fileSelected('archive'); });
+  el('bulk-junk').addEventListener('click', function () { fileSelected(junkTargetFor(state.folderId)); });
+  el('bulk-delete').addEventListener('click', function () { fileSelected('delete'); });
   el('bulk-move-go').addEventListener('click', function () {
     var target = Number(el('bulk-move').value);
     if (!target) { return; }
@@ -2881,6 +3015,7 @@
     var tag = (event.target && event.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.ctrlKey || event.metaKey || event.altKey) { return; }
     if (el('account').hidden || el('mail-section').hidden || el('message-list').hidden) { return; }
+    if (current && !el('message-view').hidden && (event.key === 'e' || event.key === '!' || event.key === '#')) { return; }
     if (event.key === 'ArrowDown' || event.key === 'j') { setCursor(cursor + 1); event.preventDefault(); }
     else if (event.key === 'ArrowUp' || event.key === 'k') { setCursor(cursor - 1); event.preventDefault(); }
     else if (event.key === 'Enter' && cursor >= 0) { var hit = listRows[cursor]; if (hit.toggle) { hit.toggle(); } else { go('/m/' + hit.id); } event.preventDefault(); }
@@ -2917,12 +3052,14 @@
   // Kept with the account (GET/PUT /api/v1/me/preferences); the browser's
   // storage holds only the theme, for the sign-in page before there is one.
   var prefs = {};
-  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'messages' };
+  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right' };
   var renderListTools = function () {
-    el('view-threads').textContent = pref('view') === 'threads' ? 'Messages' : 'Threads';
+    el('view-threads').textContent = pref('view') === 'threads' ? t('Show messages one by one') : t('Show conversations');
     var emptyable = !state.everywhere && (folderIs(state.folderId, 'Junk') || folderIs(state.folderId, 'Trash'));
     el('folder-empty').hidden = !emptyable;
-    el('folder-empty').textContent = 'Empty this folder';
+    el('folder-empty').textContent = t('Empty this folder');
+    ['right', 'bottom', 'off'].forEach(function (mode) { el('pane-' + mode).classList.toggle('on', paneMode() === mode); });
+    el('mail-search-clear').hidden = !state.query;
   };
   el('view-threads').addEventListener('click', function () {
     savePrefs({ view: pref('view') === 'threads' ? 'messages' : 'threads' }).then(function () {
@@ -3002,6 +3139,8 @@
     document.body.setAttribute('data-density', pref('density') === 'compact' ? 'compact' : 'comfortable');
     el('pref-theme').value = pref('theme') === 'light' || pref('theme') === 'dark' ? pref('theme') : 'system';
     el('pref-density').value = pref('density') === 'compact' ? 'compact' : 'comfortable';
+    el('pref-pane').value = paneMode();
+    applyPane();
     el('pref-undo').value = String(undoSeconds());
     if (!el('pref-undo').value) { el('pref-undo').value = '5'; }
     el('pref-notify').checked = pref('notify') === '1';
@@ -3138,7 +3277,7 @@
     var ticked = [];
     var labels = el('notify-folders').children;
     for (var i = 0; i < labels.length; i++) { var tick = labels[i].children[0]; if (tick && tick.checked) { ticked.push(tick.value); } }
-    savePrefs({ language: el('pref-language').value, theme: el('pref-theme').value, density: el('pref-density').value, undo_seconds: el('pref-undo').value,
+    savePrefs({ language: el('pref-language').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
                 notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(',') }).then(function (ok) {
       if (ok) { say('prefs-status', t('Saved.'), true); }
     });
@@ -3155,7 +3294,7 @@
       clear(select);
       identities.forEach(function (i) { var o = document.createElement('option'); o.value = i.address; o.textContent = i.header || i.address; select.appendChild(o); });
       var one = identities.length < 2;
-      select.hidden = one; el('compose-from-label').hidden = one;
+      select.hidden = one; el('compose-from-label').hidden = one; el('compose-from-row').hidden = one;
       renderAwayAddresses();
     });
   };
@@ -3198,6 +3337,7 @@
   var afterPrime = function (mode, message) {
     if (mode === 'draft') { selectIdentity(addressOf(message.from)); }
     else { selectIdentity(identityAddressedIn(message)); addSignature(); }
+    syncComposeRows();
     el('compose-text').focus();
   };
   var composeTo = function (entry) {
@@ -3318,6 +3458,398 @@
     var tag = (event.target && event.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.ctrlKey || event.metaKey || event.altKey) { return; }
     if (event.key === '?') { event.preventDefault(); if (el('keys-overlay').hidden) { openKeys(); } else { closeOverlays(); } }
+  });
+
+
+  // ---- The look: icons, avatars, names and times ---------------------------
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var svgNode = function (tag) { return document.createElementNS ? document.createElementNS(SVG_NS, tag) : document.createElement(tag); };
+  var icon = function (name, small) {
+    var svg = svgNode('svg');
+    svg.setAttribute('class', 'i' + (small ? ' sm' : ''));
+    svg.setAttribute('aria-hidden', 'true');
+    var use = svgNode('use');
+    use.setAttribute('href', '#i-' + name);
+    svg.appendChild(use);
+    return svg;
+  };
+  var iconButton = function (name, title, className) {
+    var b = node('button', undefined, 'iconbtn sm' + (className ? ' ' + className : ''));
+    b.type = 'button';
+    b.setAttribute('title', title);
+    b.setAttribute('aria-label', title);
+    b.appendChild(icon(name));
+    return b;
+  };
+  // The <use> inside a button, by walking: the page's test harness has no
+  // querySelector, on purpose.
+  var findUse = function (n) {
+    if (!n || !n.childNodes) { return null; }
+    for (var i = 0; i < n.childNodes.length; i++) {
+      var c = n.childNodes[i];
+      if (String(c.tagName || '').toLowerCase() === 'use') { return c; }
+      var deeper = findUse(c);
+      if (deeper) { return deeper; }
+    }
+    return null;
+  };
+  var setIcon = function (holder, name) {
+    var use = findUse(holder);
+    if (use) { use.setAttribute('href', '#i-' + name); }
+  };
+  var nameOf = function (header) {
+    var name = displayNameOf(header);
+    if (name) { return name.replace(/^"|"$/g, ''); }
+    var address = addressOf(header);
+    return address || String(header || '').trim() || '?';
+  };
+  var initialsOf = function (header) {
+    var name = nameOf(header).replace(/[<>"]/g, '').trim();
+    if (!name || name === '?') { return '?'; }
+    if (name.indexOf('@') >= 0) { name = name.split('@')[0]; }
+    var parts = name.split(/[\s._-]+/).filter(Boolean);
+    if (!parts.length) { return '?'; }
+    return ((parts[0].charAt(0)) + (parts.length > 1 ? parts[parts.length - 1].charAt(0) : '')).toUpperCase();
+  };
+  var avatarColour = function (address) {
+    var h = 0, s = String(address || '').toLowerCase();
+    for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) >>> 0; }
+    return 'var(--a' + ((h % 10) + 1) + ')';
+  };
+  var avatarFor = function (header, large) {
+    var a = node('span', initialsOf(header), 'avatar' + (large ? ' lg' : ''));
+    if (a.style) { a.style.background = avatarColour(addressOf(header)); }
+    a.setAttribute('aria-hidden', 'true');
+    return a;
+  };
+  var recipientsOf = function (header) {
+    return String(header || '').split(',').map(function (s) { return s.trim() ? nameOf(s.trim()) : ''; }).filter(Boolean);
+  };
+  var dateOf = function (m) {
+    var d = new Date(m.date || '');
+    if (isNaN(d.getTime())) { d = new Date(String(m.received || '').replace(' ', 'T')); }
+    return isNaN(d.getTime()) ? null : d;
+  };
+  // The time today, the day this year, the date otherwise - what a list shows.
+  var whenText = function (m) {
+    var d = dateOf(m);
+    if (!d) { return m.date || m.received || ''; }
+    var now = new Date();
+    try {
+      if (d.toDateString() === now.toDateString()) { return d.toLocaleTimeString(languageActive, { hour: '2-digit', minute: '2-digit', hour12: false }); }
+      if (d.getFullYear() === now.getFullYear()) { return d.toLocaleDateString(languageActive, { day: 'numeric', month: 'short' }); }
+      return d.toLocaleDateString(languageActive, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch (e) { return d.toDateString(); }
+  };
+  var fullDate = function (m) {
+    var d = dateOf(m);
+    if (!d) { return m.date || m.received || ''; }
+    try { return d.toLocaleString(languageActive, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return d.toString(); }
+  };
+
+  // ---- Toasts, with undo ----------------------------------------------------
+  var toastTimer = 0;
+  var dismissToast = function () {
+    var box = el('toasts');
+    if (box) { clear(box); }
+    if (toastTimer && typeof clearTimeout === 'function') { clearTimeout(toastTimer); }
+    toastTimer = 0;
+  };
+  var toast = function (text, undo) {
+    var box = el('toasts');
+    if (!box) { say('mail-status', text, true); return; }
+    clear(box);
+    var one = node('div', undefined, 'toast');
+    one.setAttribute('role', 'status');
+    one.appendChild(node('span', text));
+    one.appendChild(node('span', undefined, 'sp'));
+    if (undo) {
+      var u = node('button', t('Undo')); u.type = 'button';
+      u.addEventListener('click', function () { dismissToast(); undo(); });
+      one.appendChild(u);
+    }
+    var x = node('button', undefined, 'x'); x.type = 'button'; x.setAttribute('aria-label', t('Dismiss'));
+    x.appendChild(icon('close', true));
+    x.addEventListener('click', dismissToast);
+    one.appendChild(x);
+    box.appendChild(one);
+    if (toastTimer && typeof clearTimeout === 'function') { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () { clear(box); toastTimer = 0; }, 8000);
+  };
+  var filingText = function (to, result, count) {
+    var what;
+    if (to === 'delete') { what = result && result.data && result.data.deleted ? t('deleted') : t('moved to Trash'); }
+    else { what = to === 'archive' ? t('archived') : to === 'junk' ? t('moved to Junk') : to === 'inbox' ? t('moved to Inbox') : to === 'trash' ? t('moved to Trash') : t('deleted'); }
+    if (count > 1) { return tf('{0} {1}.', count, what); }
+    return what.charAt(0).toUpperCase() + what.slice(1) + '.';
+  };
+  // One call per message, in order; then a toast whose Undo moves each one
+  // back where it was, by the id the move gave it.
+  var fileMany = function (entries, to) {
+    var moved = [];
+    var last = null;
+    var chain = Promise.resolve();
+    entries.forEach(function (e) {
+      chain = chain.then(function () {
+        return fileMessage(e.id, to).then(function (r) {
+          last = r;
+          if (r.status === 200 && r.data && r.data.id && e.folderId) { moved.push({ id: r.data.id, back: e.folderId }); }
+        });
+      });
+    });
+    return chain.then(function () {
+      if (!last || last.status !== 200) { say('mail-status', describe(last || { status: 0 }, t('Could not file the message')), false); return false; }
+      say('mail-status', '', true);
+      lastListing = null;
+      loadFolders();
+      var undo = moved.length ? function () {
+        var c = Promise.resolve();
+        moved.forEach(function (x) { c = c.then(function () { return call('POST', '/api/v1/me/messages/' + x.id + '/move', { folder_id: x.back }); }); });
+        c.then(function () { lastListing = null; loadFolders(); if (!el('mail-section').hidden) { loadMessages(); } });
+      } : null;
+      toast(filingText(to, last, entries.length), undo);
+      return true;
+    });
+  };
+  var fileSelected = function (to) {
+    var ids = selectedIds();
+    var entries = ids.map(function (id) {
+      var folderId = state.folderId;
+      listRows.forEach(function (r) { if (r.id === id || (r.ids || []).indexOf(id) >= 0) { folderId = r.folderId || folderId; } });
+      return { id: id, folderId: folderId };
+    });
+    fileMany(entries, to).then(function (ok) {
+      clearSelection();
+      if (ok && current && ids.indexOf(current.id) >= 0) { closeMessage(true); }
+      loadMessages();
+    });
+  };
+  var markRows = function (entries, seen) {
+    var chain = Promise.resolve();
+    entries.forEach(function (e) {
+      (e.ids || [e.id]).forEach(function (id) {
+        chain = chain.then(function () { return call('PUT', '/api/v1/me/messages/' + id + '/flags', { seen: seen }); });
+      });
+    });
+    chain.then(function () { lastListing = null; loadFolders(); reloadKeepingPlace(); });
+  };
+  var toggleStar = function (m, star) {
+    var flagged = !m.flags.flagged;
+    call('PUT', '/api/v1/me/messages/' + m.id + '/flags', { flagged: flagged }).then(function (result) {
+      if (result.status !== 200) { say('mail-status', describe(result, t('Could not change the flags')), false); return; }
+      m.flags.flagged = flagged;
+      star.classList.toggle('on', flagged);
+      star.setAttribute('title', flagged ? t('Unstar') : t('Star'));
+      if (current && current.id === m.id) { current.flags.flagged = flagged; renderActions(); }
+    });
+  };
+  var starButton = function (m) {
+    var star = node('button', undefined, 'star' + (m.flags.flagged ? ' on' : ''));
+    star.type = 'button';
+    star.setAttribute('title', m.flags.flagged ? t('Unstar') : t('Star'));
+    star.setAttribute('aria-label', t('Star'));
+    star.appendChild(icon('star'));
+    star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(m, star); });
+    return star;
+  };
+
+  // ---- The reading pane -----------------------------------------------------
+  var paneMode = function () { var p = pref('pane'); return p === 'bottom' || p === 'off' ? p : 'right'; };
+  var applyPane = function () {
+    var s = el('mail-section');
+    var mode = paneMode();
+    s.classList.toggle('has-pane', mode !== 'off');
+    s.classList.toggle('pane-bottom', mode === 'bottom');
+    s.classList.toggle('no-pane', mode === 'off');
+  };
+  // The message leaves the pane; quietly, the address bar is put back to the
+  // list without a history entry (the message is gone), otherwise it goes
+  // back the way the reader came.
+  var dropMessage = function () {
+    current = null;
+    el('message-view').hidden = true;
+    el('pane-empty').hidden = false;
+    el('mail-section').classList.remove('has-message');
+  };
+  var closeMessage = function (quiet) {
+    current = null;
+    el('message-view').hidden = true;
+    el('pane-empty').hidden = false;
+    el('mail-section').classList.remove('has-message');
+    listRows.forEach(function (r) { r.row.classList.remove('open'); });
+    if (parseHash().parts[0] !== 'm') { return; }
+    if (!quiet && cameFromList && history.length > 1) { history.back(); return; }
+    replaceWith(listHash());
+  };
+  var currentNavHash = function () {
+    if (state.everywhere) { return state.query === 'is:flagged' ? '/starred' : ''; }
+    return state.folderId ? '/f/' + state.folderId : '';
+  };
+  var renderCount = function (page) {
+    var count = el('list-count');
+    var older = el('page-older');
+    var newer = el('page-newer');
+    var n = page.messages.length;
+    if (page.query) {
+      count.textContent = n ? tf('{0} results', n) : '';
+      older.hidden = true; newer.hidden = true;
+      return;
+    }
+    count.textContent = n ? (state.before ? tf('{0} older, of {1}', n, page.total) : tf('1-{0} of {1}', n, page.total)) : '';
+    older.hidden = !(n && page.total > n);
+    newer.hidden = !state.before;
+    pagerOlderUid = n ? page.messages[n - 1].uid : 0;
+  };
+  var pagerOlderUid = 0;
+  el('page-older').addEventListener('click', function () { if (pagerOlderUid) { state.before = pagerOlderUid; go(listHash()); } });
+  el('page-newer').addEventListener('click', function () { state.before = 0; go(listHash()); });
+  el('list-refresh').addEventListener('click', function () { lastListing = null; loadFolders(); loadMessages(); });
+  el('list-mark-all-read').addEventListener('click', function () { closeMenus(); markRows(listRows.filter(function (r) { return !r.m || !r.m.flags.seen || r.ids; }), true); });
+  el('message-details-toggle').addEventListener('click', function () {
+    var d = el('message-details');
+    d.hidden = !d.hidden;
+    el('message-details-toggle').setAttribute('aria-expanded', d.hidden ? 'false' : 'true');
+  });
+  ['right', 'bottom', 'off'].forEach(function (mode) {
+    el('pane-' + mode).addEventListener('click', function () {
+      closeMenus();
+      savePrefs({ pane: mode }).then(function () { applyPane(); renderListTools(); if (current) { el('message-view').hidden = false; el('pane-empty').hidden = true; } });
+    });
+  });
+
+  // ---- Menus that open under a button and close on a click elsewhere --------
+  var within = function (target, ancestor) { var n = target; while (n) { if (n === ancestor) { return true; } n = n.parentNode; } return false; };
+  var menus = [['list-more-btn', 'list-more'], ['message-more-btn', 'message-more'], ['select-menu-btn', 'select-menu'], ['account-btn', 'account-menu'], ['search-tune', 'search-advanced']];
+  var closeMenus = function () {
+    menus.forEach(function (pair) { var m = el(pair[1]); if (m && !m.hidden) { m.hidden = true; el(pair[0]).setAttribute('aria-expanded', 'false'); } });
+  };
+  menus.forEach(function (pair) {
+    el(pair[0]).addEventListener('click', function (event) {
+      event.stopPropagation();
+      var menu = el(pair[1]);
+      var open = menu.hidden;
+      closeMenus();
+      menu.hidden = !open;
+      el(pair[0]).setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && pair[1] === 'search-advanced') { el('adv-from').focus(); }
+    });
+    el(pair[1]).addEventListener('click', function (event) { event.stopPropagation(); });
+  });
+  document.addEventListener('click', function (event) {
+    var open = menus.filter(function (pair) { return !el(pair[1]).hidden; });
+    if (!open.length) { return; }
+    var inside = open.some(function (pair) { return within(event.target, el(pair[1])) || within(event.target, el(pair[0])); });
+    if (!inside) { closeMenus(); }
+  });
+  el('select-menu').addEventListener('click', function (event) {
+    var pick = event.target && event.target.getAttribute ? event.target.getAttribute('data-pick') : '';
+    if (!pick) { return; }
+    closeMenus();
+    listRows.forEach(function (r) {
+      var messages = r.ms || [r.m];
+      var take = pick === 'all' ? true : pick === 'none' ? false :
+        pick === 'read' ? messages.every(function (m) { return m.flags.seen; }) :
+        pick === 'unread' ? messages.some(function (m) { return !m.flags.seen; }) :
+        pick === 'starred' ? messages.some(function (m) { return m.flags.flagged; }) :
+        messages.every(function (m) { return !m.flags.flagged; });
+      (r.ids || [r.id]).forEach(function (id) { selected[id] = take; });
+      r.box.checked = take;
+    });
+    renderBulk();
+  });
+  el('select-all').addEventListener('click', function () {
+    var take = el('select-all').checked;
+    listRows.forEach(function (r) { (r.ids || [r.id]).forEach(function (id) { selected[id] = take; }); r.box.checked = take; });
+    renderBulk();
+  });
+  el('menu-settings').addEventListener('click', function () { closeMenus(); go('/settings'); });
+  el('menu-security').addEventListener('click', function () { closeMenus(); go('/security'); });
+  el('settings-btn').addEventListener('click', function () { go('/settings'); });
+  el('keys-btn').addEventListener('click', function () { openKeys(); });
+  el('storage-link').addEventListener('click', function () { go('/storage'); });
+  (function () {
+    var nav = el('side-nav').children;
+    for (var i = 0; i < nav.length; i++) {
+      (function (b) { b.addEventListener('click', function () { go(b.getAttribute('data-route')); }); })(nav[i]);
+    }
+  })();
+  el('nav-toggle').addEventListener('click', function () { el('account').classList.toggle('nav-open'); });
+  el('nav-scrim').addEventListener('click', function () { el('account').classList.remove('nav-open'); });
+  el('side').addEventListener('click', function (event) {
+    var n = event.target;
+    while (n && n !== el('side')) { if (n.tagName === 'BUTTON') { el('account').classList.remove('nav-open'); return; } n = n.parentNode; }
+  });
+
+  // ---- The search box's options ---------------------------------------------
+  var quoteTerm = function (value) { value = value.trim(); return /\s/.test(value) ? '"' + value.replace(/"/g, '') + '"' : value; };
+  var advancedQuery = function () {
+    var parts = [];
+    var words = el('adv-words').value.trim();
+    if (words) { parts.push(words); }
+    if (el('adv-from').value.trim()) { parts.push('from:' + quoteTerm(el('adv-from').value)); }
+    if (el('adv-to').value.trim()) { parts.push('to:' + quoteTerm(el('adv-to').value)); }
+    if (el('adv-subject').value.trim()) { parts.push('subject:' + quoteTerm(el('adv-subject').value)); }
+    if (el('adv-label').value.trim()) { parts.push('label:' + el('adv-label').value.trim()); }
+    if (el('adv-after').value) { parts.push('after:' + el('adv-after').value); }
+    if (el('adv-before').value) { parts.push('before:' + el('adv-before').value); }
+    if (el('adv-attachment').checked) { parts.push('has:attachment'); }
+    if (el('adv-unread').checked) { parts.push('is:unread'); }
+    if (el('adv-flagged').checked) { parts.push('is:flagged'); }
+    return parts.join(' ');
+  };
+  el('adv-search').addEventListener('click', function () {
+    var q = advancedQuery();
+    el('mail-search').value = q;
+    el('mail-search-everywhere').checked = el('adv-where').value === 'all';
+    closeMenus();
+    if (!q) { return; }
+    state.before = 0;
+    lastListing = null;
+    if (el('mail-search-everywhere').checked) { go('/search?q=' + encodeURIComponent(q)); return; }
+    go('/f/' + (state.folderId || inboxId) + '?q=' + encodeURIComponent(q));
+  });
+  el('adv-reset').addEventListener('click', function () {
+    ['adv-from', 'adv-to', 'adv-subject', 'adv-words', 'adv-label', 'adv-after', 'adv-before'].forEach(function (id) { el(id).value = ''; });
+    ['adv-attachment', 'adv-unread', 'adv-flagged'].forEach(function (id) { el(id).checked = false; });
+    el('adv-where').value = 'folder';
+  });
+  el('mail-search').addEventListener('input', function () { el('mail-search-clear').hidden = !el('mail-search').value && !state.query; });
+  window.addEventListener('hashchange', function () { el('mail-search-clear').hidden = !state.query && !el('mail-search').value; });
+
+  // ---- Compose: Cc and Bcc appear when asked for, or when they hold something
+  var syncComposeRows = function () {
+    el('compose-cc-row').hidden = !el('compose-cc').value;
+    el('compose-bcc-row').hidden = !el('compose-bcc').value;
+    el('show-cc').hidden = !el('compose-cc-row').hidden;
+    el('show-bcc').hidden = !el('compose-bcc-row').hidden;
+  };
+  el('show-cc').addEventListener('click', function () { el('compose-cc-row').hidden = false; el('show-cc').hidden = true; el('compose-cc').focus(); });
+  el('show-bcc').addEventListener('click', function () { el('compose-bcc-row').hidden = false; el('show-bcc').hidden = true; el('compose-bcc').focus(); });
+
+  // ---- The keys a mail client has, on top of the list's own ----------------
+  document.addEventListener('keydown', function (event) {
+    var tag = (event.target && event.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.ctrlKey || event.metaKey || event.altKey) { return; }
+    if (el('account').hidden || !el('keys-overlay').hidden || !el('palette').hidden) { return; }
+    if (event.key === '/') { event.preventDefault(); el('mail-search').focus(); return; }
+    if (event.key === 'c') { event.preventDefault(); go('/compose'); return; }
+    if (el('mail-section').hidden) { return; }
+    var open = current && !el('message-view').hidden;
+    if (event.key === 'u' || (event.key === 'Escape' && open)) { if (open) { event.preventDefault(); closeMessage(false); } return; }
+    if (open && event.key === 'r') { event.preventDefault(); go('/compose?reply=' + current.id); return; }
+    if (open && event.key === 'a') { event.preventDefault(); go('/compose?replyall=' + current.id); return; }
+    if (open && event.key === 'f') { event.preventDefault(); go('/compose?forward=' + current.id); return; }
+    if (event.key === 's') {
+      event.preventDefault();
+      if (open) { setFlags({ flagged: !current.flags.flagged }, false); return; }
+      if (cursor >= 0 && listRows[cursor] && listRows[cursor].star) { toggleStar(listRows[cursor].m, listRows[cursor].star); }
+      return;
+    }
+    if (event.key === 'o' && cursor >= 0 && listRows[cursor] && !el('message-list').hidden) { event.preventDefault(); go('/m/' + listRows[cursor].id); return; }
+    // With a reading pane, moving the cursor reads the message it lands on.
+    if ((event.key === 'j' || event.key === 'k' || event.key === 'ArrowDown' || event.key === 'ArrowUp') && paneMode() !== 'off' && open && cursor >= 0 && listRows[cursor] && listRows[cursor].id !== current.id) {
+      replaceWith('/m/' + listRows[cursor].id);
+    }
   });
 
   // The theme the last visit chose, for the sign-in page; the account's own
