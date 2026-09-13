@@ -46,17 +46,24 @@ namespace RegressionTests.Shared
 
       /// <summary>
       ///    The Windows one stops the service and starts it again, for a test that
-      ///    needs the server to re-read something it only reads at process start -
-      ///    hMailServer.ini, which IniFileSettings caches for the life of the process.
-      ///    Nothing in the REST API restarts the process: POST
-      ///    /api/v1/server/reinitialize restarts the services inside it and does not
-      ///    re-read the INI, so it is not the same thing and is not put here in its
-      ///    place. A test that asks for a restart is stopped at that point, and the
-      ///    tests in the same fixture that do not ask for one still run.
+      ///    wrote hMailServer.ini and needs the server to read it. Here it is POST
+      ///    /api/v1/server/reinitialize, which is the same thing for that purpose:
+      ///    Application::Reinitialize runs InitInstance again, whose
+      ///    IniFileSettings::LoadSettings reads every setting from the file afresh -
+      ///    the POSIX profile reader keeps no cache - which is why the Windows
+      ///    fixtures that write the ini and then call Reinitialize (RestApiSettings,
+      ///    ClientDiscovery) see what they wrote. What a reinitialise does not do is
+      ///    start the process again; a fixture that needs that fails here, visibly,
+      ///    rather than being skipped, and is registered by name if the need is real.
+      ///    The process is the same afterwards, so ServiceRestartDetector's counter
+      ///    carries on and nothing is re-baselined.
       /// </summary>
       protected void RestartServerAndReacquireCom()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoServerRestart);
+         _application.Reinitialize();
+
+         _application = SingletonProvider<TestSetup>.Instance.GetApp();
+         _settings = _application.Settings;
       }
 
       [SetUp]

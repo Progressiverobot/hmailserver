@@ -320,6 +320,9 @@ namespace hMailServer
       public const string Server = "/api/v1/settings";
       public const string AntiSpam = "/api/v1/settings/antispam";
       public const string Logging = "/api/v1/settings/logging";
+      public const string Directories = "/api/v1/settings/directories";
+      public const string Ini = "/api/v1/settings/ini";
+      public const string LogonFailuresClear = "/api/v1/settings/logon-failures/clear";
 
       public static JsonElement Read(string group, string key)
       {
@@ -779,29 +782,65 @@ namespace hMailServer
          NotOnThisServer.Ignore(NotOnThisServer.NoRelayerPassword);
       }
 
+      /// <summary>
+      ///    POST /api/v1/settings/logon-failures/clear: the failures the auto-ban
+      ///    counts are forgotten, which is what the COM call does.
+      /// </summary>
       public void ClearLogonFailureList()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoLogonFailureList);
+         if (!ServerApi.HasRoute(SettingsApi.LogonFailuresClear, "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoLogonFailureList);
+         ServerApi.Post(SettingsApi.LogonFailuresClear, "{}").Expect(200, "POST " + SettingsApi.LogonFailuresClear);
+      }
+
+      // ---- The [Settings] section of hMailServer.ini, over /api/v1/settings/ini ----
+      //
+      // The routes refuse what the COM members refuse, in the same sentences,
+      // and a refusal here is thrown as the COMException the fixtures expect
+      // (IniSettingsOverCom asserts the type), carrying the route's sentence.
+
+      private static void IniRouteOrSkip()
+      {
+         if (!ServerApi.HasRoute(SettingsApi.Ini, "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings);
+      }
+
+      private static ApiAnswer IniRefusalAsComException(ApiAnswer answer, string doing)
+      {
+         if (answer.Status == 400 || answer.Status == 500)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+         return answer.Expect(200, doing);
       }
 
       public string GetIniSetting(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         var answer = IniRefusalAsComException(ServerApi.Get(SettingsApi.Ini + "/" + name), "GET " + SettingsApi.Ini + "/" + name);
+         return ServerApi.StringOf(answer.Json.Value, "value");
       }
 
       public void SetIniSetting(string name, string value)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         IniRefusalAsComException(ServerApi.Put(SettingsApi.Ini + "/" + name, "{\"value\":" + ServerApi.Quote(value) + "}"), "PUT " + SettingsApi.Ini + "/" + name);
       }
 
       public void DeleteIniSetting(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         IniRefusalAsComException(ServerApi.Delete(SettingsApi.Ini + "/" + name), "DELETE " + SettingsApi.Ini + "/" + name);
       }
 
+      /// <summary>The names one per line, joined with CRLF as the COM property joins them.</summary>
       public string IniSettingNames
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings); }
+         get
+         {
+            IniRouteOrSkip();
+            var answer = ServerApi.Get(SettingsApi.Ini).Expect(200, "GET " + SettingsApi.Ini);
+            var names = ServerApi.Array(answer, "names").Select(n => n.GetString());
+            return string.Join("\r\n", names);
+         }
       }
 
       public int CrashSimulationMode
@@ -815,7 +854,7 @@ namespace hMailServer
 
       public string PublicFolderDiskName
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoPublicFolderDiskName); }
       }
 
       public void DisableAdministratorTOTP()
@@ -988,34 +1027,29 @@ namespace hMailServer
    }
 
    /// <summary>
-   ///    The server's own directories. Only the log directory has a route
-   ///    (GET /api/v1/settings/logging reports it); the program, data and event
-   ///    directories are reported by nothing, and the fixtures that read them - to
-   ///    open hMailServer.ini, or to look at the message store - skip.
+   ///    The server's own directories, from GET /api/v1/settings/directories -
+   ///    the same seven InterfaceDirectories reports. A fixture reads them to
+   ///    open hMailServer.ini (ProgramDirectory, where the CI tree and the
+   ///    Windows bench both keep it) or to look at the message store
+   ///    (DataDirectory), which is why the tests run on the machine the server
+   ///    runs on.
    /// </summary>
    public class Directories
    {
-      public string LogDirectory => SettingsApi.GetString(SettingsApi.Logging, "directory");
-
-      public string ProgramDirectory
+      private static string Get(string key)
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
+         if (!ServerApi.HasRoute(SettingsApi.Directories, "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories);
+         return SettingsApi.GetString(SettingsApi.Directories, key);
       }
 
-      public string DataDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
-
-      public string EventDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
-
-      public string TempDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
+      public string ProgramDirectory => Get("program");
+      public string DataDirectory => Get("data");
+      public string LogDirectory => Get("log");
+      public string EventDirectory => Get("event");
+      public string TempDirectory => Get("temp");
+      public string DatabaseDirectory => Get("database");
+      public string DBScriptDirectory => Get("db_scripts");
    }
 
    /// <summary>The event-handler scripting, which no REST route configures or runs.</summary>

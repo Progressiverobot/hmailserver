@@ -198,7 +198,12 @@ localhost SMTP routes go through `/api/v1/routes`; the TLS listeners the SSL
 fixtures need are made from the certificate and port routes and brought up with
 `POST /api/v1/server/reinitialize`; the delivery queue is drained through
 `/api/v1/queue`; and the ERROR log is read through `/api/v1/logs`, judged by
-what was written *during* the test rather than by whether the file exists.
+what was written *during* the test rather than by whether the file exists;
+the server's directories come from `GET /api/v1/settings/directories`, a
+`[Settings]` key of `hMailServer.ini` goes through `/api/v1/settings/ini`, the
+logon-failure list is cleared through `/api/v1/settings/logon-failures/clear`,
+and a fixture that restarts the service to have the ini read again gets
+`POST /api/v1/server/reinitialize`, which reads it again in the same process.
 Everything a test makes is removed in its teardown.
 
 What it cannot do, it says: a fixture that needs the suite's fake DNS zone

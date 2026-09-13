@@ -271,6 +271,12 @@ namespace HM
          RouteSettingsAntiSpamPut,
          RouteSettingsLoggingGet,
          RouteSettingsLoggingPut,
+         RouteSettingsDirectoriesGet,
+         RouteIniSettingList,
+         RouteIniSettingGet,
+         RouteIniSettingPut,
+         RouteIniSettingDelete,
+         RouteLogonFailuresClear,
          RouteRuleCreate,
          RouteRuleUpdate,
          RouteRuleDelete,
@@ -715,6 +721,17 @@ namespace HM
       HttpResponse HandleSettingsLogging_();
       HttpResponse HandleSettingsLoggingPut_(const AnsiString &requestBody);
       static AnsiString OpenApiSettingsPaths_();
+      // The Linux suite's route backlog, wave A: the directories the server
+      // runs in, the [Settings] section of hMailServer.ini, and the
+      // logon-failure list - what Settings.Directories, GetIniSetting /
+      // SetIniSetting / DeleteIniSetting / IniSettingNames and
+      // ClearLogonFailureList answer over COM. All in RestApiSettings.cpp.
+      HttpResponse HandleSettingsDirectories_();
+      HttpResponse HandleIniSettingList_();
+      HttpResponse HandleIniSettingGet_(const AnsiString &name);
+      HttpResponse HandleIniSettingPut_(const AnsiString &name, const AnsiString &requestBody);
+      HttpResponse HandleIniSettingDelete_(const AnsiString &name);
+      HttpResponse HandleLogonFailuresClear_();
       HttpResponse HandleCreateRule_(const AnsiString &requestBody);
       HttpResponse HandleUpdateRule_(__int64 ruleId, const AnsiString &requestBody);
       HttpResponse HandleDeleteRule_(__int64 ruleId);

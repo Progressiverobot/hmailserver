@@ -1569,6 +1569,18 @@ namespace HM
             return HandleSettingsLogging_();
          case RouteSettingsLoggingPut:
             return HandleSettingsLoggingPut_(GetRequestBody_(request));
+         case RouteSettingsDirectoriesGet:
+            return HandleSettingsDirectories_();
+         case RouteIniSettingList:
+            return HandleIniSettingList_();
+         case RouteIniSettingGet:
+            return HandleIniSettingGet_(route.identifier);
+         case RouteIniSettingPut:
+            return HandleIniSettingPut_(route.identifier, GetRequestBody_(request));
+         case RouteIniSettingDelete:
+            return HandleIniSettingDelete_(route.identifier);
+         case RouteLogonFailuresClear:
+            return HandleLogonFailuresClear_();
          case RouteRuleCreate:
             return HandleCreateRule_(GetRequestBody_(request));
          case RouteRuleUpdate:
@@ -2791,6 +2803,48 @@ namespace HM
          return;
       }
 
+      if (method == "GET" && path == "/api/v1/settings/directories")
+      {
+         route.kind = RouteSettingsDirectoriesGet;
+         return;
+      }
+
+      // One [Settings] key of hMailServer.ini, named in the path as it is
+      // spelled in the file. The name is not decoded: the characters a key
+      // cannot hold - = [ ] and a line break - are refused by the handler with
+      // the sentence COM's SetIniSetting uses, and a slash never reaches it.
+      const AnsiString iniPath = "/api/v1/settings/ini";
+      if (path == iniPath)
+      {
+         if (method == "GET")
+            route.kind = RouteIniSettingList;
+         return;
+      }
+
+      if (path.StartsWith(iniPath + "/"))
+      {
+         AnsiString name = path.Mid(iniPath.GetLength() + 1);
+         if (!name.IsEmpty() && name.Find("/") < 0)
+         {
+            if (method == "GET")
+               route.kind = RouteIniSettingGet;
+            else if (method == "PUT")
+               route.kind = RouteIniSettingPut;
+            else if (method == "DELETE")
+               route.kind = RouteIniSettingDelete;
+
+            if (route.kind != RouteUnknown)
+               route.identifier = name;
+         }
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/logon-failures/clear")
+      {
+         route.kind = RouteLogonFailuresClear;
+         return;
+      }
+
       if (method == "POST" && path == "/api/v1/server/reinitialize")
       {
          route.kind = RouteServerReinitialize;
@@ -2905,6 +2959,9 @@ namespace HM
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
       case RouteSettingsLoggingPut:
+      case RouteIniSettingPut:
+      case RouteIniSettingDelete:
+      case RouteLogonFailuresClear:
       case RouteRuleCreate:
       case RouteRuleUpdate:
       case RouteRuleDelete:
@@ -3083,6 +3140,12 @@ namespace HM
       case RouteSettingsAntiSpamPut:
       case RouteSettingsLoggingGet:
       case RouteSettingsLoggingPut:
+      case RouteSettingsDirectoriesGet:
+      case RouteIniSettingList:
+      case RouteIniSettingGet:
+      case RouteIniSettingPut:
+      case RouteIniSettingDelete:
+      case RouteLogonFailuresClear:
       case RouteRuleCreate:
       case RouteRuleUpdate:
       case RouteRuleDelete:
