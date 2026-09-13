@@ -210,7 +210,7 @@ namespace RegressionTests.Infrastructure
       /// </summary>
       public static string GetErrorLogFileName()
       {
-         var scratch = Path.Combine(Path.GetTempPath(), "hmtest-error-log-since-mark.log");
+         var scratch = Path.Join(Path.GetTempPath(), "hmtest-error-log-since-mark.log");
          var fresh = ErrorLogLinesSinceMark();
          if (fresh.Length == 0)
          {

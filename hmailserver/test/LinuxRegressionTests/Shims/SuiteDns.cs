@@ -87,8 +87,10 @@ namespace RegressionTests
          }
       }
 
+      // Static, as NUnit allows a set-up fixture's lifecycle methods to be:
+      // the state they set is the suite's, not an instance's.
       [OneTimeSetUp]
-      public void PointTheWholeSuiteAtOneLocalZone()
+      public static void PointTheWholeSuiteAtOneLocalZone()
       {
          // The explicit way out, for a bench that wants the DNS fixtures skipped
          // whatever the probe below would find.
@@ -157,7 +159,7 @@ namespace RegressionTests
       }
 
       [OneTimeTearDown]
-      public void RestoreTheSystemResolver()
+      public static void RestoreTheSystemResolver()
       {
          if (zone_ == null)
             return;
