@@ -401,17 +401,17 @@ namespace RegressionTests.API
          Assert.AreEqual(200, status, body);
          StringAssert.Contains("\"enabled\":" + (logging.Enabled ? "true" : "false"), body);
          StringAssert.Contains("\"log_debug\":" + (logging.LogDebug ? "true" : "false"), body);
-         StringAssert.Contains("\"log_format\":\"" + (logging.LogFormat == eLogOutputFormat.hLogFormatCSA ? "csa" : "default") + "\"", body);
+         StringAssert.Contains("\"log_format\":\"" + (logging.LogFormat == eLogOutputFormat.hLogFormatCSA ? "ncsa" : "default") + "\"", body);
 
          // The directory is a Windows path, whose backslashes JSON doubles.
          StringAssert.Contains("\"directory\":\"" + logging.Directory.Replace("\\", "\\\\") + "\"", body);
          StringAssert.Contains("\"current_error_log\":\"" + logging.CurrentErrorLog.Replace("\\", "\\\\") + "\"", body);
 
          (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/logging",
-            "{\"log_debug\":true,\"log_tcpip\":true,\"keep_files_open\":false,\"log_format\":\"csa\"}");
+            "{\"log_debug\":true,\"log_tcpip\":true,\"keep_files_open\":false,\"log_format\":\"ncsa\"}");
          Assert.AreEqual(200, putStatus, putBody);
          StringAssert.Contains("\"log_debug\":true", putBody);
-         StringAssert.Contains("\"log_format\":\"csa\"", putBody);
+         StringAssert.Contains("\"log_format\":\"ncsa\"", putBody);
          StringAssert.Contains("\"directory\":", putBody, "A PUT answers with the whole group, read-only keys included.");
 
          Assert.IsTrue(logging.LogDebug);
