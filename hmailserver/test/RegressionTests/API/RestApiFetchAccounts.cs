@@ -107,7 +107,7 @@ namespace RegressionTests.API
          // COM sees what the Control Panel would show.
          FetchAccounts overCom = account.FetchAccounts;
          Assert.AreEqual(1, overCom.Count);
-         FetchAccount fetchAccount = overCom[0];
+         FetchAccount fetchAccount = overCom.get_Item(0);
          Assert.AreEqual(id, fetchAccount.ID);
          Assert.AreEqual("Remote POP3", fetchAccount.Name);
          Assert.AreEqual("localhost", fetchAccount.ServerAddress);
@@ -147,7 +147,7 @@ namespace RegressionTests.API
          StringAssert.Contains("\"enabled\":false", putBody);
          StringAssert.Contains("\"username\":\"remote@dummy-example.com\"", putBody);
 
-         fetchAccount = account.FetchAccounts[0];
+         fetchAccount = account.FetchAccounts.get_Item(0);
          Assert.AreEqual(15, fetchAccount.MinutesBetweenFetch);
          Assert.AreEqual(1, fetchAccount.ServerType, "IMAP is 1 over COM.");
          Assert.IsTrue(fetchAccount.UseSSL, "tls is what UseSSL reads back as.");
@@ -166,7 +166,7 @@ namespace RegressionTests.API
             Assert.AreEqual(400, refusedStatus, refused + " -> " + refusedBody);
             StringAssert.Contains("\"error\"", refusedBody);
          }
-         fetchAccount = account.FetchAccounts[0];
+         fetchAccount = account.FetchAccounts.get_Item(0);
          Assert.AreEqual(15, fetchAccount.MinutesBetweenFetch);
          Assert.AreEqual(9491, fetchAccount.Port);
          Assert.AreEqual("Remote POP3", fetchAccount.Name);
@@ -267,7 +267,7 @@ namespace RegressionTests.API
             Assert.AreEqual(200, Bearer("GET", Base(account), readOnlyKey).status, "A read-only key lists.");
             Assert.AreEqual(403, Bearer("PUT", Base(account) + "/" + id, readOnlyKey, "{\"port\":9493}").status, "And changes nothing.");
             Assert.AreEqual(403, Bearer("POST", Base(account) + "/" + id + "/download", readOnlyKey).status, "A collection is a change.");
-            Assert.AreEqual(9492, account.FetchAccounts[0].Port);
+            Assert.AreEqual(9492, account.FetchAccounts.get_Item(0).Port);
 
             Assert.AreEqual(200, Bearer("DELETE", Base(account) + "/" + id, hereKey).status);
             Assert.AreEqual(0, account.FetchAccounts.Count);
