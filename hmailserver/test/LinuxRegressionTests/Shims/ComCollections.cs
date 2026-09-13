@@ -388,10 +388,19 @@ namespace hMailServer
 
       public long ID { get; set; }
       public string AliasName { get; set; }
+      // A test sets the id of the domain the alias belongs to before saving,
+      // as COM requires; here the owner is known already. What was set reads
+      // back; an id the server would have given is not a thing this API has.
+      private long _domainId;
       public long DomainID
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainIds); }
-         set { }
+         get
+         {
+            if (_domainId != 0)
+               return _domainId;
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoDomainIds);
+         }
+         set { _domainId = value; }
       }
       public string DomainName { get; set; }
 
