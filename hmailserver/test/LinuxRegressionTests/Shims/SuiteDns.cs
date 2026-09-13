@@ -61,6 +61,18 @@ namespace RegressionTests
       [OneTimeSetUp]
       public void PointTheWholeSuiteAtOneLocalZone()
       {
+         // WSL2 in mirrored networking mode does not deliver a UDP packet sent to
+         // 127.0.0.1:53 to a socket bound there - measured 13 September 2026 with
+         // a plain responder and strace: the query leaves, nothing arrives - so a
+         // bench inside it says so through the environment, and its DNS fixtures
+         // skip rather than hang. A real Linux host, the CI runner included, needs
+         // nothing of the kind.
+         if (Environment.GetEnvironmentVariable("HMTEST_NO_FAKE_DNS") == "1")
+         {
+            notServed_ = NotOnThisServer.NoSuiteDns + " (HMTEST_NO_FAKE_DNS=1: this bench cannot deliver loopback UDP to the zone)";
+            return;
+         }
+
          if (!TestTarget.IsLocal)
          {
             notServed_ = NotOnThisServer.NoSuiteDns + " (the server is on " + TestTarget.Host + ", and the zone can only be served on 127.0.0.1)";
