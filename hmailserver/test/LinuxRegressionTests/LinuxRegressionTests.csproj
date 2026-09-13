@@ -70,6 +70,7 @@
     <Compile Include="..\RegressionTests\Shared\IMAPClientSimulator.cs" Link="Shared\IMAPClientSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\IniFile.cs" Link="Shared\IniFile.cs" />
     <Compile Include="..\RegressionTests\Shared\IniFileSetting.cs" Link="Shared\IniFileSetting.cs" />
+    <Compile Include="..\RegressionTests\Shared\RestListener.cs" Link="Shared\RestListener.cs" />
     <Compile Include="..\RegressionTests\Shared\POP3ClientSimulator.cs" Link="Shared\POP3ClientSimulator.cs" />
     <Compile Include="..\RegressionTests\Shared\Paths.cs" Link="Shared\Paths.cs" />
     <Compile Include="..\RegressionTests\Shared\Pop3ServerSimulator.cs" Link="Shared\Pop3ServerSimulator.cs" />
@@ -98,6 +99,7 @@
     <Compile Include="..\RegressionTests\API\RestApiDomains.cs" Link="API\RestApiDomains.cs" />
     <Compile Include="..\RegressionTests\API\RestApiQueue.cs" Link="API\RestApiQueue.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSelfService.cs" Link="API\RestApiSelfService.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiFetchAccounts.cs" Link="API\RestApiFetchAccounts.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSettings.cs" Link="API\RestApiSettings.cs" />
     <Compile Include="..\RegressionTests\API\RestApiSrvRecords.cs" Link="API\RestApiSrvRecords.cs" />
     <Compile Include="..\RegressionTests\API\ScriptObjectPolicy.cs" Link="API\ScriptObjectPolicy.cs" />

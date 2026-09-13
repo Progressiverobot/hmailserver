@@ -320,6 +320,31 @@ namespace hMailServer
       public const string Server = "/api/v1/settings";
       public const string AntiSpam = "/api/v1/settings/antispam";
       public const string Logging = "/api/v1/settings/logging";
+      public const string Directories = "/api/v1/settings/directories";
+      public const string Ini = "/api/v1/settings/ini";
+      public const string LogonFailuresClear = "/api/v1/settings/logon-failures/clear";
+      public const string Scripting = "/api/v1/settings/scripting";
+      public const string Backup = "/api/v1/settings/backup";
+      public const string Messages = "/api/v1/settings/messages";
+      public const string SieveEvaluate = "/api/v1/sieve/evaluate";
+
+      /// <summary>A group's value, or the skip that names the group when this server has no such route.</summary>
+      public static JsonElement ReadOrSkip(string group, string key, string reason)
+      {
+         if (!ServerApi.HasRoute(group, "get"))
+            throw NotOnThisServer.Skipped(reason);
+         return Read(group, key);
+      }
+
+      public static void PutOrSkip(string group, string key, string jsonValue, string reason)
+      {
+         if (!ServerApi.HasRoute(group, "put"))
+            NotOnThisServer.Ignore(reason);
+         var answer = ServerApi.Put(group, "{" + ServerApi.Quote(key) + ":" + jsonValue + "}");
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+         answer.Expect(200, "PUT " + group + " " + key);
+      }
 
       public static JsonElement Read(string group, string key)
       {
@@ -769,9 +794,18 @@ namespace hMailServer
 
       // ---- What no route offers ----
 
+      /// <summary>
+      ///    The REST fixtures set the password every request of this run already
+      ///    carries, in their SetUp, so that the bench is in the state they assume;
+      ///    here that state is proven by every request that has succeeded, and
+      ///    setting it to what it is is nothing to do. Any other value is a change
+      ///    no route makes.
+      /// </summary>
       public void SetAdministratorPassword(string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorPassword);
+         if (password == TestTarget.AdminPassword)
+            return;
+         NotOnThisServer.Ignore(NotOnThisServer.NoAdministratorPassword, password);
       }
 
       public void SetSMTPRelayerPassword(string password)
@@ -779,29 +813,65 @@ namespace hMailServer
          NotOnThisServer.Ignore(NotOnThisServer.NoRelayerPassword);
       }
 
+      /// <summary>
+      ///    POST /api/v1/settings/logon-failures/clear: the failures the auto-ban
+      ///    counts are forgotten, which is what the COM call does.
+      /// </summary>
       public void ClearLogonFailureList()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoLogonFailureList);
+         if (!ServerApi.HasRoute(SettingsApi.LogonFailuresClear, "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoLogonFailureList);
+         ServerApi.Post(SettingsApi.LogonFailuresClear, "{}").Expect(200, "POST " + SettingsApi.LogonFailuresClear);
+      }
+
+      // ---- The [Settings] section of hMailServer.ini, over /api/v1/settings/ini ----
+      //
+      // The routes refuse what the COM members refuse, in the same sentences,
+      // and a refusal here is thrown as the COMException the fixtures expect
+      // (IniSettingsOverCom asserts the type), carrying the route's sentence.
+
+      private static void IniRouteOrSkip()
+      {
+         if (!ServerApi.HasRoute(SettingsApi.Ini, "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings);
+      }
+
+      private static ApiAnswer IniRefusalAsComException(ApiAnswer answer, string doing)
+      {
+         if (answer.Status == 400 || answer.Status == 500)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+         return answer.Expect(200, doing);
       }
 
       public string GetIniSetting(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         var answer = IniRefusalAsComException(ServerApi.Get(SettingsApi.Ini + "/" + name), "GET " + SettingsApi.Ini + "/" + name);
+         return ServerApi.StringOf(answer.Json.Value, "value");
       }
 
       public void SetIniSetting(string name, string value)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         IniRefusalAsComException(ServerApi.Put(SettingsApi.Ini + "/" + name, "{\"value\":" + ServerApi.Quote(value) + "}"), "PUT " + SettingsApi.Ini + "/" + name);
       }
 
       public void DeleteIniSetting(string name)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoIniSettings);
+         IniRouteOrSkip();
+         IniRefusalAsComException(ServerApi.Delete(SettingsApi.Ini + "/" + name), "DELETE " + SettingsApi.Ini + "/" + name);
       }
 
+      /// <summary>The names one per line, joined with CRLF as the COM property joins them.</summary>
       public string IniSettingNames
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoIniSettings); }
+         get
+         {
+            IniRouteOrSkip();
+            var answer = ServerApi.Get(SettingsApi.Ini).Expect(200, "GET " + SettingsApi.Ini);
+            var names = ServerApi.Array(answer, "names").Select(n => n.GetString());
+            return string.Join("\r\n", names);
+         }
       }
 
       public int CrashSimulationMode
@@ -815,7 +885,7 @@ namespace hMailServer
 
       public string PublicFolderDiskName
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
+         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoPublicFolderDiskName); }
       }
 
       public void DisableAdministratorTOTP()
@@ -977,69 +1047,75 @@ namespace hMailServer
          set { NotOnThisServer.Ignore(NotOnThisServer.NoSettingsKey("mask_passwords_in_log", "logging"), value); }
       }
 
+      /// <summary>The device row of the logging group: unknown, sql or file.</summary>
       public eLogDevice Device
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoLogDeviceWrite);
+            switch (SettingsApi.GetString(SettingsApi.Logging, "device"))
+            {
+               case "sql": return eLogDevice.hLogDeviceSQL;
+               case "file": return eLogDevice.hLogDeviceFile;
+               default: return eLogDevice.hLogDeviceUnknown;
+            }
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoLogDeviceWrite, value); }
+         set
+         {
+            string word = value == eLogDevice.hLogDeviceSQL ? "sql" : value == eLogDevice.hLogDeviceFile ? "file" : "unknown";
+            SettingsApi.PutOrSkip(SettingsApi.Logging, "device", ServerApi.Quote(word), NotOnThisServer.NoLogDeviceWrite);
+         }
       }
    }
 
    /// <summary>
-   ///    The server's own directories. Only the log directory has a route
-   ///    (GET /api/v1/settings/logging reports it); the program, data and event
-   ///    directories are reported by nothing, and the fixtures that read them - to
-   ///    open hMailServer.ini, or to look at the message store - skip.
+   ///    The server's own directories, from GET /api/v1/settings/directories -
+   ///    the same seven InterfaceDirectories reports. A fixture reads them to
+   ///    open hMailServer.ini (ProgramDirectory, where the CI tree and the
+   ///    Windows bench both keep it) or to look at the message store
+   ///    (DataDirectory), which is why the tests run on the machine the server
+   ///    runs on.
    /// </summary>
    public class Directories
    {
-      public string LogDirectory => SettingsApi.GetString(SettingsApi.Logging, "directory");
-
-      public string ProgramDirectory
+      private static string Get(string key)
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
+         if (!ServerApi.HasRoute(SettingsApi.Directories, "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories);
+         return SettingsApi.GetString(SettingsApi.Directories, key);
       }
 
-      public string DataDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
-
-      public string EventDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
-
-      public string TempDirectory
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoServerDirectories); }
-      }
+      public string ProgramDirectory => Get("program");
+      public string DataDirectory => Get("data");
+      public string LogDirectory => Get("log");
+      public string EventDirectory => Get("event");
+      public string TempDirectory => Get("temp");
+      public string DatabaseDirectory => Get("database");
+      public string DBScriptDirectory => Get("db_scripts");
    }
 
    /// <summary>The event-handler scripting, which no REST route configures or runs.</summary>
+   /// <summary>
+   ///    Settings.Scripting over GET/PUT /api/v1/settings/scripting and the two
+   ///    POSTs beside it; the file-system object the COM script host exposes has
+   ///    no HTTP equivalent and skips.
+   /// </summary>
    public class Scripting
    {
       public bool Enabled
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting, value); }
+         get { return SettingsApi.ReadOrSkip(SettingsApi.Scripting, "enabled", NotOnThisServer.NoScripting).GetBoolean(); }
+         set { SettingsApi.PutOrSkip(SettingsApi.Scripting, "enabled", value ? "true" : "false", NotOnThisServer.NoScripting); }
       }
 
       public string Language
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoScripting, value); }
+         get { return SettingsApi.ReadOrSkip(SettingsApi.Scripting, "language", NotOnThisServer.NoScripting).GetString(); }
+         set { SettingsApi.PutOrSkip(SettingsApi.Scripting, "language", ServerApi.Quote(value ?? string.Empty), NotOnThisServer.NoScripting); }
       }
 
-      public string CurrentScriptFile
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting); }
-      }
+      public string CurrentScriptFile => SettingsApi.ReadOrSkip(SettingsApi.Scripting, "current_script_file", NotOnThisServer.NoScripting).GetString();
+
+      public string Directory => SettingsApi.ReadOrSkip(SettingsApi.Scripting, "directory", NotOnThisServer.NoScripting).GetString();
 
       public object FileSystemObject
       {
@@ -1049,12 +1125,17 @@ namespace hMailServer
 
       public void Reload()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
+         if (!ServerApi.HasRoute(SettingsApi.Scripting + "/reload", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoScripting);
+         ServerApi.Post(SettingsApi.Scripting + "/reload", "{}").Expect(200, "POST " + SettingsApi.Scripting + "/reload");
       }
 
       public string CheckSyntax()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting);
+         if (!ServerApi.HasRoute(SettingsApi.Scripting + "/check", "post"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoScripting);
+         var answer = ServerApi.Post(SettingsApi.Scripting + "/check", "{}").Expect(200, "POST " + SettingsApi.Scripting + "/check");
+         return ServerApi.StringOf(answer.Json.Value, "result") ?? string.Empty;
       }
    }
 
@@ -1084,53 +1165,43 @@ namespace hMailServer
       }
    }
 
+   /// <summary>Settings.Backup over GET/PUT /api/v1/settings/backup.</summary>
    public class Backup
    {
+      private static string Text(string key) => SettingsApi.ReadOrSkip(SettingsApi.Backup, key, NotOnThisServer.NoBackupSettings).GetString();
+      private static bool Flag(string key) => SettingsApi.ReadOrSkip(SettingsApi.Backup, key, NotOnThisServer.NoBackupSettings).GetBoolean();
+      private static void Put(string key, string json) => SettingsApi.PutOrSkip(SettingsApi.Backup, key, json, NotOnThisServer.NoBackupSettings);
+
       public string Destination
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
+         get { return Text("destination"); }
+         set { Put("destination", ServerApi.Quote(value ?? string.Empty)); }
       }
 
-      public string LogFile
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings); }
-      }
+      public string LogFile => Text("log_file");
 
       public bool BackupMessages
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
+         get { return Flag("backup_messages"); }
+         set { Put("backup_messages", value ? "true" : "false"); }
       }
 
       public bool BackupSettings
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
+         get { return Flag("backup_settings"); }
+         set { Put("backup_settings", value ? "true" : "false"); }
       }
 
       public bool BackupDomains
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
+         get { return Flag("backup_domains"); }
+         set { Put("backup_domains", value ? "true" : "false"); }
       }
 
       public bool CompressDestinationFiles
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoBackupSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoBackupSettings, value); }
+         get { return Flag("compress"); }
+         set { Put("compress", value ? "true" : "false"); }
       }
    }
 
@@ -1274,22 +1345,59 @@ namespace hMailServer
       }
    }
 
+   /// <summary>Settings.ServerMessages over GET /api/v1/settings/messages and PUT .../messages/{name}.</summary>
    public class ServerMessages
    {
+      private static List<JsonElement> All()
+      {
+         if (!ServerApi.HasRoute(SettingsApi.Messages, "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoServerMessages);
+         return ServerApi.Array(ServerApi.Get(SettingsApi.Messages).Expect(200, "GET " + SettingsApi.Messages));
+      }
+
+      private static ServerMessage From(JsonElement element)
+      {
+         return new ServerMessage
+         {
+            ID = ServerApi.LongOf(element, "id"),
+            Name = ServerApi.StringOf(element, "name"),
+            Text = ServerApi.StringOf(element, "text")
+         };
+      }
+
+      public int Count => All().Count;
+
+      [System.Runtime.CompilerServices.IndexerName("At")]
+      public ServerMessage this[int index] => From(All()[index]);
+
+      public ServerMessage get_Item(int index)
+      {
+         return From(All()[index]);
+      }
+
       public ServerMessage get_ItemByName(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoServerMessages);
+         var found = All().FirstOrDefault(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.OrdinalIgnoreCase));
+         if (found.ValueKind == JsonValueKind.Undefined)
+            throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
+         return From(found);
       }
    }
 
    public class ServerMessage
    {
+      public long ID { get; set; }
       public string Name { get; set; }
       public string Text { get; set; }
 
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoServerMessages);
+         if (!ServerApi.HasRoute(SettingsApi.Messages + "/{name}", "put"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoServerMessages);
+         var answer = ServerApi.Put(SettingsApi.Messages + "/" + Name, "{\"text\":" + ServerApi.Quote(Text ?? string.Empty) + "}");
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+         answer.Expect(200, "PUT " + SettingsApi.Messages + "/" + Name);
       }
    }
 
@@ -1907,9 +2015,15 @@ namespace hMailServer
          throw new InvalidOperationException("PUT /api/v1/me/filters answered " + answer.Status + ": " + answer.Body);
       }
 
+      /// <summary>POST /api/v1/sieve/evaluate: the same verdict, nothing delivered.</summary>
       public string EvaluateSieveScript(string script, string rawMessage)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoSieveEvaluate);
+         if (!ServerApi.HasRoute(SettingsApi.SieveEvaluate, "post"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoSieveEvaluate);
+         var answer = ServerApi.Post(SettingsApi.SieveEvaluate,
+            "{\"script\":" + ServerApi.Quote(script ?? string.Empty) + ",\"message\":" + ServerApi.Quote(rawMessage ?? string.Empty) + "}");
+         answer.Expect(200, "POST " + SettingsApi.SieveEvaluate);
+         return ServerApi.StringOf(answer.Json.Value, "result") ?? string.Empty;
       }
 
       public string GetMailServer(string address)
@@ -2000,14 +2114,32 @@ namespace hMailServer
    ///    dropping the change and letting the test assert on a server that never
    ///    received it.
    /// </summary>
+   /// <summary>
+   ///    A domain over /api/v1/domains: created with POST, changed with PUT
+   ///    /api/v1/domains/{domain}, which since the fifth wave of the route
+   ///    backlog takes every scalar InterfaceDomain saves, and a new name. A
+   ///    setter records what the fixture set; Save sends the create, and then a
+   ///    PUT of what was set, so that a field the fixture never touched keeps
+   ///    the server's own default rather than this object's. A domain read
+   ///    from the listing carries every value the entry shows.
+   /// </summary>
    public class Domain : RestBackedObject
    {
       internal bool Unsaved;
-
       private string _name;
       private string _savedName;
-      private bool _active = true;
-      private string _postmaster = string.Empty;
+
+      // What the fixture set since the last Save, as JSON values by API key.
+      private readonly Dictionary<string, string> _pending = new Dictionary<string, string>();
+
+      private void Pend(string key, string json)
+      {
+         _pending[key] = json;
+      }
+
+      private static string Q(string value) => ServerApi.Quote(value ?? string.Empty);
+      private static string B(bool value) => value ? "true" : "false";
+      private static string N(long value) => value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
       public string Name
       {
@@ -2020,16 +2152,18 @@ namespace hMailServer
          }
       }
 
+      private bool _active = true;
       public bool Active
       {
          get { return _active; }
          set { _active = value; }
       }
 
+      private string _postmaster = string.Empty;
       public string Postmaster
       {
          get { return _postmaster; }
-         set { _postmaster = value; }
+         set { _postmaster = value; Pend("postmaster", Q(value)); }
       }
 
       public long ID
@@ -2043,88 +2177,117 @@ namespace hMailServer
       public Accounts Accounts => new Accounts(Name);
       public Aliases Aliases => new Aliases(Name);
       public DistributionLists DistributionLists => new DistributionLists(Name);
-      public DomainAliases DomainAliases { get; } = new DomainAliases();
+      public DomainAliases DomainAliases => new DomainAliases(Name);
 
-      // What the COM object saves and PUT /api/v1/domains/{domain} does not take.
-      public bool DKIMSignEnabled { get { Unsupported("DKIMSignEnabled"); return false; } set { Unsupported("DKIMSignEnabled", value); } }
-      public string DKIMSelector { get { Unsupported("DKIMSelector"); return null; } set { Unsupported("DKIMSelector", value); } }
-      public string DKIMPrivateKeyFile { get { Unsupported("DKIMPrivateKeyFile"); return null; } set { Unsupported("DKIMPrivateKeyFile", value); } }
+      private int _maxMessageSize; public int MaxMessageSize { get { return _maxMessageSize; } set { _maxMessageSize = value; Pend("max_message_size_kb", N(value)); } }
+      private int _maxSize; public int MaxSize { get { return _maxSize; } set { _maxSize = value; Pend("max_size_mb", N(value)); } }
+      private int _maxAccountSize; public int MaxAccountSize { get { return _maxAccountSize; } set { _maxAccountSize = value; Pend("max_account_size_mb", N(value)); } }
+      private int _maxAccounts; public int MaxNumberOfAccounts { get { return _maxAccounts; } set { _maxAccounts = value; Pend("max_accounts", N(value)); } }
+      private int _maxAliases; public int MaxNumberOfAliases { get { return _maxAliases; } set { _maxAliases = value; Pend("max_aliases", N(value)); } }
+      private int _maxLists; public int MaxNumberOfDistributionLists { get { return _maxLists; } set { _maxLists = value; Pend("max_lists", N(value)); } }
+      private bool _maxAccountsEnabled; public bool MaxNumberOfAccountsEnabled { get { return _maxAccountsEnabled; } set { _maxAccountsEnabled = value; Pend("max_accounts_enabled", B(value)); } }
+      private bool _maxAliasesEnabled; public bool MaxNumberOfAliasesEnabled { get { return _maxAliasesEnabled; } set { _maxAliasesEnabled = value; Pend("max_aliases_enabled", B(value)); } }
+      private bool _maxListsEnabled; public bool MaxNumberOfDistributionListsEnabled { get { return _maxListsEnabled; } set { _maxListsEnabled = value; Pend("max_lists_enabled", B(value)); } }
+      private bool _plusAddressing; public bool PlusAddressingEnabled { get { return _plusAddressing; } set { _plusAddressing = value; Pend("plus_addressing_enabled", B(value)); } }
+      private string _plusChar = "+"; public string PlusAddressingCharacter { get { return _plusChar; } set { _plusChar = value; Pend("plus_addressing_character", Q(value)); } }
+      private bool _greylisting = true; public bool AntiSpamEnableGreylisting { get { return _greylisting; } set { _greylisting = value; Pend("use_greylisting", B(value)); } }
+      private bool _signatureEnabled; public bool SignatureEnabled { get { return _signatureEnabled; } set { _signatureEnabled = value; Pend("signature_enabled", B(value)); } }
+      private eDomainSignatureMethod _signatureMethod; public eDomainSignatureMethod SignatureMethod { get { return _signatureMethod; } set { _signatureMethod = value; Pend("signature_method", Q(SignatureMethodWord((int) value))); } }
+      private string _signaturePlain = string.Empty; public string SignaturePlainText { get { return _signaturePlain; } set { _signaturePlain = value; Pend("signature_plain_text", Q(value)); } }
+      private string _signatureHtml = string.Empty; public string SignatureHTML { get { return _signatureHtml; } set { _signatureHtml = value; Pend("signature_html", Q(value)); } }
+      private bool _signatureReplies; public bool AddSignaturesToReplies { get { return _signatureReplies; } set { _signatureReplies = value; Pend("signature_add_to_replies", B(value)); } }
+      private bool _signatureLocal; public bool AddSignaturesToLocalMail { get { return _signatureLocal; } set { _signatureLocal = value; Pend("signature_add_to_local_mail", B(value)); } }
+      private bool _dkim; public bool DKIMSignEnabled { get { return _dkim; } set { _dkim = value; Pend("dkim_enabled", B(value)); } }
+      private string _dkimSelector = string.Empty; public string DKIMSelector { get { return _dkimSelector; } set { _dkimSelector = value; Pend("dkim_selector", Q(value)); } }
+      private string _dkimKeyFile = string.Empty; public string DKIMPrivateKeyFile { get { return _dkimKeyFile; } set { _dkimKeyFile = value; Pend("dkim_private_key_file", Q(value)); } }
+      private eDKIMAlgorithm _dkimAlgorithm = eDKIMAlgorithm.eSHA256; public eDKIMAlgorithm DKIMSigningAlgorithm { get { return _dkimAlgorithm; } set { _dkimAlgorithm = value; Pend("dkim_signing_algorithm", Q(value == eDKIMAlgorithm.eSHA1 ? "sha1" : "sha256")); } }
+      private int _retention; public int MessageRetentionDays { get { return _retention; } set { _retention = value; Pend("message_retention_days", N(value)); } }
+      private string _relayHost = string.Empty; public string RelayHost { get { return _relayHost; } set { _relayHost = value; Pend("relay_host", Q(value)); } }
+      private int _relayPort; public int RelayPort { get { return _relayPort; } set { _relayPort = value; Pend("relay_port", N(value)); } }
+      private bool _relayAuth; public bool RelayRequiresAuthentication { get { return _relayAuth; } set { _relayAuth = value; Pend("relay_requires_auth", B(value)); } }
+      private string _relayUser = string.Empty; public string RelayUsername { get { return _relayUser; } set { _relayUser = value; Pend("relay_username", Q(value)); } }
+      private string _relayPassword; public string RelayPassword { get { return _relayPassword; } set { _relayPassword = value; Pend("relay_password", Q(value)); } }
+      private eConnectionSecurity _relaySecurity = eConnectionSecurity.eCSNone; public eConnectionSecurity RelayConnectionSecurity { get { return _relaySecurity; } set { _relaySecurity = value; Pend("relay_connection_security", Q(RegressionTests.Shared.TestSetup.ConnectionSecurityName(value))); } }
+      private bool _vacationOn; public bool VacationMessageIsOn { get { return _vacationOn; } set { _vacationOn = value; Pend("vacation_enabled", B(value)); } }
+      private string _vacationSubject = string.Empty; public string VacationSubject { get { return _vacationSubject; } set { _vacationSubject = value; Pend("vacation_subject", Q(value)); } }
+      private string _vacationMessage = string.Empty; public string VacationMessage { get { return _vacationMessage; } set { _vacationMessage = value; Pend("vacation_message", Q(value)); } }
+
+      // What the route does not carry.
       public string DKIMSecondarySelector { get { Unsupported("DKIMSecondarySelector"); return null; } set { Unsupported("DKIMSecondarySelector", value); } }
       public string DKIMSecondaryPrivateKeyFile { get { Unsupported("DKIMSecondaryPrivateKeyFile"); return null; } set { Unsupported("DKIMSecondaryPrivateKeyFile", value); } }
-      public int SignatureMethod { get { Unsupported("SignatureMethod"); return 0; } set { Unsupported("SignatureMethod", value); } }
-      public bool SignatureEnabled { get { Unsupported("SignatureEnabled"); return false; } set { Unsupported("SignatureEnabled", value); } }
-      public string SignaturePlainText { get { Unsupported("SignaturePlainText"); return null; } set { Unsupported("SignaturePlainText", value); } }
-      public string SignatureHTML { get { Unsupported("SignatureHTML"); return null; } set { Unsupported("SignatureHTML", value); } }
-      public bool AddSignaturesToLocalMail { get { Unsupported("AddSignaturesToLocalMail"); return false; } set { Unsupported("AddSignaturesToLocalMail", value); } }
-      public int MaxMessageSize { get { Unsupported("MaxMessageSize"); return 0; } set { Unsupported("MaxMessageSize", value); } }
-      public int MaxAccountSize { get { Unsupported("MaxAccountSize"); return 0; } set { Unsupported("MaxAccountSize", value); } }
-      public int MaxNumberOfAccounts { get { Unsupported("MaxNumberOfAccounts"); return 0; } set { Unsupported("MaxNumberOfAccounts", value); } }
-      public int MaxNumberOfAliases { get { Unsupported("MaxNumberOfAliases"); return 0; } set { Unsupported("MaxNumberOfAliases", value); } }
-      public int MaxNumberOfDistributionLists { get { Unsupported("MaxNumberOfDistributionLists"); return 0; } set { Unsupported("MaxNumberOfDistributionLists", value); } }
-      public int MessageRetentionDays { get { Unsupported("MessageRetentionDays"); return 0; } set { Unsupported("MessageRetentionDays", value); } }
-      public string RelayHost { get { Unsupported("RelayHost"); return null; } set { Unsupported("RelayHost", value); } }
-      public int RelayPort { get { Unsupported("RelayPort"); return 0; } set { Unsupported("RelayPort", value); } }
-      public bool VacationMessageIsOn { get { Unsupported("VacationMessageIsOn"); return false; } set { Unsupported("VacationMessageIsOn", value); } }
       public string ADDomainName { get { Unsupported("ADDomainName"); return null; } set { Unsupported("ADDomainName", value); } }
-      public eDKIMAlgorithm DKIMSigningAlgorithm
-      {
-         get { Unsupported("DKIMSigningAlgorithm"); return eDKIMAlgorithm.eSHA256; }
-         set { Unsupported("DKIMSigningAlgorithm", value); }
-      }
-      public bool AntiSpamEnableGreylisting
-      {
-         get { Unsupported("AntiSpamEnableGreylisting"); return false; }
-         set { Unsupported("AntiSpamEnableGreylisting", value); }
-      }
-      public bool MaxNumberOfAccountsEnabled
-      {
-         get { Unsupported("MaxNumberOfAccountsEnabled"); return false; }
-         set { Unsupported("MaxNumberOfAccountsEnabled", value); }
-      }
-      public bool MaxNumberOfAliasesEnabled
-      {
-         get { Unsupported("MaxNumberOfAliasesEnabled"); return false; }
-         set { Unsupported("MaxNumberOfAliasesEnabled", value); }
-      }
-      public bool MaxNumberOfDistributionListsEnabled
-      {
-         get { Unsupported("MaxNumberOfDistributionListsEnabled"); return false; }
-         set { Unsupported("MaxNumberOfDistributionListsEnabled", value); }
-      }
-      public bool MaxMessageSizeEnabled
-      {
-         get { Unsupported("MaxMessageSizeEnabled"); return false; }
-         set { Unsupported("MaxMessageSizeEnabled", value); }
-      }
-      public bool MaxAccountSizeEnabled
-      {
-         get { Unsupported("MaxAccountSizeEnabled"); return false; }
-         set { Unsupported("MaxAccountSizeEnabled", value); }
-      }
-      public bool RelayRequiresAuthentication
-      {
-         get { Unsupported("RelayRequiresAuthentication"); return false; }
-         set { Unsupported("RelayRequiresAuthentication", value); }
-      }
-      public string VacationSubject
-      {
-         get { Unsupported("VacationSubject"); return null; }
-         set { Unsupported("VacationSubject", value); }
-      }
-      public string VacationMessage
-      {
-         get { Unsupported("VacationMessage"); return null; }
-         set { Unsupported("VacationMessage", value); }
-      }
+      public bool MaxMessageSizeEnabled { get { Unsupported("MaxMessageSizeEnabled"); return false; } set { Unsupported("MaxMessageSizeEnabled", value); } }
+      public bool MaxAccountSizeEnabled { get { Unsupported("MaxAccountSizeEnabled"); return false; } set { Unsupported("MaxAccountSizeEnabled", value); } }
+      public bool EnableLimitations { get { Unsupported("EnableLimitations"); return false; } set { Unsupported("EnableLimitations", value); } }
 
       public void DKIMPromoteSecondary()
       {
          Unsupported("DKIMPromoteSecondary");
          SkipIfAnythingUnsupported("PUT /api/v1/domains/{domain}");
       }
-      public bool EnableLimitations { get { Unsupported("EnableLimitations"); return false; } set { Unsupported("EnableLimitations", value); } }
-      public bool PlusAddressingEnabled { get { Unsupported("PlusAddressingEnabled"); return false; } set { Unsupported("PlusAddressingEnabled", value); } }
-      public string PlusAddressingCharacter { get { Unsupported("PlusAddressingCharacter"); return null; } set { Unsupported("PlusAddressingCharacter", value); } }
+
+      private static string SignatureMethodWord(int method)
+      {
+         switch (method)
+         {
+            case 1: return "set_if_not_specified";
+            case 2: return "overwrite";
+            case 3: return "append";
+            default: return "unknown";
+         }
+      }
+
+      private static int SignatureMethodOf(string word)
+      {
+         switch (word)
+         {
+            case "set_if_not_specified": return 1;
+            case "overwrite": return 2;
+            case "append": return 3;
+            default: return 0;
+         }
+      }
+
+      /// <summary>Every value the listing entry shows, without marking any of it as set.</summary>
+      internal void Read(JsonElement element)
+      {
+         _name = ServerApi.StringOf(element, "name");
+         _savedName = _name;
+         _active = ServerApi.FlagOf(element, "active");
+         _postmaster = ServerApi.StringOf(element, "postmaster") ?? string.Empty;
+         _maxMessageSize = (int) ServerApi.LongOf(element, "max_message_size_kb");
+         _maxSize = (int) ServerApi.LongOf(element, "max_size_mb");
+         _maxAccountSize = (int) ServerApi.LongOf(element, "max_account_size_mb");
+         _maxAccounts = (int) ServerApi.LongOf(element, "max_accounts");
+         _maxAliases = (int) ServerApi.LongOf(element, "max_aliases");
+         _maxLists = (int) ServerApi.LongOf(element, "max_lists");
+         _maxAccountsEnabled = ServerApi.FlagOf(element, "max_accounts_enabled");
+         _maxAliasesEnabled = ServerApi.FlagOf(element, "max_aliases_enabled");
+         _maxListsEnabled = ServerApi.FlagOf(element, "max_lists_enabled");
+         _plusAddressing = ServerApi.FlagOf(element, "plus_addressing_enabled");
+         _plusChar = ServerApi.StringOf(element, "plus_addressing_character") ?? "+";
+         _greylisting = ServerApi.FlagOf(element, "use_greylisting");
+         _signatureEnabled = ServerApi.FlagOf(element, "signature_enabled");
+         _signatureMethod = (eDomainSignatureMethod) SignatureMethodOf(ServerApi.StringOf(element, "signature_method"));
+         _signaturePlain = ServerApi.StringOf(element, "signature_plain_text") ?? string.Empty;
+         _signatureHtml = ServerApi.StringOf(element, "signature_html") ?? string.Empty;
+         _signatureReplies = ServerApi.FlagOf(element, "signature_add_to_replies");
+         _signatureLocal = ServerApi.FlagOf(element, "signature_add_to_local_mail");
+         _dkim = ServerApi.FlagOf(element, "dkim_enabled");
+         _dkimSelector = ServerApi.StringOf(element, "dkim_selector") ?? string.Empty;
+         _dkimKeyFile = ServerApi.StringOf(element, "dkim_private_key_file") ?? string.Empty;
+         _dkimAlgorithm = ServerApi.StringOf(element, "dkim_signing_algorithm") == "sha1" ? eDKIMAlgorithm.eSHA1 : eDKIMAlgorithm.eSHA256;
+         _retention = (int) ServerApi.LongOf(element, "message_retention_days");
+         _relayHost = ServerApi.StringOf(element, "relay_host") ?? string.Empty;
+         _relayPort = (int) ServerApi.LongOf(element, "relay_port");
+         _relayAuth = ServerApi.FlagOf(element, "relay_requires_auth");
+         _relayUser = ServerApi.StringOf(element, "relay_username") ?? string.Empty;
+         _relaySecurity = TCPIPPort.SecurityOf(ServerApi.StringOf(element, "relay_connection_security"));
+         _vacationOn = ServerApi.FlagOf(element, "vacation_enabled");
+         _vacationSubject = ServerApi.StringOf(element, "vacation_subject") ?? string.Empty;
+         _vacationMessage = ServerApi.StringOf(element, "vacation_message") ?? string.Empty;
+         _pending.Clear();
+      }
 
       public void Save()
       {
@@ -2136,35 +2299,35 @@ namespace hMailServer
                NotOnThisServer.Ignore(NotOnThisServer.NoDomainCreate);
 
             var created = ServerApi.Post("/api/v1/domains",
-               "{\"name\":" + ServerApi.Quote(Name) + ",\"active\":" + (Active ? "true" : "false") +
-               ",\"postmaster\":" + ServerApi.Quote(Postmaster ?? string.Empty) + "}");
-
+               "{\"name\":" + Q(Name) + ",\"active\":" + B(Active) + ",\"postmaster\":" + Q(Postmaster) + "}");
             if (created.Status == 400 || created.Status == 409)
                throw new System.Runtime.InteropServices.COMException("Failed to save object. " + created.Error);
-
             created.Expect(201, "POST /api/v1/domains " + Name);
             _savedName = Name;
             Unsaved = false;
-            return;
+            _pending.Remove("postmaster");
+            if (_pending.Count == 0)
+               return;
          }
 
          if (!ServerApi.HasRoute("/api/v1/domains/{domain}", "put"))
             NotOnThisServer.Ignore(NotOnThisServer.NoDomainUpdate);
 
-         // The route is addressed by name and says so: "The name cannot be changed
-         // here". A fixture that renames a domain is asking for something it does
-         // not do, and saying that is better than a 404 on the new name.
-         if (!string.Equals(_savedName, Name, StringComparison.OrdinalIgnoreCase))
+         bool renamed = !string.Equals(_savedName, Name, StringComparison.OrdinalIgnoreCase);
+         if (renamed && !ServerApi.HasRoute("/api/v1/domains/{domain}/domain-aliases", "get"))
             NotOnThisServer.Ignore(NotOnThisServer.NoDomainRename);
 
-         var answer = ServerApi.Put("/api/v1/domains/" + Name,
-            "{\"active\":" + (Active ? "true" : "false") +
-            ",\"postmaster\":" + ServerApi.Quote(Postmaster ?? string.Empty) + "}");
+         var fields = new List<string> { "\"active\":" + B(Active) };
+         if (renamed)
+            fields.Add("\"name\":" + Q(Name));
+         foreach (var pair in _pending)
+            fields.Add(ServerApi.Quote(pair.Key) + ":" + pair.Value);
 
+         var answer = ServerApi.Put("/api/v1/domains/" + _savedName, "{" + string.Join(",", fields) + "}");
          if (answer.Status == 400)
             throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
-
-         answer.Expect(200, "PUT /api/v1/domains/" + Name);
+         answer.Expect(200, "PUT /api/v1/domains/" + _savedName);
+         Read(answer.Json.Value);
       }
 
       public void Delete()
@@ -2383,6 +2546,7 @@ namespace hMailServer
                     ",\"number_of_tries\":" + NumberOfTries +
                     ",\"minutes_between_try\":" + MinutesBetweenTry +
                     ",\"all_addresses\":" + (AllAddresses ? "true" : "false") +
+                   ",\"addresses\":[" + string.Join(",", AddressList.Select(a => ServerApi.Quote(a))) + "]" +
                     ",\"treat_recipient_as_local_domain\":" + (TreatRecipientAsLocalDomain ? "true" : "false") +
                     ",\"treat_sender_as_local_domain\":" + (TreatSenderAsLocalDomain ? "true" : "false") +
                     ",\"relayer_requires_authentication\":" + (RelayerRequiresAuth ? "true" : "false") +
@@ -2416,42 +2580,98 @@ namespace hMailServer
          ServerApi.Delete("/api/v1/routes/" + ID).Expect(200, "DELETE /api/v1/routes/" + ID);
       }
 
-      public RouteAddresses Addresses
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoRouteAddresses); }
-      }
+      /// <summary>The addresses the route carries, kept here and sent whole with every Save.</summary>
+      internal List<string> AddressList = new List<string>();
+
+      public RouteAddresses Addresses => new RouteAddresses(this);
    }
 
+   /// <summary>
+   ///    Route.Addresses over the route's own body: the REST route carries its
+   ///    address list in the document that creates or replaces it, so adding or
+   ///    removing an address is a Save of the route with the list changed.
+   /// </summary>
    public class RouteAddresses
    {
-      public int Count => 0;
+      private readonly Route _route;
 
-      public RouteAddress Add() { throw NotOnThisServer.Skipped("adds a RouteAddress, which no REST route carries yet"); }
+      internal RouteAddresses(Route route)
+      {
+         _route = route;
+      }
+
+      public int Count => _route.AddressList.Count;
+
+      public RouteAddress Add()
+      {
+         return new RouteAddress(_route);
+      }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public RouteAddress this[int index] => throw NotOnThisServer.Skipped("indexes a RouteAddress, which no REST route carries yet");
+      public RouteAddress this[int index] => new RouteAddress(_route) { Address = _route.AddressList[index], ID = index + 1 };
 
       public RouteAddress get_Item(int index)
       {
-         return null;
+         return this[index];
+      }
+
+      public RouteAddress get_ItemByName(string address)
+      {
+         var found = _route.AddressList.FirstOrDefault(a => string.Equals(a, address, StringComparison.OrdinalIgnoreCase));
+         return found == null ? null : new RouteAddress(_route) { Address = found, ID = _route.AddressList.IndexOf(found) + 1 };
       }
 
       public void Clear()
       {
+         _route.AddressList.Clear();
+         _route.Save();
       }
 
       public void DeleteByDBID(long id)
       {
+         if (id >= 1 && id <= _route.AddressList.Count)
+         {
+            _route.AddressList.RemoveAt((int) id - 1);
+            _route.Save();
+         }
       }
    }
 
    public class RouteAddress
    {
+      private readonly Route _route;
+
+      internal RouteAddress(Route route)
+      {
+         _route = route;
+      }
+
+      /// <summary>One-based position in the route's list; the API has no id for an address.</summary>
       public long ID { get; set; }
       public string Address { get; set; }
 
       public void Save()
       {
+         if (ID == 0)
+         {
+            _route.AddressList.Add(Address);
+            ID = _route.AddressList.Count;
+         }
+         else
+         {
+            _route.AddressList[(int) ID - 1] = Address;
+         }
+         _route.Save();
+      }
+
+      public void Delete()
+      {
+         if (ID >= 1 && ID <= _route.AddressList.Count)
+         {
+            _route.AddressList.RemoveAt((int) ID - 1);
+            ID = 0;
+            _route.Save();
+         }
       }
    }
 
@@ -2630,7 +2850,8 @@ namespace hMailServer
 
       public AccountRules Rules { get; } = new AccountRules();
 
-      public FetchAccounts FetchAccounts { get; } = new FetchAccounts();
+      /// <summary>The account's external accounts, under its address on the API.</summary>
+      public FetchAccounts FetchAccounts => new FetchAccounts(this);
 
       public AppPasswords AppPasswords { get; } = new AppPasswords();
 

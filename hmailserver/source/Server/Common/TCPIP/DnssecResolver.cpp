@@ -626,6 +626,26 @@ namespace HM
          return true;
       }
 
+      // The receive and send deadlines of a query socket. Winsock takes the
+      // milliseconds as a DWORD; POSIX takes a timeval, and refuses the DWORD
+      // with EINVAL because it is too short - which left the socket with no
+      // deadline at all, and a name server that did not answer held the lookup
+      // thread for ever. That is what the first Linux run of the suite's fake
+      // zone found: every lookup queue thread stuck in recvfrom, StopServers
+      // waiting on them at each reinitialise, and the SMTP banner behind them.
+      void SetSocketTimeouts(SOCKET querySocket)
+      {
+#ifdef HM_PLATFORM_POSIX
+         struct timeval timeout;
+         timeout.tv_sec = DnsTimeoutMilliseconds / 1000;
+         timeout.tv_usec = (DnsTimeoutMilliseconds % 1000) * 1000;
+#else
+         DWORD timeout = DnsTimeoutMilliseconds;
+#endif
+         setsockopt(querySocket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
+         setsockopt(querySocket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+      }
+
       bool RunUdpQuery(const sockaddr_in &server, const std::vector<unsigned char> &query,
                        std::vector<unsigned char> &response, bool &truncated)
       {
@@ -635,9 +655,7 @@ namespace HM
          if (udpSocket == INVALID_SOCKET)
             return false;
 
-         DWORD timeout = DnsTimeoutMilliseconds;
-         setsockopt(udpSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-         setsockopt(udpSocket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+         SetSocketTimeouts(udpSocket);
 
          bool succeeded = false;
 
@@ -683,9 +701,7 @@ namespace HM
          if (tcpSocket == INVALID_SOCKET)
             return false;
 
-         DWORD timeout = DnsTimeoutMilliseconds;
-         setsockopt(tcpSocket, SOL_SOCKET, SO_RCVTIMEO, (const char*) &timeout, sizeof(timeout));
-         setsockopt(tcpSocket, SOL_SOCKET, SO_SNDTIMEO, (const char*) &timeout, sizeof(timeout));
+         SetSocketTimeouts(tcpSocket);
 
          bool succeeded = false;
 

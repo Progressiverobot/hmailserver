@@ -74,6 +74,7 @@ namespace HM
    class Account;
    class Domain;
    class Rule;
+   class SecurityRange;
    class IMAPFolder;
    class IMAPFolders;
    class Message;
@@ -271,6 +272,25 @@ namespace HM
          RouteSettingsAntiSpamPut,
          RouteSettingsLoggingGet,
          RouteSettingsLoggingPut,
+         RouteSettingsDirectoriesGet,
+         RouteIniSettingList,
+         RouteIniSettingGet,
+         RouteIniSettingPut,
+         RouteIniSettingDelete,
+         RouteLogonFailuresClear,
+         RouteSettingsScriptingGet,
+         RouteSettingsScriptingPut,
+         RouteScriptingReload,
+         RouteScriptingCheck,
+         RouteSettingsBackupGet,
+         RouteSettingsBackupPut,
+         RouteServerMessageList,
+         RouteServerMessagePut,
+         RouteSieveEvaluate,
+         RouteIpRangeUpdate,
+         RouteDomainAliasList,
+         RouteDomainAliasCreate,
+         RouteDomainAliasDelete,
          RouteRuleCreate,
          RouteRuleUpdate,
          RouteRuleDelete,
@@ -287,6 +307,12 @@ namespace HM
          RouteAliasCreate,
          RouteAliasDelete,
          RouteAccountUpdate,
+         RouteFetchAccountList,
+         RouteFetchAccountCreate,
+         RouteFetchAccountGet,
+         RouteFetchAccountUpdate,
+         RouteFetchAccountDelete,
+         RouteFetchAccountDownload,
          RouteServerReinitialize,
          RouteOpenApi
       };
@@ -304,6 +330,7 @@ namespace HM
          int attachment_index;    // which attachment of a message, for the download route
          __int64 record_id;       // a rule, certificate, port or route id, for the write routes that name one
          AnsiString query;        // the part after "?", for the routes that take one
+         AnsiString name;         // a second path segment naming a member of the resource (a domain alias under its domain, a server message)
       };
 
       // One record in the API key store. Never holds the clear-text token.
@@ -715,6 +742,28 @@ namespace HM
       HttpResponse HandleSettingsLogging_();
       HttpResponse HandleSettingsLoggingPut_(const AnsiString &requestBody);
       static AnsiString OpenApiSettingsPaths_();
+      // The Linux suite's route backlog, wave A: the directories the server
+      // runs in, the [Settings] section of hMailServer.ini, and the
+      // logon-failure list - what Settings.Directories, GetIniSetting /
+      // SetIniSetting / DeleteIniSetting / IniSettingNames and
+      // ClearLogonFailureList answer over COM. All in RestApiSettings.cpp.
+      HttpResponse HandleSettingsDirectories_();
+      HttpResponse HandleIniSettingList_();
+      HttpResponse HandleIniSettingGet_(const AnsiString &name);
+      HttpResponse HandleIniSettingPut_(const AnsiString &name, const AnsiString &requestBody);
+      HttpResponse HandleIniSettingDelete_(const AnsiString &name);
+      HttpResponse HandleLogonFailuresClear_();
+      // Wave E: the scripting and backup groups, the server messages and the
+      // Sieve evaluation (RestApiSettings.cpp).
+      HttpResponse HandleSettingsScripting_();
+      HttpResponse HandleSettingsScriptingPut_(const AnsiString &requestBody);
+      HttpResponse HandleScriptingReload_();
+      HttpResponse HandleScriptingCheck_();
+      HttpResponse HandleSettingsBackup_();
+      HttpResponse HandleSettingsBackupPut_(const AnsiString &requestBody);
+      HttpResponse HandleServerMessageList_();
+      HttpResponse HandleServerMessagePut_(const AnsiString &name, const AnsiString &requestBody);
+      HttpResponse HandleSieveEvaluate_(const AnsiString &requestBody);
       HttpResponse HandleCreateRule_(const AnsiString &requestBody);
       HttpResponse HandleUpdateRule_(__int64 ruleId, const AnsiString &requestBody);
       HttpResponse HandleDeleteRule_(__int64 ruleId);
@@ -736,6 +785,24 @@ namespace HM
       HttpResponse HandleCreateAlias_(const String &domainName, const AnsiString &requestBody);
       HttpResponse HandleDeleteAlias_(const String &address);
       HttpResponse HandleUpdateAccount_(const Caller &caller, const String &address, const AnsiString &requestBody);
+      // The external (fetch) accounts of an account, under its address
+      // (RestApiFetchAccounts.cpp): what Account.FetchAccounts does over COM.
+      HttpResponse HandleListFetchAccounts_(const String &address);
+      HttpResponse HandleCreateFetchAccount_(const String &address, const AnsiString &requestBody);
+      HttpResponse HandleGetFetchAccount_(const String &address, __int64 fetchAccountId);
+      HttpResponse HandleUpdateFetchAccount_(const String &address, __int64 fetchAccountId, const AnsiString &requestBody);
+      HttpResponse HandleDeleteFetchAccount_(const String &address, __int64 fetchAccountId);
+      HttpResponse HandleDownloadFetchAccount_(const String &address, __int64 fetchAccountId);
+      static AnsiString OpenApiFetchAccountsPaths_();
+      // The domain whole, the domain aliases and the IP range update
+      // (RestApiAdministration.cpp, which also defines DomainEntryJson_ and
+      // HandleUpdateDomain_).
+      HttpResponse HandleListDomainAliases_(const String &domainName);
+      HttpResponse HandleCreateDomainAlias_(const String &domainName, const AnsiString &requestBody);
+      HttpResponse HandleDeleteDomainAlias_(const String &domainName, const String &aliasName);
+      HttpResponse HandleUpdateIpRange_(__int64 rangeId, const AnsiString &requestBody);
+      static AnsiString IpRangeEntryJson_(const std::shared_ptr<SecurityRange> &range);
+      static AnsiString OpenApiAdministrationPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);

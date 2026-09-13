@@ -75,8 +75,19 @@ namespace RegressionTests.Shared
       public const string NoAccountMaxSize =
          "needs an account with a maximum size, which POST /api/v1/domains/{domain}/accounts does not set";
 
+      /// <summary>
+      ///    The event handlers are VBScript or JScript, run by Windows Active
+      ///    Scripting; this build has no script engine and says so when a script
+      ///    is loaded. A test that needs a handler to run cannot run here.
+      /// </summary>
+      public const string NoScriptEngine =
+         "needs the event-handler script to run, and this build has no script engine - VBScript and JScript are Windows Active Scripting engines with no equivalent on this platform";
+
+      public const string NoGssapi =
+         "needs SASL GSSAPI, which is SSPI on Windows and is not offered by this build";
+
       public const string NoSieveEvaluate =
-         "needs Utilities.EvaluateSieveScript, a COM-only call with no REST equivalent";
+         "needs Utilities.EvaluateSieveScript, and this server's REST API has no POST /api/v1/sieve/evaluate (it arrived after 6.3.2)";
 
       public const string NoMailServerLookup =
          "needs Utilities.GetMailServer, a COM-only call with no REST equivalent";
@@ -84,13 +95,16 @@ namespace RegressionTests.Shared
       // ---- What wave 164's survey found the REST API has no route for ----
 
       public const string NoServerDirectories =
-         "reads Settings.Directories - the server's program, data or event directory - and no REST route reports them: GET /api/v1/settings carries no directories and GET /api/v1/settings/logging carries only the log directory";
+         "reads Settings.Directories, and this server's REST API has no GET /api/v1/settings/directories (it arrived after 6.3.2)";
 
       public const string NoIniSettings =
-         "reads or writes hMailServer.ini through Settings.GetIniSetting/SetIniSetting/DeleteIniSetting, and no REST route reaches the INI";
+         "reads or writes hMailServer.ini through Settings.GetIniSetting/SetIniSetting/DeleteIniSetting, and this server's REST API has no /api/v1/settings/ini (it arrived after 6.3.2)";
 
       public const string NoLogonFailureList =
-         "needs Settings.ClearLogonFailureList, and no REST route clears the server's logon-failure list";
+         "needs Settings.ClearLogonFailureList, and this server's REST API has no POST /api/v1/settings/logon-failures/clear (it arrived after 6.3.2)";
+
+      public const string NoPublicFolderDiskName =
+         "reads Settings.PublicFolderDiskName, which no REST route reports";
 
       public const string NoAdministratorPassword =
          "needs Settings.SetAdministratorPassword, and no REST route sets the administrator password";
@@ -99,7 +113,7 @@ namespace RegressionTests.Shared
          "needs Settings.SetSMTPRelayerPassword, and PUT /api/v1/settings does not take the relayer password";
 
       public const string NoScripting =
-         "needs the server's event-handler scripting (Settings.Scripting), which no REST route configures, reloads or checks";
+         "needs the server's event-handler scripting (Settings.Scripting), and this server's REST API has no /api/v1/settings/scripting (it arrived after 6.3.2)";
 
       public const string NoCrashSimulation =
          "needs Settings.CrashSimulationMode, the COM-only switch that makes the server fault on purpose";
@@ -120,10 +134,10 @@ namespace RegressionTests.Shared
          "needs the live log, a COM callback the server pushes to the Control Panel, which HTTP has no equivalent of";
 
       public const string NoLogDeviceWrite =
-         "sets Logging.Device, and PUT /api/v1/settings/logging does not take the log device";
+         "sets Logging.Device, and this server's PUT /api/v1/settings/logging does not take the log device";
 
       public const string NoBackupSettings =
-         "needs the backup settings written (Settings.Backup), and the REST API only reports a backup through GET /api/v1/backup";
+         "needs the backup settings (Settings.Backup) or the backup run, and this server's REST API has no /api/v1/settings/backup (it arrived after 6.3.2) - the run itself is POST /api/v1/backup";
 
       public const string NoCacheControl =
          "needs Settings.Cache - the server's domain and account caches - which no REST route reads or clears";
@@ -135,7 +149,7 @@ namespace RegressionTests.Shared
          "needs Settings.Groups, and no REST route carries the account groups";
 
       public const string NoServerMessages =
-         "needs Settings.ServerMessages, and no REST route carries the server's message texts";
+         "needs Settings.ServerMessages, and this server's REST API has no /api/v1/settings/messages (it arrived after 6.3.2)";
 
       public const string NoMessageIndexing =
          "needs Settings.MessageIndexing, and no REST route switches indexing on or runs it";
@@ -177,7 +191,7 @@ namespace RegressionTests.Shared
          "names a file with a backslash in its path, which is a directory separator only on Windows";
 
       public const string NoDomainRename =
-         "renames a domain, and PUT /api/v1/domains/{domain} takes active and postmaster only - the route says of itself that the name cannot be changed there";
+         "renames a domain, and this server's PUT /api/v1/domains/{domain} takes active and postmaster only (the name arrived after 6.3.2)";
 
       public const string NoAccountUpdate =
          "changes an account, and this server's REST API has no PUT /api/v1/accounts/{address}";
@@ -189,7 +203,7 @@ namespace RegressionTests.Shared
          "needs a distribution list as an object - its mode, its authentication requirement or its recipients - and the REST API creates and deletes a list but carries none of those";
 
       public const string NoDomainAliases =
-         "needs a domain alias, and no REST route lists, creates or deletes one";
+         "needs a domain alias, and this server's REST API has no /api/v1/domains/{domain}/domain-aliases (it arrived after 6.3.2)";
 
       public const string NoPortCreate =
          "needs a TCP/IP port, and this server's REST API has no POST /api/v1/ports";
@@ -197,11 +211,14 @@ namespace RegressionTests.Shared
       public const string NoPortDefaults =
          "needs TCPIPPorts.SetDefault - every listener replaced by the installer's three, on ports 25, 110 and 143 - which no REST route does, and which would move this server onto privileged ports";
 
+      public const string StandardPortNumbers =
+         "reads the SRV records the server derives from the port NUMBERS - 25 is never advertised, 587 is preferred for submission - and this bench's listeners are on high ports, so its MX port is not 25 and the server advertises it as submission";
+
       public const string NoIpRangeCreate =
          "needs an IP range, and this server's REST API has no POST /api/v1/ipranges";
 
       public const string NoIpRangeUpdate =
-         "changes an IP range that already exists, and the REST API has GET, POST and DELETE for /api/v1/ipranges but no PUT";
+         "changes an IP range that already exists, and this server's REST API has no PUT /api/v1/ipranges/{id} (it arrived after 6.3.2)";
 
       public const string NoIpRangeDefaults =
          "needs SecurityRanges.SetDefault, which no REST route does";
@@ -213,7 +230,7 @@ namespace RegressionTests.Shared
          "changes a certificate that already exists, and the REST API has POST and DELETE for certificates but no PUT";
 
       public const string NoRouteAddresses =
-         "needs a route's address list as an object, and the REST API takes the addresses only in the body that creates or replaces the route";
+         "needs a route's address list as an object, and this server's REST API has no route write surface to carry it";
 
       public const string NoRuleCreate =
          "needs a global rule, and this server's REST API has no POST /api/v1/rules";
@@ -243,7 +260,16 @@ namespace RegressionTests.Shared
          "needs a public folder created, listed or deleted, and the REST API's folder routes reach the signed-in account's own mailbox only - the public namespace has no route";
 
       public const string NoFetchAccounts =
-         "needs external (fetch) accounts, and no REST route carries them";
+         "needs external (fetch) accounts, and this server's REST API has no /api/v1/accounts/{address}/fetch-accounts (it arrived after 6.3.2)";
+
+      /// <summary>
+      ///    The REST fixtures ask for the listener through Shared/RestListener, which
+      ///    answers the suite's own where HMTEST_REST_PORT names one. Two fixtures
+      ///    are about the listener's binding itself - its address, its TLS - and
+      ///    have to rebind the one this suite is talking to; they are skipped.
+      /// </summary>
+      public const string RebindsTheRestListener =
+         "rebinds the REST listener - to another address, or with a certificate - and that listener is the one this suite is talking to";
 
       public const string NoAppPasswords =
          "needs an account's application passwords, and no REST route carries them";
@@ -285,7 +311,7 @@ namespace RegressionTests.Shared
          "needs an IMAP folder's access-control list, and no REST route reads or writes one";
 
       public const string NoServerRestart =
-         "restarts the server process, which it does because the server reads hMailServer.ini only at start; POST /api/v1/server/reinitialize restarts the services inside the same process and does not re-read the INI, so it is not the same thing";
+         "needs the server restarted so that it reads hMailServer.ini again, and this server's REST API has no POST /api/v1/server/reinitialize";
 
       public const string NoMessageObject =
          "needs a message as a COM object - its file on disk, its headers, its recipients - and the REST message routes serve an account's own messages only, without those";
@@ -336,9 +362,20 @@ namespace RegressionTests.Shared
       /// </summary>
       private static readonly Dictionary<string, string> Registry = new Dictionary<string, string>
       {
-         { "RegressionTests.Sieve.SieveEvaluation", NoSieveEvaluate },
-         { "RegressionTests.Sieve.SieveExtensionActions", NoSieveEvaluate },
-         { "RegressionTests.Sieve.SieveVacation", NoSieveEvaluate },
+         { "RegressionTests.Infrastructure.ListenerIpv6", RebindsTheRestListener },
+         // Its catch-all swallows the skip SetDefault throws, and then asks for the
+         // error SetDefault would have reported; by name, so the skip is the answer.
+         { "RegressionTests.Infrastructure.DatabaseFailureHandling.RestoringDefaultPortsReportsFailureRatherThanClaimingSuccess", NoPortDefaults },
+         { "RegressionTests.API.RestApiSrvRecords.SrvRecordsCoverEnabledServicesAndOmitDisabled", StandardPortNumbers },
+         { "RegressionTests.SSL.ListenerTlsConfiguration", RebindsTheRestListener },
+         { "RegressionTests.API.ScriptObjectPolicy", NoScriptEngine },
+         { "RegressionTests.API.ScriptReload", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.DeletedHeaderObjectCannotWriteOntoAnotherHeader", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.HeaderObjectStillNamesItsOwnHeaderAfterAnEarlierOneIsDeleted", NoScriptEngine },
+         { "RegressionTests.API.MessageHeaderObjects.RenamingAHeaderReachesTheSavedMessage", NoScriptEngine },
+         { "RegressionTests.API.Message.TestUpdateSubjectOnMessageWithNoMessageWideCharacterSet", NoScriptEngine },
+         { "RegressionTests.Infrastructure.ErrorManagerDiagnosticsTests.MultiLineErrorDescriptionShouldStillReachTheOnErrorHandler", NoScriptEngine },
+         { "RegressionTests.IMAP.CapabilityAuthAdvertisement.GssapiIsOfferedOnlyWhenEnabledAndRefusesAStrayToken", NoGssapi },
          { "RegressionTests.SMTP.OutboundSize", NoRouteCreate },
          { "RegressionTests.SSL.SmtpDeliverySslTests", NoRouteCreate },
          { "RegressionTests.SMTP.BinaryMime.TestAuthenticatedBinarySubmissionIsRelayedViaBdat", NoRouteCreate },
@@ -350,14 +387,6 @@ namespace RegressionTests.Shared
          { "RegressionTests.Infrastructure.Persistence.AccountNameValidation.TestAccountContainingForwardSlashInDomainName", ComWordingAsserted },
          { "RegressionTests.Security.Basics.TestEmptyPassword", NoEmptyPassword },
          { "RegressionTests.Sieve.SieveSyntax.DeeplyNestedBlocksAreRefusedRatherThanRecursedInto", ScriptOverRequestCeiling },
-         { "RegressionTests.API.Unicode.TestDecodeSpecificMessage", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.IfInReplyToFieldContainsQuoteThenFetchHeadersShouldEncodeIt", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.PartialFetch_HeaderFields", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.PartialFetch_HeaderFieldsNot", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.RequestingSameHeaderFieldMultipleTimesShouldReturnItOnce", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchEnvelopeWithDateContainingQuote", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchHeaderFields", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchHeaderFieldsNot", BareLfFromNewLine },
          { "RegressionTests.SSL.CertificateTypes.SetupSSLCertificateWithPassword", WindowsPathInTheFixture },
          { "RegressionTests.IMAP.SequenceSets.UidExpungeStarAffectsOnlyTheLastMessage", DeletedMessagesAreNotListed },
          { "RegressionTests.Infrastructure.Persistence.DomainNameValidation.TestDomainWithoutName", ComWordingAsserted },
@@ -401,19 +430,6 @@ namespace RegressionTests.Shared
 
       public const string DeletedMessagesAreNotListed =
          "counts a folder's messages after flagging some \\Deleted, and the REST listing this shim reads in place of COM's collection deliberately omits deleted messages - no route answers COM's question";
-
-      /// <summary>
-      ///    The test is right where it was written and cannot run anywhere else: it
-      ///    builds the message it sends with Environment.NewLine, which is CRLF on
-      ///    Windows and a bare LF on this host - and a bare LF is not a line to an
-      ///    SMTP server, which answers "554 Rejected - Message containing bare LF's"
-      ///    and is right to. The server is not at fault and the assertion is not
-      ///    weakened; the message the fixture composes is simply not a message here.
-      ///    TestSetup.CreateLargeDummyMailBody shows the fix - spell out \r\n - which
-      ///    is a change to the Windows suite rather than to this project.
-      /// </summary>
-      public const string BareLfFromNewLine =
-         "builds the message it sends with Environment.NewLine, which is a bare LF on this host; the server rightly refuses it with 554, so the test can only run where Environment.NewLine is CRLF";
 
       public const string ScriptOverRequestCeiling =
          "checks a 70 KB script, which is over the REST API's request ceiling - PUT /api/v1/me/filters answers 413 request too large before the parser sees it, and the COM CheckSieveSyntax has no ceiling";

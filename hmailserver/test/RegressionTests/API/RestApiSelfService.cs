@@ -29,7 +29,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class RestApiSelfService : TestFixtureBase
    {
-      private const int RestPort = 9530;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9530;
       private const string AdminPassword = "testar";
       private const string UserPassword = "Original-Passw0rd!";
 
@@ -48,8 +50,7 @@ namespace RegressionTests.API
 
          _account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, Address, UserPassword);
 
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          IniFileSetting.Write("RestApiCertificateFile", "");
          IniFileSetting.Write("RestApiPrivateKeyFile", "");
 
@@ -62,7 +63,7 @@ namespace RegressionTests.API
       [TearDown]
       public void StopRestApi()
       {
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 

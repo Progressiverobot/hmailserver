@@ -41,7 +41,7 @@ than a wording problem.
 
 ### Contents and totals
 
-904 items. The counts are the point of this table — they say where the fork is
+905 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -75,12 +75,12 @@ strong and where it is thin far more honestly than any prose summary.
 | [Cross-cutting and platform](#cross-cutting-and-platform) | 11 | 1 | 0 | – |
 | **Forward-looking** | | | | |
 | [Planned work](#planned-work) | 29 | – | 0 | 2 |
-| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 2 |
+| [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 3 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 8 | 0 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
 | [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 37 | – | 1 | 1 |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **863** | **2** | **5** | **34** |
+| **Total** | **863** | **2** | **5** | **35** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -1463,6 +1463,7 @@ Future-proofing: standards and protocols
 | ✅ | **Certificate expiry and queue-age metrics** | Both are things mail operators actually alert on, and the data is already there. Queue *depth* alone does not distinguish a burst from a stuck relay. |
 | ⏸️ | **DKIM2** | Real momentum and the right backers. The charter said all documents to the IESG by 31 December 2025; eight months past that, the specification is still an Internet-Draft, nothing is in last call, and no revised schedule has been published. What has changed is that several independent implementations demonstrated interop in July 2026 — so the risk is no longer "this never happens" but "this happens on somebody else's timetable". Track; hedge only by keeping the signing path abstracted. |
 | ⏸️ | **PQC signatures (ML-DSA) and PQC for DNSSEC/DANE** | 2028 at the earliest, and they arrive through OpenSSL and the ACME client rather than as code written here. No allocated DNSSEC algorithm and an unsolved packet-size problem. Track only. |
+| ⏸️ | **HTTP/2 and HTTP/3 for the REST API and the webmail** | The listeners speak HTTP/1.1 (`HttpServer`, Boost.Asio, keep-alive, chunked bodies), which is what every mail client, monitoring tool and browser negotiates without ceremony, and what the regression suite's raw-socket clients send as HTTP/1.0 with `Connection: close` on purpose - a test client that reads to end-of-stream is simpler and cannot mis-frame a response. HTTP/2 would need a TLS-only listener with ALPN, HPACK and stream multiplexing on top of the same request handlers; HTTP/3 would need QUIC, which is a second transport stack (UDP, its own congestion control and loss recovery, TLS 1.3 handshake integration - msquic, ngtcp2 or quiche as a dependency, none of which Boost.Asio provides) and a certificate on every listener. The gain is page-load latency for the webmail behind a lossy link, not correctness or mail throughput; the API's callers are scripts and the Control Panel. Deferred, recorded 13 September 2026 in answer to the question of why the API is not on HTTP/3: revisit when the webmail is served over TLS by default and a QUIC library is a routine dependency on both platforms, and then HTTP/2 first, because it reuses the TCP listener and the TLS the server already has. |
 
 Future-proofing: platform and supply chain
 ------------------------------------------

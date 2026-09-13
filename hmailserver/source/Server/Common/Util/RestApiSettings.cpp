@@ -1,5 +1,5 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's settings routes: PUT /api/v1/settings and the anti-spam and logging groups. See RestApiServer.h.
+// The REST API's settings routes: PUT /api/v1/settings, the anti-spam, logging and directories groups, the INI keys and the logon-failure list. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //
 // Three groups of settings, each a flat JSON object of snake_case keys, each
@@ -8,6 +8,13 @@
 //    /api/v1/settings            the server-wide group InterfaceSettings holds
 //    /api/v1/settings/antispam   InterfaceAntiSpam's scalars
 //    /api/v1/settings/logging    InterfaceLogging's scalars
+//    /api/v1/settings/directories  InterfaceDirectories, read-only: where the server runs
+//
+// and, after the tables, three routes that are not a group: the [Settings]
+// section of hMailServer.ini one key at a time (/api/v1/settings/ini, what
+// GetIniSetting, SetIniSetting, DeleteIniSetting and IniSettingNames do over
+// COM, with the same refusals), and the logon-failure list's clear
+// (/api/v1/settings/logon-failures/clear, ClearLogonFailureList).
 //
 // Everything about a key is one row of one table below: its name, its type,
 // whether it can be read and written, whether the running server picks the
@@ -35,6 +42,15 @@
 #include "RestApiServer.h"
 #include "JsonDocument.h"
 #include "Unicode.h"
+#include "Utilities.h"
+#include "../Application/IniSettingStore.h"
+#include "../Application/Backup.h"
+#include "../BO/ServerMessages.h"
+#include "../BO/ServerMessage.h"
+#include "../Persistence/PersistentServerMessage.h"
+#include "../Scripting/ScriptServer.h"
+#include "../Sieve/SieveScript.h"
+#include "FileUtilities.h"
 #include "../Persistence/PersistentIMAPFolder.h"
 #include "../Persistence/PersistentRuleAction.h"
 #include "../../SMTP/SMTPConfiguration.h"
@@ -643,6 +659,100 @@ namespace
         ROW_TEXT(Logger::Instance()->GetCurrentLogFileName(Logger::AWStats)), nullptr, ROW_NO_CHECK },
    };
 
+   // InterfaceDirectories' seven properties, as facts: the Control Panel shows
+   // them and a fixture reads them to find hMailServer.ini or the message
+   // store, and nothing sets them here - a directory is chosen at install time
+   // and read at process start. ini_file is the one COM does not have: the
+   // file the settings above were read from, which on Linux may be beside the
+   // binary or under /etc/hmailserver, and which a caller that writes a key
+   // through /api/v1/settings/ini is otherwise left to guess.
+   const Row DirectoriesRows[] =
+   {
+      { "program", KindString, ReadOnly, EffectNow, nullptr,
+        "The installation directory ([Directories] ProgramFolder).",
+        ROW_TEXT(Ini()->GetProgramDirectory()), nullptr, ROW_NO_CHECK },
+      { "bin", KindString, ReadOnly, EffectNow, nullptr,
+        "The directory the server binary runs from.",
+        ROW_TEXT(Utilities::GetBinDirectory()), nullptr, ROW_NO_CHECK },
+      { "data", KindString, ReadOnly, EffectNow, nullptr,
+        "The message store, one directory per domain ([Directories] DataFolder).",
+        ROW_TEXT(Ini()->GetDataDirectory()), nullptr, ROW_NO_CHECK },
+      { "log", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the log files are written ([Directories] LogFolder).",
+        ROW_TEXT(Ini()->GetLogDirectory()), nullptr, ROW_NO_CHECK },
+      { "event", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the event-handler scripts live ([Directories] EventFolder).",
+        ROW_TEXT(Ini()->GetEventDirectory()), nullptr, ROW_NO_CHECK },
+      { "temp", KindString, ReadOnly, EffectNow, nullptr,
+        "Where a message is written while it is being received ([Directories] TempFolder).",
+        ROW_TEXT(Ini()->GetTempDirectory()), nullptr, ROW_NO_CHECK },
+      { "database", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the built-in database lives ([Directories] DatabaseFolder).",
+        ROW_TEXT(Ini()->GetDatabaseDirectory()), nullptr, ROW_NO_CHECK },
+      { "db_scripts", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the schema scripts are read from.",
+        ROW_TEXT(Ini()->GetDBScriptDirectory()), nullptr, ROW_NO_CHECK },
+      { "ini_file", KindString, ReadOnly, EffectNow, nullptr,
+        "The full path of the hMailServer.ini this server read its settings from.",
+        ROW_TEXT(IniFileSettings::GetInitializationFile()), nullptr, ROW_NO_CHECK },
+   };
+
+   // The backup log lives beside the other logs, as InterfaceBackupSettings
+   // says: <log directory>/hmailserver_backup.log.
+   String BackupLogFile()
+   {
+      String directory = Ini()->GetLogDirectory();
+      if (directory.Right(1) != FileUtilities::PathSeparator)
+         directory += FileUtilities::PathSeparator;
+      return directory + "hmailserver_backup.log";
+   }
+
+   // InterfaceScripting::put_Language's rule: two languages, and a name that
+   // is neither is refused rather than stored, because an unrecognised name
+   // turns every event handler off in silence.
+   const char *ScriptLanguageRefusalHead = "The script language '";
+   const char *ScriptLanguageRefusalTail = "' is not supported. hMailServer can run VBScript or JScript.";
+
+   const Row ScriptingRows[] =
+   {
+      { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the event handlers run at all.",
+        ROW_FLAG(Config()->GetUseScriptServer()), ROW_SET(Config()->SetUseScriptServer(v.flag)), ROW_NO_CHECK },
+      { "language", KindString, ReadWrite, EffectNow, nullptr,
+        "VBScript or JScript, the language the event handlers are written in; any other name is refused.",
+        ROW_TEXT(Config()->GetScriptLanguage()),
+        [] (const Value &v) { AnsiString word = v.text; Config()->SetScriptLanguage(word.CompareNoCase("JScript") == 0 ? String("JScript") : String("VBScript")); return Applied(); },
+        [] (const Value &v) -> String { AnsiString word = v.text; if (word.CompareNoCase("VBScript") == 0 || word.CompareNoCase("JScript") == 0) return String(); return String(ScriptLanguageRefusalHead) + v.text + ScriptLanguageRefusalTail; } },
+      { "current_script_file", KindString, ReadOnly, EffectNow, nullptr,
+        "The event-handler file the server is running, in the event directory.",
+        ROW_TEXT(ScriptServer::Instance()->GetCurrentScriptFile()), nullptr, ROW_NO_CHECK },
+      { "directory", KindString, ReadOnly, EffectNow, nullptr,
+        "Where the event-handler scripts live.",
+        ROW_TEXT(Ini()->GetEventDirectory()), nullptr, ROW_NO_CHECK },
+   };
+
+   const Row BackupRows[] =
+   {
+      { "destination", KindString, ReadWrite, EffectNow, nullptr,
+        "The directory a backup is written to.",
+        ROW_TEXT(Config()->GetBackupDestination()), ROW_SET(Config()->SetBackupDestination(v.text)), ROW_NO_CHECK },
+      { "backup_domains", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the domains, accounts, aliases and lists are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BODomains)), ROW_SET(Config()->SetBackupOption(Backup::BODomains, v.flag)), ROW_NO_CHECK },
+      { "backup_messages", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the message files are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOMessages)), ROW_SET(Config()->SetBackupOption(Backup::BOMessages, v.flag)), ROW_NO_CHECK },
+      { "backup_settings", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the server settings are backed up.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOSettings)), ROW_SET(Config()->SetBackupOption(Backup::BOSettings, v.flag)), ROW_NO_CHECK },
+      { "compress", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the backup is compressed into one file.",
+        ROW_FLAG(Config()->GetBackupOption(Backup::BOCompression)), ROW_SET(Config()->SetBackupOption(Backup::BOCompression, v.flag)), ROW_NO_CHECK },
+      { "log_file", KindString, ReadOnly, EffectNow, nullptr,
+        "The full path of the backup log, beside the other logs.",
+        ROW_TEXT(BackupLogFile()), nullptr, ROW_NO_CHECK },
+   };
+
 #undef ROW_TEXT
 #undef ROW_NUMBER
 #undef ROW_FLAG
@@ -652,6 +762,9 @@ namespace
    const Group ServerGroup = { "server", "/api/v1/settings", ServerRows, sizeof(ServerRows) / sizeof(ServerRows[0]) };
    const Group AntiSpamGroup = { "antispam", "/api/v1/settings/antispam", AntiSpamRows, sizeof(AntiSpamRows) / sizeof(AntiSpamRows[0]) };
    const Group LoggingGroup = { "logging", "/api/v1/settings/logging", LoggingRows, sizeof(LoggingRows) / sizeof(LoggingRows[0]) };
+   const Group DirectoriesGroup = { "directories", "/api/v1/settings/directories", DirectoriesRows, sizeof(DirectoriesRows) / sizeof(DirectoriesRows[0]) };
+   const Group ScriptingGroup = { "scripting", "/api/v1/settings/scripting", ScriptingRows, sizeof(ScriptingRows) / sizeof(ScriptingRows[0]) };
+   const Group BackupGroup = { "backup", "/api/v1/settings/backup", BackupRows, sizeof(BackupRows) / sizeof(BackupRows[0]) };
 
    // ---------------------------------------------------------------------
    // The two private helpers of RestApiServer these functions need, handed
@@ -1060,6 +1173,272 @@ namespace
 
       return path;
    }
+
+   // A group with no writable row has a GET and nothing else; the properties
+   // go under the response, where a reader of the document looks for what a
+   // GET answers.
+   AnsiString OpenApiReadOnlyPath(const Group &group, const char *getSummary, const char *description, const Bridge &bridge)
+   {
+      AnsiString path = ",\"";
+      path += group.path;
+      path += "\":{\"get\":{\"summary\":\"";
+      path += getSummary;
+      path += "\",\"description\":\"";
+      path += description;
+      path += "\",\"responses\":{\"200\":{\"description\":\"The group as one flat object\","
+              "\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{";
+      path += OpenApiProperties(group, bridge);
+      path += "}}}}}}}}";
+      return path;
+   }
+
+   // ---------------------------------------------------------------------
+   // The [Settings] section of hMailServer.ini, one key at a time. The
+   // checks and the sentences are InterfaceSettings::GetIniSetting,
+   // SetIniSetting and DeleteIniSetting's, so a name or a value the COM
+   // route refuses is refused here in the same words.
+   // ---------------------------------------------------------------------
+
+   const char *IniNameRefusal =
+      "The setting name is empty, longer than 100 characters, surrounded by whitespace, or contains one of = [ ] or a line break.";
+   const char *IniValueRefusal =
+      "The value is longer than 4000 characters or contains a line break, so it could not be stored or read back as one setting.";
+   const char *IniWriteRefusal =
+      "The setting could not be written to hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.";
+   const char *IniRemoveRefusal =
+      "The setting could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.";
+
+   // The name from the path as the store sees it, or the refusal. Not valid
+   // UTF-8 is refused with the name sentence too: whatever the bytes were,
+   // they are not a key the file holds.
+   bool IniName(const AnsiString &raw, String &name)
+   {
+      if (!Unicode::MultiByteToWide(raw, name))
+         return false;
+      return IniSettingStore::IsStorableName(name);
+   }
+
+   // Whether the section holds the key now, as the names list reports it.
+   // Keys are matched the way the profile API matches them, without case.
+   bool IniHas(const String &name)
+   {
+      std::vector<String> names;
+      Ini()->GetSettingsNames(names);
+      for (size_t i = 0; i < names.size(); i++)
+      {
+         if (names[i].CompareNoCase(name) == 0)
+            return true;
+      }
+      return false;
+   }
+
+   AnsiString IniSettingJson(const String &name, const Bridge &bridge)
+   {
+      AnsiString json = "{\"name\":\"" + bridge.escape(Utf8(name)) + "\",\"value\":\"";
+      json += bridge.escape(Utf8(Ini()->GetSettingsValue(name)));
+      json += "\",\"present\":";
+      json += IniHas(name) ? "true" : "false";
+      json += "}";
+      return json;
+   }
+
+   HttpResponse IniList(const Bridge &bridge)
+   {
+      std::vector<String> names;
+      Ini()->GetSettingsNames(names);
+
+      AnsiString json = "{\"names\":[";
+      for (size_t i = 0; i < names.size(); i++)
+      {
+         if (i > 0)
+            json += ",";
+         json += "\"" + bridge.escape(Utf8(names[i])) + "\"";
+      }
+      json += "]}";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse IniGet(const AnsiString &raw, const Bridge &bridge)
+   {
+      String name;
+      if (!IniName(raw, name))
+         return Refusal(bridge, 400, IniNameRefusal);
+
+      return bridge.respond(200, IniSettingJson(name, bridge), "");
+   }
+
+   HttpResponse IniPut(const AnsiString &raw, const AnsiString &requestBody, const Bridge &bridge)
+   {
+      String name;
+      if (!IniName(raw, name))
+         return Refusal(bridge, 400, IniNameRefusal);
+
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *member = document.Get("value");
+      if (!member || !member->IsString())
+         return Refusal(bridge, 400, "value must be a string");
+
+      String value;
+      if (!Unicode::MultiByteToWide(AnsiString(member->AsString().c_str()), value))
+         return Refusal(bridge, 400, "value is not valid UTF-8");
+
+      if (!IniSettingStore::IsStorableValue(value))
+         return Refusal(bridge, 400, IniValueRefusal);
+
+      if (!Ini()->WriteSettingsValue(name, value))
+         return Refusal(bridge, 500, IniWriteRefusal);
+
+      LOG_APPLICATION("RestApi: hMailServer.ini [Settings] " + name + " written.");
+
+      return bridge.respond(200, IniSettingJson(name, bridge), "");
+   }
+
+   HttpResponse IniDelete(const AnsiString &raw, const Bridge &bridge)
+   {
+      String name;
+      if (!IniName(raw, name))
+         return Refusal(bridge, 400, IniNameRefusal);
+
+      if (!Ini()->RemoveSettingsValue(name))
+         return Refusal(bridge, 500, IniRemoveRefusal);
+
+      LOG_APPLICATION("RestApi: hMailServer.ini [Settings] " + name + " removed.");
+
+      return bridge.respond(200, IniSettingJson(name, bridge), "");
+   }
+
+   // ---------------------------------------------------------------------
+   // The server's message texts: Settings.ServerMessages over COM, the
+   // texts the server puts in the mail it writes itself (a virus notice, an
+   // undeliverable-message notice). The collection is the one Configuration
+   // holds and the server reads from, so a changed text is used at once.
+   // ---------------------------------------------------------------------
+
+   AnsiString ServerMessageJson(std::shared_ptr<ServerMessage> message, const Bridge &bridge)
+   {
+      AnsiString json;
+      json.Format("{\"id\":%I64d,\"name\":\"%hs\",\"text\":\"%hs\"}",
+         message->GetID(),
+         bridge.escape(Utf8(message->GetName())).c_str(),
+         bridge.escape(Utf8(message->GetText())).c_str());
+      return json;
+   }
+
+   HttpResponse ServerMessagesList(const Bridge &bridge)
+   {
+      std::shared_ptr<ServerMessages> messages = Config()->GetServerMessages();
+      if (!messages)
+         return Refusal(bridge, 503, "the server messages are not loaded");
+
+      AnsiString json = "[";
+      int count = 0;
+      for (std::shared_ptr<ServerMessage> message : messages->GetSnapshot())
+      {
+         if (!message)
+            continue;
+         if (count > 0)
+            json += ",";
+         json += ServerMessageJson(message, bridge);
+         count++;
+      }
+      json += "]";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse ServerMessagePut(const AnsiString &rawName, const AnsiString &requestBody, const Bridge &bridge)
+   {
+      std::shared_ptr<ServerMessages> messages = Config()->GetServerMessages();
+      if (!messages)
+         return Refusal(bridge, 503, "the server messages are not loaded");
+
+      String name;
+      if (!Unicode::MultiByteToWide(rawName, name))
+         return Refusal(bridge, 400, "the name is not valid UTF-8");
+
+      std::shared_ptr<ServerMessage> message = messages->GetItemByName(name);
+      if (!message)
+         return Refusal(bridge, 404, "server message not found");
+
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *member = document.Get("text");
+      if (!member || !member->IsString())
+         return Refusal(bridge, 400, "text must be a string");
+
+      String text;
+      if (!Unicode::MultiByteToWide(AnsiString(member->AsString().c_str()), text))
+         return Refusal(bridge, 400, "text is not valid UTF-8");
+
+      // The object is the one the server reads, so the new text is in use the
+      // moment it is set; the row is what InterfaceServerMessage::Save writes.
+      String before = message->GetText();
+      message->SetText(text);
+      if (!PersistentServerMessage::SaveObject(message))
+      {
+         message->SetText(before);
+         return Refusal(bridge, 500, "the server message could not be saved; see the error log");
+      }
+
+      LOG_APPLICATION("RestApi: Server message " + name + " changed.");
+
+      return bridge.respond(200, ServerMessageJson(message, bridge), "");
+   }
+
+   // ---------------------------------------------------------------------
+   // Sieve, evaluated and not delivered: Utilities.EvaluateSieveScript over
+   // COM. The summary is the action list the script decided on for the
+   // message - "keep", "fileinto:Folder", "discard", "redirect:..." - or
+   // "error: ..." when the script does not parse; nothing is sent, filed or
+   // recorded, which is what makes this a safe way to try a script.
+   // ---------------------------------------------------------------------
+
+   HttpResponse SieveEvaluate(const AnsiString &requestBody, const Bridge &bridge)
+   {
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *script = document.Get("script");
+      const JsonValue *message = document.Get("message");
+      if (!script || !script->IsString())
+         return Refusal(bridge, 400, "script must be a string");
+      if (!message || !message->IsString())
+         return Refusal(bridge, 400, "message must be a string");
+
+      String scriptText, messageText;
+      if (!Unicode::MultiByteToWide(AnsiString(script->AsString().c_str()), scriptText) ||
+          !Unicode::MultiByteToWide(AnsiString(message->AsString().c_str()), messageText))
+         return Refusal(bridge, 400, "script and message must be valid UTF-8");
+
+      String result = SieveScript::Evaluate(scriptText, messageText);
+
+      return bridge.respond(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}", "");
+   }
+
+   // The hand-written paths beside the generated groups: the INI routes and
+   // the logon-failure clear, each beginning with a comma as OpenApiPath's do.
+   const char *ScriptingMessagesAndSievePaths =
+      ",\"/api/v1/settings/scripting/reload\":{\"post\":{\"summary\":\"Load the event-handler script again\",\"description\":\"What Scripting.Reload does over COM: the script file is read again and the handlers it defines take over from the next event. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{reloaded: true}\"}}}},"
+      "\"/api/v1/settings/scripting/check\":{\"post\":{\"summary\":\"Check the event-handler script's syntax\",\"description\":\"What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser's message otherwise. Nothing is changed. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{result: the parser's message, or empty}\"}}}},"
+      "\"/api/v1/settings/messages\":{\"get\":{\"summary\":\"The server's message texts\",\"description\":\"The texts the server puts in the mail it writes itself - Settings.ServerMessages over COM. Each entry: id, name, text. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of {id, name, text}\"}}}},"
+      "\"/api/v1/settings/messages/{name}\":{\"put\":{\"summary\":\"Change one server message text\",\"description\":\"Body: text. The name is the table's own, as the listing shows it. In use at once. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"text\"],\"properties\":{\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{id, name, text} as saved\"},\"400\":{\"description\":\"text missing or not a string\"},\"404\":{\"description\":\"No message of that name\"}}}},"
+      "\"/api/v1/sieve/evaluate\":{\"post\":{\"summary\":\"Try a Sieve script against a message, without delivering anything\",\"description\":\"Body: script (RFC 5228 Sieve) and message (the raw message, headers and body). result is the action list the script decided on - keep, fileinto:Folder, discard, redirect:address, and so on - or error: followed by the parser's message. What Utilities.EvaluateSieveScript does over COM: nothing is filed, sent or recorded. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\",\"message\"],\"properties\":{\"script\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{result}\"},\"400\":{\"description\":\"script or message missing\"}}}}";
+
+   const char *IniAndLogonFailurePaths =
+      ",\"/api/v1/settings/ini\":{\"get\":{\"summary\":\"The keys in hMailServer.ini's [Settings] section\",\"description\":\"names: every key the section holds, in file order - what Settings.IniSettingNames lists over COM. The values are read one at a time. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{names: [...]}\"}}}},"
+      "\"/api/v1/settings/ini/{name}\":{"
+      "\"get\":{\"summary\":\"One [Settings] key of hMailServer.ini\",\"description\":\"name, value and present. An absent key answers 200 with an empty value and present false, as Settings.GetIniSetting answers an empty string: a key that is not in the file is a setting at its default, not an error. A name the file could not hold - empty, over 100 characters, surrounded by whitespace, or containing = [ ] or a line break - is a 400 with that sentence. The name is taken from the path as spelled, and matched without case as the file is read. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{name, value, present}\"},\"400\":{\"description\":\"The name cannot be a key\"}}},"
+      "\"put\":{\"summary\":\"Write one [Settings] key of hMailServer.ini\",\"description\":\"Body: value (a string of at most 4000 characters with no line break). Written to the file as Settings.SetIniSetting writes it, and read by the server when it next starts or is reinitialised (POST /api/v1/server/reinitialize), except for the settings the server reads from the file each time it needs them. Answers as GET does. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"value\"],\"properties\":{\"value\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{name, value, present: true}\"},\"400\":{\"description\":\"The name cannot be a key, the value cannot be stored, or the body has no string value\"},\"500\":{\"description\":\"The file could not be written; nothing changed\"}}},"
+      "\"delete\":{\"summary\":\"Remove one [Settings] key from hMailServer.ini\",\"description\":\"The key's line is removed, which returns the setting to its default at the next start or reinitialise - not the same as writing an empty value. Removing a key that is not there is a 200. Answers as GET does, with present false. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{name, value: empty, present: false}\"},\"400\":{\"description\":\"The name cannot be a key\"},\"500\":{\"description\":\"The file could not be written; nothing changed\"}}}},"
+      "\"/api/v1/settings/logon-failures/clear\":{\"post\":{\"summary\":\"Forget every recorded logon failure\",\"description\":\"What Settings.ClearLogonFailureList does over COM: the failures the auto-ban counts are deleted, so that an address that was one failure from a ban starts again at none. It does not lift a ban already placed; that is an IP range, deleted through /api/v1/ipranges. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{cleared: true}\"},\"500\":{\"description\":\"The list could not be cleared\"}}}}";
 }
 
 namespace HM
@@ -1086,6 +1465,12 @@ namespace HM
       paths += OpenApiPath(ServerGroup, "The server-wide settings", "Change server-wide settings", bridge);
       paths += OpenApiPath(AntiSpamGroup, "The anti-spam settings", "Change anti-spam settings", bridge);
       paths += OpenApiPath(LoggingGroup, "The logging settings", "Change logging settings", bridge);
+      paths += OpenApiReadOnlyPath(DirectoriesGroup, "The directories the server runs in",
+         "What Settings.Directories reports over COM, and the hMailServer.ini the settings came from. Facts about the installation, set when it was made; nothing here is written. Server-wide; refused for domain-restricted keys.", bridge);
+      paths += IniAndLogonFailurePaths;
+      paths += OpenApiPath(ScriptingGroup, "The event-handler scripting settings", "Change the scripting settings", bridge);
+      paths += OpenApiPath(BackupGroup, "The backup settings", "Change the backup settings", bridge);
+      paths += ScriptingMessagesAndSievePaths;
       return paths;
    }
 
@@ -1122,5 +1507,119 @@ namespace HM
    {
       Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
       return GroupPut(LoggingGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsDirectories_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(DirectoriesGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleIniSettingList_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return IniList(bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleIniSettingGet_(const AnsiString &name)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return IniGet(name, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleIniSettingPut_(const AnsiString &name, const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return IniPut(name, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleIniSettingDelete_(const AnsiString &name)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return IniDelete(name, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsScripting_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(ScriptingGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsScriptingPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(ScriptingGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleScriptingReload_()
+   {
+      ScriptServer::Instance()->LoadScripts();
+      LOG_APPLICATION("RestApi: the event-handler script was loaded again.");
+      return BuildResponse_(200, "{\"reloaded\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleScriptingCheck_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      String result = ScriptServer::Instance()->CheckSyntax();
+      return BuildResponse_(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsBackup_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(BackupGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsBackupPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(BackupGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleServerMessageList_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return ServerMessagesList(bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleServerMessagePut_(const AnsiString &name, const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return ServerMessagePut(name, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSieveEvaluate_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return SieveEvaluate(requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleLogonFailuresClear_()
+   {
+      // Configuration::ClearOldLogonFailures, which is what
+      // InterfaceSettings::ClearLogonFailureList calls: every recorded failure
+      // deleted, whatever its age.
+      if (!Config()->ClearOldLogonFailures())
+         return BuildResponse_(500, "{\"error\":\"the logon-failure list could not be cleared\"}");
+
+      LOG_APPLICATION("RestApi: the logon-failure list was cleared.");
+
+      return BuildResponse_(200, "{\"cleared\":true}");
    }
 }

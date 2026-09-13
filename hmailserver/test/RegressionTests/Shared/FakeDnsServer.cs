@@ -107,12 +107,27 @@ namespace RegressionTests.Shared
       private readonly List<string> queries_ = new List<string>();
 
 
-      public FakeDnsServer()
+      /// <summary>The loopback address the zone answers on, port 53.</summary>
+      public IPAddress Address { get; }
+
+      public FakeDnsServer() : this(IPAddress.Loopback)
       {
+      }
+
+      /// <summary>
+      ///    Serves the zone on port 53 of the given loopback address. 127.0.0.1 is
+      ///    the one every fixture on the Windows bench uses; the Linux suite's
+      ///    SuiteDns chooses another when that one is held by something else or,
+      ///    as inside WSL2, binds and then delivers nothing.
+      /// </summary>
+      public FakeDnsServer(IPAddress address)
+      {
+         Address = address;
+
          try
          {
-            udp_ = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
-            tcp_ = new TcpListener(IPAddress.Loopback, 53);
+            udp_ = new UdpClient(new IPEndPoint(address, 53));
+            tcp_ = new TcpListener(address, 53);
             tcp_.Start();
          }
          catch (SocketException ex)
@@ -120,8 +135,15 @@ namespace RegressionTests.Shared
             udp_?.Close();
             tcp_?.Stop();
 
-            Assert.Fail("Could not bind 127.0.0.1:53 for the fake DNS server - something on this " +
-                        "machine is already serving DNS on loopback: " + ex.Message);
+            // An exception and not Assert.Fail: NUnit records a failed assertion
+            // against whatever is running even when the caller catches it, and
+            // the Linux suite's run-wide setup catches this one to try the next
+            // address - an assertion recorded there failed every test of a run
+            // (13 September 2026, on the hosted runner, whose hardening agent
+            // holds 127.0.0.1:53). Thrown out of a test it fails that test just
+            // the same, with the same words.
+            throw new InvalidOperationException("Could not bind " + address + ":53 for the fake DNS server - " +
+                                                "something on this machine is already serving DNS there: " + ex.Message, ex);
          }
 
          new Thread(ServeUdp_) { IsBackground = true }.Start();

@@ -246,7 +246,7 @@ if (Test-Path $serverIni) {
     #                            so the whole suite fails in setup rather than anywhere useful
     #   QuarantineEnabled      - turns spam REFUSALS into acceptances, so every
     #                            anti-spam test that expects a 550 sees a 250
-    $leftoverKeys = 'DNSServer', 'Pop3LoginDelaySeconds', 'PasswordPolicyMinimumLength',
+    $leftoverKeys = 'DNSServer', 'RestApiIniProbe', 'ZzComSettingsProbe', 'Pop3LoginDelaySeconds', 'PasswordPolicyMinimumLength',
                     'PasswordPolicyRequireMixedCase', 'PasswordPolicyRequireDigit',
                     'PasswordPolicyRequireNonAlphanumeric', 'PasswordPolicyRejectCommon',
                     'QuarantineEnabled', 'PasswordPolicyHistoryCount',

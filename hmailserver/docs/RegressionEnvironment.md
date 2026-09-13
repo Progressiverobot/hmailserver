@@ -198,7 +198,12 @@ localhost SMTP routes go through `/api/v1/routes`; the TLS listeners the SSL
 fixtures need are made from the certificate and port routes and brought up with
 `POST /api/v1/server/reinitialize`; the delivery queue is drained through
 `/api/v1/queue`; and the ERROR log is read through `/api/v1/logs`, judged by
-what was written *during* the test rather than by whether the file exists.
+what was written *during* the test rather than by whether the file exists;
+the server's directories come from `GET /api/v1/settings/directories`, a
+`[Settings]` key of `hMailServer.ini` goes through `/api/v1/settings/ini`, the
+logon-failure list is cleared through `/api/v1/settings/logon-failures/clear`,
+and a fixture that restarts the service to have the ini read again gets
+`POST /api/v1/server/reinitialize`, which reads it again in the same process.
 Everything a test makes is removed in its teardown.
 
 What it cannot do, it says: a fixture that needs the suite's fake DNS zone
@@ -230,9 +235,11 @@ is through the environment, read once when the assembly loads:
 | `HMTEST_SMTP_PORT` | `2525` |
 | `HMTEST_POP3_PORT` | `1110` |
 | `HMTEST_IMAP_PORT` | `1143` |
+| `HMTEST_SUBMISSION_PORT` | `5870` |
 | `HMTEST_REST_PORT` | `8045` |
 | `HMTEST_ADMIN_PASSWORD` | `testar` |
 | `HMTEST_SERVER_INI` | *unset; the ini is searched for* |
+| `HMTEST_NO_FAKE_DNS` | *unset; set to `1` to run without the fake DNS zone, so the DNS fixtures skip. Not needed for WSL2 or the hosted runner: the suite serves the zone on 127.0.0.1, or on 127.0.53.53 where that address is held or does not deliver, and proves delivery with a query before it points the server there* |
 
 `HMTEST_SERVER_INI` is the one that is not a port. A few fixtures write a
 setting the COM API does not carry - an account-lockout threshold, a DNS
@@ -314,7 +321,9 @@ what it can and names the rest:
   removes it in teardown. Left behind, it fails every fixture's setup in the
   next run - the observed shape is 100% of tests failing before doing anything.
 - **Test-only settings left in `hMailServer.ini`.** The suite points the
-  resolver at its own fake DNS server on 127.0.0.1 for the whole run
+  resolver at its own fake DNS server on a loopback address for the whole run
+  (127.0.0.1 on the Windows bench; the Linux suite's `Shims/SuiteDns.cs` tries
+  127.0.53.53 when that one is held or does not deliver)
   (`Shared/SuiteDns.cs`, a `[SetUpFixture]`: NODATA for every name a fixture
   has not added, the SURBL test point and localhost seeded) and puts
   `DNSServer` back when the run ends; fixtures that enable the quarantine, set

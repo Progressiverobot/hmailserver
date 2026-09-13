@@ -1569,6 +1569,44 @@ namespace HM
             return HandleSettingsLogging_();
          case RouteSettingsLoggingPut:
             return HandleSettingsLoggingPut_(GetRequestBody_(request));
+         case RouteSettingsDirectoriesGet:
+            return HandleSettingsDirectories_();
+         case RouteIniSettingList:
+            return HandleIniSettingList_();
+         case RouteIniSettingGet:
+            return HandleIniSettingGet_(route.identifier);
+         case RouteIniSettingPut:
+            return HandleIniSettingPut_(route.identifier, GetRequestBody_(request));
+         case RouteIniSettingDelete:
+            return HandleIniSettingDelete_(route.identifier);
+         case RouteLogonFailuresClear:
+            return HandleLogonFailuresClear_();
+         case RouteSettingsScriptingGet:
+            return HandleSettingsScripting_();
+         case RouteSettingsScriptingPut:
+            return HandleSettingsScriptingPut_(GetRequestBody_(request));
+         case RouteScriptingReload:
+            return HandleScriptingReload_();
+         case RouteScriptingCheck:
+            return HandleScriptingCheck_();
+         case RouteSettingsBackupGet:
+            return HandleSettingsBackup_();
+         case RouteSettingsBackupPut:
+            return HandleSettingsBackupPut_(GetRequestBody_(request));
+         case RouteServerMessageList:
+            return HandleServerMessageList_();
+         case RouteServerMessagePut:
+            return HandleServerMessagePut_(route.name, GetRequestBody_(request));
+         case RouteSieveEvaluate:
+            return HandleSieveEvaluate_(GetRequestBody_(request));
+         case RouteIpRangeUpdate:
+            return HandleUpdateIpRange_(route.range_id, GetRequestBody_(request));
+         case RouteDomainAliasList:
+            return HandleListDomainAliases_(String(route.identifier));
+         case RouteDomainAliasCreate:
+            return HandleCreateDomainAlias_(String(route.identifier), GetRequestBody_(request));
+         case RouteDomainAliasDelete:
+            return HandleDeleteDomainAlias_(String(route.identifier), String(route.name));
          case RouteRuleCreate:
             return HandleCreateRule_(GetRequestBody_(request));
          case RouteRuleUpdate:
@@ -1601,6 +1639,18 @@ namespace HM
             return HandleDeleteAlias_(String(route.identifier));
          case RouteAccountUpdate:
             return HandleUpdateAccount_(caller, String(route.identifier), GetRequestBody_(request));
+         case RouteFetchAccountList:
+            return HandleListFetchAccounts_(String(route.identifier));
+         case RouteFetchAccountCreate:
+            return HandleCreateFetchAccount_(String(route.identifier), GetRequestBody_(request));
+         case RouteFetchAccountGet:
+            return HandleGetFetchAccount_(String(route.identifier), route.record_id);
+         case RouteFetchAccountUpdate:
+            return HandleUpdateFetchAccount_(String(route.identifier), route.record_id, GetRequestBody_(request));
+         case RouteFetchAccountDelete:
+            return HandleDeleteFetchAccount_(String(route.identifier), route.record_id);
+         case RouteFetchAccountDownload:
+            return HandleDownloadFetchAccount_(String(route.identifier), route.record_id);
          case RouteServerReinitialize:
             return HandleServerReinitialize_();
          case RouteArchiveSearch:
@@ -2420,6 +2470,58 @@ namespace HM
          }
       }
 
+      // /api/v1/accounts/<address>/fetch-accounts[/<id>[/download]]: the
+      // account's external accounts, under the address that scopes them.
+      if (path.StartsWith(accountsPrefix) && path.Find("/fetch-accounts") > 0)
+      {
+         AnsiString rest = path.Mid(accountsPrefix.GetLength());
+         int slash = rest.Find("/");
+         AnsiString address = slash > 0 ? rest.Mid(0, slash) : AnsiString();
+         AnsiString tail = slash > 0 ? rest.Mid(slash) : AnsiString();
+
+         if (!address.IsEmpty() && tail == "/fetch-accounts")
+         {
+            if (method == "GET")
+               route.kind = RouteFetchAccountList;
+            else if (method == "POST")
+               route.kind = RouteFetchAccountCreate;
+
+            if (route.kind != RouteUnknown)
+               route.identifier = address;
+            return;
+         }
+
+         const AnsiString itemPrefix = "/fetch-accounts/";
+         if (!address.IsEmpty() && tail.StartsWith(itemPrefix))
+         {
+            AnsiString idPart = tail.Mid(itemPrefix.GetLength());
+            const AnsiString downloadSuffix = "/download";
+            bool download = idPart.EndsWith(downloadSuffix);
+            if (download)
+               idPart = idPart.Mid(0, idPart.GetLength() - downloadSuffix.GetLength());
+
+            __int64 id = 0;
+            if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+            {
+               if (download && method == "POST")
+                  route.kind = RouteFetchAccountDownload;
+               else if (!download && method == "GET")
+                  route.kind = RouteFetchAccountGet;
+               else if (!download && method == "PUT")
+                  route.kind = RouteFetchAccountUpdate;
+               else if (!download && method == "DELETE")
+                  route.kind = RouteFetchAccountDelete;
+
+               if (route.kind != RouteUnknown)
+               {
+                  route.identifier = address;
+                  route.record_id = id;
+               }
+            }
+            return;
+         }
+      }
+
       if ((method == "DELETE" || method == "PUT") && path.StartsWith(accountsPrefix))
       {
          AnsiString address = path.Mid(accountsPrefix.GetLength());
@@ -2559,6 +2661,37 @@ namespace HM
       }
 
       // /api/v1/domains/<name>/aliases - same shape as the accounts listing.
+      // /api/v1/domains/<name>/domain-aliases, and one alias under it by name.
+      if ((method == "GET" || method == "POST") && path.StartsWith(domainsPrefix) && path.EndsWith("/domain-aliases"))
+      {
+         AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
+            path.GetLength() - domainsPrefix.GetLength() - AnsiString("/domain-aliases").GetLength());
+
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0)
+         {
+            route.kind = method == "GET" ? RouteDomainAliasList : RouteDomainAliasCreate;
+            route.identifier = domainName;
+            return;
+         }
+      }
+
+      if (method == "DELETE" && path.StartsWith(domainsPrefix) && path.Find("/domain-aliases/") > 0)
+      {
+         AnsiString rest = path.Mid(domainsPrefix.GetLength());
+         const AnsiString marker = "/domain-aliases/";
+         int at = rest.Find(marker);
+         AnsiString domainName = at > 0 ? rest.Mid(0, at) : AnsiString();
+         AnsiString aliasName = at > 0 ? rest.Mid(at + marker.GetLength()) : AnsiString();
+
+         if (!domainName.IsEmpty() && domainName.Find("/") < 0 && !aliasName.IsEmpty() && aliasName.Find("/") < 0)
+         {
+            route.kind = RouteDomainAliasDelete;
+            route.identifier = domainName;
+            route.name = aliasName;
+            return;
+         }
+      }
+
       if ((method == "GET" || method == "POST") && path.StartsWith(domainsPrefix) && path.EndsWith("/aliases"))
       {
          AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
@@ -2598,13 +2731,13 @@ namespace HM
             route.kind = RouteIpRangeCreate;
          return;
       }
-      if (method == "DELETE" && path.StartsWith(ipRangesPath + "/"))
+      if ((method == "DELETE" || method == "PUT") && path.StartsWith(ipRangesPath + "/"))
       {
          AnsiString idPart = path.Mid(ipRangesPath.GetLength() + 1);
          __int64 rangeId = 0;
          if (idPart.Find("/") < 0 && ParseQueueId(idPart, rangeId))
          {
-            route.kind = RouteIpRangeDelete;
+            route.kind = method == "DELETE" ? RouteIpRangeDelete : RouteIpRangeUpdate;
             route.range_id = rangeId;
             return;
          }
@@ -2791,6 +2924,98 @@ namespace HM
          return;
       }
 
+      if (method == "GET" && path == "/api/v1/settings/directories")
+      {
+         route.kind = RouteSettingsDirectoriesGet;
+         return;
+      }
+
+      // One [Settings] key of hMailServer.ini, named in the path as it is
+      // spelled in the file. The name is not decoded: the characters a key
+      // cannot hold - = [ ] and a line break - are refused by the handler with
+      // the sentence COM's SetIniSetting uses, and a slash never reaches it.
+      const AnsiString iniPath = "/api/v1/settings/ini";
+      if (path == iniPath)
+      {
+         if (method == "GET")
+            route.kind = RouteIniSettingList;
+         return;
+      }
+
+      if (path.StartsWith(iniPath + "/"))
+      {
+         AnsiString name = path.Mid(iniPath.GetLength() + 1);
+         if (!name.IsEmpty() && name.Find("/") < 0)
+         {
+            if (method == "GET")
+               route.kind = RouteIniSettingGet;
+            else if (method == "PUT")
+               route.kind = RouteIniSettingPut;
+            else if (method == "DELETE")
+               route.kind = RouteIniSettingDelete;
+
+            if (route.kind != RouteUnknown)
+               route.identifier = name;
+         }
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/logon-failures/clear")
+      {
+         route.kind = RouteLogonFailuresClear;
+         return;
+      }
+
+      if (path == "/api/v1/settings/scripting" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsScriptingGet : RouteSettingsScriptingPut;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/scripting/reload")
+      {
+         route.kind = RouteScriptingReload;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/settings/scripting/check")
+      {
+         route.kind = RouteScriptingCheck;
+         return;
+      }
+
+      if (path == "/api/v1/settings/backup" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsBackupGet : RouteSettingsBackupPut;
+         return;
+      }
+
+      // The server's message texts, named as the table names them.
+      const AnsiString messagesPath = "/api/v1/settings/messages";
+      if (path == messagesPath)
+      {
+         if (method == "GET")
+            route.kind = RouteServerMessageList;
+         return;
+      }
+
+      if (path.StartsWith(messagesPath + "/"))
+      {
+         AnsiString name = path.Mid(messagesPath.GetLength() + 1);
+         if (method == "PUT" && !name.IsEmpty() && name.Find("/") < 0)
+         {
+            route.kind = RouteServerMessagePut;
+            route.name = name;
+         }
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/sieve/evaluate")
+      {
+         route.kind = RouteSieveEvaluate;
+         return;
+      }
+
       if (method == "POST" && path == "/api/v1/server/reinitialize")
       {
          route.kind = RouteServerReinitialize;
@@ -2905,9 +3130,23 @@ namespace HM
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
       case RouteSettingsLoggingPut:
+      case RouteIniSettingPut:
+      case RouteIniSettingDelete:
+      case RouteLogonFailuresClear:
+      case RouteSettingsScriptingPut:
+      case RouteScriptingReload:
+      case RouteSettingsBackupPut:
+      case RouteServerMessagePut:
+      case RouteIpRangeUpdate:
+      case RouteDomainAliasCreate:
+      case RouteDomainAliasDelete:
       case RouteRuleCreate:
       case RouteRuleUpdate:
       case RouteRuleDelete:
+      case RouteFetchAccountCreate:
+      case RouteFetchAccountUpdate:
+      case RouteFetchAccountDelete:
+      case RouteFetchAccountDownload:
       case RouteCertificateCreate:
       case RouteCertificateDelete:
       case RoutePortCreate:
@@ -3083,6 +3322,22 @@ namespace HM
       case RouteSettingsAntiSpamPut:
       case RouteSettingsLoggingGet:
       case RouteSettingsLoggingPut:
+      case RouteSettingsDirectoriesGet:
+      case RouteIniSettingList:
+      case RouteIniSettingGet:
+      case RouteIniSettingPut:
+      case RouteIniSettingDelete:
+      case RouteLogonFailuresClear:
+      case RouteSettingsScriptingGet:
+      case RouteSettingsScriptingPut:
+      case RouteScriptingReload:
+      case RouteScriptingCheck:
+      case RouteSettingsBackupGet:
+      case RouteSettingsBackupPut:
+      case RouteServerMessageList:
+      case RouteServerMessagePut:
+      case RouteSieveEvaluate:
+      case RouteIpRangeUpdate:
       case RouteRuleCreate:
       case RouteRuleUpdate:
       case RouteRuleDelete:
@@ -3123,11 +3378,20 @@ namespace HM
       case RouteListList:
       case RouteListCreate:
       case RouteDkimGet:
+      case RouteDomainAliasList:
+      case RouteDomainAliasCreate:
+      case RouteDomainAliasDelete:
          targetDomain = String(route.identifier);
          break;
       case RouteListDelete:
       case RouteAliasDelete:
       case RouteAccountUpdate:
+      case RouteFetchAccountList:
+      case RouteFetchAccountCreate:
+      case RouteFetchAccountGet:
+      case RouteFetchAccountUpdate:
+      case RouteFetchAccountDelete:
+      case RouteFetchAccountDownload:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -3985,18 +4249,6 @@ namespace HM
       return BuildResponse_(200, body);
    }
 
-   AnsiString
-   RestApiServer::DomainEntryJson_(const std::shared_ptr<Domain> &domain)
-   {
-      AnsiString entry;
-      entry.Format("{\"name\":\"%hs\",\"active\":%hs,\"postmaster\":\"%hs\"}",
-         JsonEscape_(Utf8_(domain->GetName())).c_str(),
-         domain->GetIsActive() ? "true" : "false",
-         JsonEscape_(Utf8_(domain->GetPostmaster())).c_str());
-
-      return entry;
-   }
-
    HttpResponse
    RestApiServer::HandleCreateDomain_(const AnsiString &requestBody)
    {
@@ -4058,52 +4310,6 @@ namespace HM
       LOG_APPLICATION("RestApi: Domain " + name + " created.");
 
       return BuildResponse_(201, DomainEntryJson_(domain));
-   }
-
-   HttpResponse
-   RestApiServer::HandleUpdateDomain_(const String &domainName, const AnsiString &requestBody)
-   {
-      // active is what the route is for and has to be named, as enabled has
-      // to be for the automatic reply; postmaster changes only when the body
-      // names it, so a client that sends {"active":false} to switch a domain
-      // off does not also blank its postmaster. The name is not changed here:
-      // renaming a domain renames every address in it, and stays with COM.
-      if (requestBody.Find("\"active\"") < 0)
-         return BuildResponse_(400, "{\"error\":\"active is required\"}");
-
-      Domains domains;
-      domains.Refresh();
-
-      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
-      if (!domain)
-         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
-
-      domain->SetIsActive(GetJsonBoolValue_(requestBody, "active", domain->GetIsActive()));
-
-      if (requestBody.Find("\"postmaster\"") >= 0)
-         domain->SetPostmaster(JsonUtf8Value_(requestBody, "postmaster"));
-
-      String saveError;
-
-      if (!PersistentDomain::SaveObject(domain, saveError, PersistenceModeNormal))
-      {
-         if (!saveError.IsEmpty())
-         {
-            LOG_APPLICATION("RestApi: Refused to update domain " + domain->GetName() + ": " + saveError);
-
-            AnsiString body;
-            body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(saveError)).c_str());
-
-            return BuildResponse_(400, body);
-         }
-
-         return BuildResponse_(500, "{\"error\":\"failed to save domain\"}");
-      }
-
-      LOG_APPLICATION("RestApi: Domain " + domain->GetName() + " updated, active: " +
-         String(domain->GetIsActive() ? _T("true") : _T("false")) + ".");
-
-      return BuildResponse_(200, DomainEntryJson_(domain));
    }
 
    HttpResponse
@@ -4598,37 +4804,7 @@ namespace HM
          if (count > 0)
             body += ",";
 
-         AnsiString entry;
-         entry.Format("{\"id\":%I64d,\"name\":\"%hs\",\"lower\":\"%hs\",\"upper\":\"%hs\",\"priority\":%d",
-            range->GetID(),
-            JsonEscape_(Utf8_(range->GetName())).c_str(),
-            JsonEscape_(Utf8_(range->GetLowerIPString())).c_str(),
-            JsonEscape_(Utf8_(range->GetUpperIPString())).c_str(),
-            (int) range->GetPriority());
-         // The flags one at a time: Format has a fixed arity and this row has
-         // more of them than it takes.
-         auto flag = [&entry](const char *name, bool value)
-         {
-            entry += ",\"";
-            entry += name;
-            entry += value ? "\":true" : "\":false";
-         };
-         flag("allow_smtp", range->GetAllowSMTP());
-         flag("allow_imap", range->GetAllowIMAP());
-         flag("allow_pop3", range->GetAllowPOP3());
-         flag("deliver_local_to_local", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_LOCAL_TO_LOCAL));
-         flag("deliver_local_to_remote", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_LOCAL_TO_REMOTE));
-         flag("deliver_remote_to_local", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_REMOTE_TO_LOCAL));
-         flag("deliver_remote_to_remote", range->GetAllowOption(SecurityRange::IPRANGE_RELAY_REMOTE_TO_REMOTE));
-         flag("require_auth_local_to_local", range->GetRequireSMTPAuthLocalToLocal());
-         flag("require_auth_local_to_remote", range->GetRequireSMTPAuthLocalToExternal());
-         flag("require_auth_remote_to_local", range->GetRequireSMTPAuthExternalToLocal());
-         flag("require_auth_remote_to_remote", range->GetRequireSMTPAuthExternalToExternal());
-         flag("require_tls_for_auth", range->GetRequireTLSForAuth());
-         flag("spam_protection", range->GetSpamProtection());
-         flag("virus_protection", range->GetVirusProtection());
-         flag("expires", range->GetExpires());
-         entry += "}";
+         AnsiString entry = IpRangeEntryJson_(range);
          body += entry;
          count++;
       }
@@ -9469,7 +9645,7 @@ namespace HM
          "\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}},"
          "\"post\":{\"summary\":\"Create a domain\",\"description\":\"Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: name, active, postmaster\"},\"400\":{\"description\":\"name missing, not a domain name, or taken by a domain alias (the reason is in error)\"},\"409\":{\"description\":\"A domain with that name exists\"}}}},"
          "\"/api/v1/domains/{domain}\":{"
-         "\"put\":{\"summary\":\"Switch a domain on or off, and set its postmaster\",\"description\":\"Body: active (required) and postmaster (changed only when named). The name cannot be changed here.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"active\"],\"properties\":{\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The domain as saved: name, active, postmaster\"},\"400\":{\"description\":\"active missing, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"put\":{\"summary\":\"Change a domain: on or off, its postmaster, its limits and everything else the Control Panel's domain pages hold, or its name\",\"description\":\"Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message. A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"active\"],\"properties\":{\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The domain as saved, every field the listing shows\"},\"400\":{\"description\":\"active missing, a field refused, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"}}},"
          "\"delete\":{\"summary\":\"Delete a domain with everything in it\",\"description\":\"The accounts and their messages, the aliases, the distribution lists, the domain aliases and the domain's directories go with it, exactly as when the Control Panel deletes a domain. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"
@@ -9494,7 +9670,8 @@ namespace HM
          "\"/api/v1/ipranges\":{"
          "\"get\":{\"summary\":\"List the IP ranges\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of ranges with their permissions\"}}},"
          "\"post\":{\"summary\":\"Create an IP range\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"lower\",\"upper\"],\"properties\":{\"name\":{\"type\":\"string\"},\"lower\":{\"type\":\"string\"},\"upper\":{\"type\":\"string\"},\"priority\":{\"type\":\"integer\"},\"allow_smtp\":{\"type\":\"boolean\"},\"allow_imap\":{\"type\":\"boolean\"},\"allow_pop3\":{\"type\":\"boolean\"},\"deliver_local_to_local\":{\"type\":\"boolean\"},\"deliver_local_to_remote\":{\"type\":\"boolean\"},\"deliver_remote_to_local\":{\"type\":\"boolean\"},\"deliver_remote_to_remote\":{\"type\":\"boolean\"},\"require_auth_local_to_local\":{\"type\":\"boolean\"},\"require_auth_local_to_remote\":{\"type\":\"boolean\"},\"require_auth_remote_to_local\":{\"type\":\"boolean\"},\"require_auth_remote_to_remote\":{\"type\":\"boolean\"},\"require_tls_for_auth\":{\"type\":\"boolean\"},\"spam_protection\":{\"type\":\"boolean\"},\"virus_protection\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created, with its id\"},\"400\":{\"description\":\"Missing name or an address that does not parse\"}}}},"
-         "\"/api/v1/ipranges/{id}\":{\"delete\":{\"summary\":\"Delete an IP range\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+         "\"/api/v1/ipranges/{id}\":{\"put\":{\"summary\":\"Change an IP range\",\"description\":\"Body: any subset of the fields POST takes - name, lower, upper, priority and the permission flags; a field left out keeps its value. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"responses\":{\"200\":{\"description\":\"The range as saved, as the listing shows it\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
+         "\"delete\":{\"summary\":\"Delete an IP range\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/domains/{domain}/lists\":{"
          "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"
          "\"post\":{\"summary\":\"Create a distribution list\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\"],\"properties\":{\"address\":{\"type\":\"string\"},\"members\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"require_auth\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Missing address, or one outside the domain\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"A list with that address exists\"}}}},"
@@ -9529,6 +9706,8 @@ namespace HM
       openApiJson += OpenApiRulesPaths_();
       openApiJson += OpenApiCertificatesPaths_();
       openApiJson += OpenApiRoutesPaths_();
+      openApiJson += OpenApiFetchAccountsPaths_();
+      openApiJson += OpenApiAdministrationPaths_();
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += openApiTail;
 

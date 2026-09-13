@@ -32,7 +32,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class UpdateApply : TestFixtureBase
    {
-      private const int RestPort = 9104;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9104;
       private const string AdminPassword = "testar";
       private const string LatestPath = "/repos/Progressiverobot/hmailserver/releases/latest";
 
@@ -65,8 +67,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateLogPublicKeyFile", _sigstore.WriteLogKeyFile());
          WriteSetting("UpdateRequireAuthenticode", "0");
          WriteSetting("UpdateServiceWaitSeconds", "8");
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          _application.Reinitialize();
       }
 
@@ -84,7 +85,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateLogPublicKeyFile", "");
          WriteSetting("UpdateRequireAuthenticode", "0");
          WriteSetting("UpdateServiceWaitSeconds", "180");
-         WriteSetting("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
          _feed.Dispose();
          _sigstore.Dispose();

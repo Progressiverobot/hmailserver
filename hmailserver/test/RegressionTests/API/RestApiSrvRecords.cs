@@ -38,7 +38,9 @@ namespace RegressionTests.API
       // From the 11420-11429 range reserved for this work; every other REST
       // fixture uses 9098 and both can never run at once, but a distinct port
       // means a leaked listener from either fixture cannot fail the other.
-      private const int RestPort = 11420;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 11420;
 
       // TestSetup.Authenticate() already expects this to be the administrator
       // password, and the REST API authenticates against the same credential.
@@ -112,8 +114,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          // Reinitialize (not Stop/Start): RestApiPort is cached in
          // IniFileSettings, which is only re-read by InitInstance().
@@ -126,7 +127,7 @@ namespace RegressionTests.API
       [TearDown]
       public void StopRestApi()
       {
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 
@@ -140,9 +141,11 @@ namespace RegressionTests.API
          (int status, string body) = Http("GET", "/api/v1/srv");
          Assert.AreEqual(200, status, body);
 
-         StringAssert.Contains("\"service\":\"_imap._tcp\",\"priority\":0,\"weight\":1,\"port\":143", body);
-         StringAssert.Contains("\"service\":\"_pop3._tcp\",\"priority\":0,\"weight\":1,\"port\":110", body);
-         StringAssert.Contains("\"service\":\"_submission._tcp\",\"priority\":0,\"weight\":1,\"port\":587", body);
+         // The ports the listeners are really on: the standard ones on the Windows
+         // bench, the suite's high ports against the Linux server (TestPorts).
+         StringAssert.Contains("\"service\":\"_imap._tcp\",\"priority\":0,\"weight\":1,\"port\":" + TestPorts.Imap, body);
+         StringAssert.Contains("\"service\":\"_pop3._tcp\",\"priority\":0,\"weight\":1,\"port\":" + TestPorts.Pop3, body);
+         StringAssert.Contains("\"service\":\"_submission._tcp\",\"priority\":0,\"weight\":1,\"port\":" + TestPorts.Submission, body);
 
          // No implicit-TLS listener exists in this configuration, so the
          // secure-service names must be absent - the "omit what is not
@@ -157,7 +160,7 @@ namespace RegressionTests.API
 
          // Port 25 is the MX port. Whatever its security setting, it must
          // never be advertised for client submission.
-         Assert.IsFalse(body.Contains("\"port\":25}"),
+         Assert.IsFalse(body.Contains("\"port\":" + TestPorts.Smtp + "}"),
             "Port 25 must never be advertised as a client-discovery service. Body: " + body);
          Assert.IsFalse(body.Contains(" IN SRV 0 1 25 "),
             "Port 25 must never appear in a published record. Body: " + body);

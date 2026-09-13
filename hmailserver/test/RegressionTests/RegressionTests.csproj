@@ -666,6 +666,7 @@
     <Compile Include="API\UpdateSchedule.cs" />
     <Compile Include="API\RestApiCoverage.cs" />
     <Compile Include="API\RestApiDomains.cs" />
+    <Compile Include="API\RestApiFetchAccounts.cs" />
     <Compile Include="API\RestApiSettings.cs" />
     <Compile Include="API\RestApiRules.cs" />
     <Compile Include="API\RestApiCertificatesAndPorts.cs" />
@@ -703,6 +704,7 @@
     <Compile Include="Sieve\ManageSieveTls.cs" />
     <Compile Include="SSL\ListenerTlsConfiguration.cs" />
     <Compile Include="Shared\IniFileSetting.cs" />
+    <Compile Include="Shared\RestListener.cs" />
     <Compile Include="SMTP\SpoolWriteFailure.cs" />
     <Compile Include="Shared\TlsHandshakeProbe.cs" />
     <Compile Include="MIME\FuzzHarness.cs" />

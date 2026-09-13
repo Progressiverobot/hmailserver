@@ -33,7 +33,11 @@ namespace RegressionTests.API
    [TestFixture]
    public class RestApiSettings : TestFixtureBase
    {
-      private const int RestPort = 9120;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9120;
+      // A [Settings] key no shipped setting uses, as IniSettingsOverCom's probe is.
+      private const string IniProbeKey = "RestApiIniProbe";
       private const string AdminPassword = "testar";
 
       private Snapshot _before;
@@ -77,6 +81,16 @@ namespace RegressionTests.API
          public bool LogTcpIp;
          public bool KeepFilesOpen;
          public eLogOutputFormat LogFormat;
+         public eLogDevice LogDevice;
+
+         public bool ScriptingEnabled;
+         public string ScriptingLanguage;
+
+         public string BackupDestination;
+         public bool BackupDomains;
+         public bool BackupMessages;
+         public bool BackupSettings;
+         public bool BackupCompress;
       }
 
       private Snapshot Take()
@@ -120,7 +134,17 @@ namespace RegressionTests.API
             LogDebug = logging.LogDebug,
             LogTcpIp = logging.LogTCPIP,
             KeepFilesOpen = logging.KeepFilesOpen,
-            LogFormat = logging.LogFormat
+            LogFormat = logging.LogFormat,
+            LogDevice = logging.Device,
+
+            ScriptingEnabled = _settings.Scripting.Enabled,
+            ScriptingLanguage = _settings.Scripting.Language,
+
+            BackupDestination = _settings.Backup.Destination,
+            BackupDomains = _settings.Backup.BackupDomains,
+            BackupMessages = _settings.Backup.BackupMessages,
+            BackupSettings = _settings.Backup.BackupSettings,
+            BackupCompress = _settings.Backup.CompressDestinationFiles
          };
       }
 
@@ -170,6 +194,18 @@ namespace RegressionTests.API
          if (logging.LogTCPIP != s.LogTcpIp) logging.LogTCPIP = s.LogTcpIp;
          if (logging.KeepFilesOpen != s.KeepFilesOpen) logging.KeepFilesOpen = s.KeepFilesOpen;
          if (logging.LogFormat != s.LogFormat) logging.LogFormat = s.LogFormat;
+         if (logging.Device != s.LogDevice) logging.Device = s.LogDevice;
+
+         var scripting = _settings.Scripting;
+         if (scripting.Enabled != s.ScriptingEnabled) scripting.Enabled = s.ScriptingEnabled;
+         if (scripting.Language != s.ScriptingLanguage) scripting.Language = s.ScriptingLanguage;
+
+         var backup = _settings.Backup;
+         if (backup.Destination != s.BackupDestination) backup.Destination = s.BackupDestination;
+         if (backup.BackupDomains != s.BackupDomains) backup.BackupDomains = s.BackupDomains;
+         if (backup.BackupMessages != s.BackupMessages) backup.BackupMessages = s.BackupMessages;
+         if (backup.BackupSettings != s.BackupSettings) backup.BackupSettings = s.BackupSettings;
+         if (backup.CompressDestinationFiles != s.BackupCompress) backup.CompressDestinationFiles = s.BackupCompress;
       }
 
       private void WriteSetting(string key, string value)
@@ -199,8 +235,7 @@ namespace RegressionTests.API
          _settings.SetAdministratorPassword(AdminPassword);
          _before = Take();
 
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          _application.Reinitialize();
 
@@ -214,10 +249,12 @@ namespace RegressionTests.API
          try
          {
             Restore(_before);
+            _settings.ClearLogonFailureList();
+            _settings.DeleteIniSetting(IniProbeKey);
          }
          finally
          {
-            WriteSetting("RestApiPort", "0");
+            RestListener.Stop();
             _application.Reinitialize();
          }
       }
@@ -524,6 +561,295 @@ namespace RegressionTests.API
          string namespaces = imap.Send("A1 NAMESPACE");
          StringAssert.Contains("RestPublic", namespaces, "NAMESPACE advertises the public folder name the API just set.");
          imap.Disconnect();
+      }
+
+      [Test]
+      [Description("GET /api/v1/settings/directories reports the seven directories Settings.Directories reports over COM, and the hMailServer.ini the settings were read from; the group has no PUT.")]
+      public void DirectoriesGroupMatchesCom()
+      {
+         hMailServer.Directories directories = _settings.Directories;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/directories");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"program\":\"" + JsonText(directories.ProgramDirectory) + "\"", body);
+         StringAssert.Contains("\"data\":\"" + JsonText(directories.DataDirectory) + "\"", body);
+         StringAssert.Contains("\"log\":\"" + JsonText(directories.LogDirectory) + "\"", body);
+         StringAssert.Contains("\"event\":\"" + JsonText(directories.EventDirectory) + "\"", body);
+         StringAssert.Contains("\"temp\":\"" + JsonText(directories.TempDirectory) + "\"", body);
+         StringAssert.Contains("\"database\":\"" + JsonText(directories.DatabaseDirectory) + "\"", body);
+         StringAssert.Contains("\"db_scripts\":\"" + JsonText(directories.DBScriptDirectory) + "\"", body);
+
+         // The ini is the one beside the binary, and it exists: the file this
+         // fixture's SetUp wrote the listener's port into.
+         string bin = Regex.Unescape(Extract(body, "bin"));
+         string iniFile = Regex.Unescape(Extract(body, "ini_file"));
+         Assert.IsTrue(File.Exists(iniFile), "ini_file names a file that exists: " + iniFile);
+         Assert.AreEqual(Paths.Combine(bin, "hMailServer.ini").ToLowerInvariant(), iniFile.ToLowerInvariant());
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/directories", "{\"data\":\"C:\\\\elsewhere\"}");
+         Assert.AreEqual(404, putStatus, "A directory is chosen at install time; the group has no PUT: " + putBody);
+      }
+
+      [Test]
+      [Description("The [Settings] section of hMailServer.ini one key at a time: COM reads what the API wrote, the API refuses what SetIniSetting refuses in its words, and deleting removes the line.")]
+      public void IniSettingRoundTripsThroughCom()
+      {
+         string path = "/api/v1/settings/ini/" + IniProbeKey;
+
+         (int absentStatus, string absentBody) = Http("GET", path);
+         Assert.AreEqual(200, absentStatus, absentBody);
+         StringAssert.Contains("\"present\":false", absentBody, "A key that is not in the file is a setting at its default, not an error.");
+         StringAssert.Contains("\"value\":\"\"", absentBody);
+
+         (int putStatus, string putBody) = Http("PUT", path, "{\"value\":\"one two\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"name\":\"" + IniProbeKey + "\"", putBody);
+         StringAssert.Contains("\"value\":\"one two\"", putBody);
+         StringAssert.Contains("\"present\":true", putBody);
+
+         Assert.AreEqual("one two", _settings.GetIniSetting(IniProbeKey), "COM reads what the API wrote.");
+         StringAssert.Contains(IniProbeKey, _settings.IniSettingNames);
+         Assert.AreEqual("one two", IniFileSetting.Read(IniProbeKey), "The value reached the file itself, not only the database mirror.");
+
+         (int listStatus, string listBody) = Http("GET", "/api/v1/settings/ini");
+         Assert.AreEqual(200, listStatus, listBody);
+         StringAssert.Contains("\"" + IniProbeKey + "\"", listBody);
+         StringAssert.StartsWith("{\"names\":[", listBody);
+
+         // The refusals are SetIniSetting's, and a refused write changes nothing.
+         (int typeStatus, string typeBody) = Http("PUT", path, "{\"value\":5}");
+         Assert.AreEqual(400, typeStatus, typeBody);
+         StringAssert.Contains("value must be a string", typeBody);
+
+         (int lineStatus, string lineBody) = Http("PUT", path, "{\"value\":\"two\\nlines\"}");
+         Assert.AreEqual(400, lineStatus, lineBody);
+         StringAssert.Contains("contains a line break", lineBody);
+
+         (int longStatus, string longBody) = Http("PUT", path, "{\"value\":\"" + new string('v', 4001) + "\"}");
+         Assert.AreEqual(400, longStatus, longBody);
+         StringAssert.Contains("longer than 4000 characters", longBody);
+         Assert.AreEqual("one two", _settings.GetIniSetting(IniProbeKey), "A refused value changes nothing.");
+
+         foreach (string badName in new[] { "has=equals", "has[bracket", "has]bracket", "%20leadingspace", new string('n', 101) })
+         {
+            (int nameStatus, string nameBody) = Http("PUT", "/api/v1/settings/ini/" + badName, "{\"value\":\"x\"}");
+            if (badName.StartsWith("%"))
+            {
+               // The path is not decoded: %20leadingspace is a key spelled that
+               // way, and the file can hold it. Written and removed again.
+               Assert.AreEqual(200, nameStatus, nameBody);
+               Assert.AreEqual(200, Http("DELETE", "/api/v1/settings/ini/" + badName).status);
+               continue;
+            }
+            Assert.AreEqual(400, nameStatus, "The name '" + badName + "' cannot be stored and read back as itself: " + nameBody);
+            StringAssert.Contains("The setting name is empty, longer than 100 characters", nameBody);
+         }
+
+         (int deleteStatus, string deleteBody) = Http("DELETE", path);
+         Assert.AreEqual(200, deleteStatus, deleteBody);
+         StringAssert.Contains("\"present\":false", deleteBody);
+         Assert.AreEqual("", _settings.GetIniSetting(IniProbeKey), "COM sees the key gone.");
+         StringAssert.DoesNotContain(IniProbeKey, _settings.IniSettingNames, "The line was removed, not emptied.");
+
+         (int againStatus, string againBody) = Http("DELETE", path);
+         Assert.AreEqual(200, againStatus, "Removing a key that is not there is not an error: " + againBody);
+      }
+
+      [Test]
+      [Description("POST /api/v1/settings/logon-failures/clear forgets the failures the auto-ban counts, as Settings.ClearLogonFailureList does: after it the count starts again at none, so four wrong passwords around a clear ban nothing where three in a row would.")]
+      public void LogonFailuresClearStartsTheCountAgain()
+      {
+         _settings.ClearLogonFailureList();
+         _settings.AutoBanOnLogonFailure = true;
+         _settings.MaxInvalidLogonAttempts = 3;
+         _settings.MaxInvalidLogonAttemptsWithin = 5;
+         _settings.AutoBanMinutes = 3;
+
+         Account account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "failures@example.test", "test");
+         int rangesBefore = _settings.SecurityRanges.Count;
+
+         var imap = new ImapClientSimulator();
+         string errorMessage;
+         for (int i = 0; i < 2; i++)
+         {
+            Assert.IsFalse(imap.ConnectAndLogon(account.Address, "wrong", out errorMessage));
+            imap.Disconnect();
+            StringAssert.DoesNotContain("Too many invalid logon attempts.", errorMessage);
+         }
+
+         (int status, string body) = Http("POST", "/api/v1/settings/logon-failures/clear");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"cleared\":true", body);
+
+         // The third failure in a row is the one that bans. These are the third
+         // and fourth since the account existed, and the first and second since
+         // the clear.
+         for (int i = 0; i < 2; i++)
+         {
+            Assert.IsFalse(imap.ConnectAndLogon(account.Address, "wrong", out errorMessage));
+            imap.Disconnect();
+            StringAssert.DoesNotContain("Too many invalid logon attempts.", errorMessage, "The count started again at none after the clear.");
+         }
+
+         Assert.IsTrue(imap.ConnectAndLogon(account.Address, "test"), "The right password still logs on: nothing was banned.");
+         imap.Disconnect();
+         Assert.AreEqual(rangesBefore, _settings.SecurityRanges.Count, "No auto-ban range was added.");
+      }
+
+      // A path as JSON shows it: the backslashes doubled.
+      private static string JsonText(string path)
+      {
+         return path.Replace("\\", "\\\\");
+      }
+
+      [Test]
+      [Description("PUT /api/v1/settings/logging takes the log device, and COM reads the device the API set.")]
+      public void LoggingDeviceRoundTripsThroughCom()
+      {
+         (int sqlStatus, string sqlBody) = Http("PUT", "/api/v1/settings/logging", "{\"device\":\"sql\"}");
+         Assert.AreEqual(200, sqlStatus, sqlBody);
+         StringAssert.Contains("\"device\":\"sql\"", sqlBody);
+         Assert.AreEqual(eLogDevice.hLogDeviceSQL, _settings.Logging.Device);
+
+         (int fileStatus, string fileBody) = Http("PUT", "/api/v1/settings/logging", "{\"device\":\"file\"}");
+         Assert.AreEqual(200, fileStatus, fileBody);
+         Assert.AreEqual(eLogDevice.hLogDeviceFile, _settings.Logging.Device);
+
+         (int badStatus, string badBody) = Http("PUT", "/api/v1/settings/logging", "{\"device\":\"printer\"}");
+         Assert.AreEqual(400, badStatus, badBody);
+         StringAssert.Contains("device must be one of", badBody);
+         Assert.AreEqual(eLogDevice.hLogDeviceFile, _settings.Logging.Device, "A refused word changes nothing.");
+      }
+
+      [Test]
+      [Description("GET and PUT /api/v1/settings/scripting are Settings.Scripting: the switch and the language written and read back through COM, a language that is neither refused in COM's words, the script checked and loaded again over the two POSTs.")]
+      public void ScriptingGroupRoundTripsThroughCom()
+      {
+         var scripting = _settings.Scripting;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/scripting");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"enabled\":" + (scripting.Enabled ? "true" : "false"), body);
+         StringAssert.Contains("\"language\":\"" + scripting.Language + "\"", body);
+         StringAssert.Contains("\"directory\":\"" + JsonText(_settings.Directories.EventDirectory) + "\"", body);
+         StringAssert.Contains("\"current_script_file\":", body);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/scripting", "{\"enabled\":true,\"language\":\"JScript\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         Assert.IsTrue(scripting.Enabled);
+         Assert.AreEqual("JScript", scripting.Language);
+
+         (int refusedStatus, string refusedBody) = Http("PUT", "/api/v1/settings/scripting", "{\"language\":\"Python\"}");
+         Assert.AreEqual(400, refusedStatus, refusedBody);
+         StringAssert.Contains("is not supported. hMailServer can run VBScript or JScript", refusedBody);
+         Assert.AreEqual("JScript", scripting.Language, "A refused language changes nothing.");
+
+         (int caseStatus, string caseBody) = Http("PUT", "/api/v1/settings/scripting", "{\"language\":\"vbscript\"}");
+         Assert.AreEqual(200, caseStatus, caseBody);
+         StringAssert.Contains("\"language\":\"VBScript\"", caseBody, "Stored in its canonical spelling, as COM stores it.");
+         Assert.AreEqual("VBScript", scripting.Language);
+
+         (int readOnlyStatus, string readOnlyBody) = Http("PUT", "/api/v1/settings/scripting", "{\"current_script_file\":\"x\"}");
+         Assert.AreEqual(400, readOnlyStatus, readOnlyBody);
+         StringAssert.Contains("is read-only", readOnlyBody);
+
+         (int checkStatus, string checkBody) = Http("POST", "/api/v1/settings/scripting/check");
+         Assert.AreEqual(200, checkStatus, checkBody);
+         StringAssert.Contains("\"result\":", checkBody);
+         Assert.AreEqual(scripting.CheckSyntax() ?? "", Regex.Unescape(Extract(checkBody, "result")), "The same verdict COM gives.");
+
+         (int reloadStatus, string reloadBody) = Http("POST", "/api/v1/settings/scripting/reload");
+         Assert.AreEqual(200, reloadStatus, reloadBody);
+         StringAssert.Contains("\"reloaded\":true", reloadBody);
+      }
+
+      [Test]
+      [Description("GET and PUT /api/v1/settings/backup are Settings.Backup: the destination and the four switches written and read back through COM; the log file is a fact and refused.")]
+      public void BackupGroupRoundTripsThroughCom()
+      {
+         var backup = _settings.Backup;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/backup");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"destination\":\"" + JsonText(backup.Destination) + "\"", body);
+         StringAssert.Contains("\"backup_domains\":" + (backup.BackupDomains ? "true" : "false"), body);
+         StringAssert.Contains("\"compress\":" + (backup.CompressDestinationFiles ? "true" : "false"), body);
+         StringAssert.Contains("\"log_file\":\"" + JsonText(backup.LogFile) + "\"", body);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/backup",
+            "{\"destination\":\"C:\\\\Temp\\\\restbackup\",\"backup_domains\":true,\"backup_messages\":false,\"backup_settings\":true,\"compress\":true}");
+         Assert.AreEqual(200, putStatus, putBody);
+         Assert.AreEqual("C:\\Temp\\restbackup", backup.Destination);
+         Assert.IsTrue(backup.BackupDomains);
+         Assert.IsFalse(backup.BackupMessages);
+         Assert.IsTrue(backup.BackupSettings);
+         Assert.IsTrue(backup.CompressDestinationFiles);
+
+         (int readOnlyStatus, string readOnlyBody) = Http("PUT", "/api/v1/settings/backup", "{\"log_file\":\"x\"}");
+         Assert.AreEqual(400, readOnlyStatus, readOnlyBody);
+         StringAssert.Contains("log_file is read-only", readOnlyBody);
+      }
+
+      [Test]
+      [Description("GET /api/v1/settings/messages lists the server's message texts and PUT .../messages/{name} changes one, with COM reading the new text; an unknown name is 404 and a text that is not a string is 400.")]
+      public void ServerMessagesRoundTripThroughCom()
+      {
+         const string name = "VIRUS_FOUND";
+         string original = _settings.ServerMessages.get_ItemByName(name).Text;
+
+         (int listStatus, string list) = Http("GET", "/api/v1/settings/messages");
+         Assert.AreEqual(200, listStatus, list);
+         StringAssert.Contains("\"name\":\"" + name + "\"", list);
+         StringAssert.StartsWith("[", list);
+
+         try
+         {
+            (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/messages/" + name, "{\"text\":\"Virus found (over the route)\"}");
+            Assert.AreEqual(200, putStatus, putBody);
+            StringAssert.Contains("\"text\":\"Virus found (over the route)\"", putBody);
+            Assert.AreEqual("Virus found (over the route)", _settings.ServerMessages.get_ItemByName(name).Text, "COM reads what the API wrote.");
+
+            (int unknownStatus, string unknownBody) = Http("PUT", "/api/v1/settings/messages/NO_SUCH_MESSAGE", "{\"text\":\"x\"}");
+            Assert.AreEqual(404, unknownStatus, unknownBody);
+
+            (int typeStatus, string typeBody) = Http("PUT", "/api/v1/settings/messages/" + name, "{\"text\":5}");
+            Assert.AreEqual(400, typeStatus, typeBody);
+            StringAssert.Contains("text must be a string", typeBody);
+         }
+         finally
+         {
+            Http("PUT", "/api/v1/settings/messages/" + name, "{\"text\":" + JsonString(original) + "}");
+         }
+
+         Assert.AreEqual(original, _settings.ServerMessages.get_ItemByName(name).Text, "Put back as it was.");
+      }
+
+      [Test]
+      [Description("POST /api/v1/sieve/evaluate gives the verdict Utilities.EvaluateSieveScript gives for the same script and message, delivering nothing; a script that does not parse answers error:, and a body without a script is refused.")]
+      public void SieveEvaluateMatchesCom()
+      {
+         string script = "require [\"fileinto\"];\r\nif header :contains \"subject\" \"invoice\" { fileinto \"Invoices\"; } else { keep; }";
+         string message = "From: sender@example.test\r\nTo: someone@example.test\r\nSubject: Your invoice\r\n\r\nBody\r\n";
+
+         (int status, string body) = Http("POST", "/api/v1/sieve/evaluate", "{\"script\":" + JsonString(script) + ",\"message\":" + JsonString(message) + "}");
+         Assert.AreEqual(200, status, body);
+         string result = Regex.Unescape(Extract(body, "result"));
+         StringAssert.Contains("fileinto", result);
+         Assert.AreEqual(_application.Utilities.EvaluateSieveScript(script, message), result, "The same verdict COM gives.");
+
+         (int brokenStatus, string brokenBody) = Http("POST", "/api/v1/sieve/evaluate", "{\"script\":\"if { \",\"message\":" + JsonString(message) + "}");
+         Assert.AreEqual(200, brokenStatus, brokenBody);
+         StringAssert.StartsWith("error:", Regex.Unescape(Extract(brokenBody, "result")));
+
+         (int missingStatus, string missingBody) = Http("POST", "/api/v1/sieve/evaluate", "{\"message\":\"x\"}");
+         Assert.AreEqual(400, missingStatus, missingBody);
+         StringAssert.Contains("script must be a string", missingBody);
+      }
+
+      // A string as a JSON string literal, for bodies that carry line breaks and quotes.
+      private static string JsonString(string value)
+      {
+         return "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\r", "\\r").Replace("\n", "\\n") + "\"";
       }
 
       private static (string id, string key) CreateKey(string label, string scope, string domains)

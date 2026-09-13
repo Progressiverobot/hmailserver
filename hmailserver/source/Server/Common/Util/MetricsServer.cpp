@@ -22,6 +22,7 @@
 #include "../BO/SSLCertificates.h"
 #include "../SQL/DatabaseConnectionManager.h"
 #include "../Persistence/PersistentMessage.h"
+#include "../TCPIP/AcceptLoop.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
 
@@ -567,13 +568,13 @@ namespace HM
 
       running_ = false;
 
-      if (listen_socket_ != INVALID_SOCKET)
-      {
-         closesocket(listen_socket_);
-         listen_socket_ = INVALID_SOCKET;
-      }
+      // Wakes the worker out of accept(). The descriptor itself is released after
+      // the join below, for the reason AcceptLoop.h gives: on Linux a close does
+      // not wake the accept, and a descriptor closed under a thread that may
+      // still re-enter accept() on it can be reused by then.
+      AcceptLoop::Interrupt(listen_socket_);
 
-      // Closing the listen socket only stops NEW connections; it says nothing
+      // Stopping the listener only stops NEW connections; it says nothing
       // about the one the worker may be in the middle of. Shut that one down too,
       // so a blocked handshake, read or write fails immediately and the join below
       // completes in milliseconds instead of waiting on a remote peer. The read and
@@ -614,6 +615,8 @@ namespace HM
 
       if (worker_.joinable())
          worker_.join();
+
+      AcceptLoop::Release(listen_socket_);
 
       if (refresher_.joinable())
          refresher_.join();
@@ -797,7 +800,8 @@ namespace HM
 
          if (clientSocket == INVALID_SOCKET)
          {
-            // The listen socket was closed (shutdown) or an error occurred.
+            // The listen socket was interrupted by Stop() (closed on Windows, shut
+            // down on POSIX) or an error occurred.
             if (!running_)
                return;
 

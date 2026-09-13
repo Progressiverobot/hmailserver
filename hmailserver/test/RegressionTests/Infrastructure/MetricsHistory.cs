@@ -27,7 +27,9 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class MetricsHistory : TestFixtureBase
    {
-      private const int RestPort = 11421;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 11421;
       private const string AdminPassword = "testar";
 
       private static (int status, string body) Http(string path)
@@ -179,8 +181,7 @@ namespace RegressionTests.Infrastructure
       public void TheRestRouteServesTheHistory()
       {
          _settings.SetAdministratorPassword(AdminPassword);
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          _application.Reinitialize();
 
          try
@@ -209,7 +210,7 @@ namespace RegressionTests.Infrastructure
          }
          finally
          {
-            IniFileSetting.Write("RestApiPort", "0");
+            RestListener.Stop();
             _application.Reinitialize();
          }
       }

@@ -150,33 +150,33 @@ namespace RegressionTests.API
       [Description("Issue 169 - Unicode subject not decoded properly.")]
       public void TestDecodeSpecificMessage()
       {
-         var message = "Return-Path:" + Environment.NewLine +
-                       "Received: from host ([1.2.3.4])" + Environment.NewLine +
-                       "X-Facebook: from zuckmail" + Environment.NewLine +
-                       "by localhost.localdomain with local (ZuckMail);" + Environment.NewLine +
-                       "Date: Wed, 3 Dec 2008 06:14:37 -0800" + Environment.NewLine +
-                       "To: someone@example.com" + Environment.NewLine +
-                       "From: Facebook" + Environment.NewLine +
-                       "Reply-to: Facebook" + Environment.NewLine +
+         var message = "Return-Path:" + "\r\n" +
+                       "Received: from host ([1.2.3.4])" + "\r\n" +
+                       "X-Facebook: from zuckmail" + "\r\n" +
+                       "by localhost.localdomain with local (ZuckMail);" + "\r\n" +
+                       "Date: Wed, 3 Dec 2008 06:14:37 -0800" + "\r\n" +
+                       "To: someone@example.com" + "\r\n" +
+                       "From: Facebook" + "\r\n" +
+                       "Reply-to: Facebook" + "\r\n" +
                        "Subject: =?UTF-8?Q?V=C3=A4nligen_=C3=A5terst=C3=A4ll_dina_inst=C3=A4llningar_f=C3?=" +
-                       Environment.NewLine +
-                       "    =?UTF-8?Q?=B6r_meddelanden_via_e-post.?=" + Environment.NewLine +
-                       "Message-ID:" + Environment.NewLine +
-                       "X-Priority: 3" + Environment.NewLine +
-                       "X-Mailer: ZuckMail [version 1.00]" + Environment.NewLine +
-                       "Errors-To: root+monkeymonkey@facebookmail.com" + Environment.NewLine +
-                       "MIME-Version: 1.0" + Environment.NewLine +
-                       "Content-Type: text/plain; charset=\"UTF-8\"" + Environment.NewLine +
-                       "Content-Transfer-Encoding: quoted-printable" + Environment.NewLine +
-                       "" + Environment.NewLine +
+                       "\r\n" +
+                       "    =?UTF-8?Q?=B6r_meddelanden_via_e-post.?=" + "\r\n" +
+                       "Message-ID:" + "\r\n" +
+                       "X-Priority: 3" + "\r\n" +
+                       "X-Mailer: ZuckMail [version 1.00]" + "\r\n" +
+                       "Errors-To: root+monkeymonkey@facebookmail.com" + "\r\n" +
+                       "MIME-Version: 1.0" + "\r\n" +
+                       "Content-Type: text/plain; charset=\"UTF-8\"" + "\r\n" +
+                       "Content-Transfer-Encoding: quoted-printable" + "\r\n" +
+                       "" + "\r\n" +
                        "Dina inst=C3=A4llningar f=C3=B6r meddelanden via e-post har tyv=C3=A4rr g=" +
-                       Environment.NewLine +
-                       "=C3=A5tt f=C3=B6rlorade. Vi beklagar det intr=C3=A4ffade.G=C3=" + Environment.NewLine +
+                       "\r\n" +
+                       "=C3=A5tt f=C3=B6rlorade. Vi beklagar det intr=C3=A4ffade.G=C3=" + "\r\n" +
                        "=A5 till http://www.facebook.com/editaccount.php?notifications f=C3=B6r a=" +
-                       Environment.NewLine +
+                       "\r\n" +
                        "tt =C3=A5terst=C3=A4lla dina inst=C3=A4llningar.Tack!Facebook-grupp=" +
-                       Environment.NewLine +
-                       "en." + Environment.NewLine;
+                       "\r\n" +
+                       "en." + "\r\n";
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "decode@example.test", "test");
 

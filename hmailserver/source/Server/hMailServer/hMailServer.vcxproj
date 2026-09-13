@@ -571,6 +571,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiSettings.cpp" />
     <ClCompile Include="..\Common\Util\RestApiRules.cpp" />
     <ClCompile Include="..\Common\Util\RestApiCertificates.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiAdministration.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiFetchAccounts.cpp" />
     <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMailbox.cpp" />
     <ClCompile Include="..\Common\Util\RestApiContacts.cpp" />
@@ -1192,6 +1194,7 @@ EXIT 0
     <ClInclude Include="..\Common\TCPIP\IOOperationQueue.h" />
     <ClInclude Include="..\Common\TCPIP\IOQueueWorkerTask.h" />
     <ClInclude Include="..\Common\TCPIP\IOService.h" />
+    <ClInclude Include="..\Common\TCPIP\AcceptLoop.h" />
     <ClInclude Include="..\Common\TCPIP\IPAddress.h" />
     <ClInclude Include="..\Common\Tcpip\LocalIPAddresses.h" />
     <ClInclude Include="..\Common\Tcpip\SocketConstants.h" />
