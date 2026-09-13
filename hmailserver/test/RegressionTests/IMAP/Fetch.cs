@@ -113,12 +113,12 @@ namespace RegressionTests.IMAP
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
 
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "To: Someoen <someone@example.com>" + Environment.NewLine +
-                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + Environment.NewLine +
-                       "Subject: Something" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "To: Someoen <someone@example.com>" + "\r\n" +
+                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + "\r\n" +
+                       "Subject: Something" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
 
          var smtpSimulator = new SmtpClientSimulator();
          smtpSimulator.SendRaw(account.Address, account.Address, message);
@@ -140,12 +140,12 @@ namespace RegressionTests.IMAP
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
 
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "To: Someoen <someone@example.com>" + Environment.NewLine +
-                       "In-Reply-To: ShouldBeEncodedDueToQuote\"" + Environment.NewLine +
-                       "Subject: Something" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "To: Someoen <someone@example.com>" + "\r\n" +
+                       "In-Reply-To: ShouldBeEncodedDueToQuote\"" + "\r\n" +
+                       "Subject: Something" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
 
          var smtpSimulator = new SmtpClientSimulator();
          smtpSimulator.SendRaw(account.Address, account.Address, message);
@@ -169,12 +169,12 @@ namespace RegressionTests.IMAP
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
 
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "To: Someoen <someone@example.com>" + Environment.NewLine +
-                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + Environment.NewLine +
-                       "Subject: Something" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "To: Someoen <someone@example.com>" + "\r\n" +
+                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + "\r\n" +
+                       "Subject: Something" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
 
          var smtpSimulator = new SmtpClientSimulator();
          smtpSimulator.SendRaw(account.Address, account.Address, message);
@@ -201,12 +201,12 @@ namespace RegressionTests.IMAP
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
 
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "To: Someoen <someone@example.com>" + Environment.NewLine +
-                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + Environment.NewLine +
-                       "Subject: SubjectText" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "To: Someoen <someone@example.com>" + "\r\n" +
+                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + "\r\n" +
+                       "Subject: SubjectText" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
 
          var smtpSimulator = new SmtpClientSimulator();
          smtpSimulator.SendRaw(account.Address, account.Address, message);
@@ -230,12 +230,12 @@ namespace RegressionTests.IMAP
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
 
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "To: Someoen <someone@example.com>" + Environment.NewLine +
-                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + Environment.NewLine +
-                       "Subject: Something" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "To: Someoen <someone@example.com>" + "\r\n" +
+                       "Date: Wed, 22 Apr 2009 11:05:09 \"GMT\"" + "\r\n" +
+                       "Subject: Something" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
 
          var smtpSimulator = new SmtpClientSimulator();
          smtpSimulator.SendRaw(account.Address, account.Address, message);
@@ -433,10 +433,10 @@ namespace RegressionTests.IMAP
       public void PartialFetch_HeaderFields()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "Subject: TestSubject" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "Subject: TestSubject" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
          new SmtpClientSimulator().SendRaw(account.Address, account.Address, message);
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
 
@@ -467,10 +467,10 @@ namespace RegressionTests.IMAP
       public void PartialFetch_HeaderFieldsNot()
       {
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "mimetest@example.test", "test");
-         var message = "From: Someone <someone@example.com>" + Environment.NewLine +
-                       "Subject: TestSubject" + Environment.NewLine +
-                       Environment.NewLine +
-                       "Hello" + Environment.NewLine;
+         var message = "From: Someone <someone@example.com>" + "\r\n" +
+                       "Subject: TestSubject" + "\r\n" +
+                       "\r\n" +
+                       "Hello" + "\r\n";
          new SmtpClientSimulator().SendRaw(account.Address, account.Address, message);
          Pop3ClientSimulator.AssertMessageCount(account.Address, "test", 1);
 
