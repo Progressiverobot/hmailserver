@@ -276,6 +276,7 @@
       b.appendChild(node('span', count ? String(count) : '', 'ct'));
       if (count && !(f && special(f, 'Drafts'))) { b.classList.add('unread'); }
       b.addEventListener('click', function () { go(route); });
+      if (f && route.indexOf('/f/') === 0) { dropTarget(b, f.id); }
       nav.appendChild(b);
       return b;
     };
@@ -406,6 +407,7 @@
   };
   var fileMessage = function (id, to) {
     if (to === 'delete') { return call('DELETE', '/api/v1/me/messages/' + id); }
+    if (typeof to === 'number') { return call('POST', '/api/v1/me/messages/' + id + '/move', { folder_id: to }); }
     return call('POST', '/api/v1/me/messages/' + id + '/move', { to: to });
   };
   var afterFiling = function (result, what) {
@@ -439,7 +441,7 @@
   var colourKeyOf = function (name) { var lower = name.toLowerCase(); for (var k in labelColours) { if (k.toLowerCase() === lower) { return k; } } return null; };
   var colourOf = function (name) { var k = colourKeyOf(name); return k ? labelColours[k] : '#5b6875'; };
   var chip = function (name) { var c = node('span', name, 'chip'); if (c.style) { c.style.backgroundColor = colourOf(name); } return c; };
-  var chipsFor = function (keywords) { var box = node('span', undefined, 'chips'); (keywords || []).forEach(function (k) { box.appendChild(chip(k)); }); return box; };
+  var chipsFor = function (keywords) { var box = node('span', undefined, 'chips'); (keywords || []).filter(function (k) { return k.charAt(0) !== '$'; }).forEach(function (k) { box.appendChild(chip(k)); }); return box; };
   var validLabel = function (name) { return /^[\x21-\x7e]+$/.test(name) && !/[()\{\}\[\]%*"\\]/.test(name) && name.length <= 60; };
   var saveLabelColours = function () { return savePrefs({ labels: JSON.stringify(labelColours) }); };
   var renderLabelNav = function () {
@@ -501,7 +503,7 @@
     var box = el('message-labels');
     clear(box);
     if (!current) { return; }
-    (current.flags.keywords || []).forEach(function (k) { box.appendChild(chip(k)); });
+    (current.flags.keywords || []).filter(function (k) { return k.charAt(0) !== '$'; }).forEach(function (k) { box.appendChild(chip(k)); });
   };
   var setKeywords = function (add, remove) {
     if (!current) { return Promise.resolve(false); }
@@ -563,6 +565,8 @@
     row.setAttribute('role', 'listitem');
     var folderId = m.folder_id || state.folderId;
     var entry = { id: m.id, row: row, m: m, folderId: folderId };
+    if (isPinned(m)) { row.classList.add('pinned'); }
+    rowGestures(row, entry);
     var cb = node('span', undefined, 'cb');
     var box = document.createElement('input'); box.type = 'checkbox'; box.checked = !!selected[m.id]; box.setAttribute('aria-label', t('Select'));
     box.addEventListener('click', function (event) { event.stopPropagation(); selected[m.id] = box.checked; renderBulk(); });
@@ -620,14 +624,15 @@
     step();
   };
   var renderRows = function (page, list, shown) {
+    var ordered = page.messages.filter(isPinned).concat(page.messages.filter(function (m) { return !isPinned(m); }));
     if (pref('view') !== 'threads' || page.query) {
-      page.messages.forEach(function (m) { shown[m.id] = true; });
-      chunkedAppend(page.messages, list, function (m) { return messageRow(m, false); });
+      ordered.forEach(function (m) { shown[m.id] = true; });
+      chunkedAppend(ordered, list, function (m) { return messageRow(m, false); });
       return;
     }
     // A null prototype: a References header spelling 'constructor' is a key, not a property.
     var groups = []; var byKey = Object.create(null);
-    page.messages.forEach(function (m) {
+    ordered.forEach(function (m) {
       shown[m.id] = true;
       var key = threadKey(m);
       if (!byKey[key]) { byKey[key] = { key: key, messages: [] }; groups.push(byKey[key]); }
@@ -641,6 +646,8 @@
       row.setAttribute('role', 'listitem');
       var folderId = newest.folder_id || state.folderId;
       var entry = { id: newest.id, ids: g.messages.map(function (m) { return m.id; }), ms: g.messages, row: row, m: newest, folderId: folderId };
+      if (g.messages.some(isPinned)) { row.classList.add('pinned'); }
+      rowGestures(row, entry);
       var cb = node('span', undefined, 'cb');
       var box = document.createElement('input'); box.type = 'checkbox'; box.setAttribute('aria-label', t('Select the conversation'));
       box.checked = g.messages.every(function (m) { return !!selected[m.id]; });
@@ -871,6 +878,7 @@
     el('label-menu').hidden = true;
     renderMessageLabels();
     el('message-edit').hidden = !current.flags.draft;
+    el('message-pin').textContent = isPinned(current) ? t('Unpin') : t('Pin');
     var junk = el('message-junk');
     var isJunk = folderIs(current.folder_id, 'Junk');
     junk.setAttribute('title', isJunk ? t('Not junk') : t('Junk'));
@@ -3360,6 +3368,9 @@
 
   // ---- Print ----------------------------------------------------------------
   el('message-print').addEventListener('click', function () { window.print(); });
+  el('message-pin').addEventListener('click', function () { closeMenus(); if (current) { pinMessages([current.id], !isPinned(current)); } });
+  el('message-block').addEventListener('click', function () { closeMenus(); if (current) { blockSender(addressOf(current.from)); } });
+  el('message-sweep').addEventListener('click', function () { closeMenus(); if (current) { sweepSender(addressOf(current.from), current.folder_id || state.folderId); } });
 
   // ---- The shortcut list and the palette -------------------------------------
   var closeOverlays = function () { el('keys-overlay').hidden = true; el('palette').hidden = true; };
@@ -3588,7 +3599,8 @@
   };
   var filingText = function (to, result, count) {
     var what;
-    if (to === 'delete') { what = result && result.data && result.data.deleted ? t('deleted') : t('moved to Trash'); }
+    if (typeof to === 'number') { what = t('moved to ') + folderName(to); }
+    else if (to === 'delete') { what = result && result.data && result.data.deleted ? t('deleted') : t('moved to Trash'); }
     else { what = to === 'archive' ? t('archived') : to === 'junk' ? t('moved to Junk') : to === 'inbox' ? t('moved to Inbox') : to === 'trash' ? t('moved to Trash') : t('deleted'); }
     if (count > 1) { return tf('{0} {1}.', count, what); }
     return what.charAt(0).toUpperCase() + what.slice(1) + '.';
@@ -3966,6 +3978,131 @@
       box.appendChild(card);
     });
   };
+
+
+  // ---- Pin, block, sweep; drag to a folder; the right-click menu -----------
+  var PIN = '$Pinned';
+  var isPinned = function (m) { return !!(m && m.flags && (m.flags.keywords || []).indexOf(PIN) >= 0); };
+  var pinMessages = function (ids, on) {
+    var chain = Promise.resolve();
+    ids.forEach(function (id) {
+      chain = chain.then(function () { return call('PUT', '/api/v1/me/messages/' + id + '/flags', on ? { keywords_add: [PIN] } : { keywords_remove: [PIN] }); });
+    });
+    chain.then(function () {
+      if (current && ids.indexOf(current.id) >= 0) {
+        var list = (current.flags.keywords || []).filter(function (k) { return k !== PIN; });
+        if (on) { list.push(PIN); }
+        current.flags.keywords = list;
+        renderActions();
+      }
+      lastListing = null;
+      reloadKeepingPlace();
+      toast(on ? t('Pinned to the top of the list.') : t('Unpinned.'));
+    });
+  };
+  // A rule that files what the sender sends into Junk - or discards it where
+  // the account has no Junk folder - added to the account's own rules.
+  var blockSender = function (address) {
+    address = String(address || '').trim();
+    if (!address) { return; }
+    var rules = rulesOf(el('filter-script').value);
+    if (rules === null) { toast(t('The filter script was written by hand: add the rule there.')); return; }
+    var junk = allFolders.filter(function (f) { return !f.owner && folderIs(f.id, 'Junk'); })[0];
+    var rule = junk ? { field: 'from', text: address, action: 'move', folder: junk.path } : { field: 'from', text: address, action: 'discard' };
+    var before = rules.slice();
+    saveRules(rules.concat([rule])).then(function (ok) {
+      if (!ok) { return; }
+      toast(tf('Messages from {0} will go to {1}.', address, junk ? junk.path : t('nowhere')), function () { saveRules(before); });
+    });
+  };
+  // Every message from the sender in the folder, deleted in one go, with undo.
+  var sweepSender = function (address, folderId) {
+    address = String(address || '').trim();
+    if (!address || !folderId) { return; }
+    call('GET', '/api/v1/me/folders/' + folderId + '/messages?q=' + encodeURIComponent('from:' + address) + '&limit=200').then(function (result) {
+      if (result.status !== 200 || !result.data) { say('mail-status', describe(result, t('Could not read the folder')), false); return; }
+      var hits = (result.data.messages || []).filter(function (m) { return addressOf(m.from).toLowerCase() === address.toLowerCase(); });
+      if (!hits.length) { toast(tf('Nothing from {0} in this folder.', address)); return; }
+      fileMany(hits.map(function (m) { return { id: m.id, folderId: folderId }; }), 'delete').then(function (ok) {
+        if (ok && current && hits.some(function (m) { return m.id === current.id; })) { closeMessage(true); }
+        loadMessages();
+      });
+    });
+  };
+  var dragged = null;
+  var rowGestures = function (row, entry) {
+    row.setAttribute('draggable', 'true');
+    row.addEventListener('dragstart', function (event) {
+      var ids = selected[entry.id] ? selectedIds() : (entry.ids || [entry.id]);
+      dragged = { ids: ids, folderId: entry.folderId };
+      row.classList.add('dragging');
+      if (event.dataTransfer) { try { event.dataTransfer.setData('text/plain', ids.join(',')); event.dataTransfer.effectAllowed = 'move'; } catch (e) { /* the harness's event has none */ } }
+    });
+    row.addEventListener('dragend', function () { row.classList.remove('dragging'); dragged = null; });
+    row.addEventListener('contextmenu', function (event) {
+      event.preventDefault();
+      openContextMenu(entry, event.clientX || 0, event.clientY || 0);
+    });
+  };
+  var dropTarget = function (button, folderId) {
+    button.addEventListener('dragover', function (event) { if (!dragged || dragged.folderId === folderId) { return; } event.preventDefault(); button.classList.add('drop'); });
+    button.addEventListener('dragleave', function () { button.classList.remove('drop'); });
+    button.addEventListener('drop', function (event) {
+      event.preventDefault();
+      button.classList.remove('drop');
+      if (!dragged) { return; }
+      var moving = dragged;
+      dragged = null;
+      fileMany(moving.ids.map(function (id) { return { id: id, folderId: moving.folderId }; }), folderId).then(function (ok) {
+        if (ok && current && moving.ids.indexOf(current.id) >= 0) { closeMessage(true); }
+        clearSelection();
+        loadMessages();
+      });
+    });
+  };
+  var contextRow = null;
+  var openContextMenu = function (entry, x, y) {
+    closeMenus();
+    contextRow = entry;
+    var menu = el('context-menu');
+    var m = entry.m;
+    var items = menu.children;
+    for (var i = 0; i < items.length; i++) {
+      var act = items[i].getAttribute ? items[i].getAttribute('data-act') : '';
+      if (act === 'read') { items[i].textContent = m.flags.seen ? t('Mark as unread') : t('Mark as read'); }
+      if (act === 'star') { items[i].textContent = m.flags.flagged ? t('Unstar') : t('Star'); }
+      if (act === 'pin') { items[i].textContent = isPinned(m) ? t('Unpin') : t('Pin'); }
+      if (act === 'junk') { items[i].textContent = folderIs(entry.folderId, 'Junk') ? t('Not junk') : t('Junk'); }
+    }
+    menu.hidden = false;
+    if (menu.style) {
+      var w = window.innerWidth || 1200, h = window.innerHeight || 800;
+      menu.style.left = Math.max(4, Math.min(x, w - 240)) + 'px';
+      menu.style.top = Math.max(4, Math.min(y, h - 320)) + 'px';
+    }
+  };
+  var closeContextMenu = function () { el('context-menu').hidden = true; contextRow = null; };
+  el('context-menu').addEventListener('click', function (event) {
+    var act = event.target && event.target.getAttribute ? event.target.getAttribute('data-act') : '';
+    var entry = contextRow;
+    closeContextMenu();
+    if (!act || !entry) { return; }
+    var m = entry.m;
+    if (act === 'open') { go('/m/' + entry.id); }
+    else if (act === 'archive') { fileRow(entry, 'archive'); }
+    else if (act === 'junk') { fileRow(entry, junkTargetFor(entry.folderId)); }
+    else if (act === 'delete') { fileRow(entry, 'delete'); }
+    else if (act === 'read') { markRows([entry], !m.flags.seen); }
+    else if (act === 'star' && entry.star) { toggleStar(m, entry.star); }
+    else if (act === 'pin') { pinMessages(entry.ids || [entry.id], !isPinned(m)); }
+    else if (act === 'block') { blockSender(addressOf(m.from)); }
+    else if (act === 'sweep') { sweepSender(addressOf(m.from), entry.folderId); }
+  });
+  document.addEventListener('click', function (event) {
+    if (el('context-menu').hidden) { return; }
+    if (!within(event.target, el('context-menu'))) { closeContextMenu(); }
+  });
+  document.addEventListener('keydown', function (event) { if (event.key === 'Escape' && !el('context-menu').hidden) { closeContextMenu(); } });
 
   // The theme the last visit chose, for the sign-in page; the account's own
   // choice replaces it once there is an account.

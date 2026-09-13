@@ -569,6 +569,40 @@ async function main() {
    while (onCursor() < 1) { document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body })); }
    while (onCursor() > 1) { document.dispatchEvent(makeEvent('keydown', { key: 'k', target: document.body })); }
 
+   // ---- a right-click menu on a row: pin, and Escape closes it
+   rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   check('a right-click opens the row menu', document.getElementById('context-menu').hidden === false);
+   const menuItems = document.getElementById('context-menu').children;
+   let pinItem = null; for (let i = 0; i < menuItems.length; i++) { if (menuItems[i].getAttribute && menuItems[i].getAttribute('data-act') === 'pin') { pinItem = menuItems[i]; } }
+   check('and offers to pin it', !!pinItem && pinItem.textContent === 'Pin', pinItem ? pinItem.textContent : 'no pin item');
+   const beforePin = requests.length;
+   pinItem.dispatchEvent(makeEvent('click', { target: pinItem }));
+   await flush();
+   await flush();
+   const pinCall = since(beforePin).filter((r) => r.method === 'PUT' && /\/messages\/102\/flags$/.test(r.path))[0];
+   check('Pin adds the pin keyword to the message', !!pinCall && JSON.stringify(JSON.parse(pinCall.body).keywords_add) === '["$Pinned"]', pinCall ? pinCall.body : 'no flags call');
+   check('and the menu is gone', document.getElementById('context-menu').hidden === true);
+   rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.body }));
+   check('Escape closes the row menu', document.getElementById('context-menu').hidden === true);
+
+   // ---- a row dragged onto a folder moves there, with undo
+   const sentButton = (() => { const n = document.getElementById('folder-nav').children; for (let i = 0; i < n.length; i++) { if (n[i].getAttribute && n[i].getAttribute('data-route') === '/f/2') { return n[i]; } } return null; })();
+   const beforeDrop = requests.length;
+   rows()[0].dispatchEvent(makeEvent('dragstart'));
+   sentButton.dispatchEvent(makeEvent('dragover'));
+   sentButton.dispatchEvent(makeEvent('drop'));
+   await flush();
+   await flush();
+   const dropCall = since(beforeDrop).filter((r) => r.method === 'POST' && /\/messages\/103\/move$/.test(r.path))[0];
+   check('a row dropped on a folder is moved there', !!dropCall && JSON.parse(dropCall.body).folder_id === 2, dropCall ? dropCall.body : 'no move');
+   check('and the toast offers Undo', document.getElementById('toasts').textContent.indexOf('Undo') >= 0, document.getElementById('toasts').textContent);
+   { const toastBox = document.getElementById('toasts'); const buttons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.textContent === 'Undo') { buttons.push(c); } walk(c); } })(toastBox); if (buttons.length) { buttons[0].dispatchEvent(makeEvent('click')); } }
+   await flush();
+   await flush();
+   while (onCursor() < 1) { document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body })); }
+   while (onCursor() > 1) { document.dispatchEvent(makeEvent('keydown', { key: 'k', target: document.body })); }
+
    // ---- Enter opens the message under the cursor, and it has an address
    const beforeOpen = requests.length;
    document.dispatchEvent(makeEvent('keydown', { key: 'Enter', target: document.body }));
