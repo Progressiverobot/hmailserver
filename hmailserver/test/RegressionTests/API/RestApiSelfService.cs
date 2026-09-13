@@ -1414,7 +1414,7 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("POST /api/v1/me/smime/chain: a certificate no trusted root signed is answered untrusted with OpenSSL's reason, the subject read from it and the roots consulted counted; what is not a certificate is refused")]
+      [Description("POST /api/v1/me/smime/chain: a certificate signed by no trusted root is answered untrusted with OpenSSL's reason, the subject read from it and the roots consulted counted; what is not a certificate is refused")]
       public void TheChainCheckAnswersForACertificateNoRootSigned()
       {
          using (RSA rsa = RSA.Create(2048))
