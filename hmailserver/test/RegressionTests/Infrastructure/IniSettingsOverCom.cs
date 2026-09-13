@@ -124,8 +124,9 @@ namespace RegressionTests.Infrastructure
       {
          string[] before = SettingNames();
 
-         Assert.Greater(before.Length, 10,
-            "The [Settings] section should hold dozens of names; this looks like the enumeration is not reading the file.");
+         Assert.Greater(before.Length, 3,
+            "The [Settings] section holds at least the handful of names every bench writes (dozens on the Windows one); " +
+            "this looks like the enumeration is not reading the file.");
 
          Assert.IsFalse(before.Contains(ProbeKey));
 

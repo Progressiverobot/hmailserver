@@ -169,6 +169,7 @@ namespace HMPlatform
 
 
 #include <unistd.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -567,10 +568,11 @@ inline LONGLONG InterlockedIncrement64(LONGLONG volatile *target)
 // ---------------------------------------------------------------- ids, debug
 inline DWORD GetCurrentThreadId()
 {
-   // A number that is unique among live threads and stable for one thread, which
-   // is all the log lines that print it need. pthread_self() is opaque but is a
-   // pointer-sized value on glibc; truncating keeps the log format unchanged.
-   return (DWORD) (uintptr_t) ::pthread_self();
+   // The kernel's thread id, the number ps -L and gdb show for the thread:
+   // unique among live threads, stable for one, and positive. pthread_self()
+   // is a pointer, and its low 32 bits printed as a negative number in every
+   // log line - which the log-format fixture read as the format having changed.
+   return (DWORD) ::syscall(SYS_gettid);
 }
 
 inline DWORD GetCurrentProcessId()

@@ -409,6 +409,13 @@ namespace hMailServer
 
       public void Delete()
       {
+         // An alias that was never saved has no row: a fixture's finally block
+         // deletes the alias it made whether or not the test got as far as
+         // saving it, and a 404 thrown from there would hide what really
+         // stopped the test - a skip, on this bench.
+         if (ID == 0)
+            return;
+
          var path = "/api/v1/domains/" + _ownerDomain + "/domain-aliases/" + AliasName;
          ServerApi.Delete(path).Expect(200, "DELETE " + path);
          ID = 0;
@@ -975,6 +982,9 @@ namespace hMailServer
             TreatSenderAsLocalDomain = element.TryGetProperty("treat_sender_as_local_domain", out var s) &&
                                        s.ValueKind == JsonValueKind.True,
             ConnectionSecurity = TCPIPPort.SecurityOf(ServerApi.StringOf(element, "connection_security")),
+            RelayerRequiresAuth = element.TryGetProperty("relayer_requires_authentication", out var auth) &&
+                                  auth.ValueKind == JsonValueKind.True,
+            RelayerAuthUsername = ServerApi.StringOf(element, "relayer_auth_username"),
             Existing = true
          };
       }

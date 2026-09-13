@@ -4206,6 +4206,28 @@ namespace HM
          status->GetNumberOfSessions(STIMAP),
          status->GetNumberOfSessions(STPOP3));
 
+      // What this build of the server can do, settled when it was compiled, so
+      // that a fixture layer - or an operator - can ask instead of finding out
+      // from an error: whether there is a script engine for the event handlers
+      // (Windows Active Scripting; no Linux build has one), whether the OpenSSL
+      // it was built against has the Argon2id KDF (3.2 or later) and the hybrid
+      // post-quantum key exchange groups (3.5 or later).
+#ifdef HM_PLATFORM_POSIX
+      const bool scriptEngine = false;
+#else
+      const bool scriptEngine = true;
+#endif
+      const bool argon2id = OPENSSL_VERSION_NUMBER >= 0x30200000L;
+      const bool postQuantum = OPENSSL_VERSION_NUMBER >= 0x30500000L;
+
+      AnsiString build;
+      build.Format(",\"build\":{\"script_engine\":%hs,\"argon2id\":%hs,\"post_quantum_key_exchange\":%hs}}",
+         scriptEngine ? "true" : "false",
+         argon2id ? "true" : "false",
+         postQuantum ? "true" : "false");
+
+      body = body.Left(body.GetLength() - 1) + build;
+
       return BuildResponse_(200, body);
    }
 
@@ -9586,7 +9608,7 @@ namespace HM
          "\"info\":{\"title\":\"hMailServer REST API\",\"version\":\"1\","
          "\"description\":\"Administration API. Authenticate with the administrator password (HTTP Basic, user 'Administrator') or an API key (Bearer). API keys can be read-only or restricted to named domains; key management itself requires the administrator password. The /api/v1/me endpoints are the exception: they answer to an account\'s own credentials (HTTP Basic, user = the mailbox address) and to nothing else, and /portal is a sign-in page for them.\"},"
          "\"paths\":{"
-         "\"/api/v1/status\":{\"get\":{\"summary\":\"Server status\",\"responses\":{\"200\":{\"description\":\"Status, state and uptime\"}}}},"
+         "\"/api/v1/status\":{\"get\":{\"summary\":\"Server status\",\"responses\":{\"200\":{\"description\":\"Version, state, the message counters, the session counts, and build: what this build can do - script_engine, argon2id, post_quantum_key_exchange\"}}}},"
          "\"/api/v1/server/reinitialize\":{\"post\":{\"summary\":\"Restart the services in place\",\"description\":\"What the Control Panel's Reinitialize does: every service is stopped, the configuration reloaded and the services started again in the same process, so that a port, a certificate binding or a setting the document marks as taking effect on restart takes effect now. Answers before it happens, because the REST listener itself restarts: poll GET /api/v1/status until it answers again. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"202\":{\"description\":\"Reinitialising; the listeners restart in a moment\"}}}},"
          "\"/api/v1/me\":{\"get\":{\"summary\":\"The signed-in account's own state\",\"description\":\"HTTP Basic with the account's address and password - the same credential and the same checks as an IMAP logon, including a per-name lockout and the auto-ban. Refused for the administrator password and for API keys.\",\"responses\":{\"200\":{\"description\":\"address, domain, active, quota (limit_mb, used_bytes), vacation (enabled, active, subject, message, expires, expires_date), password_changed, second_factor, directory_linked\"},\"401\":{\"description\":\"Not an account's credentials\"},\"403\":{\"description\":\"The administrator password or an API key was presented\"}}}},"
          "\"/api/v1/me/password\":{\"post\":{\"summary\":\"Change the signed-in account's password\",\"description\":\"Body: current and new. current has to be the account password itself, not an app password. An account with a second factor sends the code in X-hMailServer-OTP; without it the answer is 401 with X-hMailServer-OTP: required. The password policy and the reuse history apply exactly as when an administrator sets a password.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"current\",\"new\"],\"properties\":{\"current\":{\"type\":\"string\"},\"new\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"Changed\"},\"400\":{\"description\":\"Missing fields, or the policy refused the new password (the reason is in error)\"},\"403\":{\"description\":\"The current password did not match\"},\"409\":{\"description\":\"A directory-linked account, or a recently used password\"}}}},"

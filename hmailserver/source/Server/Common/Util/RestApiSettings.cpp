@@ -230,7 +230,7 @@ namespace
    const Word LogFormatWords[] =
    {
       { "default", 0 },
-      { "csa", 1 },
+      { "ncsa", 1 },
       { nullptr, 0 }
    };
 

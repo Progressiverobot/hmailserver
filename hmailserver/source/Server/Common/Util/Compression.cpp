@@ -76,13 +76,46 @@ namespace HM
       return true;
    }
 
-   String 
+   String
    Compression::GetExecutableFullPath_()
    {
+#ifdef HM_PLATFORM_POSIX
+      // No 7za.exe ships in the Linux packages; the archiver is the system's,
+      // under whichever name its package gives it: 7zz (7-Zip's own Linux
+      // build), 7z or 7za (p7zip), 7zr (p7zip's reduced build). The first found
+      // on PATH is used by its full path, so the log names the binary that ran.
+      // With none found, the bare 7z goes to the launcher, whose failure then
+      // names what is missing (HM5401) - the package recommends 7zip for this.
+      const char *candidates[] = { "7zz", "7z", "7za", "7zr" };
+      const char *environment = ::getenv("PATH");
+      AnsiString directories = environment && *environment ? environment : "/usr/local/bin:/usr/bin:/bin";
+
+      for (const char *candidate : candidates)
+      {
+         int start = 0;
+         while (start <= directories.GetLength())
+         {
+            int end = directories.Find(":", start);
+            if (end < 0)
+               end = directories.GetLength();
+
+            AnsiString directory = directories.Mid(start, end - start);
+            start = end + 1;
+
+            if (directory.IsEmpty())
+               continue;
+
+            AnsiString full = directory + "/" + candidate;
+            if (::access(full.c_str(), X_OK) == 0)
+               return String(full);
+         }
+      }
+
+      return "7z";
+#else
       const String ZipExecutable = "7za.exe";
-
       String binDir = IniFileSettings::Instance()->GetBinDirectory();
-
       return FileUtilities::Combine(binDir, ZipExecutable);
+#endif
    }
 }

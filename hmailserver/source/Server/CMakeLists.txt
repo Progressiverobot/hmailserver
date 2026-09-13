@@ -409,6 +409,16 @@ endif()
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_SECTION mail)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# The backup writes its archive with the system's 7-Zip (Compression.cpp looks
+# for 7zz, 7z, 7za or 7zr on PATH); recommended rather than required, because a
+# server that never takes a backup does not need it.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "7zip | p7zip-full")
+set(CPACK_RPM_PACKAGE_SUGGESTS "p7zip")
+# The backup writes its archive with the system's 7-Zip (Compression.cpp looks
+# for 7zz, 7z, 7za or 7zr on PATH); recommended rather than required, because a
+# server that never takes a backup does not need it.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "7zip | p7zip-full")
+set(CPACK_RPM_PACKAGE_SUGGESTS "p7zip")
 # An upgrade must not overwrite the configuration. CPack's DEB generator writes no
 # conffiles list of its own, so one is generated here and handed to dpkg with the
 # maintainer scripts; the RPM equivalent is the %config(noreplace) list below.

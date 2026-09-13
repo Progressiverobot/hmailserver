@@ -214,6 +214,15 @@ namespace RegressionTests.Shared
       public const string StandardPortNumbers =
          "reads the SRV records the server derives from the port NUMBERS - 25 is never advertised, 587 is preferred for submission - and this bench's listeners are on high ports, so its MX port is not 25 and the server advertises it as submission";
 
+      public const string NoArgon2id =
+         "sets PreferredHashAlgorithm to Argon2id, and this build's OpenSSL has no Argon2id KDF (3.2 or later has it) - the server reports the setting as an error at every reload, which fails every test after it";
+
+      public const string ClassicalKeyExchangeOnly =
+         "expects the hybrid post-quantum key exchange group to be preferred, and this server cannot: its OpenSSL predates ML-KEM (3.5), or its hMailServer.ini names classical groups in TlsKeyExchangeGroups because of that";
+
+      public const string NoSecretReadback =
+         "reads a stored secret back through a COM property; the REST API writes a secret and never answers one";
+
       public const string NoIpRangeCreate =
          "needs an IP range, and this server's REST API has no POST /api/v1/ipranges";
 
@@ -367,6 +376,16 @@ namespace RegressionTests.Shared
          // error SetDefault would have reported; by name, so the skip is the answer.
          { "RegressionTests.Infrastructure.DatabaseFailureHandling.RestoringDefaultPortsReportsFailureRatherThanClaimingSuccess", NoPortDefaults },
          { "RegressionTests.API.RestApiSrvRecords.SrvRecordsCoverEnabledServicesAndOmitDisabled", StandardPortNumbers },
+         { "RegressionTests.Security.HashPolicy.AMinimumOfEitherMemoryHardSchemeAcceptsBoth", NoArgon2id },
+         { "RegressionTests.Security.HashPolicy.Argon2idAndScryptArePeersSoNeitherPreferenceRewritesTheOther", NoArgon2id },
+         { "RegressionTests.Security.PasswordPepper.TestPasswordPepperAffectsArgon2idVerification", NoArgon2id },
+         { "RegressionTests.Security.PasswordHashCost.NewArgon2idHashCarriesTheConfiguredMemoryAndPasses", NoArgon2id },
+         { "RegressionTests.SSL.PostQuantumKeyExchange.ConfiguredGroupList_IsHonoured", ClassicalKeyExchangeOnly },
+         { "RegressionTests.SSL.PostQuantumKeyExchange.DefaultConfiguration_PrefersHybridPostQuantumGroupOnEveryListener", ClassicalKeyExchangeOnly },
+         { "RegressionTests.Sieve.ManageSieveTls.StartTlsUsesTheSharedKeyExchangeGroups", ClassicalKeyExchangeOnly },
+         { "RegressionTests.Security.SecretProtection.TestStoredSecretRoundTripsUnderDpapi", NoSecretReadback },
+         { "RegressionTests.Security.SecretProtection.TestStoredSecretRoundTripsWithDpapiDisabled", NoSecretReadback },
+         { "RegressionTests.Security.SecretProtection.TestStoredUnicodeSecretRoundTripsUnderDpapi", NoSecretReadback },
          { "RegressionTests.SSL.ListenerTlsConfiguration", RebindsTheRestListener },
          { "RegressionTests.API.ScriptObjectPolicy", NoScriptEngine },
          { "RegressionTests.API.ScriptReload", NoScriptEngine },
@@ -453,7 +472,25 @@ namespace RegressionTests.Shared
             return !ServerApi.HasAliasWriteRoutes;
          if (reason == NoSettingsWrite)
             return !ServerApi.HasSettingsWriteRoutes;
+         if (reason == NoScriptEngine)
+            return !ServerApi.Capability("script_engine");
+         if (reason == NoArgon2id)
+            return !ServerApi.Capability("argon2id");
+         if (reason == ClassicalKeyExchangeOnly)
+            return !ServerApi.Capability("post_quantum_key_exchange") || IniNamesClassicalGroups();
          return true;
+      }
+
+      // Whether hMailServer.ini's TlsKeyExchangeGroups is set and names no ML-KEM
+      // group - what the CI job writes for a runner whose OpenSSL has none.
+      private static bool IniNamesClassicalGroups()
+      {
+         var setting = ServerApi.TryGet("/api/v1/settings/ini/TlsKeyExchangeGroups");
+
+         if (setting == null || setting.Status != 200 || !setting.Json.HasValue)
+            return false;
+
+         return ServerApi.StringOf(setting.Json.Value, "value").IndexOf("MLKEM", System.StringComparison.OrdinalIgnoreCase) < 0;
       }
 
       public static void SkipIfRegistered()
