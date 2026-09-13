@@ -84,13 +84,16 @@ namespace RegressionTests.Shared
       // ---- What wave 164's survey found the REST API has no route for ----
 
       public const string NoServerDirectories =
-         "reads Settings.Directories - the server's program, data or event directory - and no REST route reports them: GET /api/v1/settings carries no directories and GET /api/v1/settings/logging carries only the log directory";
+         "reads Settings.Directories, and this server's REST API has no GET /api/v1/settings/directories (it arrived after 6.3.2)";
 
       public const string NoIniSettings =
-         "reads or writes hMailServer.ini through Settings.GetIniSetting/SetIniSetting/DeleteIniSetting, and no REST route reaches the INI";
+         "reads or writes hMailServer.ini through Settings.GetIniSetting/SetIniSetting/DeleteIniSetting, and this server's REST API has no /api/v1/settings/ini (it arrived after 6.3.2)";
 
       public const string NoLogonFailureList =
-         "needs Settings.ClearLogonFailureList, and no REST route clears the server's logon-failure list";
+         "needs Settings.ClearLogonFailureList, and this server's REST API has no POST /api/v1/settings/logon-failures/clear (it arrived after 6.3.2)";
+
+      public const string NoPublicFolderDiskName =
+         "reads Settings.PublicFolderDiskName, which no REST route reports";
 
       public const string NoAdministratorPassword =
          "needs Settings.SetAdministratorPassword, and no REST route sets the administrator password";
@@ -285,7 +288,7 @@ namespace RegressionTests.Shared
          "needs an IMAP folder's access-control list, and no REST route reads or writes one";
 
       public const string NoServerRestart =
-         "restarts the server process, which it does because the server reads hMailServer.ini only at start; POST /api/v1/server/reinitialize restarts the services inside the same process and does not re-read the INI, so it is not the same thing";
+         "needs the server restarted so that it reads hMailServer.ini again, and this server's REST API has no POST /api/v1/server/reinitialize";
 
       public const string NoMessageObject =
          "needs a message as a COM object - its file on disk, its headers, its recipients - and the REST message routes serve an account's own messages only, without those";
@@ -350,14 +353,6 @@ namespace RegressionTests.Shared
          { "RegressionTests.Infrastructure.Persistence.AccountNameValidation.TestAccountContainingForwardSlashInDomainName", ComWordingAsserted },
          { "RegressionTests.Security.Basics.TestEmptyPassword", NoEmptyPassword },
          { "RegressionTests.Sieve.SieveSyntax.DeeplyNestedBlocksAreRefusedRatherThanRecursedInto", ScriptOverRequestCeiling },
-         { "RegressionTests.API.Unicode.TestDecodeSpecificMessage", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.IfInReplyToFieldContainsQuoteThenFetchHeadersShouldEncodeIt", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.PartialFetch_HeaderFields", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.PartialFetch_HeaderFieldsNot", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.RequestingSameHeaderFieldMultipleTimesShouldReturnItOnce", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchEnvelopeWithDateContainingQuote", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchHeaderFields", BareLfFromNewLine },
-         { "RegressionTests.IMAP.Fetch.TestFetchHeaderFieldsNot", BareLfFromNewLine },
          { "RegressionTests.SSL.CertificateTypes.SetupSSLCertificateWithPassword", WindowsPathInTheFixture },
          { "RegressionTests.IMAP.SequenceSets.UidExpungeStarAffectsOnlyTheLastMessage", DeletedMessagesAreNotListed },
          { "RegressionTests.Infrastructure.Persistence.DomainNameValidation.TestDomainWithoutName", ComWordingAsserted },
@@ -401,19 +396,6 @@ namespace RegressionTests.Shared
 
       public const string DeletedMessagesAreNotListed =
          "counts a folder's messages after flagging some \\Deleted, and the REST listing this shim reads in place of COM's collection deliberately omits deleted messages - no route answers COM's question";
-
-      /// <summary>
-      ///    The test is right where it was written and cannot run anywhere else: it
-      ///    builds the message it sends with Environment.NewLine, which is CRLF on
-      ///    Windows and a bare LF on this host - and a bare LF is not a line to an
-      ///    SMTP server, which answers "554 Rejected - Message containing bare LF's"
-      ///    and is right to. The server is not at fault and the assertion is not
-      ///    weakened; the message the fixture composes is simply not a message here.
-      ///    TestSetup.CreateLargeDummyMailBody shows the fix - spell out \r\n - which
-      ///    is a change to the Windows suite rather than to this project.
-      /// </summary>
-      public const string BareLfFromNewLine =
-         "builds the message it sends with Environment.NewLine, which is a bare LF on this host; the server rightly refuses it with 554, so the test can only run where Environment.NewLine is CRLF";
 
       public const string ScriptOverRequestCeiling =
          "checks a 70 KB script, which is over the REST API's request ceiling - PUT /api/v1/me/filters answers 413 request too large before the parser sees it, and the COM CheckSieveSyntax has no ceiling";

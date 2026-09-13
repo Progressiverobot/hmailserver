@@ -34,6 +34,8 @@ namespace RegressionTests.API
    public class RestApiSettings : TestFixtureBase
    {
       private const int RestPort = 9120;
+      // A [Settings] key no shipped setting uses, as IniSettingsOverCom's probe is.
+      private const string IniProbeKey = "RestApiIniProbe";
       private const string AdminPassword = "testar";
 
       private Snapshot _before;
@@ -214,6 +216,8 @@ namespace RegressionTests.API
          try
          {
             Restore(_before);
+            _settings.ClearLogonFailureList();
+            _settings.DeleteIniSetting(IniProbeKey);
          }
          finally
          {
@@ -524,6 +528,145 @@ namespace RegressionTests.API
          string namespaces = imap.Send("A1 NAMESPACE");
          StringAssert.Contains("RestPublic", namespaces, "NAMESPACE advertises the public folder name the API just set.");
          imap.Disconnect();
+      }
+
+      [Test]
+      [Description("GET /api/v1/settings/directories reports the seven directories Settings.Directories reports over COM, and the hMailServer.ini the settings were read from; the group has no PUT.")]
+      public void DirectoriesGroupMatchesCom()
+      {
+         hMailServer.Directories directories = _settings.Directories;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/directories");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"program\":\"" + JsonText(directories.ProgramDirectory) + "\"", body);
+         StringAssert.Contains("\"data\":\"" + JsonText(directories.DataDirectory) + "\"", body);
+         StringAssert.Contains("\"log\":\"" + JsonText(directories.LogDirectory) + "\"", body);
+         StringAssert.Contains("\"event\":\"" + JsonText(directories.EventDirectory) + "\"", body);
+         StringAssert.Contains("\"temp\":\"" + JsonText(directories.TempDirectory) + "\"", body);
+         StringAssert.Contains("\"database\":\"" + JsonText(directories.DatabaseDirectory) + "\"", body);
+         StringAssert.Contains("\"db_scripts\":\"" + JsonText(directories.DBScriptDirectory) + "\"", body);
+
+         // The ini is the one beside the binary, and it exists: the file this
+         // fixture's SetUp wrote the listener's port into.
+         string bin = Regex.Unescape(Extract(body, "bin"));
+         string iniFile = Regex.Unescape(Extract(body, "ini_file"));
+         Assert.IsTrue(File.Exists(iniFile), "ini_file names a file that exists: " + iniFile);
+         Assert.AreEqual(Paths.Combine(bin, "hMailServer.ini").ToLowerInvariant(), iniFile.ToLowerInvariant());
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/directories", "{\"data\":\"C:\\\\elsewhere\"}");
+         Assert.AreEqual(404, putStatus, "A directory is chosen at install time; the group has no PUT: " + putBody);
+      }
+
+      [Test]
+      [Description("The [Settings] section of hMailServer.ini one key at a time: COM reads what the API wrote, the API refuses what SetIniSetting refuses in its words, and deleting removes the line.")]
+      public void IniSettingRoundTripsThroughCom()
+      {
+         string path = "/api/v1/settings/ini/" + IniProbeKey;
+
+         (int absentStatus, string absentBody) = Http("GET", path);
+         Assert.AreEqual(200, absentStatus, absentBody);
+         StringAssert.Contains("\"present\":false", absentBody, "A key that is not in the file is a setting at its default, not an error.");
+         StringAssert.Contains("\"value\":\"\"", absentBody);
+
+         (int putStatus, string putBody) = Http("PUT", path, "{\"value\":\"one two\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"name\":\"" + IniProbeKey + "\"", putBody);
+         StringAssert.Contains("\"value\":\"one two\"", putBody);
+         StringAssert.Contains("\"present\":true", putBody);
+
+         Assert.AreEqual("one two", _settings.GetIniSetting(IniProbeKey), "COM reads what the API wrote.");
+         StringAssert.Contains(IniProbeKey, _settings.IniSettingNames);
+         Assert.AreEqual("one two", IniFileSetting.Read(IniProbeKey), "The value reached the file itself, not only the database mirror.");
+
+         (int listStatus, string listBody) = Http("GET", "/api/v1/settings/ini");
+         Assert.AreEqual(200, listStatus, listBody);
+         StringAssert.Contains("\"" + IniProbeKey + "\"", listBody);
+         StringAssert.StartsWith("{\"names\":[", listBody);
+
+         // The refusals are SetIniSetting's, and a refused write changes nothing.
+         (int typeStatus, string typeBody) = Http("PUT", path, "{\"value\":5}");
+         Assert.AreEqual(400, typeStatus, typeBody);
+         StringAssert.Contains("value must be a string", typeBody);
+
+         (int lineStatus, string lineBody) = Http("PUT", path, "{\"value\":\"two\\nlines\"}");
+         Assert.AreEqual(400, lineStatus, lineBody);
+         StringAssert.Contains("contains a line break", lineBody);
+
+         (int longStatus, string longBody) = Http("PUT", path, "{\"value\":\"" + new string('v', 4001) + "\"}");
+         Assert.AreEqual(400, longStatus, longBody);
+         StringAssert.Contains("longer than 4000 characters", longBody);
+         Assert.AreEqual("one two", _settings.GetIniSetting(IniProbeKey), "A refused value changes nothing.");
+
+         foreach (string badName in new[] { "has=equals", "has[bracket", "has]bracket", "%20leadingspace", new string('n', 101) })
+         {
+            (int nameStatus, string nameBody) = Http("PUT", "/api/v1/settings/ini/" + badName, "{\"value\":\"x\"}");
+            if (badName.StartsWith("%"))
+            {
+               // The path is not decoded: %20leadingspace is a key spelled that
+               // way, and the file can hold it. Written and removed again.
+               Assert.AreEqual(200, nameStatus, nameBody);
+               Assert.AreEqual(200, Http("DELETE", "/api/v1/settings/ini/" + badName).status);
+               continue;
+            }
+            Assert.AreEqual(400, nameStatus, "The name '" + badName + "' cannot be stored and read back as itself: " + nameBody);
+            StringAssert.Contains("The setting name is empty, longer than 100 characters", nameBody);
+         }
+
+         (int deleteStatus, string deleteBody) = Http("DELETE", path);
+         Assert.AreEqual(200, deleteStatus, deleteBody);
+         StringAssert.Contains("\"present\":false", deleteBody);
+         Assert.AreEqual("", _settings.GetIniSetting(IniProbeKey), "COM sees the key gone.");
+         StringAssert.DoesNotContain(IniProbeKey, _settings.IniSettingNames, "The line was removed, not emptied.");
+
+         (int againStatus, string againBody) = Http("DELETE", path);
+         Assert.AreEqual(200, againStatus, "Removing a key that is not there is not an error: " + againBody);
+      }
+
+      [Test]
+      [Description("POST /api/v1/settings/logon-failures/clear forgets the failures the auto-ban counts, as Settings.ClearLogonFailureList does: after it the count starts again at none, so four wrong passwords around a clear ban nothing where three in a row would.")]
+      public void LogonFailuresClearStartsTheCountAgain()
+      {
+         _settings.ClearLogonFailureList();
+         _settings.AutoBanOnLogonFailure = true;
+         _settings.MaxInvalidLogonAttempts = 3;
+         _settings.MaxInvalidLogonAttemptsWithin = 5;
+         _settings.AutoBanMinutes = 3;
+
+         Account account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "failures@example.test", "test");
+         int rangesBefore = _settings.SecurityRanges.Count;
+
+         var imap = new ImapClientSimulator();
+         string errorMessage;
+         for (int i = 0; i < 2; i++)
+         {
+            Assert.IsFalse(imap.ConnectAndLogon(account.Address, "wrong", out errorMessage));
+            imap.Disconnect();
+            StringAssert.DoesNotContain("Too many invalid logon attempts.", errorMessage);
+         }
+
+         (int status, string body) = Http("POST", "/api/v1/settings/logon-failures/clear");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"cleared\":true", body);
+
+         // The third failure in a row is the one that bans. These are the third
+         // and fourth since the account existed, and the first and second since
+         // the clear.
+         for (int i = 0; i < 2; i++)
+         {
+            Assert.IsFalse(imap.ConnectAndLogon(account.Address, "wrong", out errorMessage));
+            imap.Disconnect();
+            StringAssert.DoesNotContain("Too many invalid logon attempts.", errorMessage, "The count started again at none after the clear.");
+         }
+
+         Assert.IsTrue(imap.ConnectAndLogon(account.Address, "test"), "The right password still logs on: nothing was banned.");
+         imap.Disconnect();
+         Assert.AreEqual(rangesBefore, _settings.SecurityRanges.Count, "No auto-ban range was added.");
+      }
+
+      // A path as JSON shows it: the backslashes doubled.
+      private static string JsonText(string path)
+      {
+         return path.Replace("\\", "\\\\");
       }
 
       private static (string id, string key) CreateKey(string label, string scope, string domains)
