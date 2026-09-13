@@ -3,8 +3,13 @@
 
 using System;
 using NUnit.Framework;
+using RegressionTests.Shared;
 
-namespace RegressionTests.Shared
+// The namespace is the point: a SetUpFixture runs once for every test in its
+// namespace and below, so this one lives at RegressionTests, over every
+// fixture, as the Windows one does - in RegressionTests.Shared it ran for
+// nothing, and the first Linux run resolved every name through the host.
+namespace RegressionTests
 {
    /// <summary>
    ///    The suite-wide fake DNS zone, the Windows one's shape exactly: a

@@ -488,6 +488,14 @@ namespace RegressionTests.Shared
             var current = ReadGroup(group);
             body.Clear();
 
+            // A host name, when the server has none: the Windows bench has the
+            // installer's, the banner and the autoconfiguration routes give it out,
+            // and a fresh --create-database leaves it empty. Set once, kept in the
+            // baseline like the rest.
+            string hostName;
+            if (group == "/api/v1/settings" && current.TryGetValue("host_name", out hostName) && hostName == "\"\"")
+               body.Append("\"host_name\":\"linux-bench.example.test\"");
+
             foreach (var wanted in SuiteDefaults.Where(wanted => wanted.Group == group))
             {
                string now;
