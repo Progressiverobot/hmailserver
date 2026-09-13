@@ -452,7 +452,13 @@ namespace DBUpdater
                          "update hm_smimekeys set smimecreated = smimecreated where 1 = 0"),
          // Upgrade6037to6038* - a SURBL server's expected result, judged like a DNSBL's.
          new SchemaProbe(6038, "hm_surblservers.surblresult",
-                         "update hm_surblservers set surblresult = surblresult where 1 = 0")
+                         "update hm_surblservers set surblresult = surblresult where 1 = 0"),
+         // Upgrade6038to6039* - the domain relay password widened to 1024, the width
+         // the route, fetch-account and certificate secrets have had since 6004: a
+         // DPAPI envelope for an eleven-character password is 314 characters, and
+         // the column was 255 (probing proves the column exists, not its width).
+         new SchemaProbe(6039, "hm_domains.domainrelaypassword",
+                         "update hm_domains set domainrelaypassword = domainrelaypassword where 1 = 0")
       };
 
       /// <summary>

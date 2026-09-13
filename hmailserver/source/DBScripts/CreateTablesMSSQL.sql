@@ -263,7 +263,7 @@ create table hm_domains (
    domainrelayport int not null,
    domainrelayrequiresauth int not null,
    domainrelayusername nvarchar(255) not null,
-   domainrelaypassword nvarchar(255) not null,
+   domainrelaypassword nvarchar(1024) not null,
    domainrelayconnectionsecurity int not null,
 	domainvacationmessageon int not null,
 	domainvacationsubject nvarchar(200) not null,
@@ -1312,4 +1312,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6038)
+insert into hm_dbversion values (6039)
