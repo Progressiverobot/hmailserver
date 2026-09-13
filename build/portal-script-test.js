@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// The portal's script, executed. build/check-portal-script.py recovers the page
-// and the script from the C++ literals in RestApiPortal.cpp and hands them here;
-// this builds a small DOM from the markup, answers fetch out of a table of
+// The portal's script, executed. build/check-portal-script.py hands the page
+// (Portal.html) and the script (Portal.js) here as the files they are; this
+// builds a small DOM from the markup, answers fetch out of a table of
 // recorded API responses, runs the script in that world and then asserts what
 // the reader would see.
 //

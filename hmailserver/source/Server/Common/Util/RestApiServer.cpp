@@ -12,6 +12,7 @@
 #include "Encoding/ModifiedUTF7.h"
 #include <boost/thread/thread.hpp>
 #include <boost/chrono.hpp>
+#include <mutex>
 #include "../Application/MetricsHistoryTask.h"
 #include "ServerStatus.h"
 #include "OtelTracer.h"
@@ -9587,17 +9588,35 @@ namespace HM
       return path == "/api/v1/me/messages" || path == "/api/v1/me/drafts";
    }
 
-   // The page, its script and the headers both are served with are defined in
-   // RestApiPortal.cpp - the same literals, moved out of the middle of this
-   // file so that the page can be worked on without touching the router, and
-   // so that a harness can read the script whole. They are pointers to const
-   // char, not const pointers, so they have external linkage and this is a
-   // declaration of the same three objects.
-   extern const char *PortalHtml;
-   extern const char *PortalScript;
+   // The page, its script, its manifest and its service worker are files
+   // beside RestApiPortal.cpp - Portal.html, Portal.js, Portal.webmanifest,
+   // PortalServiceWorker.js - carried into the binary by
+   // build/generate-portal-page.py as PortalPageData.cpp, each in pieces of
+   // four thousand characters (a compiler's limit on one literal), joined here
+   // on first use. The headers both are served with stay a literal in
+   // RestApiPortal.cpp.
+   extern const char *const PortalHtmlPieces[];
+   extern const char *const PortalScriptPieces[];
+   extern const char *const PortalManifestPieces[];
+   extern const char *const PortalServiceWorkerPieces[];
    extern const char *PortalHeaders;
-   extern const char *PortalManifest;
-   extern const char *PortalServiceWorker;
+
+   namespace
+   {
+      const AnsiString &
+      Joined_(const char *const *pieces, AnsiString &into, std::once_flag &once)
+      {
+         std::call_once(once, [&]()
+         {
+            for (const char *const *piece = pieces; *piece; piece++)
+               into += *piece;
+         });
+         return into;
+      }
+
+      AnsiString portalHtml_, portalScript_, portalManifest_, portalServiceWorker_;
+      std::once_flag portalHtmlOnce_, portalScriptOnce_, portalManifestOnce_, portalServiceWorkerOnce_;
+   }
 
    HttpResponse
    RestApiServer::HandlePortalPage_(const AnsiString &request)
@@ -9607,7 +9626,7 @@ namespace HM
       // The server-wide branding rides in the page as data, not as script:
       // a JSON block the policy does not run and the script reads for the
       // first paint. A domain's own arrives after sign-in.
-      AnsiString page = PortalHtml;
+      AnsiString page = Joined_(PortalHtmlPieces, portalHtml_, portalHtmlOnce_);
       page.Replace("<!--hm-branding-->", ("<script type=\"application/json\" id=\"branding-data\">" + BrandingJson_(String()) + "</script>").c_str());
       // The catalogue for the reader's Accept-Language rides in the page too,
       // so the first paint is already in their language; the script fetches
@@ -9627,7 +9646,7 @@ namespace HM
    {
       HttpResponse response;
       response.content_type = "text/javascript; charset=utf-8";
-      response.body = PortalScript;
+      response.body = Joined_(PortalScriptPieces, portalScript_, portalScriptOnce_);
       response.extra_headers = PortalHeaders;
       return response;
    }
@@ -9637,7 +9656,7 @@ namespace HM
    {
       HttpResponse response;
       response.content_type = "application/manifest+json";
-      response.body = PortalManifest;
+      response.body = Joined_(PortalManifestPieces, portalManifest_, portalManifestOnce_);
       response.extra_headers = PortalHeaders;
       return response;
    }
@@ -9649,7 +9668,7 @@ namespace HM
    {
       HttpResponse response;
       response.content_type = "text/javascript; charset=utf-8";
-      response.body = PortalServiceWorker;
+      response.body = Joined_(PortalServiceWorkerPieces, portalServiceWorker_, portalServiceWorkerOnce_);
       response.extra_headers = AnsiString(PortalHeaders) + "Service-Worker-Allowed: /\r\n";
       return response;
    }

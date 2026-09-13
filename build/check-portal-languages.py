@@ -6,7 +6,7 @@
 """The webmail's catalogues against the page they translate.
 
 English is the key. The page (hmailserver/source/Server/Common/Util/
-RestApiPortal.cpp) holds the keys in two forms: the texts of its markup - text
+Portal.html, and Portal.js) holds the keys in two forms: the texts of its markup - text
 nodes, placeholders, aria-labels, titles, alts - which the script walks at
 run time, and the literals the script hands to t() and tf(). Each language
 lives in hmailserver/source/Server/Common/Util/PortalLanguages/<code>.json as
@@ -31,7 +31,8 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PAGE = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "RestApiPortal.cpp")
+PAGE_HTML = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "Portal.html")
+PAGE_JS = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "Portal.js")
 CATALOGUES = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "PortalLanguages")
 GENERATED = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "PortalLanguagesData.cpp")
 GENERATOR = os.path.join(ROOT, "build", "generate-portal-languages.py")
@@ -42,29 +43,9 @@ SURVIVORS = ["from:", "to:", "subject:", "has:attachment", "before:", "after:", 
              "{subject}", "{name}", "Sieve", "IMAP", "SMTP", "hMailServer"]
 
 
-def literal(text, name):
-    start = text.index("const char *" + name + " =")
-    m = re.compile(r'\\n";[ \t]*\r?$', re.M).search(text, start)
-    body = text[start:m.start() + 3]
-    lines = []
-    for line in body.split("\n"):
-        s = line.strip()
-        if not s.startswith('"'):
-            continue
-        s = s[1:]
-        if s.endswith('";'):
-            s = s[:-2]
-        elif s.endswith('"'):
-            s = s[:-1]
-        s = s.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
-        lines.append(s)
-    return "".join(lines)
-
-
 def page_keys():
-    text = io.open(PAGE, "r", encoding="utf-8-sig").read()
-    html = literal(text, "PortalHtml")
-    script = literal(text, "PortalScript")
+    html = io.open(PAGE_HTML, "r", encoding="utf-8-sig").read()
+    script = io.open(PAGE_JS, "r", encoding="utf-8-sig").read()
     # Style and script blocks are not text a reader sees.
     html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.S)
     html = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.S)

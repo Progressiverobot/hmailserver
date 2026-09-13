@@ -5,7 +5,7 @@ The webmail at `/portal` has a keyboard map (press `?` in it) and a search
 syntax (the search box lists it in its tooltip). This page is the same two
 lists, for anyone who reads before they click. The page itself is the source:
 the keyboard map is the `keys-overlay` in
-`hmailserver/source/Server/Common/Util/RestApiPortal.cpp`, the search syntax
+`hmailserver/source/Server/Common/Util/Portal.js`, the search syntax
 is the `x-operators` line of `/api/v1/me/search` in `RestApiServer.cpp` and
 the OpenAPI document at `/api/v1/openapi.json`.
 

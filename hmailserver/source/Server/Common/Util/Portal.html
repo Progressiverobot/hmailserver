@@ -1,0 +1,712 @@
+<!doctype html>
+<!--
+  https://www.progressiverobot.com
+  Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hMailServer - my account</title>
+<link rel="icon" href="data:,">
+<link rel="manifest" href="/portal.webmanifest">
+<!--hm-branding-->
+<!--hm-language-->
+<meta name="theme-color" content="#0b1018">
+<meta name="mobile-web-app-capable" content="yes">
+<style>
+:root{
+  --bg:#070b12; --bg2:#0b1018; --surface:rgba(255,255,255,.045); --surface2:rgba(255,255,255,.08);
+  --border:rgba(255,255,255,.09); --text:#e6edf3; --muted:#8b949e;
+  --accent:#36c2ff; --accent2:#7c5cff; --good:#3fb950; --warn:#d29922; --bad:#f85149;
+  --glow:0 0 24px rgba(54,194,255,.25);
+  --radius:14px; --font:'Segoe UI Variable','Segoe UI',system-ui,sans-serif;
+  --mono:'Cascadia Mono',Consolas,'SFMono-Regular',monospace;
+}
+[data-theme="light"]{
+  --bg:#eef2f7; --bg2:#f7fafc; --surface:rgba(255,255,255,.75); --surface2:rgba(255,255,255,.95);
+  --border:rgba(15,30,50,.12); --text:#1c2530; --muted:#5a6877;
+  --accent:#0969da; --accent2:#6f42c1; --glow:0 4px 18px rgba(9,105,218,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden}
+
+/* The same aurora the Control Deck has: two blurred discs and no image file,
+   because the policy this page is served under allows no remote resource. */
+.aurora{position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.5;filter:blur(90px)}
+.aurora::before,.aurora::after{content:"";position:absolute;width:55vw;height:55vw;border-radius:50%;
+  background:radial-gradient(circle,var(--accent) 0%,transparent 60%);animation:drift 26s ease-in-out infinite}
+.aurora::after{background:radial-gradient(circle,var(--accent2) 0%,transparent 60%);
+  right:-10vw;bottom:-18vw;animation-delay:-13s}
+.aurora::before{left:-12vw;top:-18vw}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(7vw,5vh) scale(1.15)}}
+
+.app{position:relative;z-index:1;display:flex;height:100%}
+
+/* ---------- Sidebar: write, the folders, then everything else ---------- */
+.side{position:relative;width:246px;display:flex;flex-direction:column;padding:20px 14px;gap:10px;
+  background:linear-gradient(180deg,var(--surface),transparent);border-right:1px solid var(--border);backdrop-filter:blur(18px)}
+.brand{display:flex;align-items:center;gap:10px;padding:6px 10px 8px}
+.brand .logo{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-weight:700;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow)}
+.brand b{font-size:15px;letter-spacing:.4px}
+.brand small{display:block;color:var(--muted);font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav.folders{overflow:auto;flex:0 1 auto;max-height:44vh}
+.nav button{all:unset;display:flex;align-items:center;gap:9px;padding:9px 12px;border-radius:10px;
+  color:var(--muted);font-size:13.5px;cursor:pointer;transition:all .18s}
+.nav button:hover{background:var(--surface2);color:var(--text)}
+.nav button.on{background:linear-gradient(90deg,rgba(54,194,255,.16),transparent);color:var(--text);
+  box-shadow:inset 2.5px 0 0 var(--accent)}
+.nav .ico{width:17px;text-align:center;opacity:.9;flex:none}
+.nav .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav .ct{font-size:11px;font-weight:700;color:var(--accent);flex:none}
+.navhead{color:var(--muted);font-size:10.5px;letter-spacing:1.5px;text-transform:uppercase;padding:6px 12px 2px}
+.side .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;padding:6px 10px}
+.pill{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:7px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good);animation:pulse 2s infinite}
+.dot.stale{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+@keyframes pulse{50%{opacity:.45}}
+
+/* ---------- Main ---------- */
+.main{flex:1;display:flex;flex-direction:column;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;padding:14px 24px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.topbar h1{font-size:18px;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+.topbar .sp{flex:1}
+.iconbtn{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;
+  border:1px solid var(--border);background:var(--surface);transition:all .18s;font-size:15px;flex:none}
+.iconbtn:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.content{flex:1;overflow:auto;padding:22px 24px 40px}
+
+/* ---------- Cards ---------- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;backdrop-filter:blur(14px);margin-bottom:16px;max-width:64rem}
+.card h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:12px}
+.muted{color:var(--muted)}
+.note{color:var(--muted);font-size:12.5px;line-height:1.6;margin-bottom:14px}
+code{font-family:var(--mono);font-size:12px}
+
+.btn{all:unset;cursor:pointer;padding:8px 16px;border-radius:9px;font-size:13px;font-weight:600;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;transition:all .18s;letter-spacing:.3px;
+  display:inline-block;text-align:center}
+.btn:hover{box-shadow:var(--glow);transform:translateY(-1px)}
+.btn.ghost{background:var(--surface);border:1px solid var(--border);color:var(--text)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.danger{background:linear-gradient(135deg,#f85149,#c93c54)}
+.btn.sm{padding:5px 11px;font-size:12px}
+.btn.wide{display:block;width:100%;padding:10px}
+
+label{display:block;margin:.7rem 0 .3rem;font-size:12.5px;color:var(--muted)}
+label.inline{display:inline-flex;align-items:center;gap:7px;margin:.6rem 1rem .2rem 0;color:var(--text);font-size:13px}
+input,select,textarea{background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);
+  padding:9px 13px;font-size:13.5px;font-family:var(--font);outline:none;transition:all .18s;max-width:100%}
+input[type=text],input[type=password],input[type=date],input[type=search],select,textarea{width:100%}
+textarea{min-height:8rem;line-height:1.6;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:var(--glow)}
+input[type=checkbox]{width:17px;height:17px;accent-color:var(--accent);padding:0;flex:none}
+input[type=file]{width:100%;padding:7px;color:var(--muted)}
+option{background:var(--bg2);color:var(--text)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row input[type=text],.row select{width:auto;flex:1 1 12rem;min-width:10rem}
+form .btn{margin-top:14px}
+form .row .btn{margin-top:0}
+
+.status{margin-top:10px;font-size:12.5px;min-height:1.1rem;line-height:1.5}
+.status.error{color:var(--bad)}
+.status.ok{color:var(--good)}
+.meter{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:.5rem 0}
+.meter div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .3s}
+.badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.4px}
+.badge.good{background:rgba(63,185,80,.15);color:var(--good)}
+.badge.info{background:rgba(54,194,255,.15);color:var(--accent)}
+.empty{color:var(--muted);padding:34px;text-align:center;font-size:13.5px}
+
+/* ---------- The search box in the top bar ---------- */
+.search{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.search input[type=search]{width:15rem}
+.search label{margin:0}
+
+/* ---------- The listing ---------- */
+.msg{display:flex;gap:10px;align-items:flex-start;padding:11px 12px;border-radius:10px;cursor:pointer;
+  border:1px solid transparent;transition:background .15s,border-color .15s}
+.msg:hover{background:var(--surface2)}
+.msg+.msg{margin-top:2px}
+.msg-body{flex:1;min-width:0}
+.msg-subject{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg.unseen .msg-subject{font-weight:700}
+.msg.unseen{box-shadow:inset 2.5px 0 0 var(--accent)}
+.msg-detail{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msg-reply{margin-left:1.5rem}
+.msg-cursor{background:var(--surface2);border-color:var(--accent)}
+#bulk-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+  padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--surface)}
+#bulk-bar select{width:auto}
+#bulk-count{font-size:12.5px;color:var(--muted);margin-right:4px}
+.listfoot{margin-top:14px;font-size:12px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+/* ---------- One message ---------- */
+#message-subject{font-size:19px;font-weight:600;margin:4px 0 6px;line-height:1.35}
+#message-meta{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6}
+#message-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+#message-actions select{width:auto}
+pre{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12.5px;line-height:1.7;
+  background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;max-height:34rem;overflow:auto}
+iframe{width:100%;min-height:14rem;border:1px solid var(--border);border-radius:10px;background:#fff}
+#message-attachments{margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.9}
+#message-attachments a{color:var(--accent);text-decoration:none}
+#message-attachments a:hover{text-decoration:underline}
+
+/* ---------- Folder management ---------- */
+.frow{display:flex;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.frow:last-child{border-bottom:none}
+.frow .fname{flex:1;min-width:10rem;font-size:13.5px}
+.frow input[type=text]{flex:1;min-width:10rem;width:auto}
+.frow .fmeta{font-size:11.5px;color:var(--muted)}
+
+/* ---------- The sign-in gate ---------- */
+.gate{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--bg);padding:16px}
+.gate .aurora{opacity:.6}
+.login{position:relative;width:min(380px,100%);background:var(--surface);border:1px solid var(--border);
+  border-radius:18px;padding:38px;backdrop-filter:blur(20px);box-shadow:0 24px 80px rgba(0,0,0,.45)}
+.login .logo{width:52px;height:52px;border-radius:14px;display:grid;place-items:center;font-weight:700;font-size:21px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:var(--glow);margin-bottom:18px}
+.login h1{font-size:20px;margin-bottom:4px}
+.login p{color:var(--muted);font-size:13px;margin-bottom:22px;line-height:1.6}
+.login label{margin-top:12px}
+.login .btn{width:100%;margin-top:18px;padding:11px}
+
+.view{animation:fadein .22s ease}
+@keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+[hidden]{display:none!important}
+
+/* The shortcut list and the palette: one sheet over a dimmed page. */
+.overlay{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding-top:10vh}
+.sheet{width:min(640px,92vw);max-height:78vh;overflow:auto;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--glow);padding:18px}
+.keys{width:100%;border-collapse:collapse;margin-bottom:12px}
+.keys td{padding:6px 8px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:top}
+.keys kbd{font-family:var(--mono);font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 6px}
+#palette-input{font-size:16px;padding:10px 12px}
+#palette-list{list-style:none;margin-top:8px}
+#palette-list li{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;gap:10px;align-items:baseline}
+#palette-list li.on{background:var(--surface2)}
+#palette-list .kind{color:var(--muted);font-size:11.5px;margin-left:auto}
+/* Undo send: the message waits in the page, and this says for how long. */
+.undo{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);margin-top:8px}
+/* The compact density: the same page with less air. */
+[data-density="compact"] .card{padding:12px 14px;margin-bottom:10px}
+[data-density="compact"] .content{padding:14px 16px 30px}
+[data-density="compact"] .nav button{padding:6px 12px}
+[data-density="compact"] .msg{padding:6px 10px}
+[data-density="compact"] .msg-subject{font-size:13px}
+[data-density="compact"] .msg-detail{font-size:11px;margin-top:1px}
+[data-density="compact"] label{margin:.45rem 0 .2rem}
+/* Headers, verdict badges, conversations. */
+.headers{white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0;max-height:40vh;overflow:auto}
+.badge.bad{background:rgba(248,81,73,.15);color:var(--bad)}
+.badge.warn{background:rgba(210,153,34,.18);color:var(--warn)}
+.badge.muted{background:var(--surface2);color:var(--muted)}
+#message-badges{margin:8px 0;gap:6px}
+#list-tools{margin-bottom:8px;gap:8px}
+.thread-count{display:inline-block;min-width:1.4em;text-align:center;padding:1px 7px;border-radius:99px;background:var(--surface2);color:var(--muted);font-size:11px;margin-right:8px}
+.msg.in-thread{margin-left:1.5rem}
+a.btn{text-decoration:none;display:inline-block}
+/* Warnings, previews, dropping files. */
+.warnbox{background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.45);color:var(--text);border-radius:10px;padding:10px 12px;margin:8px 0;font-size:13px}
+.warnbox div+div{margin-top:6px}
+.previews{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.previews img{max-width:240px;max-height:180px;border-radius:8px;border:1px solid var(--border);background:#fff}
+.previews iframe{width:100%;height:60vh;border:1px solid var(--border);border-radius:8px;background:#fff}
+#message-remote{margin:8px 0}
+#compose-form.dropping{outline:2px dashed var(--accent);outline-offset:6px;border-radius:12px}
+/* The skip link, plain lists, a secret shown once. */
+.skip{position:absolute;left:-999px;top:8px;z-index:60;background:var(--bg2);color:var(--text);padding:8px 12px;border-radius:8px;border:1px solid var(--border)}
+.skip:focus{left:8px}
+.plain{list-style:none}
+.plain li{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.plain li span.kind{color:var(--muted);margin-left:8px;font-size:12px}
+code.secret{font-family:var(--mono);font-size:16px;letter-spacing:1px;padding:6px 10px;background:var(--surface2);border-radius:8px;user-select:all}
+.list td.num{text-align:right;white-space:nowrap}
+tr.clickable{cursor:pointer}
+/* Owners in the folder list. */
+.navhead{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);padding:10px 12px 4px}
+#template-row{margin:6px 0}
+/* The formatted editor, touch, the offline note. */
+.editor{min-height:8rem;line-height:1.6;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--text);outline:none;overflow:auto;max-height:50vh}
+.editor:focus{border-color:var(--accent)}
+.editor blockquote{border-left:3px solid var(--border);margin:6px 0;padding-left:10px;color:var(--muted)}
+.editor img{max-width:100%}
+#rich-row{margin:6px 0}
+#offline-note{margin:10px 24px 0;background:rgba(210,153,34,.14);border:1px solid rgba(210,153,34,.4);border-radius:10px;padding:8px 12px}
+.msg.swiping{transition:none}
+@media (max-width:720px){
+  .msg{padding:14px 12px}
+  .btn.sm{padding:9px 12px}
+  .nav button{padding:10px 12px}
+  .iconbtn{width:42px;height:42px}
+  input[type=checkbox]{width:20px;height:20px}
+}
+/* Labels: chips, the sidebar list, the menu. */
+.chips{display:inline-flex;gap:4px;flex-wrap:wrap;vertical-align:middle}
+#message-labels{margin:6px 0 0}
+.chip{display:inline-block;padding:1px 8px;border-radius:9px;font-size:11px;line-height:16px;color:#04121c;background:#5b6875;font-weight:600}
+.msg-subject .chips{margin-left:6px}
+#label-nav{padding:4px 0}
+#label-nav .nav-heading{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);padding:6px 14px 2px}
+#label-nav button{display:block;background:none;border:0;padding:4px 14px;cursor:pointer;text-align:left;width:100%}
+#label-menu label.inline{margin-right:10px}
+#label-menu input[type=text]{width:140px}
+/* The announcement and the support notice. */
+.announce{margin:10px 24px 0;background:rgba(54,194,255,.12);border:1px solid rgba(54,194,255,.35);border-radius:10px;padding:8px 12px;font-size:13px}
+.announce.warn{background:rgba(210,153,34,.14);border-color:rgba(210,153,34,.4)}
+.login .announce{margin:10px 0 0}
+#signin-logo img{width:56px;height:56px;border-radius:12px;display:block}
+/* Print: the message alone. */
+@media print{
+  .side,.topbar,.aurora,#message-actions,#message-back,#quota-card,#list-hint,#bulk-bar,.status,.overlay,#signin{display:none!important}
+  html,body{height:auto;overflow:visible;background:#fff;color:#000}
+  .app{display:block}.content{overflow:visible;padding:0}
+  .card{background:none;border:0;box-shadow:none;backdrop-filter:none;max-width:none;padding:0}
+  #message-subject{font-size:18px;font-weight:700;margin-bottom:6px}
+  #message-meta{color:#333;margin-bottom:12px}
+  #message-text{white-space:pre-wrap;font-family:Georgia,serif;font-size:12pt}
+  #message-html{width:100%;height:auto;min-height:70vh;border:0}
+}
+@media (max-width:820px){
+  body{overflow:auto}
+  .app{flex-direction:column;height:auto;min-height:100%}
+  /* The sidebar becomes a header: two rows of chips that scroll sideways, so
+     the mail is on the screen rather than below a page of navigation. */
+  .side{width:100%;border-right:0;border-bottom:1px solid var(--border);padding:12px 14px;gap:8px}
+  .brand{padding:0 2px 2px}
+  .side .btn.wide{position:absolute;right:14px;top:14px;width:auto;display:inline-block;padding:8px 18px}
+  .nav{flex-direction:row;overflow-x:auto;gap:6px;padding-bottom:2px}
+  .nav.folders{max-height:none;flex:none}
+  .nav button{flex:none;border:1px solid var(--border)}
+  .navhead{display:none}
+  .side .foot{margin-top:0;flex-direction:row;flex-wrap:wrap;gap:14px;padding:2px}
+  .topbar{padding:12px 14px}
+  .content{padding:16px 14px 40px}
+  .search input[type=search]{width:100%}
+  .search{width:100%}
+}
+.complete-wrap { position: relative; }
+.complete { position: absolute; left: 0; right: 0; z-index: 20; margin: 0; padding: 4px 0; list-style: none; background: var(--panel, #1f2430); border: 1px solid var(--line, #3a4150); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.35); max-height: 240px; overflow: auto; }
+.complete li { padding: 6px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+.complete li.on, .complete li:hover { background: var(--accent-soft, rgba(88,166,255,.18)); }
+.complete .nm { font-weight: 600; }
+.complete .ad { opacity: .75; font-size: .92em; }
+</style>
+</head>
+<body data-theme="dark">
+<div class="aurora"></div>
+
+<div class="gate" id="signin">
+<div class="aurora"></div>
+<form class="login" id="signin-form">
+<div class="logo" id="signin-logo">hM</div>
+<h1 id="signin-title">My account</h1>
+<div id="signin-announcement" class="announce" hidden></div>
+<p>Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.</p>
+<label for="address">E-mail address</label><input id="address" type="text" autocomplete="username" required>
+<label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
+<button class="btn" type="submit">Sign in</button>
+<div id="signin-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+
+<div class="app" id="account" hidden>
+<a class="skip" id="skip" href="#content">Skip to content</a>
+<aside class="side">
+<div class="brand"><div class="logo">hM</div><div><b>hMailServer</b><small>My account</small></div></div>
+<button class="btn wide" id="nav-compose" type="button">Write</button>
+<div class="navhead">Folders</div>
+<nav class="nav folders" id="folder-nav" aria-label="Folders"></nav>
+<nav class="nav labels" id="label-nav" aria-label="Labels"></nav>
+<nav class="nav" id="view-nav" aria-label="Pages">
+<button type="button" data-route="/held"><span class="ico">&#9888;</span><span class="nm">Held mail</span><span class="ct" id="held-count"></span></button>
+<button type="button" data-route="/folders"><span class="ico">&#9707;</span><span class="nm">Manage folders</span></button>
+<button type="button" data-route="/settings"><span class="ico">&#9881;</span><span class="nm">Settings</span></button>
+<button type="button" data-route="/filters"><span class="ico">&#9878;</span><span class="nm">Filters</span></button>
+<button type="button" data-route="/contacts"><span class="ico">&#9993;</span><span class="nm">Contacts</span></button>
+<button type="button" data-route="/away"><span class="ico">&#9992;</span><span class="nm">Away and forwarding</span></button>
+<button type="button" data-route="/storage"><span class="ico">&#9776;</span><span class="nm">Storage</span></button>
+<button type="button" data-route="/security"><span class="ico">&#9939;</span><span class="nm">Security</span></button>
+<button type="button" data-route="/password"><span class="ico">&#9919;</span><span class="nm">Password</span></button>
+</nav>
+<div class="foot">
+<div class="pill"><span class="dot" id="probe-dot"></span><span id="probe-state">Watching for new mail</span></div>
+<div class="pill" id="who"></div>
+</div>
+</aside>
+
+<div class="main">
+<div class="topbar">
+<h1 id="view-title" tabindex="-1">Mail</h1>
+<div class="sp"></div>
+<form id="mail-search-form" class="search">
+<input id="mail-search" type="search" maxlength="200" placeholder="Search - from: subject: is:unread" aria-label="Search mail" title="Words, &quot;quoted phrases&quot;, from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name">
+<label class="inline"><input id="mail-search-everywhere" type="checkbox"> All folders</label>
+<button class="btn ghost sm" type="submit">Search</button>
+<button id="mail-search-clear" class="btn ghost sm" type="button">Clear</button>
+</form>
+<button class="iconbtn" id="theme-btn" type="button" title="Light or dark" aria-label="Light or dark">&#9680;</button>
+<button class="iconbtn" id="signout" type="button" title="Sign out" aria-label="Sign out">&#9096;</button>
+</div>
+
+<div id="announcement" class="announce" hidden></div>
+<div id="support-note" class="announce warn" hidden><span id="support-note-text"></span> <button id="support-note-dismiss" class="btn ghost sm" type="button">Dismiss</button></div>
+<div id="offline-note" class="note" hidden>No connection. Showing what was saved; anything sent waits until the connection is back.</div>
+<div class="content" id="content" role="main" tabindex="-1">
+
+<section id="mail-section" class="view" hidden>
+<div id="quota-card" class="card">
+<h2>Mailbox</h2>
+<div id="quota"></div>
+<div class="meter"><div id="quota-bar" style="width:0"></div></div>
+<div id="password-changed" class="note"></div>
+</div>
+<div class="card">
+<div id="list-tools" class="row"><button id="view-threads" class="btn ghost sm" type="button">Threads</button><button id="folder-empty" class="btn ghost sm danger" type="button" hidden>Empty this folder</button></div>
+<div id="bulk-bar" hidden><span id="bulk-count"></span> <button id="bulk-read" class="btn ghost sm" type="button">Mark read</button><button id="bulk-unread" class="btn ghost sm" type="button">Mark unread</button><button id="bulk-archive" class="btn ghost sm" type="button">Archive</button><button id="bulk-junk" class="btn ghost sm" type="button">Junk</button><button id="bulk-delete" class="btn ghost sm" type="button">Delete</button><select id="bulk-move" aria-label="Move selected to"></select><button id="bulk-move-go" class="btn ghost sm" type="button">Move</button><button id="bulk-clear" class="btn ghost sm" type="button">Clear</button></div>
+<p class="note" id="list-hint">Arrow keys or j and k move, Enter opens, x ticks the box, e archives, ! files as junk, # deletes. ? lists every shortcut; Ctrl+K opens the palette.</p>
+<div id="message-list" role="list" aria-label="Messages"></div>
+<div id="message-view" hidden>
+<button id="message-back" class="btn ghost sm" type="button">Back to the list</button>
+<div id="message-subject"></div>
+<div id="message-meta"></div>
+<div id="message-badges" class="row"></div>
+<div id="message-warnings" class="warnbox" hidden></div>
+<div id="message-receipt" class="note" hidden>The sender asked to be told when this is read. <button id="receipt-send" class="btn ghost sm" type="button">Send a receipt</button><button id="receipt-never" class="btn ghost sm" type="button">Never ask</button></div>
+<div id="message-smime" class="note" hidden><span id="message-smime-text"></span> <button id="message-smime-unlock" class="btn ghost sm" type="button" hidden>Unlock keys to read</button></div>
+<div id="snooze-menu" class="row" hidden><span class="muted">Bring it back</span><button class="btn ghost sm" id="snooze-3h" type="button">in 3 hours</button><button class="btn ghost sm" id="snooze-tomorrow" type="button">tomorrow at 9</button><button class="btn ghost sm" id="snooze-week" type="button">next week</button><input id="snooze-at" type="datetime-local" aria-label="Until"><button class="btn ghost sm" id="snooze-go" type="button">at that time</button></div>
+<div id="message-actions"><button id="message-edit" class="btn ghost sm" type="button" hidden>Edit draft</button><button id="message-reply" class="btn ghost sm" type="button">Reply</button><button id="message-reply-all" class="btn ghost sm" type="button">Reply all</button><button id="message-forward" class="btn ghost sm" type="button">Forward</button><button id="message-archive" class="btn ghost sm" type="button">Archive</button><button id="message-junk" class="btn ghost sm" type="button">Junk</button><button id="message-snooze" class="btn ghost sm" type="button">Snooze</button><button id="message-print" class="btn ghost sm" type="button">Print</button><button id="message-headers-toggle" class="btn ghost sm" type="button">Headers</button><a id="message-source" class="btn ghost sm" href="#" download="message.eml">Source</a><button id="message-unsubscribe" class="btn ghost sm" type="button" hidden>Unsubscribe</button><button id="message-html-toggle" class="btn ghost sm" type="button" hidden>Show as sent</button><button id="message-unread" class="btn ghost sm" type="button">Mark as unread</button><button id="message-flag" class="btn ghost sm" type="button">Flag</button><button id="message-delete" class="btn ghost sm danger" type="button">Delete</button><select id="message-move" aria-label="Move to"></select><button id="message-move-go" class="btn ghost sm" type="button">Move</button><button id="message-label" class="btn ghost sm" type="button">Label</button></div>
+<div id="label-menu" class="row" hidden></div>
+<pre id="message-headers" class="headers" hidden></pre>
+<pre id="message-text"></pre>
+<div id="message-remote" class="note" hidden>Remote images and styles were not loaded. <button id="remote-once" class="btn ghost sm" type="button">Show them</button><button id="remote-always" class="btn ghost sm" type="button">Always show from this sender</button></div>
+<iframe id="message-html" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="The message as it was sent" hidden></iframe>
+<div id="message-labels" class="chips"></div>
+<div id="message-attachments"></div>
+<div id="message-previews" class="previews"></div>
+</div>
+<div id="mail-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="compose-section" class="view" hidden>
+<div class="card">
+<h2>New message</h2>
+<form id="compose-form">
+<label for="compose-from" id="compose-from-label" hidden>From</label><select id="compose-from" hidden></select>
+<label for="compose-to">To</label><div class="complete-wrap"><input id="compose-to" type="text" required></div>
+<label for="compose-cc">Cc</label><div class="complete-wrap"><input id="compose-cc" type="text"></div>
+<label for="compose-bcc">Bcc</label><div class="complete-wrap"><input id="compose-bcc" type="text"></div>
+<label for="compose-subject">Subject</label><input id="compose-subject" type="text" maxlength="500">
+<div class="row" id="template-row"><select id="template-pick" aria-label="Templates"><option value="">Templates</option></select><button id="template-use" class="btn ghost sm" type="button">Insert</button><button id="template-save" class="btn ghost sm" type="button">Save as template</button></div>
+<div class="row" id="later-row"><label for="compose-later" class="inline">Send at</label><input id="compose-later" type="datetime-local" aria-label="Send at"><button id="compose-send-later" class="btn ghost sm" type="button">Send later</button></div>
+<label for="compose-text">Message</label>
+<div id="rich-row" class="row"><button id="rich-toggle" class="btn ghost sm" type="button">Formatting</button><div id="rich-tools" class="row" hidden><button class="btn ghost sm" type="button" data-cmd="bold" title="Bold"><b>B</b></button><button class="btn ghost sm" type="button" data-cmd="italic" title="Italic"><i>I</i></button><button class="btn ghost sm" type="button" data-cmd="underline" title="Underline"><u>U</u></button><button class="btn ghost sm" type="button" data-cmd="insertUnorderedList" title="List">List</button><button class="btn ghost sm" type="button" data-cmd="formatBlock" data-arg="blockquote" title="Quote">Quote</button><button class="btn ghost sm" type="button" data-cmd="createLink" title="Link">Link</button><button class="btn ghost sm" type="button" data-cmd="removeFormat" title="Remove formatting">Plain</button></div></div>
+<textarea id="compose-text"></textarea>
+<div id="compose-editor" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message, formatted" hidden></div>
+<label class="inline"><input id="compose-receipt" type="checkbox"> Ask for a read receipt</label>
+<label class="inline" id="compose-sign-label" hidden><input id="compose-sign" type="checkbox"> Sign with my certificate</label>
+<label class="inline" id="compose-encrypt-label" hidden><input id="compose-encrypt" type="checkbox"> Encrypt for the recipients</label>
+<div id="compose-smime-note" class="hint" hidden></div>
+<label for="compose-files">Files</label><input id="compose-files" type="file" multiple><div id="compose-files-note" class="note"></div>
+<div id="compose-links" class="note" hidden></div>
+<div class="row"><button class="btn" id="compose-send" type="submit">Send</button><button id="compose-save" type="button" class="btn ghost">Save draft</button><button id="compose-discard" type="button" class="btn ghost">Clear</button></div>
+<div id="compose-status" class="status" aria-live="polite"></div>
+<div id="undo-bar" class="undo" hidden><span id="undo-text"></span><button id="undo-send" class="btn sm" type="button">Undo</button></div>
+</form>
+</div>
+</section>
+
+<section id="quarantine-section" class="view" hidden>
+<div class="card">
+<h2>Held as suspected spam</h2>
+<p id="quarantine-note" class="note"></p>
+<div id="quarantine-list"></div>
+<div id="quarantine-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="folders-section" class="view" hidden>
+<div class="card">
+<h2>Manage folders</h2>
+<p class="note">A folder made here is a folder in your mailbox: your mail program will see it too. A name may be a whole path - every part of it that is not there yet is made. Renaming a folder to a different path moves it, and what is inside it goes too. Deleting one deletes what is in it, and the folders inside it; the folders the server keeps for a purpose of its own cannot be deleted at all.</p>
+<div id="folder-admin-list"></div>
+<form id="folder-move-form" class="row">
+<label for="folder-export-target" class="inline">Download</label><select id="folder-export-target" aria-label="Folder to download"></select><a id="folder-export-link" class="btn ghost sm" href="#" download="folder.mbox">as mbox</a>
+<label for="folder-import-file" class="inline">Import a .eml into</label><select id="folder-import-target" aria-label="Folder to import into"></select><input id="folder-import-file" type="file" accept=".eml,message/rfc822" aria-label="The .eml file"><button id="folder-import-go" class="btn ghost sm" type="button">Import</button>
+</form>
+<div id="folder-import-status" class="status" aria-live="polite"></div>
+<form id="folder-new-form">
+<label for="folder-new-name">New folder</label>
+<div class="row"><input id="folder-new-name" type="text" maxlength="255"><select id="folder-new-parent" aria-label="Inside"></select><button class="btn" type="submit">Create</button></div>
+</form>
+<div id="folder-admin-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="away-section" class="view" hidden>
+<div class="card">
+<h2>Out of office</h2>
+<form id="vacation-form">
+<label class="inline"><input id="vacation-enabled" type="checkbox"> Send an automatic reply</label>
+<label for="vacation-subject">Subject</label><input id="vacation-subject" type="text" maxlength="200">
+<label for="vacation-message">Message</label><textarea id="vacation-message" maxlength="20000"></textarea>
+<label class="inline"><input id="vacation-expires" type="checkbox"> Stop replying after</label>
+<input id="vacation-expires-date" type="date">
+<button class="btn" type="submit">Save</button>
+<div id="vacation-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+<div class="card">
+<h2>Forwarding</h2>
+<form id="forward-form">
+<label class="inline"><input id="forward-enabled" type="checkbox"> Forward my mail</label>
+<label for="forward-address">Forward to</label><input id="forward-address" type="text" autocomplete="off">
+<label class="inline"><input id="forward-keep" type="checkbox"> Keep a copy here</label>
+<button class="btn" type="submit">Save</button>
+<div id="forward-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+<div class="card">
+<h2>Scheduled</h2>
+<p class="note">Drafts waiting to be sent, and messages snoozed until later. Cancelling a send keeps the draft; cancelling a snooze brings the message back now.</p>
+<table class="list" id="scheduled-table"><thead><tr><th>What</th><th>Subject</th><th>When</th><th></th></tr></thead><tbody id="scheduled-rows"></tbody></table>
+<div id="scheduled-empty" class="hint" hidden>Nothing is waiting.</div>
+<div id="scheduled-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>Addresses that reach this mailbox</h2>
+<p class="note">Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.</p>
+<ul id="away-addresses" class="plain"></ul>
+</div>
+</section>
+
+<section id="settings-section" class="view" hidden>
+<div class="card">
+<h2>Name and signature</h2>
+<form id="settings-form">
+<label for="name-first">First name</label><input id="name-first" type="text" maxlength="100">
+<label for="name-last">Last name</label><input id="name-last" type="text" maxlength="100">
+<label class="inline"><input id="signature-enabled" type="checkbox"> Add a signature to what I send</label>
+<label for="signature-text">Signature</label><textarea id="signature-text" maxlength="20000"></textarea>
+<button class="btn" type="submit">Save</button>
+<div id="settings-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+<div class="card">
+<h2>Preferences</h2>
+<p class="note">Kept with the account, so they follow you between browsers.</p>
+<form id="prefs-form">
+<label for="pref-theme">Theme</label><select id="pref-theme"><option value="system">Follow the system</option><option value="dark">Dark</option><option value="light">Light</option></select>
+<label for="pref-density">Density</label><select id="pref-density"><option value="comfortable">Comfortable</option><option value="compact">Compact</option></select>
+<label for="pref-undo">Undo send</label><select id="pref-undo"><option value="0">Send at once</option><option value="5">5 seconds to undo</option><option value="10">10 seconds to undo</option><option value="20">20 seconds to undo</option><option value="30">30 seconds to undo</option></select>
+<label for="pref-language">Language</label><select id="pref-language"></select>
+<label class="inline"><input id="pref-notify" type="checkbox"> Notify me of new mail in these folders</label>
+<div id="notify-folders" class="row"></div>
+<button class="btn" type="submit">Save</button>
+<div id="prefs-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+<div class="card">
+<h2>Templates</h2>
+<p class="note">Written in a new message and saved from there. In a template, {first_name} becomes the first name of the first recipient, {subject} the subject, {date} today's date.</p>
+<table class="list" id="template-table"><thead><tr><th>Name</th><th>Subject</th><th></th></tr></thead><tbody id="template-rows"></tbody></table>
+<div id="template-empty" class="hint" hidden>No templates. Write one in a new message and press "Save as template".</div>
+<div id="template-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>Labels</h2>
+<p class="note">A label is an IMAP keyword on the message, so every mail program sees it as a flag of the message. The colour is yours alone.</p>
+<form id="label-form" class="row"><input id="label-name" type="text" maxlength="60" placeholder="Name - one word" aria-label="Label name" required><input id="label-colour" type="color" value="#36c2ff" aria-label="Colour"><button class="btn sm" type="submit">Add</button></form>
+<div id="label-rows"></div>
+<div id="label-empty" class="hint" hidden>No labels yet. Add one here, or from a message's Label menu.</div>
+<div id="label-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="filter-section" class="view" hidden>
+<div class="card">
+<h2>Rules</h2>
+<p class="note">When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.</p>
+<div id="rules-handwritten" class="hint" hidden>The filter script below was written by hand, so it is not shown as rules. Edit it there, or clear it to start with rules.</div>
+<form id="rule-form" class="row">
+<select id="rule-field" aria-label="Field"><option value="from">From</option><option value="to">To or Cc</option><option value="subject">Subject</option><option value="any">From, To or Subject</option></select>
+<span>contains</span>
+<input id="rule-text" type="text" maxlength="200" placeholder="text" aria-label="Text" required>
+<select id="rule-action" aria-label="Action"><option value="move">move to</option><option value="label">label</option><option value="flag">flag</option><option value="read">mark as read</option><option value="discard">delete</option></select>
+<input id="rule-label" type="text" maxlength="60" placeholder="label" aria-label="Label" hidden>
+<select id="rule-folder" aria-label="Folder"></select>
+<button class="btn" type="submit">Add rule</button>
+</form>
+<table class="list" id="rule-table"><thead><tr><th>When</th><th>Then</th><th></th></tr></thead><tbody id="rule-rows"></tbody></table>
+<div id="rule-empty" class="hint" hidden>No rules.</div>
+<div id="rule-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>Filters</h2>
+<p class="note">A Sieve script, run on every message as it arrives. It is checked before it is saved.</p>
+<form id="filter-form">
+<label for="filter-script">Script</label><textarea id="filter-script" spellcheck="false"></textarea>
+<button class="btn" type="submit">Save</button>
+<div id="filter-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+</section>
+
+<section id="storage-section" class="view" hidden>
+<div class="card">
+<h2>Storage</h2>
+<div id="storage-quota" class="note"></div>
+<table class="list" id="storage-folders"><thead><tr><th>Folder</th><th>Messages</th><th>Size</th></tr></thead><tbody id="storage-folder-rows"></tbody></table>
+</div>
+<div class="card">
+<h2>Largest messages</h2>
+<table class="list" id="storage-largest"><thead><tr><th>Subject</th><th>From</th><th>Folder</th><th>Size</th></tr></thead><tbody id="storage-largest-rows"></tbody></table>
+<div id="storage-largest-empty" class="hint" hidden>Nothing here yet.</div>
+</div>
+<div class="card">
+<h2>Files sent as links</h2>
+<div id="files-note" class="note"></div>
+<table class="list" id="files-table"><thead><tr><th>File</th><th>Size</th><th>Downloads</th><th>Expires</th><th></th></tr></thead><tbody id="files-rows"></tbody></table>
+<div id="files-empty" class="hint" hidden>No files sent as links.</div>
+<div id="files-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>Clean up</h2>
+<form id="storage-clean-form" class="row">
+<label for="storage-days">Delete from Trash and Junk what is older than</label>
+<select id="storage-days"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option><option value="0">everything</option></select>
+<button class="btn ghost sm danger" id="storage-clean" type="submit">Delete</button>
+</form>
+<div id="storage-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="security-section" class="view" hidden>
+<div class="card">
+<h2>App passwords</h2>
+<p class="note">A password for one program or phone, separate from your own. Revoke it here when the device goes; your own password stays as it is.</p>
+<p class="note">Making one asks for your own password again, so a program that holds one of these cannot make another.</p>
+<form id="apppassword-form" class="row">
+<input id="apppassword-name" type="text" maxlength="255" placeholder="What it is for, e.g. Phone" aria-label="What the password is for" required>
+<input id="apppassword-password" type="password" autocomplete="current-password" placeholder="Your password" aria-label="Your own password, to prove it is you" required>
+<input id="apppassword-otp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Code" aria-label="Code from your authenticator app" hidden>
+<button class="btn" type="submit">Create</button>
+</form>
+<div id="apppassword-new" class="note" hidden>This is the only time it is shown. Copy it into the program now: <code id="apppassword-secret" class="secret"></code></div>
+<div id="apppassword-status" class="status" aria-live="polite"></div>
+<table class="list" id="apppassword-table"><thead><tr><th>For</th><th>Created</th><th>Last used</th><th></th></tr></thead><tbody id="apppassword-rows"></tbody></table>
+<div id="apppassword-empty" class="hint" hidden>No app passwords.</div>
+</div>
+<div class="card">
+<h2>Support access</h2>
+<p class="note">Off, an administrator cannot open this mailbox as you. On, they can - for support, on request - and every such session is listed here, marked, and written to the server's log; the last one is noted below.</p>
+<label class="inline"><input id="support-allowed" type="checkbox"> Allow an administrator to open my mailbox for support</label>
+<div id="support-last" class="note" hidden></div>
+<div id="support-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>S/MIME</h2>
+<p class="note">Sign and encrypt mail in this browser. Your private key is wrapped with your password here before it is stored; the server cannot open it. Import a PKCS#12 (.p12, .pfx) or PEM file with its passphrase.</p>
+<form id="smime-import-form" class="row">
+<input id="smime-file" type="file" accept=".p12,.pfx,.pem,.crt,.cer,.der,.key" aria-label="Certificate file">
+<input id="smime-passphrase" type="password" autocomplete="off" placeholder="The file's passphrase, if any" aria-label="The file's passphrase">
+<button class="btn" type="submit">Import</button>
+</form>
+<div id="smime-status" class="status" aria-live="polite"></div>
+<table class="list" id="smime-own-table" hidden><thead><tr><th>Address</th><th>Certificate</th><th>Expires</th><th></th></tr></thead><tbody id="smime-own-rows"></tbody></table>
+<div id="smime-own-empty" class="hint">No certificate of your own yet.</div>
+<h3>Correspondents' certificates</h3>
+<p class="note">Kept from the signed messages they sent, so a message to them can be encrypted.</p>
+<table class="list" id="smime-recipient-table" hidden><thead><tr><th>Address</th><th>Certificate</th><th>Expires</th><th></th></tr></thead><tbody id="smime-recipient-rows"></tbody></table>
+<div id="smime-recipient-empty" class="hint">None yet.</div>
+</div>
+<div class="card">
+<h2>Sessions</h2>
+<p class="note">Every browser signed in as you. End one you do not recognise, or all the others at once.</p>
+<table class="list" id="session-table"><thead><tr><th>Started</th><th>Last seen</th><th></th><th></th></tr></thead><tbody id="session-rows"></tbody></table>
+<div class="row"><button class="btn ghost sm danger" id="sessions-end-others" type="button">End every other session</button></div>
+<div id="session-status" class="status" aria-live="polite"></div>
+</div>
+</section>
+
+<section id="contacts-section" class="view" hidden>
+<div class="card">
+<h2>Contacts</h2>
+<p class="hint">Everyone you write to is added here on its own; the To, Cc and Bcc fields complete from this list as you type.</p>
+<form id="contact-form" class="row">
+<input id="contact-name" type="text" maxlength="255" placeholder="Name" aria-label="Name">
+<input id="contact-address" type="text" maxlength="255" placeholder="someone@example.com" aria-label="Address" required>
+<button class="btn" type="submit">Add</button>
+</form>
+<div id="contact-status" class="status" aria-live="polite"></div>
+<table class="list" id="contact-table"><thead><tr><th>Name</th><th>Address</th><th>From</th><th></th></tr></thead><tbody id="contact-rows"></tbody></table>
+<div id="contact-empty" class="hint" hidden>No contacts yet. Send a message, or add one above.</div>
+</div>
+</section>
+
+<section id="password-section" class="view" hidden>
+<div class="card">
+<h2>Change password</h2>
+<form id="password-form">
+<input id="password-user" type="text" autocomplete="username" hidden readonly aria-hidden="true" tabindex="-1">
+<label for="current">Current password</label><input id="current" type="password" autocomplete="current-password" required>
+<label for="new">New password</label><input id="new" type="password" autocomplete="new-password" required>
+<label for="confirm">New password again</label><input id="confirm" type="password" autocomplete="new-password" required>
+<div id="otp-row" hidden><label for="otp">Code from your authenticator app</label><input id="otp" type="text" inputmode="numeric" autocomplete="one-time-code"></div>
+<button class="btn" type="submit">Change password</button>
+<div id="password-status" class="status" aria-live="polite"></div>
+</form>
+</div>
+</section>
+
+</div>
+</div>
+</div>
+<div id="keys-overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="keys-title">
+<div class="sheet">
+<h2 id="keys-title">Keyboard shortcuts</h2>
+<table class="keys"><tbody>
+<tr><td><kbd>j</kbd> or <kbd>&darr;</kbd></td><td>Next message</td></tr>
+<tr><td><kbd>k</kbd> or <kbd>&uarr;</kbd></td><td>Previous message</td></tr>
+<tr><td><kbd>Enter</kbd></td><td>Open the message under the cursor</td></tr>
+<tr><td><kbd>x</kbd></td><td>Tick or untick the message under the cursor</td></tr>
+<tr><td><kbd>e</kbd></td><td>Archive the message</td></tr>
+<tr><td><kbd>!</kbd></td><td>File the message as junk, or as not junk from the Junk folder</td></tr>
+<tr><td><kbd>#</kbd></td><td>Delete the message (to Trash)</td></tr>
+<tr><td><kbd>l</kbd></td><td>Label the message</td></tr>
+<tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>The palette: an action, a page, a folder or a contact</td></tr>
+<tr><td><kbd>?</kbd></td><td>This list</td></tr>
+<tr><td><kbd>Esc</kbd></td><td>Close this list or the palette</td></tr>
+<tr><td><kbd>&darr;</kbd> <kbd>&uarr;</kbd> <kbd>Enter</kbd> <kbd>Tab</kbd></td><td>In To, Cc and Bcc: choose a completion</td></tr>
+</tbody></table>
+<p class="row"><button id="keys-close" class="btn ghost sm" type="button">Close</button></p>
+</div>
+</div>
+<div id="palette" class="overlay" hidden role="dialog" aria-modal="true" aria-label="Command palette">
+<div class="sheet">
+<input id="palette-input" type="text" autocomplete="off" placeholder="Type an action, a folder or a contact" aria-label="Command">
+<ul id="palette-list" role="listbox"></ul>
+</div>
+</div>
+<div id="smime-unlock" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="smime-unlock-title">
+<div class="sheet">
+<h2 id="smime-unlock-title">Unlock your keys</h2>
+<p class="note" id="smime-unlock-note">Your password unwraps the private key in this browser; nothing is sent to the server.</p>
+<form id="smime-unlock-form">
+<label for="smime-unlock-password">Password</label><input id="smime-unlock-password" type="password" autocomplete="current-password">
+<div id="smime-unlock-status" class="status" aria-live="polite"></div>
+<p class="row"><button class="btn" type="submit">Unlock</button> <button id="smime-unlock-cancel" class="btn ghost sm" type="button">Cancel</button></p>
+</form>
+</div>
+</div>
+<script src="/portal.js"></script>
+<script src="/portal-smime.js"></script>
+</body>
+</html>

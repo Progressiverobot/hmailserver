@@ -5,53 +5,56 @@
 
 """The self-service portal's script, executed rather than grepped.
 
-The portal is three C++ string literals in
-hmailserver/source/Server/Common/Util/RestApiPortal.cpp: PortalHtml, PortalScript
-and PortalHeaders. Until this existed, the only thing standing behind them was a
-regression test that asserted that certain SUBSTRINGS were present in what the
-server served - which proves that a name is spelled somewhere in a file, and
-nothing whatever about what the page does. A script can carry a syntax error, a
-handler wired to an element that does not exist, or a sign-in that keeps the
-password, and pass every one of those assertions.
+The portal is served from four files in hmailserver/source/Server/Common/Util/:
+Portal.html (the page, its stylesheet inline), Portal.js (the script), the
+manifest and the service worker - carried into the binary by
+build/generate-portal-page.py - and the headers both are served with, a C++
+string literal in RestApiPortal.cpp. Until this existed, the only thing
+standing behind the page was a regression test that asserted that certain
+SUBSTRINGS were present in what the server served - which proves that a name
+is spelled somewhere in a file, and nothing whatever about what the page does.
+A script can carry a syntax error, a handler wired to an element that does not
+exist, or a sign-in that keeps the password, and pass every one of those
+assertions.
 
-So: this recovers the two literals, unescapes them back into an .html and a .js,
-and hands them to build/portal-script-test.js, which builds a small DOM from the
-markup, stubs fetch with recorded API answers, runs the script in it and asserts
-behaviour - a sign-in that stores nothing secret, a listing that renders rows, a
-keyboard cursor that moves, a cid: image that resolves to the attachment download
-route, the change probe causing a refresh, the address bar naming what is shown.
+So: this checks the cheap truths first - the page loads only its own script,
+carries no inline script or handler and names no remote resource; the headers
+say script-src 'self' and frame-ancestors 'none' and allow no remote source -
+and then hands the page and the script to build/portal-script-test.js, which
+builds a small DOM from the markup, stubs fetch with recorded API answers, runs
+the script in it and asserts behaviour - a sign-in that stores nothing secret,
+a listing that renders rows, a keyboard cursor that moves, a cid: image that
+resolves to the attachment download route, the change probe causing a refresh,
+the address bar naming what is shown.
 
-The literals therefore keep a shape this can parse, which is the shape they have:
-
-    const char *Name =
-       "line\n"
-       "line\n";
-
-- a name, '=', then string literals one per line until the semicolon. Nothing
-else in the file may look like that, and a raw string literal (R"(...)") is not
-understood on purpose: the concatenated form is what keeps the page readable in
-a diff.
+The headers literal keeps a shape this can parse:
+    const char *PortalHeaders =
+       "line\\r\\n"
+       "line\\r\\n";
+- a name, '=', then string literals one per line until the semicolon.
 
 Run from the repository root:  python3 build/check-portal-script.py
-Needs node on PATH (every GitHub-hosted runner has it). --keep names a directory
-to leave the extracted files in, for looking at by hand.
+Needs node on PATH (every GitHub-hosted runner has it). --no-node runs the
+static checks only.
 """
+
 import argparse
 import os
 import re
 import shutil
 import subprocess
 import sys
-import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SOURCE = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util", "RestApiPortal.cpp")
+UTIL = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Util")
+PAGE = os.path.join(UTIL, "Portal.html")
+SCRIPT = os.path.join(UTIL, "Portal.js")
+HEADERS_SOURCE = os.path.join(UTIL, "RestApiPortal.cpp")
 RUNNER = os.path.join(ROOT, "build", "portal-script-test.js")
 
 # "const char *Name =", then only string-literal lines until the one ending in ';'
 DEFINITION = re.compile(r'^\s*const\s+char\s*\*\s*(\w+)\s*=\s*$')
 LITERAL = re.compile(r'^\s*"((?:[^"\\]|\\.)*)"\s*(;?)\s*$')
-
 ESCAPES = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "'": "'", "0": "\0"}
 
 
@@ -108,25 +111,29 @@ def extract(path):
     return found
 
 
+def read(path):
+    with open(path, encoding="utf-8") as handle:
+        return handle.read().replace("\r\n", "\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--keep", metavar="DIR", help="write the extracted page and script here and keep them")
-    parser.add_argument("--extract-only", action="store_true", help="extract, check the shape, and do not run node")
+    parser.add_argument("--no-node", action="store_true", help="the static checks only; do not run node")
     args = parser.parse_args()
 
-    if not os.path.exists(SOURCE):
-        raise SystemExit("not found: %s (run this from the repository root)" % SOURCE)
+    for path in (PAGE, SCRIPT, HEADERS_SOURCE):
+        if not os.path.exists(path):
+            raise SystemExit("not found: %s (run this from the repository root)" % path)
 
-    found = extract(SOURCE)
-    for wanted in ("PortalHtml", "PortalScript", "PortalHeaders"):
-        if wanted not in found:
-            raise SystemExit("%s defines no %s" % (os.path.basename(SOURCE), wanted))
+    html = read(PAGE)
+    found = extract(HEADERS_SOURCE)
+    if "PortalHeaders" not in found:
+        raise SystemExit("%s defines no PortalHeaders" % os.path.basename(HEADERS_SOURCE))
+    headers = found["PortalHeaders"]
 
-    html, script, headers = found["PortalHtml"], found["PortalScript"], found["PortalHeaders"]
-
-    # Cheap truths about the three, before anything is executed. These are the
-    # only substring assertions here, and each one is a property of the page
-    # rather than a name in it.
+    # Cheap truths about the page and the headers, before anything is executed.
+    # These are the only substring assertions here, and each one is a property
+    # of the page rather than a name in it.
     problems = []
     if "<script" in html and 'src="/portal.js"' not in html:
         problems.append("the page loads a script that is not /portal.js")
@@ -146,35 +153,19 @@ def main():
                 problems.append("the headers allow a remote source (%s)" % source)
     if problems:
         for problem in problems:
-            sys.stderr.write("RestApiPortal.cpp: %s\n" % problem)
+            sys.stderr.write("portal: %s\n" % problem)
         return 1
 
-    where = args.keep or tempfile.mkdtemp(prefix="portal-script-")
-    os.makedirs(where, exist_ok=True)
-    page = os.path.join(where, "portal.html")
-    code = os.path.join(where, "portal.js")
-    with open(page, "w", encoding="utf-8", newline="") as handle:
-        handle.write(html)
-    with open(code, "w", encoding="utf-8", newline="") as handle:
-        handle.write(script)
-    with open(os.path.join(where, "portal.headers"), "w", encoding="utf-8", newline="") as handle:
-        handle.write(headers)
-
-    if args.extract_only:
-        print("extracted %d bytes of page and %d bytes of script into %s" % (len(html), len(script), where))
+    if args.no_node:
+        print("portal: the page and the headers pass the static checks")
         return 0
 
     node = shutil.which("node") or shutil.which("node.exe")
     if not node:
-        sys.stderr.write("node is not on PATH; it runs the portal's script. Install node, or pass --extract-only.\n")
+        sys.stderr.write("node is not on PATH; it runs the portal's script. Install node, or pass --no-node.\n")
         return 1
 
-    try:
-        run = subprocess.run([node, RUNNER, page, code], cwd=ROOT)
-    finally:
-        if not args.keep:
-            shutil.rmtree(where, ignore_errors=True)
-    return run.returncode
+    return subprocess.run([node, RUNNER, PAGE, SCRIPT], cwd=ROOT).returncode
 
 
 if __name__ == "__main__":

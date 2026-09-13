@@ -121,6 +121,8 @@ jobs:
         run: node build/check-portal-smime.js
       - name: The S/MIME module embedded in the server is current
         run: python3 build/generate-portal-smime.py --check
+      - name: The webmail's page embedded in the server is current
+        run: python3 build/generate-portal-page.py --check
 
   dotnet-format:
     name: dotnet format leaves the C# tree unchanged
