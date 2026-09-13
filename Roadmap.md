@@ -48,7 +48,7 @@ strong and where it is thin far more honestly than any prose summary.
 |---|--:|--:|--:|--:|
 | **Urgent — the OpenSSF gold badge** | | | | |
 | [What stands between here and gold](#what-stands-between-here-and-gold) | 6 | – | 3 | 3 |
-| [Housekeeping that fell out of the badge work](#housekeeping-that-fell-out-of-the-badge-work) | 4 | – | 1 | 1 |
+| [Housekeeping that fell out of the badge work](#housekeeping-that-fell-out-of-the-badge-work) | 5 | – | 0 | 1 |
 | [Dated items — the forcing functions](#dated-items--the-forcing-functions) | 6 | – | – | 1 |
 | [Defects found by the audit](#defects-found-by-the-audit) | 30 | – | – | – |
 | **The next generation** | | | | |
@@ -80,7 +80,7 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
 | [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 37 | – | 1 | 1 |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **862** | **2** | **6** | **34** |
+| **Total** | **863** | **2** | **5** | **34** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
@@ -173,7 +173,7 @@ small change rather than a project.
 | ⏸️ | **Repository setting: Code quality** | **Tested 22 August 2026 and settled.** The CI coverage upload needs the *Code quality* repository setting, and with the setting configured and *no languages* the upload does succeed (`PATCH /repos/{o}/{r}/code-quality/setup`, `{"state":"configured","languages":[]}`; CI run 32552896421). But the setting being on at all re-exposes the 1,482 stale findings of the managed buildless scan that was switched off on 21 August for ignoring the repository's analysis configuration — and with no languages configured nothing ever re-scans them closed. There is no API to dismiss findings. So the setting stays off, the cobertura build artifact is the coverage record, and `fail-on-error: false` stays with the reasoning written beside it. Revisit only if GitHub adds per-rule filtering or a dismissal API to the feature. |
 | ✅ | **The five Scorecard findings on the code-scanning page** | **Cleared 4 September 2026, one by code and four with the reason written on the dismissal.** Pinned-Dependencies was the only one code could fix: NuGet lock files (`packages.lock.json`, `RestorePackagesWithLockFile` in `source/Tools/Directory.Build.props`) beside all nine SDK-style projects, and every restore in CI - the two explicit ones in `ci.yml`, the tools build, and the implicit ones inside the CodeQL builds - held to them with locked mode, so a package bump without its lock-file update fails the build instead of quietly resolving a different graph. Branch-Protection and Code-Review both require a second reviewer, which one maintainer cannot supply, and are dismissed pointing at the `bus_factor` and `two_person_review` rows above; required status checks (eight of them, strict) were added to the master ruleset anyway, because a red CI should not be mergeable, with the announced admin bypass kept for emergencies. Maintained warns only that the repository is younger than 90 days, which stops being true on 10 September. SAST counts commits inside a 30-commit window that still holds pre-workflow direct pushes; every pull request since 22 August is analysed and the old ones leave the window as new ones land. |
 | ✅ | **Repository setting: automatic dependency submission** | **Closed 4 September 2026 by making it work rather than switching it off.** GitHub's own NuGet submission job was red on every push because it restores every project on a Linux runner and the first `net10.0-windows` project fails with NETSDK1100. A one-property `Directory.Build.props` under `source/Tools` (`EnableWindowsTargeting=true`, inert on Windows) lets the restore complete, so the dependency graph now receives the transitive NuGet packages the manifests alone do not show. The setting stays on. |
-| ⬜ | **Organisation setting: require 2FA** | The maintainer account uses a passkey; the org-wide requirement is still off (the API refused it — it would eject any member without 2FA, and the org has a second, read-only member). Enable it in *Authentication security* once that member is confirmed enrolled. |
+| ✅ | **Organisation setting: require 2FA** | **Enabled 13 September 2026** in the organisation's *Authentication security* settings, once the second member was enrolled; the API reports `two_factor_requirement_enabled: true`. The maintainer account uses a passkey. |
 
 
 Dated items — the forcing functions
