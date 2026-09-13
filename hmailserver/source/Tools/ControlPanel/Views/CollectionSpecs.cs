@@ -36,10 +36,10 @@ namespace hMailServer.ControlPanel.Views
 
       private static readonly (int Value, string Label)[] ConnectionSecurityOptions =
       {
-         (0, L("None - no encryption (port 110)")),
-         (1, L("SSL/TLS - encrypted from the first byte (port 995)")),
-         (2, L("STARTTLS, optional - upgrade if offered, continue in the clear if not (port 110)")),
-         (3, L("STARTTLS, required - refuse to download unless the upgrade succeeds (port 110)"))
+         (0, L("None - no encryption")),
+         (1, L("SSL/TLS - encrypted from the first byte")),
+         (2, L("STARTTLS, optional - upgrade if offered, continue in the clear if not")),
+         (3, L("STARTTLS, required - refuse to download unless the upgrade succeeds"))
       };
 
       public static CollectionEditorView SurblServers() => new(new CollectionSpec
