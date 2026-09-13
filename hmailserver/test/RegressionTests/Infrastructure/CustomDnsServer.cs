@@ -188,7 +188,7 @@ namespace RegressionTests.Infrastructure
          using (SuiteDns.Suspend())
          using (var fakeDns = new MalformedUdpDnsServer())
          {
-            SetIniSetting("DNSServer", "127.0.0.1");
+            SetIniSetting("DNSServer", SuiteDns.Resolver);
             SetIniSetting("DNSQueryTimeout", "5");
 
             try
@@ -228,7 +228,8 @@ namespace RegressionTests.Infrastructure
       /// <summary>
       ///    UDP: every response is malformed in the way measured to produce status 9502
       ///    (RDLENGTH = 512 with 11 bytes of RDATA in the packet). TCP: correct answers.
-      ///    Binds 127.0.0.1:53 - which the DNS client uses implicitly, since a custom
+      ///    Binds port 53 of the suite's resolver address (127.0.0.1 on the Windows
+      ///    bench) - port 53 because the DNS client uses it implicitly, since a custom
       ///    server entry must not name a port at all (see the port-zero comment in
       ///    DNSResolverWinApi.cpp).
       /// </summary>
@@ -243,10 +244,12 @@ namespace RegressionTests.Infrastructure
 
          public MalformedUdpDnsServer()
          {
+            IPAddress address = IPAddress.Parse(SuiteDns.Resolver);
+
             try
             {
-               udp_ = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
-               tcp_ = new TcpListener(IPAddress.Loopback, 53);
+               udp_ = new UdpClient(new IPEndPoint(address, 53));
+               tcp_ = new TcpListener(address, 53);
                tcp_.Start();
             }
             catch (SocketException ex)
@@ -260,8 +263,8 @@ namespace RegressionTests.Infrastructure
                udp_?.Close();
                tcp_?.Stop();
 
-               Assert.Fail("Could not bind 127.0.0.1:53 for the fake DNS server - something on this " +
-                           "machine is already serving DNS on loopback (WSL? a local resolver?): " + ex.Message);
+               Assert.Fail("Could not bind " + address + ":53 for the fake DNS server - something on this " +
+                           "machine is already serving DNS there (WSL? a local resolver?): " + ex.Message);
             }
 
             new Thread(ServeUdp_) { IsBackground = true }.Start();

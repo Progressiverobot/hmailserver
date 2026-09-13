@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -13,27 +17,44 @@ namespace RegressionTests
 {
    /// <summary>
    ///    The suite-wide fake DNS zone, the Windows one's shape exactly: a
-   ///    <see cref="FakeDnsServer"/> bound on 127.0.0.1:53 before the first fixture,
-   ///    the server's DNSServer pointed at it for the run, the two names every
-   ///    fixture may assume seeded, and every fixture that adds a name calling
-   ///    <see cref="Reset"/> in its teardown. What differs is how the server is
-   ///    told: DNSServer is written through PUT /api/v1/settings/ini/DNSServer and
-   ///    read again through POST /api/v1/server/reinitialize, which runs
+   ///    <see cref="FakeDnsServer"/> bound on port 53 of a loopback address before
+   ///    the first fixture, the server's DNSServer pointed at it for the run, the
+   ///    two names every fixture may assume seeded, and every fixture that adds a
+   ///    name calling <see cref="Reset"/> in its teardown. What differs is how the
+   ///    server is told: DNSServer is written through PUT /api/v1/settings/ini/DNSServer
+   ///    and read again through POST /api/v1/server/reinitialize, which runs
    ///    LoadSettings afresh - the POSIX resolver takes the configured server from
    ///    that setting, on port 53, as the Windows one does.
+   ///
+   ///    And which address. The Windows suite's is 127.0.0.1, and so is a plain
+   ///    Linux host's; two benches cannot serve it there. A GitHub-hosted runner's
+   ///    hardening agent runs a DNS proxy on 127.0.0.1:53, so the bind fails. WSL2
+   ///    in mirrored networking mode binds 127.0.0.1:53 without complaint and then
+   ///    delivers nothing sent to it - measured 13 September 2026 with a plain
+   ///    responder and strace: the query leaves, nothing arrives - while the same
+   ///    packet to 127.0.53.53 arrived at once. Any 127/8 address is loopback on
+   ///    Linux without configuration, so the setup tries 127.0.0.1 and then
+   ///    127.0.53.53, and takes the first that both binds and answers a query sent
+   ///    to it from this process, before it points the server there. The fixtures
+   ///    do not know which was chosen; <see cref="Resolver"/> says.
    ///
    ///    The zone can only be served to a server on this machine, from a process
    ///    allowed to bind port 53 (the CI job lowers ip_unprivileged_port_start for
    ///    the purpose; a root shell needs nothing). When either is not so, or the
-   ///    server is older than the two routes, nothing here throws from the
-   ///    run-wide setup - an ignore there would ignore the whole run - and the
-   ///    first fixture to reach for <see cref="Zone"/> is skipped with the reason.
+   ///    server is older than the two routes, or no address serves, nothing here
+   ///    throws from the run-wide setup - an ignore there would ignore the whole
+   ///    run - and the first fixture to reach for <see cref="Zone"/> is skipped
+   ///    with the reason.
    /// </summary>
    [SetUpFixture]
    public class SuiteDns
    {
-      /// <summary>What DNSServer says for the whole run.</summary>
-      public const string Resolver = "127.0.0.1";
+      /// <summary>
+      ///    What DNSServer says for the whole run: the address the zone is served on.
+      ///    127.0.0.1 until the run-wide setup has chosen, which is before any fixture
+      ///    reads it.
+      /// </summary>
+      public static string Resolver { get; private set; } = "127.0.0.1";
 
       /// <summary>
       ///    127.0.0.2 is what a URI blacklist returns for a listed name, and this is the
@@ -43,7 +64,15 @@ namespace RegressionTests
 
       private const string IniRoute = "/api/v1/settings/ini/DNSServer";
 
+      // In the order they are tried. See the class comment for the two benches
+      // the second one is for.
+      private static readonly string[] Candidates = { "127.0.0.1", "127.0.53.53" };
+
       private static FakeDnsServer zone_;
+
+      // The address the zone was served on, for the one that replaces it after a
+      // Suspend.
+      private static IPAddress address_;
 
       // Why the zone is not up, or null while it is.
       private static string notServed_;
@@ -61,21 +90,17 @@ namespace RegressionTests
       [OneTimeSetUp]
       public void PointTheWholeSuiteAtOneLocalZone()
       {
-         // WSL2 in mirrored networking mode does not deliver a UDP packet sent to
-         // 127.0.0.1:53 to a socket bound there - measured 13 September 2026 with
-         // a plain responder and strace: the query leaves, nothing arrives - so a
-         // bench inside it says so through the environment, and its DNS fixtures
-         // skip rather than hang. A real Linux host, the CI runner included, needs
-         // nothing of the kind.
+         // The explicit way out, for a bench that wants the DNS fixtures skipped
+         // whatever the probe below would find.
          if (Environment.GetEnvironmentVariable("HMTEST_NO_FAKE_DNS") == "1")
          {
-            notServed_ = NotOnThisServer.NoSuiteDns + " (HMTEST_NO_FAKE_DNS=1: this bench cannot deliver loopback UDP to the zone)";
+            notServed_ = NotOnThisServer.NoSuiteDns + " (HMTEST_NO_FAKE_DNS=1: this bench runs without the zone)";
             return;
          }
 
          if (!TestTarget.IsLocal)
          {
-            notServed_ = NotOnThisServer.NoSuiteDns + " (the server is on " + TestTarget.Host + ", and the zone can only be served on 127.0.0.1)";
+            notServed_ = NotOnThisServer.NoSuiteDns + " (the server is on " + TestTarget.Host + ", and the zone can only be served on loopback)";
             return;
          }
 
@@ -86,15 +111,43 @@ namespace RegressionTests
             return;
          }
 
-         try
+         var reasons = new List<string>();
+
+         foreach (string candidate in Candidates)
          {
-            zone_ = Seed_(new FakeDnsServer());
+            IPAddress address = IPAddress.Parse(candidate);
+            FakeDnsServer zone;
+
+            try
+            {
+               zone = new FakeDnsServer(address);
+            }
+            catch (InvalidOperationException bind)
+            {
+               // FakeDnsServer says which address and why; here there is no test
+               // to fail, only the next address to try.
+               reasons.Add(bind.Message.Trim());
+               continue;
+            }
+
+            string undelivered = Undelivered_(zone);
+
+            if (undelivered != null)
+            {
+               zone.Dispose();
+               reasons.Add(undelivered);
+               continue;
+            }
+
+            zone_ = Seed_(zone);
+            address_ = address;
+            Resolver = candidate;
+            break;
          }
-         catch (AssertionException bind)
+
+         if (zone_ == null)
          {
-            // FakeDnsServer fails the test when it cannot bind; here there is no
-            // test to fail, only a reason to give.
-            notServed_ = NotOnThisServer.NoSuiteDns + " (" + bind.Message.Trim() + ")";
+            notServed_ = NotOnThisServer.NoSuiteDns + " (" + string.Join("; ", reasons) + ")";
             return;
          }
 
@@ -137,9 +190,9 @@ namespace RegressionTests
       }
 
       /// <summary>
-      ///    Gives up 127.0.0.1:53 for the duration of the returned scope, for a test
-      ///    that serves DNS itself. The zone comes back seeded - and only seeded - when
-      ///    the scope is disposed.
+      ///    Gives up the zone's port for the duration of the returned scope, for a
+      ///    test that serves DNS itself (on the same address: <see cref="Resolver"/>).
+      ///    The zone comes back seeded - and only seeded - when the scope is disposed.
       /// </summary>
       public static IDisposable Suspend()
       {
@@ -153,7 +206,7 @@ namespace RegressionTests
       {
          public void Dispose()
          {
-            zone_ = Seed_(new FakeDnsServer());
+            zone_ = Seed_(new FakeDnsServer(address_));
          }
       }
 
@@ -162,6 +215,51 @@ namespace RegressionTests
          return zone
             .WithA(SurblTestPoint, "127.0.0.2")
             .WithA("localhost", "127.0.0.1");
+      }
+
+      /// <summary>
+      ///    One query to the zone from a socket of this process, the way the server
+      ///    will send its: null when an answer came back, otherwise why the address is
+      ///    no use. A bind that succeeds proves nothing on the bench this exists for.
+      /// </summary>
+      private static string Undelivered_(FakeDnsServer zone)
+      {
+         byte[] query = ProbeQuery_();
+
+         using (var client = new UdpClient(AddressFamily.InterNetwork))
+         {
+            client.Client.ReceiveTimeout = 1500;
+
+            try
+            {
+               client.Send(query, query.Length, new IPEndPoint(zone.Address, 53));
+
+               var from = new IPEndPoint(IPAddress.Any, 0);
+               client.Receive(ref from);
+               return null;
+            }
+            catch (SocketException lost)
+            {
+               return "a query to " + zone.Address + ":53 was not answered (" + lost.SocketErrorCode +
+                      "): this bench does not deliver loopback UDP to that address";
+            }
+         }
+      }
+
+      // A recursion-desired A query for probe.suite-dns.invalid: twelve bytes of
+      // header, the name as labels, type and class.
+      private static byte[] ProbeQuery_()
+      {
+         var packet = new List<byte> { 0x53, 0x44, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+
+         foreach (string label in "probe.suite-dns.invalid".Split('.'))
+         {
+            packet.Add((byte) label.Length);
+            packet.AddRange(Encoding.ASCII.GetBytes(label));
+         }
+
+         packet.AddRange(new byte[] { 0x00, 0x00, 0x01, 0x00, 0x01 });
+         return packet.ToArray();
       }
    }
 }

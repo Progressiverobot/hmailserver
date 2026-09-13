@@ -1194,6 +1194,7 @@ EXIT 0
     <ClInclude Include="..\Common\TCPIP\IOOperationQueue.h" />
     <ClInclude Include="..\Common\TCPIP\IOQueueWorkerTask.h" />
     <ClInclude Include="..\Common\TCPIP\IOService.h" />
+    <ClInclude Include="..\Common\TCPIP\AcceptLoop.h" />
     <ClInclude Include="..\Common\TCPIP\IPAddress.h" />
     <ClInclude Include="..\Common\Tcpip\LocalIPAddresses.h" />
     <ClInclude Include="..\Common\Tcpip\SocketConstants.h" />

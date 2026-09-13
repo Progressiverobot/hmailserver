@@ -77,7 +77,12 @@ namespace RegressionTests.SSL
       {
          try
          {
-            IniFileSetting.Write("RestApiPort", "0");
+            // Not where the listener is the suite's own (RestListener): the tests
+            // that would have moved it are skipped there, and this teardown still
+            // runs after the skip.
+            if (RestListener.Provided == 0)
+               IniFileSetting.Write("RestApiPort", "0");
+
             IniFileSetting.Write("RestApiCertificateFile", "");
             IniFileSetting.Write("RestApiPrivateKeyFile", "");
             IniFileSetting.Write("WebServicesHttpPort", "0");

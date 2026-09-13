@@ -1522,6 +1522,7 @@ namespace hMailServer
          {
             ID = ServerApi.LongOf(element, "id"),
             Name = ServerApi.StringOf(element, "name"),
+            SavedName = ServerApi.StringOf(element, "name"),
             CurrentUID = ServerApi.LongOf(element, "uidvalidity"),
             ParentID = ServerApi.LongOf(element, "parent_id"),
             Account = _account
@@ -1624,6 +1625,12 @@ namespace hMailServer
    {
       internal Account Account;
 
+      // The name the server knows this folder by, so that Save can tell a rename
+      // from the COM habit of saving an object that has not changed - which over
+      // the rename route would ask the server to rename a folder onto itself and
+      // be refused as "already exists".
+      internal string SavedName;
+
       public long ID { get; set; }
       public string Name { get; set; }
       public long CurrentUID { get; set; }
@@ -1650,6 +1657,11 @@ namespace hMailServer
       /// </summary>
       public void Save()
       {
+         // Nothing to rename: the COM fixtures call Save on a folder they have
+         // just added, or changed a property of that the route does not carry.
+         if (string.Equals(Name, SavedName, StringComparison.Ordinal))
+            return;
+
          Account.RequireOwnCredentials("renames a folder");
 
          string whole = Name;
@@ -1669,6 +1681,7 @@ namespace hMailServer
             throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
 
          answer.Expect(200, "PUT /api/v1/me/folders/" + ID + " as " + Account.Address);
+         SavedName = Name;
       }
 
       public void Delete()

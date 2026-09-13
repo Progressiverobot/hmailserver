@@ -13,6 +13,7 @@ namespace RegressionTests.Shared
    ///       HMTEST_SMTP_PORT       2525
    ///       HMTEST_POP3_PORT       1110
    ///       HMTEST_IMAP_PORT       1143
+   ///       HMTEST_SUBMISSION_PORT 5870
    ///       HMTEST_REST_PORT       8045
    ///       HMTEST_ADMIN_PASSWORD  testar
    ///
@@ -34,7 +35,7 @@ namespace RegressionTests.Shared
       ///    (2525 and 2526, as the Linux recipe writes them). Named in its own
       ///    variable where it is somewhere else.
       /// </summary>
-      public static readonly int SubmissionPort = Read("HMTEST_SUBMISSION_PORT", Read("HMTEST_SMTP_PORT", 2525) + 1);
+      public static readonly int SubmissionPort = Read("HMTEST_SUBMISSION_PORT", 5870);
 
       public static readonly int Pop3Port = Read("HMTEST_POP3_PORT", 1110);
       public static readonly int ImapPort = Read("HMTEST_IMAP_PORT", 1143);
