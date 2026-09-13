@@ -20,6 +20,7 @@
 #include "../Util/AccountLogon.h"
 #include "../Util/ServerStatus.h"
 #include "../Util/Parsing/StringParser.h"
+#include "../TCPIP/AcceptLoop.h"
 #include "../TCPIP/IPAddress.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../TCPIP/SslContextInitializer.h"
@@ -437,14 +438,14 @@ namespace HM
 
       running_ = false;
 
-      if (listen_socket_ != INVALID_SOCKET)
-      {
-         closesocket(listen_socket_);
-         listen_socket_ = INVALID_SOCKET;
-      }
+      // Wakes the worker out of accept(); the descriptor is released once the
+      // worker has been joined. AcceptLoop.h says why the two are separate.
+      AcceptLoop::Interrupt(listen_socket_);
 
       if (worker_.joinable())
          worker_.join();
+
+      AcceptLoop::Release(listen_socket_);
 
       // After the join: the worker reads the context for every STARTTLS, so
       // releasing it while that thread was still alive would be a use-after-free.
