@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The HTTP/1.1 server the optional listeners run on. See HttpServer.cpp for
 // the shape of the concurrency model and why each ceiling is absolute.
 

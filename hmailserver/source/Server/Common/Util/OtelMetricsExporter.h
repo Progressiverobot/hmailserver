@@ -1,7 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// https://www.progressiverobot.com
-//
+
 // The OTLP metrics signal: a periodic push of the SAME counters the Prometheus
 // /metrics endpoint scrapes, to an OTLP/HTTP (protobuf-over-JSON) collector.
 // Enabled with OtelMetricsEndpoint in hMailServer.ini; when disabled every

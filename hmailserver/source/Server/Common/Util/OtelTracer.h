@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
-//
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Dependency-free OpenTelemetry tracing. Spans are emitted at the points already
 // instrumented for metrics (per-command dispatch in TCPConnection, the database
 // query chokepoint in DatabaseConnectionManager) and exported in batches to an
@@ -16,7 +17,6 @@
 // (OtelExportChannel) and the same batching shape as this class. W3C trace
 // context - accepting a caller's traceparent and emitting this server's own -
 // lives in OtelTraceContext.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

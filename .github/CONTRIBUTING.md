@@ -60,8 +60,10 @@ fix is `git commit --amend -s` and a push.
   `-warnaserror`, the hosted C++ server build, CodeQL (C#), dependency review,
   binary provenance, and the coding-style jobs - editorconfig (`.editorconfig`:
   spaces, width 3 for `.h`/`.cpp`/`.cs`), `dotnet format --verify-no-changes`, and
-  `python3 build/add-license-headers.py --check` (every source file carries the
-  copyright line and `SPDX-License-Identifier: AGPL-3.0-or-later`).
+  `python3 build/add-license-headers.py --check` (every source file opens with the
+  project's three-line header - the site, the copyright line and
+  `SPDX-License-Identifier: AGPL-3.0-or-later` - and the script's other mode
+  puts it there).
 - Control Panel changes are held to five more checks in the same job: every static
   caption carries an Alt-key mnemonic (`build/check-mnemonics.py`); folder-access
   decisions stay in `ACLManager` (`build/check-authz-choke-point.py`); and, in the

@@ -1,8 +1,8 @@
 #!/bin/bash
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # How much of the server core compiles on Linux, counted rather than estimated.
 #
 # The roadmap's Linux section opens with a row whose deliverable is not a running

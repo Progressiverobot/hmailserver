@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # rpm %postun. $1 is the number of instances of this package that will remain:
 # 0 after a removal, 1 after an upgrade's old version is cleaned up.
 #

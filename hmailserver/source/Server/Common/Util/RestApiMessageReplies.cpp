@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Two answers a reader gives a message without writing one: a read receipt,
 // for a message that asked for one (POST /api/v1/me/messages/{id}/receipt - an
 // RFC 8098 disposition notification, queued as the account sends anything),

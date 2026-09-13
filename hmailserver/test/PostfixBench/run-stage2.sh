@@ -1,4 +1,8 @@
 #!/bin/bash
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Stage 2: postfix (real, PIPELINING) -> hMailServer at [127.0.0.1]:25.
 # Counts only NEW deliveries after this run's marker.
 BENCH="$(dirname "$0")"

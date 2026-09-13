@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Large attachments as links. Above a size the domain sets, the webmail does
 // not attach a file to the message: it sends the file here in chunks (POST
 // /api/v1/me/files makes the record, PUT /api/v1/me/files/{id}/content?offset=

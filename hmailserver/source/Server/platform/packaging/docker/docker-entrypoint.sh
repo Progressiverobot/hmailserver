@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The container's entrypoint. The environment becomes the configuration, each
 # part only when it is set, each idempotent, and then the server runs:
 #

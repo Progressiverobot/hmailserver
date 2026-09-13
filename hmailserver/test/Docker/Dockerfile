@@ -1,3 +1,7 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # escape=\
 # Pinned by digest, not by tag. A tag is a moving target: "ltsc2022" is
 # whatever Microsoft last pushed, so an image that built and passed yesterday

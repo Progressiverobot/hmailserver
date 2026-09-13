@@ -1,10 +1,11 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ARC results used for inbound filtering (RFC 8617). See SpamTestArc.h for
 // the trust model and the reasons behind each refusal below.
 //
 // Everything parsed in this file arrives in an unauthenticated message.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "StdAfx.h"
 

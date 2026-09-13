@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // libFuzzer target: the codecs, driven directly.
 //
 // MimeCode.cpp is reachable through the other two targets, but only at the end

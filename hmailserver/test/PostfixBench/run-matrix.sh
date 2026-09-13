@@ -1,4 +1,8 @@
 #!/bin/bash
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Full matrix: inject all four cases, then flush patiently until the WSL
 # clock-skew window passes (qmgr skips queue files stamped "in the future"),
 # and report exactly what Postfix transmitted.

@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The webmail's catalogues, embedded: PortalLanguagesData.cpp is generated
 // from hmailserver/source/Server/Common/Util/PortalLanguages/<code>.json by
 // build/generate-portal-languages.py, and build/check-portal-languages.py

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 """The Control Panel's translation catalogues agree with its source, and every
 language that claims to be complete is.
 

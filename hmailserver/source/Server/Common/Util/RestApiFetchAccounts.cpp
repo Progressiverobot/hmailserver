@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's external (fetch) accounts: what InterfaceFetchAccounts and InterfaceFetchAccount do over COM. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's external (fetch) accounts: what InterfaceFetchAccounts and InterfaceFetchAccount do over COM. See RestApiServer.h.
 //
 // An external account is a remote POP3 or IMAP mailbox the server collects
 // into one of its own accounts, on a schedule. Over COM it is

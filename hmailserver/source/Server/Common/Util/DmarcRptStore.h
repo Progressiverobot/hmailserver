@@ -1,4 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // In-memory store of inbound DMARC evaluation outcomes, aggregated per UTC
 // day and policy domain. Used to generate DMARC aggregate reports (RFC 7489
 // section 7.2) - the rua reports this server has always consumed policies
@@ -7,7 +10,6 @@
 // The sibling of TlsRptStore, and deliberately shaped like it: a day is a
 // map of buckets, a completed day is one before today, and popping a day is
 // destructive - the reporter owns whatever it pops.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

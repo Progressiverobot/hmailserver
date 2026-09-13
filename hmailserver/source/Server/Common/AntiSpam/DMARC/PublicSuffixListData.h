@@ -1,7 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// https://www.progressiverobot.com
-//
+
 // GENERATED FILE - DO NOT EDIT BY HAND.
 // Regenerate with build\generate-public-suffix-list.ps1, which also documents
 // why the data is compiled in rather than loaded from disk.

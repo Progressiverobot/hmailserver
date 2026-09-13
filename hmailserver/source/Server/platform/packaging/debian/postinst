@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The Debian post-installation script, named by CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA.
 #
 # It creates the identity the mail store belongs to, the directories it lives in,

@@ -1,7 +1,8 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// Constant-time comparison of a presented secret against an expected one.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// Constant-time comparison of a presented secret against an expected one.
 
 #pragma once
 

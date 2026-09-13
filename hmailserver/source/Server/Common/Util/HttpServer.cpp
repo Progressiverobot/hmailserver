@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // An HTTP/1.1 server on Boost.Asio for the optional listeners.
 //
 // What it replaces: each listener was a std::thread around a blocking accept()

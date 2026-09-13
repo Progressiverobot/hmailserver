@@ -1,7 +1,8 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// ARC sealing and chain evaluation (RFC 8617). See Arc.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// ARC sealing and chain evaluation (RFC 8617). See Arc.h.
 
 #include "StdAfx.h"
 

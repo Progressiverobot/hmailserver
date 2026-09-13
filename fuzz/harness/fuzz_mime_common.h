@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Shared machinery for the MIME fuzz targets: the input-buffer contract, the
 // exception policy, and the traversal that drags a parsed message past the
 // accessors an untrusted message actually reaches in the server.
@@ -8,7 +10,6 @@
 // a decision that, if got wrong, turns the fuzzer from a bug finder into a
 // generator of false positives - and a fuzzer that cries wolf gets switched off
 // within a week, which is the normal way this kind of work dies.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

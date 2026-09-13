@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
-//
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The OTLP/HTTP transport shared by the three signal exporters (OtelTracer,
 // OtelMetricsExporter, OtelLogExporter): endpoint-URL parsing with a per-signal
 // default path, and a blocking JSON POST over a raw socket. Extracted from
@@ -9,7 +10,6 @@
 // listeners each built their own context and each drifted from the shared
 // configuration, and a third copy of THIS code would repeat that mistake with
 // the endpoint grammar instead of the cipher list.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

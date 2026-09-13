@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # S/MIME fixtures made with OpenSSL, the independent implementation the page's
 # module is checked against: a CA, an RSA leaf and an EC leaf for
 # alice@example.test (emailAddress in the subject and an rfc822Name SAN), the

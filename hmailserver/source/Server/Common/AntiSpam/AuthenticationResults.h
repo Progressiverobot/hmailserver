@@ -1,12 +1,12 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
-//
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // RFC 8601 Authentication-Results and RFC 7208 section 9.1 Received-SPF.
 //
 // Carries the authentication verdicts for one inbound message from the spam tests
 // that produced them to the point where the trace headers are written. Nothing
 // here touches the disk - see AuthenticationResultsWriter.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

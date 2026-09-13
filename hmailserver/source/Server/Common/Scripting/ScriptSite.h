@@ -1,8 +1,11 @@
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /////////////////////////////////////////////////////////////////////////////
 //
 // ATL Active Script Host Wrapper
 // (C) Copyright 2001 VisionTech Limited. All rights reserved.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 // http://www.visiontech.ltd.uk/
 // bateman@acm.org
 //

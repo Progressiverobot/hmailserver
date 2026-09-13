@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Password reuse history and password age.
 //
 // The two halves of "password expiry" that are worth having, and they are worth

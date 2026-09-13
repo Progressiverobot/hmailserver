@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The RPM %post scriptlet, named by CPACK_RPM_POST_INSTALL_SCRIPT_FILE. CPack
 # copies the contents of this file into the spec it generates, so what is written
 # here IS the body of %post - the shebang above is a comment as far as rpm is

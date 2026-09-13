@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Runs the page's S/MIME module (PortalSmime.js) in Node against fixtures
 // OpenSSL made - certificates, keys in three forms, messages signed detached,
 // opaque and by an EC key, messages encrypted with AES-256 and AES-128, one

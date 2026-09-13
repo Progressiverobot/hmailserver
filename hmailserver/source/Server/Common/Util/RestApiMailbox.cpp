@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's own-mailbox writes and its change probe. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's own-mailbox writes and its change probe. See RestApiServer.h.
 //
 // Three things the self-service portal needs and the read-only mailbox routes
 // did not give it: folders it can create, rename and delete; and a probe it can

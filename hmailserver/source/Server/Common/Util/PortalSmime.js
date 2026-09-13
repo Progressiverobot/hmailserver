@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // S/MIME for the webmail page, in the browser, on the Web Crypto API and
 // nothing else: DER, X.509, PKCS#8 and PKCS#12 (PBES2), CMS SignedData and
 // EnvelopedData (RFC 5652, RFC 8551), and the MIME on either side of them.

@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+# https://www.progressiverobot.com
 # Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 """The self-service portal's script, executed rather than grepped.
 
 The portal is three C++ string literals in

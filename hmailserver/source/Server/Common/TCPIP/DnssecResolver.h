@@ -1,5 +1,7 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Validating DNSSEC stub resolver (RFC 4033-4035) used for DANE TLSA
 // lookups (RFC 7672).
 //
@@ -18,7 +20,6 @@
 // authority section, signed by the parent; without the proof, or with one
 // that does not verify, it is Bogus (RFC 4035 section 5.2, RFC 5155
 // section 8). A stripped DS is therefore a failure, not a downgrade.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

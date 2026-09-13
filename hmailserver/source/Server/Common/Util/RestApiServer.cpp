@@ -1,7 +1,8 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// REST administration API over HTTPS. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// REST administration API over HTTPS. See RestApiServer.h.
 
 #include "StdAfx.h"
 

@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// http://www.progrssiverobot.com
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// http://www.progrssiverobot.com
 
 #include "StdAfx.h"
 

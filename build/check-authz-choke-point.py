@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
+# https://www.progressiverobot.com
 # Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Every folder-access decision goes through ACLManager, and this keeps it that way.
 
 "May account A do X to folder F" is answered by ACLManager::CheckPermission (folder

@@ -1,7 +1,7 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // ARC results used for inbound filtering (RFC 8617).
 //
 // A mailing list or forwarder breaks SPF (the envelope sender changes) and

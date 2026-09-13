@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Over-the-wire protocol fuzzing. These tests feed the live SMTP and IMAP command
 // parsers, and the inbound MIME parser, a large volume of malformed / randomised
 // input and assert that the server never crashes, hangs or logs an unhandled
@@ -13,7 +15,6 @@
 //
 // The inputs use a fixed RNG seed so any failure is reproducible. A per-test
 // [Timeout] is a hard backstop in case a malformed input ever wedged the server.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Text;

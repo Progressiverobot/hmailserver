@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The Debian pre-removal script.
 #
 # It has one job: stop the server before its binary is taken away. An upgrade is

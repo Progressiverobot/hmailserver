@@ -1,7 +1,7 @@
+# https://www.progressiverobot.com
 # Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-# https://www.progressiverobot.com
-#
+
 # Regenerates hmailserver\source\Server\Common\AntiSpam\DMARC\PublicSuffixListData.h
 # from the Public Suffix List (https://publicsuffix.org/).
 #
@@ -279,9 +279,10 @@ function Emit-RuleArray([System.Text.StringBuilder] $out, [string] $name, [strin
 }
 
 $out = [System.Text.StringBuilder]::new()
-[void]$out.AppendLine('// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd')
 [void]$out.AppendLine('// https://www.progressiverobot.com')
-[void]$out.AppendLine('//')
+[void]$out.AppendLine('// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd')
+[void]$out.AppendLine('// SPDX-License-Identifier: AGPL-3.0-or-later')
+[void]$out.AppendLine('')
 [void]$out.AppendLine('// GENERATED FILE - DO NOT EDIT BY HAND.')
 [void]$out.AppendLine('// Regenerate with build\generate-public-suffix-list.ps1, which also documents')
 [void]$out.AppendLine('// why the data is compiled in rather than loaded from disk.')

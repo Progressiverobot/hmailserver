@@ -58,11 +58,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The same script that added the headers, in its report-only mode. A
-      # file added without one fails here with its name, and the fix is the
-      # script's other mode. Generated MIDL output and vendored code under
-      # libraries/ are excluded inside the script, with the reasons.
-      - name: Every source file carries a copyright line and an SPDX identifier
+      # The same script that puts the headers there, in its report-only mode: a
+      # file whose header is missing, or differs from the one form, fails here
+      # with its name, and the fix is the script's other mode. Generated MIDL
+      # output and the third-party sources are excluded inside the script, with
+      # the reasons.
+      - name: Every source file opens with the project header
         run: python3 build/add-license-headers.py --check
 
       # Every static caption in the Control Panel carries an Alt-key mnemonic and

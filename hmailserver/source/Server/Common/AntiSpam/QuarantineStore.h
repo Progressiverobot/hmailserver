@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The spam quarantine: a store for messages the server would otherwise have
 // refused, so that a human can look before they are gone.
 //

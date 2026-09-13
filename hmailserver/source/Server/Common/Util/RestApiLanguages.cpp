@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The webmail in the reader's language. English is the page; a catalogue
 // maps every text of it to one language. GET /portal-lang/<code>.json
 // answers a catalogue to anyone (the sign-in page has no account), cached a

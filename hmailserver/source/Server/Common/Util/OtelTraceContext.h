@@ -1,7 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-// https://www.progressiverobot.com
-//
+
 // W3C Trace Context (traceparent / tracestate) ingestion and propagation.
 //
 // A traceparent is attacker-supplied on every internet-facing path this server

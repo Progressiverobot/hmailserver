@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The schema-upgrade gate: prove that a database at schema 6029 holding orphaned
 # rows upgrades to this build's schema through the real upgrade scripts, on a real
 # backend. Nothing in CI executed an upgrade before 11 September 2026, which is how

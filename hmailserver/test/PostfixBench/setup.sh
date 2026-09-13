@@ -1,4 +1,8 @@
 #!/bin/bash
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
 # Configures the WSL Postfix as a PMG-shaped relay for the bench. Idempotent.
 # Run inside WSL as root, from this directory. See README.md.
 set -e

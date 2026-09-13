@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// See AccountLockout.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// See AccountLockout.h.
 
 #include "StdAfx.h"
 

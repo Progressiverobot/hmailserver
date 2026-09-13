@@ -1,9 +1,10 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Implementation of the shared traversal. See fuzz_mime_common.h for the
 // reasoning behind the buffer contract, the volatile sink and the traversal
 // limits.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

@@ -1,5 +1,7 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // ARC (Authenticated Received Chain, RFC 8617): sealing and chain evaluation.
 //
 // When a message is relayed onward (forwarding, distribution lists), the
@@ -10,7 +12,6 @@
 // The same chain, read inbound, is what lets THIS server recover the
 // authentication results a forwarder observed before it broke SPF/DKIM for
 // us - see SpamTestArc. Both directions share the chain validation here.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

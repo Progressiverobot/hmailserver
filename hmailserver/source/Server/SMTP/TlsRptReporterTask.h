@@ -1,5 +1,7 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Scheduled task that generates and sends SMTP TLS reports (RFC 8460)
 // to domains publishing a _smtp._tls TXT record with a mailto: rua.
 //
@@ -8,7 +10,6 @@
 // constructor says so in the application log - once per service start, because
 // the task is constructed once - since the alternative is an administrator
 // waiting indefinitely for reports that were never going to be sent.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

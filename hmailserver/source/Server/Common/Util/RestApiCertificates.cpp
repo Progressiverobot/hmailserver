@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's certificate writes and the TCP/IP ports with their certificate binding. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's certificate writes and the TCP/IP ports with their certificate binding. See RestApiServer.h.
 //
 // Two collections, persisted the way the Control Panel persists them through
 // COM, with one difference in each direction that is stated where it is made:

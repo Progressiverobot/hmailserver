@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The signed-in account's preferences: GET and PUT /api/v1/me/preferences, a
 // small key/value store the webmail keeps its choices in - the theme, the
 // density, the undo-send delay, which folders to notify for - so that they

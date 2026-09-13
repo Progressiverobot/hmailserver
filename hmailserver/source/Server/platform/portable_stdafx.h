@@ -1,7 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The precompiled-header substitute for the POSIX build of the server core.
 //
 // Every core translation unit opens with #include "StdAfx.h" (or "stdafx.h" -

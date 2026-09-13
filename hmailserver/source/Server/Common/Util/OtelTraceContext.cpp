@@ -1,7 +1,8 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
-// W3C Trace Context ingestion and propagation. See OtelTraceContext.h.
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// W3C Trace Context ingestion and propagation. See OtelTraceContext.h.
 
 #include "StdAfx.h"
 

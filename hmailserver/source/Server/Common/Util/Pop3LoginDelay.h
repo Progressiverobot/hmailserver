@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 // RFC 2449 LOGIN-DELAY: the minimum interval a POP3 client must leave between
 // logins to one account.
 //

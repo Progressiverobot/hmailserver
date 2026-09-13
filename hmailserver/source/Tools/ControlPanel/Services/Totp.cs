@@ -1,11 +1,12 @@
-// Copyright (c) 2026 hMailServer
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Time-based one-time password (TOTP, RFC 6238) support used for the
 // Control Panel two-factor authentication login. The secret is stored under
 // HKLM\SOFTWARE\hMailServer (value "AdminTotpSecret"), machine-scope DPAPI
 // protected, exactly like hMailServer Administrator, so an existing 2FA
 // configuration carries over between the two admin tools.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
 using System.Security.Cryptography;

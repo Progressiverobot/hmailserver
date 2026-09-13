@@ -1,7 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Shadows the server's own precompiled header on POSIX.
 //
 // Both spellings exist in the tree - #include "StdAfx.h" in 274 sources and

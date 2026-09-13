@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # What hMailServer's auto-ban does below the server on Linux.
 #
 # Installed as /usr/lib/hmailserver/autoban-hook and run by the server when

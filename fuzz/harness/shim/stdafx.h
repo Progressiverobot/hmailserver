@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Precompiled-header substitute for the clang-cl / libFuzzer build of the MIME
 // parser. Every translation unit the fuzz build compiles out of Server\Common
 // opens with #include "stdafx.h", and build-fuzz.ps1 puts THIS directory first

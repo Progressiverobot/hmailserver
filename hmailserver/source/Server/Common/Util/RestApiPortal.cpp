@@ -1,7 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The self-service portal as it is served: the page, the script it loads, and
 // the headers both carry. Three string literals and nothing else - the routes
 // that serve them are RestApiServer's HandlePortalPage_ and

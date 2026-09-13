@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
-//
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // The OTLP logs signal: log entries forwarded in batches to an OTLP/HTTP
 // (protobuf-over-JSON) collector. Enabled with OtelLogsEndpoint in
 // hMailServer.ini; when disabled the entry point is a cheap no-op.
@@ -17,7 +18,6 @@
 // Follows the OtelTracer pattern: a Singleton with Start/Stop driven from
 // Application::StartServers, a bounded drop-oldest queue, a worker std::thread
 // batching to the shared OtelExportChannel transport.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #pragma once
 

@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Out-of-line definitions the fuzz build needs so the MIME translation units
 // link, for the two dependencies whose real headers are used unmodified:
 // Common\Util\File and Common\Util\Strings\Formatter.
@@ -9,7 +11,6 @@
 // compiled from the real source in Server\Common; if it only exists so the
 // parser can report an error, open a file or format a log line, it is stubbed
 // here. Stubbing a byte of parsing would make the fuzzer's findings worthless.
-// SPDX-License-Identifier: AGPL-3.0-or-later
 
 #include "stdafx.h"
 

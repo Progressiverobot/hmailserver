@@ -1,8 +1,8 @@
 #!/bin/sh
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The RPM %preun scriptlet, named by CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE. CPack
 # copies its contents into the generated spec, so this file is the body of %preun.
 #

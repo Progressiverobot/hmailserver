@@ -1,7 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The Win32 surface the SERVER CORE uses, for a POSIX build.
 //
 // This file exists so that the core's own sources compile unchanged on Linux.

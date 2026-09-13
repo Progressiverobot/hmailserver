@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's global rule writes: POST /api/v1/rules, PUT and DELETE /api/v1/rules/<id>. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's global rule writes: POST /api/v1/rules, PUT and DELETE /api/v1/rules/<id>. See RestApiServer.h.
 //
 // What a rule is here, and where each part of it goes: a row in hm_rules with
 // its criteria in hm_rule_criterias and its actions in hm_rule_actions, saved

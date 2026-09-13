@@ -1,8 +1,8 @@
 #!/bin/bash
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # WHAT THIS PRODUCES, AND WHAT IT IS NOT FOR
 #
 # An AppImage of a mail server is a try-it-out artefact and nothing more. Read

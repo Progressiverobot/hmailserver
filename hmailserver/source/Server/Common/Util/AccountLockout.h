@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Per-account (strictly: per-username) failed-authentication lockout.
 //
 // The per-IP auto-ban cannot see a distributed attack: a botnet spending one

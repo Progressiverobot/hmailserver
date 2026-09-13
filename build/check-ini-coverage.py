@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 """Every setting the server reads from hMailServer.INI can be set from the Control Panel.
 
 An INI setting with no editor is not a small omission. It is invisible to a

@@ -1,8 +1,8 @@
 # Maintainer: Christopher Holloway <christopher.j.holloway@outlook.com>
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The Arch package. SUSE and the RPM distributions consume the .rpm CPack builds;
 # Arch has no equivalent of that, so it gets a PKGBUILD that builds from the
 # repository with the same CMakeLists.txt the .deb and .rpm are built from.

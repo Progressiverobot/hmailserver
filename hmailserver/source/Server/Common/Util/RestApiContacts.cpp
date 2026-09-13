@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The signed-in account's address book: GET and POST /api/v1/me/contacts, PUT
 // and DELETE /api/v1/me/contacts/{id}, and the collection of recipients from
 // what the account sends through the API. Phase A of the roadmap's address-book

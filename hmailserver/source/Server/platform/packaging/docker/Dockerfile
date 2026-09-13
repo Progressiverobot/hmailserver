@@ -1,7 +1,7 @@
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The hMailServer container image: the Linux .deb the tag's own workflow built,
 # installed on the distribution release it was built for, run as its own user.
 #

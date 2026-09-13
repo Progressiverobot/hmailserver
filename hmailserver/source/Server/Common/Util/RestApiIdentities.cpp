@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // Who the signed-in account may write as: GET /api/v1/me/identities, and the
 // resolution of a "from" the send and draft routes are given. The rule is the
 // SMTP submission rule (SMTPConnection::SenderPermittedFor): the account's own

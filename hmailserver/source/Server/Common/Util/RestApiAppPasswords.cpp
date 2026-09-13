@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The signed-in account's app passwords: GET and POST /api/v1/me/app-passwords,
 // DELETE /api/v1/me/app-passwords/{id}. The same store the Control Panel and
 // COM administer (hm_apppasswords, AppPassword::SetPassword, the account's

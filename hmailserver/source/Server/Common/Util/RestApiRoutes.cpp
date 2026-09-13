@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's SMTP routes, alias writes and the account update. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's SMTP routes, alias writes and the account update. See RestApiServer.h.
 //
 // Each handler here does what the Control Panel does through COM, with the same
 // persistence call, the same limitation check and the same cache refresh:

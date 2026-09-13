@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's settings routes: PUT /api/v1/settings, the anti-spam, logging and directories groups, the INI keys and the logon-failure list. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's settings routes: PUT /api/v1/settings, the anti-spam, logging and directories groups, the INI keys and the logon-failure list. See RestApiServer.h.
 //
 // Three groups of settings, each a flat JSON object of snake_case keys, each
 // read with GET and changed with PUT:

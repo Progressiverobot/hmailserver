@@ -1,5 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
 // Scheduled task that generates and sends DMARC aggregate reports (RFC 7489
 // section 7.2) to domains publishing a rua= tag in their _dmarc TXT record.
 // The sibling of TlsRptReporterTask, and deliberately shaped like it.

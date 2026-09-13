@@ -1,6 +1,7 @@
-// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+// https://www.progressiverobot.com
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // See GssapiAcceptor.h. The wrap tokens that carry the security-layer
 // exchange are what EncryptMessage and DecryptMessage produce with the
 // Kerberos package - the RFC 4121 wrap token - laid out as the token buffer,

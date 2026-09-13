@@ -1,6 +1,7 @@
-# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 # SPDX-License-Identifier: AGPL-3.0-or-later
-#
+
 # The static-analysis build: the server, Release x64, rebuilt from scratch with MSVC's
 # /analyze (PREfast) on, and the findings summarised by code and by file. This is how
 # the static-analysis backlog in Roadmap.md is measured; run it, read the list, fix
