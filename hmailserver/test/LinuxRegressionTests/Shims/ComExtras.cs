@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
+using System.Linq;
+using System.Text.Json;
 using System.Collections.Generic;
 using RegressionTests.Shared;
 
@@ -96,95 +98,254 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    Account.FetchAccounts over /api/v1/accounts/{address}/fetch-accounts: the
+   ///    external POP3 or IMAP mailboxes the server collects into the account.
+   ///    Add gives an unsaved object; Save is the POST, or the PUT once it has an
+   ///    id; Delete and DownloadNow are the DELETE and the POST .../download. A
+   ///    refusal comes back as the COMException a fixture would see over COM.
+   /// </summary>
    public class FetchAccounts
    {
+      private readonly Account _account;
+
+      internal FetchAccounts(Account account)
+      {
+         _account = account;
+      }
+
+      internal string Base => "/api/v1/accounts/" + _account.Address + "/fetch-accounts";
+
+      internal static void RouteOrSkip()
+      {
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/fetch-accounts", "get"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
+      }
+
+      private List<FetchAccount> Load()
+      {
+         RouteOrSkip();
+         var answer = ServerApi.Get(Base).Expect(200, "GET " + Base);
+         return ServerApi.Array(answer).Select(entry => FetchAccount.From(_account, entry)).ToList();
+      }
+
       public FetchAccount Add()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
+         RouteOrSkip();
+         return new FetchAccount(_account);
       }
 
-      public int Count
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
-         }
-      }
+      public int Count => Load().Count;
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public FetchAccount this[int index]
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts); }
-      }
+      public FetchAccount this[int index] => Load()[index];
 
       public FetchAccount get_Item(int index)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
+         return Load()[index];
       }
 
       public FetchAccount get_ItemByName(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFetchAccounts);
+         return Load().FirstOrDefault(f => string.Equals(f.Name, name, StringComparison.OrdinalIgnoreCase));
+      }
+
+      public FetchAccount get_ItemByDBID(long id)
+      {
+         return Load().FirstOrDefault(f => f.ID == id);
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
+         RouteOrSkip();
+         ServerApi.Delete(Base + "/" + id).Expect(200, "DELETE " + Base + "/" + id);
       }
 
       public void Clear()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
+         foreach (var fetchAccount in Load())
+            fetchAccount.Delete();
+      }
+
+      public void Refresh()
+      {
       }
    }
 
    public class FetchAccount
    {
-      public long ID { get; set; }
+      private readonly Account _account;
+
+      internal FetchAccount(Account account)
+      {
+         _account = account;
+         Enabled = true;
+         MinutesBetweenFetch = 30;
+         MIMERecipientHeaders = "To,CC,X-RCPT-TO,X-Envelope-To";
+      }
+
+      internal static FetchAccount From(Account account, JsonElement entry)
+      {
+         var fetchAccount = new FetchAccount(account);
+         fetchAccount.Read(entry);
+         return fetchAccount;
+      }
+
+      private string Base => new FetchAccounts(_account).Base;
+
+      private void Read(JsonElement entry)
+      {
+         ID = ServerApi.LongOf(entry, "id");
+         Name = ServerApi.StringOf(entry, "name");
+         ServerAddress = ServerApi.StringOf(entry, "server_address");
+         Port = (int) ServerApi.LongOf(entry, "port");
+         ServerType = ServerApi.StringOf(entry, "server_type") == "imap" ? 1 : 0;
+         Username = ServerApi.StringOf(entry, "username");
+         Enabled = ServerApi.FlagOf(entry, "enabled");
+         MinutesBetweenFetch = (int) ServerApi.LongOf(entry, "minutes_between_fetch");
+         DaysToKeepMessages = (int) ServerApi.LongOf(entry, "days_to_keep_messages");
+         ConnectionSecurity = SecurityOf(ServerApi.StringOf(entry, "connection_security"));
+         ProcessMIMERecipients = ServerApi.FlagOf(entry, "process_mime_recipients");
+         ProcessMIMEDate = ServerApi.FlagOf(entry, "process_mime_date");
+         UseAntiSpam = ServerApi.FlagOf(entry, "use_antispam");
+         UseAntiVirus = ServerApi.FlagOf(entry, "use_antivirus");
+         EnableRouteRecipients = ServerApi.FlagOf(entry, "enable_route_recipients");
+         MIMERecipientHeaders = ServerApi.StringOf(entry, "mime_recipient_headers");
+         MirrorFolders = ServerApi.FlagOf(entry, "mirror_folders");
+         _locked = ServerApi.FlagOf(entry, "locked");
+         _nextDownloadTime = ServerApi.StringOf(entry, "next_download_time");
+      }
+
+      private static eConnectionSecurity SecurityOf(string word)
+      {
+         switch (word)
+         {
+            case "tls": return eConnectionSecurity.eCSTLS;
+            case "starttls_optional": return eConnectionSecurity.eCSSTARTTLSOptional;
+            case "starttls_required": return eConnectionSecurity.eCSSTARTTLSRequired;
+            default: return eConnectionSecurity.eCSNone;
+         }
+      }
+
+      private static string WordOf(eConnectionSecurity security)
+      {
+         switch (security)
+         {
+            case eConnectionSecurity.eCSTLS: return "tls";
+            case eConnectionSecurity.eCSSTARTTLSOptional: return "starttls_optional";
+            case eConnectionSecurity.eCSSTARTTLSRequired: return "starttls_required";
+            default: return "none";
+         }
+      }
+
+      public long ID { get; private set; }
       public string Name { get; set; }
       public string Username { get; set; }
       public string Password { get; set; }
       public string ServerAddress { get; set; }
       public int Port { get; set; }
-      public bool Active { get; set; }
-      public bool UseSSL { get; set; }
+      public bool Enabled { get; set; }
       public eConnectionSecurity ConnectionSecurity { get; set; }
       public int MinutesBetweenFetch { get; set; }
-      public bool DeleteMessagesAfterFetch { get; set; }
       public bool ProcessMIMERecipients { get; set; }
       public bool ProcessMIMEDate { get; set; }
       public bool UseAntiSpam { get; set; }
       public bool UseAntiVirus { get; set; }
       public bool EnableRouteRecipients { get; set; }
-      public bool UseIMAP { get; set; }
-      public string IMAPFolder { get; set; }
-      public bool IMAPIdle { get; set; }
       public bool MirrorFolders { get; set; }
       public int DaysToKeepMessages { get; set; }
-      public string AuthenticationMethod { get; set; }
-      public string OAuth2ClientID { get; set; }
-      public string OAuth2ClientSecret { get; set; }
-      public string OAuth2RefreshToken { get; set; }
-      public string OAuth2TokenEndpoint { get; set; }
-      public string OAuth2Scope { get; set; }
-      public bool Enabled { get; set; }
-      public bool IsLocked { get; set; }
+      public string MIMERecipientHeaders { get; set; }
+
+      /// <summary>0 is POP3 and 1 is IMAP, as over COM.</summary>
       public int ServerType { get; set; }
-      public string PersonalizedFrom { get; set; }
+
+      /// <summary>What the COM property is: tls, or none.</summary>
+      public bool UseSSL
+      {
+         get { return ConnectionSecurity == eConnectionSecurity.eCSTLS; }
+         set { ConnectionSecurity = value ? eConnectionSecurity.eCSTLS : eConnectionSecurity.eCSNone; }
+      }
+
+      private bool _locked;
+      private string _nextDownloadTime;
+
+      /// <summary>Read from the server each time, as the fixtures poll it.</summary>
+      public bool IsLocked
+      {
+         get
+         {
+            Reload();
+            return _locked;
+         }
+      }
+
+      public string NextDownloadTime
+      {
+         get
+         {
+            Reload();
+            return _nextDownloadTime;
+         }
+      }
+
+      private void Reload()
+      {
+         if (ID == 0)
+            return;
+         var answer = ServerApi.Get(Base + "/" + ID).Expect(200, "GET " + Base + "/" + ID);
+         Read(answer.Json.Value);
+      }
+
+      private string Body()
+      {
+         var fields = new List<string>
+         {
+            "\"name\":" + ServerApi.Quote(Name ?? ""),
+            "\"server_address\":" + ServerApi.Quote(ServerAddress ?? ""),
+            "\"port\":" + Port,
+            "\"server_type\":" + ServerApi.Quote(ServerType == 1 ? "imap" : "pop3"),
+            "\"username\":" + ServerApi.Quote(Username ?? ""),
+            "\"enabled\":" + (Enabled ? "true" : "false"),
+            "\"minutes_between_fetch\":" + MinutesBetweenFetch,
+            "\"days_to_keep_messages\":" + DaysToKeepMessages,
+            "\"connection_security\":" + ServerApi.Quote(WordOf(ConnectionSecurity)),
+            "\"process_mime_recipients\":" + (ProcessMIMERecipients ? "true" : "false"),
+            "\"process_mime_date\":" + (ProcessMIMEDate ? "true" : "false"),
+            "\"use_antispam\":" + (UseAntiSpam ? "true" : "false"),
+            "\"use_antivirus\":" + (UseAntiVirus ? "true" : "false"),
+            "\"enable_route_recipients\":" + (EnableRouteRecipients ? "true" : "false"),
+            "\"mime_recipient_headers\":" + ServerApi.Quote(MIMERecipientHeaders ?? ""),
+            "\"mirror_folders\":" + (MirrorFolders ? "true" : "false")
+         };
+         if (Password != null)
+            fields.Add("\"password\":" + ServerApi.Quote(Password));
+         return "{" + string.Join(",", fields) + "}";
+      }
 
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
+         FetchAccounts.RouteOrSkip();
+         var answer = ID == 0
+            ? ServerApi.Post(Base, Body())
+            : ServerApi.Put(Base + "/" + ID, Body());
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+         answer.Expect(ID == 0 ? 201 : 200, (ID == 0 ? "POST " : "PUT ") + Base);
+         Read(answer.Json.Value);
       }
 
       public void Delete()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
+         FetchAccounts.RouteOrSkip();
+         if (ID == 0)
+            return;
+         ServerApi.Delete(Base + "/" + ID).Expect(200, "DELETE " + Base + "/" + ID);
       }
 
       public void DownloadNow()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFetchAccounts);
+         FetchAccounts.RouteOrSkip();
+         ServerApi.Post(Base + "/" + ID + "/download", "{}").Expect(202, "POST " + Base + "/" + ID + "/download");
       }
    }
 

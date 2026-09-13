@@ -293,6 +293,12 @@ namespace HM
          RouteAliasCreate,
          RouteAliasDelete,
          RouteAccountUpdate,
+         RouteFetchAccountList,
+         RouteFetchAccountCreate,
+         RouteFetchAccountGet,
+         RouteFetchAccountUpdate,
+         RouteFetchAccountDelete,
+         RouteFetchAccountDownload,
          RouteServerReinitialize,
          RouteOpenApi
       };
@@ -753,6 +759,15 @@ namespace HM
       HttpResponse HandleCreateAlias_(const String &domainName, const AnsiString &requestBody);
       HttpResponse HandleDeleteAlias_(const String &address);
       HttpResponse HandleUpdateAccount_(const Caller &caller, const String &address, const AnsiString &requestBody);
+      // The external (fetch) accounts of an account, under its address
+      // (RestApiFetchAccounts.cpp): what Account.FetchAccounts does over COM.
+      HttpResponse HandleListFetchAccounts_(const String &address);
+      HttpResponse HandleCreateFetchAccount_(const String &address, const AnsiString &requestBody);
+      HttpResponse HandleGetFetchAccount_(const String &address, __int64 fetchAccountId);
+      HttpResponse HandleUpdateFetchAccount_(const String &address, __int64 fetchAccountId, const AnsiString &requestBody);
+      HttpResponse HandleDeleteFetchAccount_(const String &address, __int64 fetchAccountId);
+      HttpResponse HandleDownloadFetchAccount_(const String &address, __int64 fetchAccountId);
+      static AnsiString OpenApiFetchAccountsPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);

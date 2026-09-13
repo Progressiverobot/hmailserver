@@ -246,7 +246,19 @@ namespace RegressionTests.Shared
          "needs a public folder created, listed or deleted, and the REST API's folder routes reach the signed-in account's own mailbox only - the public namespace has no route";
 
       public const string NoFetchAccounts =
-         "needs external (fetch) accounts, and no REST route carries them";
+         "needs external (fetch) accounts, and this server's REST API has no /api/v1/accounts/{address}/fetch-accounts (it arrived after 6.3.2)";
+
+      /// <summary>
+      ///    A fixture that starts the REST listener on a port of its own by writing
+      ///    RestApiPort into hMailServer.ini and reinitialising - and turns it off the
+      ///    same way in its teardown. On the Windows bench the listener is off until a
+      ///    fixture wants it; here it is the one this whole suite talks to, on the port
+      ///    HMTEST_REST_PORT names, and a fixture that moved it would take every test
+      ///    after it down with it. Skipped before it starts, until those fixtures ask
+      ///    for the listener through one helper that knows when it is already on.
+      /// </summary>
+      public const string MovesTheRestListener =
+         "starts and stops the REST listener on a port of its own through hMailServer.ini, which is the listener this suite is talking to";
 
       public const string NoAppPasswords =
          "needs an account's application passwords, and no REST route carries them";
@@ -339,6 +351,19 @@ namespace RegressionTests.Shared
       /// </summary>
       private static readonly Dictionary<string, string> Registry = new Dictionary<string, string>
       {
+         { "RegressionTests.API.RestApiApiKeys", MovesTheRestListener },
+         { "RegressionTests.API.RestApiArchive", MovesTheRestListener },
+         { "RegressionTests.API.RestApiAuthorization", MovesTheRestListener },
+         { "RegressionTests.API.RestApiDomains", MovesTheRestListener },
+         { "RegressionTests.API.RestApiFetchAccounts", MovesTheRestListener },
+         { "RegressionTests.API.RestApiQueue", MovesTheRestListener },
+         { "RegressionTests.API.RestApiSelfService", MovesTheRestListener },
+         { "RegressionTests.API.RestApiSettings", MovesTheRestListener },
+         { "RegressionTests.API.RestApiSrvRecords", MovesTheRestListener },
+         { "RegressionTests.Infrastructure.HttpFoundation", MovesTheRestListener },
+         { "RegressionTests.Infrastructure.ListenerIpv6", MovesTheRestListener },
+         { "RegressionTests.Security.AdministratorTwoFactor", MovesTheRestListener },
+         { "RegressionTests.SSL.ListenerTlsConfiguration", MovesTheRestListener },
          { "RegressionTests.Sieve.SieveEvaluation", NoSieveEvaluate },
          { "RegressionTests.Sieve.SieveExtensionActions", NoSieveEvaluate },
          { "RegressionTests.Sieve.SieveVacation", NoSieveEvaluate },

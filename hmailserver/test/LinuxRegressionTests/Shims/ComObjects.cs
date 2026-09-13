@@ -2664,7 +2664,8 @@ namespace hMailServer
 
       public AccountRules Rules { get; } = new AccountRules();
 
-      public FetchAccounts FetchAccounts { get; } = new FetchAccounts();
+      /// <summary>The account's external accounts, under its address on the API.</summary>
+      public FetchAccounts FetchAccounts => new FetchAccounts(this);
 
       public AppPasswords AppPasswords { get; } = new AppPasswords();
 

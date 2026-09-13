@@ -1613,6 +1613,18 @@ namespace HM
             return HandleDeleteAlias_(String(route.identifier));
          case RouteAccountUpdate:
             return HandleUpdateAccount_(caller, String(route.identifier), GetRequestBody_(request));
+         case RouteFetchAccountList:
+            return HandleListFetchAccounts_(String(route.identifier));
+         case RouteFetchAccountCreate:
+            return HandleCreateFetchAccount_(String(route.identifier), GetRequestBody_(request));
+         case RouteFetchAccountGet:
+            return HandleGetFetchAccount_(String(route.identifier), route.record_id);
+         case RouteFetchAccountUpdate:
+            return HandleUpdateFetchAccount_(String(route.identifier), route.record_id, GetRequestBody_(request));
+         case RouteFetchAccountDelete:
+            return HandleDeleteFetchAccount_(String(route.identifier), route.record_id);
+         case RouteFetchAccountDownload:
+            return HandleDownloadFetchAccount_(String(route.identifier), route.record_id);
          case RouteServerReinitialize:
             return HandleServerReinitialize_();
          case RouteArchiveSearch:
@@ -2432,6 +2444,58 @@ namespace HM
          }
       }
 
+      // /api/v1/accounts/<address>/fetch-accounts[/<id>[/download]]: the
+      // account's external accounts, under the address that scopes them.
+      if (path.StartsWith(accountsPrefix) && path.Find("/fetch-accounts") > 0)
+      {
+         AnsiString rest = path.Mid(accountsPrefix.GetLength());
+         int slash = rest.Find("/");
+         AnsiString address = slash > 0 ? rest.Mid(0, slash) : AnsiString();
+         AnsiString tail = slash > 0 ? rest.Mid(slash) : AnsiString();
+
+         if (!address.IsEmpty() && tail == "/fetch-accounts")
+         {
+            if (method == "GET")
+               route.kind = RouteFetchAccountList;
+            else if (method == "POST")
+               route.kind = RouteFetchAccountCreate;
+
+            if (route.kind != RouteUnknown)
+               route.identifier = address;
+            return;
+         }
+
+         const AnsiString itemPrefix = "/fetch-accounts/";
+         if (!address.IsEmpty() && tail.StartsWith(itemPrefix))
+         {
+            AnsiString idPart = tail.Mid(itemPrefix.GetLength());
+            const AnsiString downloadSuffix = "/download";
+            bool download = idPart.EndsWith(downloadSuffix);
+            if (download)
+               idPart = idPart.Mid(0, idPart.GetLength() - downloadSuffix.GetLength());
+
+            __int64 id = 0;
+            if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+            {
+               if (download && method == "POST")
+                  route.kind = RouteFetchAccountDownload;
+               else if (!download && method == "GET")
+                  route.kind = RouteFetchAccountGet;
+               else if (!download && method == "PUT")
+                  route.kind = RouteFetchAccountUpdate;
+               else if (!download && method == "DELETE")
+                  route.kind = RouteFetchAccountDelete;
+
+               if (route.kind != RouteUnknown)
+               {
+                  route.identifier = address;
+                  route.record_id = id;
+               }
+            }
+            return;
+         }
+      }
+
       if ((method == "DELETE" || method == "PUT") && path.StartsWith(accountsPrefix))
       {
          AnsiString address = path.Mid(accountsPrefix.GetLength());
@@ -2965,6 +3029,10 @@ namespace HM
       case RouteRuleCreate:
       case RouteRuleUpdate:
       case RouteRuleDelete:
+      case RouteFetchAccountCreate:
+      case RouteFetchAccountUpdate:
+      case RouteFetchAccountDelete:
+      case RouteFetchAccountDownload:
       case RouteCertificateCreate:
       case RouteCertificateDelete:
       case RoutePortCreate:
@@ -3191,6 +3259,12 @@ namespace HM
       case RouteListDelete:
       case RouteAliasDelete:
       case RouteAccountUpdate:
+      case RouteFetchAccountList:
+      case RouteFetchAccountCreate:
+      case RouteFetchAccountGet:
+      case RouteFetchAccountUpdate:
+      case RouteFetchAccountDelete:
+      case RouteFetchAccountDownload:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -9592,6 +9666,7 @@ namespace HM
       openApiJson += OpenApiRulesPaths_();
       openApiJson += OpenApiCertificatesPaths_();
       openApiJson += OpenApiRoutesPaths_();
+      openApiJson += OpenApiFetchAccountsPaths_();
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += openApiTail;
 
