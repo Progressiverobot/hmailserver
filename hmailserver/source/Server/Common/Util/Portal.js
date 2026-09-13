@@ -206,7 +206,7 @@
   var quarantineOn = true;
 
   // ---- The app shell ------------------------------------------------------
-  var panels = ['mail-section', 'compose-section', 'quarantine-section', 'folders-section', 'settings-section', 'filter-section', 'contacts-section', 'away-section', 'storage-section', 'security-section', 'password-section', 'scheduled-section'];
+  var panels = ['mail-section', 'quarantine-section', 'folders-section', 'settings-section', 'filter-section', 'contacts-section', 'away-section', 'storage-section', 'security-section', 'password-section', 'scheduled-section'];
   var SETTINGS_PANELS = ['settings-section', 'away-section', 'filter-section', 'folders-section', 'storage-section', 'security-section', 'password-section'];
   var showPanel = function (id, title) {
     panels.forEach(function (p) { var e = el(p); if (e) { e.hidden = p !== id; } });
@@ -712,6 +712,7 @@
     renderBulk();
     renderCount(page);
     renderSearchNote(list, page);
+    if (current) { renderConversation(current); }
     if (current) { listRows.forEach(function (r) { r.row.classList.toggle('open', r.id === current.id || (r.ids || []).indexOf(current.id) >= 0); }); }
   };
   var listingKey = function () { return state.everywhere + '|' + state.folderId + '|' + state.query + '|' + state.before; };
@@ -949,6 +950,7 @@
       attachments.appendChild(link);
     });
     current = m;
+    renderConversation(m);
     renderActions();
     smimeInspect(m);
     el('message-html-toggle').hidden = !m.html || m.truncated;
@@ -1473,18 +1475,17 @@
     });
   };
   var showCompose = function (params) {
-    showPanel('compose-section', 'New message');
-    markNav('');
     var mode = params.reply !== undefined ? 'reply' : params.replyall !== undefined ? 'replyall' :
       params.forward !== undefined ? 'forward' : params.draft !== undefined ? 'draft' : 'new';
     var id = Number(params[mode] || 0);
     var key = mode + ':' + id;
-    if (composeKey === key) { el('compose-to').focus(); return; }
+    if (composeKey === key) { openCompose(mode, id); el('compose-to').focus(); return; }
     composeKey = key;
-    if (mode === 'new' || !id) { blankCompose(); addSignature(); syncComposeRows(); el('compose-to').focus(); return; }
-    if (current && current.id === id) { var was = current; prime(mode, was).then(function () { afterPrime(mode, was); }); return; }
+    if (mode === 'new' || !id) { blankCompose(); addSignature(); syncComposeRows(); openCompose('new', 0); el('compose-to').focus(); return; }
+    if (current && current.id === id) { var was = current; prime(mode, was).then(function () { afterPrime(mode, was); openCompose(mode, id); }); return; }
     call('GET', '/api/v1/me/messages/' + id).then(function (result) {
-      if (result.status === 200 && result.data) { prime(mode, result.data).then(function () { afterPrime(mode, result.data); }); return; }
+      if (result.status === 200 && result.data) { prime(mode, result.data).then(function () { afterPrime(mode, result.data); openCompose(mode, id); }); return; }
+      openCompose(mode, id);
       say('compose-status', describe(result, t('Could not read the message being answered')), false);
     });
   };
@@ -1501,7 +1502,12 @@
     if (head === 'm' && r.parts[1]) { showMessage(Number(r.parts[1])); return; }
     if (head === 'starred') { cameFromList = true; showSearch({ q: 'is:flagged' }); el('view-title').textContent = t('Starred'); markNav('/starred'); return; }
     if (head === 'scheduled') { showPanel('scheduled-section', t('Scheduled')); markNav('/scheduled'); loadScheduled(); return; }
-    if (head === 'compose') { showCompose(r.params); return; }
+    if (head === 'compose') {
+      // The window opens over whatever page is shown; on a reload, over the list.
+      if (!panels.some(function (p) { return el(p) && !el(p).hidden; })) { showMail(state.folderId || inboxId, {}); }
+      showCompose(r.params);
+      return;
+    }
     if (head === 'held') { showPanel('quarantine-section', 'Held as suspected spam'); markNav('/held'); loadQuarantine(); return; }
     if (head === 'folders') { showPanel('folders-section', 'Manage folders'); markNav('/folders'); renderFolderAdmin(); return; }
     if (head === 'settings') { showPanel('settings-section', 'Settings'); markNav('/settings'); return; }
@@ -1836,7 +1842,7 @@
   el('message-reply-all').addEventListener('click', function () { if (current) { go('/compose?replyall=' + current.id); } });
   el('message-forward').addEventListener('click', function () { if (current) { go('/compose?forward=' + current.id); } });
   el('message-edit').addEventListener('click', function () { if (current) { go('/compose?draft=' + current.id); } });
-  el('compose-discard').addEventListener('click', function () { composeKey = newComposeKey(); blankCompose(); go('/compose'); });
+  el('compose-discard').addEventListener('click', function () { composeKey = newComposeKey(); blankCompose(); closeCompose(); toast(t('Discarded.')); });
   // ---- Contacts ------------------------------------------------------------
   var contactsCache = null;
   var renderContacts = function (list) {
@@ -1958,9 +1964,9 @@
         if (composeKey === queued.key) {
           blankCompose();
           composeKey = newComposeKey();
-          if (!el('compose-section').hidden) { replaceWith('/compose'); }
+          closeCompose();
         }
-        say('compose-status', t('Sent.'), true);
+        toast(t('Sent.'));
         if (queued.draft) { call('DELETE', '/api/v1/me/messages/' + queued.draft + '?permanent=1').then(function () { loadFolders(); }); return; }
         loadFolders();
         return;
@@ -1978,6 +1984,7 @@
     pendingSend = null;
     el('undo-bar').hidden = true;
     el('compose-send').disabled = false;
+    if (el('toasts') && el('toasts').textContent.indexOf(t('Sending in {0} s').split('{0}')[0]) >= 0) { dismissToast(); }
   };
   el('compose-form').addEventListener('submit', function (event) {
     event.preventDefault();
@@ -1992,16 +1999,18 @@
       var delay = undoSeconds();
       if (!delay) { return submitMessage(queued); }
       var left = delay;
-      el('undo-text').textContent = 'Sending in ' + left + ' s';
-      el('undo-bar').hidden = false;
+      el('undo-text').textContent = tf('Sending in {0} s', left);
       el('compose-send').disabled = true;
       pendingSend = queued;
-      pendingSend.ticker = setInterval(function () { left--; el('undo-text').textContent = 'Sending in ' + Math.max(left, 0) + ' s'; }, 1000);
+      pendingSend.mode = composeMode; pendingSend.id = composeId;
+      hideCompose();
+      var countdown = toast(tf('Sending in {0} s', left), function () { el('undo-send').click(); }, true);
+      pendingSend.ticker = setInterval(function () { left--; var text = tf('Sending in {0} s', Math.max(left, 0)); el('undo-text').textContent = text; if (countdown && countdown.firstChild) { countdown.firstChild.textContent = text; } }, 1000);
       pendingSend.timer = setTimeout(function () { var q = pendingSend; cancelUndo(); if (q) { submitMessage(q); } }, delay * 1000);
       return null;
     }, function (why) { say('compose-status', why, false); return null; });
   });
-  el('undo-send').addEventListener('click', function () { cancelUndo(); say('compose-status', t('Not sent. The message is still here.'), true); });
+  el('undo-send').addEventListener('click', function () { var q = pendingSend; cancelUndo(); dismissToast(); if (q) { openCompose(q.mode || 'new', q.id || 0); } say('compose-status', t('Not sent. The message is still here.'), true); });
   // The send that is waiting goes now: before the form is cleared or
   // written to, and before the account signs out.
   var flushPending = function () {
@@ -3555,9 +3564,9 @@
     if (toastTimer && typeof clearTimeout === 'function') { clearTimeout(toastTimer); }
     toastTimer = 0;
   };
-  var toast = function (text, undo) {
+  var toast = function (text, undo, sticky) {
     var box = el('toasts');
-    if (!box) { say('mail-status', text, true); return; }
+    if (!box) { say('mail-status', text, true); return null; }
     clear(box);
     var one = node('div', undefined, 'toast');
     one.setAttribute('role', 'status');
@@ -3574,7 +3583,8 @@
     one.appendChild(x);
     box.appendChild(one);
     if (toastTimer && typeof clearTimeout === 'function') { clearTimeout(toastTimer); }
-    toastTimer = setTimeout(function () { clear(box); toastTimer = 0; }, 8000);
+    toastTimer = sticky ? 0 : setTimeout(function () { clear(box); toastTimer = 0; }, 8000);
+    return one;
   };
   var filingText = function (to, result, count) {
     var what;
@@ -3666,6 +3676,7 @@
   // list without a history entry (the message is gone), otherwise it goes
   // back the way the reader came.
   var dropMessage = function () {
+    if (!el('compose-section').hidden && el('compose-section').classList.contains('inline')) { placeCompose('dock'); }
     current = null;
     el('message-view').hidden = true;
     el('pane-empty').hidden = false;
@@ -3851,6 +3862,109 @@
       replaceWith('/m/' + listRows[cursor].id);
     }
   });
+
+
+  // ---- The compose window: docked over the mail, or under the message it answers
+  var composeMode = 'new';
+  var composeId = 0;
+  var placeCompose = function (where) {
+    var dock = el('compose-section');
+    if (where === 'inline') {
+      if (dock.parentNode !== el('reply-slot')) { el('reply-slot').appendChild(dock); }
+      dock.classList.add('inline');
+      dock.classList.remove('min'); dock.classList.remove('full');
+    } else {
+      if (dock.parentNode !== document.body) { document.body.appendChild(dock); }
+      dock.classList.remove('inline');
+    }
+  };
+  var composeTitle = function (mode) {
+    if (mode === 'reply') { return t('Reply'); }
+    if (mode === 'replyall') { return t('Reply all'); }
+    if (mode === 'forward') { return t('Forward'); }
+    if (mode === 'draft') { return t('Draft'); }
+    return t('New message');
+  };
+  var openCompose = function (mode, id) {
+    composeMode = mode; composeId = id;
+    var answering = (mode === 'reply' || mode === 'replyall' || mode === 'forward') && current && current.id === id && !el('message-view').hidden;
+    placeCompose(answering ? 'inline' : 'dock');
+    el('compose-title').textContent = composeTitle(mode) + (answering && current && current.subject ? ': ' + current.subject : '');
+    el('compose-section').hidden = false;
+    el('compose-section').classList.remove('min');
+  };
+  var hideCompose = function () { el('compose-section').hidden = true; };
+  // Closing keeps what was written: a draft is saved when there is anything
+  // to save, and the address bar goes back to the list when it named the window.
+  var closeCompose = function () {
+    hideCompose();
+    el('compose-section').classList.remove('min'); el('compose-section').classList.remove('full');
+    if (parseHash().parts[0] === 'compose') { replaceWith(listHash()); }
+  };
+  el('compose-close').addEventListener('click', function () {
+    var written = el('compose-to').value.trim() || el('compose-subject').value.trim() || el('compose-text').value.trim();
+    if (written && !pendingSend) { el('compose-save').click(); }
+    closeCompose();
+  });
+  el('compose-attach').addEventListener('click', function () { el('compose-files').click(); });
+  el('compose-min').addEventListener('click', function () { el('compose-section').classList.toggle('min'); el('compose-section').classList.remove('full'); });
+  el('compose-expand').addEventListener('click', function () { el('compose-section').classList.toggle('full'); el('compose-section').classList.remove('min'); });
+  el('compose-title').addEventListener('click', function () { if (el('compose-section').classList.contains('min')) { el('compose-section').classList.remove('min'); } });
+
+  // ---- The rest of a conversation, above the message opened ---------------
+  var conversationOpen = {};
+  var renderConversation = function (m) {
+    var box = el('conversation');
+    clear(box);
+    if (!lastListing || !lastListing.page || pref('view') !== 'threads' || lastListing.page.query) { return; }
+    var key = threadKey(m);
+    var others = lastListing.page.messages.filter(function (x) { return x.id !== m.id && threadKey(x) === key; });
+    if (!others.length) { return; }
+    others.sort(function (a, b) { var da = dateOf(a), db = dateOf(b); return (da ? da.getTime() : 0) - (db ? db.getTime() : 0); });
+    box.appendChild(node('div', tf('{0} earlier messages in this conversation', others.length), 'count'));
+    others.forEach(function (x) {
+      var card = node('div', undefined, 'msg-card collapsed');
+      var head = node('div', undefined, 'msg-head');
+      head.appendChild(avatarFor(x.from, true));
+      var from = node('div', undefined, 'from');
+      var line = node('div'); line.appendChild(node('b', nameOf(x.from))); from.appendChild(line);
+      from.appendChild(node('div', x.snippet || '', 'snip'));
+      head.appendChild(from);
+      var when = node('div', whenText(x), 'date'); when.setAttribute('title', fullDate(x)); head.appendChild(when);
+      card.appendChild(head);
+      var body = node('div', undefined, 'body'); body.hidden = true; card.appendChild(body);
+      var atts = node('div', undefined, 'atts'); atts.hidden = true; card.appendChild(atts);
+      var loaded = null;
+      card.addEventListener('click', function () {
+        var open = card.classList.contains('collapsed');
+        card.classList.toggle('collapsed', !open);
+        body.hidden = !open; atts.hidden = !open;
+        from.childNodes[1].hidden = open;
+        if (!open || loaded) { return; }
+        loaded = true;
+        body.textContent = t('Loading...');
+        call('GET', '/api/v1/me/messages/' + x.id).then(function (result) {
+          if (result.status !== 200 || !result.data) { body.textContent = t('Could not open the message'); return; }
+          var d = result.data;
+          var text = d.text || '';
+          if (!text && d.html) { text = new DOMParser().parseFromString(d.html, 'text/html').body.textContent || ''; }
+          body.textContent = text || t('(no text)');
+          clear(atts);
+          (d.attachments || []).forEach(function (a) {
+            var link = node('a', undefined, 'att');
+            link.href = '/api/v1/me/messages/' + d.id + '/attachments/' + a.index;
+            link.setAttribute('download', a.name);
+            link.appendChild(icon('file'));
+            var words = node('div'); words.appendChild(node('div', a.name, 'n')); words.appendChild(node('div', format(a.size), 's'));
+            link.appendChild(words);
+            atts.appendChild(link);
+          });
+          if (!d.flags.seen) { call('PUT', '/api/v1/me/messages/' + d.id + '/flags', { seen: true }).then(function () { x.flags.seen = true; loadFolders(); }); }
+        });
+      });
+      box.appendChild(card);
+    });
+  };
 
   // The theme the last visit chose, for the sign-in page; the account's own
   // choice replaces it once there is an account.

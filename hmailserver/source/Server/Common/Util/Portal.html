@@ -331,6 +331,12 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 #message-details{font-size:12.5px;color:var(--text-2);margin:10px 0 0 52px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:10px 12px;border-radius:8px;background:var(--surface-2)}
 #message-details span:nth-child(odd){color:var(--muted)}
 #message-meta{display:none}
+#conversation .msg-card.collapsed{cursor:pointer;padding:10px 20px}
+#conversation .msg-card.collapsed:hover{background:var(--surface-2)}
+#conversation .msg-card .snip{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
+#conversation .msg-card .body{font-family:var(--font);font-size:14.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:14px 0 0 52px}
+#conversation .msg-card .atts{margin:14px 0 0 52px;display:flex;flex-wrap:wrap;gap:10px}
+#conversation .count{font-size:12.5px;color:var(--muted);margin:0 0 8px}
 .warnbox{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:13px;margin:0 0 12px;line-height:1.5}
 .warnbox div+div{margin-top:4px}
 .infobar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text-2);margin:0 0 12px}
@@ -364,11 +370,24 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .toast button:hover{background:rgba(255,255,255,.1)}
 .toast button.x{color:inherit;opacity:.7;padding:4px}
 
-/* ---------- Compose ---------- */
-#compose-section .card{max-width:56rem;border:none;padding:0}
-#compose-section{overflow:auto;padding:0 28px 40px}
-.compose-head{display:flex;align-items:center;gap:12px;padding:16px 0 8px}
-.compose-head h2{font-size:18px;font-weight:500;flex:1}
+/* ---------- Compose: a window docked at the bottom right, or a card under the message it answers ---------- */
+.dock{position:fixed;right:24px;bottom:0;width:600px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--surface);border-radius:12px 12px 0 0;box-shadow:0 8px 24px rgba(0,0,0,.28);z-index:55;animation:rise .15s ease-out}
+[data-theme="dark"] .dock{border:1px solid var(--line);border-bottom:none}
+.dock.full{right:auto;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:min(1000px,calc(100vw - 48px));height:min(88vh,900px);max-height:88vh;border-radius:12px}
+.dock.min{max-height:none;height:auto}
+.dock.min .dock-body{display:none}
+.dock-head{display:flex;align-items:center;gap:2px;padding:8px 8px 8px 16px;background:#404040;color:#fff;border-radius:12px 12px 0 0;flex:none;cursor:default}
+[data-theme="dark"] .dock-head{background:#2b3138}
+.dock-head h2{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dock-head .iconbtn{color:#fff;width:32px;height:32px}
+.dock-head .iconbtn:hover{background:rgba(255,255,255,.15)}
+.dock-body{flex:1;min-height:0;overflow:auto;padding:0 16px 8px}
+.dock.inline{position:static;width:auto;max-width:none;max-height:none;border-radius:12px;box-shadow:none;border:1px solid var(--line);margin:18px 0 0 52px;animation:none;transform:none}
+.dock.inline .dock-head{border-radius:12px 12px 0 0}
+.dock.inline .dock-head #compose-min,.dock.inline .dock-head #compose-expand{display:none}
+.dock.inline .dock-body{max-height:none}
+.dock #compose-text,.dock .editor{min-height:14rem}
+.dock.full #compose-text,.dock.full .editor{min-height:24rem}
 .field{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--line);min-height:44px}
 .field > label{margin:0;flex:none;width:64px;color:var(--muted);font-weight:400;font-size:14px}
 .field input,.field select{border:none;background:transparent;box-shadow:none;padding:8px 4px;flex:1;font-size:14px}
@@ -391,8 +410,10 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .compose-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line);margin-top:8px}
 .compose-foot .btn{margin:0}
 .compose-foot .sp{flex:1}
-#compose-section label.inline{margin:6px 0}
+#compose-section label.inline{margin:6px 0;display:inline-flex;margin-right:16px}
 #template-row,#later-row{margin:8px 0}
+#template-row select{width:auto;max-width:16rem;height:32px;padding:4px 8px;font-size:13px}
+#rich-row{margin-top:2px}
 .undo{display:flex;align-items:center;gap:12px;background:var(--surface-2);border-radius:8px;padding:10px 14px;margin-top:12px;font-size:13.5px}
 .undo .btn{margin:0}
 
@@ -452,6 +473,10 @@ table.keys td:first-child{white-space:nowrap;width:40%}
   .search{height:40px;min-width:0}
   #keys-btn,#theme-btn,#settings-btn{display:none}
   #toasts{left:12px;right:12px;bottom:12px}
+  .dock,.dock.full{position:fixed;inset:0;width:auto;max-width:none;height:auto;max-height:none;border-radius:0;transform:none}
+  .dock.inline{position:static;margin-left:0}
+  .dock-head{border-radius:0}
+  .dock-head #compose-expand{display:none}
   .toast{min-width:0;width:100%}
 }
 @media (min-width:901px){
@@ -514,6 +539,8 @@ table.keys td:first-child{white-space:nowrap;width:40%}
     <symbol id="i-signout" viewBox="0 0 24 24"><path d="M10 17l5-5-5-5M15 12H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></symbol>
     <symbol id="i-empty" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
     <symbol id="i-plane" viewBox="0 0 24 24"><path d="M21 3 3 10.5l7.5 3 3 7.5z"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
   </defs>
 </svg>
 
@@ -669,7 +696,8 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div id="message-badges"></div>
 <div id="message-labels" class="chips"></div>
 <div id="message-warnings" class="warnbox" hidden></div>
-<div class="msg-card">
+<div id="conversation"></div>
+<div class="msg-card" id="message-card">
 <div class="msg-head">
 <span class="avatar lg" id="message-avatar">?</span>
 <div class="from"><div><b id="message-from-name"></b><span class="addr" id="message-from-address"></span></div>
@@ -694,39 +722,13 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <button id="message-reply-all" class="btn ghost" type="button"><svg class="i"><use href="#i-reply-all"/></svg>Reply all</button>
 <button id="message-forward" class="btn ghost" type="button"><svg class="i"><use href="#i-forward"/></svg>Forward</button>
 </div>
+<div id="reply-slot"></div>
 </div>
 </div>
 <div id="pane-empty" class="empty"><svg class="i"><use href="#i-mail-open"/></svg>Select a message to read it here</div>
 </div>
 </section>
 
-<section id="compose-section" class="view" hidden>
-<div class="card">
-<form id="compose-form">
-<div class="compose-head"><h2>New message</h2><button id="compose-discard" type="button" class="btn quiet sm" title="Discard"><svg class="i"><use href="#i-trash"/></svg>Discard</button></div>
-<div class="field" id="compose-from-row" hidden><label for="compose-from" id="compose-from-label">From</label><select id="compose-from"></select></div>
-<div class="field"><label for="compose-to">To</label><div class="complete-wrap"><input id="compose-to" type="text" required autocomplete="off"></div><div class="links"><button id="show-cc" type="button">Cc</button><button id="show-bcc" type="button">Bcc</button></div></div>
-<div class="field" id="compose-cc-row" hidden><label for="compose-cc">Cc</label><div class="complete-wrap"><input id="compose-cc" type="text" autocomplete="off"></div></div>
-<div class="field" id="compose-bcc-row" hidden><label for="compose-bcc">Bcc</label><div class="complete-wrap"><input id="compose-bcc" type="text" autocomplete="off"></div></div>
-<div class="field"><label for="compose-subject">Subject</label><input id="compose-subject" type="text" maxlength="500" autocomplete="off"></div>
-<div class="row" id="template-row"><select id="template-pick" aria-label="Templates"><option value="">Templates</option></select><button id="template-use" class="btn ghost sm" type="button">Use</button><button id="template-save" class="btn quiet sm" type="button">Save as template</button></div>
-<div id="rich-row" class="row"><button id="rich-toggle" class="btn quiet sm" type="button">Formatting</button><div id="rich-tools" class="row" hidden><button class="btn quiet sm" type="button" data-cmd="bold" title="Bold"><b>B</b></button><button class="btn quiet sm" type="button" data-cmd="italic" title="Italic"><i>I</i></button><button class="btn quiet sm" type="button" data-cmd="underline" title="Underline"><u>U</u></button><button class="btn quiet sm" type="button" data-cmd="insertUnorderedList" title="List">List</button><button class="btn quiet sm" type="button" data-cmd="formatBlock" data-arg="blockquote" title="Quote">Quote</button><button class="btn quiet sm" type="button" data-cmd="createLink" title="Link">Link</button><button class="btn quiet sm" type="button" data-cmd="removeFormat" title="Remove formatting">Plain</button></div></div>
-<label for="compose-text" class="sr">Message</label>
-<textarea id="compose-text" placeholder="Write your message"></textarea>
-<div id="compose-editor" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message, formatted" hidden></div>
-<div class="row" id="later-row"><label for="compose-later" class="inline">Send at</label><input id="compose-later" type="datetime-local" aria-label="Send at" style="width:auto"><button id="compose-send-later" class="btn ghost sm" type="button">Schedule</button></div>
-<label class="inline"><input id="compose-receipt" type="checkbox"> Ask for a read receipt</label>
-<label class="inline" id="compose-sign-label" hidden><input id="compose-sign" type="checkbox"> Sign with my certificate</label>
-<label class="inline" id="compose-encrypt-label" hidden><input id="compose-encrypt" type="checkbox"> Encrypt for the recipients</label>
-<div id="compose-smime-note" class="hint" hidden></div>
-<label for="compose-files">Attach files</label><input id="compose-files" type="file" multiple><div id="compose-files-note" class="note"></div>
-<div id="compose-links" class="note" hidden></div>
-<div class="compose-foot"><button class="btn" id="compose-send" type="submit"><svg class="i"><use href="#i-send"/></svg>Send</button><button id="compose-save" type="button" class="btn ghost">Save draft</button><div class="sp"></div></div>
-<div id="compose-status" class="status" aria-live="polite"></div>
-<div id="undo-bar" class="undo" hidden><span id="undo-text"></span><button id="undo-send" class="btn sm" type="button">Undo</button></div>
-</form>
-</div>
-</section>
 
 <section id="quarantine-section" class="view page" hidden>
 <div class="page-head"><h1>Held mail</h1></div>
@@ -997,6 +999,38 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 </div>
 </div>
 
+<div id="compose-section" class="dock" hidden role="dialog" aria-labelledby="compose-title">
+<div class="dock-head">
+<h2 id="compose-title">New message</h2>
+<button class="iconbtn sm" id="compose-min" type="button" title="Minimise" aria-label="Minimise"><svg class="i"><use href="#i-down"/></svg></button>
+<button class="iconbtn sm" id="compose-expand" type="button" title="Full screen" aria-label="Full screen"><svg class="i"><use href="#i-expand"/></svg></button>
+<button class="iconbtn sm" id="compose-close" type="button" title="Save and close" aria-label="Save and close"><svg class="i"><use href="#i-close"/></svg></button>
+</div>
+<div class="dock-body">
+<form id="compose-form">
+<div class="field" id="compose-from-row" hidden><label for="compose-from" id="compose-from-label">From</label><select id="compose-from"></select></div>
+<div class="field"><label for="compose-to">To</label><div class="complete-wrap"><input id="compose-to" type="text" required autocomplete="off"></div><div class="links"><button id="show-cc" type="button">Cc</button><button id="show-bcc" type="button">Bcc</button></div></div>
+<div class="field" id="compose-cc-row" hidden><label for="compose-cc">Cc</label><div class="complete-wrap"><input id="compose-cc" type="text" autocomplete="off"></div></div>
+<div class="field" id="compose-bcc-row" hidden><label for="compose-bcc">Bcc</label><div class="complete-wrap"><input id="compose-bcc" type="text" autocomplete="off"></div></div>
+<div class="field"><label for="compose-subject">Subject</label><input id="compose-subject" type="text" maxlength="500" autocomplete="off"></div>
+<div id="rich-row" class="row"><button id="rich-toggle" class="btn quiet sm" type="button">Formatting</button><div id="rich-tools" class="row" hidden><button class="btn quiet sm" type="button" data-cmd="bold" title="Bold"><b>B</b></button><button class="btn quiet sm" type="button" data-cmd="italic" title="Italic"><i>I</i></button><button class="btn quiet sm" type="button" data-cmd="underline" title="Underline"><u>U</u></button><button class="btn quiet sm" type="button" data-cmd="insertUnorderedList" title="List">List</button><button class="btn quiet sm" type="button" data-cmd="formatBlock" data-arg="blockquote" title="Quote">Quote</button><button class="btn quiet sm" type="button" data-cmd="createLink" title="Link">Link</button><button class="btn quiet sm" type="button" data-cmd="removeFormat" title="Remove formatting">Plain</button></div></div>
+<label for="compose-text" class="sr">Message</label>
+<textarea id="compose-text" placeholder="Write your message"></textarea>
+<div id="compose-editor" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message, formatted" hidden></div>
+<div class="row" id="template-row"><select id="template-pick" aria-label="Templates"><option value="">Templates</option></select><button id="template-use" class="btn ghost sm" type="button">Use</button><button id="template-save" class="btn quiet sm" type="button">Save as template</button></div>
+<div class="row" id="later-row"><label for="compose-later" class="inline">Send at</label><input id="compose-later" type="datetime-local" aria-label="Send at" style="width:auto"><button id="compose-send-later" class="btn ghost sm" type="button">Schedule</button></div>
+<label class="inline"><input id="compose-receipt" type="checkbox"> Ask for a read receipt</label>
+<label class="inline" id="compose-sign-label" hidden><input id="compose-sign" type="checkbox"> Sign with my certificate</label>
+<label class="inline" id="compose-encrypt-label" hidden><input id="compose-encrypt" type="checkbox"> Encrypt for the recipients</label>
+<div id="compose-smime-note" class="hint" hidden></div>
+<label for="compose-files" class="sr">Attach files</label><input id="compose-files" type="file" multiple class="sr"><div id="compose-files-note" class="note"></div>
+<div id="compose-links" class="note" hidden></div>
+<div class="compose-foot"><button class="btn" id="compose-send" type="submit"><svg class="i"><use href="#i-send"/></svg>Send</button><button id="compose-save" type="button" class="btn ghost">Save draft</button><button id="compose-attach" type="button" class="iconbtn sm" title="Attach files" aria-label="Attach files"><svg class="i"><use href="#i-clip"/></svg></button><div class="sp"></div><button id="compose-discard" type="button" class="iconbtn sm" title="Discard" aria-label="Discard"><svg class="i"><use href="#i-trash"/></svg></button></div>
+<div id="compose-status" class="status" aria-live="polite"></div>
+<div id="undo-bar" class="undo" hidden><span id="undo-text"></span><button id="undo-send" class="btn sm" type="button">Undo</button></div>
+</form>
+</div>
+</div>
 <div id="toasts" aria-live="polite"></div>
 
 <div id="keys-overlay" class="overlay" hidden role="dialog" aria-modal="true" aria-labelledby="keys-title">

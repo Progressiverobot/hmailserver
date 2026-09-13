@@ -611,8 +611,9 @@ async function main() {
       document.getElementById('compose-to').value);
    check('and its subject answers the original', document.getElementById('compose-subject').value === 'Re: Second',
       document.getElementById('compose-subject').value);
-   check('the compose form is the view', document.getElementById('compose-section').hidden === false &&
-      document.getElementById('mail-section').hidden === true);
+   check('the reply is written under the message, over the list', document.getElementById('compose-section').hidden === false &&
+      document.getElementById('mail-section').hidden === false && document.getElementById('compose-section').className.indexOf('inline') >= 0,
+      document.getElementById('compose-section').className);
 
    // ---- Back goes back, and lands on the row it left
    history.back();
