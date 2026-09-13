@@ -217,6 +217,13 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .tabs button{all:unset;cursor:pointer;padding:10px 14px;font-size:14px;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button:hover{color:var(--text);background:var(--surface-2);border-radius:8px 8px 0 0}
 .tabs button.on{color:var(--accent-text);border-bottom-color:var(--accent-text);font-weight:500}
+.inbox-tabs{margin:0;position:static;flex:none;flex-wrap:nowrap;overflow-x:auto;padding:0 6px;gap:0}
+.inbox-tabs button{display:flex;align-items:center;gap:8px;padding:11px 16px;font-size:13.5px;white-space:nowrap;margin-bottom:-1px}
+.inbox-tabs button svg.i{width:18px;height:18px;flex:none}
+.inbox-tabs .n{font-size:11px;font-weight:600;background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;line-height:16px;min-width:16px;text-align:center}
+#select-note{background:var(--surface-2);color:var(--text-2);font-size:13px;padding:8px 16px;text-align:center;border-bottom:1px solid var(--line);flex:none}
+.linkbtn{all:unset;cursor:pointer;color:var(--accent-text);font-weight:500;padding:0 4px}
+.linkbtn:hover{text-decoration:underline}
 .card{max-width:60rem;padding:8px 0 24px;border-bottom:1px solid var(--line);margin-bottom:8px}
 .card:last-child{border-bottom:none}
 .card h2{font-size:16px;font-weight:500;margin:14px 0 8px}
@@ -289,6 +296,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .msg .meta{display:flex;align-items:center;gap:6px;flex:none;padding-left:8px;color:var(--muted)}
 .msg .when{font-size:12px;color:var(--muted);white-space:nowrap;min-width:64px;text-align:right}
 .msg .clip{color:var(--muted)}
+.msg .mute{color:var(--muted);display:inline-flex}
+.msg .mute svg.i{width:16px;height:16px}
 .msg .acts{display:none;position:absolute;right:8px;top:0;bottom:0;align-items:center;gap:0;background:inherit;padding-left:8px}
 .msg:hover .acts,.msg.msg-cursor .acts{display:flex}
 .msg:hover .meta,.msg.msg-cursor .meta{visibility:hidden}
@@ -520,6 +529,11 @@ table.keys td:first-child{white-space:nowrap;width:40%}
     <symbol id="i-label" viewBox="0 0 24 24"><path d="M3 5h11l7 7-7 7H3z"/><circle cx="7.5" cy="12" r="1.2"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z"/><path d="M12 8v4M12 15h.01"/></symbol>
     <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><circle cx="17" cy="9" r="2.5"/><path d="M16 15.5a5 5 0 0 1 5.5 4.5"/></symbol>
+    <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></symbol>
+    <symbol id="i-bell-off" viewBox="0 0 24 24"><path d="M18 13V9a6 6 0 0 0-9.3-5M6 9v4l-2 3h12M10 20a2 2 0 0 0 4 0"/><path d="M3 3l18 18"/></symbol>
     <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></symbol>
     <symbol id="i-mail-open" viewBox="0 0 24 24"><path d="M3 9.5 12 3l9 6.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="m3 10 9 6 9-6"/></symbol>
     <symbol id="i-reply" viewBox="0 0 24 24"><path d="M9 6 3 12l6 6"/><path d="M3 12h10a7 7 0 0 1 7 7v1"/></symbol>
@@ -667,6 +681,8 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <button class="iconbtn sm" id="page-newer" type="button" title="Newer" aria-label="Newer" hidden><svg class="i"><use href="#i-left"/></svg></button>
 <button class="iconbtn sm" id="page-older" type="button" title="Older" aria-label="Older" hidden><svg class="i"><use href="#i-right"/></svg></button>
 </div>
+<nav class="tabs inbox-tabs" id="inbox-tabs" aria-label="Inbox tabs" hidden></nav>
+<div id="select-note" hidden><span id="select-note-text"></span> <button id="select-folder" class="linkbtn" type="button"></button></div>
 <p class="note" id="list-hint" hidden>Arrow keys or j and k move, Enter opens, x ticks the box, e archives, ! files as junk, # deletes. ? lists every shortcut; Ctrl+K opens the palette.</p>
 <div id="message-list" role="list" aria-label="Messages" tabindex="0"></div>
 <div id="mail-status" class="status" aria-live="polite"></div>
@@ -695,6 +711,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <button id="message-unsubscribe" type="button" hidden>Unsubscribe</button>
 <div class="sep"></div>
 <button id="message-pin" type="button">Pin</button>
+<button id="message-mute" type="button">Mute</button>
 <button id="message-block" type="button">Block this sender</button>
 <button id="message-sweep" type="button">Delete all from this sender</button>
 </div>
@@ -856,6 +873,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div class="row">
 <div style="flex:1;min-width:12rem"><label for="pref-undo">Undo send</label><select id="pref-undo"><option value="0">Send at once</option><option value="5">5 seconds to undo</option><option value="10">10 seconds to undo</option><option value="20">20 seconds to undo</option><option value="30">30 seconds to undo</option></select></div>
 <div style="flex:1;min-width:12rem"><label for="pref-language">Language</label><select id="pref-language"></select></div>
+<div style="flex:1;min-width:12rem"><label for="pref-inbox">Inbox</label><select id="pref-inbox"><option value="tabs">In tabs: Primary, Social, Promotions, Updates, Forums</option><option value="focused">Focused and Other</option><option value="all">One list</option></select></div>
 </div>
 <label class="inline"><input id="pref-notify" type="checkbox"> Notify me of new mail in these folders</label>
 <div id="notify-folders" class="row"></div>
@@ -1048,9 +1066,11 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <button type="button" data-act="read">Mark as read</button>
 <button type="button" data-act="star">Star</button>
 <button type="button" data-act="pin">Pin</button>
+<button type="button" data-act="mute">Mute</button>
 <div class="sep"></div>
 <button type="button" data-act="block">Block this sender</button>
 <button type="button" data-act="sweep">Delete all from this sender</button>
+<div id="context-tabs" hidden></div>
 </div>
 <div id="toasts" aria-live="polite"></div>
 
@@ -1069,6 +1089,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <tr><td><kbd>!</kbd></td><td>File the message as junk, or as not junk from the Junk folder</td></tr>
 <tr><td><kbd>#</kbd></td><td>Delete the message (to Trash)</td></tr>
 <tr><td><kbd>l</kbd></td><td>Label the message</td></tr>
+<tr><td><kbd>m</kbd></td><td>Mute or unmute the conversation</td></tr>
 <tr><td><kbd>c</kbd></td><td>Write a new message</td></tr>
 <tr><td><kbd>r</kbd> <kbd>a</kbd> <kbd>f</kbd></td><td>Reply, reply to all, forward the open message</td></tr>
 <tr><td><kbd>/</kbd></td><td>Search</td></tr>

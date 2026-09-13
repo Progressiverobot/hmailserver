@@ -28,6 +28,7 @@ use.
 | `!` | File the message as junk, or as not junk from the Junk folder |
 | `#` | Delete the message (to Trash) |
 | `l` | Label the message (the Label menu of the open message) |
+| `m` | Mute or unmute the conversation: it leaves the inbox, and a rule the page writes files its replies into the archive folder |
 | `c` | Write a new message |
 | `r` `a` `f` | Reply, reply to all, forward the open message |
 | `/` | Search |

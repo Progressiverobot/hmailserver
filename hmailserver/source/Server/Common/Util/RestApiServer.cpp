@@ -9271,8 +9271,9 @@ namespace HM
    // first hundred and sixty characters that are not a quotation, or the
    // text of an HTML-only message with its markup removed. The text needs the
    // message parsed, which MessageData caps by size; a message over the cap
-   // has no snippet. Kept per message id, since a folder is listed again at
-   // every change the probe reports and a message file does not change.
+   // has no snippet. And the tab of the inbox the message belongs under, see
+   // CategoryOf. Kept per message id, since a folder is listed again at every
+   // change the probe reports and a message file does not change.
    namespace
    {
       struct ListingExtras
@@ -9285,13 +9286,84 @@ namespace HM
       const size_t ListingExtrasKept = 4000;
       const int SnippetLength = 160;
 
+      // The tab of the inbox a message belongs under, the way Gmail sorts an
+      // inbox, decided from the header alone: social when the sender is one of
+      // the networks; forums when it came through a list a person can post to
+      // (List-Post, or Precedence: list); promotions when it carries an
+      // unsubscribe link or was sent in bulk; updates when a machine sent it -
+      // Auto-Submitted, or an address such as no-reply, notifications or
+      // receipts; and primary for the rest. The page sorts its inbox by it and
+      // lets the reader overrule it per sender.
+      const char *const SocialDomains[] =
+      {
+         "facebook.com", "facebookmail.com", "twitter.com", "x.com", "linkedin.com", "instagram.com",
+         "pinterest.com", "reddit.com", "redditmail.com", "tiktok.com", "youtube.com", "discord.com",
+         "snapchat.com", "threads.net", "tumblr.com", "meetup.com", "nextdoor.com", "quora.com",
+         "strava.com", "bsky.app", "mastodon.social", "twitch.tv", "flickr.com", "goodreads.com",
+         "yelp.com", "whatsapp.com", "telegram.org", 0
+      };
+
+      const char *const MachineSenders[] =
+      {
+         "noreply", "no-reply", "no_reply", "donotreply", "do-not-reply", "do_not_reply", "notification",
+         "notifications", "notify", "alert", "alerts", "mailer-daemon", "postmaster", "receipt", "receipts",
+         "billing", "invoice", "invoices", "order", "orders", "statement", "statements", "security",
+         "verify", "verification", "confirm", "confirmation", "update", "updates", 0
+      };
+
+      AnsiString LowerHeaderValue(const MimeHeader &header, const char *name)
+      {
+         const char *value = header.GetRawFieldValue(name);
+         AnsiString out = value ? value : "";
+         out.ToLower();
+         return out;
+      }
+
+      AnsiString CategoryOf(const MimeHeader &header)
+      {
+         AnsiString from = LowerHeaderValue(header, "From");
+         int open = from.Find("<");
+         int close = from.Find(">");
+         if (open >= 0 && close > open)
+            from = from.Mid(open + 1, close - open - 1);
+         from.Trim();
+         int at = from.Find("@");
+         AnsiString local = at >= 0 ? from.Mid(0, at) : from;
+         AnsiString domain = at >= 0 ? from.Mid(at + 1) : AnsiString();
+
+         for (int i = 0; SocialDomains[i]; i++)
+         {
+            AnsiString social = SocialDomains[i];
+            AnsiString suffix = ".";
+            suffix += social;
+            if (domain == social || domain.EndsWith(suffix.c_str()))
+               return "social";
+         }
+
+         AnsiString precedence = LowerHeaderValue(header, "Precedence");
+         if (header.FieldExists("List-Post") || precedence.Find("list") >= 0)
+            return "forums";
+         if (header.FieldExists("List-Unsubscribe") || precedence.Find("bulk") >= 0)
+            return "promotions";
+
+         AnsiString autoSubmitted = LowerHeaderValue(header, "Auto-Submitted");
+         if ((!autoSubmitted.IsEmpty() && !autoSubmitted.StartsWith("no")) || header.FieldExists("X-Auto-Response-Suppress"))
+            return "updates";
+         for (int i = 0; MachineSenders[i]; i++)
+            if (local == MachineSenders[i])
+               return "updates";
+
+         return "primary";
+      }
+
       String TextWithoutMarkup(const String &html)
       {
          String out;
          out.reserve(html.GetLength());
          bool inTag = false;
          bool inStyle = false;
-         const String lower = html.ToLower();
+         String lower = html;
+         lower.ToLower();
          for (int i = 0; i < html.GetLength(); i++)
          {
             const wchar_t c = html[i];
@@ -9373,12 +9445,14 @@ namespace HM
 
       String to;
       bool attachments = false;
+      AnsiString category = "primary";
       AnsiString header = PersistentMessage::LoadHeader(fileName, false);
       if (!header.IsEmpty())
       {
          MimeHeader mimeHeader;
          mimeHeader.Load(header.c_str(), header.GetLength(), true);
          to = mimeHeader.GetUnicodeFieldValue("To");
+         category = CategoryOf(mimeHeader);
 
          AnsiString lower = header;
          lower.ToLower();
@@ -9396,10 +9470,11 @@ namespace HM
       }
 
       AnsiString json;
-      json.Format("\"to\":\"%hs\",\"has_attachments\":%hs,\"snippet\":\"%hs\"",
+      json.Format("\"to\":\"%hs\",\"has_attachments\":%hs,\"snippet\":\"%hs\",\"category\":\"%hs\"",
          JsonEscape_(Utf8_(to)).c_str(),
          attachments ? "true" : "false",
-         JsonEscape_(Utf8_(snippet)).c_str());
+         JsonEscape_(Utf8_(snippet)).c_str(),
+         category.c_str());
 
       boost::lock_guard<boost::mutex> guard(listingExtrasLock);
       if (listingExtras.size() >= ListingExtrasKept)
@@ -9858,7 +9933,7 @@ namespace HM
          "\"/api/v1/me/quarantine\":{\"get\":{\"summary\":\"The messages held as suspected spam for the signed-in account\",\"description\":\"Only the entries this address is a recipient of, without the other recipients. enabled says whether the server holds spam at all.\",\"responses\":{\"200\":{\"description\":\"enabled, messages (id, sender, subject, reason, score, size, created)\"}}}},"
          "\"/api/v1/me/quarantine/{id}/release\":{\"post\":{\"summary\":\"Deliver a held message to the signed-in account\",\"description\":\"Delivered to this address only; the entry stays for its other recipients and goes when this was the last. A message this address was not sent is 404.\",\"responses\":{\"200\":{\"description\":\"Released\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
          "\"/api/v1/me/quarantine/{id}\":{\"delete\":{\"summary\":\"Give up the signed-in account's copy of a held message\",\"description\":\"This address leaves the entry; the entry and its file go when no recipient is left. Nothing is delivered.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Not held for this account\"}}}},"
-         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted), message_id, in_reply_to, references. total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
+         "\"/api/v1/me/folders/{id}/messages\":{\"get\":{\"summary\":\"One folder's messages, newest first\",\"description\":\"Query parameters: limit (1-200, default 200), before_uid (only messages with a lower UID - the way to page back) and q (only messages containing the text, case-insensitively, in Subject, From, To, Cc, the text or the HTML; at most 2000 are looked at per request - scanned says how many, complete whether that was all, and next_before_uid where to continue). Each entry: id, uid, size, received, subject, from, date (decoded from the head of the file, as FETCH ENVELOPE would), flags (seen, flagged, answered, draft, deleted), message_id, in_reply_to, references, to, has_attachments, snippet (the first 160 characters of the text, quotations and the signature left out) and category - primary, social, promotions, updates or forums, decided from the header alone: the sender's domain, List-Post, List-Unsubscribe, Precedence and Auto-Submitted. total is the folder's count. A folder of another account, or one the ACL keeps from this one, is 404.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"Not this account's folder\"}}}},"
          "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, from (as on a send), and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"

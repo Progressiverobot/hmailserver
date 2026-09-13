@@ -1642,6 +1642,42 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("A folder listing carries, for every message, the recipient, whether it has attachments, a snippet of its text and the inbox tab it belongs under - primary, social, promotions, updates or forums - decided from the header")]
+      public void TheListingSaysWhichTabAMessageBelongsUnder()
+      {
+         string to = "To: " + Address + "\r\n";
+         SmtpClientSimulator.StaticSendRaw("friend@example.com", Address,
+            "From: friend@example.com\r\n" + to + "Subject: Primary\r\n\r\nLunch on Thursday?\r\n> An earlier line, quoted.\r\n");
+         SmtpClientSimulator.StaticSendRaw("notifications@facebookmail.com", Address,
+            "From: Facebook <notifications@facebookmail.com>\r\n" + to + "Subject: Social\r\nList-Unsubscribe: <https://www.facebook.com/leave>\r\n\r\nSomeone commented.\r\n");
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\n" + to + "Subject: Promotions\r\nList-Unsubscribe: <mailto:leave@example.com>\r\nPrecedence: bulk\r\n\r\nThis week's offers.\r\n");
+         SmtpClientSimulator.StaticSendRaw("no-reply@example.com", Address,
+            "From: no-reply@example.com\r\n" + to + "Subject: Updates\r\n\r\nYour order has shipped.\r\n");
+         SmtpClientSimulator.StaticSendRaw("robot@example.com", Address,
+            "From: robot@example.com\r\n" + to + "Subject: Auto\r\nAuto-Submitted: auto-generated\r\n\r\nA report, generated.\r\n");
+         SmtpClientSimulator.StaticSendRaw("member@example.com", Address,
+            "From: member@example.com\r\n" + to + "Subject: Forums\r\nList-Id: The list <list.example.com>\r\nList-Post: <mailto:list@example.com>\r\nList-Unsubscribe: <mailto:list-leave@example.com>\r\n\r\nA question for the list.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 6);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         Assert.AreEqual(200, page.status, "Body: " + page.body);
+
+         string primary = EntryFor(page.body, "Primary");
+         StringAssert.Contains("\"to\":\"" + Address + "\"", primary);
+         StringAssert.Contains("\"has_attachments\":false", primary);
+         StringAssert.Contains("\"snippet\":\"Lunch on Thursday?\"", primary);
+         StringAssert.Contains("\"category\":\"primary\"", primary);
+         StringAssert.Contains("\"category\":\"social\"", EntryFor(page.body, "Social"));
+         StringAssert.Contains("\"category\":\"promotions\"", EntryFor(page.body, "Promotions"));
+         StringAssert.Contains("\"category\":\"updates\"", EntryFor(page.body, "Updates"));
+         StringAssert.Contains("\"category\":\"updates\"", EntryFor(page.body, "Auto"));
+         StringAssert.Contains("\"category\":\"forums\"", EntryFor(page.body, "Forums"));
+      }
+
+      [Test]
       [Description("POST /unsubscribe writes to the list's mailto with its subject; a message with no List-Unsubscribe is refused; the JSON names the headers")]
       public void AnUnsubscribeByMailIsQueued()
       {

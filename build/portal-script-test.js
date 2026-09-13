@@ -300,6 +300,8 @@ let renameRefusal = null;
 // One message arrives while the reader is looking at the folder: the probe
 // says so, and from then on the folder tree and the listing both show it.
 let arrived = false;
+// The preferences the page saves, answered back merged, as the server does.
+let prefsStore = {};
 // A server that does not answer the change route at all - an older one, or one
 // built before that route existed.
 let changesMissing = false;
@@ -315,13 +317,19 @@ function folderTree() {
 }
 
 const LISTING = {
-   total: 3,
+   total: 5,
    messages: [
       { id: 103, uid: 13, subject: 'Third', from: 'c@example.net', to: 'user@example.com', date: '2026-09-09 09:00', size: 900, flags: { seen: false, flagged: false, draft: false } },
       { id: 102, uid: 12, subject: 'Second', from: 'b@example.net', to: 'user@example.com', date: '2026-09-08 09:00', size: 800, flags: { seen: false, flagged: false, draft: false }, in_reply_to: '<one@example.net>' },
       { id: 101, uid: 11, subject: 'First', from: 'a@example.net', to: 'user@example.com', date: '2026-09-07 09:00', size: 700, flags: { seen: true, flagged: false, draft: false } }
    ]
 };
+
+// The rest of the folder, two pages deep: what the page asks for with before_uid.
+const OLDER = [
+   { id: 100, uid: 10, subject: 'Older', from: 'e@example.net', to: 'user@example.com', date: '2026-09-06 09:00', size: 500, flags: { seen: true, flagged: false, draft: false } },
+   { id: 99, uid: 9, subject: 'Oldest', from: 'e@example.net', to: 'user@example.com', date: '2026-09-05 09:00', size: 500, flags: { seen: true, flagged: false, draft: false } }
+];
 
 const ARRIVAL = { id: 104, uid: 14, subject: 'Just in', from: 'd@example.net', to: 'user@example.com', date: '2026-09-09 12:00', size: 400, flags: { seen: false, flagged: false, draft: false } };
 
@@ -342,7 +350,7 @@ function json(status, body, headers) {
    return { status, body: body === undefined ? '' : JSON.stringify(body), headers: headers || {} };
 }
 
-function answer(method, path) {
+function answer(method, path, body) {
    if (method === 'POST' && path === '/api/v1/session') { signedIn = true; return json(201, { address: 'user@example.com' }); }
    if (method === 'DELETE' && path === '/api/v1/session') { signedIn = false; return json(200, { ended: true }); }
    if (!signedIn) { return json(401, { error: 'Not signed in.' }); }
@@ -359,9 +367,13 @@ function answer(method, path) {
       return json(200, { name: { first: 'A', last: 'B' }, forwarding: { enabled: false, address: '', keep_original: true }, signature: { enabled: false, text: '' } });
    }
    if (path === '/api/v1/me/filters' && method === 'GET') { return json(200, { active: '' }); }
+   if (path === '/api/v1/me/filters' && method === 'PUT') { return json(200, { saved: true }); }
+   if (path === '/api/v1/me/preferences' && method === 'GET') { return json(200, { preferences: prefsStore }); }
+   if (path === '/api/v1/me/preferences' && method === 'PUT') { Object.assign(prefsStore, JSON.parse(body || '{}')); return json(200, { preferences: prefsStore }); }
    if (path.startsWith('/api/v1/me/folders/1/messages')) {
+      if (path.indexOf('before_uid=') >= 0) { return json(200, { total: arrived ? 6 : 5, messages: OLDER }); }
       if (!arrived) { return json(200, LISTING); }
-      return json(200, { total: 4, messages: [ARRIVAL].concat(LISTING.messages) });
+      return json(200, { total: 6, messages: [ARRIVAL].concat(LISTING.messages) });
    }
    if (/^\/api\/v1\/me\/folders\/\d+\/messages/.test(path)) { return json(200, { total: 0, messages: [] }); }
    if (/^\/api\/v1\/me\/messages\/102\/attachments\/(\d+)$/.test(path)) {
@@ -398,7 +410,7 @@ function fetchStub(path, options) {
    const method = (options && options.method) || 'GET';
    const headers = (options && options.headers) || {};
    requests.push({ method, path, headers, body: options && options.body });
-   const reply = answer(method, path);
+   const reply = answer(method, path, options && options.body);
    return Promise.resolve({
       status: reply.status,
       headers: { get: (name) => (name in reply.headers ? reply.headers[name] : null) },
@@ -535,6 +547,8 @@ async function main() {
    const archiveCall = since(beforeArchive).filter((r) => r.method === 'POST' && /\/messages\/102\/move$/.test(r.path))[0];
    check('e archives the message under the cursor', !!archiveCall && JSON.parse(archiveCall.body).to === 'archive', archiveCall ? archiveCall.body : 'no move');
    const toasts = document.getElementById('toasts');
+   const clickUndo = () => { const buttons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.textContent === 'Undo') { buttons.push(c); } if (c.childNodes) { walk(c); } } })(toasts); if (!buttons.length) { throw new Error('no Undo button in the toast'); } buttons[0].dispatchEvent(makeEvent('click')); };
+   const dismissAllToasts = () => { const buttons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.getAttribute('aria-label') === 'Dismiss') { buttons.push(c); } if (c.childNodes) { walk(c); } } })(toasts); buttons.forEach((b) => b.dispatchEvent(makeEvent('click'))); };
    check('a toast says so and offers Undo', toasts.children.length === 1 && toasts.textContent.indexOf('Archived') >= 0 && toasts.textContent.indexOf('Undo') >= 0,
       toasts.textContent);
    const undoButtons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.textContent === 'Undo') { undoButtons.push(c); } walk(c); } })(toasts);
@@ -585,6 +599,92 @@ async function main() {
    rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
    document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.body }));
    check('Escape closes the row menu', document.getElementById('context-menu').hidden === true);
+
+   // ---- the inbox in tabs: every message here is primary, so one tab holds them all
+   const tabBar = () => document.getElementById('inbox-tabs');
+   const contextItems = (attribute, value) => { const out = []; const walk = (n) => { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.getAttribute && c.getAttribute(attribute) === value) { out.push(c); } if (c.childNodes) { walk(c); } } }; walk(document.getElementById('context-menu')); return out; };
+   check('the inbox shows its tabs', tabBar().hidden === false && tabBar().children.length === 5, tabBar().hidden + ' ' + tabBar().children.length);
+   check('Primary is the open tab', tabBar().children[0].className.indexOf('on') >= 0 && tabBar().children[0].textContent.indexOf('Primary') === 0, tabBar().children[0].textContent);
+   check('and carries the unread count', tabBar().children[0].textContent === 'Primary2', tabBar().children[0].textContent);
+   rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   const tabItems = contextItems('data-act', 'tab');
+   const socialItem = tabItems.filter((b) => b.getAttribute('data-tab') === 'social')[0];
+   check('the row menu offers the other four tabs', tabItems.length === 4 && !!socialItem, tabItems.length + ' items');
+   const beforeTab = requests.length;
+   socialItem.dispatchEvent(makeEvent('click', { target: socialItem }));
+   await flush();
+   await flush();
+   const prefCall = since(beforeTab).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   check('the sender\'s tab is kept with the account\'s preferences', !!prefCall && JSON.parse(JSON.parse(prefCall.body).tabs_by_sender)['b@example.net'] === 'social', prefCall ? prefCall.body : 'no preferences call');
+   check('the row leaves Primary', rows().length === 2, rows().length + ' rows');
+   check('and Social counts it', tabBar().children[1].textContent === 'Social1', tabBar().children[1].textContent);
+   check('the toast offers Undo', toasts.textContent.indexOf('b@example.net') >= 0 && toasts.textContent.indexOf('Undo') >= 0, toasts.textContent);
+   tabBar().children[1].dispatchEvent(makeEvent('click'));
+   check('the Social tab shows it', rows().length === 1 && rows()[0].textContent.indexOf('Second') >= 0, rows().length + ' rows');
+   rows()[0].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   const primaryItem = contextItems('data-act', 'tab').filter((b) => b.getAttribute('data-tab') === 'primary')[0];
+   primaryItem.dispatchEvent(makeEvent('click', { target: primaryItem }));
+   await flush();
+   await flush();
+   check('sent back, the tab is empty and says so', rows().length === 1 && rows()[0].textContent.indexOf('Nothing under Social') >= 0, rows()[0].textContent);
+   tabBar().children[0].dispatchEvent(makeEvent('click'));
+   check('and Primary has its three rows again', rows().length === 3, rows().length + ' rows');
+   dismissAllToasts();
+   while (onCursor() < 1) { document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body })); }
+   while (onCursor() > 1) { document.dispatchEvent(makeEvent('keydown', { key: 'k', target: document.body })); }
+
+   // ---- mute: the conversation is archived, its replies will be filed by a rule, and Undo takes it all back
+   rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   const muteItem = contextItems('data-act', 'mute')[0];
+   check('the row menu offers Mute', !!muteItem && muteItem.textContent === 'Mute', muteItem ? muteItem.textContent : 'no mute item');
+   const beforeMute = requests.length;
+   muteItem.dispatchEvent(makeEvent('click', { target: muteItem }));
+   await flush();
+   await flush();
+   await flush();
+   const muteFlag = since(beforeMute).filter((r) => r.method === 'PUT' && /\/messages\/102\/flags$/.test(r.path))[0];
+   check('Mute marks the message', !!muteFlag && JSON.stringify(JSON.parse(muteFlag.body).keywords_add) === '["$Muted"]', muteFlag ? muteFlag.body : 'no flags call');
+   check('after reading the rules the server has', called(beforeMute, 'GET', '/api/v1/me/filters'));
+   const muteRule = since(beforeMute).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/filters')[0];
+   const muteScript = muteRule ? JSON.parse(muteRule.body).script : '';
+   check('and writes a rule that files its replies into the archive folder',
+      muteScript.indexOf('header :contains ["references", "in-reply-to"] "<one@example.net>"') >= 0 && muteScript.indexOf('fileinto "Archive"') >= 0, muteScript.slice(0, 300));
+   const muteMove = since(beforeMute).filter((r) => r.method === 'POST' && /\/messages\/102\/move$/.test(r.path))[0];
+   check('and archives the conversation', !!muteMove && JSON.parse(muteMove.body).to === 'archive', muteMove ? muteMove.body : 'no move');
+   check('the toast says so and offers Undo', toasts.textContent.indexOf('Muted') >= 0 && toasts.textContent.indexOf('Undo') >= 0, toasts.textContent);
+   const beforeUnmute = requests.length;
+   clickUndo();
+   await flush();
+   await flush();
+   await flush();
+   const rulesBack = since(beforeUnmute).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/filters')[0];
+   check('Undo takes the rule away', !!rulesBack && JSON.parse(rulesBack.body).script === '', rulesBack ? rulesBack.body : 'no filters call');
+   const moveBack = since(beforeUnmute).filter((r) => r.method === 'POST' && /\/messages\/202\/move$/.test(r.path))[0];
+   check('moves the message back by the id the archive gave it', !!moveBack && JSON.parse(moveBack.body).folder_id === 1, moveBack ? moveBack.body : 'no move back');
+   const unmark = since(beforeUnmute).filter((r) => r.method === 'PUT' && /\/messages\/202\/flags$/.test(r.path))[0];
+   check('and takes the mark off it', !!unmark && JSON.stringify(JSON.parse(unmark.body).keywords_remove) === '["$Muted"]', unmark ? unmark.body : 'no flags call');
+   dismissAllToasts();
+
+   // ---- select all: the page first, then the whole folder, read page by page
+   document.getElementById('select-all').checked = true;
+   document.getElementById('select-all').dispatchEvent(makeEvent('click'));
+   const note = document.getElementById('select-note');
+   check('ticking every row on the page offers the rest of the folder', note.hidden === false && note.textContent.indexOf('Select every message in Primary') >= 0, note.hidden + ' ' + note.textContent);
+   document.getElementById('select-folder').dispatchEvent(makeEvent('click'));
+   check('and says the whole folder is selected', document.getElementById('bulk-count').textContent === 'All of Primary selected' && note.textContent.indexOf('Clear selection') >= 0,
+      document.getElementById('bulk-count').textContent + ' / ' + note.textContent);
+   const beforeSweep = requests.length;
+   document.getElementById('bulk-read').dispatchEvent(makeEvent('click'));
+   await flush();
+   await flush();
+   await flush();
+   const pagedCalls = since(beforeSweep).filter((r) => r.method === 'GET' && /\/folders\/1\/messages\?limit=200/.test(r.path));
+   check('the folder is read page by page, from the uid the first page ended on', pagedCalls.length === 2 && /before_uid=11$/.test(pagedCalls[1].path), pagedCalls.map((r) => r.path).join(' '));
+   const flaggedIds = since(beforeSweep).filter((r) => r.method === 'PUT' && /\/flags$/.test(r.path)).map((r) => r.path.match(/messages\/(\d+)\//)[1]);
+   check('and every message of it is acted on, not only the page', flaggedIds.join(',') === '103,102,101,100,99', flaggedIds.join(','));
+   check('the selection is cleared after', document.getElementById('bulk-bar').hidden === true && note.hidden === true);
+   while (onCursor() < 1) { document.dispatchEvent(makeEvent('keydown', { key: 'j', target: document.body })); }
+   while (onCursor() > 1) { document.dispatchEvent(makeEvent('keydown', { key: 'k', target: document.body })); }
 
    // ---- a row dragged onto a folder moves there, with undo
    const sentButton = (() => { const n = document.getElementById('folder-nav').children; for (let i = 0; i < n.length; i++) { if (n[i].getAttribute && n[i].getAttribute('data-route') === '/f/2') { return n[i]; } } return null; })();

@@ -339,6 +339,7 @@
   var listRows = [];
   var cursor = -1;
   var selected = {};
+  var wholeFolder = false;
   var lastListing = null;
   // What "where the reader was" means, kept whenever the listing is left:
   // the scroll offset, the message the cursor was on, and the ticked boxes.
@@ -369,17 +370,19 @@
   var selectedIds = function () { return Object.keys(selected).filter(function (k) { return selected[k]; }).map(Number); };
   var renderBulk = function () {
     var ids = selectedIds();
-    el('bulk-bar').hidden = ids.length === 0;
-    el('bulk-count').textContent = ids.length ? tf('{0} selected', ids.length) : '';
     fillFolderSelect(el('bulk-move'), state.folderId);
     var all = el('select-all');
     if (all) {
       all.checked = listRows.length > 0 && listRows.every(function (r) { return !!selected[r.id]; });
       all.indeterminate = ids.length > 0 && !all.checked;
     }
+    if (!all || !all.checked) { wholeFolder = false; }
+    renderSelectNote();
+    el('bulk-bar').hidden = ids.length === 0;
+    el('bulk-count').textContent = wholeFolder ? tf('All of {0} selected', selectionScope()) : ids.length ? tf('{0} selected', ids.length) : '';
     listRows.forEach(function (r) { r.row.classList.toggle('selected', !!selected[r.id]); });
   };
-  var clearSelection = function () { selected = {}; renderBulk(); };
+  var clearSelection = function () { selected = {}; wholeFolder = false; renderBulk(); };
   var renderSearchNote = function (list, page) {
     if (!page.query) { return; }
     var note = 'Searched ' + page.scanned + ' message' + (page.scanned === 1 ? '' : 's') + ' for \'' + page.query + '\'.';
@@ -589,6 +592,7 @@
     row.appendChild(what);
     var meta = node('div', undefined, 'meta');
     if (m.has_attachments) { var clip = node('span', undefined, 'clip'); clip.setAttribute('title', t('Has attachments')); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
+    if (isMuted(m)) { meta.appendChild(muteMark()); }
     var when = node('span', whenText(m), 'when'); when.setAttribute('title', fullDate(m)); meta.appendChild(when);
     row.appendChild(meta);
     var acts = node('div', undefined, 'acts');
@@ -673,6 +677,7 @@
       row.appendChild(what);
       var meta = node('div', undefined, 'meta');
       if (g.messages.some(function (m) { return m.has_attachments; })) { var clip = node('span', undefined, 'clip'); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
+      if (g.messages.some(isMuted)) { meta.appendChild(muteMark()); }
       var when = node('span', whenText(newest), 'when'); when.setAttribute('title', fullDate(newest)); meta.appendChild(when);
       row.appendChild(meta);
       var acts = node('div', undefined, 'acts');
@@ -698,22 +703,27 @@
       }
     });
   };
+  var lastPage = null;
   var renderMessages = function (page) {
     var list = el('message-list');
     clear(list);
     list.classList.remove('skeleton');
     listRows = []; cursor = -1;
-    if (!page.messages.length) {
+    lastPage = page;
+    renderTabs(page);
+    var tabbed = tabsActive(page);
+    var visible = tabbed ? page.messages.filter(function (m) { return tabOf(m) === activeTab; }) : page.messages;
+    if (!visible.length) {
       selected = {}; renderBulk(); renderCount(page);
       var empty = node('div', undefined, 'empty');
       empty.appendChild(icon('empty'));
-      empty.appendChild(node('div', page.query ? t('Nothing matched.') : t('This folder is empty.')));
+      empty.appendChild(node('div', page.query ? t('Nothing matched.') : tabbed && page.messages.length ? tf('Nothing under {0}.', tabName(activeTab)) : t('This folder is empty.')));
       list.appendChild(empty);
       renderSearchNote(list, page);
       return;
     }
     var shown = {};
-    renderRows(page, list, shown);
+    renderRows(tabbed ? { messages: visible, query: page.query } : page, list, shown);
     Object.keys(selected).forEach(function (k) { if (!shown[k]) { delete selected[k]; } });
     setCursor(0, true);
     renderBulk();
@@ -879,6 +889,7 @@
     renderMessageLabels();
     el('message-edit').hidden = !current.flags.draft;
     el('message-pin').textContent = isPinned(current) ? t('Unpin') : t('Pin');
+    el('message-mute').textContent = isMuted(current) ? t('Unmute') : t('Mute');
     var junk = el('message-junk');
     var isJunk = folderIs(current.folder_id, 'Junk');
     junk.setAttribute('title', isJunk ? t('Not junk') : t('Junk'));
@@ -1820,6 +1831,7 @@
     else if (event.key === '!') { fileCurrent(junkTargetFor(current.folder_id)); event.preventDefault(); }
     else if (event.key === '#') { fileCurrent('delete'); event.preventDefault(); }
     else if (event.key === 'l') { toggleLabelMenu(); event.preventDefault(); }
+    else if (event.key === 'm') { muteThread(entryOfCurrent(), !isMuted(current)); event.preventDefault(); }
   });
   el('message-move-go').addEventListener('click', function () {
     var target = el('message-move').value;
@@ -2360,6 +2372,10 @@
   };
   var sieveString = function (s) { return '"' + String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'; };
   var conditionOf = function (r) {
+    if (r.field === 'thread') {
+      var ids = Array.isArray(r.text) ? r.text : [r.text];
+      return 'anyof (' + ids.map(function (id) { return 'header :contains ["references", "in-reply-to"] ' + sieveString(id); }).join(', ') + ')';
+    }
     var text = sieveString(r.text);
     if (r.field === 'any') { return 'anyof (header :contains "from" ' + text + ', header :contains ["to", "cc"] ' + text + ', header :contains "subject" ' + text + ')'; }
     if (r.field === 'to') { return 'header :contains ["to", "cc"] ' + text; }
@@ -2379,6 +2395,7 @@
       rules.map(function (r) { return 'if ' + conditionOf(r) + ' {\n  ' + actionOf(r) + '\n}'; }).join('\n') + '\n';
   };
   var describeRule = function (r) {
+    if (r.field === 'thread') { return { when: tf('A reply in the conversation "{0}"', r.subject || ''), then: 'move to ' + r.folder }; }
     var when = (r.field === 'any' ? 'From, To or Subject' : r.field === 'to' ? 'To or Cc' : r.field.charAt(0).toUpperCase() + r.field.slice(1)) + ' contains "' + r.text + '"';
     var then = r.action === 'move' ? 'move to ' + r.folder : r.action === 'label' ? 'label ' + r.label : r.action === 'flag' ? 'flag' : r.action === 'read' ? 'mark as read' : 'delete';
     return { when: when, then: then };
@@ -3023,22 +3040,24 @@
   el('bulk-clear').addEventListener('click', function () { clearSelection(); listRows.forEach(function (r) { r.box.checked = false; }); });
   // One call per message, in order, then one reload.
   var eachSelected = function (act) {
-    var ids = selectedIds();
-    var chain = Promise.resolve();
-    ids.forEach(function (id) { chain = chain.then(function () { return act(id); }); });
-    return chain.then(function () { clearSelection(); lastListing = null; loadFolders(); return loadMessages(); });
+    return selectedEntries().then(function (entries) {
+      var chain = Promise.resolve();
+      entries.forEach(function (e) { chain = chain.then(function () { return act(e.id); }); });
+      return chain.then(function () { clearSelection(); lastListing = null; loadFolders(); return loadMessages(); });
+    }, function (r) { say('mail-status', describe(r, t('Could not read the folder')), false); });
   };
   document.addEventListener('keydown', function (event) {
     var tag = (event.target && event.target.tagName) || '';
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || event.ctrlKey || event.metaKey || event.altKey) { return; }
     if (el('account').hidden || el('mail-section').hidden || el('message-list').hidden) { return; }
-    if (current && !el('message-view').hidden && (event.key === 'e' || event.key === '!' || event.key === '#')) { return; }
+    if (current && !el('message-view').hidden && (event.key === 'e' || event.key === '!' || event.key === '#' || event.key === 'm')) { return; }
     if (event.key === 'ArrowDown' || event.key === 'j') { setCursor(cursor + 1); event.preventDefault(); }
     else if (event.key === 'ArrowUp' || event.key === 'k') { setCursor(cursor - 1); event.preventDefault(); }
     else if (event.key === 'Enter' && cursor >= 0) { var hit = listRows[cursor]; if (hit.toggle) { hit.toggle(); } else { go('/m/' + hit.id); } event.preventDefault(); }
     else if (event.key === 'e' && cursor >= 0) { fileRow(listRows[cursor], 'archive'); event.preventDefault(); }
     else if (event.key === '!' && cursor >= 0) { fileRow(listRows[cursor], junkTargetFor(state.folderId)); event.preventDefault(); }
     else if (event.key === '#' && cursor >= 0) { fileRow(listRows[cursor], 'delete'); event.preventDefault(); }
+    else if (event.key === 'm' && cursor >= 0) { muteThread(listRows[cursor], !isMuted(listRows[cursor].m)); event.preventDefault(); }
     else if (event.key === 'x' && cursor >= 0) { var r = listRows[cursor]; r.box.checked = !r.box.checked; (r.ids || [r.id]).forEach(function (id) { selected[id] = r.box.checked; }); renderBulk(); event.preventDefault(); }
   });
   window.addEventListener('hashchange', route);
@@ -3069,7 +3088,7 @@
   // Kept with the account (GET/PUT /api/v1/me/preferences); the browser's
   // storage holds only the theme, for the sign-in page before there is one.
   var prefs = {};
-  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right' };
+  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '' };
   var renderListTools = function () {
     el('view-threads').textContent = pref('view') === 'threads' ? t('Show messages one by one') : t('Show conversations');
     var emptyable = !state.everywhere && (folderIs(state.folderId, 'Junk') || folderIs(state.folderId, 'Trash'));
@@ -3161,6 +3180,7 @@
     el('pref-undo').value = String(undoSeconds());
     if (!el('pref-undo').value) { el('pref-undo').value = '5'; }
     el('pref-notify').checked = pref('notify') === '1';
+    el('pref-inbox').value = inboxMode();
     el('pref-language').value = knownLanguage(pref('language') || '') || languageActive;
     renderNotifyFolders();
     renderTemplates();
@@ -3295,8 +3315,8 @@
     var labels = el('notify-folders').children;
     for (var i = 0; i < labels.length; i++) { var tick = labels[i].children[0]; if (tick && tick.checked) { ticked.push(tick.value); } }
     savePrefs({ language: el('pref-language').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
-                notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(',') }).then(function (ok) {
-      if (ok) { say('prefs-status', t('Saved.'), true); }
+                notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(','), inbox: el('pref-inbox').value }).then(function (ok) {
+      if (ok) { say('prefs-status', t('Saved.'), true); if (lastPage) { renderMessages(lastPage); } }
     });
   });
   el('pref-notify').addEventListener('change', function () {
@@ -3369,6 +3389,7 @@
   // ---- Print ----------------------------------------------------------------
   el('message-print').addEventListener('click', function () { window.print(); });
   el('message-pin').addEventListener('click', function () { closeMenus(); if (current) { pinMessages([current.id], !isPinned(current)); } });
+  el('message-mute').addEventListener('click', function () { closeMenus(); if (current) { muteThread(entryOfCurrent(), !isMuted(current)); } });
   el('message-block').addEventListener('click', function () { closeMenus(); if (current) { blockSender(addressOf(current.from)); } });
   el('message-sweep').addEventListener('click', function () { closeMenus(); if (current) { sweepSender(addressOf(current.from), current.folder_id || state.folderId); } });
 
@@ -3634,17 +3655,64 @@
     });
   };
   var fileSelected = function (to) {
-    var ids = selectedIds();
-    var entries = ids.map(function (id) {
-      var folderId = state.folderId;
-      listRows.forEach(function (r) { if (r.id === id || (r.ids || []).indexOf(id) >= 0) { folderId = r.folderId || folderId; } });
-      return { id: id, folderId: folderId };
-    });
-    fileMany(entries, to).then(function (ok) {
-      clearSelection();
-      if (ok && current && ids.indexOf(current.id) >= 0) { closeMessage(true); }
-      loadMessages();
-    });
+    selectedEntries().then(function (entries) {
+      var ids = entries.map(function (e) { return e.id; });
+      return fileMany(entries, to).then(function (ok) {
+        clearSelection();
+        if (ok && current && ids.indexOf(current.id) >= 0) { closeMessage(true); }
+        loadMessages();
+      });
+    }, function (r) { say('mail-status', describe(r, t('Could not read the folder')), false); });
+  };
+  // ---- Every message of the folder, not only the page ----------------------
+  // Ticking the page's box offers the rest of the folder, as both webmails
+  // do; taken up, the bulk actions read the folder page by page - at most
+  // five thousand messages - and act on all of it, or on the open tab of it.
+  var selectionScope = function () {
+    return lastPage && tabsActive(lastPage) ? tabName(activeTab) : folderName(state.folderId);
+  };
+  var renderSelectNote = function () {
+    var note = el('select-note');
+    var page = lastListing && lastListing.key === listingKey() ? lastListing.page : null;
+    var all = el('select-all');
+    if (!page || page.query || state.everywhere || !all || !all.checked || !listRows.length || !(page.total > page.messages.length)) { wholeFolder = false; note.hidden = true; return; }
+    if (wholeFolder) {
+      el('select-note-text').textContent = tf('Every message in {0} is selected.', selectionScope());
+      el('select-folder').textContent = t('Clear selection');
+    } else {
+      el('select-note-text').textContent = tf('All {0} messages on this page are selected.', selectedIds().length);
+      el('select-folder').textContent = tf('Select every message in {0}', selectionScope());
+    }
+    note.hidden = false;
+  };
+  el('select-folder').addEventListener('click', function () {
+    if (wholeFolder) { clearSelection(); listRows.forEach(function (r) { r.box.checked = false; }); return; }
+    wholeFolder = true;
+    renderBulk();
+  });
+  var selectedEntries = function () {
+    if (!wholeFolder) {
+      return Promise.resolve(selectedIds().map(function (id) {
+        var folderId = state.folderId;
+        listRows.forEach(function (r) { if (r.id === id || (r.ids || []).indexOf(id) >= 0) { folderId = r.folderId || folderId; } });
+        return { id: id, folderId: folderId };
+      }));
+    }
+    var folderId = state.folderId;
+    var tab = lastPage && tabsActive(lastPage) ? activeTab : '';
+    var entries = [], seen = 0, before = 0;
+    var step = function () {
+      return call('GET', '/api/v1/me/folders/' + folderId + '/messages?limit=200' + (before ? '&before_uid=' + before : '')).then(function (r) {
+        if (r.status !== 200 || !r.data) { return Promise.reject(r); }
+        var ms = r.data.messages || [];
+        seen += ms.length;
+        ms.forEach(function (m) { if (!tab || tabOf(m) === tab) { entries.push({ id: m.id, folderId: folderId }); } });
+        if (!ms.length || seen >= (r.data.total || 0) || entries.length >= 5000 || !ms[ms.length - 1].uid) { return entries; }
+        before = ms[ms.length - 1].uid;
+        return step();
+      });
+    };
+    return step();
   };
   var markRows = function (entries, seen) {
     var chain = Promise.resolve();
@@ -3981,6 +4049,169 @@
 
 
   // ---- Pin, block, sweep; drag to a folder; the right-click menu -----------
+  // ---- The inbox in tabs ----------------------------------------------------
+  // Primary, Social, Promotions, Updates and Forums, the way Gmail sorts an
+  // inbox, or Focused and Other, the way Outlook does; or one list. The
+  // server says which tab a message is from its header (category in the
+  // listing); the reader's own word for a sender, kept with the account's
+  // preferences, overrules it. A tab is a filter over the page loaded, so
+  // switching costs no request.
+  var TABS = ['primary', 'social', 'promotions', 'updates', 'forums'];
+  var TAB_ICONS = { primary: 'person', social: 'people', promotions: 'tag', updates: 'info', forums: 'chat', focused: 'person', other: 'inbox' };
+  var tabName = function (tab) {
+    return tab === 'primary' ? t('Primary') : tab === 'social' ? t('Social') : tab === 'promotions' ? t('Promotions') : tab === 'updates' ? t('Updates') :
+      tab === 'forums' ? t('Forums') : tab === 'focused' ? t('Focused') : t('Other');
+  };
+  var inboxMode = function () { var m = pref('inbox'); return m === 'focused' || m === 'all' ? m : 'tabs'; };
+  var tabList = function () { return inboxMode() === 'focused' ? ['focused', 'other'] : TABS; };
+  var activeTab = 'primary';
+  var senderTabs = function () { try { var v = JSON.parse(pref('tabs_by_sender') || '{}'); return v && typeof v === 'object' ? v : {}; } catch (e) { return {}; } };
+  var tabOf = function (m) {
+    var own = senderTabs()[addressOf(m.from || '').toLowerCase()] || '';
+    var focused = inboxMode() === 'focused';
+    if (focused && (own === 'focused' || own === 'other')) { return own; }
+    var category = TABS.indexOf(own) >= 0 ? own : TABS.indexOf(m.category) >= 0 ? m.category : 'primary';
+    if (focused) { return category === 'primary' ? 'focused' : 'other'; }
+    return category;
+  };
+  var tabsActive = function (page) { return inboxMode() !== 'all' && !state.everywhere && !page.query && !!inboxId && state.folderId === inboxId; };
+  var renderTabs = function (page) {
+    var bar = el('inbox-tabs');
+    clear(bar);
+    if (!tabsActive(page)) { bar.hidden = true; return; }
+    var tabs = tabList();
+    if (tabs.indexOf(activeTab) < 0) { activeTab = tabs[0]; }
+    var unseen = {};
+    page.messages.forEach(function (m) { if (!m.flags.seen) { var tab = tabOf(m); unseen[tab] = (unseen[tab] || 0) + 1; } });
+    tabs.forEach(function (tab) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('data-tab', tab);
+      b.setAttribute('aria-selected', tab === activeTab ? 'true' : 'false');
+      if (tab === activeTab) { b.classList.add('on'); }
+      b.appendChild(icon(TAB_ICONS[tab]));
+      b.appendChild(node('span', tabName(tab)));
+      if (unseen[tab]) { var n = node('span', String(unseen[tab]), 'n'); n.setAttribute('title', tf('{0} unread', unseen[tab])); b.appendChild(n); }
+      b.addEventListener('click', function () { activeTab = tab; if (lastPage) { renderMessages(lastPage); } });
+      bar.appendChild(b);
+    });
+    bar.hidden = false;
+  };
+  // The row's menu offers the other tabs for the sender; the choice is kept
+  // in the preferences, so it holds on every device and for every message
+  // from that sender, and Undo takes it back.
+  var renderContextTabs = function (m) {
+    var box = el('context-tabs');
+    clear(box);
+    if (lastPage && tabsActive(lastPage) && m) {
+      var mine = tabOf(m);
+      box.appendChild(node('div', undefined, 'sep'));
+      tabList().forEach(function (tab) {
+        if (tab === mine) { return; }
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.setAttribute('data-act', 'tab');
+        b.setAttribute('data-tab', tab);
+        b.textContent = tf('Show under {0}', tabName(tab));
+        box.appendChild(b);
+      });
+    }
+    box.hidden = !box.children.length;
+  };
+  var moveSenderToTab = function (address, tab) {
+    address = String(address || '').trim().toLowerCase();
+    if (!address || !tab) { return; }
+    var map = senderTabs();
+    var before = JSON.stringify(map);
+    map[address] = tab;
+    savePrefs({ tabs_by_sender: JSON.stringify(map) }).then(function (ok) {
+      if (!ok) { return; }
+      if (lastPage) { renderMessages(lastPage); }
+      toast(tf('Messages from {0} will show under {1}.', address, tabName(tab)), function () {
+        savePrefs({ tabs_by_sender: before }).then(function () { if (lastPage) { renderMessages(lastPage); } });
+      });
+    });
+  };
+
+  // ---- Mute -----------------------------------------------------------------
+  // The conversation leaves the inbox, and its replies will too: every
+  // message of it carries $Muted (so a row shows it, and Unmute knows), the
+  // messages are archived, and a rule files whatever answers any of them
+  // into the archive folder. Unmute takes the keyword and the rule away.
+  var MUTE = '$Muted';
+  var isMuted = function (m) { return !!(m && m.flags && (m.flags.keywords || []).indexOf(MUTE) >= 0); };
+  var muteMark = function () { var s = node('span', undefined, 'mute'); s.setAttribute('title', t('Muted')); s.appendChild(icon('bell-off', true)); return s; };
+  var entryOfCurrent = function () {
+    var hit = null;
+    listRows.forEach(function (r) { if (r.id === current.id || (r.ids || []).indexOf(current.id) >= 0) { hit = r; } });
+    return hit || { id: current.id, m: current, folderId: current.folder_id || state.folderId };
+  };
+  var threadIdsOf = function (messages) {
+    var ids = [];
+    messages.forEach(function (m) {
+      [m.message_id, m.in_reply_to].concat(String(m.references || '').split(/\s+/)).forEach(function (id) {
+        id = String(id || '').trim();
+        if (id && ids.indexOf(id) < 0) { ids.push(id); }
+      });
+    });
+    return ids;
+  };
+  var setKeywordOn = function (ids, keyword, on) {
+    var chain = Promise.resolve();
+    ids.forEach(function (id) { chain = chain.then(function () { return call('PUT', '/api/v1/me/messages/' + id + '/flags', on ? { keywords_add: [keyword] } : { keywords_remove: [keyword] }); }); });
+    return chain;
+  };
+  var muteThread = function (entry, on) {
+    if (!entry || !entry.m) { return; }
+    var messages = entry.ms || [entry.m];
+    var ids = messages.map(function (m) { return m.id; });
+    var key = threadKey(entry.m);
+    withRules(function (rules) {
+      var before = rules.slice();
+      var kept = rules.filter(function (r) { return !(r.field === 'thread' && r.key === key); });
+      var next = kept;
+      if (on) {
+        var archive = allFolders.filter(function (f) { return !f.owner && folderIs(f.id, 'Archive'); })[0];
+        next = kept.concat([{ field: 'thread', key: key, text: threadIdsOf(messages), subject: entry.m.subject || '', action: 'move', folder: archive ? archive.path : 'Archive' }]);
+      }
+      return setKeywordOn(ids, MUTE, on).then(function () { return saveRules(next); }).then(function (ok) {
+        if (!ok) { return; }
+        var moved = [];
+        var moves = Promise.resolve();
+        if (on && !folderIs(entry.folderId, 'Archive')) {
+          ids.forEach(function (id) {
+            moves = moves.then(function () {
+              return fileMessage(id, 'archive').then(function (r) { if (r.status === 200 && r.data && r.data.id) { moved.push({ id: r.data.id, back: entry.folderId }); } });
+            });
+          });
+        }
+        return moves.then(function () {
+          if (current && ids.indexOf(current.id) >= 0) {
+            if (moved.length) { closeMessage(true); }
+            else { current.flags.keywords = (current.flags.keywords || []).filter(function (k) { return k !== MUTE; }).concat(on ? [MUTE] : []); renderActions(); }
+          }
+          lastListing = null;
+          loadFolders();
+          if (moved.length) { loadMessages(); } else { reloadKeepingPlace(); }
+          toast(on ? t('Muted. Replies will skip the inbox.') : t('Unmuted.'), on ? function () {
+            var back = [];
+            var undo = saveRules(before);
+            moved.forEach(function (x) {
+              undo = undo.then(function () {
+                return call('POST', '/api/v1/me/messages/' + x.id + '/move', { folder_id: x.back }).then(function (r) { if (r.status === 200 && r.data && r.data.id) { back.push(r.data.id); } });
+              });
+            });
+            undo.then(function () { return setKeywordOn(moved.length ? back : ids, MUTE, false); }).then(function () {
+              lastListing = null;
+              loadFolders();
+              if (!el('mail-section').hidden) { loadMessages(); }
+            });
+          } : null);
+        });
+      });
+    });
+  };
   var PIN = '$Pinned';
   var isPinned = function (m) { return !!(m && m.flags && (m.flags.keywords || []).indexOf(PIN) >= 0); };
   var pinMessages = function (ids, on) {
@@ -4005,14 +4236,25 @@
   var blockSender = function (address) {
     address = String(address || '').trim();
     if (!address) { return; }
-    var rules = rulesOf(el('filter-script').value);
-    if (rules === null) { toast(t('The filter script was written by hand: add the rule there.')); return; }
-    var junk = allFolders.filter(function (f) { return !f.owner && folderIs(f.id, 'Junk'); })[0];
-    var rule = junk ? { field: 'from', text: address, action: 'move', folder: junk.path } : { field: 'from', text: address, action: 'discard' };
-    var before = rules.slice();
-    saveRules(rules.concat([rule])).then(function (ok) {
-      if (!ok) { return; }
-      toast(tf('Messages from {0} will go to {1}.', address, junk ? junk.path : t('nowhere')), function () { saveRules(before); });
+    withRules(function (rules) {
+      var junk = allFolders.filter(function (f) { return !f.owner && folderIs(f.id, 'Junk'); })[0];
+      var rule = junk ? { field: 'from', text: address, action: 'move', folder: junk.path } : { field: 'from', text: address, action: 'discard' };
+      var before = rules.slice();
+      return saveRules(rules.concat([rule])).then(function (ok) {
+        if (!ok) { return; }
+        toast(tf('Messages from {0} will go to {1}.', address, junk ? junk.path : t('nowhere')), function () { saveRules(before); });
+      });
+    });
+  };
+  // The account's rules as the server has them now - the page's copy is only
+  // as fresh as the last visit to the Rules page - or a word when the script
+  // was written by hand, in which case nothing is written over it.
+  var withRules = function (fn) {
+    return call('GET', '/api/v1/me/filters').then(function (result) {
+      if (result.status === 200 && result.data) { el('filter-script').value = result.data.active || ''; }
+      var rules = rulesOf(el('filter-script').value);
+      if (rules === null) { toast(t('The filter script was written by hand: add the rule there.')); return null; }
+      return fn(rules);
     });
   };
   // Every message from the sender in the folder, deleted in one go, with undo.
@@ -4072,8 +4314,10 @@
       if (act === 'read') { items[i].textContent = m.flags.seen ? t('Mark as unread') : t('Mark as read'); }
       if (act === 'star') { items[i].textContent = m.flags.flagged ? t('Unstar') : t('Star'); }
       if (act === 'pin') { items[i].textContent = isPinned(m) ? t('Unpin') : t('Pin'); }
+      if (act === 'mute') { items[i].textContent = isMuted(m) ? t('Unmute') : t('Mute'); }
       if (act === 'junk') { items[i].textContent = folderIs(entry.folderId, 'Junk') ? t('Not junk') : t('Junk'); }
     }
+    renderContextTabs(m);
     menu.hidden = false;
     if (menu.style) {
       var w = window.innerWidth || 1200, h = window.innerHeight || 800;
@@ -4097,6 +4341,8 @@
     else if (act === 'pin') { pinMessages(entry.ids || [entry.id], !isPinned(m)); }
     else if (act === 'block') { blockSender(addressOf(m.from)); }
     else if (act === 'sweep') { sweepSender(addressOf(m.from), entry.folderId); }
+    else if (act === 'mute') { muteThread(entry, !isMuted(m)); }
+    else if (act === 'tab') { moveSenderToTab(addressOf(m.from), event.target.getAttribute('data-tab')); }
   });
   document.addEventListener('click', function (event) {
     if (el('context-menu').hidden) { return; }
