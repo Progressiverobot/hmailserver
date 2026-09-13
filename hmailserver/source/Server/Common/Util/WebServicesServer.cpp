@@ -14,6 +14,7 @@
 #include "FileUtilities.h"
 #include "OtelTracer.h"
 #include "OtelTraceContext.h"
+#include "CardDavServer.h"
 
 #include "../BO/Domains.h"
 #include "../BO/Domain.h"
@@ -55,6 +56,13 @@ namespace HM
       const unsigned MaxConnections = 128;
       const unsigned WorkerThreads = 4;
       const int MxCacheSeconds = 3600;
+
+      // A CardDAV PUT or REPORT can be larger than anything else this
+      // listener takes: a card with a photo, a multiget naming a whole
+      // address book. CardDavServer::IsLargeRequest says which requests
+      // qualify; every other request keeps MaxRequestSize.
+      const size_t MaxLargeRequestSize = 1024 * 1024 + 64 * 1024;
+      const unsigned LargeRequestSeconds = 60;
 
       // How far ahead the mandatory RFC 9116 Expires field is set. Derived
       // from the current time on every request rather than written as a
@@ -349,6 +357,10 @@ namespace HM
             if (davRedirectConfigured)
                features += ", CalDAV/CardDAV service discovery (/.well-known/caldav and /.well-known/carddav)";
 
+            // CardDAV has no enable setting either: it is served for every
+            // account once a listener exists, so it is always in the list.
+            features += ", CardDAV (/dav/, the accounts' contacts for phones and desktop clients, over HTTPS)";
+
             featureMessage = _T("WebServices: these features are enabled but unreachable, because no web services listener is configured: ") + String(features) +
                _T(". Nothing answers those URLs until WebServicesHttpPort and/or WebServicesHttpsPort is set to a non-zero port in hMailServer.ini - both default to 0.");
 
@@ -360,10 +372,17 @@ namespace HM
                featureMessage += _T(" MTA-STS policy hosting needs WebServicesHttpsPort specifically: RFC 8461 section 3.3 has the policy fetched over HTTPS only, so a plain-HTTP listener cannot serve it.");
             }
          }
-         else if (mtaStsHosting && https_port <= 0)
+         else if (https_port <= 0)
          {
-            // A listener exists, but not one this feature can use.
-            featureMessage = _T("WebServices: MTA-STS policy hosting is enabled (MtaStsHostingEnabled) but WebServicesHttpsPort is 0, so only the plain-HTTP listener is running. RFC 8461 section 3.3 requires the policy to be fetched over HTTPS, so the policy cannot be served and sending servers will treat the domain as having no policy. Set WebServicesHttpsPort in hMailServer.ini. The other web services are unaffected and are being served over HTTP.");
+            // A listener exists, but not one these two features can use.
+            if (mtaStsHosting)
+               featureMessage = _T("WebServices: MTA-STS policy hosting is enabled (MtaStsHostingEnabled) but WebServicesHttpsPort is 0, so only the plain-HTTP listener is running. RFC 8461 section 3.3 requires the policy to be fetched over HTTPS, so the policy cannot be served and sending servers will treat the domain as having no policy. Set WebServicesHttpsPort in hMailServer.ini. The other web services are unaffected and are being served over HTTP. ");
+
+            // CardDAV authenticates with the account's password, so it holds
+            // itself to the same rule; said here, at startup, as well as in
+            // the 403 a client gets, because the client's log is not where
+            // an administrator looks first.
+            featureMessage += _T("WebServices: CardDAV (/dav/) is served over HTTPS only, because HTTP Basic would put an account's password on the wire in clear, and WebServicesHttpsPort is 0: a client reaching /dav/ on the plain-HTTP listener is refused with that reason. Set WebServicesHttpsPort in hMailServer.ini, or put a TLS-terminating proxy in front of the plain listener that sets X-Forwarded-Proto: https.");
          }
 
          if (acmeMessage.IsEmpty() && featureMessage.IsEmpty())
@@ -507,6 +526,8 @@ namespace HM
 
       HttpLimits limits;
       limits.max_request_bytes = MaxRequestSize;
+      limits.max_request_bytes_large = MaxLargeRequestSize;
+      limits.request_seconds_large = LargeRequestSeconds;
       limits.request_seconds = RequestSeconds;
       limits.connection_seconds = ConnectionSeconds;
       limits.max_connections = MaxConnections;
@@ -515,13 +536,15 @@ namespace HM
       std::shared_ptr<HttpServer> server(new HttpServer("WebServices", limits,
          [](const HttpRequest &request)
          {
-            return ProcessRequest_(request.raw, request.over_tls);
+            return ProcessRequest_(request);
          },
          HttpServer::AcceptFilter(),
          [](int status, const AnsiString &message)
          {
             return BuildResponse_(status, "text/plain", message);
          }));
+
+      server->SetLargeRequestFilter(&CardDavServer::IsLargeRequest);
 
       bool httpListening = http_port > 0 &&
          server->Listen(bind_address, http_port, std::shared_ptr<boost::asio::ssl::context>());
@@ -583,8 +606,13 @@ namespace HM
    }
 
    HttpResponse
-   WebServicesServer::ProcessRequest_(const AnsiString &request, bool over_tls)
+   WebServicesServer::ProcessRequest_(const HttpRequest &httpRequest)
    {
+      // The handlers below were written against the raw request and parse
+      // it themselves; CardDAV, written after them, takes the split one.
+      const AnsiString &request = httpRequest.raw;
+      const bool over_tls = httpRequest.over_tls;
+
       int lineEnd = request.Find("\r\n");
       if (lineEnd < 0)
          return BuildResponse_(400, "text/plain", "malformed request");
@@ -621,6 +649,12 @@ namespace HM
 
       try
       {
+         // CardDAV (RFC 6352): everything under /dav/, authenticated as the
+         // account, over HTTPS. CardDavServer answers the plain-HTTP case
+         // itself, with the reason, rather than this dispatch hiding it.
+         if (CardDavServer::IsDavTarget(path))
+            return CardDavServer::Handle(httpRequest, RequestArrivedOverHttps_(request, over_tls));
+
          // ACME http-01 challenges.
          AnsiString challengePrefix = "/.well-known/acme-challenge/";
          if (method == "GET" && path.StartsWith(challengePrefix))
@@ -640,10 +674,15 @@ namespace HM
          // CalDAV / CardDAV service discovery (RFC 6764). Deliberately not
          // restricted to GET: section 6 has clients issuing PROPFIND straight
          // at the well-known URI, and a client that gets 404 for its PROPFIND
-         // stops looking. Not gated on AutoconfigEnabled either - this points
-         // at a different server entirely, and is off unless a target is set.
+         // stops looking. Not gated on AutoconfigEnabled either. CalDAV points
+         // at a different server entirely and is off unless a target is set;
+         // CardDAV points at this server's own /dav/ unless CardDavRedirectUrl
+         // names another.
          if (path == "/.well-known/caldav" || path == "/.well-known/carddav")
-            return HandleWellKnownDavRedirect_(path == "/.well-known/caldav");
+         {
+            bool calendar = path == "/.well-known/caldav";
+            return HandleWellKnownDavRedirect_(calendar, calendar ? AnsiString("") : BuiltInCardDavUrl_(request, over_tls));
+         }
 
          if (IniFileSettings::Instance()->GetAutoconfigEnabled())
          {
@@ -1149,24 +1188,112 @@ namespace HM
    }
 
    HttpResponse
-   WebServicesServer::HandleWellKnownDavRedirect_(bool calendar)
+   WebServicesServer::HandleWellKnownDavRedirect_(bool calendar, const AnsiString &built_in_target)
    {
       AnsiString target;
 
       if (!GetDavRedirectTarget_(calendar, target))
       {
-         // 404, deliberately, and not a redirect to this server or to a guessed
-         // host name. A client that follows a redirect to something which does
-         // not speak CalDAV reports a broken calendar account and retries it
-         // forever; a client that gets 404 concludes there is no calendar
-         // service and stops. The second is the truth, and it is also the
-         // outcome that does not send an administrator debugging the wrong
-         // server.
-         LOG_DEBUG(_T("WebServices: No CalDAV/CardDAV redirect served - CalDavRedirectUrl / CardDavRedirectUrl is not set in hMailServer.ini. This server does not implement CalDAV or CardDAV; the setting points at the server that does."));
+         // CardDAV is served by this server, so with no other server named
+         // the well-known URI points at the built-in address book.
+         if (!built_in_target.IsEmpty())
+            return BuildRedirectResponse_(built_in_target);
+
+         // CalDAV: 404, deliberately, and not a redirect to this server or to
+         // a guessed host name. A client that follows a redirect to something
+         // which does not speak CalDAV reports a broken calendar account and
+         // retries it forever; a client that gets 404 concludes there is no
+         // calendar service and stops. The second is the truth, and it is
+         // also the outcome that does not send an administrator debugging the
+         // wrong server.
+         LOG_DEBUG(_T("WebServices: No CalDAV redirect served - CalDavRedirectUrl is not set in hMailServer.ini. This server does not implement CalDAV; the setting points at the server that does."));
          return BuildResponse_(404, "text/plain", "not found");
       }
 
       return BuildRedirectResponse_(target);
+   }
+
+   AnsiString
+   WebServicesServer::GetRequestHostHeader_(const AnsiString &request)
+   {
+      AnsiString lowerRequest = request;
+      lowerRequest.MakeLower();
+
+      int headerPosition = lowerRequest.Find("\r\nhost:");
+      if (headerPosition < 0)
+         return "";
+
+      int valueStart = headerPosition + 7;
+      int lineEnd = lowerRequest.Find("\r\n", valueStart);
+      if (lineEnd < 0)
+         return "";
+
+      AnsiString host = lowerRequest.Mid(valueStart, lineEnd - valueStart);
+      host.Trim();
+
+      // It goes into a Location header verbatim, so the same rule as a
+      // configured redirect target: printable US-ASCII, no spaces.
+      if (host.IsEmpty() || host.GetLength() > 253)
+         return "";
+
+      for (int i = 0; i < host.GetLength(); i++)
+      {
+         unsigned char character = static_cast<unsigned char>(host[i]);
+         if (character < 0x21 || character > 0x7e)
+            return "";
+      }
+
+      return host;
+   }
+
+   AnsiString
+   WebServicesServer::BuiltInCardDavUrl_(const AnsiString &request, bool over_tls)
+   {
+      AnsiString hostWithPort = GetRequestHostHeader_(request);
+      if (hostWithPort.IsEmpty())
+      {
+         // No usable Host: a relative reference, which the client resolves
+         // against the URI it asked for (RFC 7231 section 7.1.2).
+         return CardDavServer::ContextPath;
+      }
+
+      if (RequestArrivedOverHttps_(request, over_tls))
+         return "https://" + hostWithPort + CardDavServer::ContextPath;
+
+      // Over plain HTTP, /dav/ refuses Basic with the reason. When an HTTPS
+      // listener is configured the client is sent there instead - the host
+      // it used, that listener's port - which is the answer that works.
+      int httpsPort = IniFileSettings::Instance()->GetWebServicesHttpsPort();
+      if (httpsPort > 0)
+      {
+         AnsiString host = hostWithPort;
+         if (host.StartsWith("["))
+         {
+            int close = host.Find("]");
+            if (close > 0)
+               host = host.Mid(0, close + 1);
+         }
+         else
+         {
+            int colon = host.Find(":");
+            if (colon > 0)
+               host = host.Mid(0, colon);
+         }
+
+         AnsiString location = "https://" + host;
+         if (httpsPort != 443)
+         {
+            AnsiString port;
+            port.Format(":%d", httpsPort);
+            location += port;
+         }
+         return location + CardDavServer::ContextPath;
+      }
+
+      // No HTTPS listener at all. The client is still sent to /dav/, where
+      // the answer is 403 with the reason; that sentence in the client's log
+      // is more use to whoever set the account up than a 404 here would be.
+      return "http://" + hostWithPort + CardDavServer::ContextPath;
    }
 
    bool

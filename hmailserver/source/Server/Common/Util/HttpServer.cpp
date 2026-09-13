@@ -980,6 +980,7 @@ namespace HM
       case 201: return "Created";
       case 202: return "Accepted";
       case 204: return "No Content";
+      case 207: return "Multi-Status";
       case 301: return "Moved Permanently";
       case 302: return "Found";
       case 304: return "Not Modified";

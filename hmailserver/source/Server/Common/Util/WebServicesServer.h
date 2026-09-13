@@ -14,13 +14,15 @@
 //     (/email.mobileconfig), all generated from the actual TCP/IP port
 //     configuration by GetClientAccessSettings_ - one source of truth for
 //     three wire formats.
-//   - CalDAV / CardDAV service discovery (RFC 6764): /.well-known/caldav
-//     and /.well-known/carddav redirect to CalDavRedirectUrl /
-//     CardDavRedirectUrl. This server implements neither protocol; the
-//     redirects exist so a separate calendar or contacts server can be
-//     paired with the mail domain. With no target configured the paths
-//     answer 404 - never a redirect to somewhere that does not speak the
-//     protocol.
+//   - CardDAV (RFC 6352): the account's address book under /dav/, served
+//     by CardDavServer over HTTPS and authenticated as the account. See
+//     CardDavServer.h for the tree a client walks.
+//   - CalDAV / CardDAV service discovery (RFC 6764): /.well-known/carddav
+//     redirects to CardDavRedirectUrl when one is set, and to the built-in
+//     /dav/ otherwise; /.well-known/caldav redirects to CalDavRedirectUrl.
+//     This server implements no CalDAV, so with no target configured that
+//     path answers 404 - never a redirect to somewhere that does not speak
+//     the protocol.
 //   - ACME http-01 challenges (/.well-known/acme-challenge/<token>),
 //     served from AcmeChallengeStore so certificate issuance works
 //     while this server owns port 80.
@@ -105,7 +107,7 @@ namespace HM
       // reaches it.
       static void ReportUnreachableFeatures_(int http_port, int https_port);
 
-      static HttpResponse ProcessRequest_(const AnsiString &request, bool over_tls);
+      static HttpResponse ProcessRequest_(const HttpRequest &request);
 
       static HttpResponse BuildResponse_(int status_code, const AnsiString &content_type, const AnsiString &body,
                                        const AnsiString &extra_headers = "");
@@ -132,7 +134,20 @@ namespace HM
       static HttpResponse HandleAppleProfile_(const AnsiString &host, const AnsiString &query);
 
       // RFC 6764 well-known redirect. calendar selects caldav over carddav.
-      static HttpResponse HandleWellKnownDavRedirect_(bool calendar);
+      // built_in_target is where the path points when no other server is
+      // configured: this server's own CardDAV for carddav, nothing for caldav.
+      static HttpResponse HandleWellKnownDavRedirect_(bool calendar, const AnsiString &built_in_target);
+
+      // The absolute URL of this server's CardDAV context path, on the host
+      // the client used and over HTTPS: the HTTPS listener's port when the
+      // request came over plain HTTP and one is configured. Relative when the
+      // request named no host.
+      static AnsiString BuiltInCardDavUrl_(const AnsiString &request, bool over_tls);
+
+      // The Host header as sent, port included, lower-cased; empty when
+      // absent or not printable US-ASCII without spaces. GetRequestHost_
+      // strips the port, which a Location header must keep.
+      static AnsiString GetRequestHostHeader_(const AnsiString &request);
 
       // The configured redirect target, if there is a usable one.
       // GetDavRedirectSetting_ answers only "is anything configured", without

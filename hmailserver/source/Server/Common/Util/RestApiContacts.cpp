@@ -5,25 +5,20 @@
 // The signed-in account's address book: GET and POST /api/v1/me/contacts, PUT
 // and DELETE /api/v1/me/contacts/{id}, and the collection of recipients from
 // what the account sends through the API. Phase A of the roadmap's address-book
-// row - a per-account store, no CardDAV yet; Phase B is CardDAV over this table.
+// row - the per-account store; Phase B, the CardDAV address book over the same
+// rows, is CardDavServer.cpp.
 //
-// The store is hm_contacts (schema 6032): one row per account and address, with
-// a name, a source (0 = added by the user, 1 = collected from a message the
-// account sent) and a creation time. Reads and writes go through the same
-// SQLCommand/SQLStatement path as every other table, parameterised; the
-// filtering the completion popup asks for (q=) is done here in memory, since a
-// case-insensitive substring match is not spelled the same on the four database
-// backends and an address book is small.
+// The store is hm_contacts (schema 6032), read and written through ContactStore
+// so that this surface and CardDAV cannot disagree about what a contact is.
+// The filtering the completion popup asks for (q=) is done here in memory,
+// since a case-insensitive substring match is not spelled the same on the four
+// database backends and an address book is small.
 
 #include "StdAfx.h"
 #include "RestApiServer.h"
 #include "HttpServer.h"
-#include "Time.h"
+#include "ContactStore.h"
 #include "../BO/Account.h"
-#include "../SQL/SQLCommand.h"
-#include "../SQL/SQLStatement.h"
-#include "../SQL/DALRecordset.h"
-#include "../Application/Application.h"
 
 #ifdef _DEBUG
 #define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -43,61 +38,6 @@ namespace HM
          text.Format("%I64d", value);
          return text;
       }
-
-      // "Name <address>", "<address>" or "address" -> the name (may be empty) and
-      // the address, lower-cased, without the brackets.
-      void SplitContactEntry(const String &entry, String &name, String &address)
-      {
-         String text = entry;
-         text.TrimLeft();
-         text.TrimRight();
-         name = _T("");
-         address = _T("");
-
-         int open = text.Find(_T("<"));
-         int close = text.Find(_T(">"));
-         if (open >= 0 && close > open)
-         {
-            address = text.Mid(open + 1, close - open - 1);
-            name = text.Mid(0, open);
-            name.TrimLeft();
-            name.TrimRight();
-            if (name.GetLength() >= 2 && name.StartsWith(_T("\"")) && name.EndsWith(_T("\"")))
-               name = name.Mid(1, name.GetLength() - 2);
-         }
-         else
-         {
-            address = text;
-         }
-
-         address.TrimLeft();
-         address.TrimRight();
-         address.ToLower();
-      }
-
-      // One address, with a local part and a domain, no whitespace or line
-      // breaks, and short enough for the column.
-      bool ValidContactAddress(const String &address)
-      {
-         if (address.IsEmpty() || address.GetLength() > 255)
-            return false;
-
-         int at = address.Find(_T("@"));
-         if (at <= 0 || at == address.GetLength() - 1)
-            return false;
-
-         if (address.Find(_T("@"), at + 1) >= 0)
-            return false;
-
-         for (int i = 0; i < address.GetLength(); i++)
-         {
-            wchar_t c = address[i];
-            if (c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '<' || c == '>' || c == ',' || c == ';' || c == '"')
-               return false;
-         }
-
-         return true;
-      }
    }
 
    AnsiString
@@ -106,46 +46,9 @@ namespace HM
       AnsiString json = "{\"id\":" + Int64Text(id) +
          ",\"name\":\"" + JsonEscape_(Utf8_(name)) +
          "\",\"address\":\"" + JsonEscape_(Utf8_(address)) +
-         "\",\"source\":\"" + (source == 1 ? AnsiString("collected") : AnsiString("manual")) +
+         "\",\"source\":\"" + (source == ContactStore::SourceCollected ? AnsiString("collected") : AnsiString("manual")) +
          "\",\"created\":\"" + JsonEscape_(Utf8_(created)) + "\"}";
       return json;
-   }
-
-   // Whether the account already has this address, and its row id if so.
-   bool
-   RestApiServer::FindContact_(__int64 accountId, const String &address, __int64 &contactId)
-   {
-      contactId = 0;
-
-      SQLCommand command("select contactid from hm_contacts where contactaccountid = @ACCOUNTID and contactaddress = @ADDRESS");
-      command.AddParameter("@ACCOUNTID", accountId);
-      command.AddParameter("@ADDRESS", address);
-
-      std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
-      if (!recordset || recordset->IsEOF())
-         return false;
-
-      contactId = recordset->GetInt64Value("contactid");
-      return contactId > 0;
-   }
-
-   bool
-   RestApiServer::InsertContact_(__int64 accountId, const String &name, const String &address, int source, __int64 &contactId, String &created)
-   {
-      created = Time::GetCurrentDateTime();
-
-      SQLStatement statement;
-      statement.SetTable("hm_contacts");
-      statement.SetStatementType(SQLStatement::STInsert);
-      statement.SetIdentityColumn("contactid");
-      statement.AddColumnInt64("contactaccountid", accountId);
-      statement.AddColumn("contactname", name);
-      statement.AddColumn("contactaddress", address);
-      statement.AddColumnInt64("contactsource", source);
-      statement.AddColumnDate("contactcreated", Time::GetDateFromSystemDate(created));
-
-      contactId = 0;
-      return Application::Instance()->GetDBManager()->Execute(statement, &contactId) && contactId > 0;
    }
 
    HttpResponse
@@ -170,26 +73,21 @@ namespace HM
             limit = ContactListMaximumLimit;
       }
 
-      SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated from hm_contacts where contactaccountid = @ACCOUNTID order by contactname asc, contactaddress asc");
-      command.AddParameter("@ACCOUNTID", account->GetID());
-
-      std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
-      if (!recordset)
+      std::vector<ContactRecord> contacts;
+      if (!ContactStore::List(account->GetID(), contacts))
          return BuildResponse_(500, "{\"error\":\"the contacts could not be read\"}");
 
       AnsiString json = "{\"contacts\":[";
       int count = 0;
       int total = 0;
-      while (!recordset->IsEOF())
+      for (const ContactRecord &contact : contacts)
       {
-         String name = recordset->GetStringValue("contactname");
-         String address = recordset->GetStringValue("contactaddress");
          bool matches = needle.IsEmpty();
          if (!matches)
          {
-            String lowerName = name;
+            String lowerName = contact.name;
             lowerName.ToLower();
-            String lowerAddress = address;
+            String lowerAddress = contact.address;
             lowerAddress.ToLower();
             matches = lowerName.Find(needle) >= 0 || lowerAddress.Find(needle) >= 0;
          }
@@ -201,14 +99,10 @@ namespace HM
             {
                if (count > 0)
                   json += ",";
-               json += ContactJson_(recordset->GetInt64Value("contactid"), name, address,
-                                    (int) recordset->GetLongValue("contactsource"),
-                                    recordset->GetStringValue("contactcreated"));
+               json += ContactJson_(contact.id, contact.name, contact.address, contact.source, contact.created);
                count++;
             }
          }
-
-         recordset->MoveNext();
       }
 
       json += "],\"count\":" + Int64Text(count) + ",\"total\":" + Int64Text(total) + "}";
@@ -224,27 +118,26 @@ namespace HM
 
       String name;
       String address;
-      SplitContactEntry(JsonUtf8Value_(requestBody, "address"), name, address);
+      ContactStore::SplitEntry(JsonUtf8Value_(requestBody, "address"), name, address);
       String givenName = JsonUtf8Value_(requestBody, "name");
       givenName.TrimLeft();
       givenName.TrimRight();
       if (!givenName.IsEmpty())
          name = givenName;
-      if (name.GetLength() > 255)
+      if (name.GetLength() > ContactStore::MaximumNameLength)
          return BuildResponse_(400, "{\"error\":\"name is at most 255 characters\"}");
-      if (!ValidContactAddress(address))
+      if (!ContactStore::IsValidAddress(address))
          return BuildResponse_(400, "{\"error\":\"address must be one e-mail address\"}");
 
       __int64 existing = 0;
-      if (FindContact_(account->GetID(), address, existing))
+      if (ContactStore::FindByAddress(account->GetID(), address, existing))
          return BuildResponse_(409, "{\"error\":\"a contact with that address exists\",\"id\":" + Int64Text(existing) + "}");
 
-      __int64 id = 0;
-      String created;
-      if (!InsertContact_(account->GetID(), name, address, 0, id, created))
+      ContactRecord inserted;
+      if (!ContactStore::Insert(account->GetID(), name, address, ContactStore::SourceManual, inserted))
          return BuildResponse_(500, "{\"error\":\"the contact could not be saved\"}");
 
-      return BuildResponse_(201, ContactJson_(id, name, address, 0, created));
+      return BuildResponse_(201, ContactJson_(inserted.id, inserted.name, inserted.address, inserted.source, inserted.created));
    }
 
    HttpResponse
@@ -256,49 +149,38 @@ namespace HM
 
       // The row must be this account's; another account's id is 404, not 403,
       // so that the ids of one address book say nothing about another.
-      SQLCommand select("select contactname, contactaddress, contactsource, contactcreated from hm_contacts where contactid = @ID and contactaccountid = @ACCOUNTID");
-      select.AddParameter("@ID", id);
-      select.AddParameter("@ACCOUNTID", account->GetID());
-      std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(select);
-      if (!recordset || recordset->IsEOF())
+      ContactRecord contact;
+      if (!ContactStore::Get(account->GetID(), id, contact))
          return BuildResponse_(404, "{\"error\":\"no such contact\"}");
 
-      String name = recordset->GetStringValue("contactname");
-      String address = recordset->GetStringValue("contactaddress");
-      int source = (int) recordset->GetLongValue("contactsource");
-      String created = recordset->GetStringValue("contactcreated");
+      String name = contact.name;
+      String address = contact.address;
 
       if (requestBody.Find("\"name\"") >= 0)
       {
          name = JsonUtf8Value_(requestBody, "name");
          name.TrimLeft();
          name.TrimRight();
-         if (name.GetLength() > 255)
+         if (name.GetLength() > ContactStore::MaximumNameLength)
             return BuildResponse_(400, "{\"error\":\"name is at most 255 characters\"}");
       }
 
       if (requestBody.Find("\"address\"") >= 0)
       {
          String ignored;
-         SplitContactEntry(JsonUtf8Value_(requestBody, "address"), ignored, address);
-         if (!ValidContactAddress(address))
+         ContactStore::SplitEntry(JsonUtf8Value_(requestBody, "address"), ignored, address);
+         if (!ContactStore::IsValidAddress(address))
             return BuildResponse_(400, "{\"error\":\"address must be one e-mail address\"}");
 
          __int64 other = 0;
-         if (FindContact_(account->GetID(), address, other) && other != id)
+         if (ContactStore::FindByAddress(account->GetID(), address, other) && other != id)
             return BuildResponse_(409, "{\"error\":\"a contact with that address exists\",\"id\":" + Int64Text(other) + "}");
       }
 
-      SQLStatement statement;
-      statement.SetTable("hm_contacts");
-      statement.SetStatementType(SQLStatement::STUpdate);
-      statement.AddColumn("contactname", name);
-      statement.AddColumn("contactaddress", address);
-      statement.SetWhereClause("contactid = " + Int64Text(id) + " and contactaccountid = " + Int64Text(account->GetID()));
-      if (!Application::Instance()->GetDBManager()->Execute(statement))
+      if (!ContactStore::Update(account->GetID(), id, name, address))
          return BuildResponse_(500, "{\"error\":\"the contact could not be saved\"}");
 
-      return BuildResponse_(200, ContactJson_(id, name, address, source, created));
+      return BuildResponse_(200, ContactJson_(id, name, address, contact.source, contact.created));
    }
 
    HttpResponse
@@ -308,17 +190,11 @@ namespace HM
       if (!account)
          return BuildResponse_(500, "{\"error\":\"internal error\"}");
 
-      SQLCommand select("select contactid from hm_contacts where contactid = @ID and contactaccountid = @ACCOUNTID");
-      select.AddParameter("@ID", id);
-      select.AddParameter("@ACCOUNTID", account->GetID());
-      std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(select);
-      if (!recordset || recordset->IsEOF())
+      ContactRecord contact;
+      if (!ContactStore::Get(account->GetID(), id, contact))
          return BuildResponse_(404, "{\"error\":\"no such contact\"}");
 
-      SQLCommand command("delete from hm_contacts where contactid = @ID and contactaccountid = @ACCOUNTID");
-      command.AddParameter("@ID", id);
-      command.AddParameter("@ACCOUNTID", account->GetID());
-      if (!Application::Instance()->GetDBManager()->Execute(command))
+      if (!ContactStore::Delete(account->GetID(), id))
          return BuildResponse_(500, "{\"error\":\"the contact could not be deleted\"}");
 
       return BuildResponse_(200, "{\"deleted\":true}");
@@ -341,17 +217,16 @@ namespace HM
       {
          String name;
          String address;
-         SplitContactEntry(entry, name, address);
-         if (!ValidContactAddress(address) || address == own)
+         ContactStore::SplitEntry(entry, name, address);
+         if (!ContactStore::IsValidAddress(address) || address == own)
             continue;
 
          __int64 existing = 0;
-         if (FindContact_(account->GetID(), address, existing))
+         if (ContactStore::FindByAddress(account->GetID(), address, existing))
             continue;
 
-         __int64 id = 0;
-         String created;
-         InsertContact_(account->GetID(), name, address, 1, id, created);
+         ContactRecord inserted;
+         ContactStore::Insert(account->GetID(), name, address, ContactStore::SourceCollected, inserted);
       }
    }
 }

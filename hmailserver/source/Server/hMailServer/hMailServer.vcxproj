@@ -576,6 +576,9 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMailbox.cpp" />
     <ClCompile Include="..\Common\Util\RestApiContacts.cpp" />
+    <ClCompile Include="..\Common\Util\ContactStore.cpp" />
+    <ClCompile Include="..\Common\Util\VCard.cpp" />
+    <ClCompile Include="..\Common\Util\CardDavServer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiBranding.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFiles.cpp" />
     <ClCompile Include="..\Common\Util\RestApiLanguages.cpp" />
@@ -1290,6 +1293,9 @@ EXIT 0
     <ClInclude Include="..\Common\Util\HttpServer.h" />
     <ClInclude Include="..\Common\Util\RestApiServer.h" />
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
+    <ClInclude Include="..\Common\Util\ContactStore.h" />
+    <ClInclude Include="..\Common\Util\VCard.h" />
+    <ClInclude Include="..\Common\Util\CardDavServer.h" />
     <ClInclude Include="..\Common\AntiSpam\QuarantineStore.h" />
     <ClInclude Include="..\Common\Util\Totp.h" />
     <ClInclude Include="..\Common\Util\MessageTrace.h" />

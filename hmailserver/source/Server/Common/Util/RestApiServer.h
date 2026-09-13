@@ -502,8 +502,6 @@ namespace HM
       static HttpResponse HandleMeContactDelete_(const Caller &caller, __int64 id);
       static void CollectContacts_(std::shared_ptr<const Account> account, const std::vector<String> &entries);
       static AnsiString ContactJson_(__int64 id, const String &name, const String &address, int source, const String &created);
-      static bool FindContact_(__int64 accountId, const String &address, __int64 &contactId);
-      static bool InsertContact_(__int64 accountId, const String &name, const String &address, int source, __int64 &contactId, String &created);
 
       // Who the account may write as, and the From a send or draft asked for (RestApiIdentities.cpp).
       static HttpResponse HandleMeIdentities_(const Caller &caller);
