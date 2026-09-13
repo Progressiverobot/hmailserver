@@ -29,7 +29,9 @@ namespace RegressionTests.Infrastructure
    [TestFixture]
    public class HttpFoundation : TestFixtureBase
    {
-      private const int RestPort = 11431;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 11431;
       private const int WebPort = 11432;
       private const string AdminPassword = "testar";
 
@@ -40,8 +42,7 @@ namespace RegressionTests.Infrastructure
       [OneTimeSetUp]
       public void HttpFoundationFixtureSetUp()
       {
-         IniFileSetting.Write("RestApiBindAddress", "127.0.0.1");
-         IniFileSetting.Write("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          IniFileSetting.Write("WebServicesBindAddress", "127.0.0.1");
          IniFileSetting.Write("WebServicesHttpPort", WebPort.ToString());
 
@@ -51,7 +52,7 @@ namespace RegressionTests.Infrastructure
       [OneTimeTearDown]
       public void HttpFoundationFixtureTearDown()
       {
-         IniFileSetting.Write("RestApiPort", "0");
+         RestListener.Stop();
          IniFileSetting.Write("WebServicesBindAddress", "0.0.0.0");
          IniFileSetting.Write("WebServicesHttpPort", "0");
 

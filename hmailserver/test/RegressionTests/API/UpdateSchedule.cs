@@ -32,7 +32,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class UpdateSchedule : TestFixtureBase
    {
-      private const int RestPort = 9104;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9104;
       private const string AdminPassword = "testar";
       private const string LatestPath = "/repos/Progressiverobot/hmailserver/releases/latest";
 
@@ -72,8 +74,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateAutoDownload", "0");
          WriteSetting("UpdateWindow", "");
          WriteSetting("UpdateBackupBeforeApply", "1");
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
          _application.Reinitialize();
       }
 
@@ -93,7 +94,7 @@ namespace RegressionTests.API
          WriteSetting("UpdateAutoDownload", "0");
          WriteSetting("UpdateWindow", "");
          WriteSetting("UpdateBackupBeforeApply", "1");
-         WriteSetting("RestApiPort", "0");
+         RestListener.Stop();
          _settings.Backup.Destination = _previousBackupDestination;
          _application.Reinitialize();
          if (outcomePending)

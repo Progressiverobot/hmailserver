@@ -38,7 +38,9 @@ namespace RegressionTests.API
       // Fixed loopback port for the API under test. The listener refuses to
       // run without TLS unless it is bound to 127.0.0.1, which is why this
       // test can speak plain HTTP to it.
-      private const int RestPort = 9098;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9098;
 
       // TestSetup.Authenticate() already expects this to be the administrator
       // password, and the REST API authenticates against the same credential.
@@ -135,8 +137,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          // Reinitialize (not Stop/Start): RestApiPort is cached in
          // IniFileSettings, which is only re-read by InitInstance().
@@ -155,7 +156,7 @@ namespace RegressionTests.API
          // delivery queue is empty when they start.
          TestSetup.DeleteMessagesInQueue();
 
-         WriteSetting("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 

@@ -36,7 +36,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class RestApiRules : TestFixtureBase
    {
-      private const int RestPort = 9121;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9121;
       private const string AdminPassword = "testar";
       private const string RulePrefix = "restrule-";
       private const string RouteDomain = "restrule-route.test";
@@ -67,8 +69,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          _application.Reinitialize();
 
@@ -103,7 +104,7 @@ namespace RegressionTests.API
          }
          finally
          {
-            WriteSetting("RestApiPort", "0");
+            RestListener.Stop();
             _application.Reinitialize();
          }
       }

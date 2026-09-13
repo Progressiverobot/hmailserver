@@ -28,7 +28,9 @@ namespace RegressionTests.API
    [TestFixture]
    public class RestApiQuarantineAndAliases : TestFixtureBase
    {
-      private const int RestPort = 9098;
+      // The port the listener answers on: this one on the Windows bench, the
+      // suite's own where RestListener finds one already on.
+      private static int RestPort = 9098;
       private const string AdminPassword = "testar";
 
       private void WriteSetting(string key, string value)
@@ -116,8 +118,7 @@ namespace RegressionTests.API
       {
          _settings.SetAdministratorPassword(AdminPassword);
 
-         WriteSetting("RestApiBindAddress", "127.0.0.1");
-         WriteSetting("RestApiPort", RestPort.ToString());
+         RestPort = RestListener.Start(RestPort);
 
          _application.Reinitialize();
 
@@ -128,7 +129,7 @@ namespace RegressionTests.API
       [TearDown]
       public void StopRestApi()
       {
-         WriteSetting("RestApiPort", "0");
+         RestListener.Stop();
          _application.Reinitialize();
       }
 
