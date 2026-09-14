@@ -467,6 +467,18 @@ namespace HM
       case IOOperation::BCTRead:
          {
             AsyncRead(operation->GetString());
+
+            // A write queued behind this read goes now. The rules above allow a
+            // send while a receive is in progress, but nothing else would start
+            // it: the next completion handler to run this queue is the read's,
+            // and when the peer is waiting for the very bytes queued here, that
+            // completion never comes. That is how an outbound BDAT chunk larger
+            // than one send buffer stalled (issue #261, 14 September 2026): the
+            // reply's read was armed as soon as the command had been queued, the
+            // chunk streamed a buffer at a time from OnDataSent, the second
+            // buffer was queued behind the read once the first had gone, and the
+            // remote sat waiting for it until its own timeout.
+            ProcessOperationQueue_(recurse_level + 1);
             break;
          }
       case IOOperation::BCTDelay:

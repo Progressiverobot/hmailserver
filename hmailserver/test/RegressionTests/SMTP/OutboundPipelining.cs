@@ -126,6 +126,79 @@ namespace RegressionTests.SMTP
          }
       }
 
+      // A body several send buffers long (the connection sends 60,000 bytes at a
+      // time): 3,000 lines of 74 bytes, and a last line to look for.
+      private const string LastLine = "The last line of a body larger than one send buffer.";
+
+      private static string LargeBody()
+      {
+         var body = new System.Text.StringBuilder();
+         for (int i = 0; i < 3000; i++)
+            body.Append("Line ").Append(i.ToString("D6")).Append(' ').Append('x', 60).Append("\r\n");
+         body.Append(LastLine);
+         return body.ToString();
+      }
+
+      private static void AssertTheWholeChunkArrived(SmtpServerSimulator server)
+      {
+         ClassicAssert.AreEqual(1, server.BdatCommands.Count,
+            "Exactly one BDAT chunk. Commands: " + string.Join(" | ", server.CommandsReceived));
+
+         Match bdat = Regex.Match(server.BdatCommands[0], @"^BDAT (\d+) LAST$");
+         ClassicAssert.IsTrue(bdat.Success, "Not the BDAT <size> LAST shape: " + server.BdatCommands[0]);
+
+         int declared = int.Parse(bdat.Groups[1].Value);
+         ClassicAssert.Greater(declared, 200000,
+            "The chunk must be several send buffers long, or this proves nothing.");
+         ClassicAssert.AreEqual(declared, server.MessageData.Length,
+            "The whole chunk must arrive, not the first send buffer of it (issue #261).");
+         StringAssert.Contains(LastLine, server.MessageData);
+
+         CustomAsserts.AssertRecipientsInDeliveryQueue(0);
+      }
+
+      [Test]
+      [Description("A message several send buffers long goes whole over BDAT while the pipelined envelope's replies arrive " +
+                   "(issue #261: the second buffer waited behind the reply's read, and the remote timed out)")]
+      public void ALargeBdatChunkIsSentWholeWhileTheEnvelopeRepliesArrive()
+      {
+         int port = TestSetup.GetNextFreePort();
+         using (var server = new SmtpServerSimulator(1, port))
+         {
+            server.AdvertisePipelining = true;
+            server.AdvertiseChunking = true;
+            server.AddRecipientResult(Results(Accepted(Remote)));
+            server.StartListen();
+
+            Deliver(port, LargeBody(), Remote);
+
+            server.WaitForCompletion();
+
+            ClassicAssert.IsTrue(server.EnvelopeArrivedPipelined, string.Join(" | ", server.CommandsReceived));
+            AssertTheWholeChunkArrived(server);
+         }
+      }
+
+      [Test]
+      [Description("The same chunk without PIPELINING: the reply's read is armed as soon as BDAT has been sent, and the buffers behind it still go")]
+      public void ALargeBdatChunkIsSentWholeWithoutPipelining()
+      {
+         int port = TestSetup.GetNextFreePort();
+         using (var server = new SmtpServerSimulator(1, port))
+         {
+            server.AdvertiseChunking = true;
+            server.AddRecipientResult(Results(Accepted(Remote)));
+            server.StartListen();
+
+            Deliver(port, LargeBody(), Remote);
+
+            server.WaitForCompletion();
+
+            ClassicAssert.IsFalse(server.EnvelopeArrivedPipelined, string.Join(" | ", server.CommandsReceived));
+            AssertTheWholeChunkArrived(server);
+         }
+      }
+
       [Test]
       [Description("With CHUNKING advertised the message goes as one BDAT ... LAST chunk: no 354, no dot-stuffing, and the declared size is the chunk's size")]
       public void TheMessageGoesAsOneBdatChunkWhenTheRemoteAdvertisesChunking()
