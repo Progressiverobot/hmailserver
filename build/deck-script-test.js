@@ -1,6 +1,7 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//
+
 // The Control Deck's script, executed. build/check-deck-script.py lifts the one
 // inline script out of hmailserver/installation/WebAdmin/index.html and hands
 // the page and the script here; this builds a small DOM from the markup,
