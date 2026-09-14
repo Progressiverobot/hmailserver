@@ -10,9 +10,9 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|
 | COM properties the desktop program writes | 330 |
 | of them writable over REST | 322 |
-| of them reachable from a Deck view | 250 |
+| of them reachable from a Deck view | 262 |
 | missing over REST | 8 |
-| over REST but not reached by any Deck view | 72 |
+| over REST but not reached by any Deck view | 60 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
@@ -33,7 +33,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties |
 |---|---|---|
 | Account | 23 | `ADDomain`, `ADUsername`, `AdminLevel`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
-| Cache | 9 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL`, `Enabled` |
 | DistributionList | 7 | `Active`, `Address`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSMTPAuth`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
@@ -41,12 +40,10 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Alias | 3 | `Active`, `Name`, `Value` |
 | BlockedSender | 3 | `Address`, `Description`, `Score` |
 | IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
-| Scripting | 2 | `Enabled`, `Language` |
 | BlockedAttachment | 2 | `Description`, `Wildcard` |
 | ServerMessage | 2 | `Name`, `Text` |
 | GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
 | DistributionListRecipient | 1 | `RecipientAddress` |
-| MessageIndexing | 1 | `Enabled` |
 
 ## Left out of the count
 
@@ -374,8 +371,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | - |
-| `Language` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | - |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | backup, settings |
+| `Language` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | backup, settings |
 
 ### DomainAlias
 
@@ -422,15 +419,15 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `AccountCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `AccountCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `AliasCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `AliasCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `DistributionListCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `DistributionListCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `DomainCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `DomainCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
-| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | - |
+| `AccountCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `AccountCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `AliasCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `AliasCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `DistributionListCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `DistributionListCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `DomainCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `DomainCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter) | backup, settings |
 
 ### BackupSettings
 
@@ -583,7 +580,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/indexing` (setter) | - |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/indexing` (setter) | backup, settings |
 
 ## Methods the desktop program invokes
 
@@ -742,18 +739,18 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/settings/antispam` | AntiSpam | `add_header_reason`, `add_header_spam`, `arc_filtering_enabled`, `arc_trusted_sealers`, `bypass_greylisting_on_mail_from_mx`, `bypass_greylisting_on_spf_success`, `check_host_in_helo`, `check_host_in_helo_score`, `check_mx_records`, `check_mx_records_score`, `check_ptr`, `check_ptr_score`, `dkim_verification_enabled`, `dkim_verification_failure_score`, `dmarc_enabled`, `dmarc_failure_score`, `greylisting_enabled`, `greylisting_final_delete`, `greylisting_initial_delay`, `greylisting_initial_delete`, `maximum_message_size_kb`, `prepend_subject`, `prepend_subject_text`, `spam_delete_threshold`, `spam_mark_threshold`, `spamassassin_enabled`, `spamassassin_host`, `spamassassin_merge_score`, `spamassassin_port`, `spamassassin_score`, `tarpit_count`, `tarpit_delay`, `use_spf`, `use_spf_score` | yes |
 | `PUT /api/v1/settings/antivirus` | AntiVirus | `action`, `attachment_blocking_enabled`, `clamav_enabled`, `clamav_host`, `clamav_port`, `clamwin_db_folder`, `clamwin_enabled`, `clamwin_executable`, `custom_scanner_enabled`, `custom_scanner_executable`, `custom_scanner_return_value`, `maximum_message_size_kb`, `notify_receiver`, `notify_sender` | yes |
 | `PUT /api/v1/settings/backup` | BackupSettings, Backup | `backup_domains`, `backup_messages`, `backup_settings`, `compress`, `destination` | yes |
-| `PUT /api/v1/settings/cache` | Cache | `account_cache_max_size_kb`, `account_cache_ttl`, `alias_cache_max_size_kb`, `alias_cache_ttl`, `distribution_list_cache_max_size_kb`, `distribution_list_cache_ttl`, `domain_cache_max_size_kb`, `domain_cache_ttl`, `enabled` | - |
-| `POST /api/v1/settings/cache/clear` | Cache | - | - |
-| `PUT /api/v1/settings/indexing` | MessageIndexing | `enabled` | - |
-| `POST /api/v1/settings/indexing/clear` | MessageIndexing | - | - |
-| `POST /api/v1/settings/indexing/index` | MessageIndexing | - | - |
+| `PUT /api/v1/settings/cache` | Cache | `account_cache_max_size_kb`, `account_cache_ttl`, `alias_cache_max_size_kb`, `alias_cache_ttl`, `distribution_list_cache_max_size_kb`, `distribution_list_cache_ttl`, `domain_cache_max_size_kb`, `domain_cache_ttl`, `enabled` | yes |
+| `POST /api/v1/settings/cache/clear` | Cache | - | yes |
+| `PUT /api/v1/settings/indexing` | MessageIndexing | `enabled` | yes |
+| `POST /api/v1/settings/indexing/clear` | MessageIndexing | - | yes |
+| `POST /api/v1/settings/indexing/index` | MessageIndexing | - | yes |
 | `PUT /api/v1/settings/ini/{name}` | - | `from`, `to`, `value` | - |
 | `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip` | yes |
 | `POST /api/v1/settings/logon-failures/clear` | - | - | - |
 | `PUT /api/v1/settings/messages/{name}` | ServerMessage | `text` | - |
-| `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | - |
-| `POST /api/v1/settings/scripting/check` | Scripting | - | - |
-| `POST /api/v1/settings/scripting/reload` | Scripting | - | - |
+| `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | yes |
+| `POST /api/v1/settings/scripting/check` | Scripting | - | yes |
+| `POST /api/v1/settings/scripting/reload` | Scripting | - | yes |
 | `POST /api/v1/sieve/evaluate` | - | `action`, `address`, `body`, `message`, `script` | - |
 | `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `reject_message`, `score` | - |
 | `PUT /api/v1/surbl-servers/{id}` | SURBLServer | `active`, `body`, `dns_host`, `domains`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
@@ -773,8 +770,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `fetch` | `GET /api/v1/accounts/{}/fetch-accounts`, `POST /api/v1/accounts/{}/fetch-accounts`, `DELETE /api/v1/accounts/{}/fetch-accounts/{}`, `PUT /api/v1/accounts/{}/fetch-accounts/{}`, `POST /api/v1/accounts/{}/fetch-accounts/{}/download`, `GET /api/v1/domains`, `GET /api/v1/domains/{}/accounts`, `GET /api/v1/openapi.json` |
 | `queue` | `GET /api/v1/queue`, `DELETE /api/v1/queue/{}`, `POST /api/v1/queue/{}/retry` |
 | `tlsa` | `GET /api/v1/tlsa` |
-| `settings` | `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `GET /api/v1/settings/logging`, `PUT /api/v1/settings/logging` |
-| `backup` | `GET /api/v1/backup`, `POST /api/v1/backup`, `GET /api/v1/openapi.json`, `PUT /api/v1/settings`, `PUT /api/v1/settings/antispam`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `PUT /api/v1/settings/logging` |
+| `settings` | `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `POST /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `POST /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `POST /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `POST /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `GET /api/v1/settings/cache`, `POST /api/v1/settings/cache`, `PUT /api/v1/settings/cache`, `GET /api/v1/settings/cache/clear`, `POST /api/v1/settings/cache/clear`, `PUT /api/v1/settings/cache/clear`, `GET /api/v1/settings/indexing`, `POST /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing`, `GET /api/v1/settings/indexing/clear`, `POST /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/clear`, `GET /api/v1/settings/indexing/index`, `POST /api/v1/settings/indexing/index`, `PUT /api/v1/settings/indexing/index`, `GET /api/v1/settings/logging`, `POST /api/v1/settings/logging`, `PUT /api/v1/settings/logging`, `GET /api/v1/settings/scripting`, `POST /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting`, `GET /api/v1/settings/scripting/check`, `POST /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/check`, `GET /api/v1/settings/scripting/reload`, `POST /api/v1/settings/scripting/reload`, `PUT /api/v1/settings/scripting/reload` |
+| `backup` | `GET /api/v1/backup`, `POST /api/v1/backup`, `GET /api/v1/openapi.json`, `PUT /api/v1/settings`, `PUT /api/v1/settings/antispam`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `PUT /api/v1/settings/cache`, `PUT /api/v1/settings/cache/clear`, `PUT /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/index`, `PUT /api/v1/settings/logging`, `PUT /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/reload` |
 | `rules` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `GET /api/v1/rules`, `POST /api/v1/rules`, `DELETE /api/v1/rules/{}`, `PUT /api/v1/rules/{}` |
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |

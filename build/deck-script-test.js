@@ -556,6 +556,36 @@ const SETTING_GROUPS = {
       },
       values: { clamav_enabled: false, clamav_host: 'localhost', clamav_port: 3310, action: 'delete_attachments', maximum_message_size_kb: 0 }
    },
+   // The three groups the Settings view gained on 14 September: the scripting
+   // switch and language, the cache's switch, ceilings, lives and counters
+   // (the counters read-only, as the table has them), and the indexing switch
+   // with its two counts.
+   '/api/v1/settings/scripting': {
+      props: {
+         enabled: { type: 'boolean', description: 'Whether the event handlers run at all.' },
+         language: { type: 'string', description: 'VBScript or JScript, the language the event handlers are written in; any other name is refused.' },
+         current_script_file: { type: 'string', description: 'The event-handler file the server is running, in the event directory.', readOnly: true }
+      },
+      values: { enabled: false, language: 'VBScript', current_script_file: '/var/lib/hmailserver/events/EventHandlers.vbs' }
+   },
+   '/api/v1/settings/cache': {
+      props: {
+         enabled: { type: 'boolean', description: 'Whether the domain, account, alias and distribution-list caches are used at all.' },
+         domain_cache_size_kb: { type: 'integer', description: 'What the domain cache holds now, in kilobytes.', readOnly: true },
+         domain_cache_max_size_kb: { type: 'integer', description: 'The domain cache\'s ceiling, in kilobytes. Held in memory only, as over COM: the built-in 10240 returns when the server starts.' },
+         domain_cache_ttl: { type: 'integer', description: 'Seconds a domain stays cached.' },
+         domain_hit_rate: { type: 'integer', description: 'Of the domain lookups since the cache was last cleared, the percentage the cache answered.', readOnly: true }
+      },
+      values: { enabled: true, domain_cache_size_kb: 12, domain_cache_max_size_kb: 10240, domain_cache_ttl: 3600, domain_hit_rate: 97 }
+   },
+   '/api/v1/settings/indexing': {
+      props: {
+         enabled: { type: 'boolean', description: 'Whether delivered messages are indexed for search.' },
+         total_indexed_count: { type: 'integer', description: 'How many messages the index holds.', readOnly: true },
+         total_message_count: { type: 'integer', description: 'How many delivered messages there are to index.', readOnly: true }
+      },
+      values: { enabled: true, total_indexed_count: 40, total_message_count: 45 }
+   },
    '/api/v1/settings/backup': {
       props: {
          destination: { type: 'string', description: 'The directory a backup is written to.' },
@@ -641,6 +671,14 @@ const spec = {
       },
       '/api/v1/accounts/{address}/fetch-accounts/{id}/download': { post: { summary: 'Collect from the remote mailbox now' } },
       '/api/v1/settings/backup': settingsPath('/api/v1/settings/backup'),
+      '/api/v1/settings/scripting': settingsPath('/api/v1/settings/scripting'),
+      '/api/v1/settings/scripting/reload': { post: { summary: 'Load the event-handler script again', description: 'What Scripting.Reload does over COM: the script file is read again and the handlers it defines take over from the next event.' } },
+      '/api/v1/settings/scripting/check': { post: { summary: 'Check the event-handler script\'s syntax', description: 'What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser\'s message otherwise. Nothing is changed.' } },
+      '/api/v1/settings/cache': settingsPath('/api/v1/settings/cache'),
+      '/api/v1/settings/cache/clear': { post: { summary: 'Empty the caches', description: 'What Settings.Cache.Clear does over COM: the domain, account, alias and distribution-list caches are emptied.' } },
+      '/api/v1/settings/indexing': settingsPath('/api/v1/settings/indexing'),
+      '/api/v1/settings/indexing/index': { post: { summary: 'Index the messages not yet indexed, now', description: 'What Settings.MessageIndexing.Index does over COM: the indexer runs at once rather than at its next tick; the answer does not wait for it.' } },
+      '/api/v1/settings/indexing/clear': { post: { summary: 'Empty the message index', description: 'What Settings.MessageIndexing.Clear does over COM: every indexed message\'s metadata, the full-text terms and the backfill cursor go.' } },
       '/api/v1/backup': {
          get: { summary: 'The backup manager\'s status text and the last lines of the backup log' },
          post: { summary: 'Start a backup with the configured settings', description: 'Runs on the maintenance queue; poll GET for the outcome.' }
@@ -673,6 +711,8 @@ const state = {
    fetcherDown: false,
    backup: { status: '', log: ['2026-09-13 02:00:00 Backup started.', '2026-09-13 02:00:09 Backup completed.'] },
    backupRunning: false,
+   scriptReloads: 0,
+   scriptProblem: '',
    ranges: [
       Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false }, RANGE_CREATE_DEFAULTS,
          { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
@@ -887,6 +927,17 @@ function answer(method, path, headers, raw) {
    }
 
    if (path === '/api/v1/tlsa') { return json(200, state.tlsa); }
+
+   // The verbs beside three of the groups.
+   if (method === 'POST' && path === '/api/v1/settings/scripting/reload') { state.scriptReloads += 1; return json(200, { reloaded: true }); }
+   if (method === 'POST' && path === '/api/v1/settings/scripting/check') { return json(200, { result: state.scriptProblem }); }
+   if (method === 'POST' && path === '/api/v1/settings/cache/clear') {
+      SETTING_GROUPS['/api/v1/settings/cache'].values.domain_cache_size_kb = 0;
+      SETTING_GROUPS['/api/v1/settings/cache'].values.domain_hit_rate = 0;
+      return json(200, { cleared: true });
+   }
+   if (method === 'POST' && path === '/api/v1/settings/indexing/index') { SETTING_GROUPS['/api/v1/settings/indexing'].values.total_indexed_count = 45; return json(200, { started: true }); }
+   if (method === 'POST' && path === '/api/v1/settings/indexing/clear') { SETTING_GROUPS['/api/v1/settings/indexing'].values.total_indexed_count = 0; return json(200, { cleared: true }); }
 
    if (path in SETTING_GROUPS) {
       const group = SETTING_GROUPS[path];
@@ -1533,8 +1584,9 @@ async function main() {
    // ---- settings, drawn from the OpenAPI document
    before = requests.length;
    await goTo('settings');
-   check('the settings view reads the four groups, and the document was read once for the whole session',
-      called(0, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging', '/api/v1/settings/antivirus'].every((p) => called(before, 'GET', p).length === 1),
+   check('the settings view reads the seven groups, and the document was read once for the whole session',
+      called(0, 'GET', '/api/v1/openapi.json').length === 1 &&
+      ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging', '/api/v1/settings/antivirus', '/api/v1/settings/scripting', '/api/v1/settings/cache', '/api/v1/settings/indexing'].every((p) => called(before, 'GET', p).length === 1),
       paths(before));
    check('a string is a text box with the value', document.getElementById('set_srv_hostname').type === 'text' && document.getElementById('set_srv_hostname').value === 'mail.example.com');
    check('an integer is a number box', document.getElementById('set_srv_max_message_size_kb').type === 'number' && document.getElementById('set_srv_max_message_size_kb').value === '10240');
@@ -1589,6 +1641,52 @@ async function main() {
    filter.value = '';
    filter.dispatchEvent(makeEvent('input'));
    check('and clearing it shows them again', document.getElementById('set_srv_hostname').closest('.fr').hidden === false);
+
+   // ---- the three groups with verbs beside them
+   check('the cache group draws its counters read-only and its ceiling and life as number boxes', document.getElementById('set_cache_domain_cache_size_kb') === null &&
+      document.getElementById('set_cache_domain_hit_rate') === null && content().textContent.indexOf('97') >= 0 &&
+      document.getElementById('set_cache_domain_cache_max_size_kb').type === 'number' && document.getElementById('set_cache_domain_cache_max_size_kb').value === '10240' &&
+      document.getElementById('set_cache_domain_cache_ttl').value === '3600' && document.getElementById('set_cache_enabled').checked === true);
+   check('the scripting and indexing groups are drawn with their switches and the read-only facts', document.getElementById('set_script_enabled').checked === false && document.getElementById('set_script_language').value === 'VBScript' &&
+      document.getElementById('set_script_current_script_file') === null && content().textContent.indexOf('EventHandlers.vbs') >= 0 &&
+      document.getElementById('set_index_enabled').checked === true && document.getElementById('set_index_total_indexed_count') === null && content().textContent.indexOf('40') >= 0);
+   check('each verb is a button worded from the route, with the route\'s sentence beside it', act('setpost', { group: 'script', path: '/api/v1/settings/scripting/reload' }) !== null &&
+      act('setpost', { group: 'script', path: '/api/v1/settings/scripting/check' }) !== null && act('setpost', { group: 'cache', path: '/api/v1/settings/cache/clear' }) !== null &&
+      act('setpost', { group: 'index', path: '/api/v1/settings/indexing/index' }) !== null && act('setpost', { group: 'index', path: '/api/v1/settings/indexing/clear' }) !== null &&
+      content().textContent.indexOf('What Settings.Cache.Clear does over COM') >= 0);
+   setValue('set_cache_domain_cache_max_size_kb', '2048');
+   before = requests.length;
+   click(act('setsave', { group: 'cache' }));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/settings/cache');
+   check('saving the cache group sends only the ceiling that changed, and never a counter', JSON.stringify(put) === '{"domain_cache_max_size_kb":2048}', JSON.stringify(put));
+   before = requests.length;
+   click(act('setpost', { group: 'cache', path: '/api/v1/settings/cache/clear' }));
+   await flush();
+   check('Empty the caches posts to the verb and re-reads the group, so the counters follow', called(before, 'POST', '/api/v1/settings/cache/clear').length === 1 && called(before, 'GET', '/api/v1/settings/cache').length === 1 &&
+      toastText() === 'Empty the caches: done' && $$('.fr').filter((r) => r.textContent.indexOf('domain_hit_rate') >= 0)[0].textContent.indexOf('97') < 0, toastText());
+   state.scriptProblem = 'Line 12: expected end of statement';
+   before = requests.length;
+   click(act('setpost', { group: 'script', path: '/api/v1/settings/scripting/check' }));
+   await flush();
+   check('Check the syntax shows the parser\'s message beside the group and changes nothing', called(before, 'POST', '/api/v1/settings/scripting/check').length === 1 &&
+      document.getElementById('err_set_script').textContent === 'Line 12: expected end of statement' && called(before, 'GET', /settings/).length === 0, document.getElementById('err_set_script').textContent);
+   state.scriptProblem = '';
+   click(act('setpost', { group: 'script', path: '/api/v1/settings/scripting/check' }));
+   await flush();
+   check('and says so when it parses', document.getElementById('err_set_script').textContent === '' && toastText() === 'The script parses.', toastText());
+   before = requests.length;
+   click(act('setpost', { group: 'script', path: '/api/v1/settings/scripting/reload' }));
+   await flush();
+   check('Reload the script posts to its route', called(before, 'POST', '/api/v1/settings/scripting/reload').length === 1 && state.scriptReloads === 1);
+   before = requests.length;
+   click(act('setpost', { group: 'index', path: '/api/v1/settings/indexing/index' }));
+   await flush();
+   check('Index now posts and the re-read count follows', called(before, 'POST', '/api/v1/settings/indexing/index').length === 1 && $$('.fr').filter((r) => r.textContent.indexOf('total_indexed_count') >= 0)[0].textContent.indexOf('45') >= 0);
+   nextRefusal = 'The index is being rebuilt already.';
+   click(act('setpost', { group: 'index', path: '/api/v1/settings/indexing/clear' }));
+   await flush();
+   check('a refused verb is the server\'s sentence beside its group', document.getElementById('err_set_index').textContent === 'The index is being rebuilt already.');
 
    // ---- backup: a settings group of its own, beside the manager's status
    before = requests.length;
