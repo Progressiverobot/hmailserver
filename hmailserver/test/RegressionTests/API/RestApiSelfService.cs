@@ -1242,6 +1242,315 @@ namespace RegressionTests.API
          StringAssert.DoesNotContain("Invoice", listed.body);
       }
 
+      // The search's answer for q, over every folder, asserted 200.
+      private string SearchBody(string q)
+      {
+         (int status, string body) hit = Http("GET", "/api/v1/me/search?q=" + Uri.EscapeDataString(q), UserHeader(UserPassword));
+         Assert.AreEqual(200, hit.status, "q=" + q + " Body: " + hit.body);
+         return hit.body;
+      }
+
+      [Test]
+      [Description("cc: narrows to messages naming the address or the name in Cc, in the search and in a folder listing; it does not read To")]
+      public void CcNarrowsToTheCopiedHeader()
+      {
+         string to = "To: " + Address + "\r\n";
+         SmtpClientSimulator.StaticSendRaw("alice@example.com", Address,
+            "From: alice@example.com\r\n" + to + "Cc: Dave Lister <dave@example.org>\r\nSubject: Copied to Dave\r\n\r\nDave is copied.\r\n");
+         SmtpClientSimulator.StaticSendRaw("alice@example.com", Address,
+            "From: alice@example.com\r\n" + to + "Subject: Nobody copied\r\n\r\nNobody is copied.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         string byAddress = SearchBody("cc:dave@example.org");
+         StringAssert.Contains("Copied to Dave", byAddress);
+         StringAssert.DoesNotContain("Nobody copied", byAddress);
+         string byName = SearchBody("cc:lister");
+         StringAssert.Contains("Copied to Dave", byName);
+         StringAssert.DoesNotContain("Nobody copied", byName);
+         string notTo = SearchBody("cc:" + Address);
+         StringAssert.DoesNotContain("Copied to Dave", notTo);
+         StringAssert.DoesNotContain("Nobody copied", notTo);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) listed = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("cc:dave"), UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("Copied to Dave", listed.body);
+         StringAssert.DoesNotContain("Nobody copied", listed.body);
+      }
+
+      [Test]
+      [Description("bcc: narrows to messages whose stored copy names the address or the name in Bcc - a sender's own copy, since a delivered message carries none")]
+      public void BccNarrowsToTheBlindCopyHeader()
+      {
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         string kept = "From: " + Address + "\r\nTo: alice@example.com\r\nBcc: Eve Hidden <eve@example.net>\r\nSubject: Blind copy kept\r\n\r\nSent with a blind copy.\r\n";
+         string plain = "From: " + Address + "\r\nTo: alice@example.com\r\nSubject: No blind copy\r\n\r\nSent to Alice alone.\r\n";
+         StringAssert.Contains("A1 OK", imap.SendSingleCommandWithLiteral("A1 APPEND INBOX {" + kept.Length + "}", kept));
+         StringAssert.Contains("A2 OK", imap.SendSingleCommandWithLiteral("A2 APPEND INBOX {" + plain.Length + "}", plain));
+         imap.Disconnect();
+
+         string byAddress = SearchBody("bcc:eve@example.net");
+         StringAssert.Contains("Blind copy kept", byAddress);
+         StringAssert.DoesNotContain("No blind copy", byAddress);
+         string byName = SearchBody("bcc:hidden");
+         StringAssert.Contains("Blind copy kept", byName);
+         StringAssert.DoesNotContain("No blind copy", byName);
+         string notTo = SearchBody("bcc:alice");
+         StringAssert.DoesNotContain("Blind copy kept", notTo);
+         StringAssert.DoesNotContain("No blind copy", notTo);
+      }
+
+      [Test]
+      [Description("filename: narrows to messages carrying an attachment whose file name contains the text - the attachments' names, not the words - and the message is read whole for it")]
+      public void FilenameNarrowsToAnAttachmentsName()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "No file", "Nothing attached.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         (int status, string body) report = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"With the report\",\"text\":\"See the report.\",\"attachments\":[{\"name\":\"Quarterly-Report.pdf\",\"type\":\"application/pdf\",\"data\":\"JVBERi0=\"}]}");
+         Assert.AreEqual(201, report.status, "Body: " + report.body);
+         (int status, string body) note = Http("POST", "/api/v1/me/messages", UserHeader(UserPassword),
+            "{\"to\":\"" + Address + "\",\"subject\":\"With a note\",\"text\":\"See the note.\",\"attachments\":[{\"name\":\"note.txt\",\"type\":\"text/plain\",\"data\":\"SGVsbG8=\"}]}");
+         Assert.AreEqual(201, note.status, "Body: " + note.body);
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         string byName = SearchBody("filename:report");
+         StringAssert.Contains("With the report", byName);
+         StringAssert.DoesNotContain("With a note", byName);
+         StringAssert.DoesNotContain("No file", byName);
+         string byExtension = SearchBody("filename:.txt");
+         StringAssert.Contains("With a note", byExtension);
+         StringAssert.DoesNotContain("With the report", byExtension);
+         string inTheTextOnly = SearchBody("filename:see");
+         StringAssert.DoesNotContain("With the report", inTheTextOnly);
+         StringAssert.DoesNotContain("With a note", inTheTextOnly);
+      }
+
+      [Test]
+      [Description("larger: narrows to messages over the size, given in bytes or with K, M or G; a value that is not a size is a word")]
+      public void LargerNarrowsBySize()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "A short one", "Short.");
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "A long one", string.Join("\r\n", Enumerable.Repeat("The quick brown fox jumps over the lazy dog.", 500)));
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         string overTenK = SearchBody("larger:10K");
+         StringAssert.Contains("A long one", overTenK);
+         StringAssert.DoesNotContain("A short one", overTenK);
+         string overFiveThousandBytes = SearchBody("larger:5000");
+         StringAssert.Contains("A long one", overFiveThousandBytes);
+         StringAssert.DoesNotContain("A short one", overFiveThousandBytes);
+         string overAMegabyte = SearchBody("larger:1M");
+         StringAssert.DoesNotContain("A long one", overAMegabyte);
+         StringAssert.DoesNotContain("A short one", overAMegabyte);
+         string notASize = SearchBody("larger:big");
+         StringAssert.DoesNotContain("A long one", notASize);
+         StringAssert.DoesNotContain("A short one", notASize);
+      }
+
+      [Test]
+      [Description("smaller: narrows to messages under the size, and with larger: bounds it on both sides")]
+      public void SmallerNarrowsBySize()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "A short one", "Short.");
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "A long one", string.Join("\r\n", Enumerable.Repeat("The quick brown fox jumps over the lazy dog.", 500)));
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+
+         string underTenK = SearchBody("smaller:10K");
+         StringAssert.Contains("A short one", underTenK);
+         StringAssert.DoesNotContain("A long one", underTenK);
+         string underAMegabyte = SearchBody("smaller:1M");
+         StringAssert.Contains("A short one", underAMegabyte);
+         StringAssert.Contains("A long one", underAMegabyte);
+         string between = SearchBody("larger:10K smaller:1M");
+         StringAssert.Contains("A long one", between);
+         StringAssert.DoesNotContain("A short one", between);
+      }
+
+      [Test]
+      [Description("older_than: narrows to messages stored longer ago than the span - 7d, 2w, 3m, 1y - on the clock before: reads; a value that is not a span is a word")]
+      public void OlderThanNarrowsByAge()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Fresh today", "Just in.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         string old = "From: alice@example.com\r\nTo: " + Address + "\r\nSubject: From years back\r\n\r\nStored long ago.\r\n";
+         StringAssert.Contains("A1 OK", imap.SendSingleCommandWithLiteral("A1 APPEND INBOX \"01-Jan-2020 10:00:00 +0000\" {" + old.Length + "}", old));
+         imap.Disconnect();
+
+         string aYear = SearchBody("older_than:1y");
+         StringAssert.Contains("From years back", aYear);
+         StringAssert.DoesNotContain("Fresh today", aYear);
+         string aWeek = SearchBody("older_than:1w");
+         StringAssert.Contains("From years back", aWeek);
+         StringAssert.DoesNotContain("Fresh today", aWeek);
+         string notASpan = SearchBody("older_than:ages");
+         StringAssert.DoesNotContain("From years back", notASpan);
+         StringAssert.DoesNotContain("Fresh today", notASpan);
+      }
+
+      [Test]
+      [Description("newer_than: narrows to messages stored within the span")]
+      public void NewerThanNarrowsByAge()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Fresh today", "Just in.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 1);
+         var imap = new ImapClientSimulator();
+         Assert.IsTrue(imap.ConnectAndLogon(Address, UserPassword));
+         string old = "From: alice@example.com\r\nTo: " + Address + "\r\nSubject: From years back\r\n\r\nStored long ago.\r\n";
+         StringAssert.Contains("A1 OK", imap.SendSingleCommandWithLiteral("A1 APPEND INBOX \"01-Jan-2020 10:00:00 +0000\" {" + old.Length + "}", old));
+         imap.Disconnect();
+
+         string aWeek = SearchBody("newer_than:7d");
+         StringAssert.Contains("Fresh today", aWeek);
+         StringAssert.DoesNotContain("From years back", aWeek);
+         string twoMonths = SearchBody("newer_than:2m");
+         StringAssert.Contains("Fresh today", twoMonths);
+         StringAssert.DoesNotContain("From years back", twoMonths);
+         string tenYears = SearchBody("newer_than:10y");
+         StringAssert.Contains("Fresh today", tenYears);
+         StringAssert.Contains("From years back", tenYears);
+      }
+
+      [Test]
+      [Description("is:muted narrows to messages carrying the $Muted keyword the page mutes a thread with, and turned round with a minus finds the rest")]
+      public void IsMutedNarrowsToTheKeyword()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Quiet thread", "Muted.");
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Loud thread", "Not muted.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long quiet = IdBefore(page.body, "\"subject\":\"Quiet thread\"");
+         (int status, string body) muted = Http("PUT", "/api/v1/me/messages/" + quiet + "/flags", UserHeader(UserPassword), "{\"keywords_add\":[\"$Muted\"]}");
+         Assert.AreEqual(200, muted.status, "Body: " + muted.body);
+
+         string found = SearchBody("is:muted");
+         StringAssert.Contains("Quiet thread", found);
+         StringAssert.DoesNotContain("Loud thread", found);
+         string notPinned = SearchBody("is:pinned");
+         StringAssert.DoesNotContain("Quiet thread", notPinned);
+         StringAssert.DoesNotContain("Loud thread", notPinned);
+         string turnedRound = SearchBody("-is:muted");
+         StringAssert.Contains("Loud thread", turnedRound);
+         StringAssert.DoesNotContain("Quiet thread", turnedRound);
+      }
+
+      [Test]
+      [Description("is:pinned narrows to messages carrying the $Pinned keyword the page pins a message with")]
+      public void IsPinnedNarrowsToTheKeyword()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Kept on top", "Pinned.");
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Left in place", "Not pinned.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 2);
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) page = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages", UserHeader(UserPassword));
+         long kept = IdBefore(page.body, "\"subject\":\"Kept on top\"");
+         (int status, string body) pinned = Http("PUT", "/api/v1/me/messages/" + kept + "/flags", UserHeader(UserPassword), "{\"keywords_add\":[\"$Pinned\"]}");
+         Assert.AreEqual(200, pinned.status, "Body: " + pinned.body);
+
+         string found = SearchBody("is:pinned");
+         StringAssert.Contains("Kept on top", found);
+         StringAssert.DoesNotContain("Left in place", found);
+         string notMuted = SearchBody("is:muted");
+         StringAssert.DoesNotContain("Kept on top", notMuted);
+         StringAssert.DoesNotContain("Left in place", notMuted);
+         (int status, string body) listed = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("is:pinned"), UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("Kept on top", listed.body);
+         StringAssert.DoesNotContain("Left in place", listed.body);
+      }
+
+      [Test]
+      [Description("category: narrows to the inbox tab the listing gives the message - primary, social, promotions, updates or forums - by the listing's own rule; a value that is not a tab is a word")]
+      public void CategoryNarrowsToTheTab()
+      {
+         string to = "To: " + Address + "\r\n";
+         SmtpClientSimulator.StaticSendRaw("friend@example.com", Address,
+            "From: friend@example.com\r\n" + to + "Subject: Lunch\r\n\r\nLunch on Thursday?\r\n");
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\n" + to + "Subject: Offers\r\nList-Unsubscribe: <mailto:leave@example.com>\r\nPrecedence: bulk\r\n\r\nThis week's offers.\r\n");
+         SmtpClientSimulator.StaticSendRaw("no-reply@example.com", Address,
+            "From: no-reply@example.com\r\n" + to + "Subject: Shipped\r\n\r\nYour order has shipped.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         string promotions = SearchBody("category:promotions");
+         StringAssert.Contains("Offers", promotions);
+         StringAssert.DoesNotContain("Lunch", promotions);
+         StringAssert.DoesNotContain("Shipped", promotions);
+         string updates = SearchBody("category:updates");
+         StringAssert.Contains("Shipped", updates);
+         StringAssert.DoesNotContain("Lunch", updates);
+         StringAssert.DoesNotContain("Offers", updates);
+         string primary = SearchBody("category:primary");
+         StringAssert.Contains("Lunch", primary);
+         StringAssert.DoesNotContain("Offers", primary);
+         StringAssert.DoesNotContain("Shipped", primary);
+         string notATab = SearchBody("category:spam");
+         StringAssert.DoesNotContain("Lunch", notATab);
+         StringAssert.DoesNotContain("Offers", notATab);
+         StringAssert.DoesNotContain("Shipped", notATab);
+      }
+
+      [Test]
+      [Description("A term after a minus - a word, a phrase or an operator - is one the message must not match; a word is looked for where a word is, so the body is read for it")]
+      public void AMinusTermExcludes()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Invoice March", "The March invoice.");
+         SmtpClientSimulator.StaticSend("bob@example.org", Address, "Invoice April", "The April invoice, overdue.");
+         SmtpClientSimulator.StaticSend("carol@example.net", Address, "Holiday plans", "Sun and sand.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         string notApril = SearchBody("invoice -april");
+         StringAssert.Contains("Invoice March", notApril);
+         StringAssert.DoesNotContain("Invoice April", notApril);
+         string notOverdue = SearchBody("invoice -overdue");
+         StringAssert.Contains("Invoice March", notOverdue);
+         StringAssert.DoesNotContain("Invoice April", notOverdue);
+         string notAPhrase = SearchBody("-\"sun and sand\"");
+         StringAssert.Contains("Invoice March", notAPhrase);
+         StringAssert.Contains("Invoice April", notAPhrase);
+         StringAssert.DoesNotContain("Holiday plans", notAPhrase);
+         string notFromBob = SearchBody("invoice -from:bob");
+         StringAssert.Contains("Invoice March", notFromBob);
+         StringAssert.DoesNotContain("Invoice April", notFromBob);
+      }
+
+      [Test]
+      [Description("OR between two terms - words, phrases or operators, and on through a OR b OR c - has one of them suffice; the terms beside the group must still all match, and or in small letters is a word")]
+      public void OrTakesEitherTerm()
+      {
+         SmtpClientSimulator.StaticSend("alice@example.com", Address, "Invoice March", "The March invoice.");
+         SmtpClientSimulator.StaticSend("bob@example.org", Address, "Invoice April", "The April invoice.");
+         SmtpClientSimulator.StaticSend("carol@example.net", Address, "Holiday plans", "Sun and sand.");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 3);
+
+         string either = SearchBody("from:alice OR from:carol");
+         StringAssert.Contains("Invoice March", either);
+         StringAssert.Contains("Holiday plans", either);
+         StringAssert.DoesNotContain("Invoice April", either);
+         string words = SearchBody("march OR april");
+         StringAssert.Contains("Invoice March", words);
+         StringAssert.Contains("Invoice April", words);
+         StringAssert.DoesNotContain("Holiday plans", words);
+         string three = SearchBody("march OR april OR holiday");
+         StringAssert.Contains("Invoice March", three);
+         StringAssert.Contains("Invoice April", three);
+         StringAssert.Contains("Holiday plans", three);
+         string narrowed = SearchBody("march OR holiday from:carol");
+         StringAssert.Contains("Holiday plans", narrowed);
+         StringAssert.DoesNotContain("Invoice March", narrowed);
+         StringAssert.DoesNotContain("Invoice April", narrowed);
+         string smallOr = SearchBody("march or april");
+         StringAssert.DoesNotContain("Invoice", smallOr);
+         StringAssert.DoesNotContain("Holiday", smallOr);
+      }
+
       [Test]
       [Description("An app password is made once with its clear text - the account's own password proving who asks - listed without it, signs in, may not mint or revoke another or end the account's sessions, and is removed")]
       public void AppPasswordsAreMadeListedAndRemoved()

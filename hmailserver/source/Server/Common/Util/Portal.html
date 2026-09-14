@@ -166,6 +166,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 #search-advanced .grid{display:grid;grid-template-columns:110px 1fr;gap:10px 12px;align-items:center}
 #search-advanced .grid label{margin:0;font-weight:400;color:var(--text-2)}
 #search-advanced .grid input[type=text],#search-advanced .grid select,#search-advanced .grid input[type=date]{width:100%}
+#search-advanced .grid .row{flex-wrap:nowrap}
+#search-advanced .grid .row select,#search-advanced .grid .row input[type=text]{width:auto;flex:1;min-width:0}
 #search-advanced .foot{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
 #search-advanced .foot .btn{margin:0}
 
@@ -590,7 +592,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div class="brand"><div class="logo">hM</div><div><b>hMailServer</b><small>My account</small></div></div>
 <form id="mail-search-form" class="search" role="search">
 <button class="iconbtn sm" id="search-go" type="submit" title="Search" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button>
-<input id="mail-search" type="search" maxlength="200" placeholder="Search mail" aria-label="Search mail" autocomplete="off" title="Words, &quot;quoted phrases&quot;, from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name">
+<input id="mail-search" type="search" maxlength="200" placeholder="Search mail" aria-label="Search mail" autocomplete="off" title="Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b">
 <div id="search-history" class="complete history" hidden>
 <div class="head"><span>Recent searches</span><button id="search-history-clear" type="button">Clear the list</button></div>
 <div id="search-history-list" role="list"></div>
@@ -608,6 +610,8 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <label for="adv-label">Label</label><input id="adv-label" type="text" autocomplete="off">
 <label for="adv-after">Date after</label><input id="adv-after" type="date">
 <label for="adv-before">Date before</label><input id="adv-before" type="date">
+<label for="adv-size">Size</label><div class="row"><select id="adv-size-kind"><option value="larger">Larger than</option><option value="smaller">Smaller than</option></select><input id="adv-size" type="text" placeholder="10M" autocomplete="off"></div>
+<label for="adv-age">Newer than</label><select id="adv-age"><option value="">Any time</option><option value="1d">1 day</option><option value="1w">1 week</option><option value="1m">1 month</option><option value="6m">6 months</option><option value="1y">1 year</option></select>
 <label for="adv-where">Search in</label><select id="adv-where"><option value="folder">This folder</option><option value="all">All folders</option></select>
 </div>
 <div class="row" style="margin-top:12px">

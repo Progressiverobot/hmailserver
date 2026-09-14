@@ -4005,6 +4005,9 @@
     if (el('adv-label').value.trim()) { parts.push('label:' + el('adv-label').value.trim()); }
     if (el('adv-after').value) { parts.push('after:' + el('adv-after').value); }
     if (el('adv-before').value) { parts.push('before:' + el('adv-before').value); }
+    var size = el('adv-size').value.replace(/\s+/g, '');
+    if (size) { parts.push((el('adv-size-kind').value === 'smaller' ? 'smaller:' : 'larger:') + size); }
+    if (el('adv-age').value) { parts.push('newer_than:' + el('adv-age').value); }
     if (el('adv-attachment').checked) { parts.push('has:attachment'); }
     if (el('adv-unread').checked) { parts.push('is:unread'); }
     if (el('adv-flagged').checked) { parts.push('is:flagged'); }

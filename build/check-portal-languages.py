@@ -39,7 +39,8 @@ GENERATOR = os.path.join(ROOT, "build", "generate-portal-languages.py")
 
 # What must survive translation, when the English has it.
 SURVIVORS = ["from:", "to:", "subject:", "has:attachment", "before:", "after:", "in:folder", "is:unread", "is:read",
-             "is:flagged", "is:unflagged", "is:answered", "label:name", "INBOX", "Ctrl+K", ".eml", "{first_name}",
+             "is:flagged", "is:unflagged", "is:answered", "label:name", "cc:", "bcc:", "filename:", "larger:", "smaller:",
+             "older_than:", "newer_than:", "is:muted", "is:pinned", "category:", "INBOX", "Ctrl+K", ".eml", "{first_name}",
              "{subject}", "{name}", "Sieve", "IMAP", "SMTP", "hMailServer"]
 
 
@@ -67,7 +68,8 @@ def page_keys():
 def tokens_of(s):
     found = set(re.findall(r"\{[A-Za-z0-9_]+\}", s))
     for survivor in SURVIVORS:
-        if survivor in s:
+        # An operator, not the tail of a word: "cc:" is not in "Bcc:".
+        if re.search(r"(?<![A-Za-z])" + re.escape(survivor), s):
             found.add(survivor)
     return found
 

@@ -44,24 +44,35 @@ Search operators
 
 The search box searches the folder shown; the options panel beside it (the
 sliders icon) builds the same syntax from fields - from, to, subject, words,
-label, dates, attachments, unread, starred - and can search every folder the
-account may read. Words must all be found; the order does not matter.
+label, dates, size, age, attachments, unread, starred - and can search every
+folder the account may read. Words must all be found; the order does not
+matter. A term may be turned round with a minus, or offered as one of several
+with `OR`.
 
 | Operator | What it matches |
 | --- | --- |
 | `word` | The word in the subject or the sender; failing those, anywhere in the message, which is then read whole (for a message small enough). Every word given must be found. |
 | `"quoted phrase"` | The words together, in that order. |
+| `-term` | What follows the minus - a word, a phrase or an operator - must not match: `invoice -overdue`, `-from:lists`. A word is looked for where a word is, so the message may be read for it. |
+| `a OR b` | One of the two must match, and so on through `a OR b OR c`; the terms around the group must still all match. `OR` in capitals - `or` is a word. |
 | `from:` | The sender's address or name. |
 | `to:` | A recipient's address or name, in To or Cc. |
+| `cc:` / `bcc:` | An address or name in that header. Bcc is only in the sender's own copy of a message. |
 | `subject:` | The subject. |
 | `has:attachment` | Messages carrying an attachment. |
+| `filename:` | Messages carrying an attachment whose file name contains the text; the message is read whole for it. |
+| `larger:` / `smaller:` | By size: bytes, or with `K`, `M` or `G` for multiples of 1024, as in `larger:10M`. |
 | `before:YYYY-MM-DD` | Messages dated before that day. |
 | `after:YYYY-MM-DD` | Messages dated after that day. |
+| `older_than:` / `newer_than:` | By age: `7d`, `2w`, `3m`, `1y`, against the same clock `before:` and `after:` read. |
 | `in:folder` | Messages in that folder (a whole path may be given). |
 | `is:unread` / `is:read` | By the seen flag. |
 | `is:flagged` / `is:unflagged` | By the flag. |
 | `is:answered` | Messages that have been replied to. |
+| `is:muted` / `is:pinned` | Muted threads and pinned messages (the `$Muted` and `$Pinned` keywords). |
 | `label:name` | Messages carrying that label (an IMAP keyword); several `label:` terms must all be present. |
+| `category:` | The inbox tab the message is listed under: `primary`, `social`, `promotions`, `updates` or `forums`. |
 
 Examples: `from:alice is:unread`, `subject:"quarterly report" has:attachment`,
-`in:Archive after:2026-01-01 label:travel`.
+`in:Archive after:2026-01-01 label:travel`, `from:alice OR from:bob -is:read`,
+`larger:5M older_than:1y filename:.zip`, `category:promotions newer_than:7d`.
