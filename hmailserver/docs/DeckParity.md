@@ -351,8 +351,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | AppPasswordsPanel | - | - |
-| `Name` | AppPasswordsPanel | - | - |
+| `Active` | AppPasswordsPanel | `POST /api/v1/accounts/{address}/app-passwords` (setter) | - |
+| `Name` | AppPasswordsPanel | `POST /api/v1/accounts/{address}/app-passwords` (setter) | - |
 
 ### Scripting
 

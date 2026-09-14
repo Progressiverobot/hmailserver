@@ -593,6 +593,7 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiPreferences.cpp" />
     <ClCompile Include="..\Common\Util\RestApiIdentities.cpp" />
     <ClCompile Include="..\Common\Util\RestApiBlockedAttachments.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiAccountResources.cpp" />
     <ClCompile Include="..\Common\Util\WebServicesServer.cpp" />
     <ClCompile Include="..\Common\AntiSpam\QuarantineStore.cpp" />
     <ClCompile Include="..\Common\Util\Totp.cpp" />

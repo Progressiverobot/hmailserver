@@ -317,6 +317,7 @@
     <Compile Include="..\RegressionTests\Stress\IMAP\ConcurrentConnectionsStressTests.cs" Link="Stress\IMAP\ConcurrentConnectionsStressTests.cs" />
     <Compile Include="..\RegressionTests\Stress\IMAP\NotificationThreadingStressTests.cs" Link="Stress\IMAP\NotificationThreadingStressTests.cs" />
     <Compile Include="..\RegressionTests\Stress\StabilitySanityTests.cs" Link="Stress\StabilitySanityTests.cs" />
+    <Compile Include="..\RegressionTests\API\RestApiAccountAppPasswords.cs" Link="API\RestApiAccountAppPasswords.cs" />
   </ItemGroup>
 
   <!-- The embedded messages, under the manifest names the Windows assembly gives

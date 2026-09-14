@@ -365,6 +365,12 @@ namespace HM
          RouteGreyListingWhiteAddressCreate,
          RouteGreyListingWhiteAddressUpdate,
          RouteGreyListingWhiteAddressDelete,
+         // An account's resources under its address (RestApiAccountResources.cpp):
+         // its app passwords. Each scoped to the address's domain in Authorize_
+         // as the account routes are.
+         RouteAccountAppPasswordList,
+         RouteAccountAppPasswordCreate,
+         RouteAccountAppPasswordDelete,
          RouteOpenApi
       };
 
@@ -885,6 +891,14 @@ namespace HM
       // in the same shape: one entry point for the four routes.
       HttpResponse HandleBlockedAttachments_(RouteKind kind, __int64 id, const AnsiString &requestBody);
       static AnsiString OpenApiBlockedAttachmentsPaths_();
+      // An account's resources under its address, administered
+      // (RestApiAccountResources.cpp): the app passwords. One entry point,
+      // the route saying which resource and which verb; the parser for what
+      // follows the address in the path, so that ParseRoute_ splits the
+      // address off once and this unit owns its own tails.
+      static bool ParseAccountResourceRoute_(const AnsiString &method, const AnsiString &tail, Route &route);
+      HttpResponse HandleAccountResources_(const Route &route, const AnsiString &requestBody);
+      static AnsiString OpenApiAccountResourcesPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);

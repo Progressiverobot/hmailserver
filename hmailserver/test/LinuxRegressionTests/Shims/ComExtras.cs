@@ -350,40 +350,73 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    Account.AppPasswords over GET, POST and DELETE
+   ///    /api/v1/accounts/{address}/app-passwords - the administrative routes,
+   ///    which take the administrator's credential every request of this run
+   ///    carries and not the account's password, as the COM collection does.
+   ///    Read from the server on every use, as the COM collection is.
+   /// </summary>
    public class AppPasswords
    {
+      private readonly Account _account;
+
+      internal AppPasswords(Account account)
+      {
+         _account = account;
+      }
+
+      internal string Base => "/api/v1/accounts/" + _account.Address + "/app-passwords";
+
+      internal static void RouteOrSkip()
+      {
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/app-passwords", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
+      }
+
+      private List<AppPassword> Load()
+      {
+         RouteOrSkip();
+         var answer = ServerApi.Get(Base).Expect(200, "GET " + Base);
+         return ServerApi.Array(answer, "app_passwords").Select(entry => AppPassword.From(this, entry)).ToList();
+      }
+
       public AppPassword Add()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
+         RouteOrSkip();
+         return new AppPassword(this);
       }
 
-      public int Count
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
-         }
-      }
+      public int Count => Load().Count;
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public AppPassword this[int index]
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords); }
-      }
+      public AppPassword this[int index] => Load()[index];
 
       public AppPassword get_Item(int index)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
+         return Load()[index];
+      }
+
+      public AppPassword get_ItemByDBID(long id)
+      {
+         return Load().FirstOrDefault(password => password.ID == id);
+      }
+
+      public void Delete(int index)
+      {
+         DeleteByDBID(Load()[index].ID);
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
+         RouteOrSkip();
+         ServerApi.Delete(Base + "/" + id).Expect(200, "DELETE " + Base + "/" + id);
       }
 
       public void Clear()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
+         foreach (var password in Load())
+            DeleteByDBID(password.ID);
       }
 
       public void Refresh()
@@ -391,27 +424,92 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    One app password. Over COM the secret is put on the unsaved object by
+   ///    Generate or SetPassword and the row is written by Save; the route does
+   ///    both in one POST, so the request is made where the secret is chosen and
+   ///    Save has nothing left to do. SetPassword's two checks - the floor of
+   ///    twelve characters and the password policy - are the route's own, so a
+   ///    refused secret is the COMException it is over COM and nothing is stored.
+   /// </summary>
    public class AppPassword
    {
-      public long ID { get; set; }
+      private readonly AppPasswords _owner;
+
+      internal AppPassword(AppPasswords owner)
+      {
+         _owner = owner;
+         Active = true;
+         CreatedTime = string.Empty;
+         LastUsedTime = string.Empty;
+      }
+
+      internal static AppPassword From(AppPasswords owner, JsonElement entry)
+      {
+         var password = new AppPassword(owner);
+         password.Read(entry);
+         return password;
+      }
+
+      private void Read(JsonElement entry)
+      {
+         ID = ServerApi.LongOf(entry, "id");
+         Name = ServerApi.StringOf(entry, "name");
+         CreatedTime = ServerApi.StringOf(entry, "created") ?? string.Empty;
+         LastUsedTime = ServerApi.StringOf(entry, "last_used") ?? string.Empty;
+         Active = ServerApi.FlagOf(entry, "active", true);
+      }
+
+      public long ID { get; private set; }
       public string Name { get; set; }
-      public string Password { get; set; }
-      public DateTime LastUsed { get; set; }
-      public DateTime CreatedTime { get; set; }
+      public string CreatedTime { get; private set; }
+      public string LastUsedTime { get; private set; }
+      public bool Active { get; set; }
+
+      // The POST: the name and the active flag, and the chosen secret when
+      // there is one - left out, the server generates one as Generate does.
+      private string Issue(string chosen)
+      {
+         AppPasswords.RouteOrSkip();
+
+         var body = "{\"name\":" + ServerApi.Quote(Name ?? string.Empty) +
+                    ",\"active\":" + (Active ? "true" : "false") +
+                    (chosen == null ? string.Empty : ",\"password\":" + ServerApi.Quote(chosen)) + "}";
+
+         var answer = ServerApi.Post(_owner.Base, body);
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+
+         answer.Expect(201, "POST " + _owner.Base);
+         Read(answer.Json.Value);
+         return ServerApi.StringOf(answer.Json.Value, "password");
+      }
 
       public string Generate()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoAppPasswords);
+         return Issue(null);
       }
 
       public void SetPassword(string password)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
+         Issue(password);
       }
 
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAppPasswords);
+         // Written already by Generate or SetPassword. A Save with neither is
+         // what the store refuses over COM too: a row with no hash.
+         if (ID != 0)
+            return;
+
+         throw new System.Runtime.InteropServices.COMException(
+            "An app password with no stored hash would authenticate nothing, and a row that cannot be used is a row nobody will think to delete.");
+      }
+
+      public void Delete()
+      {
+         if (ID != 0)
+            _owner.DeleteByDBID(ID);
       }
    }
 

@@ -3018,7 +3018,8 @@ namespace hMailServer
       /// <summary>The account's external accounts, under its address on the API.</summary>
       public FetchAccounts FetchAccounts => new FetchAccounts(this);
 
-      public AppPasswords AppPasswords { get; } = new AppPasswords();
+      /// <summary>The account's app passwords, under its address on the API.</summary>
+      public AppPasswords AppPasswords => new AppPasswords(this);
 
       public bool TOTPEnabled
       {

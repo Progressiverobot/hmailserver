@@ -1919,6 +1919,11 @@ namespace HM
          case RouteSessionDelete:
             return HandleSessionDelete_(caller);
 
+         case RouteAccountAppPasswordList:
+         case RouteAccountAppPasswordCreate:
+         case RouteAccountAppPasswordDelete:
+            return HandleAccountResources_(route, GetRequestBody_(request));
+
          case RouteOpenApi:
             return HandleOpenApi_();
 
@@ -2586,6 +2591,24 @@ namespace HM
             route.kind = method == "DELETE" ? RouteAccountDelete : method == "PUT" ? RouteAccountUpdate : RouteAccountGet;
             route.identifier = address;
             return;
+         }
+      }
+
+      // /api/v1/accounts/<address>/<resource>...: the account's resources
+      // administered under its address (RestApiAccountResources.cpp), which
+      // owns the tails; the address is split off here once.
+      if (path.StartsWith(accountsPrefix))
+      {
+         AnsiString rest = path.Mid(accountsPrefix.GetLength());
+         int slash = rest.Find("/");
+         if (slash > 0)
+         {
+            AnsiString address = rest.Mid(0, slash);
+            if (ParseAccountResourceRoute_(method, rest.Mid(slash), route))
+            {
+               route.identifier = address;
+               return;
+            }
          }
       }
 
@@ -3352,6 +3375,8 @@ namespace HM
       case RouteMeFolderDelete:
       case RouteSessionCreate:
       case RouteSessionDelete:
+      case RouteAccountAppPasswordCreate:
+      case RouteAccountAppPasswordDelete:
          return true;
 
       default:
@@ -3600,6 +3625,9 @@ namespace HM
       case RouteFetchAccountUpdate:
       case RouteFetchAccountDelete:
       case RouteFetchAccountDownload:
+      case RouteAccountAppPasswordList:
+      case RouteAccountAppPasswordCreate:
+      case RouteAccountAppPasswordDelete:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -10452,6 +10480,7 @@ namespace HM
       openApiJson += OpenApiAntiSpamListsPaths_();
       openApiJson += OpenApiBlockedAttachmentsPaths_();
       openApiJson += OpenApiMailboxPaths_();
+      openApiJson += OpenApiAccountResourcesPaths_();
       openApiJson += openApiTail;
 
       return BuildResponse_(200, openApiJson);

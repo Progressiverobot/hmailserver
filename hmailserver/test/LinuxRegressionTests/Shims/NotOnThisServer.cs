@@ -282,7 +282,7 @@ namespace RegressionTests.Shared
          "rebinds the REST listener - to another address, or with a certificate - and that listener is the one this suite is talking to";
 
       public const string NoAppPasswords =
-         "needs an account's application passwords, and no REST route carries them";
+         "needs an account's application passwords, and this server's REST API has no /api/v1/accounts/{address}/app-passwords (it arrived after 6.3.2)";
 
       public const string NoDirectoryLink =
          "needs an account linked to a directory (IsAD, ADUsername, ADDomain), and PUT /api/v1/accounts/{address} does not take them";
