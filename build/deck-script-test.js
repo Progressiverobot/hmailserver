@@ -462,6 +462,39 @@ const RANGE_CREATE_DEFAULTS = { allow_smtp: true, allow_imap: true, allow_pop3: 
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 function ipAddress(text) { return IPV4.test(text) || /^[0-9a-f:]+$/i.test(text) && text.indexOf(':') >= 0; }
 
+// The fetch account's schema and description as RestApiFetchAccounts.cpp
+// emits them; the update takes any subset of the same keys.
+const FETCH_PROPS = {
+   name: { type: 'string' }, server_address: { type: 'string' }, port: { type: 'integer' },
+   server_type: { type: 'string', enum: ['pop3', 'imap'] }, username: { type: 'string' }, password: { type: 'string', writeOnly: true },
+   enabled: { type: 'boolean' }, minutes_between_fetch: { type: 'integer' }, days_to_keep_messages: { type: 'integer' },
+   connection_security: { type: 'string', enum: ['none', 'starttls_optional', 'starttls_required', 'tls'] },
+   process_mime_recipients: { type: 'boolean' }, process_mime_date: { type: 'boolean' }, use_antispam: { type: 'boolean' }, use_antivirus: { type: 'boolean' },
+   enable_route_recipients: { type: 'boolean' }, mime_recipient_headers: { type: 'string' }, mirror_folders: { type: 'boolean' }
+};
+const FETCH_GET = 'The remote POP3 or IMAP mailboxes the server collects into this account - Account.FetchAccounts over COM. Each entry: id, name, server_address, port, server_type (pop3 or imap), username, enabled, minutes_between_fetch, days_to_keep_messages, connection_security, process_mime_recipients, process_mime_date, use_antispam, use_antivirus, enable_route_recipients, mime_recipient_headers, mirror_folders, locked (a collection is running now) and next_download_time. The remote password is never emitted. A key restricted to named domains reaches the accounts of those domains only.';
+const FETCH_POST = 'Body: name, server_address and port (required); server_type (pop3, the default, or imap), username, password (write-only), enabled (default true), minutes_between_fetch (default 30), days_to_keep_messages (default 0: delete after collecting; -1 keeps every message; for IMAP the remote INBOX is collected once by UID and left intact when this says so), connection_security (none, starttls_optional, starttls_required, tls; default none), process_mime_recipients, process_mime_date, use_antispam, use_antivirus, enable_route_recipients, mime_recipient_headers, mirror_folders. What InterfaceFetchAccounts.Add and Save do; the first collection is scheduled at once. Everything is checked before anything is saved: an unknown field, a value of the wrong type or a value out of range is a 400 naming it.';
+const FETCH_PUT = 'Body: any subset of the fields POST takes; a field left out keeps its value, and a password left out is kept. The same checks as POST, and nothing changes when one fails. What the setters and Save do over COM.';
+// A fetch account as FetchAccountJson emits it, at the constructor's defaults.
+function fetchRecord(id, name) {
+   return { id, name, server_address: '', port: 110, server_type: 'pop3', username: '', minutes_between_fetch: 30, days_to_keep_messages: 0,
+      connection_security: 'none', mime_recipient_headers: '', enabled: true, process_mime_recipients: false, process_mime_date: false,
+      use_antispam: true, use_antivirus: true, enable_route_recipients: false, mirror_folders: false, locked: false, next_download_time: '' };
+}
+// ApplyBody's checks, the first problem being the answer.
+function fetchProblem(parsed, creating) {
+   for (const key of Object.keys(parsed)) { if (!(key in FETCH_PROPS)) { return 'unknown field: ' + key; } }
+   const range = (key, low, high) => (key in parsed && (typeof parsed[key] !== 'number' || parsed[key] < low || parsed[key] > high)) ? key + ' must be a whole number between ' + low + ' and ' + high : null;
+   const problem = range('port', 1, 65535) || range('minutes_between_fetch', 1, 100000) || range('days_to_keep_messages', -1, 100000);
+   if (problem) { return problem; }
+   if ('server_type' in parsed && FETCH_PROPS.server_type.enum.indexOf(parsed.server_type) < 0) { return 'server_type must be pop3 or imap'; }
+   if ('connection_security' in parsed && FETCH_PROPS.connection_security.enum.indexOf(parsed.connection_security) < 0) { return 'connection_security must be one of none, starttls_optional, starttls_required, tls'; }
+   if (creating && !String(parsed.name || '').trim()) { return 'name is required'; }
+   if (creating && !String(parsed.server_address || '').trim()) { return 'server_address is required'; }
+   if (creating && !('port' in parsed)) { return 'port is required'; }
+   return null;
+}
+
 // A domain as DomainEntryJson_ emits it: every field, the relay password
 // never among them.
 function domainRecord(name, active, postmaster) {
@@ -511,6 +544,17 @@ const SETTING_GROUPS = {
          log_directory: { type: 'string', description: 'Where the log files are written.', readOnly: true }
       },
       values: { enabled: true, log_smtp: false, log_directory: '/var/log/hmailserver' }
+   },
+   '/api/v1/settings/backup': {
+      props: {
+         destination: { type: 'string', description: 'The directory a backup is written to.' },
+         backup_domains: { type: 'boolean', description: 'Whether the domains, accounts, aliases and lists are backed up.' },
+         backup_messages: { type: 'boolean', description: 'Whether the message files are backed up.' },
+         backup_settings: { type: 'boolean', description: 'Whether the server settings are backed up.' },
+         compress: { type: 'boolean', description: 'Whether the backup is compressed into one file.' },
+         log_file: { type: 'string', description: 'The full path of the backup log, beside the other logs.', readOnly: true }
+      },
+      values: { destination: '/var/backups/hmailserver', backup_domains: true, backup_messages: true, backup_settings: true, compress: false, log_file: '/var/log/hmailserver/hmailserver_backup.log' }
    }
 };
 const secrets = {};
@@ -573,6 +617,21 @@ const spec = {
       '/api/v1/ipranges/{id}': {
          put: { summary: 'Change an IP range', description: RANGE_PUT, requestBody: body({}) },
          delete: { summary: 'Delete an IP range' }
+      },
+      '/api/v1/accounts/{address}/fetch-accounts': {
+         get: { summary: 'The account\'s external (fetch) accounts', description: FETCH_GET },
+         post: { summary: 'Create an external (fetch) account', description: FETCH_POST, requestBody: body(FETCH_PROPS, ['name', 'server_address', 'port']) }
+      },
+      '/api/v1/accounts/{address}/fetch-accounts/{id}': {
+         get: { summary: 'One external (fetch) account' },
+         put: { summary: 'Change an external (fetch) account', description: FETCH_PUT, requestBody: body({}) },
+         delete: { summary: 'Delete an external (fetch) account' }
+      },
+      '/api/v1/accounts/{address}/fetch-accounts/{id}/download': { post: { summary: 'Collect from the remote mailbox now' } },
+      '/api/v1/settings/backup': settingsPath('/api/v1/settings/backup'),
+      '/api/v1/backup': {
+         get: { summary: 'The backup manager\'s status text and the last lines of the backup log' },
+         post: { summary: 'Start a backup with the configured settings', description: 'Runs on the maintenance queue; poll GET for the outcome.' }
       }
    }
 };
@@ -596,6 +655,12 @@ const state = {
       [HOSTILE]: [{ address: 'x@' + HOSTILE, active: true }],
       'second.example': []
    },
+   fetchAccounts: {
+      'anna@example.com': [Object.assign(fetchRecord(7, 'ISP POP3'), { server_address: 'pop.isp.example', port: 995, connection_security: 'tls', username: 'anna.isp', next_download_time: '2026-09-14 10:30:00' })]
+   },
+   fetcherDown: false,
+   backup: { status: '', log: ['2026-09-13 02:00:00 Backup started.', '2026-09-13 02:00:09 Backup completed.'] },
+   backupRunning: false,
    ranges: [
       Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false }, RANGE_CREATE_DEFAULTS,
          { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
@@ -728,6 +793,51 @@ function answer(method, path, headers, raw) {
       const address = segment(path, 4);
       Object.keys(state.accounts).forEach((d) => { state.accounts[d] = state.accounts[d].filter((a) => a.address !== address); });
       return json(200, { deleted: true });
+   }
+
+   if (/^\/api\/v1\/accounts\/[^/]+\/fetch-accounts(\/\d+(\/download)?)?$/.test(path)) {
+      const address = segment(path, 4);
+      if (!Object.keys(state.accounts).some((d) => state.accounts[d].some((a) => a.address === address))) { return json(404, { error: 'account not found' }); }
+      const list = state.fetchAccounts[address] = state.fetchAccounts[address] || [];
+      const parts = path.split('/');
+      if (parts.length === 6) {
+         if (method === 'GET') { return json(200, list); }
+         if (method === 'POST') {
+            const problem = fetchProblem(parsed, true);
+            if (problem) { return json(400, { error: problem }); }
+            const item = Object.assign(fetchRecord(nextId++, ''), parsed);
+            if ('password' in parsed) { secrets.fetch_password = parsed.password; delete item.password; }
+            list.push(item);
+            return json(201, item);
+         }
+      }
+      const id = Number(parts[6]);
+      const at = list.findIndex((x) => x.id === id);
+      if (at < 0) { return json(404, { error: 'fetch account not found' }); }
+      if (parts.length === 8 && method === 'POST') {
+         if (state.fetcherDown) { return json(503, { error: 'the external fetcher is not running' }); }
+         list[at].locked = true;
+         return json(202, { queued: true });
+      }
+      if (parts.length === 7 && method === 'GET') { return json(200, list[at]); }
+      if (parts.length === 7 && method === 'PUT') {
+         const problem = fetchProblem(parsed, false);
+         if (problem) { return json(400, { error: problem }); }
+         Object.assign(list[at], parsed);
+         if ('password' in parsed) { secrets.fetch_password = parsed.password; delete list[at].password; }
+         return json(200, list[at]);
+      }
+      if (parts.length === 7 && method === 'DELETE') { list.splice(at, 1); return json(200, { deleted: true }); }
+   }
+
+   if (path === '/api/v1/backup') {
+      if (method === 'GET') { return json(200, state.backup); }
+      if (method === 'POST') {
+         if (state.backupRunning) { return json(409, { error: 'the backup did not start', status: 'A backup is already running.' }); }
+         state.backupRunning = true;
+         state.backup.log.push('2026-09-14 11:00:00 Backup started.');
+         return json(202, { started: true });
+      }
    }
 
    if (path === '/api/v1/ipranges' && method === 'GET') { return json(200, state.ranges); }
@@ -1286,6 +1396,101 @@ async function main() {
    await flush();
    check('a refused delete is shown on its row', document.getElementById('err_range_1').textContent === 'The last range cannot be deleted.' && rows().length === 3);
 
+   // ---- fetch accounts, under the account that owns them
+   const fetchList = '/api/v1/accounts/anna%40example.com/fetch-accounts';
+   before = requests.length;
+   await goTo('fetch');
+   check('the fetch view reads the domains, the first domain\'s accounts and the first account\'s external accounts',
+      called(before, 'GET', '/api/v1/domains').length === 1 && called(before, 'GET', '/api/v1/domains/renamed.example/accounts').length === 1 && called(before, 'GET', fetchList).length === 1, paths(before));
+   check('the pickers hold the domains and the accounts, the first of each chosen', $('#fetchDomain').querySelectorAll('option').length === 3 && $('#fetchDomain').value === 'renamed.example' &&
+      $('#fetchAccount').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'anna@example.com,carla@example.com' && $('#fetchAccount').value === 'anna@example.com');
+   check('one row per external account with its server, security, schedule and state', rows().length === 1 && rows()[0].textContent.indexOf('pop.isp.example:995') >= 0 && rows()[0].textContent.indexOf('TLS') >= 0 &&
+      rows()[0].textContent.indexOf('30 min') >= 0 && rows()[0].textContent.indexOf('On') >= 0 && rows()[0].textContent.indexOf('2026-09-14 10:30:00') >= 0, rows().length ? rows()[0].textContent : 'no rows');
+   before = requests.length;
+   $('#fetchAccount').value = 'carla@example.com';
+   $('#fetchAccount').dispatchEvent(makeEvent('change'));
+   await flush();
+   check('choosing an account reads its external accounts', called(before, 'GET', '/api/v1/accounts/carla%40example.com/fetch-accounts').length === 1 && $('#fetchAccount').value === 'carla@example.com' &&
+      rows().length === 1 && rows()[0].textContent.indexOf('No external accounts') >= 0, paths(before));
+   before = requests.length;
+   $('#fetchDomain').value = 'second.example';
+   $('#fetchDomain').dispatchEvent(makeEvent('change'));
+   await flush();
+   check('choosing a domain reads its accounts, and one without any has nothing to add to', called(before, 'GET', '/api/v1/domains/second.example/accounts').length === 1 &&
+      $('#fetchAccount').querySelectorAll('option').length === 0 && content().querySelectorAll('button[data-act="fetchnew"]').length === 0 && called(before, 'GET', /fetch-accounts/).length === 0, paths(before));
+   $('#fetchDomain').value = 'renamed.example';
+   $('#fetchDomain').dispatchEvent(makeEvent('change'));
+   await flush();
+   check('back on a domain with accounts, its first is chosen again', $('#fetchAccount').value === 'anna@example.com' && rows().length === 1 && rows()[0].textContent.indexOf('ISP POP3') >= 0);
+   click(act('fetchnew'));
+   await flush();
+   const fetchHeadings = content().querySelectorAll('h2').map((h) => h.textContent.trim());
+   check('the editor names the account and is grouped', fetchHeadings[0].indexOf('anna@example.com') >= 0 && ['External account', 'Schedule', 'Downloaded mail'].every((g) => fetchHeadings.indexOf(g) >= 0) && fetchHeadings.indexOf('Other') < 0,
+      JSON.stringify(fetchHeadings));
+   const drawnFetch = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('fetch_') === 0).map((id) => id.slice(6)).sort();
+   check('every key of the schema has a control, and nothing else', JSON.stringify(drawnFetch) === JSON.stringify(Object.keys(FETCH_PROPS).sort()), JSON.stringify(drawnFetch));
+   check('a new one starts at the defaults the description states, read out of its sentence', document.getElementById('fetch_enabled').checked === true && document.getElementById('fetch_minutes_between_fetch').value === '30' &&
+      document.getElementById('fetch_days_to_keep_messages').value === '0' && document.getElementById('fetch_server_type').value === 'pop3' && document.getElementById('fetch_connection_security').value === 'none' &&
+      document.getElementById('fetch_port').value === '' && document.getElementById('fetch_name').value === '',
+      'minutes=' + document.getElementById('fetch_minutes_between_fetch').value + ' days=' + document.getElementById('fetch_days_to_keep_messages').value + ' type=' + document.getElementById('fetch_server_type').value + ' sec=' + document.getElementById('fetch_connection_security').value);
+   check('the three required keys are marked, the password box is write-only and empty, the port carries the desktop\'s advice',
+      ['name', 'server_address', 'port'].every((k) => document.getElementById('fetch_' + k).closest('.fr').textContent.indexOf('required') >= 0) &&
+      document.getElementById('fetch_username').closest('.fr').textContent.indexOf('required') < 0 &&
+      document.getElementById('fetch_password').type === 'password' && document.getElementById('fetch_password').value === '' && document.getElementById('fetch_password').closest('.fr').textContent.indexOf('write-only') >= 0 &&
+      document.getElementById('fetch_port').closest('.fr').textContent.indexOf('995') >= 0);
+   setValue('fetch_name', 'ISP mailbox');
+   setValue('fetch_server_address', 'mail.isp.example');
+   setValue('fetch_port', '110');
+   setValue('fetch_username', 'anna');
+   setValue('fetch_password', 'isp-secret');
+   setValue('fetch_connection_security', 'starttls_required');
+   before = requests.length;
+   click(act('fetchsave'));
+   await flush();
+   posted = lastBody(before, 'POST', fetchList);
+   check('saving a new one posts the form under the account, numbers as numbers and the password as typed', !!posted && posted.name === 'ISP mailbox' && posted.server_address === 'mail.isp.example' && posted.port === 110 &&
+      posted.minutes_between_fetch === 30 && posted.days_to_keep_messages === 0 && posted.password === 'isp-secret' && posted.connection_security === 'starttls_required' && posted.server_type === 'pop3' && posted.enabled === true,
+      JSON.stringify(posted));
+   check('and the re-read list has it, for the same account', called(before, 'GET', fetchList).length === 1 && rows().length === 2 && rows()[1].textContent.indexOf('ISP mailbox') >= 0 &&
+      rows()[1].textContent.indexOf('mail.isp.example:110') >= 0 && toastText() === 'External account saved', toastText());
+   click(act('fetchedit', { id: 7 }));
+   await flush();
+   check('editing shows its values and an empty password box', document.getElementById('fetch_name').value === 'ISP POP3' && document.getElementById('fetch_port').value === '995' &&
+      document.getElementById('fetch_connection_security').value === 'tls' && document.getElementById('fetch_password').value === '');
+   setValue('fetch_minutes_between_fetch', '0');
+   before = requests.length;
+   click(act('fetchsave'));
+   await flush();
+   check('a schedule the server refuses is its sentence in the editor, with the edits kept', called(before, 'PUT', fetchList + '/7').length === 1 &&
+      document.getElementById('err_fetchedit').textContent === 'minutes_between_fetch must be a whole number between 1 and 100000' && document.getElementById('fetch_minutes_between_fetch').value === '0');
+   setValue('fetch_minutes_between_fetch', '15');
+   before = requests.length;
+   click(act('fetchsave'));
+   await flush();
+   put = lastBody(before, 'PUT', fetchList + '/7');
+   check('saving an existing one PUTs the form by id without a password it was not given', !!put && put.minutes_between_fetch === 15 && put.name === 'ISP POP3' && !('password' in put), JSON.stringify(put));
+   check('and the list shows the change', rows()[0].textContent.indexOf('15 min') >= 0);
+   before = requests.length;
+   click(act('fetchnow', { id: 7 }));
+   await flush();
+   check('Collect now posts to the download route and re-reads, showing the collection under way', called(before, 'POST', fetchList + '/7/download').length === 1 && called(before, 'GET', fetchList).length === 1 &&
+      rows()[0].textContent.indexOf('collecting') >= 0 && toastText() === 'Collection queued', toastText());
+   state.fetcherDown = true;
+   click(act('fetchnow', { id: 7 }));
+   await flush();
+   check('a fetcher that is not running is the server\'s sentence on the row', document.getElementById('err_fetch_7').textContent === 'the external fetcher is not running');
+   state.fetcherDown = false;
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('fetchdel', { id: 7 }));
+   await flush();
+   check('deleting asks, naming it and what stays', called(before, 'DELETE', /fetch-accounts/).length === 0 && confirmations[confirmations.length - 1].indexOf('ISP POP3') >= 0 &&
+      confirmations[confirmations.length - 1].indexOf('already collected stays') >= 0, confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('fetchdel', { id: 7 }));
+   await flush();
+   check('yes deletes by id under the account and the re-read list is without it', called(before, 'DELETE', fetchList + '/7').length === 1 && rows().length === 1 && rows()[0].textContent.indexOf('ISP mailbox') >= 0);
+
    // ---- the delivery queue
    before = requests.length;
    await goTo('queue');
@@ -1372,6 +1577,40 @@ async function main() {
    filter.value = '';
    filter.dispatchEvent(makeEvent('input'));
    check('and clearing it shows them again', document.getElementById('set_srv_hostname').closest('.fr').hidden === false);
+
+   // ---- backup: a settings group of its own, beside the manager's status
+   before = requests.length;
+   await goTo('backup');
+   check('the backup view reads its group and the status', called(before, 'GET', '/api/v1/settings/backup').length === 1 && called(before, 'GET', '/api/v1/backup').length === 1 && $('#viewTitle').textContent === 'Backup', paths(before));
+   check('the settings are drawn from the document: the folder, the switches, the read-only log path', document.getElementById('set_backup_destination').value === '/var/backups/hmailserver' &&
+      document.getElementById('set_backup_backup_domains').checked === true && document.getElementById('set_backup_compress').checked === false && document.getElementById('set_backup_log_file') === null &&
+      content().textContent.indexOf('/var/log/hmailserver/hmailserver_backup.log') >= 0);
+   check('the status card shows the log\'s tail and no failure', $('#backupLog').textContent.indexOf('Backup completed.') >= 0 && content().textContent.indexOf('No failure recorded') >= 0);
+   check('and says where the schedule is', content().textContent.indexOf('ScheduledBackupTime') >= 0);
+   setValue('set_backup_destination', '/mnt/backup');
+   setChecked('set_backup_compress', true);
+   before = requests.length;
+   click(act('setsave', { group: 'backup' }));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/settings/backup');
+   check('saving the backup settings sends only what changed', JSON.stringify(put) === '{"destination":"/mnt/backup","compress":true}', JSON.stringify(put));
+   check('then re-reads the group on this view, not the settings view', called(before, 'GET', '/api/v1/settings/backup').length === 1 && called(before, 'GET', '/api/v1/settings').length === 0 &&
+      $('#viewTitle').textContent === 'Backup' && document.getElementById('set_backup_destination').value === '/mnt/backup' && document.getElementById('set_backup_compress').checked === true && toastText() === '2 settings saved', toastText());
+   before = requests.length;
+   click(act('backupstart'));
+   await flush();
+   check('Start backup now posts and re-reads the status', called(before, 'POST', '/api/v1/backup').length === 1 && called(before, 'GET', '/api/v1/backup').length === 1 && toastText() === 'Backup started' &&
+      $('#backupLog').textContent.indexOf('2026-09-14 11:00:00 Backup started.') >= 0, toastText());
+   click(act('backupstart'));
+   await flush();
+   check('a backup already running is the server\'s refusal beside the button', document.getElementById('err_backupstart').textContent === 'the backup did not start');
+   state.backupRunning = false;
+   state.backup.status = 'The destination directory could not be written.';
+   before = requests.length;
+   click(act('backupstatus'));
+   await flush();
+   check('Re-read status reads it again and shows the manager\'s last failure', called(before, 'GET', '/api/v1/backup').length === 1 && content().textContent.indexOf('The destination directory could not be written.') >= 0);
+   state.backup.status = '';
 
    // ---- rules
    before = requests.length;

@@ -182,9 +182,11 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="dash" class="on"><span class="ico">◈</span>Dashboard</button>
       <button data-view="domains"><span class="ico">⌂</span>Domains</button>
       <button data-view="ipranges"><span class="ico">⌗</span>IP ranges</button>
+      <button data-view="fetch"><span class="ico">⇓</span>Fetch accounts</button>
       <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
       <button data-view="settings"><span class="ico">⚙</span>Settings</button>
+      <button data-view="backup"><span class="ico">⛃</span>Backup</button>
       <button data-view="rules"><span class="ico">⚖</span>Rules</button>
       <button data-view="routes"><span class="ico">⇥</span>Routes</button>
       <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
@@ -225,7 +227,9 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[]};
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],
+  /* The fetch view's chosen domain and account, kept across its re-reads. */
+  fetch:{domain:"",address:"",accounts:[],items:[]}};
 
 /* The editor a view has open, if any: {kind, id, values} - id 0 is a new one. */
 let editing=null;
@@ -356,8 +360,8 @@ $("#nav").addEventListener("click",e=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   view=b.dataset.view;editing=null;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",
-  rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
+const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",fetch:"Fetch accounts",queue:"Delivery queue",tlsa:"DANE / TLSA",
+  settings:"Settings",backup:"Backup",rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
 
 async function render(silent){
   $("#viewTitle").textContent=titles[view];
@@ -365,9 +369,11 @@ async function render(silent){
     if(view==="dash")await renderDash(silent);
     else if(view==="domains")await renderDomains();
     else if(view==="ipranges")await renderIpRanges();
+    else if(view==="fetch")await renderFetch();
     else if(view==="queue")await renderQueue();
     else if(view==="tlsa")await renderTlsa();
     else if(view==="settings")await renderSettings();
+    else if(view==="backup")await renderBackup();
     else if(view==="rules")await renderRules();
     else if(view==="routes")await renderRoutes();
     else if(view==="certs")await renderCerts();
@@ -400,6 +406,13 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="rangeedit")openRange(Number(d.id));
   else if(d.act==="rangedel")deleteRange(Number(d.id),d.label);
   else if(d.act==="rangesave")saveRange();
+  else if(d.act==="fetchnew")openFetch(0);
+  else if(d.act==="fetchedit")openFetch(Number(d.id));
+  else if(d.act==="fetchdel")deleteFetch(Number(d.id),d.name);
+  else if(d.act==="fetchsave")saveFetch();
+  else if(d.act==="fetchnow")fetchNow(Number(d.id));
+  else if(d.act==="backupstart")startBackup();
+  else if(d.act==="backupstatus")render();
   else if(d.act==="add")addAccount(d.domain);
   else if(d.act==="del")delAccount(d.address,d.domain);
   else if(d.act==="retry")retryMsg(d.id);
@@ -433,6 +446,8 @@ $("#content").addEventListener("click",e=>{
 $("#content").addEventListener("change",e=>{
   const el=e.target.closest("[data-r]");if(!el)return;
   if(el.dataset.r==="crit-field"||el.dataset.r==="act-type"){readRuleForm();renderRuleEditor();}
+  else if(el.dataset.r==="fetch-domain"){cache.fetch.domain=el.value;cache.fetch.address="";render();}
+  else if(el.dataset.r==="fetch-account"){cache.fetch.address=el.value;render();}
 });
 /* Enter in a text box inside a row marked data-enter presses that row's
    button, so the small forms - a new account, a new domain, another name for
@@ -479,9 +494,14 @@ function documentedDefaults(path,method,props){
     // spelling but must not cross a bracket: without that, "addresses (an array
     // of e-mail addresses) and connection_security (default none)" hands the
     // address list the word "none".
-    const parenthesised=new RegExp("\\b"+key+"\\b[^.;()]{0,40}?\\(default ([^),]*)[),]").exec(text);
+    const parenthesised=new RegExp("\\b"+key+"\\b[^.;()]{0,40}?\\(default ([^),:]*)[),:]").exec(text);
+    // "connection_security (none, starttls_optional, starttls_required, tls;
+    // default none)" and "server_type (pop3, the default, or imap)": the
+    // words listed first, the default named among them.
+    const listed=new RegExp("\\b"+key+"\\b \\([^)]*;\\s*default ([^)]*)\\)").exec(text);
+    const theDefault=new RegExp("\\b"+key+"\\b \\(([A-Za-z0-9_.:]+), the default").exec(text);
     const prose=new RegExp("\\b"+key+"\\b (?:defaults to|to) ([A-Za-z0-9_.:]+)").exec(text);
-    const match=parenthesised||prose;
+    const match=parenthesised||listed||theDefault||prose;
     if(!match)return;
     const raw=String(match[1]).trim();
     const type=props[key].type||"string";
@@ -948,7 +968,9 @@ async function saveSettings(groupId){
   try{
     await api(st.path,{method:"PUT",body:JSON.stringify(body)});
     toast(Object.keys(body).length+" setting"+(Object.keys(body).length===1?"":"s")+" saved");
-    await renderSettings();
+    // The view that holds the group reads it back: Settings for its three,
+    // Backup for its own.
+    await render();
   }catch(e){
     if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
     setErr("err_set_"+groupId,e.message);
@@ -1477,6 +1499,170 @@ async function deleteRange(id,label){
   setErr("err_range_"+id,"");
   try{await api("/api/v1/ipranges/"+id,{method:"DELETE"});toast("IP range deleted");await render();}
   catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_range_"+id,e.message);}
+}
+
+/* ---------- Fetch accounts ----------
+   The external POP3 or IMAP mailboxes the server collects into an account:
+   Account.FetchAccounts over COM, /api/v1/accounts/{address}/fetch-accounts
+   here, under the address that scopes them. The view picks a domain and an
+   account first and lists that account's external accounts. The editor is
+   built from the schema of the create route, which types every key and gives
+   the two enumerations their words, in the order the desktop's external
+   accounts editor has them and with its captions; a new one starts at the
+   defaults the route's description states - enabled, every 30 minutes, keep 0
+   days, pop3, no security - read out of that sentence. */
+const FETCH_GROUPS=[
+  {title:"External account",keys:["enabled","name","server_type","server_address","port","connection_security","username","password"]},
+  {title:"Schedule",keys:["minutes_between_fetch","days_to_keep_messages"]},
+  {title:"Downloaded mail",keys:["use_antispam","use_antivirus","mirror_folders","process_mime_recipients","process_mime_date","enable_route_recipients","mime_recipient_headers"]}
+];
+const FETCH_HINTS={
+  enabled:"Collect from this mailbox on the schedule.",name:"A name for the external account.",
+  server_type:"POP3 or IMAP.",server_address:"The remote server.",
+  port:"Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143.",
+  connection_security:"How the connection to the remote server is secured.",username:"The user name at the remote server.",
+  password:"The password at the remote server. Accepted here and never shown.",
+  minutes_between_fetch:"Minutes between downloads.",
+  days_to_keep_messages:"Days to keep a message on the remote server; 0 deletes it after the download, -1 keeps every message.",
+  use_antispam:"Run anti-spam on downloaded mail.",use_antivirus:"Run anti-virus on downloaded mail.",
+  mirror_folders:"Mirror every folder (IMAP only): a migration, verbatim, with flags and dates, nothing delivered.",
+  process_mime_recipients:"Read the recipients from the message's headers and deliver to the local ones found there; when none are, to this account.",
+  process_mime_date:"Use the message's own Date header as its date rather than the time of the download.",
+  enable_route_recipients:"Also deliver to a recipient found in the headers when a route covers its domain.",
+  mime_recipient_headers:"The headers the recipients are read from, comma-separated."
+};
+function fetchProps(){
+  const props=properties("/api/v1/accounts/{address}/fetch-accounts","post"), out={};
+  Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&FETCH_HINTS[k])out[k].description=FETCH_HINTS[k];});
+  return out;
+}
+async function renderFetch(){
+  await loadSpec();
+  const f=cache.fetch;
+  cache.domains=asList(await api("/api/v1/domains"),"domains");
+  if(!cache.domains.some(d=>d.name===f.domain)){f.domain=cache.domains.length?cache.domains[0].name:"";f.address="";}
+  f.accounts=f.domain?asList(await api("/api/v1/domains/"+encodeURIComponent(f.domain)+"/accounts"),"accounts"):[];
+  if(!f.accounts.some(a=>a.address===f.address))f.address=f.accounts.length?f.accounts[0].address:"";
+  f.items=f.address?asList(await api("/api/v1/accounts/"+encodeURIComponent(f.address)+"/fetch-accounts"),"fetch_accounts"):[];
+  if(editing&&editing.kind==="fetch"){renderFetchEditor();return;}
+  const rows=f.items.map(x=>`
+    <tr><td><b>${escHtml(x.name)}</b><div class="hint muted">id ${escHtml(x.id)}</div></td>
+        <td>${x.enabled?'<span class="badge good">On</span>':'<span class="badge warn">Off</span>'}${x.locked?' <span class="badge info">collecting</span>':""}</td>
+        <td><code>${escHtml(x.server_address)}:${escHtml(x.port)}</code><div class="hint muted">${escHtml(humanise(x.server_type))}, ${escHtml(humanise(x.connection_security))}</div></td>
+        <td>${escHtml(x.username||"—")}</td>
+        <td>${escHtml(x.minutes_between_fetch)} min<div class="hint muted">keep ${escHtml(x.days_to_keep_messages)} days</div></td>
+        <td>${escHtml(x.next_download_time||"—")}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="fetchnow" data-id="${escHtml(x.id)}">Collect now</button>
+          <button class="btn ghost sm" data-act="fetchedit" data-id="${escHtml(x.id)}">Edit</button>
+          <button class="btn danger sm" data-act="fetchdel" data-id="${escHtml(x.id)}" data-name="${escHtml(x.name)}">Delete</button>
+          <div class="err" id="err_fetch_${escHtml(x.id)}"></div></td></tr>`).join("");
+  const domainChoices=cache.domains.map(d=>({value:d.name,label:d.name}));
+  const accountChoices=f.accounts.map(a=>({value:a.address,label:a.address}));
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/accounts/{address}/fetch-accounts","get").description||"")}</p>
+      <div class="row">
+        <label class="row" style="gap:7px">Domain <select id="fetchDomain" data-r="fetch-domain">${optionsHtml(domainChoices,f.domain)}</select></label>
+        <label class="row" style="gap:7px">Account <select id="fetchAccount" data-r="fetch-account">${optionsHtml(accountChoices,f.address)}</select></label>
+      </div>
+    </div>
+    <div class="sect"><h2>${f.address?escHtml(f.address)+" — external accounts":"No account to collect for"}</h2>
+      <div class="card flat">
+        <div class="tablewrap"><table><thead><tr><th>Name</th><th>State</th><th>Server</th><th>User name</th><th>Every</th><th>Next download</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="7" class="empty">'+(f.address?"No external accounts are collected for "+escHtml(f.address)+".":"Choose a domain that has accounts.")+'</td></tr>'}</tbody></table></div>
+        ${f.address?'<div class="row" style="margin-top:16px"><button class="btn" data-act="fetchnew">Add an external account</button></div>':""}
+      </div></div></div>`;
+}
+function openFetch(id){
+  const existing=cache.fetch.items.filter(x=>Number(x.id)===Number(id))[0];
+  const values=existing
+    ? JSON.parse(JSON.stringify(existing))
+    : documentedDefaults("/api/v1/accounts/{address}/fetch-accounts","post",fetchProps());
+  editing={kind:"fetch",id:Number(id)||0,values:values};
+  renderFetchEditor();
+}
+function renderFetchEditor(){
+  const props=fetchProps(), required=requiredOf("/api/v1/accounts/{address}/fetch-accounts","post");
+  const cards=groupedKeys(FETCH_GROUPS,props).map(g=>`
+    <div class="sect"><h2>${escHtml(g.title)}</h2>
+      <div class="card flat"><div class="form">${formHtml("fetch",pick(props,g.keys),editing.values,{required:required})}</div></div></div>`).join("");
+  const op=editing.id?operation("/api/v1/accounts/{address}/fetch-accounts/{id}","put"):operation("/api/v1/accounts/{address}/fetch-accounts","post");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All external accounts</button>
+    <div class="sect"><h2>${editing.id?"Edit external account "+escHtml(editing.id):"New external account"} for ${escHtml(cache.fetch.address)}</h2>
+      <div class="card flat"><p class="note">${escHtml(op.description||"")}</p></div></div>
+    ${cards}
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="fetchsave">Save external account</button>
+      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <div class="err" id="err_fetchedit"></div>
+    </div></div></div>`;
+}
+async function saveFetch(){
+  setErr("err_fetchedit","");
+  let body;
+  try{body=readForm("fetch",fetchProps(),{});}catch(e){setErr("err_fetchedit",e.message);return;}
+  const address=encodeURIComponent(cache.fetch.address);
+  try{
+    if(editing.id)await api("/api/v1/accounts/"+address+"/fetch-accounts/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/accounts/"+address+"/fetch-accounts",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast("External account saved");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetchedit",e.message);}
+}
+async function deleteFetch(id,name){
+  if(!confirm("Delete the external account "+name+"? Mail already collected stays."))return;
+  setErr("err_fetch_"+id,"");
+  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id,{method:"DELETE"});toast("External account deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetch_"+id,e.message);}
+}
+async function fetchNow(id){
+  setErr("err_fetch_"+id,"");
+  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id+"/download",{method:"POST"});toast("Collection queued");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetch_"+id,e.message);}
+}
+
+/* ---------- Backup ----------
+   The backup settings are a settings group like the three on the Settings
+   view - the form is the schema of PUT /api/v1/settings/backup, Save sends
+   what changed and reads the group back - beside the backup manager's status
+   and the tail of its log from GET /api/v1/backup, and the button that starts
+   a backup with those settings. The desktop page's other halves, the schedule
+   and a restore, are not on the API: the schedule is four keys of
+   hMailServer.ini, and the note says so. */
+async function renderBackup(){
+  await loadSpec();
+  const props=properties("/api/v1/settings/backup","put");
+  const values=await api("/api/v1/settings/backup");
+  settingsState.backup={path:"/api/v1/settings/backup",props:props,values:values};
+  let status=null,statusError="";
+  try{status=await api("/api/v1/backup");}catch(e){if(e.message==="auth")throw e;statusError=e.message;}
+  const log=status&&Array.isArray(status.log)?status.log:[];
+  $("#content").innerHTML=`<div class="view">
+    <div class="sect"><h2>Backup <code class="muted">PUT /api/v1/settings/backup</code></h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/settings/backup","put").description||"")}</p>
+        <div class="form">${formHtml("set_backup",props,values,{})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="setsave" data-group="backup">Save backup settings</button>
+          <button class="btn ghost" data-act="backupstart">Start backup now</button>
+          <div class="err" id="err_set_backup"></div>
+          <div class="err" id="err_backupstart"></div>
+        </div>
+        <p class="note" style="margin-top:12px">${escHtml(operation("/api/v1/backup","post").summary||"")}. ${escHtml(operation("/api/v1/backup","post").description||"")} The schedule is in hMailServer.ini (ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount, ScheduledBackupMaxAgeDays) and a restore is not on the API; both are the desktop Control Panel's.</p>
+      </div></div>
+    <div class="sect"><h2>Status <code class="muted">GET /api/v1/backup</code></h2>
+      <div class="card flat">
+        ${statusError?'<div class="err">'+escHtml(statusError)+'</div>':
+          '<p class="note">'+(status.status?escHtml(status.status):"No failure recorded.")+'</p>'+
+          '<pre id="backupLog">'+escHtml(log.join("\n")||"(the backup log is empty)")+'</pre>'}
+        <div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="backupstatus">Re-read status</button></div>
+      </div></div></div>`;
+}
+async function startBackup(){
+  setErr("err_backupstart","");
+  try{await api("/api/v1/backup",{method:"POST"});toast("Backup started");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_backupstart",e.message);}
 }
 
 /* ---------- Logs ---------- */

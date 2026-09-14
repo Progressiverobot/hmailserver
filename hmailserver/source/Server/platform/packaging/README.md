@@ -304,9 +304,11 @@ Turn on the REST API in the configuration (`RestApiPort`, and
 with `sudo systemctl reload hmailserver`, and open
 `http://127.0.0.1:<RestApiPort>/` in a browser: it signs in as `Administrator`
 with the password from step 4 and writes much of what the API can write -
-settings, rules, routes, accounts, certificates and listeners. Not aliases or
-distribution lists: those have routes and no page, so they are reached with
-`curl` or any other HTTP client until the Deck grows a view for them.
+settings, domains, IP ranges, accounts and the external mailboxes they collect
+from, rules, routes, certificates, listeners and the backup. Not account
+aliases or distribution lists: those have routes and no page, so they are
+reached with `curl` or any other HTTP client until the Deck grows a view for
+them.
 
 If that page instead says "Web administration page not installed", the file above
 is missing: the server falls back to a built-in stub whenever it is not there, and
