@@ -427,6 +427,11 @@ namespace RegressionTests.Infrastructure
          var expected = new List<string> { firstContent };
          expected.AddRange(contents);
 
+         // Recorded before the wait: a line the server writes late - after the
+         // mark below has moved past the first - is still this expected error,
+         // and TearDown must not read it as a new one.
+         LogHandler.ExpectError(expected);
+
          var deadline = DateTime.UtcNow.AddSeconds(10);
          string errorLog = string.Empty;
 
@@ -437,7 +442,6 @@ namespace RegressionTests.Infrastructure
             if (expected.All(errorLog.Contains))
             {
                LogHandler.MarkErrorLog();
-               LogHandler.ExpectError(expected);
                return;
             }
 

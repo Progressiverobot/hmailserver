@@ -89,6 +89,11 @@ namespace RegressionTests.Shared
       public void TearDown()
       {
          var testFailed = TestContext.CurrentContext.Result.Outcome.Status == NUnit.Framework.Interfaces.TestStatus.Failed;
+         // A body a shim skipped, or that ended inconclusive, keeps that outcome
+         // and its reason: the server may well have logged during the part that
+         // ran (the stress tests' HM5026 for a file the test deletes), and
+         // turning the skip into a failure hid the reason it stopped.
+         var testPassed = TestContext.CurrentContext.Result.Outcome.Status == NUnit.Framework.Interfaces.TestStatus.Passed;
 
          if (testFailed)
          {
@@ -118,8 +123,9 @@ namespace RegressionTests.Shared
             Console.WriteLine();
 
             // Only a test that passed is failed here: a failed test's server-side
-            // error is diagnostic output for that failure, not a second failure.
-            if (!testFailed)
+            // error is diagnostic output for that failure, not a second failure,
+            // and a skipped one keeps its skip.
+            if (testPassed)
                Assert.Fail("The server wrote to its ERROR log during a test that passed:" + Environment.NewLine +
                            string.Join(Environment.NewLine, newErrors));
          }
