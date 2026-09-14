@@ -12,6 +12,11 @@ schedule. Dates that *are* given belong to the outside world — runtime
 end-of-life, regulatory deadlines, a provider switching something off — and
 those are not negotiable.
 
+**The programme after 6.3.2 - the Linux control panel to parity, the webmail
+against Gmail and Outlook.com, calendar and tasks, the Linux package, measured
+quality - is planned in [Roadmap2.md](Roadmap2.md).** This file stays the record:
+a row moves from there to here when it is done, with the measure that says so.
+
 How to read this
 ----------------
 
