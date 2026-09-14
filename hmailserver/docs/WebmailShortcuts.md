@@ -23,6 +23,7 @@ use.
 | `Enter` or `o` | Open the message under the cursor - beside the list when the reading pane is on, in its place when it is off |
 | `u` or `Esc` | Back to the list |
 | `x` | Tick or untick the message under the cursor |
+| `Shift` + click, `Ctrl` + click | On a row or its box: Shift ticks every row from the last one clicked (or ticked with `x`) to this one; Ctrl (Cmd on a Mac) ticks or unticks the row without opening it |
 | `s` | Star or unstar the message |
 | `e` | Archive the message |
 | `!` | File the message as junk, or as not junk from the Junk folder |

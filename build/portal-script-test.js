@@ -926,6 +926,31 @@ async function main() {
    check('a mention only in the quoted lines is the other person\'s and is not questioned', confirms.length === 2 && called(beforeQuoted, 'POST', '/api/v1/me/messages'), confirms.length + ' questions');
    dismissAllToasts();
 
+   // ---- shift-click and ctrl-click in the list select; a plain click still opens
+   nav.children[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   check('the inbox is listed again, with the message that arrived', location.hash === '#/f/1' && rows().length === 4, location.hash + ' ' + rows().length + ' rows');
+   const boxOf = (row) => row.childNodes[0].childNodes[0];
+   const ticked = () => rows().filter((r) => r.className.indexOf('selected') >= 0).length;
+   const beforeCtrl = requests.length;
+   rows()[0].dispatchEvent(makeEvent('click', { ctrlKey: true }));
+   check('a ctrl-click ticks the row without opening it', document.getElementById('bulk-count').textContent === '1 selected' && location.hash === '#/f/1' && boxOf(rows()[0]).checked === true,
+      document.getElementById('bulk-count').textContent + ' ' + location.hash);
+   rows()[2].dispatchEvent(makeEvent('click', { shiftKey: true }));
+   check('a shift-click ticks every row from the last one clicked to this one', document.getElementById('bulk-count').textContent === '3 selected' && ticked() === 3 && boxOf(rows()[1]).checked === true,
+      document.getElementById('bulk-count').textContent + ', ' + ticked() + ' rows marked');
+   rows()[1].dispatchEvent(makeEvent('click', { ctrlKey: true }));
+   check('a ctrl-click on a ticked row unticks it', document.getElementById('bulk-count').textContent === '2 selected' && boxOf(rows()[1]).checked === false, document.getElementById('bulk-count').textContent);
+   boxOf(rows()[3]).checked = true;
+   boxOf(rows()[3]).dispatchEvent(makeEvent('click', { shiftKey: true }));
+   check('a shift-click on a box ticks the range from the last row clicked', document.getElementById('bulk-count').textContent === '4 selected' && ticked() === 4, document.getElementById('bulk-count').textContent);
+   check('and none of it opened a message or asked the server', location.hash === '#/f/1' && !called(beforeCtrl, 'GET', /\/messages\/\d+$/), JSON.stringify(since(beforeCtrl).map((r) => r.path)));
+   rows()[1].dispatchEvent(makeEvent('click'));
+   await flush();
+   check('a plain click still opens the message', location.hash === '#/m/103' && called(beforeCtrl, 'GET', '/api/v1/me/messages/103'), location.hash);
+   document.getElementById('bulk-clear').dispatchEvent(makeEvent('click'));
+   check('and the selection can be cleared', document.getElementById('bulk-bar').hidden === true && ticked() === 0, ticked() + ' rows marked');
+
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',

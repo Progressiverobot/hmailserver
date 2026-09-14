@@ -383,6 +383,35 @@
     listRows.forEach(function (r) { r.row.classList.toggle('selected', !!selected[r.id]); });
   };
   var clearSelection = function () { selected = {}; wholeFolder = false; renderBulk(); };
+  // Shift-click and Ctrl-click in the list, as the file manager has them: a
+  // shift-click ticks every row from the last row clicked to this one, a
+  // ctrl-click (Cmd on a Mac) ticks or unticks this one without opening it.
+  // The anchor is the row last clicked in any way, or ticked with x; when it
+  // is no longer in the listing, the cursor row stands in for it.
+  var anchorId = 0;
+  var tickEntry = function (entry, on) {
+    (entry.ids || [entry.id]).forEach(function (id) { selected[id] = on; });
+    if (entry.box) { entry.box.checked = on; }
+  };
+  var tickRange = function (entry, on) {
+    var to = listRows.indexOf(entry);
+    if (to < 0) { return; }
+    var from = -1;
+    listRows.forEach(function (r, i) { if (r.id === anchorId) { from = i; } });
+    if (from < 0) { from = cursor >= 0 ? cursor : to; }
+    for (var i = Math.min(from, to); i <= Math.max(from, to); i++) { tickEntry(listRows[i], on); }
+    renderBulk();
+  };
+  // True when the click selected rather than opened, and has been dealt with.
+  var selectingClick = function (event, entry) {
+    if (!event || !(event.shiftKey || event.ctrlKey || event.metaKey)) { anchorId = entry.id; return false; }
+    if (event.preventDefault) { event.preventDefault(); }
+    if (event.shiftKey) { tickRange(entry, true); return true; }
+    tickEntry(entry, !selected[entry.id]);
+    anchorId = entry.id;
+    renderBulk();
+    return true;
+  };
   var renderSearchNote = function (list, page) {
     if (!page.query) { return; }
     var note = 'Searched ' + page.scanned + ' message' + (page.scanned === 1 ? '' : 's') + ' for \'' + page.query + '\'.';
@@ -572,7 +601,7 @@
     rowGestures(row, entry);
     var cb = node('span', undefined, 'cb');
     var box = document.createElement('input'); box.type = 'checkbox'; box.checked = !!selected[m.id]; box.setAttribute('aria-label', t('Select'));
-    box.addEventListener('click', function (event) { event.stopPropagation(); selected[m.id] = box.checked; renderBulk(); });
+    box.addEventListener('click', function (event) { event.stopPropagation(); if (event.shiftKey) { tickRange(entry, box.checked); return; } selected[m.id] = box.checked; anchorId = m.id; renderBulk(); });
     cb.appendChild(box);
     row.appendChild(cb);
     entry.box = box;
@@ -601,7 +630,7 @@
     act('trash', t('Delete'), function () { fileRow(entry, 'delete'); });
     act(m.flags.seen ? 'mail' : 'mail-open', m.flags.seen ? t('Mark as unread') : t('Mark as read'), function () { markRows([entry], !m.flags.seen); });
     row.appendChild(acts);
-    row.addEventListener('click', function () { go('/m/' + m.id); });
+    row.addEventListener('click', function (event) { if (selectingClick(event, entry)) { return; } go('/m/' + m.id); });
     // On a touch screen: a swipe to the right archives, to the left deletes.
     var touchX = null;
     row.addEventListener('touchstart', function (e) { touchX = e.touches && e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
@@ -655,7 +684,7 @@
       var cb = node('span', undefined, 'cb');
       var box = document.createElement('input'); box.type = 'checkbox'; box.setAttribute('aria-label', t('Select the conversation'));
       box.checked = g.messages.every(function (m) { return !!selected[m.id]; });
-      box.addEventListener('click', function (event) { event.stopPropagation(); g.messages.forEach(function (m) { selected[m.id] = box.checked; }); renderBulk(); });
+      box.addEventListener('click', function (event) { event.stopPropagation(); if (event.shiftKey) { tickRange(entry, box.checked); return; } g.messages.forEach(function (m) { selected[m.id] = box.checked; }); anchorId = newest.id; renderBulk(); });
       cb.appendChild(box); row.appendChild(cb);
       entry.box = box;
       entry.star = starButton(newest);
@@ -693,7 +722,7 @@
         listRows.forEach(function (r, i) { if (r.toggle && r.id === newest.id) { setCursor(i, true); } });
       };
       count.addEventListener('click', function (event) { event.stopPropagation(); toggle(); });
-      row.addEventListener('click', function () { go('/m/' + newest.id); });
+      row.addEventListener('click', function (event) { if (selectingClick(event, entry)) { return; } go('/m/' + newest.id); });
       entry.toggle = toggle;
       listRows.push(entry);
       list.appendChild(row);
@@ -3074,7 +3103,7 @@
     else if (event.key === '!' && cursor >= 0) { fileRow(listRows[cursor], junkTargetFor(state.folderId)); event.preventDefault(); }
     else if (event.key === '#' && cursor >= 0) { fileRow(listRows[cursor], 'delete'); event.preventDefault(); }
     else if (event.key === 'm' && cursor >= 0) { muteThread(listRows[cursor], !isMuted(listRows[cursor].m)); event.preventDefault(); }
-    else if (event.key === 'x' && cursor >= 0) { var r = listRows[cursor]; r.box.checked = !r.box.checked; (r.ids || [r.id]).forEach(function (id) { selected[id] = r.box.checked; }); renderBulk(); event.preventDefault(); }
+    else if (event.key === 'x' && cursor >= 0) { var r = listRows[cursor]; r.box.checked = !r.box.checked; (r.ids || [r.id]).forEach(function (id) { selected[id] = r.box.checked; }); anchorId = r.id; renderBulk(); event.preventDefault(); }
   });
   window.addEventListener('hashchange', route);
   // Registered after the router's own listener - listeners run in the
