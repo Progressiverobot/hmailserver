@@ -379,7 +379,7 @@ namespace RegressionTests.API
          // Fails the way the real one did on 14 September 2026 - exit code 5, and a
          // log in Inno Setup's shape saying which file it could not replace and why.
          _loud = Compile(directory, "loud",
-            @"foreach (string a in args) if (a.StartsWith(""/LOG="")) File.WriteAllText(a.Substring(5).Trim('""'), ""2026-09-14 01:38:20.001   Dest filename: C:\Program Files\hMailServer\ControlPanel\hMailCP.exe\r\n2026-09-14 01:38:20.002   Message box (Abort/Retry/Ignore):\r\n   C:\Program Files\hMailServer\ControlPanel\hMailCP.exe\r\n\r\nAn error occurred while trying to replace the existing file:\r\nDeleteFile failed; code 32.\r\nThe process cannot access the file because it is being used by another process.\r\n2026-09-14 01:38:20.003   User chose Abort.\r\n"");", 5);
+            @"foreach (string a in args) if (a.StartsWith(""/LOG="")) File.WriteAllText(a.Substring(5).Trim('""'), ""2026-09-14 01:38:20.001   Dest filename: C:\\Program Files\\hMailServer\\ControlPanel\\hMailCP.exe\r\n2026-09-14 01:38:20.002   Message box (Abort/Retry/Ignore):\r\n   C:\\Program Files\\hMailServer\\ControlPanel\\hMailCP.exe\r\n\r\nAn error occurred while trying to replace the existing file:\r\nDeleteFile failed; code 32.\r\nThe process cannot access the file because it is being used by another process.\r\n2026-09-14 01:38:20.003   User chose Abort.\r\n"");", 5);
          // Runs as the service account, so it can do what the suite cannot: age the
          // token file, which only SYSTEM, Administrators and that account may touch.
          _ager = Compile(directory, "ager",
