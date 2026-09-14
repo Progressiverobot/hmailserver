@@ -7,6 +7,7 @@
 #include "SQLCommand.h"
 
 #include "DatabaseSettings.h"
+#include "PGConnection.h"
 #include "../Util/VariantDateTime.h"
 #include "../Util/Time.h"
 
@@ -567,10 +568,15 @@ namespace HM
       what it is not is byte-faithful. On a PostgreSQL server with
       standard_conforming_strings on (the default since 9.1) and on a MySQL
       server running with NO_BACKSLASH_ESCAPES, a backslash is an ordinary
-      character and the value is stored with the backslash doubled. Making that
-      right means asking the connection what it does rather than the ini file
-      (PQparameterStatus / mysql_real_escape_string), which is a change to the
-      DALConnection interface and is deliberately not done here.
+      character and the value is stored with the backslash doubled. For
+      PostgreSQL that is put right by asking the connection rather than the ini
+      file: PGConnection reads standard_conforming_strings from the server when
+      a connection comes up (PQparameterStatus), and the backslash is doubled
+      only when the server says it escapes - which is how the hosted Linux run
+      of 14 September 2026 found a domain's key-file path, C:\keys\next.pem,
+      read back with every backslash doubled. MySQL under NO_BACKSLASH_ESCAPES
+      is still not asked (mysql_real_escape_string would be the way), and is
+      still doubled.
    */
    String
    SQLStatement::Escape(const String &input)
@@ -581,7 +587,8 @@ namespace HM
 
       HM::DatabaseSettings::SQLDBType iType = IniFileSettings::Instance()->GetDatabaseType();
 
-      if (iType == DatabaseSettings::TypeMYSQLServer || iType == DatabaseSettings::TypePGServer)
+      if (iType == DatabaseSettings::TypeMYSQLServer ||
+          (iType == DatabaseSettings::TypePGServer && !PGConnection::StandardConformingStrings()))
          sRetVal.Replace(_T("\\"), _T("\\\\"));
 
       return sRetVal;

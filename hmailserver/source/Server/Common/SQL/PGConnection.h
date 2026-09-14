@@ -5,6 +5,7 @@
 #pragma once
 
 #include <libpq-fe.h>
+#include <atomic>
 
 #include "DALConnection.h"
 
@@ -25,6 +26,15 @@ namespace HM
       PGconn *GetConnection() const;
 
       virtual bool GetSupportsCommandParameters() const {return false; }
+
+      // Whether the server treats a backslash in a string literal as an
+      // ordinary character (standard_conforming_strings on, the default since
+      // 9.1) - read from the server's own answer when a connection comes up,
+      // and what decides whether a backslash is doubled on the way in. False
+      // until a connection has said otherwise, since not doubling on a server
+      // that does escape would let a trailing backslash swallow the closing
+      // quote.
+      static bool StandardConformingStrings();
       virtual void OnConnected();
 
       virtual bool BeginTransaction(String &sErrorMessage);
@@ -73,6 +83,8 @@ namespace HM
 
   
       PGconn *dbconn_;
+
+      static std::atomic<bool> standard_conforming_strings_;
 
       bool is_connected_;
    };

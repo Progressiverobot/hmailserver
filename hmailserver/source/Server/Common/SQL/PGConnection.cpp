@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "PGConnection.h"
+#include <cstring>
 #include "PGRecordset.h"
 #include "DatabaseSettings.h"
 #include "../Util/Unicode.h"
@@ -111,6 +112,13 @@ namespace HM
          }
 
          is_connected_ = true;
+
+         // The server says whether a backslash in a literal is an ordinary
+         // character; every string escaped from here on follows its answer.
+         // A server that does not report it (none since 8.2) is taken to
+         // escape, the safe reading.
+         const char *conforming = PQparameterStatus(dbconn_, "standard_conforming_strings");
+         standard_conforming_strings_ = (conforming != nullptr && strcmp(conforming, "on") == 0);
 
          // statement_timeout is a session setting and this session has just been
          // created, so it starts at whatever postgresql.conf says - normally no
@@ -386,11 +394,25 @@ namespace HM
       return recordset;
    }
 
+   std::atomic<bool> PGConnection::standard_conforming_strings_(false);
+
+   bool
+   PGConnection::StandardConformingStrings()
+   {
+      return standard_conforming_strings_;
+   }
+
    void
    PGConnection::EscapeString(String &sInput)
    {
       sInput.Replace(_T("'"), _T("''"));
-      sInput.Replace(_T("\\"), _T("\\\\"));
+
+      // A backslash is doubled only where the server would otherwise read it
+      // as an escape; with standard_conforming_strings on, doubling it stored
+      // it doubled - every Windows path in a setting, every backslash in a
+      // signature or a rule, on PostgreSQL, until 14 September 2026.
+      if (!StandardConformingStrings())
+         sInput.Replace(_T("\\"), _T("\\\\"));
    }
 
    std::shared_ptr<IMacroExpander> 
