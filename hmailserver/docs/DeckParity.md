@@ -9,10 +9,10 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 306 |
+| of them writable over REST | 314 |
 | of them reachable from a Deck view | 248 |
-| missing over REST | 29 |
-| over REST but not reached by any Deck view | 58 |
+| missing over REST | 21 |
+| over REST but not reached by any Deck view | 66 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
 | REST routes (path and method) | 191, 88 of them writes |
@@ -22,7 +22,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
-| Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
 | IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
 | SecurityRange | 2 | `Expires`, `ExpiresTime` |
 | AppPassword | 2 | `Active`, `Name` |
@@ -42,6 +41,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties |
 |---|---|---|
 | Account | 23 | `ADDomain`, `ADUsername`, `AdminLevel`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
+| Cache | 9 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL`, `Enabled` |
 | DistributionList | 7 | `Active`, `Address`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSMTPAuth`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
@@ -50,7 +50,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | BlockedSender | 3 | `Address`, `Description`, `Score` |
 | IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | Scripting | 2 | `Enabled`, `Language` |
-| Cache | 1 | `Enabled` |
 | ServerMessage | 1 | `Text` |
 | MessageIndexing | 1 | `Enabled` |
 
@@ -419,14 +418,14 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `AccountCacheMaxSizeKb` | ServerSettingsView | - | - |
-| `AccountCacheTTL` | ServerSettingsView | - | - |
-| `AliasCacheMaxSizeKb` | ServerSettingsView | - | - |
-| `AliasCacheTTL` | ServerSettingsView | - | - |
-| `DistributionListCacheMaxSizeKb` | ServerSettingsView | - | - |
-| `DistributionListCacheTTL` | ServerSettingsView | - | - |
-| `DomainCacheMaxSizeKb` | ServerSettingsView | - | - |
-| `DomainCacheTTL` | ServerSettingsView | - | - |
+| `AccountCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `AccountCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `AliasCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `AliasCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `DistributionListCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `DistributionListCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `DomainCacheMaxSizeKb` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
+| `DomainCacheTTL` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown) | - |
 | `Enabled` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown)<br>`PUT /api/v1/settings/indexing` (name, scope unknown) | - |
 
 ### BackupSettings
@@ -742,7 +741,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/settings/antispam` | AntiSpam | `add_header_reason`, `add_header_spam`, `arc_filtering_enabled`, `arc_trusted_sealers`, `bypass_greylisting_on_mail_from_mx`, `bypass_greylisting_on_spf_success`, `check_host_in_helo`, `check_host_in_helo_score`, `check_mx_records`, `check_mx_records_score`, `check_ptr`, `check_ptr_score`, `dkim_verification_enabled`, `dkim_verification_failure_score`, `dmarc_enabled`, `dmarc_failure_score`, `greylisting_enabled`, `greylisting_final_delete`, `greylisting_initial_delay`, `greylisting_initial_delete`, `maximum_message_size_kb`, `prepend_subject`, `prepend_subject_text`, `spam_delete_threshold`, `spam_mark_threshold`, `spamassassin_enabled`, `spamassassin_host`, `spamassassin_merge_score`, `spamassassin_port`, `spamassassin_score`, `tarpit_count`, `tarpit_delay`, `use_spf`, `use_spf_score` | yes |
 | `PUT /api/v1/settings/antivirus` | AntiVirus | `action`, `attachment_blocking_enabled`, `clamav_enabled`, `clamav_host`, `clamav_port`, `clamwin_db_folder`, `clamwin_enabled`, `clamwin_executable`, `custom_scanner_enabled`, `custom_scanner_executable`, `custom_scanner_return_value`, `maximum_message_size_kb`, `notify_receiver`, `notify_sender` | yes |
 | `PUT /api/v1/settings/backup` | BackupSettings, Backup | `backup_domains`, `backup_messages`, `backup_settings`, `compress`, `destination` | yes |
-| `PUT /api/v1/settings/cache` | ? | `enabled` | - |
+| `PUT /api/v1/settings/cache` | ? | `account_cache_max_size_kb`, `account_cache_ttl`, `alias_cache_max_size_kb`, `alias_cache_ttl`, `distribution_list_cache_max_size_kb`, `distribution_list_cache_ttl`, `domain_cache_max_size_kb`, `domain_cache_ttl`, `enabled` | - |
 | `POST /api/v1/settings/cache/clear` | ? | - | - |
 | `PUT /api/v1/settings/indexing` | ? | `enabled` | - |
 | `POST /api/v1/settings/indexing/clear` | ? | - | - |

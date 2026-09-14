@@ -674,6 +674,7 @@
     <Compile Include="API\RestApiRoutesAndAliases.cs" />
     <Compile Include="API\RestApiSelfService.cs" />
     <Compile Include="API\RestApiArchive.cs" />
+    <Compile Include="API\RestApiParityGaps.cs" />
     <Compile Include="Infrastructure\PrometheusConventions.cs" />
     <Compile Include="SMTP\DistributionListHeaders.cs" />
     <Compile Include="SMTP\TlsRptInertReporting.cs" />

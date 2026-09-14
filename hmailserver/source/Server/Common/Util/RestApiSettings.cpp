@@ -827,9 +827,22 @@ namespace
    };
 
    // Settings.Cache over COM: the switch, and for each of the four caches what
-   // it holds, its ceiling, its time to live and its hit rate - read-only, as
-   // they are there; the ceilings and lives are the [Settings] keys of
-   // hMailServer.ini, and a clear is a POST beside the group.
+   // it holds and its hit rate (read-only, as they are there), its ceiling and
+   // its time to live. The lives are settings rows - put_DomainCacheTTL writes
+   // PROPERTY_DOMAINCACHETTL and CacheContainer::OnPropertyChanged hands the
+   // new value to the cache - so a change is stored and in force at once. The
+   // ceilings are what put_DomainCacheMaxSizeKb sets: the live Cache<T>'s
+   // limit and nothing else. No row and no INI key holds them (the Control
+   // Panel's note under the same four editors says so), so a change takes
+   // effect at once and the built-in 10240 KB returns when the server starts.
+   // A clear is a POST beside the group.
+   const char *CacheNegativeRefusalTail = " must be 0 or more.";
+
+   String CacheNotNegative(const char *key, const Value &v)
+   {
+      return v.number < 0 ? String(key) + CacheNegativeRefusalTail : String();
+   }
+
    const Row CacheRows[] =
    {
       { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
@@ -838,48 +851,64 @@ namespace
       { "domain_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
         "What the domain cache holds now, in kilobytes.",
         ROW_NUMBER(CacheContainer::Instance()->GetDomainCacheSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "domain_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
-        "The domain cache's ceiling, in kilobytes (DomainCacheMaxSizeKb in hMailServer.ini).",
-        ROW_NUMBER(CacheContainer::Instance()->GetDomainCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "domain_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+      { "domain_cache_max_size_kb", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The domain cache's ceiling, in kilobytes. Held in memory only, as over COM: the built-in 10240 returns when the server starts.",
+        ROW_NUMBER(CacheContainer::Instance()->GetDomainCacheMaxSize() / 1024),
+        ROW_SET(CacheContainer::Instance()->SetDomainCacheMaxSize((size_t) v.number * 1024)),
+        [] (const Value &v) { return CacheNotNegative("domain_cache_max_size_kb", v); } },
+      { "domain_cache_ttl", KindInteger, ReadWrite, EffectNow, nullptr,
         "Seconds a domain stays cached.",
-        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDomainCacheTTL()), nullptr, ROW_NO_CHECK },
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDomainCacheTTL()),
+        ROW_SET(Config()->GetCacheConfiguration()->SetDomainCacheTTL((int) v.number)),
+        [] (const Value &v) { return CacheNotNegative("domain_cache_ttl", v); } },
       { "domain_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
         "Of the domain lookups since the cache was last cleared, the percentage the cache answered.",
         ROW_NUMBER(Cache<Domain>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
       { "account_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
         "What the account cache holds now, in kilobytes.",
         ROW_NUMBER(CacheContainer::Instance()->GetAccountCacheSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "account_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
-        "The account cache's ceiling, in kilobytes (AccountCacheMaxSizeKb in hMailServer.ini).",
-        ROW_NUMBER(CacheContainer::Instance()->GetAccountCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "account_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+      { "account_cache_max_size_kb", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The account cache's ceiling, in kilobytes. Held in memory only, as over COM: the built-in 10240 returns when the server starts.",
+        ROW_NUMBER(CacheContainer::Instance()->GetAccountCacheMaxSize() / 1024),
+        ROW_SET(CacheContainer::Instance()->SetAccountCacheMaxSize((size_t) v.number * 1024)),
+        [] (const Value &v) { return CacheNotNegative("account_cache_max_size_kb", v); } },
+      { "account_cache_ttl", KindInteger, ReadWrite, EffectNow, nullptr,
         "Seconds an account stays cached.",
-        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAccountCacheTTL()), nullptr, ROW_NO_CHECK },
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAccountCacheTTL()),
+        ROW_SET(Config()->GetCacheConfiguration()->SetAccountCacheTTL((int) v.number)),
+        [] (const Value &v) { return CacheNotNegative("account_cache_ttl", v); } },
       { "account_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
         "Of the account lookups since the cache was last cleared, the percentage the cache answered.",
         ROW_NUMBER(Cache<Account>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
       { "alias_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
         "What the alias cache holds now, in kilobytes.",
         ROW_NUMBER(CacheContainer::Instance()->GetAliasCacheSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "alias_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
-        "The alias cache's ceiling, in kilobytes (AliasCacheMaxSizeKb in hMailServer.ini).",
-        ROW_NUMBER(CacheContainer::Instance()->GetAliasCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "alias_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+      { "alias_cache_max_size_kb", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The alias cache's ceiling, in kilobytes. Held in memory only, as over COM: the built-in 10240 returns when the server starts.",
+        ROW_NUMBER(CacheContainer::Instance()->GetAliasCacheMaxSize() / 1024),
+        ROW_SET(CacheContainer::Instance()->SetAliasCacheMaxSize((size_t) v.number * 1024)),
+        [] (const Value &v) { return CacheNotNegative("alias_cache_max_size_kb", v); } },
+      { "alias_cache_ttl", KindInteger, ReadWrite, EffectNow, nullptr,
         "Seconds an alias stays cached.",
-        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAliasCacheTTL()), nullptr, ROW_NO_CHECK },
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetAliasCacheTTL()),
+        ROW_SET(Config()->GetCacheConfiguration()->SetAliasCacheTTL((int) v.number)),
+        [] (const Value &v) { return CacheNotNegative("alias_cache_ttl", v); } },
       { "alias_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
         "Of the alias lookups since the cache was last cleared, the percentage the cache answered.",
         ROW_NUMBER(Cache<Alias>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
       { "distribution_list_cache_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
         "What the distribution-list cache holds now, in kilobytes.",
         ROW_NUMBER(CacheContainer::Instance()->GetDistributionListCacheSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "distribution_list_cache_max_size_kb", KindInteger, ReadOnly, EffectNow, nullptr,
-        "The distribution-list cache's ceiling, in kilobytes (DistributionListCacheMaxSizeKb in hMailServer.ini).",
-        ROW_NUMBER(CacheContainer::Instance()->GetDistributionListCacheMaxSize() / 1024), nullptr, ROW_NO_CHECK },
-      { "distribution_list_cache_ttl", KindInteger, ReadOnly, EffectNow, nullptr,
+      { "distribution_list_cache_max_size_kb", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The distribution-list cache's ceiling, in kilobytes. Held in memory only, as over COM: the built-in 10240 returns when the server starts.",
+        ROW_NUMBER(CacheContainer::Instance()->GetDistributionListCacheMaxSize() / 1024),
+        ROW_SET(CacheContainer::Instance()->SetDistributionListCacheMaxSize((size_t) v.number * 1024)),
+        [] (const Value &v) { return CacheNotNegative("distribution_list_cache_max_size_kb", v); } },
+      { "distribution_list_cache_ttl", KindInteger, ReadWrite, EffectNow, nullptr,
         "Seconds a distribution list stays cached.",
-        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDistributionListCacheTTL()), nullptr, ROW_NO_CHECK },
+        ROW_NUMBER(Config()->GetCacheConfiguration()->GetDistributionListCacheTTL()),
+        ROW_SET(Config()->GetCacheConfiguration()->SetDistributionListCacheTTL((int) v.number)),
+        [] (const Value &v) { return CacheNotNegative("distribution_list_cache_ttl", v); } },
       { "distribution_list_hit_rate", KindInteger, ReadOnly, EffectNow, nullptr,
         "Of the distribution-list lookups since the cache was last cleared, the percentage the cache answered.",
         ROW_NUMBER(Cache<DistributionList>::Instance()->GetHitRate()), nullptr, ROW_NO_CHECK },
