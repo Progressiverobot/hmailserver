@@ -188,6 +188,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
       <button data-view="settings"><span class="ico">⚙</span>Settings</button>
       <button data-view="backup"><span class="ico">⛃</span>Backup</button>
+      <button data-view="messages"><span class="ico">✎</span>Server messages</button>
       <button data-view="rules"><span class="ico">⚖</span>Rules</button>
       <button data-view="routes"><span class="ico">⇥</span>Routes</button>
       <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
@@ -228,7 +229,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],collections:{},
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],collections:{},messages:[],
   /* The fetch view's chosen domain and account, kept across its re-reads. */
   fetch:{domain:"",address:"",accounts:[],items:[]}};
 
@@ -362,7 +363,7 @@ $("#nav").addEventListener("click",e=>{
   view=b.dataset.view;editing=null;render();
 });
 const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",fetch:"Fetch accounts",lists:"Lists",queue:"Delivery queue",tlsa:"DANE / TLSA",
-  settings:"Settings",backup:"Backup",rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
+  settings:"Settings",backup:"Backup",messages:"Server messages",rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
 
 async function render(silent){
   $("#viewTitle").textContent=titles[view];
@@ -376,6 +377,7 @@ async function render(silent){
     else if(view==="tlsa")await renderTlsa();
     else if(view==="settings")await renderSettings();
     else if(view==="backup")await renderBackup();
+    else if(view==="messages")await renderMessages();
     else if(view==="rules")await renderRules();
     else if(view==="routes")await renderRoutes();
     else if(view==="certs")await renderCerts();
@@ -427,6 +429,7 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="colledit")openCollectionItem(d.coll,Number(d.id));
   else if(d.act==="colldel")deleteCollectionItem(d.coll,Number(d.id),d.label);
   else if(d.act==="collsave")saveCollectionItem();
+  else if(d.act==="msgsave")saveMessage(d.name,Number(d.i));
   else if(d.act==="backupstart")startBackup();
   else if(d.act==="backupstatus")render();
   else if(d.act==="add")addAccount(d.domain);
@@ -2104,6 +2107,46 @@ async function startBackup(){
   setErr("err_backupstart","");
   try{await api("/api/v1/backup",{method:"POST"});toast("Backup started");await render();}
   catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_backupstart",e.message);}
+}
+
+/* ---------- Server messages ----------
+   The texts the server puts in the mail it writes itself, Settings.ServerMessages
+   over COM: a fixed set, named, each editable. GET /api/v1/settings/messages
+   lists them and PUT /api/v1/settings/messages/{name} changes one text, in use
+   at once; the name is the table's own and is not changed here, which is why
+   it is the row's caption and not a control. Each row is a text area with its
+   own Save, which sends the text only when it differs from what was read and
+   then reads the messages again. */
+async function renderMessages(){
+  await loadSpec();
+  cache.messages=asList(await api("/api/v1/settings/messages"),"messages");
+  const rows=cache.messages.map((m,i)=>`
+    <div class="fr" data-k="${escHtml((m.name+" "+m.text).toLowerCase())}">
+      <div class="lab"><b>${escHtml(m.name)}</b><code>${escHtml(m.name)}</code></div>
+      <div class="ctl"><textarea id="msg_${i}" rows="3">${escHtml(m.text)}</textarea>
+        <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="msgsave" data-name="${escHtml(m.name)}" data-i="${i}">Save</button>
+        <div class="err" id="err_msg_${i}"></div></div></div>
+    </div>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/settings/messages","get").description||"")} ${escHtml(operation("/api/v1/settings/messages/{name}","put").description||"")}</p>
+      <input id="msgFilter" placeholder="Filter messages by name or text" style="width:100%">
+    </div>
+    <div class="sect"><div class="card flat"><div class="form">${rows||'<div class="empty">No server messages.</div>'}</div></div></div></div>`;
+  $("#msgFilter").oninput=e=>{
+    const q=e.target.value.trim().toLowerCase();
+    document.querySelectorAll("#content .fr").forEach(r=>{r.hidden=!!q&&r.dataset.k.indexOf(q)<0;});
+  };
+}
+async function saveMessage(name,i){
+  setErr("err_msg_"+i,"");
+  const el=document.getElementById("msg_"+i);
+  const was=cache.messages[i]?cache.messages[i].text:undefined;
+  if(!el||el.value===was){toast("Nothing changed");return;}
+  try{
+    await api("/api/v1/settings/messages/"+encodeURIComponent(name),{method:"PUT",body:JSON.stringify({text:el.value})});
+    toast("Message saved: "+name);await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_msg_"+i,e.message);}
 }
 
 /* ---------- Logs ---------- */

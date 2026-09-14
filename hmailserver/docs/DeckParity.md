@@ -10,14 +10,14 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|
 | COM properties the desktop program writes | 330 |
 | of them writable over REST | 322 |
-| of them reachable from a Deck view | 320 |
+| of them reachable from a Deck view | 322 |
 | missing over REST | 8 |
-| over REST but not reached by any Deck view | 2 |
+| over REST but not reached by any Deck view | 0 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
 | REST routes (path and method) | 199, 92 of them writes |
-| Deck views | 14 |
+| Deck views | 15 |
 
 ## Missing over REST, by interface
 
@@ -30,9 +30,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 
 ## Over REST but not reached by any Deck view
 
-| Interface | Count | Properties |
-|---|---|---|
-| ServerMessage | 2 | `Name`, `Text` |
+Every property writable over REST is reached by a Deck view.
 
 ## Left out of the count
 
@@ -488,8 +486,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Name` | CollectionSpecs | `PUT /api/v1/settings/messages/{name}` (path) | - |
-| `Text` | CollectionSpecs | `PUT /api/v1/settings/messages/{name}` (setter) | - |
+| `Name` | CollectionSpecs | `PUT /api/v1/settings/messages/{name}` (path) | messages |
+| `Text` | CollectionSpecs | `PUT /api/v1/settings/messages/{name}` (setter) | messages |
 
 ### GreyListingWhiteAddress
 
@@ -736,7 +734,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/settings/ini/{name}` | - | `from`, `to`, `value` | - |
 | `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip` | yes |
 | `POST /api/v1/settings/logon-failures/clear` | - | - | - |
-| `PUT /api/v1/settings/messages/{name}` | ServerMessage | `text` | - |
+| `PUT /api/v1/settings/messages/{name}` | ServerMessage | `text` | yes |
 | `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | yes |
 | `POST /api/v1/settings/scripting/check` | Scripting | - | yes |
 | `POST /api/v1/settings/scripting/reload` | Scripting | - | yes |
@@ -762,6 +760,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `tlsa` | `GET /api/v1/tlsa` |
 | `settings` | `GET /api/v1/blocked-attachments`, `POST /api/v1/blocked-attachments`, `PUT /api/v1/blocked-attachments`, `GET /api/v1/blocked-senders`, `POST /api/v1/blocked-senders`, `PUT /api/v1/blocked-senders`, `GET /api/v1/dns-blacklists`, `POST /api/v1/dns-blacklists`, `PUT /api/v1/dns-blacklists`, `GET /api/v1/greylisting-white-addresses`, `POST /api/v1/greylisting-white-addresses`, `PUT /api/v1/greylisting-white-addresses`, `GET /api/v1/incoming-relays`, `POST /api/v1/incoming-relays`, `PUT /api/v1/incoming-relays`, `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `POST /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `POST /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `POST /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `POST /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `GET /api/v1/settings/cache`, `POST /api/v1/settings/cache`, `PUT /api/v1/settings/cache`, `GET /api/v1/settings/cache/clear`, `POST /api/v1/settings/cache/clear`, `PUT /api/v1/settings/cache/clear`, `GET /api/v1/settings/indexing`, `POST /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing`, `GET /api/v1/settings/indexing/clear`, `POST /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/clear`, `GET /api/v1/settings/indexing/index`, `POST /api/v1/settings/indexing/index`, `PUT /api/v1/settings/indexing/index`, `GET /api/v1/settings/logging`, `POST /api/v1/settings/logging`, `PUT /api/v1/settings/logging`, `GET /api/v1/settings/scripting`, `POST /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting`, `GET /api/v1/settings/scripting/check`, `POST /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/check`, `GET /api/v1/settings/scripting/reload`, `POST /api/v1/settings/scripting/reload`, `PUT /api/v1/settings/scripting/reload`, `GET /api/v1/surbl-servers`, `POST /api/v1/surbl-servers`, `PUT /api/v1/surbl-servers`, `GET /api/v1/whitelist-addresses`, `POST /api/v1/whitelist-addresses`, `PUT /api/v1/whitelist-addresses` |
 | `backup` | `GET /api/v1/backup`, `POST /api/v1/backup`, `PUT /api/v1/blocked-attachments`, `PUT /api/v1/blocked-senders`, `PUT /api/v1/dns-blacklists`, `PUT /api/v1/greylisting-white-addresses`, `PUT /api/v1/incoming-relays`, `GET /api/v1/openapi.json`, `PUT /api/v1/settings`, `PUT /api/v1/settings/antispam`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `PUT /api/v1/settings/cache`, `PUT /api/v1/settings/cache/clear`, `PUT /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/index`, `PUT /api/v1/settings/logging`, `PUT /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/reload`, `PUT /api/v1/surbl-servers`, `PUT /api/v1/whitelist-addresses` |
+| `messages` | `GET /api/v1/openapi.json`, `GET /api/v1/settings/messages`, `PUT /api/v1/settings/messages/{}` |
 | `rules` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `GET /api/v1/rules`, `POST /api/v1/rules`, `DELETE /api/v1/rules/{}`, `PUT /api/v1/rules/{}` |
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |

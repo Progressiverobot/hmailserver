@@ -764,6 +764,8 @@ const spec = {
       '/api/v1/accounts/{address}/fetch-accounts/{id}/download': { post: { summary: 'Collect from the remote mailbox now' } },
       '/api/v1/settings/backup': settingsPath('/api/v1/settings/backup'),
       ...collectionPaths(),
+      '/api/v1/settings/messages': { get: { summary: 'The server\'s message texts', description: 'The texts the server puts in the mail it writes itself - Settings.ServerMessages over COM. Each entry: id, name, text. Server-wide; refused for domain-restricted keys.' } },
+      '/api/v1/settings/messages/{name}': { put: { summary: 'Change one server message text', description: 'Body: text. The name is the table\'s own, as the listing shows it. In use at once. Server-wide; refused for domain-restricted and read-only keys.', requestBody: body({ text: { type: 'string' } }, ['text']) } },
       '/api/v1/settings/scripting': settingsPath('/api/v1/settings/scripting'),
       '/api/v1/settings/scripting/reload': { post: { summary: 'Load the event-handler script again', description: 'What Scripting.Reload does over COM: the script file is read again and the handlers it defines take over from the next event.' } },
       '/api/v1/settings/scripting/check': { post: { summary: 'Check the event-handler script\'s syntax', description: 'What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser\'s message otherwise. Nothing is changed.' } },
@@ -818,6 +820,10 @@ const state = {
    backupRunning: false,
    scriptReloads: 0,
    scriptProblem: '',
+   messages: [
+      { id: 1, name: 'BOUNCE_MESSAGE', text: 'Your message could not be delivered.' },
+      { id: 2, name: 'VIRUS_NOTIFICATION', text: 'A virus was found in a message sent to you.' }
+   ],
    collections: {
       '/api/v1/dns-blacklists': [{ id: 11, active: true, dns_host: 'zen.spamhaus.org', expected_result: '127.0.0.2-11', reject_message: 'Listed at Spamhaus', score: 5 }],
       '/api/v1/surbl-servers': [{ id: 12, active: false, dns_host: 'multi.surbl.org', expected_result: '', reject_message: '', score: 5 }],
@@ -1144,6 +1150,16 @@ function answer(method, path, headers, raw) {
    }
 
    if (path === '/api/v1/tlsa') { return json(200, state.tlsa); }
+
+   if (path === '/api/v1/settings/messages' && method === 'GET') { return json(200, state.messages); }
+   if (/^\/api\/v1\/settings\/messages\/[^/]+$/.test(path) && method === 'PUT') {
+      const name = segment(path, 5);
+      const at = state.messages.findIndex((m) => m.name === name);
+      if (at < 0) { return json(404, { error: 'server message not found' }); }
+      if (typeof parsed.text !== 'string') { return json(400, { error: 'text must be a string' }); }
+      state.messages[at].text = parsed.text;
+      return json(200, state.messages[at]);
+   }
 
    // The verbs beside three of the groups.
    if (method === 'POST' && path === '/api/v1/settings/scripting/reload') { state.scriptReloads += 1; return json(200, { reloaded: true }); }
@@ -2180,6 +2196,34 @@ async function main() {
    await flush();
    check('Re-read status reads it again and shows the manager\'s last failure', called(before, 'GET', '/api/v1/backup').length === 1 && content().textContent.indexOf('The destination directory could not be written.') >= 0);
    state.backup.status = '';
+
+   // ---- the server messages
+   before = requests.length;
+   await goTo('messages');
+   check('the messages view reads the messages', called(before, 'GET', '/api/v1/settings/messages').length === 1 && $('#viewTitle').textContent === 'Server messages', paths(before));
+   check('one row per message, the name as the caption and the text in a text area with its own Save', $$('.fr').length === 2 && $$('.fr')[0].textContent.indexOf('BOUNCE_MESSAGE') >= 0 &&
+      document.getElementById('msg_0').tagName === 'TEXTAREA' && document.getElementById('msg_0').value === 'Your message could not be delivered.' &&
+      act('msgsave', { name: 'VIRUS_NOTIFICATION' }) !== null && content().textContent.indexOf('The name is the table\'s own') >= 0);
+   before = requests.length;
+   click(act('msgsave', { name: 'BOUNCE_MESSAGE' }));
+   await flush();
+   check('saving an unchanged text sends nothing', called(before, 'PUT', /messages/).length === 0 && toastText() === 'Nothing changed');
+   setValue('msg_1', 'A virus was found in a message sent to you, and it was removed.');
+   before = requests.length;
+   click(act('msgsave', { name: 'VIRUS_NOTIFICATION' }));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/settings/messages/VIRUS_NOTIFICATION');
+   check('a changed text is PUT by name, as text alone', JSON.stringify(put) === '{"text":"A virus was found in a message sent to you, and it was removed."}', JSON.stringify(put));
+   check('and the messages are read again with the change', called(before, 'GET', '/api/v1/settings/messages').length === 1 && document.getElementById('msg_1').value.indexOf('it was removed') >= 0 && toastText() === 'Message saved: VIRUS_NOTIFICATION');
+   setValue('msg_0', 'Undeliverable.');
+   nextRefusal = 'text is not valid UTF-8';
+   click(act('msgsave', { name: 'BOUNCE_MESSAGE' }));
+   await flush();
+   check('a refusal is the server\'s sentence under the row, with the edit kept', document.getElementById('err_msg_0').textContent === 'text is not valid UTF-8' && document.getElementById('msg_0').value === 'Undeliverable.');
+   const messageFilter = $('#msgFilter');
+   messageFilter.value = 'virus';
+   messageFilter.dispatchEvent(makeEvent('input'));
+   check('the filter hides the messages that do not match', $$('.fr')[0].hidden === true && $$('.fr')[1].hidden === false);
 
    // ---- rules
    before = requests.length;
