@@ -39,6 +39,7 @@ namespace RegressionTests.API
       {
          public int DomainCacheMaxSizeKb, DomainCacheTTL, AccountCacheMaxSizeKb, AccountCacheTTL;
          public int AliasCacheMaxSizeKb, AliasCacheTTL, DistributionListCacheMaxSizeKb, DistributionListCacheTTL;
+         public string UserInterfaceLanguage;
       }
 
       private Snapshot _before;
@@ -48,6 +49,7 @@ namespace RegressionTests.API
          hMailServer.Cache cache = _settings.Cache;
          return new Snapshot
          {
+            UserInterfaceLanguage = _settings.UserInterfaceLanguage,
             DomainCacheMaxSizeKb = cache.DomainCacheMaxSizeKb,
             DomainCacheTTL = cache.DomainCacheTTL,
             AccountCacheMaxSizeKb = cache.AccountCacheMaxSizeKb,
@@ -61,6 +63,7 @@ namespace RegressionTests.API
 
       private void Restore(Snapshot s)
       {
+         _settings.UserInterfaceLanguage = s.UserInterfaceLanguage;
          hMailServer.Cache cache = _settings.Cache;
          cache.DomainCacheMaxSizeKb = s.DomainCacheMaxSizeKb;
          cache.DomainCacheTTL = s.DomainCacheTTL;
@@ -388,6 +391,29 @@ namespace RegressionTests.API
 
          StringAssert.Contains("forward: to and abort_spam_flagged", Http("GET", "/api/v1/openapi.json").body);
          Assert.AreEqual(200, Http("DELETE", "/api/v1/rules/" + id).status);
+      }
+
+      [Test]
+      [Description("The user-interface language the desktop stores for third-party COM tools is a row of the server group: written by PUT, read back through Settings.UserInterfaceLanguage and from the INI key, shown by GET, and described as stored for the Control Panel.")]
+      public void UserInterfaceLanguageIsAStoredRow()
+      {
+         (int status, string body) = Http("PUT", "/api/v1/settings", "{\"user_interface_language\":\"Svenska\"}");
+         Assert.AreEqual(200, status, body);
+         Assert.AreEqual("Svenska", _settings.UserInterfaceLanguage);
+         StringAssert.Contains("\"user_interface_language\":\"Svenska\"", Http("GET", "/api/v1/settings").body);
+
+         // The same key of hMailServer.ini, read the way the settings-over-INI route reads one.
+         (int iniStatus, string iniBody) = Http("GET", "/api/v1/settings/ini/UseLanguage");
+         Assert.AreEqual(200, iniStatus, iniBody);
+         StringAssert.Contains("Svenska", iniBody);
+
+         Assert.AreEqual(400, Http("PUT", "/api/v1/settings", "{\"user_interface_language\":7}").status);
+         Assert.AreEqual("Svenska", _settings.UserInterfaceLanguage, "A refused body changes nothing.");
+
+         (int docStatus, string doc) = Http("GET", "/api/v1/openapi.json");
+         Assert.AreEqual(200, docStatus);
+         StringAssert.Contains("\"user_interface_language\":{\"type\":\"string\",\"description\":\"The language name third-party administration tools read over COM", doc);
+         StringAssert.Contains("nothing with it. Stored for the Control Panel; nothing in this server reads it.", doc);
       }
 
       private static (int status, string body) Http(string method, string path, string requestBody = null)

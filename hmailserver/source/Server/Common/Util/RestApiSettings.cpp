@@ -524,6 +524,17 @@ namespace
       { "log_pop3_conversations", KindBoolean, ReadWrite, EffectNow, nullptr,
         "Whether POP3 sessions are written to the log; the same switch as log_pop3 in the logging group.",
         ROW_FLAG(Config()->GetLogPOP3Conversations()), ROW_SET(Config()->SetLogPOP3Conversations(v.flag)), ROW_NO_CHECK },
+
+      // Settings.UserInterfaceLanguage over COM: [Settings] UseLanguage in
+      // hMailServer.ini, read from the file on every get and mirrored to the
+      // database so a backup carries it. The server translates nothing with
+      // it - the classic Administrator did, and was retired in 6.2.10 - so it
+      // is for third-party administration tools that read it over COM; the
+      // Control Panel's own language is its own setting. Stored, as the
+      // desktop writes it, so the Deck can too.
+      { "user_interface_language", KindString, ReadWrite, EffectStored, nullptr,
+        "The language name third-party administration tools read over COM (Settings.UserInterfaceLanguage, UseLanguage in hMailServer.ini); the server translates nothing with it.",
+        ROW_TEXT(Ini()->GetUserInterfaceLanguage()), ROW_SET(Ini()->SetUserInterfaceLanguage(v.text)), ROW_NO_CHECK },
    };
 
    const Row AntiSpamRows[] =
