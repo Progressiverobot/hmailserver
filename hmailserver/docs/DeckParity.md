@@ -10,14 +10,14 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|
 | COM properties the desktop program writes | 330 |
 | of them writable over REST | 322 |
-| of them reachable from a Deck view | 296 |
+| of them reachable from a Deck view | 320 |
 | missing over REST | 8 |
-| over REST but not reached by any Deck view | 26 |
+| over REST but not reached by any Deck view | 2 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
 | REST routes (path and method) | 199, 92 of them writes |
-| Deck views | 13 |
+| Deck views | 14 |
 
 ## Missing over REST, by interface
 
@@ -32,14 +32,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 
 | Interface | Count | Properties |
 |---|---|---|
-| DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
-| SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
-| WhiteListAddress | 4 | `Description`, `EmailAddress`, `LowerIPAddress`, `UpperIPAddress` |
-| BlockedSender | 3 | `Address`, `Description`, `Score` |
-| IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
-| BlockedAttachment | 2 | `Description`, `Wildcard` |
 | ServerMessage | 2 | `Name`, `Text` |
-| GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
 
 ## Left out of the count
 
@@ -326,11 +319,11 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
-| `DNSHost` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
-| `ExpectedResult` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
-| `RejectMessage` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
-| `Score` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
+| `Active` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
+| `DNSHost` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
+| `ExpectedResult` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
+| `RejectMessage` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
+| `Score` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
 
 ### RouteAddress
 
@@ -439,11 +432,11 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
-| `DNSHost` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
-| `ExpectedResult` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
-| `RejectMessage` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
-| `Score` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
+| `Active` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | lists, settings |
+| `DNSHost` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | lists, settings |
+| `ExpectedResult` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | lists, settings |
+| `RejectMessage` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | lists, settings |
+| `Score` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | lists, settings |
 
 ### AntiSpam
 
@@ -488,8 +481,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | - |
-| `Wildcard` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | - |
+| `Description` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | lists, settings |
+| `Wildcard` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | lists, settings |
 
 ### ServerMessage
 
@@ -502,8 +495,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | - |
-| `IPAddress` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | - |
+| `Description` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | lists, settings |
+| `IPAddress` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | lists, settings |
 
 ### TCPIPPort
 
@@ -521,18 +514,18 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
-| `EmailAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
-| `LowerIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
-| `UpperIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
+| `Description` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | lists, settings |
+| `EmailAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | lists, settings |
+| `LowerIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | lists, settings |
+| `UpperIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | lists, settings |
 
 ### BlockedSender
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Address` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
-| `Description` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
-| `Score` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
+| `Address` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | lists, settings |
+| `Description` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | lists, settings |
+| `Score` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | lists, settings |
 
 ### SSLCertificate
 
@@ -568,9 +561,9 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `LowerIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | - |
-| `Name` | UtilityViews | `POST /api/v1/incoming-relays` (setter)<br>`PUT /api/v1/incoming-relays/{id}` (setter) | - |
-| `UpperIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | - |
+| `LowerIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | lists, settings |
+| `Name` | UtilityViews | `POST /api/v1/incoming-relays` (setter)<br>`PUT /api/v1/incoming-relays/{id}` (setter) | lists, settings |
+| `UpperIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | lists, settings |
 
 ### MessageIndexing
 
@@ -671,12 +664,12 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
 | `POST /api/v1/backup` | BackupSettings, Backup | - | yes |
-| `POST /api/v1/blocked-attachments` | BlockedAttachment | `description`, `message`, `name`, `wildcard` | - |
+| `POST /api/v1/blocked-attachments` | BlockedAttachment | `description`, `message`, `name`, `wildcard` | yes |
 | `PUT /api/v1/blocked-attachments/{id}` | BlockedAttachment | `body`, `description`, `field`, `message`, `name`, `value`, `wildcard` | - |
-| `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `score` | - |
+| `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `score` | yes |
 | `PUT /api/v1/blocked-senders/{id}` | BlockedSender | `address`, `body`, `description`, `field`, `message`, `score`, `value` | - |
 | `POST /api/v1/certificates` | SSLCertificate | `certificate_file`, `name`, `private_key_file`, `private_key_password` | yes |
-| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score`, `wildcard` | - |
+| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score`, `wildcard` | yes |
 | `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value`, `wildcard` | - |
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | yes |
 | `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | yes |
@@ -684,9 +677,9 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | yes |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | yes |
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | yes |
-| `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address` | - |
+| `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address` | yes |
 | `PUT /api/v1/greylisting-white-addresses/{id}` | GreyListingWhiteAddress | `address`, `body`, `description`, `field`, `ip_address`, `value` | - |
-| `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | - |
+| `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | yes |
 | `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `upper_ip`, `value` | - |
 | `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
 | `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `body`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | yes |
@@ -748,12 +741,12 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/settings/scripting/check` | Scripting | - | yes |
 | `POST /api/v1/settings/scripting/reload` | Scripting | - | yes |
 | `POST /api/v1/sieve/evaluate` | - | `action`, `address`, `body`, `message`, `script` | - |
-| `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `reject_message`, `score` | - |
+| `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `reject_message`, `score` | yes |
 | `PUT /api/v1/surbl-servers/{id}` | SURBLServer | `active`, `body`, `dns_host`, `domains`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
 | `POST /api/v1/update/check` | - | - | - |
 | `POST /api/v1/update/download` | - | - | - |
 | `POST /api/v1/update/install` | - | - | - |
-| `POST /api/v1/whitelist-addresses` | WhiteListAddress | `address`, `description`, `email_address`, `lower_ip`, `message`, `upper_ip` | - |
+| `POST /api/v1/whitelist-addresses` | WhiteListAddress | `address`, `description`, `email_address`, `lower_ip`, `message`, `upper_ip` | yes |
 | `PUT /api/v1/whitelist-addresses/{id}` | WhiteListAddress | `address`, `body`, `description`, `email_address`, `field`, `lower_ip`, `message`, `upper_ip`, `value` | - |
 
 ## Deck views
@@ -764,10 +757,11 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `domains` | `DELETE /api/v1/accounts/{}`, `GET /api/v1/accounts/{}`, `PUT /api/v1/accounts/{}`, `DELETE /api/v1/aliases/{}`, `GET /api/v1/domains`, `POST /api/v1/domains`, `DELETE /api/v1/domains/{}`, `PUT /api/v1/domains/{}`, `GET /api/v1/domains/{}/accounts`, `POST /api/v1/domains/{}/accounts`, `GET /api/v1/domains/{}/aliases`, `POST /api/v1/domains/{}/aliases`, `GET /api/v1/domains/{}/domain-aliases`, `POST /api/v1/domains/{}/domain-aliases`, `DELETE /api/v1/domains/{}/domain-aliases/{}`, `GET /api/v1/domains/{}/lists`, `POST /api/v1/domains/{}/lists`, `DELETE /api/v1/lists/{}`, `PUT /api/v1/lists/{}`, `GET /api/v1/openapi.json` |
 | `ipranges` | `GET /api/v1/ipranges`, `POST /api/v1/ipranges`, `DELETE /api/v1/ipranges/{}`, `PUT /api/v1/ipranges/{}`, `GET /api/v1/openapi.json` |
 | `fetch` | `GET /api/v1/accounts/{}/fetch-accounts`, `POST /api/v1/accounts/{}/fetch-accounts`, `DELETE /api/v1/accounts/{}/fetch-accounts/{}`, `PUT /api/v1/accounts/{}/fetch-accounts/{}`, `POST /api/v1/accounts/{}/fetch-accounts/{}/download`, `GET /api/v1/domains`, `GET /api/v1/domains/{}/accounts`, `GET /api/v1/openapi.json` |
+| `lists` | `GET /api/v1/blocked-attachments`, `POST /api/v1/blocked-attachments`, `GET /api/v1/blocked-senders`, `POST /api/v1/blocked-senders`, `GET /api/v1/dns-blacklists`, `POST /api/v1/dns-blacklists`, `GET /api/v1/greylisting-white-addresses`, `POST /api/v1/greylisting-white-addresses`, `GET /api/v1/incoming-relays`, `POST /api/v1/incoming-relays`, `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `POST /api/v1/settings`, `GET /api/v1/settings/antispam`, `POST /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `POST /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `POST /api/v1/settings/backup`, `GET /api/v1/settings/cache`, `POST /api/v1/settings/cache`, `GET /api/v1/settings/cache/clear`, `POST /api/v1/settings/cache/clear`, `GET /api/v1/settings/indexing`, `POST /api/v1/settings/indexing`, `GET /api/v1/settings/indexing/clear`, `POST /api/v1/settings/indexing/clear`, `GET /api/v1/settings/indexing/index`, `POST /api/v1/settings/indexing/index`, `GET /api/v1/settings/logging`, `POST /api/v1/settings/logging`, `GET /api/v1/settings/scripting`, `POST /api/v1/settings/scripting`, `GET /api/v1/settings/scripting/check`, `POST /api/v1/settings/scripting/check`, `GET /api/v1/settings/scripting/reload`, `POST /api/v1/settings/scripting/reload`, `GET /api/v1/surbl-servers`, `POST /api/v1/surbl-servers`, `GET /api/v1/whitelist-addresses`, `POST /api/v1/whitelist-addresses` |
 | `queue` | `GET /api/v1/queue`, `DELETE /api/v1/queue/{}`, `POST /api/v1/queue/{}/retry` |
 | `tlsa` | `GET /api/v1/tlsa` |
-| `settings` | `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `POST /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `POST /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `POST /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `POST /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `GET /api/v1/settings/cache`, `POST /api/v1/settings/cache`, `PUT /api/v1/settings/cache`, `GET /api/v1/settings/cache/clear`, `POST /api/v1/settings/cache/clear`, `PUT /api/v1/settings/cache/clear`, `GET /api/v1/settings/indexing`, `POST /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing`, `GET /api/v1/settings/indexing/clear`, `POST /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/clear`, `GET /api/v1/settings/indexing/index`, `POST /api/v1/settings/indexing/index`, `PUT /api/v1/settings/indexing/index`, `GET /api/v1/settings/logging`, `POST /api/v1/settings/logging`, `PUT /api/v1/settings/logging`, `GET /api/v1/settings/scripting`, `POST /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting`, `GET /api/v1/settings/scripting/check`, `POST /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/check`, `GET /api/v1/settings/scripting/reload`, `POST /api/v1/settings/scripting/reload`, `PUT /api/v1/settings/scripting/reload` |
-| `backup` | `GET /api/v1/backup`, `POST /api/v1/backup`, `GET /api/v1/openapi.json`, `PUT /api/v1/settings`, `PUT /api/v1/settings/antispam`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `PUT /api/v1/settings/cache`, `PUT /api/v1/settings/cache/clear`, `PUT /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/index`, `PUT /api/v1/settings/logging`, `PUT /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/reload` |
+| `settings` | `GET /api/v1/blocked-attachments`, `POST /api/v1/blocked-attachments`, `PUT /api/v1/blocked-attachments`, `GET /api/v1/blocked-senders`, `POST /api/v1/blocked-senders`, `PUT /api/v1/blocked-senders`, `GET /api/v1/dns-blacklists`, `POST /api/v1/dns-blacklists`, `PUT /api/v1/dns-blacklists`, `GET /api/v1/greylisting-white-addresses`, `POST /api/v1/greylisting-white-addresses`, `PUT /api/v1/greylisting-white-addresses`, `GET /api/v1/incoming-relays`, `POST /api/v1/incoming-relays`, `PUT /api/v1/incoming-relays`, `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `POST /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `POST /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `POST /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `POST /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `GET /api/v1/settings/cache`, `POST /api/v1/settings/cache`, `PUT /api/v1/settings/cache`, `GET /api/v1/settings/cache/clear`, `POST /api/v1/settings/cache/clear`, `PUT /api/v1/settings/cache/clear`, `GET /api/v1/settings/indexing`, `POST /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing`, `GET /api/v1/settings/indexing/clear`, `POST /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/clear`, `GET /api/v1/settings/indexing/index`, `POST /api/v1/settings/indexing/index`, `PUT /api/v1/settings/indexing/index`, `GET /api/v1/settings/logging`, `POST /api/v1/settings/logging`, `PUT /api/v1/settings/logging`, `GET /api/v1/settings/scripting`, `POST /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting`, `GET /api/v1/settings/scripting/check`, `POST /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/check`, `GET /api/v1/settings/scripting/reload`, `POST /api/v1/settings/scripting/reload`, `PUT /api/v1/settings/scripting/reload`, `GET /api/v1/surbl-servers`, `POST /api/v1/surbl-servers`, `PUT /api/v1/surbl-servers`, `GET /api/v1/whitelist-addresses`, `POST /api/v1/whitelist-addresses`, `PUT /api/v1/whitelist-addresses` |
+| `backup` | `GET /api/v1/backup`, `POST /api/v1/backup`, `PUT /api/v1/blocked-attachments`, `PUT /api/v1/blocked-senders`, `PUT /api/v1/dns-blacklists`, `PUT /api/v1/greylisting-white-addresses`, `PUT /api/v1/incoming-relays`, `GET /api/v1/openapi.json`, `PUT /api/v1/settings`, `PUT /api/v1/settings/antispam`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/backup`, `PUT /api/v1/settings/backup`, `PUT /api/v1/settings/cache`, `PUT /api/v1/settings/cache/clear`, `PUT /api/v1/settings/indexing`, `PUT /api/v1/settings/indexing/clear`, `PUT /api/v1/settings/indexing/index`, `PUT /api/v1/settings/logging`, `PUT /api/v1/settings/scripting`, `PUT /api/v1/settings/scripting/check`, `PUT /api/v1/settings/scripting/reload`, `PUT /api/v1/surbl-servers`, `PUT /api/v1/whitelist-addresses` |
 | `rules` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `GET /api/v1/rules`, `POST /api/v1/rules`, `DELETE /api/v1/rules/{}`, `PUT /api/v1/rules/{}` |
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |

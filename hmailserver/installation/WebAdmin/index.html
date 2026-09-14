@@ -183,6 +183,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="domains"><span class="ico">⌂</span>Domains</button>
       <button data-view="ipranges"><span class="ico">⌗</span>IP ranges</button>
       <button data-view="fetch"><span class="ico">⇓</span>Fetch accounts</button>
+      <button data-view="lists"><span class="ico">≣</span>Lists</button>
       <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
       <button data-view="settings"><span class="ico">⚙</span>Settings</button>
@@ -227,7 +228,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],collections:{},
   /* The fetch view's chosen domain and account, kept across its re-reads. */
   fetch:{domain:"",address:"",accounts:[],items:[]}};
 
@@ -360,7 +361,7 @@ $("#nav").addEventListener("click",e=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   view=b.dataset.view;editing=null;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",fetch:"Fetch accounts",queue:"Delivery queue",tlsa:"DANE / TLSA",
+const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",fetch:"Fetch accounts",lists:"Lists",queue:"Delivery queue",tlsa:"DANE / TLSA",
   settings:"Settings",backup:"Backup",rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
 
 async function render(silent){
@@ -370,6 +371,7 @@ async function render(silent){
     else if(view==="domains")await renderDomains();
     else if(view==="ipranges")await renderIpRanges();
     else if(view==="fetch")await renderFetch();
+    else if(view==="lists")await renderLists();
     else if(view==="queue")await renderQueue();
     else if(view==="tlsa")await renderTlsa();
     else if(view==="settings")await renderSettings();
@@ -421,6 +423,10 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="fetchdel")deleteFetch(Number(d.id),d.name);
   else if(d.act==="fetchsave")saveFetch();
   else if(d.act==="fetchnow")fetchNow(Number(d.id));
+  else if(d.act==="collnew")openCollectionItem(d.coll,0);
+  else if(d.act==="colledit")openCollectionItem(d.coll,Number(d.id));
+  else if(d.act==="colldel")deleteCollectionItem(d.coll,Number(d.id),d.label);
+  else if(d.act==="collsave")saveCollectionItem();
   else if(d.act==="backupstart")startBackup();
   else if(d.act==="backupstatus")render();
   else if(d.act==="add")addAccount(d.domain);
@@ -1948,6 +1954,113 @@ async function fetchNow(id){
   setErr("err_fetch_"+id,"");
   try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id+"/download",{method:"POST"});toast("Collection queued");await render();}
   catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetch_"+id,e.message);}
+}
+
+/* ---------- Lists ----------
+   The seven small collections the desktop edits in its collection editors,
+   each a resource of the same shape - a listing and a create at its path, an
+   update and a delete at /{id} - drawn from one description: the DNS
+   blacklists, the SURBL servers, the anti-spam white list, the blocked
+   senders, the blocked attachments, the greylisting white list and the
+   incoming relays. Each is a table of the entry's own keys, with Edit and
+   Delete on the row and Add below, and the editor is built from the schema
+   of that collection's create, which types every key; a new entry starts at
+   the defaults the create's description states, and at the desktop editor's
+   where the description has none - a score of 5 for a DNS list, 100 for a
+   blocked sender, *.exe for an attachment. Save posts a new entry and PUTs
+   the whole record of an existing one by id, as the range editor does, then
+   reads the collections again. The captions are the desktop editors'. */
+const COLLECTIONS=[
+  {id:"dnsbl",path:"/api/v1/dns-blacklists",title:"DNS blacklists",noun:"DNS blacklist",columns:["active","dns_host","expected_result","reject_message","score"],
+    defaults:{score:5},hints:{active:"Consulted for the next message.",dns_host:"The zone the connecting address is looked up in.",expected_result:"The answers that mean listed: 127.0.0.2, a range or a wildcard.",reject_message:"The text of the refusal.",score:"The spam score a listing adds."}},
+  {id:"surbl",path:"/api/v1/surbl-servers",title:"SURBL servers",noun:"SURBL server",columns:["active","dns_host","expected_result","reject_message","score"],
+    defaults:{score:5},hints:{active:"Consulted for the next message.",dns_host:"The zone the domains in a message are looked up in.",expected_result:"The answers that mean listed; empty is any answer but a refusal code.",reject_message:"The text of the refusal.",score:"The spam score a listing adds."}},
+  {id:"whitelist",path:"/api/v1/whitelist-addresses",title:"Anti-spam white list",noun:"white-list address",columns:["lower_ip","upper_ip","email_address","description"],
+    defaults:{},hints:{lower_ip:"The lowest address of the range.",upper_ip:"The highest address of the range.",email_address:"The sender, with wildcards; empty is any.",description:"A note."}},
+  {id:"blocked",path:"/api/v1/blocked-senders",title:"Blocked senders",noun:"blocked sender",columns:["address","score","description"],
+    defaults:{score:100},hints:{address:"An address, or a domain that covers its subdomains.",score:"The spam score the sender adds; the desktop's 100 crosses every threshold.",description:"A note."}},
+  {id:"attachments",path:"/api/v1/blocked-attachments",title:"Blocked attachments",noun:"blocked attachment",columns:["wildcard","description"],
+    defaults:{wildcard:"*.exe"},hints:{wildcard:"A file-name pattern, such as *.exe.",description:"A note."}},
+  {id:"greylist",path:"/api/v1/greylisting-white-addresses",title:"Greylisting white list",noun:"greylisting white address",columns:["ip_address","description"],
+    defaults:{},hints:{ip_address:"An address, or a pattern such as 192.168.* or 2001:db8:*.",description:"A note."}},
+  {id:"relays",path:"/api/v1/incoming-relays",title:"Incoming relays",noun:"incoming relay",columns:["name","lower_ip","upper_ip"],
+    defaults:{},hints:{name:"A name for the relay.",lower_ip:"The lowest address of the range.",upper_ip:"The highest address of the range."}}
+];
+function collectionById(id){return COLLECTIONS.filter(c=>c.id===id)[0];}
+function collectionProps(c){
+  const props=properties(c.path,"post"), out={};
+  Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&c.hints[k])out[k].description=c.hints[k];});
+  return out;
+}
+async function renderLists(){
+  await loadSpec();
+  for(const c of COLLECTIONS)cache.collections[c.id]=asList(await api(c.path),"items");
+  if(editing&&editing.kind==="collection"){renderCollectionEditor();return;}
+  const cell=(c,x,k)=>{
+    const prop=properties(c.path,"post")[k]||{};
+    if(prop.type==="boolean")return yesNo(x[k]);
+    return escHtml(x[k]===undefined||x[k]===null||x[k]===""?"—":x[k]);
+  };
+  const sections=COLLECTIONS.map(c=>{
+    // The question a delete asks names the entry by its first text column.
+    const labelKey=c.columns.filter(k=>(properties(c.path,"post")[k]||{}).type!=="boolean")[0]||c.columns[0];
+    const rows=cache.collections[c.id].map(x=>`
+      <tr>${c.columns.map(k=>'<td>'+cell(c,x,k)+'</td>').join("")}
+          <td style="text-align:right;white-space:nowrap">
+            <button class="btn ghost sm" data-act="colledit" data-coll="${c.id}" data-id="${escHtml(x.id)}">Edit</button>
+            <button class="btn danger sm" data-act="colldel" data-coll="${c.id}" data-id="${escHtml(x.id)}" data-label="${escHtml(x[labelKey]===undefined?x.id:x[labelKey])}">Delete</button>
+            <div class="err" id="err_coll_${c.id}_${escHtml(x.id)}"></div></td></tr>`).join("");
+    return `<div class="sect"><h2>${escHtml(c.title)} <code class="muted">${escHtml(c.path)}</code></h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation(c.path,"get").description||"")}</p>
+        <div class="tablewrap"><table><thead><tr>${c.columns.map(k=>'<th>'+escHtml(humanise(k))+'</th>').join("")}<th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="'+(c.columns.length+1)+'" class="empty">Nothing here.</td></tr>'}</tbody></table></div>
+        <div class="row" style="margin-top:16px"><button class="btn" data-act="collnew" data-coll="${c.id}">Add a ${escHtml(c.noun)}</button></div>
+      </div></div>`;
+  }).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat"><p class="note">The lists the desktop Control Panel edits in its collection editors, each a resource of its own. Every table and every editor below is built from the server's OpenAPI document, so a key a collection gains appears here on its own.</p></div>
+    ${sections}</div>`;
+}
+function openCollectionItem(collId,id){
+  const c=collectionById(collId);
+  const existing=(cache.collections[collId]||[]).filter(x=>Number(x.id)===Number(id))[0];
+  const values=existing?JSON.parse(JSON.stringify(existing)):Object.assign(documentedDefaults(c.path,"post",collectionProps(c)),c.defaults);
+  editing={kind:"collection",coll:collId,id:Number(id)||0,values:values};
+  renderCollectionEditor();
+}
+function renderCollectionEditor(){
+  const c=collectionById(editing.coll), props=collectionProps(c);
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All lists</button>
+    <div class="sect"><h2>${editing.id?"Edit "+escHtml(c.noun)+" "+escHtml(editing.id):"New "+escHtml(c.noun)}</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation(editing.id?c.path+"/{id}":c.path,editing.id?"put":"post").description||"")}</p>
+        <div class="form">${formHtml("coll",props,editing.values,{required:requiredOf(c.path,"post")})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="collsave">Save ${escHtml(c.noun)}</button>
+          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <div class="err" id="err_colledit"></div>
+        </div>
+      </div></div></div>`;
+}
+async function saveCollectionItem(){
+  setErr("err_colledit","");
+  const c=collectionById(editing.coll);
+  let body;
+  try{body=readForm("coll",collectionProps(c),{});}catch(e){setErr("err_colledit",e.message);return;}
+  try{
+    if(editing.id)await api(c.path+"/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api(c.path,{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast(humanise(c.noun).replace(/^./,ch=>ch.toUpperCase())+" saved");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_colledit",e.message);}
+}
+async function deleteCollectionItem(collId,id,label){
+  const c=collectionById(collId);
+  if(!confirm("Delete the "+c.noun+" "+label+"?"))return;
+  setErr("err_coll_"+collId+"_"+id,"");
+  try{await api(c.path+"/"+id,{method:"DELETE"});toast(humanise(c.noun).replace(/^./,ch=>ch.toUpperCase())+" deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_coll_"+collId+"_"+id,e.message);}
 }
 
 /* ---------- Backup ----------

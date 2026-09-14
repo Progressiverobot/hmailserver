@@ -479,6 +479,45 @@ const LIST_CREATE_PROPS = Object.assign({ address: { type: 'string' }, members: 
 const LISTS_POST = 'Body: address (required, in this domain), members (an array of addresses), active (default true), require_auth (default false), mode (public, membership, announcement or domain_members; default public, and any other word is refused as put_Mode refuses it), require_sender_address (the one sender an announcement list accepts), moderator_address and bounce_address. Saved as the Control Panel saves a list, with the same limitation check. Scoped to the domain.';
 const LIST_PUT = 'Body: any subset of active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address and bounce_address; a field left out keeps its value, and the members are not changed here. Everything is checked before anything is applied. Scoped to the address\'s domain.';
 
+// The seven small collections as RestApiAntiSpamLists.cpp and
+// RestApiBlockedAttachments.cpp describe them: the create's schema, its
+// required keys and the three descriptions; the update takes any subset of
+// the same keys. The entries the recorded server starts with are below.
+const DNS_LIST_PROPS = { dns_host: { type: 'string' }, expected_result: { type: 'string' }, reject_message: { type: 'string' }, score: { type: 'integer' }, active: { type: 'boolean' } };
+const COLLECTION_SPECS = {
+   '/api/v1/dns-blacklists': { props: DNS_LIST_PROPS, required: ['dns_host'], noun: 'DNS black list',
+      get: 'AntiSpam.DNSBlackLists over COM. Each entry: id, active, dns_host, expected_result, reject_message, score. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: dns_host (required, the zone queried), expected_result (the answers that mean listed, 127.0.0.2 or a range or wildcard), reject_message, score and active (default true). Saved as a list saved in the Control Panel is, and consulted for the next message. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/surbl-servers': { props: DNS_LIST_PROPS, required: ['dns_host'], noun: 'SURBL server',
+      get: 'AntiSpam.SURBLServers over COM. Each entry: id, active, dns_host, expected_result, reject_message, score. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: dns_host (required, the zone the domains in a message are looked up in), expected_result (the answers that mean listed; empty is any answer but a refusal code), reject_message, score and active (default true). Saved as one saved in the Control Panel is, and consulted for the next message. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/whitelist-addresses': { props: { lower_ip: { type: 'string' }, upper_ip: { type: 'string' }, email_address: { type: 'string' }, description: { type: 'string' } }, required: ['lower_ip', 'upper_ip'], noun: 'white-list address',
+      get: 'AntiSpam.WhiteListAddresses over COM: the senders and address ranges the spam tests skip. Each entry: id, lower_ip, upper_ip, email_address, description. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: lower_ip and upper_ip (required, the address range), email_address (the sender, with wildcards; empty is any) and description. Saved as one saved in the Control Panel is; the white-list cache is reloaded for the next message. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/blocked-senders': { props: { address: { type: 'string' }, score: { type: 'integer' }, description: { type: 'string' } }, required: ['address'], noun: 'blocked sender',
+      get: 'AntiSpam.BlockedSenders over COM: the envelope senders, by address or by domain, that score. Each entry: id, address, score, description. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: address (required; an address, or a domain that covers its subdomains), score and description. Saved as one saved in the Control Panel is; the blocked-sender cache is reloaded for the next message. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/blocked-attachments': { props: { wildcard: { type: 'string' }, description: { type: 'string' } }, required: ['wildcard'], noun: 'blocked attachment',
+      get: 'AntiVirus.BlockedAttachments over COM: the file-name wildcards stripped from incoming messages when attachment_blocking_enabled is on in the anti-virus settings. Each entry: id, wildcard, description. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: wildcard (required; a file-name pattern such as *.exe) and description. Saved as one saved in the Control Panel is, and consulted for the next message scanned. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/greylisting-white-addresses': { props: { ip_address: { type: 'string' }, description: { type: 'string' } }, required: ['ip_address'], noun: 'greylisting white address',
+      get: 'AntiSpam.GreyListingWhiteAddresses over COM: the address patterns whose connections are never greylisted. Each entry: id, ip_address (with the wildcards as typed), description. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: ip_address (required; an address, or a pattern such as 192.168.* or 2001:db8:*) and description. Saved as one saved in the Control Panel is, and consulted for the next connection. Server-wide; refused for domain-restricted and read-only keys.' },
+   '/api/v1/incoming-relays': { props: { name: { type: 'string' }, lower_ip: { type: 'string' }, upper_ip: { type: 'string' } }, required: ['name', 'lower_ip', 'upper_ip'], noun: 'incoming relay',
+      get: 'Settings.IncomingRelays over COM: the address ranges whose Received headers are skipped when the real sender of a message is looked for. Each entry: id, name, lower_ip, upper_ip. Server-wide; refused for domain-restricted keys.',
+      post: 'Body: name, lower_ip and upper_ip (all required). Saved as one saved in the Control Panel is, and in force for the next session. Server-wide; refused for domain-restricted and read-only keys.' }
+};
+const COLLECTION_PUT = 'Body: any subset of the fields POST takes; a field left out keeps its value. Nothing changes when the body is refused. Server-wide; refused for domain-restricted and read-only keys.';
+function collectionPaths() {
+   const out = {};
+   Object.keys(COLLECTION_SPECS).forEach((path) => {
+      const c = COLLECTION_SPECS[path];
+      out[path] = { get: { summary: 'List the ' + c.noun + 's', description: c.get }, post: { summary: 'Add a ' + c.noun, description: c.post, requestBody: body(c.props, c.required) } };
+      out[path + '/{id}'] = { put: { summary: 'Change a ' + c.noun, description: COLLECTION_PUT, requestBody: body(c.props) }, delete: { summary: 'Remove a ' + c.noun } };
+   });
+   return out;
+}
+
 // The IP range's schema as the ports and certificates literal emits it, every
 // field typed; the update takes any subset of the same keys.
 const RANGE_PROPS = {
@@ -724,6 +763,7 @@ const spec = {
       },
       '/api/v1/accounts/{address}/fetch-accounts/{id}/download': { post: { summary: 'Collect from the remote mailbox now' } },
       '/api/v1/settings/backup': settingsPath('/api/v1/settings/backup'),
+      ...collectionPaths(),
       '/api/v1/settings/scripting': settingsPath('/api/v1/settings/scripting'),
       '/api/v1/settings/scripting/reload': { post: { summary: 'Load the event-handler script again', description: 'What Scripting.Reload does over COM: the script file is read again and the handlers it defines take over from the next event.' } },
       '/api/v1/settings/scripting/check': { post: { summary: 'Check the event-handler script\'s syntax', description: 'What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser\'s message otherwise. Nothing is changed.' } },
@@ -778,6 +818,15 @@ const state = {
    backupRunning: false,
    scriptReloads: 0,
    scriptProblem: '',
+   collections: {
+      '/api/v1/dns-blacklists': [{ id: 11, active: true, dns_host: 'zen.spamhaus.org', expected_result: '127.0.0.2-11', reject_message: 'Listed at Spamhaus', score: 5 }],
+      '/api/v1/surbl-servers': [{ id: 12, active: false, dns_host: 'multi.surbl.org', expected_result: '', reject_message: '', score: 5 }],
+      '/api/v1/whitelist-addresses': [{ id: 13, lower_ip: '10.0.0.1', upper_ip: '10.0.0.9', email_address: '*@partner.example', description: 'The partner' }],
+      '/api/v1/blocked-senders': [{ id: 14, address: 'spam.example', score: 100, description: 'A spam domain' }],
+      '/api/v1/blocked-attachments': [{ id: 15, wildcard: '*.exe', description: 'Programs' }],
+      '/api/v1/greylisting-white-addresses': [{ id: 16, ip_address: '10.0.0.*', description: 'The office' }],
+      '/api/v1/incoming-relays': [{ id: 17, name: 'Front relay', lower_ip: '192.0.2.1', upper_ip: '192.0.2.1' }]
+   },
    ranges: [
       Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false }, RANGE_CREATE_DEFAULTS,
          { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
@@ -1048,6 +1097,42 @@ function answer(method, path, headers, raw) {
       }
       if (at < 0) { return json(404, { error: 'ip range not found' }); }
       if (method === 'DELETE') { state.ranges.splice(at, 1); return json(200, { deleted: true }); }
+   }
+
+   // The seven small collections, each in the same shape: the body read
+   // whole, an unknown field or a missing required one refused by name.
+   for (const base of Object.keys(COLLECTION_SPECS)) {
+      const c = COLLECTION_SPECS[base];
+      const items = state.collections[base];
+      const refused = () => {
+         for (const key of Object.keys(parsed)) { if (!(key in c.props)) { return 'unknown field: ' + key; } }
+         for (const key of Object.keys(parsed)) { if (c.props[key].type === 'integer' && typeof parsed[key] !== 'number') { return key + ' must be a whole number between -2000000000 and 2000000000'; } }
+         return null;
+      };
+      if (path === base && method === 'GET') { return json(200, items); }
+      if (path === base && method === 'POST') {
+         const problem = refused() || c.required.filter((k) => !String(parsed[k] || '').trim()).map((k) => k + ' is required')[0];
+         if (problem) { return json(400, { error: problem }); }
+         const item = Object.assign({ id: nextId++ }, c.props.active ? { active: true } : {}, parsed);
+         items.push(item);
+         return json(201, item);
+      }
+      if (path.indexOf(base + '/') === 0) {
+         const id = Number(path.slice(base.length + 1));
+         const at = items.findIndex((x) => x.id === id);
+         if (method === 'PUT') {
+            const problem = refused();
+            if (problem) { return json(400, { error: problem }); }
+            if (at < 0) { return json(404, { error: c.noun + ' not found' }); }
+            Object.assign(items[at], parsed);
+            return json(200, items[at]);
+         }
+         if (method === 'DELETE') {
+            if (at < 0) { return json(404, { error: c.noun + ' not found' }); }
+            items.splice(at, 1);
+            return json(200, { deleted: true });
+         }
+      }
    }
 
    if (path === '/api/v1/queue' && method === 'GET') { return json(200, { messages: state.queue }); }
@@ -1849,6 +1934,84 @@ async function main() {
    click(act('fetchdel', { id: 7 }));
    await flush();
    check('yes deletes by id under the account and the re-read list is without it', called(before, 'DELETE', fetchList + '/7').length === 1 && rows().length === 1 && rows()[0].textContent.indexOf('ISP mailbox') >= 0);
+
+   // ---- the seven small collections, one view
+   before = requests.length;
+   await goTo('lists');
+   check('the Lists view reads the seven collections', Object.keys(COLLECTION_SPECS).every((p) => called(before, 'GET', p).length === 1) && $('#viewTitle').textContent === 'Lists', paths(before));
+   const tables = content().querySelectorAll('table');
+   check('one table per collection, each with its entry\'s own columns and a row per entry', tables.length === 7 && tables.every((t) => t.querySelectorAll('tbody tr').length === 1) &&
+      tables[0].querySelectorAll('th').map((h) => h.textContent).join(',') === 'Active,DNS host,Expected result,Reject message,Score,' &&
+      tables[6].querySelectorAll('th').map((h) => h.textContent).join(',') === 'Name,Lower IP,Upper IP,', tables.length + ' tables');
+   check('a flag is yes or no, and the values are the entries\' own', tables[0].querySelector('.badge.good') !== null && tables[1].querySelector('.badge.warn') !== null &&
+      tables[0].textContent.indexOf('zen.spamhaus.org') >= 0 && tables[4].textContent.indexOf('*.exe') >= 0 && tables[5].textContent.indexOf('10.0.0.*') >= 0 && tables[6].textContent.indexOf('Front relay') >= 0);
+   check('each section carries its route\'s own sentence and an Add', content().textContent.indexOf('AntiVirus.BlockedAttachments over COM') >= 0 &&
+      COLLECTION_SPECS && ['dnsbl', 'surbl', 'whitelist', 'blocked', 'attachments', 'greylist', 'relays'].every((id) => act('collnew', { coll: id }) !== null));
+   click(act('collnew', { coll: 'dnsbl' }));
+   await flush();
+   const drawnColl = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('coll_') === 0).map((id) => id.slice(5)).sort();
+   check('Add opens an editor with every key of the create and nothing else', JSON.stringify(drawnColl) === JSON.stringify(Object.keys(DNS_LIST_PROPS).sort()), JSON.stringify(drawnColl));
+   check('a new entry starts at the description\'s default and the desktop editor\'s', document.getElementById('coll_active').checked === true && document.getElementById('coll_score').value === '5' &&
+      document.getElementById('coll_dns_host').value === '' && document.getElementById('coll_dns_host').closest('.fr').textContent.indexOf('required') >= 0 &&
+      document.getElementById('coll_score').closest('.fr').textContent.indexOf('required') < 0);
+   setValue('coll_score', 'high');
+   before = requests.length;
+   click(act('collsave'));
+   await flush();
+   check('a score that is not a number is refused by the page', called(before, 'POST', /dns-blacklists/).length === 0 && document.getElementById('err_colledit').textContent.indexOf('whole number') >= 0);
+   setValue('coll_score', '3');
+   click(act('collsave'));
+   await flush();
+   check('a create without its required key is the server\'s refusal in the editor', called(before, 'POST', '/api/v1/dns-blacklists').length === 1 && document.getElementById('err_colledit').textContent === 'dns_host is required');
+   setValue('coll_dns_host', 'bl.example.test');
+   setValue('coll_reject_message', 'Listed');
+   before = requests.length;
+   click(act('collsave'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/dns-blacklists');
+   check('saving a new entry posts the form, the score as a number', JSON.stringify(posted) === '{"dns_host":"bl.example.test","expected_result":"","reject_message":"Listed","score":3,"active":true}', JSON.stringify(posted));
+   check('and the re-read view has it', called(before, 'GET', '/api/v1/dns-blacklists').length === 1 && content().querySelectorAll('table')[0].querySelectorAll('tbody tr').length === 2 &&
+      content().querySelectorAll('table')[0].textContent.indexOf('bl.example.test') >= 0 && toastText() === 'DNS blacklist saved', toastText());
+   click(act('colledit', { coll: 'blocked', id: 14 }));
+   await flush();
+   check('editing shows the entry\'s own values and the update\'s sentence', document.getElementById('coll_address').value === 'spam.example' && document.getElementById('coll_score').value === '100' &&
+      document.getElementById('coll_description').value === 'A spam domain' && content().textContent.indexOf('a field left out keeps its value') >= 0);
+   setValue('coll_score', '50');
+   before = requests.length;
+   click(act('collsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/blocked-senders/14');
+   check('saving an existing entry PUTs the whole record by id', JSON.stringify(put) === '{"address":"spam.example","score":50,"description":"A spam domain"}' && content().querySelectorAll('table')[3].textContent.indexOf('50') >= 0, JSON.stringify(put));
+   click(act('collnew', { coll: 'attachments' }));
+   await flush();
+   check('a new attachment starts at the desktop\'s *.exe, a new relay at nothing', document.getElementById('coll_wildcard').value === '*.exe');
+   click(act('cancel'));
+   await flush();
+   click(act('collnew', { coll: 'greylist' }));
+   await flush();
+   setValue('coll_ip_address', '203.0.113.*');
+   nextRefusal = 'The IP address must not be empty.';
+   click(act('collsave'));
+   await flush();
+   check('a refused save keeps the editor open with the server\'s sentence', document.getElementById('err_colledit').textContent === 'The IP address must not be empty.' && document.getElementById('coll_ip_address').value === '203.0.113.*');
+   before = requests.length;
+   click(act('collsave'));
+   await flush();
+   check('and the next save posts to the collection\'s own path', called(before, 'POST', '/api/v1/greylisting-white-addresses').length === 1 && content().querySelectorAll('table')[5].textContent.indexOf('203.0.113.*') >= 0);
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('colldel', { coll: 'relays', id: 17 }));
+   await flush();
+   check('deleting asks, naming the entry by its first text column', called(before, 'DELETE', /incoming-relays/).length === 0 && confirmations[confirmations.length - 1].indexOf('incoming relay Front relay') >= 0,
+      confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('colldel', { coll: 'relays', id: 17 }));
+   await flush();
+   check('yes deletes by id and the re-read table is empty', called(before, 'DELETE', '/api/v1/incoming-relays/17').length === 1 && content().querySelectorAll('table')[6].textContent.indexOf('Nothing here') >= 0);
+   nextRefusal = 'The white list is in use.';
+   click(act('colldel', { coll: 'whitelist', id: 13 }));
+   await flush();
+   check('a refused delete is shown on its row', document.getElementById('err_coll_whitelist_13').textContent === 'The white list is in use.');
 
    // ---- the delivery queue
    before = requests.length;
