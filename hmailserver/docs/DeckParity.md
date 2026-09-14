@@ -9,9 +9,9 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 320 |
-| of them reachable from a Deck view | 250 |
-| missing over REST | 15 |
+| of them writable over REST | 321 |
+| of them reachable from a Deck view | 251 |
+| missing over REST | 14 |
 | over REST but not reached by any Deck view | 70 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
@@ -28,7 +28,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Settings | 1 | `UserInterfaceLanguage` |
 | DistributionListRecipient | 1 | `RecipientAddress` |
 | RouteAddress | 1 | `RouteID` |
-| RuleAction | 1 | `AbortSpamFlagged` |
 | ServerMessage | 1 | `Name` |
 | Group | 1 | `Name` |
 | GroupMember | 1 | `AccountID` |
@@ -399,7 +398,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `AbortSpamFlagged` | RuleActionDialog | - | - |
+| `AbortSpamFlagged` | RuleActionDialog | `POST /api/v1/rules` (setter)<br>`PUT /api/v1/rules/{id}` (setter) | rules |
 | `Body` | RuleActionDialog | `POST /api/v1/rules` (setter)<br>`PUT /api/v1/rules/{id}` (setter) | rules |
 | `FromAddress` | RuleActionDialog | `POST /api/v1/rules` (setter)<br>`PUT /api/v1/rules/{id}` (setter) | rules |
 | `FromName` | RuleActionDialog | `POST /api/v1/rules` (setter)<br>`PUT /api/v1/rules/{id}` (setter) | rules |
@@ -735,8 +734,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/queue/{id}/retry` | - | - | yes |
 | `POST /api/v1/routes` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
 | `PUT /api/v1/routes/{id}` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
-| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
-| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
+| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `abort_spam_flagged`, `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
+| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `abort_spam_flagged`, `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
 | `POST /api/v1/scheduled/run` | - | - | - |
 | `POST /api/v1/server/reinitialize` | - | - | yes |
 | `POST /api/v1/session` | - | - | - |

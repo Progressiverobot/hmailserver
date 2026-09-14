@@ -105,6 +105,12 @@ namespace RegressionTests.API
             hMailServer.GreyListingWhiteAddresses whiteAddresses = _settings.AntiSpam.GreyListingWhiteAddresses;
             for (int i = whiteAddresses.Count - 1; i >= 0; i--)
                if (whiteAddresses[i].Description.StartsWith("rest-greylist", StringComparison.Ordinal)) whiteAddresses.DeleteByDBID(whiteAddresses[i].ID);
+
+            // A global rule is in no domain, so the per-test domain reset
+            // does not take it with it.
+            hMailServer.Rules rules = _application.Rules;
+            for (int i = rules.Count - 1; i >= 0; i--)
+               if (rules[i].Name.StartsWith("rest-parity", StringComparison.Ordinal)) rules[i].Delete();
          }
          finally
          {
@@ -332,6 +338,56 @@ namespace RegressionTests.API
          Assert.AreEqual(404, Http("DELETE", "/api/v1/greylisting-white-addresses/" + id).status);
          StringAssert.DoesNotContain("rest-greylist", Http("GET", "/api/v1/greylisting-white-addresses").body);
          StringAssert.Contains("\"/api/v1/greylisting-white-addresses\"", Http("GET", "/api/v1/openapi.json").body);
+      }
+
+      [Test]
+      [Description("A rule action's abort-if-spam-flagged flag is stored for a forward and a reply, read back through COM, shown in the listing, turned round by PUT, off when unsaid, and refused on an action that does not send mail on or when it is not a boolean.")]
+      public void RuleActionAbortSpamFlaggedRoundTrip()
+      {
+         const string name = "rest-parity-abort";
+         (int status, string body) created = Http("POST", "/api/v1/rules",
+            "{\"name\":\"" + name + "\",\"active\":false,\"all_criteria\":true," +
+            "\"criteria\":[{\"field\":\"subject\",\"match\":\"contains\",\"value\":\"rest-parity\"}]," +
+            "\"actions\":[{\"type\":\"forward\",\"to\":\"on@example.test\",\"abort_spam_flagged\":true}," +
+            "{\"type\":\"reply\",\"from_address\":\"noreply@example.test\",\"subject\":\"Re\",\"abort_spam_flagged\":false}," +
+            "{\"type\":\"reply\",\"from_address\":\"noreply@example.test\"}]}");
+         Assert.AreEqual(201, created.status, created.body);
+         StringAssert.Contains("{\"type\":\"forward\",\"value\":\"on@example.test\",\"to\":\"on@example.test\",\"abort_spam_flagged\":true}", created.body);
+         StringAssert.Contains("\"subject\":\"Re\",\"body\":\"\",\"abort_spam_flagged\":false}", created.body);
+         string id = IdOf(created.body);
+
+         Rule rule = _application.Rules.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual(3, rule.Actions.Count);
+         Assert.IsTrue(rule.Actions[0].AbortSpamFlagged);
+         Assert.IsFalse(rule.Actions[1].AbortSpamFlagged);
+         Assert.IsFalse(rule.Actions[2].AbortSpamFlagged, "Off unless said, as a new action is in the desktop dialog.");
+
+         string listing = Http("GET", "/api/v1/rules").body;
+         StringAssert.Contains("\"to\":\"on@example.test\",\"abort_spam_flagged\":true", listing);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/rules/" + id,
+            "{\"name\":\"" + name + "\",\"active\":false,\"criteria\":[]," +
+            "\"actions\":[{\"type\":\"forward\",\"to\":\"on@example.test\"},{\"type\":\"reply\",\"from_address\":\"noreply@example.test\",\"abort_spam_flagged\":true}]}");
+         Assert.AreEqual(200, putStatus, putBody);
+         rule = _application.Rules.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual(2, rule.Actions.Count);
+         Assert.IsFalse(rule.Actions[0].AbortSpamFlagged);
+         Assert.IsTrue(rule.Actions[1].AbortSpamFlagged);
+
+         (int deleteStatus, string deleteBody) = Http("PUT", "/api/v1/rules/" + id,
+            "{\"name\":\"" + name + "\",\"active\":false,\"criteria\":[],\"actions\":[{\"type\":\"delete\",\"abort_spam_flagged\":true}]}");
+         Assert.AreEqual(400, deleteStatus, deleteBody);
+         StringAssert.Contains("abort_spam_flagged is not a parameter of a delete action", deleteBody);
+         (int wordStatus, string wordBody) = Http("PUT", "/api/v1/rules/" + id,
+            "{\"name\":\"" + name + "\",\"active\":false,\"criteria\":[],\"actions\":[{\"type\":\"forward\",\"to\":\"on@example.test\",\"abort_spam_flagged\":\"yes\"}]}");
+         Assert.AreEqual(400, wordStatus, wordBody);
+         StringAssert.Contains("abort_spam_flagged must be true or false", wordBody);
+         rule = _application.Rules.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual(2, rule.Actions.Count, "A refused body changes nothing.");
+         Assert.IsTrue(rule.Actions[1].AbortSpamFlagged);
+
+         StringAssert.Contains("forward: to and abort_spam_flagged", Http("GET", "/api/v1/openapi.json").body);
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/rules/" + id).status);
       }
 
       private static (int status, string body) Http(string method, string path, string requestBody = null)

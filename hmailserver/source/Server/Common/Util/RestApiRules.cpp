@@ -381,8 +381,10 @@ namespace HM
       {
          switch (type)
          {
-         case RuleAction::Forward: return key == "to";
-         case RuleAction::Reply: return key == "from_name" || key == "from_address" || key == "subject" || key == "body";
+         // abort_spam_flagged is the desktop dialog's "Abort on messages
+         // marked as spam", offered for the two actions that send mail on.
+         case RuleAction::Forward: return key == "to" || key == "abort_spam_flagged";
+         case RuleAction::Reply: return key == "from_name" || key == "from_address" || key == "subject" || key == "body" || key == "abort_spam_flagged";
          case RuleAction::MoveToIMAPFolder: return key == "folder";
          case RuleAction::ScriptFunction: return key == "script_function";
          case RuleAction::SetHeaderValue: return key == "header";
@@ -438,7 +440,7 @@ namespace HM
          static const char *known[] =
          {
             "type", "value", "to", "from_name", "from_address", "subject", "body",
-            "folder", "header", "route_id", "script_function"
+            "folder", "header", "route_id", "script_function", "abort_spam_flagged"
          };
 
          const std::vector<std::pair<std::string, JsonValue> > &members = object.Members();
@@ -530,6 +532,19 @@ namespace HM
             routeId = routeValue->AsInt64();
          }
 
+         // Off unless said, as a new action is in the desktop dialog.
+         bool abortSpamFlagged = false;
+         const JsonValue *abortValue = object.Get("abort_spam_flagged");
+         if (abortValue && !abortValue->IsNull())
+         {
+            if (!abortValue->IsBool())
+            {
+               error = position + "abort_spam_flagged must be true or false";
+               return false;
+            }
+            abortSpamFlagged = abortValue->AsBool();
+         }
+
          to.Trim();
          fromAddress.Trim();
          folder.Trim();
@@ -592,6 +607,7 @@ namespace HM
          action->SetHeaderName(headerName);
          action->SetScriptFunction(scriptFunction);
          action->SetRouteID(routeId);
+         action->SetAbortSpamFlagged(abortSpamFlagged);
          action->SetValue(standsFor && std::string(standsFor) == "value" ? value : String());
          return true;
       }
@@ -761,14 +777,16 @@ namespace HM
                {
                case RuleAction::Forward:
                   value = Utf8(action->GetTo());
-                  extra.Format(",\"to\":\"%hs\"", escape(value).c_str());
+                  extra.Format(",\"to\":\"%hs\",\"abort_spam_flagged\":%hs", escape(value).c_str(),
+                     action->GetAbortSpamFlagged() ? "true" : "false");
                   break;
                case RuleAction::Reply:
-                  extra.Format(",\"from_name\":\"%hs\",\"from_address\":\"%hs\",\"subject\":\"%hs\",\"body\":\"%hs\"",
+                  extra.Format(",\"from_name\":\"%hs\",\"from_address\":\"%hs\",\"subject\":\"%hs\",\"body\":\"%hs\",\"abort_spam_flagged\":%hs",
                      escape(Utf8(action->GetFromName())).c_str(),
                      escape(Utf8(action->GetFromAddress())).c_str(),
                      escape(Utf8(action->GetSubject())).c_str(),
-                     escape(Utf8(action->GetBody())).c_str());
+                     escape(Utf8(action->GetBody())).c_str(),
+                     action->GetAbortSpamFlagged() ? "true" : "false");
                   break;
                case RuleAction::MoveToIMAPFolder:
                   value = Utf8(folder);
@@ -855,13 +873,13 @@ namespace HM
       // appears once.
       static const char *paths =
          ",\"/api/v1/rules\":{"
-         "\"get\":{\"summary\":\"List the global rules with their criteria and actions\",\"description\":\"Each entry: id, name, active, all_criteria, criteria (field, header, match, value) and actions (type, value). Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of rules\"}}},"
-         "\"post\":{\"summary\":\"Create a global rule\",\"description\":\"Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header's name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to; reply: from_name, from_address (required), subject, body; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.\","
-         "\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"all_criteria\":{\"type\":\"boolean\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"match\",\"value\"],\"properties\":{\"field\":{\"type\":\"string\",\"enum\":[\"from\",\"to\",\"cc\",\"subject\",\"body\",\"message_size\",\"recipient_list\",\"delivery_attempts\",\"header\"]},\"header\":{\"type\":\"string\"},\"match\":{\"type\":\"string\",\"enum\":[\"equals\",\"contains\",\"less_than\",\"greater_than\",\"regex\",\"not_contains\",\"not_equals\",\"wildcard\"]},\"value\":{\"type\":\"string\"}}}},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"delete\",\"forward\",\"reply\",\"move_to_folder\",\"script_function\",\"stop\",\"set_header\",\"send_using_route\",\"copy\",\"bind_to_address\"]},\"value\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"},\"from_name\":{\"type\":\"string\"},\"from_address\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"header\":{\"type\":\"string\"},\"route_id\":{\"type\":\"integer\"},\"script_function\":{\"type\":\"string\"}}}}}}}}},"
+         "\"get\":{\"summary\":\"List the global rules with their criteria and actions\",\"description\":\"Each entry: id, name, active, all_criteria, criteria (field, header, match, value) and actions (type, value, and the parameters the type takes beside it - a forward's and a reply's abort_spam_flagged among them). Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of rules\"}}},"
+         "\"post\":{\"summary\":\"Create a global rule\",\"description\":\"Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header's name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to and abort_spam_flagged; reply: from_name, from_address (required), subject, body and abort_spam_flagged; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.\","
+         "\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"all_criteria\":{\"type\":\"boolean\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"match\",\"value\"],\"properties\":{\"field\":{\"type\":\"string\",\"enum\":[\"from\",\"to\",\"cc\",\"subject\",\"body\",\"message_size\",\"recipient_list\",\"delivery_attempts\",\"header\"]},\"header\":{\"type\":\"string\"},\"match\":{\"type\":\"string\",\"enum\":[\"equals\",\"contains\",\"less_than\",\"greater_than\",\"regex\",\"not_contains\",\"not_equals\",\"wildcard\"]},\"value\":{\"type\":\"string\"}}}},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"delete\",\"forward\",\"reply\",\"move_to_folder\",\"script_function\",\"stop\",\"set_header\",\"send_using_route\",\"copy\",\"bind_to_address\"]},\"value\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"},\"from_name\":{\"type\":\"string\"},\"from_address\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"header\":{\"type\":\"string\"},\"route_id\":{\"type\":\"integer\"},\"script_function\":{\"type\":\"string\"},\"abort_spam_flagged\":{\"type\":\"boolean\"}}}}}}}}},"
          "\"responses\":{\"201\":{\"description\":\"Created: the rule as the listing shows it, with its id, and each action's parameters beside its value\"},\"400\":{\"description\":\"name missing, the body not JSON, or a criterion or action refused (the reason names it in error)\"}}}},"
          "\"/api/v1/rules/{id}\":{"
          "\"put\":{\"summary\":\"Replace a global rule\",\"description\":\"The same body as POST. The rule's name, flags, criteria and actions are all replaced - the old criteria and actions are deleted and the new ones created, which is what saving an edited rule in the Control Panel comes to - and its place in the order is kept. A rule that belongs to an account is not reachable here.\","
-         "\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"all_criteria\":{\"type\":\"boolean\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"match\",\"value\"],\"properties\":{\"field\":{\"type\":\"string\",\"enum\":[\"from\",\"to\",\"cc\",\"subject\",\"body\",\"message_size\",\"recipient_list\",\"delivery_attempts\",\"header\"]},\"header\":{\"type\":\"string\"},\"match\":{\"type\":\"string\",\"enum\":[\"equals\",\"contains\",\"less_than\",\"greater_than\",\"regex\",\"not_contains\",\"not_equals\",\"wildcard\"]},\"value\":{\"type\":\"string\"}}}},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"delete\",\"forward\",\"reply\",\"move_to_folder\",\"script_function\",\"stop\",\"set_header\",\"send_using_route\",\"copy\",\"bind_to_address\"]},\"value\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"},\"from_name\":{\"type\":\"string\"},\"from_address\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"header\":{\"type\":\"string\"},\"route_id\":{\"type\":\"integer\"},\"script_function\":{\"type\":\"string\"}}}}}}}}},"
+         "\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"all_criteria\":{\"type\":\"boolean\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"match\",\"value\"],\"properties\":{\"field\":{\"type\":\"string\",\"enum\":[\"from\",\"to\",\"cc\",\"subject\",\"body\",\"message_size\",\"recipient_list\",\"delivery_attempts\",\"header\"]},\"header\":{\"type\":\"string\"},\"match\":{\"type\":\"string\",\"enum\":[\"equals\",\"contains\",\"less_than\",\"greater_than\",\"regex\",\"not_contains\",\"not_equals\",\"wildcard\"]},\"value\":{\"type\":\"string\"}}}},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"delete\",\"forward\",\"reply\",\"move_to_folder\",\"script_function\",\"stop\",\"set_header\",\"send_using_route\",\"copy\",\"bind_to_address\"]},\"value\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"},\"from_name\":{\"type\":\"string\"},\"from_address\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"header\":{\"type\":\"string\"},\"route_id\":{\"type\":\"integer\"},\"script_function\":{\"type\":\"string\"},\"abort_spam_flagged\":{\"type\":\"boolean\"}}}}}}}}},"
          "\"responses\":{\"200\":{\"description\":\"The rule as saved\"},\"400\":{\"description\":\"As for POST; the rule is unchanged\"},\"404\":{\"description\":\"No global rule with that id\"}}},"
          "\"delete\":{\"summary\":\"Delete a global rule\",\"description\":\"With its criteria and actions, as the Control Panel deletes one. A rule that belongs to an account is not reachable here.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"No global rule with that id\"}}}}";
 
