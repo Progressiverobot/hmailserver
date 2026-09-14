@@ -2,7 +2,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// An account's resources under its address, administered: what Account.AppPasswords and IMAPFolder.Permissions do over COM. See RestApiServer.h.
+// An account's resources under its address, administered: what Account.AppPasswords, IMAPFolder.Permissions and the Messages collections do over COM. See RestApiServer.h.
 //
 // The /api/v1/me routes let an account holder manage their own mailbox. An
 // administrator - the Control Panel, a provisioning script, the Linux
@@ -21,6 +21,15 @@
 //    POST   /api/v1/accounts/{address}/folders/{id}/permissions        grant one
 //    PUT    /api/v1/accounts/{address}/folders/{id}/permissions/{pid}  change one
 //    DELETE /api/v1/accounts/{address}/folders/{id}/permissions/{pid}  revoke one
+//
+//    GET    /api/v1/accounts/{address}/messages                   every message of the account (Account.Messages)
+//    DELETE /api/v1/accounts/{address}/messages                   Account.DeleteMessages
+//    GET    /api/v1/accounts/{address}/folders/{id}/messages      a folder's messages, the \Deleted included (IMAPFolder.Messages)
+//    POST   /api/v1/accounts/{address}/folders/{id}/messages      a raw message into the folder (Messages.Add + Message.Save)
+//    GET    /api/v1/accounts/{address}/messages/{id}              the row, the decoded header fields and every header as written
+//    PUT    /api/v1/accounts/{address}/messages/{id}              its flags
+//    DELETE /api/v1/accounts/{address}/messages/{id}              Messages.DeleteByDBID
+//    GET    /api/v1/accounts/{address}/messages/{id}/source       the file, message/rfc822
 //
 // Each handler does what the COM member does with the same persistence call
 // and the same checks. A create is InterfaceAppPasswords::Add, then
@@ -55,14 +64,36 @@
 // every decision, so a grant written here is in force for the next command.
 // The rights are named as the COM interface's eACLPermission names them and
 // carried as the letters SETACL takes, so that the three surfaces are one.
+//
+// The messages are the rows of hm_messages as COM's Message reports them -
+// id, uid, folder, account, size, state, the time received, the envelope
+// sender and the flags - and a folder's listing is the folder's whole
+// collection, the live one every IMAP session shares, so a message flagged
+// \Deleted and not yet expunged is in it as it is in COM's; the account's
+// own /api/v1/me listing is a reader's view and leaves those out on purpose,
+// which is why the fixtures that count a folder after flagging could not run
+// on it. A message added here is what Messages.Add and Message.Save do: the
+// bytes written where the server keeps a delivered message, the row saved
+// with its UID, the folder's sessions told; the flags travel in the query,
+// as APPEND carries them beside the literal. A delete is what
+// Messages.DeleteByDBID does, and what EXPUNGE does for one message - the
+// row and the file go, through the folder's live collection, and every
+// session is told. The flags are written on the path STORE takes, with the
+// folder's next mod-sequence, so CONDSTORE clients see the change. The
+// account's whole is Account.Messages - every folder, in the collection's
+// order - and its DELETE is Account.DeleteMessages: PersistentAccount's, with
+// the same caches dropped.
 
 #include "StdAfx.h"
 #include "RestApiServer.h"
 #include "JsonDocument.h"
 #include "Unicode.h"
 #include "PasswordPolicy.h"
+#include "FileUtilities.h"
 #include "../Application/Logger.h"
+#include "../Application/Application.h"
 #include "../Application/Configuration.h"
+#include "../Application/FolderManager.h"
 #include "../BO/Account.h"
 #include "../BO/AppPassword.h"
 #include "../BO/AppPasswords.h"
@@ -72,16 +103,25 @@
 #include "../BO/ACLPermissions.h"
 #include "../BO/Group.h"
 #include "../BO/Groups.h"
+#include "../BO/Message.h"
+#include "../BO/Messages.h"
 #include "../Cache/CacheContainer.h"
+#include "../Mime/Mime.h"
 #include "../Persistence/PersistentAccount.h"
 #include "../Persistence/PersistentAppPassword.h"
 #include "../Persistence/PersistentACLPermission.h"
+#include "../Persistence/PersistentMessage.h"
+#include "../Tracking/ChangeNotification.h"
+#include "../Tracking/NotificationServer.h"
 #include "../../IMAP/IMAPConfiguration.h"
 #include "../../IMAP/IMAPFolderContainer.h"
 #include "../../IMAP/IMAPSpecialUse.h"
+#include "../../IMAP/MessagesContainer.h"
 
 #include <cmath>
+#include <fstream>
 #include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -763,6 +803,477 @@ namespace
    }
 
    // ------------------------------------------------------------------------
+   // Messages: the rows, as COM's Message reports them.
+   // ------------------------------------------------------------------------
+
+   const __int64 MaxMessageBytes = 25 * 1024 * 1024;
+   const int MaxHeaderBytes = 64 * 1024;
+
+   // Every IMAP session on the folder is told, the way APPEND, STORE and
+   // EXPUNGE tell them: by message id, which each turns into its own
+   // sequence numbers.
+   void NotifyFolder(std::shared_ptr<IMAPFolder> folder, ChangeNotification::NotificationType type, const std::vector<__int64> &messageIds)
+   {
+      std::shared_ptr<ChangeNotification> notification =
+         std::shared_ptr<ChangeNotification>(new ChangeNotification(folder->GetAccountID(), folder->GetID(), type, messageIds));
+
+      Application::Instance()->GetNotificationServer()->SendNotification(notification);
+   }
+
+   // The value of one query parameter, or nothing: the flags and the
+   // envelope sender of a message added, as APPEND carries its flags.
+   AnsiString ParameterOf(const AnsiString &query, const AnsiString &name)
+   {
+      int start = 0;
+      while (start <= query.GetLength())
+      {
+         int end = query.Find("&", start);
+         AnsiString pair = end < 0 ? query.Mid(start) : query.Mid(start, end - start);
+         if (pair.StartsWith(name + "="))
+            return pair.Mid(name.GetLength() + 1);
+         if (end < 0)
+            break;
+         start = end + 1;
+      }
+      return AnsiString();
+   }
+
+   AnsiString FlagsJson(const Bridge &bridge, std::shared_ptr<Message> message)
+   {
+      AnsiString keywords;
+      std::vector<String> list = message->GetKeywordList();
+      for (size_t i = 0; i < list.size(); i++)
+      {
+         if (i > 0)
+            keywords += ",";
+         keywords += "\"" + bridge.escape(Utf8(list[i])) + "\"";
+      }
+
+      AnsiString flags;
+      flags.Format("{\"seen\":%hs,\"deleted\":%hs,\"flagged\":%hs,\"answered\":%hs,\"draft\":%hs,\"recent\":%hs,\"keywords\":[%hs]}",
+         message->GetFlagSeen() ? "true" : "false",
+         message->GetFlagDeleted() ? "true" : "false",
+         message->GetFlagFlagged() ? "true" : "false",
+         message->GetFlagAnswered() ? "true" : "false",
+         message->GetFlagDraft() ? "true" : "false",
+         message->GetFlagRecent() ? "true" : "false",
+         keywords.c_str());
+      return flags;
+   }
+
+   // The row, as every message route emits it: what COM's Message reports
+   // of the row. Without its closing brace, so the whole-message answer can
+   // carry the header fields beside it.
+   AnsiString RowFields(const Bridge &bridge, std::shared_ptr<Message> message)
+   {
+      AnsiString fields;
+      fields.Format("\"id\":%I64d,\"uid\":%u,\"folder_id\":%I64d,\"account_id\":%I64d,\"size\":%d,\"state\":%d,\"received\":\"%hs\",\"from_address\":\"%hs\",\"flags\":%hs",
+         message->GetID(),
+         message->GetUID(),
+         message->GetFolderID(),
+         message->GetAccountID(),
+         message->GetSize(),
+         (int) message->GetState(),
+         bridge.escape(Utf8(message->GetCreateTime())).c_str(),
+         bridge.escape(Utf8(message->GetFromAddress())).c_str(),
+         FlagsJson(bridge, message).c_str());
+      return fields;
+   }
+
+   AnsiString RowJson(const Bridge &bridge, std::shared_ptr<Message> message)
+   {
+      return "{" + RowFields(bridge, message) + "}";
+   }
+
+   // The header block of the file: the five fields a reader asks for by
+   // name, decoded, and every field as written, name and value - what
+   // Message.Headers and Message.HeaderValue answer over COM. A header block
+   // is bytes and the JSON is UTF-8; decoding and re-encoding turns any byte
+   // that is not UTF-8 into the replacement character, so the document stays
+   // valid whatever an old client wrote in a header.
+   AnsiString HeaderJson(const Bridge &bridge, const String &fileName)
+   {
+      AnsiString header = FileUtilities::Exists(fileName) ? PersistentMessage::LoadHeader(fileName, false) : AnsiString();
+      if (header.GetLength() > MaxHeaderBytes)
+         header = header.Mid(0, MaxHeaderBytes);
+
+      MimeHeader mimeHeader;
+      if (!header.IsEmpty())
+         mimeHeader.Load(header.c_str(), header.GetLength(), true);
+
+      AnsiString json;
+      json.Format(",\"subject\":\"%hs\",\"from\":\"%hs\",\"to\":\"%hs\",\"cc\":\"%hs\",\"date\":\"%hs\",\"headers\":[",
+         bridge.escape(Utf8(mimeHeader.GetUnicodeFieldValue("Subject"))).c_str(),
+         bridge.escape(Utf8(mimeHeader.GetUnicodeFieldValue("From"))).c_str(),
+         bridge.escape(Utf8(mimeHeader.GetUnicodeFieldValue("To"))).c_str(),
+         bridge.escape(Utf8(mimeHeader.GetUnicodeFieldValue("Cc"))).c_str(),
+         bridge.escape(Utf8(mimeHeader.GetUnicodeFieldValue("Date"))).c_str());
+
+      int written = 0;
+      for (int i = 0; i < mimeHeader.GetFieldCount(); i++)
+      {
+         MimeField *field = mimeHeader.GetField((unsigned int) i);
+         if (!field || !field->GetName())
+            continue;
+
+         String name;
+         Unicode::MultiByteToWide(AnsiString(field->GetName()), name);
+         String value;
+         Unicode::MultiByteToWide(AnsiString(field->GetValue() ? field->GetValue() : ""), value);
+
+         if (written > 0)
+            json += ",";
+         json += "{\"name\":\"" + bridge.escape(Utf8(name)) + "\",\"value\":\"" + bridge.escape(Utf8(value)) + "\"}";
+         written++;
+      }
+
+      json += "]";
+      return json;
+   }
+
+   // The message the id names, if it is this account's and in a folder of
+   // its tree: the row, and the folder. Another account's message, or one
+   // whose folder is not in the tree, is not found: the id space is shared,
+   // and an answer that differed would say it exists.
+   std::shared_ptr<Message> OwnMessageRow(std::shared_ptr<Account> account, __int64 messageId, std::shared_ptr<IMAPFolder> &folder)
+   {
+      std::shared_ptr<Message> row = std::shared_ptr<Message>(new Message());
+      if (!PersistentMessage::ReadObject(row, messageId) || row->GetID() == 0)
+         return std::shared_ptr<Message>();
+
+      if (row->GetAccountID() != account->GetID())
+         return std::shared_ptr<Message>();
+
+      folder = OwnFolder(account, row->GetFolderID());
+      if (!folder)
+         return std::shared_ptr<Message>();
+
+      return row;
+   }
+
+   // The live object every IMAP session on the folder shares, since what
+   // is changed here must be what they see.
+   std::shared_ptr<Message> LiveMessage(std::shared_ptr<IMAPFolder> folder, __int64 messageId)
+   {
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
+      if (!messages)
+         return std::shared_ptr<Message>();
+
+      return messages->GetItemByDBID((unsigned __int64) messageId);
+   }
+
+   HttpResponse ListFolderMessages(const Bridge &bridge, std::shared_ptr<Account> account, __int64 folderId)
+   {
+      std::shared_ptr<IMAPFolder> folder = OwnFolder(account, folderId);
+      if (!folder)
+         return Refusal(bridge, 404, "folder not found");
+
+      // A snapshot of the live collection - the folder's whole, \Deleted
+      // included - walked in its own order, which is UID order.
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
+      std::vector<std::shared_ptr<Message> > snapshot = messages ? messages->GetCopy() : std::vector<std::shared_ptr<Message> >();
+
+      AnsiString json;
+      json.Format("{\"folder_id\":%I64d,\"total\":%d,\"messages\":[", folder->GetID(), (int) snapshot.size());
+      for (size_t i = 0; i < snapshot.size(); i++)
+      {
+         if (i > 0)
+            json += ",";
+         json += RowJson(bridge, snapshot[i]);
+      }
+      json += "]}";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse ListAccountMessages(const Bridge &bridge, std::shared_ptr<Account> account)
+   {
+      // Account.Messages over COM: every message of the account whatever
+      // its folder, read fresh as Account::GetMessages reads it.
+      std::shared_ptr<Messages> messages = account->GetMessages();
+      std::vector<std::shared_ptr<Message> > snapshot = messages ? messages->GetCopy() : std::vector<std::shared_ptr<Message> >();
+
+      AnsiString json;
+      json.Format("{\"total\":%d,\"messages\":[", (int) snapshot.size());
+      for (size_t i = 0; i < snapshot.size(); i++)
+      {
+         if (i > 0)
+            json += ",";
+         json += RowJson(bridge, snapshot[i]);
+      }
+      json += "]}";
+      return bridge.respond(200, json, "");
+   }
+
+   // ?flags=seen,flagged,... onto a message being added, as APPEND's flag
+   // list goes beside the literal.
+   bool ApplyFlagList(const AnsiString &query, std::shared_ptr<Message> message, AnsiString &error)
+   {
+      AnsiString list = ParameterOf(query, "flags");
+      int start = 0;
+      while (start <= list.GetLength() && !list.IsEmpty())
+      {
+         int end = list.Find(",", start);
+         AnsiString word = end < 0 ? list.Mid(start) : list.Mid(start, end - start);
+         word.TrimLeft();
+         word.TrimRight();
+         word.ToLower();
+
+         if (word == "seen")
+            message->SetFlagSeen(true);
+         else if (word == "flagged")
+            message->SetFlagFlagged(true);
+         else if (word == "answered")
+            message->SetFlagAnswered(true);
+         else if (word == "draft")
+            message->SetFlagDraft(true);
+         else if (word == "deleted")
+            message->SetFlagDeleted(true);
+         else if (!word.IsEmpty())
+         {
+            error = "unknown flag: " + word.Mid(0, 48) + "; the flags are seen, flagged, answered, draft and deleted";
+            return false;
+         }
+
+         if (end < 0)
+            break;
+         start = end + 1;
+      }
+      return true;
+   }
+
+   // One message, the request body, into a folder of the account's: what
+   // Messages.Add and Message.Save do over COM, and what APPEND does.
+   HttpResponse CreateFolderMessage(const Bridge &bridge, std::shared_ptr<Account> account, __int64 folderId, const AnsiString &requestBody, const AnsiString &query)
+   {
+      std::shared_ptr<IMAPFolder> folder = OwnFolder(account, folderId);
+      if (!folder)
+         return Refusal(bridge, 404, "folder not found");
+
+      if (requestBody.size() == 0)
+         return Refusal(bridge, 400, "the body is the message, as a .eml file");
+      if ((__int64) requestBody.size() > MaxMessageBytes)
+         return Refusal(bridge, 413, "a message is at most 25 MB here");
+
+      int colon = requestBody.Find(":");
+      int lineEnd = requestBody.Find("\n");
+      if (colon < 0 || (lineEnd >= 0 && colon > lineEnd))
+         return Refusal(bridge, 400, "the body does not begin with a header line");
+
+      std::shared_ptr<Message> message = std::shared_ptr<Message>(new Message());
+      message->SetAccountID(folder->GetAccountID());
+      message->SetFolderID(folder->GetID());
+
+      AnsiString error;
+      if (!ApplyFlagList(query, message, error))
+         return Refusal(bridge, 400, String(error));
+
+      // The envelope sender the row carries, as Message.FromAddress sets it.
+      String fromAddress;
+      Unicode::MultiByteToWide(ParameterOf(query, "from"), fromAddress);
+      fromAddress.Trim();
+      message->SetFromAddress(fromAddress);
+
+      // Lines end in CRLF in a stored message; a body that came with bare LF
+      // is given them.
+      AnsiString text;
+      for (int i = 0; i < requestBody.GetLength(); i++)
+      {
+         char c = requestBody[i];
+         if (c == '\n' && (i == 0 || requestBody[i - 1] != '\r'))
+            text += '\r';
+         text += c;
+      }
+      if (text.GetLength() < 2 || text.Mid(text.GetLength() - 2) != "\r\n")
+         text += "\r\n";
+
+      const String fileName = PersistentMessage::GetFileName(account, message);
+      // An account that has never had a message on disk has no directory
+      // yet; APPEND makes it on the way, and so does this.
+      String directory = FileUtilities::GetFilePath(fileName);
+      if (!FileUtilities::Exists(directory) && !FileUtilities::CreateDirectory(directory))
+         return Refusal(bridge, 500, "the account's directory could not be made");
+      if (!FileUtilities::WriteToFile(fileName, text))
+         return Refusal(bridge, 500, "the message could not be written");
+
+      message->SetSize((int) FileUtilities::FileSize(fileName));
+      // A message in a folder is a delivered one, as InterfaceMessage::Save
+      // marks it before the store sees it; the row gets its UID on the way.
+      message->SetState(Message::Delivered);
+      if (!PersistentMessage::SaveObject(message))
+      {
+         FileUtilities::DeleteFile(fileName);
+         return Refusal(bridge, 500, "the message could not be stored; see the error log");
+      }
+
+      MessagesContainer::Instance()->SetFolderNeedsRefresh(folder->GetID());
+      std::vector<__int64> added;
+      added.push_back(message->GetID());
+      NotifyFolder(folder, ChangeNotification::NotificationMessageAdded, added);
+
+      return bridge.respond(201, RowJson(bridge, message), "");
+   }
+
+   HttpResponse GetMessage(const Bridge &bridge, std::shared_ptr<Account> account, __int64 messageId)
+   {
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> row = OwnMessageRow(account, messageId, folder);
+      if (!row)
+         return Refusal(bridge, 404, "message not found");
+
+      // The file's path is the COM Filename: where the bytes are on the
+      // server's own disk, for an operator beside it.
+      const String fileName = PersistentMessage::GetFileName(account, row);
+
+      AnsiString json = "{" + RowFields(bridge, row) +
+         ",\"file\":\"" + bridge.escape(Utf8(fileName)) + "\"" +
+         ",\"file_exists\":" + (FileUtilities::Exists(fileName) ? "true" : "false") +
+         HeaderJson(bridge, fileName) + "}";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse MessageSource(const Bridge &bridge, std::shared_ptr<Account> account, __int64 messageId)
+   {
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> row = OwnMessageRow(account, messageId, folder);
+      if (!row)
+         return Refusal(bridge, 404, "message not found");
+
+      const String fileName = PersistentMessage::GetFileName(account, row);
+      if (!FileUtilities::Exists(fileName))
+         return Refusal(bridge, 404, "the message file is missing");
+
+      if ((__int64) FileUtilities::FileSize(fileName) > MaxMessageBytes)
+         return Refusal(bridge, 413, "the message is larger than 25 MB; fetch it with a mail client");
+
+      AnsiString bytes;
+      {
+#ifdef HM_PLATFORM_POSIX
+         // A narrow path, because libstdc++ has no wide-path constructor.
+         const AnsiString narrowFileName = fileName.c_str();
+         std::ifstream in(narrowFileName.c_str(), std::ios::binary);
+#else
+         std::ifstream in(fileName.c_str(), std::ios::binary);
+#endif
+         if (!in)
+            return Refusal(bridge, 500, "the message file could not be read");
+         std::string contents((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+         bytes = AnsiString(contents);
+      }
+
+      AnsiString fileLabel;
+      fileLabel.Format("message-%I64d.eml", row->GetID());
+
+      HttpResponse response;
+      response.status = 200;
+      response.content_type = "message/rfc822";
+      response.body = bytes;
+      response.extra_headers =
+         "Content-Disposition: attachment; filename=\"" + fileLabel + "\"\r\n"
+         "X-Content-Type-Options: nosniff\r\n"
+         "Content-Security-Policy: sandbox\r\n"
+         "Cache-Control: no-store\r\n";
+      return response;
+   }
+
+   HttpResponse UpdateMessageFlags(const Bridge &bridge, std::shared_ptr<Account> account, __int64 messageId, const AnsiString &requestBody)
+   {
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> row = OwnMessageRow(account, messageId, folder);
+      if (!row)
+         return Refusal(bridge, 404, "message not found");
+
+      std::shared_ptr<Message> message = LiveMessage(folder, messageId);
+      if (!message)
+         return Refusal(bridge, 404, "message not found");
+
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      // Only the flags the body names change; the rest stay as they are,
+      // so two clients touching different flags do not undo each other.
+      static const char *const names[] = { "seen", "deleted", "flagged", "answered", "draft" };
+      AnsiString error;
+      if (UnknownKey(body, names, sizeof(names) / sizeof(names[0]), error))
+         return Refusal(bridge, 400, String(error));
+
+      bool named[5] = { false, false, false, false, false };
+      bool values[5] = { false, false, false, false, false };
+      int mentioned = 0;
+      for (int i = 0; i < 5; i++)
+      {
+         const JsonValue *member = body.Get(names[i]);
+         if (!member || member->IsNull())
+            continue;
+         if (!ReadBool(body, names[i], values[i], error))
+            return Refusal(bridge, 400, String(error));
+         named[i] = true;
+         mentioned++;
+      }
+      if (mentioned == 0)
+         return Refusal(bridge, 400, "no flag named: seen, deleted, flagged, answered or draft");
+
+      if (named[0])
+         message->SetFlagSeen(values[0]);
+      if (named[1])
+         message->SetFlagDeleted(values[1]);
+      if (named[2])
+         message->SetFlagFlagged(values[2]);
+      if (named[3])
+         message->SetFlagAnswered(values[3]);
+      if (named[4])
+         message->SetFlagDraft(values[4]);
+
+      // The path STORE takes: the flags are written with the folder's next
+      // mod-sequence, so CONDSTORE and QRESYNC clients see the change.
+      if (!Application::Instance()->GetFolderManager()->UpdateMessageFlags((int) folder->GetAccountID(), (int) folder->GetID(), message->GetID(), message->GetFlags(), message->GetKeywords()))
+         return Refusal(bridge, 500, "the flags could not be stored");
+
+      std::vector<__int64> changed;
+      changed.push_back(message->GetID());
+      NotifyFolder(folder, ChangeNotification::NotificationMessageFlagsChanged, changed);
+
+      return bridge.respond(200, RowJson(bridge, message), "");
+   }
+
+   // What EXPUNGE does for one message, and Messages.DeleteByDBID over COM:
+   // the row and the file go, the folder's shared collection drops it, and
+   // every session is told.
+   HttpResponse DeleteMessage(const Bridge &bridge, std::shared_ptr<Account> account, __int64 messageId)
+   {
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> row = OwnMessageRow(account, messageId, folder);
+      if (!row)
+         return Refusal(bridge, 404, "message not found");
+
+      std::shared_ptr<Messages> messages = MessagesContainer::Instance()->GetMessages(folder->GetAccountID(), folder->GetID());
+      if (!messages)
+         return Refusal(bridge, 500, "the folder could not be read");
+
+      std::set<__int64> ids;
+      ids.insert(messageId);
+
+      std::vector<__int64> deleted = messages->DeleteMessagesById(ids);
+      if (deleted.empty())
+         return Refusal(bridge, 500, "the message could not be deleted; see the error log");
+
+      NotifyFolder(folder, ChangeNotification::NotificationMessageDeleted, deleted);
+
+      return bridge.respond(200, "{\"deleted\":true}", "");
+   }
+
+   HttpResponse DeleteAccountMessages(const Bridge &bridge, std::shared_ptr<Account> account)
+   {
+      // Account.DeleteMessages over COM, to the call.
+      if (!PersistentAccount::DeleteMessages(account))
+         return Refusal(bridge, 500, "the messages could not be deleted; see the error log");
+
+      LOG_APPLICATION("REST API: every message of " + account->GetAddress() + " deleted by the administrator.");
+
+      return bridge.respond(200, "{\"deleted\":true}", "");
+   }
+
+   // ------------------------------------------------------------------------
    // The OpenAPI entries, each beginning with a comma as HandleOpenApi_ asks.
    // ------------------------------------------------------------------------
 
@@ -777,7 +1288,18 @@ namespace
       "\"post\":{\"summary\":\"Grant a permission on a folder (administrator)\",\"description\":\"Body: type (required: user, group or anyone); for a user permission account_id or account (the address), for a group permission group_id or group (the name); rights, an object of true/false by right - a right not named is not granted. What InterfaceIMAPFolderPermissions.Add, the setters and Save do, saved by PersistentACLPermission::SaveObject and in force for the next IMAP command. Checked before anything is saved: the shape the store insists on (a user permission names an account and no group, a group permission the reverse, anyone neither), that the account or group exists, and that the account is not the folder's owner - whose rights are implicit and cannot be changed, as SETACL says. Logged with the account's address.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"user\",\"group\",\"anyone\"]},\"account_id\":{\"type\":\"integer\"},\"account\":{\"type\":\"string\"},\"group_id\":{\"type\":\"integer\"},\"group\":{\"type\":\"string\"},\"rights\":{\"type\":\"object\",\"properties\":{\"lookup\":{\"type\":\"boolean\"},\"read\":{\"type\":\"boolean\"},\"write_seen\":{\"type\":\"boolean\"},\"write_others\":{\"type\":\"boolean\"},\"insert\":{\"type\":\"boolean\"},\"post\":{\"type\":\"boolean\"},\"create\":{\"type\":\"boolean\"},\"delete_mailbox\":{\"type\":\"boolean\"},\"write_deleted\":{\"type\":\"boolean\"},\"expunge\":{\"type\":\"boolean\"},\"administer\":{\"type\":\"boolean\"}}}}}}}},\"responses\":{\"201\":{\"description\":\"Created: the permission as the listing shows it, with its id\"},\"400\":{\"description\":\"No type, a type other than the three, an account or group missing or unknown, the folder's owner, an unknown right or field, or a value of the wrong type (error names it); nothing saved\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"}}}},"
       "\"/api/v1/accounts/{address}/folders/{id}/permissions/{pid}\":{"
       "\"put\":{\"summary\":\"Change a permission (administrator)\",\"description\":\"Body: any subset of what POST takes. A field left out keeps its value; a right not named keeps its value; a change of type drops the account and the group unless the body names them, since the old ones could not belong to the new type. The same checks as POST, and nothing changes when one fails.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"responses\":{\"200\":{\"description\":\"The permission as saved\"},\"400\":{\"description\":\"A field refused; nothing changed\"},\"404\":{\"description\":\"No such account, folder or permission\"}}},"
-      "\"delete\":{\"summary\":\"Revoke a permission (administrator)\",\"description\":\"Through the folder's collection as InterfaceIMAPFolderPermissions.DeleteByDBID goes; a permission of another folder is not found here. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account, folder or permission\"}}}}";
+      "\"delete\":{\"summary\":\"Revoke a permission (administrator)\",\"description\":\"Through the folder's collection as InterfaceIMAPFolderPermissions.DeleteByDBID goes; a permission of another folder is not found here. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account, folder or permission\"}}}},"
+      "\"/api/v1/accounts/{address}/messages\":{"
+      "\"get\":{\"summary\":\"Every message of an account (administrator)\",\"description\":\"What Account.Messages is over COM: every message of the account whatever its folder, in the collection's order, read fresh. total, and messages, each the row as COM's Message reports it: id, uid, folder_id, account_id, size (bytes), state (0 created, 1 delivering, 2 delivered), received, from_address (the envelope sender) and flags - seen, deleted, flagged, answered, draft, recent and keywords. A message flagged deleted and not yet expunged is listed, as it is in the COM collection; the account's own /api/v1/me listing is a reader's view and leaves it out. A key restricted to named domains reaches the accounts of those domains only.\",\"responses\":{\"200\":{\"description\":\"total, messages\"},\"404\":{\"description\":\"No such account\"}}},"
+      "\"delete\":{\"summary\":\"Delete every message of an account (administrator)\",\"description\":\"What Account.DeleteMessages does over COM, to the call - PersistentAccount::DeleteMessages: the account's messages go with the folders the server does not keep, the inbox and the designated folders stay emptied, and the account's caches are dropped. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account\"}}}},"
+      "\"/api/v1/accounts/{address}/folders/{id}/messages\":{"
+      "\"get\":{\"summary\":\"A folder's messages, every one of them (administrator)\",\"description\":\"What IMAPFolder.Messages is over COM: the folder's whole collection, the live one every IMAP session shares, in UID order - a message flagged deleted and not yet expunged included. folder_id, total, and messages, each the row as GET /api/v1/accounts/{address}/messages describes it. The folder is one of the account's own.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"}}},"
+      "\"post\":{\"summary\":\"Add a message to a folder from its text (administrator)\",\"description\":\"The body is the message, as a .eml file; a bare-LF body is given CRLF. What Messages.Add and Message.Save do over COM, and what APPEND does: the bytes are written where the server keeps a delivered message, the row saved with its UID and the state delivered, and every session on the folder told. flags= in the query names the flags to store it with, comma-separated from seen, flagged, answered, draft and deleted, as APPEND's flag list goes beside the literal; from= the envelope sender the row carries, as Message.FromAddress sets it. Nothing in the text is changed or added.\",\"requestBody\":{\"content\":{\"message/rfc822\":{\"schema\":{\"type\":\"string\"}}}},\"responses\":{\"201\":{\"description\":\"The row, with its id and uid\"},\"400\":{\"description\":\"An empty body, one that does not begin with a header line, or an unknown flag\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"},\"413\":{\"description\":\"Over 25 MB\"}}}},"
+      "\"/api/v1/accounts/{address}/messages/{id}\":{"
+      "\"get\":{\"summary\":\"One message: its row, its header fields and every header (administrator)\",\"description\":\"The row as the listing shows it, then file - the path on the server's own disk, the COM Filename - and file_exists, then subject, from, to, cc and date decoded from the header block, and headers: every field as written, name and value in order, which is what Message.Headers and Message.HeaderValue answer over COM. The header block is read to 64 KB. A message of another account, or in a folder outside the account's tree, is not found.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"No such account or message\"}}},"
+      "\"put\":{\"summary\":\"Change a message's flags (administrator)\",\"description\":\"Body: any of seen, deleted, flagged, answered and draft, true or false; a flag not named keeps its value. Written on the path STORE takes, with the folder's next mod-sequence, and every session told. Answers the row as changed.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"The row\"},\"400\":{\"description\":\"No flag named, an unknown field, or a value that is not true or false\"},\"404\":{\"description\":\"No such account or message\"}}},"
+      "\"delete\":{\"summary\":\"Delete a message (administrator)\",\"description\":\"What Messages.DeleteByDBID does over COM and EXPUNGE does for one message: the row and the file go, through the folder's live collection, and every session is told.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account or message\"}}}},"
+      "\"/api/v1/accounts/{address}/messages/{id}/source\":{\"get\":{\"summary\":\"A message's file (administrator)\",\"description\":\"The bytes as stored, message/rfc822, as a download; up to 25 MB.\",\"responses\":{\"200\":{\"description\":\"The message file\"},\"404\":{\"description\":\"No such account or message, or the file is missing\"},\"413\":{\"description\":\"Over 25 MB\"}}}}";
 }
 
 namespace HM
@@ -849,6 +1371,18 @@ namespace HM
             return route.kind != RouteUnknown;
          }
 
+         if (sub == "/messages")
+         {
+            if (method == "GET")
+               route.kind = RouteAccountFolderMessageList;
+            else if (method == "POST")
+               route.kind = RouteAccountFolderMessageCreate;
+
+            if (route.kind != RouteUnknown)
+               route.folder_id = folderId;
+            return route.kind != RouteUnknown;
+         }
+
          if (sub.StartsWith(permissions + "/"))
          {
             AnsiString pidPart = sub.Mid(permissions.GetLength() + 1);
@@ -870,6 +1404,47 @@ namespace HM
          }
 
          return false;
+      }
+
+      // /messages, /messages/<id> and /messages/<id>/source.
+      const AnsiString messages = "/messages";
+
+      if (tail == messages)
+      {
+         if (method == "GET")
+            route.kind = RouteAccountMessageList;
+         else if (method == "DELETE")
+            route.kind = RouteAccountMessagesDelete;
+
+         return route.kind != RouteUnknown;
+      }
+
+      if (tail.StartsWith(messages + "/"))
+      {
+         AnsiString rest = tail.Mid(messages.GetLength() + 1);
+         int slash = rest.Find("/");
+         AnsiString idPart = slash < 0 ? rest : rest.Mid(0, slash);
+         AnsiString sub = slash < 0 ? AnsiString() : rest.Mid(slash);
+
+         __int64 messageId = 0;
+         if (!ParseId(idPart, messageId))
+            return false;
+
+         if (sub.IsEmpty())
+         {
+            if (method == "GET")
+               route.kind = RouteAccountMessageGet;
+            else if (method == "PUT")
+               route.kind = RouteAccountMessageFlags;
+            else if (method == "DELETE")
+               route.kind = RouteAccountMessageDelete;
+         }
+         else if (sub == "/source" && method == "GET")
+            route.kind = RouteAccountMessageSource;
+
+         if (route.kind != RouteUnknown)
+            route.message_id = messageId;
+         return route.kind != RouteUnknown;
       }
 
       return false;
@@ -911,6 +1486,23 @@ namespace HM
          return UpdatePermission(bridge, account, route.folder_id, route.record_id, requestBody);
       case RouteAccountFolderPermissionDelete:
          return DeletePermission(bridge, account, route.folder_id, route.record_id);
+
+      case RouteAccountMessageList:
+         return ListAccountMessages(bridge, account);
+      case RouteAccountMessagesDelete:
+         return DeleteAccountMessages(bridge, account);
+      case RouteAccountFolderMessageList:
+         return ListFolderMessages(bridge, account, route.folder_id);
+      case RouteAccountFolderMessageCreate:
+         return CreateFolderMessage(bridge, account, route.folder_id, requestBody, route.query);
+      case RouteAccountMessageGet:
+         return GetMessage(bridge, account, route.message_id);
+      case RouteAccountMessageFlags:
+         return UpdateMessageFlags(bridge, account, route.message_id, requestBody);
+      case RouteAccountMessageDelete:
+         return DeleteMessage(bridge, account, route.message_id);
+      case RouteAccountMessageSource:
+         return MessageSource(bridge, account, route.message_id);
       default:
          break;
       }

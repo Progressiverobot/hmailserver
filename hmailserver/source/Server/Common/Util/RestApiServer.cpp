@@ -1927,6 +1927,14 @@ namespace HM
          case RouteAccountFolderPermissionCreate:
          case RouteAccountFolderPermissionUpdate:
          case RouteAccountFolderPermissionDelete:
+         case RouteAccountMessageList:
+         case RouteAccountMessagesDelete:
+         case RouteAccountFolderMessageList:
+         case RouteAccountFolderMessageCreate:
+         case RouteAccountMessageGet:
+         case RouteAccountMessageFlags:
+         case RouteAccountMessageDelete:
+         case RouteAccountMessageSource:
             return HandleAccountResources_(route, GetRequestBody_(request));
 
          case RouteOpenApi:
@@ -3385,6 +3393,10 @@ namespace HM
       case RouteAccountFolderPermissionCreate:
       case RouteAccountFolderPermissionUpdate:
       case RouteAccountFolderPermissionDelete:
+      case RouteAccountMessagesDelete:
+      case RouteAccountFolderMessageCreate:
+      case RouteAccountMessageFlags:
+      case RouteAccountMessageDelete:
          return true;
 
       default:
@@ -3641,6 +3653,14 @@ namespace HM
       case RouteAccountFolderPermissionCreate:
       case RouteAccountFolderPermissionUpdate:
       case RouteAccountFolderPermissionDelete:
+      case RouteAccountMessageList:
+      case RouteAccountMessagesDelete:
+      case RouteAccountFolderMessageList:
+      case RouteAccountFolderMessageCreate:
+      case RouteAccountMessageGet:
+      case RouteAccountMessageFlags:
+      case RouteAccountMessageDelete:
+      case RouteAccountMessageSource:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -10263,6 +10283,10 @@ namespace HM
          return false;
 
       if (path.StartsWith("/api/v1/me/folders/") && path.EndsWith("/messages"))
+         return true;
+      // A raw message into one of an account's folders, by the administrator
+      // (RestApiAccountResources.cpp): the same 25 MB as the account's own import.
+      if (path.StartsWith("/api/v1/accounts/") && path.Find("/folders/") > 0 && path.EndsWith("/messages"))
          return true;
       return path == "/api/v1/me/messages" || path == "/api/v1/me/drafts";
    }

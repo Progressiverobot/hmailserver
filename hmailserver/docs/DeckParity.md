@@ -658,8 +658,10 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/accounts/{address}/fetch-accounts` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `PUT /api/v1/accounts/{address}/fetch-accounts/{id}` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `POST /api/v1/accounts/{address}/fetch-accounts/{id}/download` | FetchAccount | - | yes |
+| `POST /api/v1/accounts/{address}/folders/{id}/messages` | ServerMessage | - | - |
 | `POST /api/v1/accounts/{address}/folders/{id}/permissions` | IMAPFolderPermission | `account`, `account_id`, `administer`, `create`, `delete_mailbox`, `expunge`, `folder`, `group`, `group_id`, `insert`, `lookup`, `name`, `post`, `read`, `rights`, `type`, `write_deleted`, `write_others`, `write_seen` | - |
 | `PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` | IMAPFolderPermission | `account`, `account_id`, `administer`, `body`, `create`, `delete_mailbox`, `expunge`, `field`, `folder`, `group`, `group_id`, `insert`, `lookup`, `name`, `new`, `post`, `read`, `rights`, `to`, `type`, `value`, `write_deleted`, `write_others`, `write_seen` | - |
+| `PUT /api/v1/accounts/{address}/messages/{id}` | ServerMessage | `answered`, `deleted`, `draft`, `flagged`, `folder`, `seen`, `value` | - |
 | `POST /api/v1/accounts/{address}/support-session` | - | - | - |
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |

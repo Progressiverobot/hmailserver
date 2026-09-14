@@ -3283,9 +3283,13 @@ namespace hMailServer
          ServerApi.Delete("/api/v1/accounts/" + Address).Expect(200, "DELETE /api/v1/accounts/" + Address);
       }
 
+      /// <summary>DELETE /api/v1/accounts/{address}/messages: what the COM call does, to the call.</summary>
       public void DeleteMessages()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoDeleteMessages);
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/messages", "delete"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoDeleteMessages);
+
+         ServerApi.Delete("/api/v1/accounts/" + Address + "/messages").Expect(200, "DELETE /api/v1/accounts/" + Address + "/messages");
       }
 
       public void ExportMessages(string directory)
@@ -3350,16 +3354,23 @@ namespace hMailServer
    }
 
    /// <summary>
-   ///    The messages of an account's INBOX, read and deleted through the account's
-   ///    own /api/v1/me routes. On Windows Account.Messages is the account's whole
-   ///    message table in id order; the fixtures that use it here (API/Messages) put
-   ///    everything in the INBOX, and the listing is put in ascending id order to
-   ///    match. A delete is ?permanent=1, because the COM DeleteByDBID removes the
-   ///    row rather than moving it to Trash.
+   ///    Account.Messages and IMAPFolder.Messages over the administrative message
+   ///    routes: GET /api/v1/accounts/{address}/messages is every message of the
+   ///    account whatever its folder, which is what COM's Account.Messages is, and
+   ///    GET /api/v1/accounts/{address}/folders/{id}/messages is a folder's, every
+   ///    one of them - a message flagged \Deleted and not yet expunged included,
+   ///    since the collection is the folder's whole and not a reader's view. Read
+   ///    from the server on every use, as the COM collection is, and put in
+   ///    ascending id order, which is the order the fixtures index by. A delete is
+   ///    DELETE .../messages/{id}, which is what Messages.DeleteByDBID does: the row
+   ///    and the file go and every session on the folder is told. Add is a Message
+   ///    bound to this folder, written by its Save.
    /// </summary>
    public class Messages
    {
       private readonly Account _account;
+
+      // 0: the account's whole, as COM's Account.Messages (a folder id of -1 there).
       private readonly long _folderId;
 
       public Messages(Account account)
@@ -3373,49 +3384,58 @@ namespace hMailServer
          _folderId = folderId;
       }
 
+      internal static string Base(Account account)
+      {
+         return "/api/v1/accounts/" + account.Address + "/messages";
+      }
+
+      private string ListPath => _folderId == 0
+         ? Base(_account)
+         : "/api/v1/accounts/" + _account.Address + "/folders/" + _folderId + "/messages";
+
+      internal static void RouteOrSkip()
+      {
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/messages", "get"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoAccountMessages);
+      }
+
       private List<Message> Load()
       {
-         _account.RequireOwnCredentials("lists the account's messages");
+         RouteOrSkip();
 
-         var inboxId = _folderId;
+         var listing = ServerApi.Get(ListPath).Expect(200, "GET " + ListPath);
 
-         if (inboxId == 0)
-         {
-            var folders = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Get, "/api/v1/me/folders")
-               .Expect(200, "GET /api/v1/me/folders as " + _account.Address);
-
-            inboxId = ServerApi.Array(folders, "folders")
-               .Where(folder => string.Equals(ServerApi.StringOf(folder, "name"), "INBOX", StringComparison.OrdinalIgnoreCase))
-               .Select(folder => ServerApi.LongOf(folder, "id"))
-               .LastOrDefault();
-
-            if (inboxId == 0)
-               throw new InvalidOperationException(_account.Address + " has no INBOX in GET /api/v1/me/folders: " + folders.Body);
-         }
-
-         var listing = ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Get,
-            "/api/v1/me/folders/" + inboxId + "/messages?limit=200").Expect(200, "listing the INBOX of " + _account.Address);
-
-         var result = new List<Message>();
-         foreach (var entry in ServerApi.Array(listing, "messages"))
-            result.Add(new Message { ID = ServerApi.LongOf(entry, "id"), Account = _account });
-
+         var result = ServerApi.Array(listing, "messages").Select(entry => Message.Listed(_account, entry)).ToList();
          result.Sort((a, b) => a.ID.CompareTo(b.ID));
          return result;
       }
 
       public int Count => Load().Count;
 
+      [System.Runtime.CompilerServices.IndexerName("At")]
       public Message this[int index] => Load()[index];
+
+      public Message get_Item(int index)
+      {
+         return Load()[index];
+      }
 
       public Message get_ItemByDBID(long id)
       {
          return Load().FirstOrDefault(message => message.ID == id);
       }
 
+      /// <summary>
+      ///    A message of this folder's, to be written by its Save. InterfaceMessages::Add
+      ///    refuses on the account's whole collection, which has no folder to add to.
+      /// </summary>
       public Message Add()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+         if (_folderId == 0)
+            throw new System.Runtime.InteropServices.COMException("A message is added to a folder's collection, not the account's.");
+
+         RouteOrSkip();
+         return new Message(_account, _folderId);
       }
 
       public void Refresh()
@@ -3424,145 +3444,270 @@ namespace hMailServer
 
       public void Clear()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         foreach (var message in Load())
+            DeleteByDBID(message.ID);
       }
 
       public void DeleteByDBID(long id)
       {
-         _account.RequireOwnCredentials("deletes one of the account's messages");
-
-         ServerApi.AsAccount(_account.Address, _account.Password, HttpMethod.Delete,
-            "/api/v1/me/messages/" + id + "?permanent=1").Expect(200, "DELETE /api/v1/me/messages/" + id);
+         RouteOrSkip();
+         ServerApi.Delete(Base(_account) + "/" + id).Expect(200, "DELETE " + Base(_account) + "/" + id);
       }
    }
 
+   /// <summary>
+   ///    One message. Stored, it is the row GET /api/v1/accounts/{address}/messages/{id}
+   ///    answers - id, uid, folder, account, size, state, the time received, the
+   ///    envelope sender, the flags - with the header fields decoded and every header
+   ///    as written, and the file's bytes at .../source; its text and HTML are the
+   ///    account's own GET /api/v1/me/messages/{id}, as before. New, it is what the
+   ///    setters and AddRecipient compose, written by Save as the raw message
+   ///    POST .../folders/{id}/messages stores - what Messages.Add and Message.Save
+   ///    do over COM - with the flags set before the save in the query. A stored
+   ///    message's MIME content is not rewritten by any route, so a setter on one
+   ///    is a skip; its flags are, over PUT, which Save makes when one was changed.
+   /// </summary>
    public class Message
    {
       internal Account Account;
 
-      public long ID { get; set; }
+      private readonly long _folderId;
+      private JsonElement? _row;
+      private JsonElement? _whole;
 
-      private JsonElement Read()
+      // What a new message is composed of before Save.
+      private string _subject;
+      private string _body;
+      private string _htmlBody;
+      private string _from;
+      private string _fromAddress;
+      private string _charset;
+      private string _date;
+      private readonly List<KeyValuePair<string, string>> _headers = new List<KeyValuePair<string, string>>();
+      private readonly List<KeyValuePair<string, string>> _recipients = new List<KeyValuePair<string, string>>();
+
+      private long _pendingFlags;
+      private bool _flagsTouched;
+
+      /// <summary>A message in no folder - one to be delivered - which no route carries.</summary>
+      public Message()
       {
+      }
+
+      internal Message(Account account, long folderId)
+      {
+         Account = account;
+         _folderId = folderId;
+      }
+
+      // One as a listing shows it.
+      internal static Message Listed(Account account, JsonElement row)
+      {
+         var message = new Message(account, ServerApi.LongOf(row, "folder_id"));
+         message._row = row;
+         message.ID = ServerApi.LongOf(row, "id");
+         return message;
+      }
+
+      public long ID { get; private set; }
+
+      private bool Stored => ID != 0;
+
+      private void RequireStored()
+      {
+         if (!Stored)
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+      }
+
+      // A stored message's content is not rewritten by any route.
+      private void RefuseIfStored(object value)
+      {
+         if (Stored)
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value);
+      }
+
+      private JsonElement Whole()
+      {
+         RequireStored();
+
+         if (!_whole.HasValue)
+         {
+            Messages.RouteOrSkip();
+            var answer = ServerApi.Get(Messages.Base(Account) + "/" + ID).Expect(200, "GET " + Messages.Base(Account) + "/" + ID);
+            _whole = answer.Json.Value;
+         }
+
+         return _whole.Value;
+      }
+
+      private JsonElement Row()
+      {
+         return _row ?? Whole();
+      }
+
+      private void Invalidate()
+      {
+         _row = null;
+         _whole = null;
+      }
+
+      // The text and the HTML: the account's own reading of its message, as before.
+      private string ViaOwnRoutes(string field)
+      {
+         RequireStored();
+         Account.RequireOwnCredentials("reads a message's text");
+
          var answer = ServerApi.AsAccount(Account.Address, Account.Password, HttpMethod.Get,
             "/api/v1/me/messages/" + ID).Expect(200, "GET /api/v1/me/messages/" + ID);
-         return answer.Json.Value;
+         return ServerApi.StringOf(answer.Json.Value, field);
       }
 
       public string Subject
       {
-         get { return ServerApi.StringOf(Read(), "subject"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ServerApi.StringOf(Whole(), "subject") : _subject; }
+         set { RefuseIfStored(value); _subject = value; }
       }
 
       public string From
       {
-         get { return ServerApi.StringOf(Read(), "from"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ServerApi.StringOf(Whole(), "from") : _from; }
+         set { RefuseIfStored(value); _from = value; }
       }
 
       public string To
       {
-         get { return ServerApi.StringOf(Read(), "to"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ServerApi.StringOf(Whole(), "to") : string.Join(", ", _recipients.Select(Mailbox)); }
+      }
+
+      public string CC
+      {
+         get { return Stored ? ServerApi.StringOf(Whole(), "cc") : string.Empty; }
       }
 
       public string Body
       {
-         get { return ServerApi.StringOf(Read(), "text"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ViaOwnRoutes("text") : _body; }
+         set { RefuseIfStored(value); _body = value; }
       }
 
       public string HTMLBody
       {
-         get { return ServerApi.StringOf(Read(), "html"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ViaOwnRoutes("html") : _htmlBody; }
+         set { RefuseIfStored(value); _htmlBody = value; }
       }
 
-      public long UID => ServerApi.LongOf(Read(), "uid");
+      public long UID => ServerApi.LongOf(Row(), "uid");
 
-      public long Size => ServerApi.LongOf(Read(), "size");
+      public long Size => ServerApi.LongOf(Row(), "size");
 
-      // The file on the server's disk, its raw headers, its recipient collection and
-      // its character set: the COM Message carries all of these and the REST message
-      // routes carry none of them.
+      /// <summary>
+      ///    The file on the server's own disk, as the route reports the path. It is
+      ///    the COM Filename only where this host has the server's data directory
+      ///    beside it - the server on this host, and the file readable - since what
+      ///    a fixture does next is open it; anywhere else it is a skip that says so.
+      /// </summary>
       public string Filename
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
-      }
-
-      public MessageHeaders Headers
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
-      }
-
-      public string FromAddress
-      {
-         get { return ServerApi.StringOf(Read(), "from"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
-      }
-
-      public int FlagSeen
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+            var file = ServerApi.StringOf(Whole(), "file");
+
+            if (!string.IsNullOrEmpty(file) && TestTarget.IsLocal && System.IO.File.Exists(file))
+               return file;
+
+            throw NotOnThisServer.Skipped(NotOnThisServer.MessageFileNotOnThisHost);
          }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+      }
+
+      public MessageHeaders Headers => new MessageHeaders(this, Whole());
+
+      public string FromAddress
+      {
+         get { return Stored ? ServerApi.StringOf(Row(), "from_address") : _fromAddress; }
+         set { RefuseIfStored(value); _fromAddress = value; }
       }
 
       public string Date
       {
-         get { return ServerApi.StringOf(Read(), "date"); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return Stored ? ServerApi.StringOf(Whole(), "date") : _date; }
+         set { RefuseIfStored(value); _date = value; }
       }
 
-      public long FolderID
+      public long FolderID => Stored ? ServerApi.LongOf(Row(), "folder_id") : _folderId;
+
+      public long AccountID => Stored ? ServerApi.LongOf(Row(), "account_id") : Account.ID;
+
+      /// <summary>0 created, 1 delivering, 2 delivered - as the row says, or created until saved.</summary>
+      public int State => Stored ? (int) ServerApi.LongOf(Row(), "state") : 0;
+
+      private static long FlagsOf(JsonElement row)
       {
-         get { return ServerApi.LongOf(Read(), "folder_id"); }
+         JsonElement flags;
+         if (!row.TryGetProperty("flags", out flags) || flags.ValueKind != JsonValueKind.Object)
+            return 0;
+
+         long value = 0;
+         if (ServerApi.FlagOf(flags, "seen")) value |= (long) eMessageFlag.eMFSeen;
+         if (ServerApi.FlagOf(flags, "deleted")) value |= (long) eMessageFlag.eMFDeleted;
+         if (ServerApi.FlagOf(flags, "flagged")) value |= (long) eMessageFlag.eMFFlagged;
+         if (ServerApi.FlagOf(flags, "answered")) value |= (long) eMessageFlag.eMFAnswered;
+         if (ServerApi.FlagOf(flags, "draft")) value |= (long) eMessageFlag.eMFDraft;
+         if (ServerApi.FlagOf(flags, "recent")) value |= (long) eMessageFlag.eMFRecent;
+         return value;
       }
 
-      public long AccountID
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
-         }
-      }
-
-      public int State
-      {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
-         }
-      }
+      private long CurrentFlags => _flagsTouched ? _pendingFlags : (Stored ? FlagsOf(Row()) : 0);
 
       public int Flags
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get { return (int) CurrentFlags; }
+         set { _pendingFlags = value; _flagsTouched = true; }
+      }
+
+      public bool get_Flag(eMessageFlag flag)
+      {
+         return (CurrentFlags & (long) flag) != 0;
+      }
+
+      public void set_Flag(eMessageFlag flag, bool value)
+      {
+         var flags = CurrentFlags;
+         if (value)
+            flags |= (long) flag;
+         else
+            flags &= ~(long) flag;
+         _pendingFlags = flags;
+         _flagsTouched = true;
       }
 
       public void Delete()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         RequireStored();
+         new Messages(Account).DeleteByDBID(ID);
       }
 
       public string Charset
       {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject, value); }
+         get
+         {
+            if (Stored)
+               throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+            return _charset;
+         }
+         set { RefuseIfStored(value); _charset = value; }
       }
 
+      /// <summary>The time received, as the row keeps it (YYYY-MM-DD HH:MM:SS, the server's local clock).</summary>
       public DateTime InternalDate
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+            var received = ServerApi.StringOf(Row(), "received") ?? string.Empty;
+            DateTime parsed;
+            if (DateTime.TryParseExact(received, "yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture,
+                   System.Globalization.DateTimeStyles.None, out parsed))
+               return parsed;
+            return DateTime.MinValue;
          }
       }
 
@@ -3578,55 +3723,220 @@ namespace hMailServer
 
       public void set_HeaderValue(string name, string value)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         RefuseIfStored(value);
+         _headers.RemoveAll(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase));
+         _headers.Add(new KeyValuePair<string, string>(name, value));
       }
 
       public string get_HeaderValue(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject);
+         if (Stored)
+         {
+            var header = Headers.get_ItemByName(name);
+            return header == null ? string.Empty : header.Value;
+         }
+
+         return _headers.Where(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase))
+            .Select(header => header.Value).FirstOrDefault() ?? string.Empty;
       }
 
       public void RefreshContent()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         Invalidate();
       }
 
       public void AddRecipient(string name, string address)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         if (Stored)
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+
+         _recipients.Add(new KeyValuePair<string, string>(name ?? string.Empty, address ?? string.Empty));
       }
 
+      /// <summary>
+      ///    A new message: the POST of what was composed, with the flags in the
+      ///    query. A stored one: the PUT of its flags when one was changed, which is
+      ///    all a re-save changes over COM that a route carries.
+      /// </summary>
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+         if (Stored)
+         {
+            if (_flagsTouched)
+               PutFlags();
+            return;
+         }
+
+         if (Account == null || _folderId == 0)
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+
+         Messages.RouteOrSkip();
+
+         var path = "/api/v1/accounts/" + Account.Address + "/folders/" + _folderId + "/messages" + SaveQuery();
+         var answer = ServerApi.Post(path, Compose());
+
+         if (answer.Status == 400 || answer.Status == 413)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(201, "POST " + path);
+
+         ID = ServerApi.LongOf(answer.Json.Value, "id");
+         _row = answer.Json.Value;
+         _whole = null;
+         _flagsTouched = false;
+      }
+
+      private static readonly KeyValuePair<string, eMessageFlag>[] FlagWords =
+      {
+         new KeyValuePair<string, eMessageFlag>("seen", eMessageFlag.eMFSeen),
+         new KeyValuePair<string, eMessageFlag>("deleted", eMessageFlag.eMFDeleted),
+         new KeyValuePair<string, eMessageFlag>("flagged", eMessageFlag.eMFFlagged),
+         new KeyValuePair<string, eMessageFlag>("answered", eMessageFlag.eMFAnswered),
+         new KeyValuePair<string, eMessageFlag>("draft", eMessageFlag.eMFDraft)
+      };
+
+      private string SaveQuery()
+      {
+         var parameters = new List<string>();
+
+         if (_flagsTouched)
+         {
+            var words = FlagWords.Where(word => (_pendingFlags & (long) word.Value) != 0).Select(word => word.Key).ToList();
+            if (words.Count > 0)
+               parameters.Add("flags=" + string.Join(",", words));
+         }
+
+         if (!string.IsNullOrEmpty(_fromAddress))
+            parameters.Add("from=" + Uri.EscapeDataString(_fromAddress));
+
+         return parameters.Count == 0 ? string.Empty : "?" + string.Join("&", parameters);
+      }
+
+      private void PutFlags()
+      {
+         Messages.RouteOrSkip();
+
+         var body = "{" + string.Join(",", FlagWords.Select(word =>
+            "\"" + word.Key + "\":" + ((_pendingFlags & (long) word.Value) != 0 ? "true" : "false"))) + "}";
+
+         var path = Messages.Base(Account) + "/" + ID;
+         ServerApi.Put(path, body).Expect(200, "PUT " + path);
+
+         Invalidate();
+         _flagsTouched = false;
+      }
+
+      private static string Mailbox(KeyValuePair<string, string> recipient)
+      {
+         return recipient.Key.Length == 0 ? recipient.Value : EncodeWord(recipient.Key) + " <" + recipient.Value + ">";
+      }
+
+      // RFC 2047 for a header word beyond ASCII, as the COM message writes one.
+      private static string EncodeWord(string text)
+      {
+         if (text.All(c => c < 128))
+            return text;
+         return "=?utf-8?B?" + Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(text)) + "?=";
+      }
+
+      /// <summary>
+      ///    The message as InterfaceMessage::Save would write it: the headers the
+      ///    setters, AddRecipient and HeaderValue gave, a Date when none was, a
+      ///    MIME-Version, and the text in the character set named (utf-8 when none)
+      ///    after a blank line; a plain and an HTML body together are
+      ///    multipart/alternative.
+      /// </summary>
+      private string Compose()
+      {
+         var charset = string.IsNullOrEmpty(_charset) ? "utf-8" : _charset;
+         var text = new System.Text.StringBuilder();
+
+         foreach (var header in _headers)
+            text.Append(header.Key).Append(": ").Append(header.Value).Append("\r\n");
+
+         if (!string.IsNullOrEmpty(_from))
+            text.Append("From: ").Append(_from).Append("\r\n");
+         else if (!string.IsNullOrEmpty(_fromAddress))
+            text.Append("From: <").Append(_fromAddress).Append(">\r\n");
+
+         if (_recipients.Count > 0)
+            text.Append("To: ").Append(string.Join(", ", _recipients.Select(Mailbox))).Append("\r\n");
+
+         if (_subject != null)
+            text.Append("Subject: ").Append(EncodeWord(_subject)).Append("\r\n");
+
+         text.Append("Date: ").Append(string.IsNullOrEmpty(_date) ? DateTime.UtcNow.ToString("R") : _date).Append("\r\n");
+         text.Append("MIME-Version: 1.0\r\n");
+
+         var plain = _body ?? string.Empty;
+         var html = _htmlBody ?? string.Empty;
+
+         if (html.Length > 0 && plain.Length > 0)
+         {
+            const string boundary = "----=_hmailserver_shim_alternative";
+            text.Append("Content-Type: multipart/alternative; boundary=\"").Append(boundary).Append("\"\r\n\r\n");
+            text.Append("--").Append(boundary).Append("\r\n");
+            text.Append(Part("text/plain", charset, plain));
+            text.Append("--").Append(boundary).Append("\r\n");
+            text.Append(Part("text/html", charset, html));
+            text.Append("--").Append(boundary).Append("--\r\n");
+         }
+         else if (html.Length > 0)
+            text.Append(Part("text/html", charset, html));
+         else
+            text.Append(Part("text/plain", charset, plain));
+
+         return text.ToString();
+      }
+
+      private static string Part(string type, string charset, string content)
+      {
+         var lines = content.Replace("\r\n", "\n").Replace("\n", "\r\n");
+         var encoding = lines.All(c => c < 128) ? "7bit" : "8bit";
+         return "Content-Type: " + type + "; charset=\"" + charset + "\"\r\nContent-Transfer-Encoding: " + encoding + "\r\n\r\n" + lines + "\r\n";
       }
    }
 
+   /// <summary>
+   ///    Message.Headers of a stored message: every header as the file has it,
+   ///    from the message's own answer; read-only, since no route rewrites one.
+   /// </summary>
    public class MessageHeaders
    {
-      public int Count => 0;
+      private readonly List<MessageHeader> _headers;
 
-      public MessageHeader Add() { throw NotOnThisServer.Skipped("adds a MessageHeader, which no REST route carries yet"); }
+      internal MessageHeaders(Message message, JsonElement whole)
+      {
+         _headers = ServerApi.Array(whole, "headers")
+            .Select(entry => new MessageHeader { Name = ServerApi.StringOf(entry, "name"), Value = ServerApi.StringOf(entry, "value") })
+            .ToList();
+      }
+
+      public int Count => _headers.Count;
+
+      public MessageHeader Add() { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public MessageHeader this[int index] => throw NotOnThisServer.Skipped("indexes a MessageHeader, which no REST route carries yet");
+      public MessageHeader this[int index] => _headers[index];
 
       public MessageHeader get_Item(int index)
       {
-         return null;
+         return _headers[index];
       }
 
       public MessageHeader get_ItemByName(string name)
       {
-         return null;
+         return _headers.FirstOrDefault(header => string.Equals(header.Name, name, StringComparison.OrdinalIgnoreCase));
       }
 
       public void DeleteByName(string name)
       {
+         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
       }
 
       public void Clear()
       {
+         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
       }
    }
 
@@ -3637,6 +3947,7 @@ namespace hMailServer
 
       public void Save()
       {
+         NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
       }
    }
 

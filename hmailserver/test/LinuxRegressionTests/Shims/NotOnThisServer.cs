@@ -291,7 +291,20 @@ namespace RegressionTests.Shared
          "reads Account.LastLogonTime, which no REST route reports";
 
       public const string NoDeleteMessages =
-         "needs Account.DeleteMessages, and the REST API deletes a message at a time through /api/v1/me/messages/{id}";
+         "needs Account.DeleteMessages, and this server's REST API has no DELETE /api/v1/accounts/{address}/messages (it arrived after 6.3.2)";
+
+      public const string NoAccountMessages =
+         "needs an account's messages as objects, and this server's REST API has no /api/v1/accounts/{address}/messages (it arrived after 6.3.2)";
+
+      /// <summary>
+      ///    GET /api/v1/accounts/{address}/messages/{id} reports where the file is
+      ///    on the server's own disk - the COM Filename. What a fixture does with
+      ///    it next is open, delete or count it, which only a host with the server's
+      ///    data directory beside it can do; anywhere else the value would be a
+      ///    path to nothing, so it is a skip that says so.
+      /// </summary>
+      public const string MessageFileNotOnThisHost =
+         "reads Message.Filename to reach the file on the server's disk, and this host does not have the server's data directory beside it";
 
       public const string NoExportMessages =
          "needs Account.ExportMessages, which writes files on the server and has no REST route";
@@ -324,7 +337,7 @@ namespace RegressionTests.Shared
          "needs the server restarted so that it reads hMailServer.ini again, and this server's REST API has no POST /api/v1/server/reinitialize";
 
       public const string NoMessageObject =
-         "needs a message as a COM object - its file on disk, its headers, its recipients - and the REST message routes serve an account's own messages only, without those";
+         "needs a stored message's MIME content as a COM object - a header or a body written, its recipients, its attachments - or a message that is in no folder, one to be delivered; the REST message routes carry a stored message's row, its headers and its file as it is, and nothing composes or rewrites one";
 
       public const string NoServerStartTime =
          "reads Status.StartTime, which GET /api/v1/status does not report";
@@ -416,7 +429,6 @@ namespace RegressionTests.Shared
          { "RegressionTests.Security.Basics.TestEmptyPassword", NoEmptyPassword },
          { "RegressionTests.Sieve.SieveSyntax.DeeplyNestedBlocksAreRefusedRatherThanRecursedInto", ScriptOverRequestCeiling },
          { "RegressionTests.SSL.CertificateTypes.SetupSSLCertificateWithPassword", WindowsPathInTheFixture },
-         { "RegressionTests.IMAP.SequenceSets.UidExpungeStarAffectsOnlyTheLastMessage", DeletedMessagesAreNotListed },
          { "RegressionTests.Infrastructure.Persistence.DomainNameValidation.TestDomainWithoutName", ComWordingAsserted },
          { "RegressionTests.POP3.Basics.TestAuthPlainSaslPrepNfkcUsername", NoUnicodeNormalisation },
          // Its calls are inside a try/catch that expects a COMException, so the
@@ -431,18 +443,6 @@ namespace RegressionTests.Shared
       };
 
       /// <summary>
-      ///    COM's IMAPFolder.Messages is every message in the folder. The REST
-      ///    listing the shim reads in its place is every message a reader should
-      ///    see, which is not the same collection: a message flagged \Deleted and
-      ///    not yet expunged is in the first and deliberately not in the second,
-      ///    because that route exists to draw a mailbox in a browser and a webmail
-      ///    that showed deleted mail would be wrong. So a test that flags messages
-      ///    \Deleted and then counts the folder is asking a question no route here
-      ///    answers, and it is skipped rather than failed: the difference is a
-      ///    decision, not a defect, and weakening the assertion would hide the day
-      ///    it becomes one.
-      /// </summary>
-      /// <summary>
       ///    RFC 4013 SASLprep normalises a credential with Unicode NFKC before
       ///    comparing it, so a fullwidth letter and its ASCII spelling are the
       ///    same user name. On Windows that step is NormalizeString from
@@ -455,9 +455,6 @@ namespace RegressionTests.Shared
       /// </summary>
       public const string NoUnicodeNormalisation =
          "needs Unicode NFKC for SASLprep, which this build does not have on Linux - the server deliberately refuses a non-ASCII credential instead of comparing it unnormalised; see the roadmap's \"Linux and AArch64\" section";
-
-      public const string DeletedMessagesAreNotListed =
-         "counts a folder's messages after flagging some \\Deleted, and the REST listing this shim reads in place of COM's collection deliberately omits deleted messages - no route answers COM's question";
 
       public const string ScriptOverRequestCeiling =
          "checks a 70 KB script, which is over the REST API's request ceiling - PUT /api/v1/me/filters answers 413 request too large before the parser sees it, and the COM CheckSieveSyntax has no ceiling";

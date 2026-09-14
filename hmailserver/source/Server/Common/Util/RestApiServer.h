@@ -366,8 +366,8 @@ namespace HM
          RouteGreyListingWhiteAddressUpdate,
          RouteGreyListingWhiteAddressDelete,
          // An account's resources under its address (RestApiAccountResources.cpp):
-         // its app passwords, its folders and their ACLs. Each scoped to the
-         // address's domain in Authorize_ as the account routes are.
+         // its app passwords, its folders and their ACLs, its messages. Each
+         // scoped to the address's domain in Authorize_ as the account routes are.
          RouteAccountAppPasswordList,
          RouteAccountAppPasswordCreate,
          RouteAccountAppPasswordDelete,
@@ -376,6 +376,14 @@ namespace HM
          RouteAccountFolderPermissionCreate,
          RouteAccountFolderPermissionUpdate,
          RouteAccountFolderPermissionDelete,
+         RouteAccountMessageList,
+         RouteAccountMessagesDelete,
+         RouteAccountFolderMessageList,
+         RouteAccountFolderMessageCreate,
+         RouteAccountMessageGet,
+         RouteAccountMessageFlags,
+         RouteAccountMessageDelete,
+         RouteAccountMessageSource,
          RouteOpenApi
       };
 
@@ -898,7 +906,7 @@ namespace HM
       static AnsiString OpenApiBlockedAttachmentsPaths_();
       // An account's resources under its address, administered
       // (RestApiAccountResources.cpp): the app passwords, the folders and
-      // their ACLs. One entry point,
+      // their ACLs, the messages. One entry point,
       // the route saying which resource and which verb; the parser for what
       // follows the address in the path, so that ParseRoute_ splits the
       // address off once and this unit owns its own tails.
