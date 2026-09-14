@@ -9,13 +9,13 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 281 |
+| of them writable over REST | 286 |
 | of them reachable from a Deck view | 167 |
-| missing over REST | 54 |
-| over REST but not reached by any Deck view | 114 |
+| missing over REST | 49 |
+| over REST but not reached by any Deck view | 119 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 170, 77 of them writes |
+| REST routes (path and method) | 171, 78 of them writes |
 | Deck views | 10 |
 
 ## Missing over REST, by interface
@@ -23,7 +23,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
 | Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
-| DistributionList | 5 | `Active`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | WhiteListAddress | 4 | `Description`, `EmailAddress`, `LowerIPAddress`, `UpperIPAddress` |
@@ -51,9 +50,9 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Account | 23 | `ADDomain`, `ADUsername`, `AdminLevel`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
 | SecurityRange | 18 | `AllowDeliveryFromLocalToLocal`, `AllowDeliveryFromLocalToRemote`, `AllowDeliveryFromRemoteToLocal`, `AllowDeliveryFromRemoteToRemote`, `AllowIMAPConnections`, `AllowPOP3Connections`, `AllowSMTPConnections`, `EnableAntiVirus`, `EnableSpamProtection`, `LowerIP`, `Name`, `Priority`, `RequireSMTPAuthExternalToExternal`, `RequireSMTPAuthExternalToLocal`, `RequireSMTPAuthLocalToExternal`, `RequireSMTPAuthLocalToLocal`, `RequireSSLTLSForAuth`, `UpperIP` |
 | FetchAccount | 13 | `ConnectionSecurity`, `DaysToKeepMessages`, `Enabled`, `MinutesBetweenFetch`, `MirrorFolders`, `Name`, `Password`, `Port`, `ServerAddress`, `ServerType`, `UseAntiSpam`, `UseAntiVirus`, `Username` |
+| DistributionList | 7 | `Active`, `Address`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSMTPAuth`, `RequireSenderAddress` |
 | BackupSettings | 5 | `BackupDomains`, `BackupMessages`, `BackupSettings`, `CompressDestinationFiles`, `Destination` |
 | Alias | 3 | `Active`, `Name`, `Value` |
-| DistributionList | 2 | `Address`, `RequireSMTPAuth` |
 | Scripting | 2 | `Enabled`, `Language` |
 | DomainAlias | 1 | `AliasName` |
 | Cache | 1 | `Enabled` |
@@ -254,13 +253,13 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | DistributionListDialog, DomainsView | - | - |
-| `Address` | DistributionListDialog, DomainsView | `POST /api/v1/domains/{domain}/lists` (setter) | - |
-| `BounceAddress` | DistributionListDialog | - | - |
-| `Mode` | DistributionListDialog | - | - |
-| `ModeratorAddress` | DistributionListDialog | - | - |
-| `RequireSMTPAuth` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter) | - |
-| `RequireSenderAddress` | DistributionListDialog | - | - |
+| `Active` | DistributionListDialog, DomainsView | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `Address` | DistributionListDialog, DomainsView | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `BounceAddress` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `Mode` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `ModeratorAddress` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `RequireSMTPAuth` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
+| `RequireSenderAddress` | DistributionListDialog | `POST /api/v1/domains/{domain}/lists` (setter)<br>`PUT /api/v1/lists/{address}` (setter) | - |
 
 ### DistributionListRecipient
 
@@ -694,9 +693,10 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
 | `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | - |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | - |
-| `POST /api/v1/domains/{domain}/lists` | DistributionList | `address`, `members`, `require_auth` | - |
+| `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | - |
 | `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | - |
 | `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | - |
+| `PUT /api/v1/lists/{address}` | DistributionList | `active`, `bounce_address`, `domain_members`, `field`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to`, `value` | - |
 | `POST /api/v1/me/app-passwords` | AppPassword | `address`, `name`, `password`, `text`, `to` | - |
 | `POST /api/v1/me/contacts` | ? | `address`, `name` | - |
 | `PUT /api/v1/me/contacts/{id}` | ? | `address`, `name` | - |

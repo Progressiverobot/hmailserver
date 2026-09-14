@@ -1,11 +1,19 @@
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// The REST API's domain update in full, the domain aliases, the distribution list create and update, and the IP range update: what the Control Panel's domain, list and IP range pages do. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // The REST API's domain update in full, the domain aliases and the IP range update: what the Control Panel's domain and IP range pages do. See RestApiServer.h.
 //
-// Three things the write surface of wave 162 left out, each the whole of a
+// Four things the write surface of wave 162 left out, each the whole of a
 // COM object rather than two of its fields:
+//
+//   - POST /api/v1/domains/{domain}/lists and PUT /api/v1/lists/{address}:
+//     every scalar InterfaceDistributionList saves - active, the mode, the
+//     required sender, the moderator and the bounce address - where the
+//     create once fixed public and active whatever the body said; the mode
+//     takes the four words the server implements and refuses anything else
+//     as put_Mode does. The entry every list route answers with is here too.
 //
 //   - PUT /api/v1/domains/{domain} took active and postmaster and said of
 //     itself that the name could not be changed there. It now takes every
@@ -37,10 +45,16 @@
 #include "../BO/Domain.h"
 #include "../BO/DomainAliases.h"
 #include "../BO/DomainAlias.h"
+#include "../BO/DistributionLists.h"
+#include "../BO/DistributionList.h"
+#include "../BO/DistributionListRecipients.h"
+#include "../BO/DistributionListRecipient.h"
 #include "../BO/SecurityRanges.h"
 #include "../BO/SecurityRange.h"
 #include "../Persistence/PersistentDomain.h"
 #include "../Persistence/PersistentDomainAlias.h"
+#include "../Persistence/PersistentDistributionList.h"
+#include "../Persistence/PersistentDistributionListRecipient.h"
 #include "../Persistence/PersistentSecurityRange.h"
 #include "../Persistence/PersistenceMode.h"
 #include "../TCPIP/IPAddress.h"
@@ -690,6 +704,268 @@ namespace HM
       LOG_APPLICATION("RestApi: Domain alias " + aliasName + " of " + domain->GetName() + " deleted.");
 
       return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   // ------------------------------------------------------------------------
+   // Distribution lists: the entry every list route answers with, the create
+   // and the update. The listing and the delete stay in RestApiServer.cpp.
+   // ------------------------------------------------------------------------
+
+   namespace
+   {
+      // eDistributionListMode over COM, the four values the server implements.
+      // put_Mode refuses the fifth the type library still declares
+      // (eLMServerMembers), and so does the parse below, by having no word
+      // for it.
+      const char *ListModeWord(DistributionList::ListMode mode)
+      {
+         switch (mode)
+         {
+         case DistributionList::LMMembership:
+            return "membership";
+         case DistributionList::LMAnnouncement:
+            return "announcement";
+         case DistributionList::LMDomainMembers:
+            return "domain_members";
+         case DistributionList::LMPublic:
+         default:
+            return "public";
+         }
+      }
+
+      bool ParseListModeWord(const String &word, DistributionList::ListMode &mode)
+      {
+         AnsiString value = word;
+
+         if (value.CompareNoCase("public") == 0)
+            mode = DistributionList::LMPublic;
+         else if (value.CompareNoCase("membership") == 0)
+            mode = DistributionList::LMMembership;
+         else if (value.CompareNoCase("announcement") == 0)
+            mode = DistributionList::LMAnnouncement;
+         else if (value.CompareNoCase("domain_members") == 0)
+            mode = DistributionList::LMDomainMembers;
+         else
+            return false;
+
+         return true;
+      }
+
+      const char *ListModeRefusal = "{\"error\":\"mode must be public, membership, announcement or domain_members\"}";
+
+      // The list an address names, through its domain, or null.
+      std::shared_ptr<DistributionList> ListByAddress(const String &address)
+      {
+         std::shared_ptr<Domain> domain = DomainByName(StringParser::ExtractDomain(address));
+         if (!domain)
+            return std::shared_ptr<DistributionList>();
+
+         DistributionLists lists(domain->GetID());
+         lists.Refresh();
+         return lists.GetItemByAddress(address);
+      }
+   }
+
+   AnsiString
+   RestApiServer::ListEntryJson_(const std::shared_ptr<DistributionList> &list)
+   {
+      Quote quote = [](const String &value) { return JsonEscape_(Utf8_(value)); };
+
+      AnsiString entry;
+      entry.Format("{\"address\":\"%hs\",\"active\":%hs,\"require_auth\":%hs,\"mode\":\"%hs\",\"require_sender_address\":\"%hs\",\"moderator_address\":\"%hs\",\"bounce_address\":\"%hs\",\"members\":[",
+         quote(list->GetAddress()).c_str(),
+         list->GetActive() ? "true" : "false",
+         list->GetRequireAuth() ? "true" : "false",
+         ListModeWord(list->GetListMode()),
+         quote(list->GetRequireAddress()).c_str(),
+         quote(list->GetModeratorAddress()).c_str(),
+         quote(list->GetBounceAddress()).c_str());
+
+      // GetMembers reads the recipients again each time, so a create that has
+      // just saved them answers with them.
+      std::shared_ptr<DistributionListRecipients> recipients = list->GetMembers();
+      if (recipients)
+      {
+         int count = 0;
+         for (int m = 0; m < recipients->GetCount(); m++)
+         {
+            std::shared_ptr<DistributionListRecipient> recipient = recipients->GetItem(m);
+            if (!recipient)
+               continue;
+            if (count > 0)
+               entry += ",";
+            entry += "\"" + quote(recipient->GetAddress()) + "\"";
+            count++;
+         }
+      }
+      entry += "]}";
+      return entry;
+   }
+
+   HttpResponse
+   RestApiServer::HandleCreateList_(const String &domainName, const AnsiString &requestBody)
+   {
+      Quote quote = [](const String &value) { return JsonEscape_(Utf8_(value)); };
+
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return BuildResponse_(400, "{\"error\":\"the body must be a JSON object\"}");
+
+      static const char *const keys[] =
+      {
+         "address", "members", "active", "require_auth", "mode", "require_sender_address", "moderator_address", "bounce_address"
+      };
+      AnsiString error;
+      if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      String address, modeWord, requireAddress, moderatorAddress, bounceAddress;
+      if (!ReadString(body, "address", address, error) ||
+          !ReadString(body, "mode", modeWord, error) ||
+          !ReadString(body, "require_sender_address", requireAddress, error) ||
+          !ReadString(body, "moderator_address", moderatorAddress, error) ||
+          !ReadString(body, "bounce_address", bounceAddress, error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      address.Trim();
+      if (address.IsEmpty())
+         return BuildResponse_(400, "{\"error\":\"address is required\"}");
+
+      String addressDomain = StringParser::ExtractDomain(address);
+      if (addressDomain.CompareNoCase(domainName) != 0)
+         return BuildResponse_(400, "{\"error\":\"address does not belong to the domain\"}");
+
+      // The defaults InterfaceDistributionLists::Add leaves in place: active,
+      // no authentication required, public.
+      bool active = true, requireAuth = false;
+      if (!ReadBool(body, "active", active, error) ||
+          !ReadBool(body, "require_auth", requireAuth, error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      DistributionList::ListMode mode = DistributionList::LMPublic;
+      if (!modeWord.IsEmpty() && !ParseListModeWord(modeWord, mode))
+         return BuildResponse_(400, ListModeRefusal);
+
+      // The members: an array of addresses, empty ones skipped, as the route
+      // has always taken them.
+      std::vector<String> members;
+      const JsonValue *memberList = body.Get("members");
+      if (memberList && !memberList->IsNull())
+      {
+         if (!memberList->IsArray())
+            return BuildResponse_(400, "{\"error\":\"members must be an array of e-mail addresses\"}");
+
+         for (const JsonValue &item : memberList->Items())
+         {
+            if (!item.IsString())
+               return BuildResponse_(400, "{\"error\":\"members must be an array of e-mail addresses\"}");
+
+            String member = Utf8ToString(item.AsString());
+            member.Trim();
+            if (!member.IsEmpty())
+               members.push_back(member);
+         }
+      }
+
+      std::shared_ptr<Domain> domain = DomainByName(domainName);
+      if (!domain)
+         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
+
+      DistributionLists lists(domain->GetID());
+      lists.Refresh();
+      if (lists.GetItemByAddress(address))
+         return BuildResponse_(409, "{\"error\":\"a list with that address exists\"}");
+
+      std::shared_ptr<DistributionList> list(new DistributionList);
+      list->SetDomainID(domain->GetID());
+      list->SetAddress(address);
+      list->SetActive(active);
+      list->SetRequireAuth(requireAuth);
+      list->SetListMode(mode);
+      list->SetRequireAddress(requireAddress);
+      list->SetModeratorAddress(moderatorAddress);
+      list->SetBounceAddress(bounceAddress);
+
+      String saveError;
+      if (!PersistentDistributionList::SaveObject(list, saveError, PersistenceModeNormal))
+      {
+         if (!saveError.IsEmpty())
+            return BuildResponse_(400, ErrorBody(quote, saveError));
+         return BuildResponse_(500, "{\"error\":\"failed to save the list\"}");
+      }
+
+      int saved = 0;
+      for (const String &member : members)
+      {
+         std::shared_ptr<DistributionListRecipient> recipient(new DistributionListRecipient);
+         recipient->SetListID(list->GetID());
+         recipient->SetAddress(member);
+         if (PersistentDistributionListRecipient::SaveObject(recipient))
+            saved++;
+      }
+
+      LOG_APPLICATION("RestApi: Distribution list '" + list->GetAddress() + "' created with " + StringParser::IntToString(saved) + " member(s).");
+
+      return BuildResponse_(201, ListEntryJson_(list));
+   }
+
+   HttpResponse
+   RestApiServer::HandleUpdateList_(const String &address, const AnsiString &requestBody)
+   {
+      Quote quote = [](const String &value) { return JsonEscape_(Utf8_(value)); };
+
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return BuildResponse_(400, "{\"error\":\"the body must be a JSON object\"}");
+
+      static const char *const keys[] =
+      {
+         "active", "require_auth", "mode", "require_sender_address", "moderator_address", "bounce_address"
+      };
+      AnsiString error;
+      if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      std::shared_ptr<DistributionList> list = ListByAddress(address);
+      if (!list)
+         return BuildResponse_(404, "{\"error\":\"list not found\"}");
+
+      bool active = list->GetActive(), requireAuth = list->GetRequireAuth();
+      String modeWord, requireAddress = list->GetRequireAddress();
+      String moderatorAddress = list->GetModeratorAddress(), bounceAddress = list->GetBounceAddress();
+
+      if (!ReadBool(body, "active", active, error) ||
+          !ReadBool(body, "require_auth", requireAuth, error) ||
+          !ReadString(body, "mode", modeWord, error) ||
+          !ReadString(body, "require_sender_address", requireAddress, error) ||
+          !ReadString(body, "moderator_address", moderatorAddress, error) ||
+          !ReadString(body, "bounce_address", bounceAddress, error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      DistributionList::ListMode mode = list->GetListMode();
+      if (!modeWord.IsEmpty() && !ParseListModeWord(modeWord, mode))
+         return BuildResponse_(400, ListModeRefusal);
+
+      list->SetActive(active);
+      list->SetRequireAuth(requireAuth);
+      list->SetListMode(mode);
+      list->SetRequireAddress(requireAddress);
+      list->SetModeratorAddress(moderatorAddress);
+      list->SetBounceAddress(bounceAddress);
+
+      // SaveObject drops the list from its cache, so the next message to it
+      // reads the row just written.
+      String saveError;
+      if (!PersistentDistributionList::SaveObject(list, saveError, PersistenceModeNormal))
+      {
+         if (!saveError.IsEmpty())
+            return BuildResponse_(400, ErrorBody(quote, saveError));
+         return BuildResponse_(500, "{\"error\":\"failed to save the list\"}");
+      }
+
+      LOG_APPLICATION("RestApi: Distribution list '" + list->GetAddress() + "' updated.");
+
+      return BuildResponse_(200, ListEntryJson_(list));
    }
 
    // ------------------------------------------------------------------------

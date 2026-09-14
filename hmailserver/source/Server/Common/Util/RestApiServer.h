@@ -74,6 +74,7 @@ namespace HM
    class IPAddress;
    class Account;
    class Domain;
+   class DistributionList;
    class Rule;
    class SecurityRange;
    class IMAPFolder;
@@ -326,6 +327,9 @@ namespace HM
          // The anti-virus settings group, server-wide as the other groups are.
          RouteSettingsAntiVirusGet,
          RouteSettingsAntiVirusPut,
+         // The distribution list's update, scoped to the address's domain as
+         // its delete is.
+         RouteListUpdate,
          RouteOpenApi
       };
 
@@ -824,6 +828,11 @@ namespace HM
       HttpResponse HandleDeleteDomainAlias_(const String &domainName, const String &aliasName);
       HttpResponse HandleUpdateIpRange_(__int64 rangeId, const AnsiString &requestBody);
       static AnsiString IpRangeEntryJson_(const std::shared_ptr<SecurityRange> &range);
+      // The distribution list's create and update, and the entry every list
+      // route answers with (RestApiAdministration.cpp); the listing and the
+      // delete stay in RestApiServer.cpp.
+      HttpResponse HandleUpdateList_(const String &address, const AnsiString &requestBody);
+      static AnsiString ListEntryJson_(const std::shared_ptr<DistributionList> &list);
       static AnsiString OpenApiAdministrationPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
