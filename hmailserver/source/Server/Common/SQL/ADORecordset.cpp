@@ -33,6 +33,7 @@ namespace HM
    ADORecordset::ADORecordset()
    {
       cur_row_ = 0;
+      exhausted_ = false;
    }
 
    ADORecordset::~ADORecordset()
@@ -154,6 +155,8 @@ namespace HM
    bool
    ADORecordset::IsEOF() const
    {
+      if (exhausted_)
+         return true;
       if (cur_row_ >= RecordCount())
          return true;
       else
@@ -164,7 +167,41 @@ namespace HM
    ADORecordset::MoveNext()
    {
       cur_row_++;
-      cADORecordset->MoveNext();
+      try
+      {
+         cADORecordset->MoveNext();
+      }
+      catch (_com_error &err)
+      {
+         // The wrapper throws where ADO answers with a failed HRESULT - a
+         // recordset closed under the walk, a provider that has lost the row.
+         // Left to propagate, as it was, the exception left the caller's loop,
+         // the caller, and the scheduled task it ran in, which the exception
+         // handler then reported as a nameless "..." exception with a minidump:
+         // the Windows gate of 14 September 2026, once in five runs, in a task
+         // walking the accounts while a test was deleting its domain. The walk
+         // ends here instead: the error is reported with ADO's own words, IsEOF
+         // answers true from now on, and the caller's loop finishes with the
+         // rows it has.
+         _bstr_t bstrSource(err.Source());
+         _bstr_t bstrDescription(err.Description());
+
+         LPCSTR lpcSource = bstrSource;
+         String sErrSource = lpcSource ? lpcSource : "";
+
+         LPCSTR lpcDesc = bstrDescription;
+         String sErrDesc = lpcDesc ? lpcDesc : "";
+
+         String hresult;
+         hresult.Format(_T("0x%08X"), (unsigned int) err.Error());
+
+         ErrorManager::Instance()->ReportError(ErrorManager::High, 5037, "ADORecordset::MoveNext",
+            "Error while moving to the next row of a recordset; the rows after it were not read. HRESULT: " + hresult +
+            ". ADO-Source: " + sErrSource + ". ADO-Description: " + sErrDesc);
+
+         exhausted_ = true;
+         return false;
+      }
       return true;
    }
 

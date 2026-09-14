@@ -44,6 +44,9 @@ namespace HM
       _RecordsetPtr cADORecordset;
 
       long cur_row_;
+      // Set when MoveNext could not move: IsEOF answers true from then on, so
+      // the caller's loop ends where the recordset did.
+      bool exhausted_;
    };
 
 }

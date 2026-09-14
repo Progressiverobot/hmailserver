@@ -99,6 +99,28 @@ namespace HM
 
          throw;
       }
+#ifndef HM_PLATFORM_POSIX
+      catch (_com_error& error)
+      {
+         // What the ADO wrappers throw, and not a std::exception: caught below
+         // as "..." it was reported with no description at all, and the minidump
+         // that followed was the only word on what had failed.
+         try
+         {
+            String hresult;
+            hresult.Format(_T("0x%08X"), (unsigned int) error.Error());
+            _bstr_t description(error.Description());
+            LPCSTR text = description;
+            ErrorManager::Instance()->ReportError(ErrorManager::High, 4208, "ExceptionHandler::Run",
+               GetExceptionText(descriptive_name) + ", COM error " + hresult + ": " + String(text ? text : ""));
+         }
+         catch (...)
+         {
+            // Don't swallow the original exception.
+         }
+         throw;
+      }
+#endif
       catch (std::exception& error)
       {
          String sErrorMessage = 
