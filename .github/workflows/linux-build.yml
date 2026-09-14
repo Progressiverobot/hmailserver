@@ -974,9 +974,15 @@ jobs:
 
       - name: The pushed image starts, listens, and is administrable
         env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/hmailserver:${{ steps.meta.outputs.version }}
+          IMAGE_OWNER: ${{ github.repository_owner }}
+          IMAGE_VERSION: ${{ steps.meta.outputs.version }}
         run: |
           set -euo pipefail
+          # docker refuses a repository name with an upper-case letter, and the
+          # owner as GitHub spells it has one. metadata-action lowercases it for
+          # the tags it writes; the name used here is lowercased the same way.
+          IMAGE="ghcr.io/$(printf '%s' "$IMAGE_OWNER" | tr '[:upper:]' '[:lower:]')/hmailserver:${IMAGE_VERSION}"
+          echo "image: ${IMAGE}"
           # The real first start, the way the Dockerfile's own example runs it: a
           # bridge network with a PostgreSQL container beside the image, the
           # entrypoint writing [Database], the REST listener and the administrator
