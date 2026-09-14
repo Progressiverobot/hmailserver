@@ -328,6 +328,9 @@ function folderTree() {
 // message starts with a follow-up due today, so the reminder has something
 // to say at sign-in.
 const todayStamp = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+// A listing date that many days ago, in the shape the server writes, so the
+// nudges - which count days from today - read the same whenever this runs.
+const stampDaysAgo = (days) => { const d = new Date(Date.now() - days * 86400000); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
 const flaggedById = { 101: true };
 const keywordsById = { 101: ['$FollowUp', '$Due-' + todayStamp] };
 const withState = (m) => Object.assign({}, m, { flags: Object.assign({}, m.flags, { flagged: !!flaggedById[m.id], keywords: (keywordsById[m.id] || []).slice() }) });
@@ -335,11 +338,20 @@ const withState = (m) => Object.assign({}, m, { flags: Object.assign({}, m.flags
 const LISTING = {
    total: 5,
    messages: [
-      { id: 103, uid: 13, subject: 'Third', from: 'c@example.net', to: 'user@example.com', date: '2026-09-09 09:00', size: 900, flags: { seen: false, flagged: false, draft: false } },
+      // Received five days ago, asks a question, never answered: the shape a nudge is for.
+      { id: 103, uid: 13, subject: 'Third', from: 'c@example.net', to: 'user@example.com', date: stampDaysAgo(5), size: 900, snippet: 'Can you send the figures?', flags: { seen: false, flagged: false, draft: false } },
       { id: 102, uid: 12, subject: 'Second', from: 'b@example.net', to: 'user@example.com', date: '2026-09-08 09:00', size: 800, flags: { seen: false, flagged: false, draft: false }, in_reply_to: '<one@example.net>' },
       { id: 101, uid: 11, subject: 'First', from: 'a@example.net', to: 'user@example.com', date: '2026-09-07 09:00', size: 700, flags: { seen: true, flagged: false, draft: false } }
    ]
 };
+
+// The Sent folder: one message the inbox's 'Second' answers, one nothing
+// answered, sent long enough ago to be nudged, and one sent yesterday.
+const SENT_LISTING = [
+   { id: 401, uid: 1, subject: 'Figures for the board', from: 'user@example.com', to: 'alice@example.net', date: stampDaysAgo(6), size: 500, message_id: '<one@example.net>', flags: { seen: true, flagged: false, draft: false } },
+   { id: 402, uid: 2, subject: 'Draft agenda', from: 'user@example.com', to: 'bob@example.net', date: stampDaysAgo(5), size: 500, message_id: '<agenda@example.com>', flags: { seen: true, flagged: false, draft: false } },
+   { id: 403, uid: 3, subject: 'Thanks', from: 'user@example.com', to: 'carol@example.net', date: stampDaysAgo(1), size: 300, message_id: '<thanks@example.com>', flags: { seen: true, flagged: false, draft: false } }
+];
 
 // The rest of the folder, two pages deep: what the page asks for with before_uid.
 const OLDER = [
@@ -402,12 +414,17 @@ function answer(method, path, body) {
       if (!arrived) { return json(200, { total: LISTING.total, messages: LISTING.messages.map(withState) }); }
       return json(200, { total: 6, messages: [ARRIVAL].concat(LISTING.messages).map(withState) });
    }
+   if (path.startsWith('/api/v1/me/folders/2/messages')) { return json(200, { total: SENT_LISTING.length, messages: SENT_LISTING.map(withState) }); }
    if (path.startsWith('/api/v1/me/search?')) {
-      // Every folder, for the two queries the page makes of it: the Starred
-      // view's and the follow-up reminder's.
+      // Every folder, for the three queries the page makes of it: the Starred
+      // view's, the follow-up reminder's, and the Sent folder's nudges asking
+      // what answered its messages (in_reply_to: terms joined by OR).
       const q = decodeURIComponent((path.split('q=')[1] || '').split('&')[0]);
-      const all = LISTING.messages.concat(arrived ? [ARRIVAL] : [], OLDER).map(withState);
-      const hits = q === 'is:flagged' ? all.filter((m) => m.flags.flagged)
+      const all = LISTING.messages.concat(arrived ? [ARRIVAL] : [], OLDER, SENT_LISTING).map(withState);
+      const asked = q.split(' OR ').filter((t) => t.startsWith('in_reply_to:')).map((t) => t.slice('in_reply_to:'.length).replace(/[<>]/g, '').toLowerCase());
+      const answers = (m) => ((m.in_reply_to || '') + ' ' + (m.references || '')).toLowerCase().split(/\s+/).map((r) => r.replace(/[<>]/g, '')).some((r) => r && asked.indexOf(r) >= 0);
+      const hits = asked.length ? all.filter(answers)
+         : q === 'is:flagged' ? all.filter((m) => m.flags.flagged)
          : q === 'label:$FollowUp' ? all.filter((m) => m.flags.keywords.some((k) => k.toLowerCase() === '$followup')) : [];
       return json(200, { query: q, scanned: all.length, complete: true, more: false, messages: hits.map((m) => Object.assign({ folder_id: 1, folder: 'INBOX' }, m)) });
    }
@@ -1183,6 +1200,39 @@ async function main() {
    check('Open opens the message', location.hash === '#/m/101' && called(beforeAgain, 'GET', '/api/v1/me/messages/101') && toastBox.children.length === 0, location.hash + ' ' + toastBox.children.length + ' toasts');
    document.getElementById('message-back').dispatchEvent(makeEvent('click'));
    await flush();
+
+   // ---- nudges: a reply or a follow-up that seems owed, from the row's own fields and one bounded search
+   location.hash = '#/f/1';
+   await flush();
+   const nudgeOf = (row) => { let found = null; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.className === 'nudge') { found = c; } if (c.childNodes) { walk(c); } } })(row); return found; };
+   check('a message received days ago that asked a question and was never answered is nudged', !!nudgeOf(rowBySubject('Third')) && nudgeOf(rowBySubject('Third')).textContent === 'Received 5 days ago. Reply?',
+      nudgeOf(rowBySubject('Third')) ? nudgeOf(rowBySubject('Third')).textContent : 'no nudge');
+   check('and one that asked nothing is not', !nudgeOf(rowBySubject('Second')) && !nudgeOf(rowBySubject('First')));
+   const beforeSentView = requests.length;
+   location.hash = '#/f/2';
+   await flush();
+   const askCall = since(beforeSentView).filter((r) => r.method === 'GET' && r.path.startsWith('/api/v1/me/search?q='))[0];
+   check('the Sent folder asks once whether anything answered the messages old enough to nudge, in one search',
+      since(beforeSentView).filter((r) => r.path.startsWith('/api/v1/me/search?q=')).length === 1 && !!askCall && decodeURIComponent(askCall.path.split('q=')[1].split('&')[0]) === 'in_reply_to:<one@example.net> OR in_reply_to:<agenda@example.com>',
+      askCall ? askCall.path : 'no search');
+   check('a sent message nothing answered is nudged to follow up', !!nudgeOf(rowBySubject('Draft agenda')) && nudgeOf(rowBySubject('Draft agenda')).textContent === 'Sent 5 days ago. Follow up?',
+      nudgeOf(rowBySubject('Draft agenda')) ? nudgeOf(rowBySubject('Draft agenda')).textContent : 'no nudge');
+   check('one that was answered is not, nor one sent yesterday', !nudgeOf(rowBySubject('Figures for the board')) && !nudgeOf(rowBySubject('Thanks')),
+      rows().map((r) => r.textContent.slice(0, 60)).join(' | '));
+   location.hash = '#/f/1';
+   await flush();
+   const beforeSentAgain = requests.length;
+   location.hash = '#/f/2';
+   await flush();
+   check('listed again within a while, the folder asks nothing more', !since(beforeSentAgain).some((r) => r.path.startsWith('/api/v1/me/search?q=')) && !!nudgeOf(rowBySubject('Draft agenda')),
+      JSON.stringify(since(beforeSentAgain).map((r) => r.path)));
+   document.getElementById('pref-nudges').checked = false;
+   const beforeNudgesOff = requests.length;
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const nudgePref = since(beforeNudgesOff).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   check('the preference turns nudges off, with the account', !!nudgePref && JSON.parse(nudgePref.body).nudges === '0' && !nudgeOf(rowBySubject('Draft agenda')),
+      (nudgePref ? nudgePref.body : 'no preferences call') + ' nudge=' + !!nudgeOf(rowBySubject('Draft agenda')));
 
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));

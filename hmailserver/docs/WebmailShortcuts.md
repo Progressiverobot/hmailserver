@@ -74,6 +74,7 @@ with `OR`.
 | `is:muted` / `is:pinned` | Muted threads and pinned messages (the `$Muted` and `$Pinned` keywords). |
 | `label:name` | Messages carrying that label (an IMAP keyword); several `label:` terms must all be present. |
 | `category:` | The inbox tab the message is listed under: `primary`, `social`, `promotions`, `updates` or `forums`. |
+| `in_reply_to:` | Messages whose `In-Reply-To` or `References` names the message-id (with or without its angle brackets): the replies to a message. The webmail asks it for the Sent folder's nudges. |
 
 Examples: `from:alice is:unread`, `subject:"quarterly report" has:attachment`,
 `in:Archive after:2026-01-01 label:travel`, `from:alice OR from:bob -is:read`,

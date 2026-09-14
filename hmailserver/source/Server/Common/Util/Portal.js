@@ -616,6 +616,8 @@
     what.appendChild(node('span', m.subject || t('(no subject)'), 'subject'));
     if (m.flags && m.flags.keywords && m.flags.keywords.length) { what.appendChild(chipsFor(m.flags.keywords)); }
     if (m.folder && state.everywhere) { what.appendChild(node('span', m.folder, 'badge')); }
+    var nudge = nudgeFor(m, folderId);
+    if (nudge) { entry.nudge = node('span', nudge, 'nudge'); what.appendChild(entry.nudge); }
     what.appendChild(node('span', m.snippet || '', 'snip'));
     row.appendChild(what);
     var meta = node('div', undefined, 'meta');
@@ -705,6 +707,8 @@
       var keywords = [];
       g.messages.forEach(function (m) { (m.flags.keywords || []).forEach(function (k) { if (keywords.indexOf(k) < 0) { keywords.push(k); } }); });
       if (keywords.length) { what.appendChild(chipsFor(keywords)); }
+      var nudge = nudgeFor(newest, folderId);
+      if (nudge) { entry.nudge = node('span', nudge, 'nudge'); what.appendChild(entry.nudge); }
       what.appendChild(node('span', newest.snippet || '', 'snip'));
       row.appendChild(what);
       var meta = node('div', undefined, 'meta');
@@ -789,6 +793,7 @@
       if (result.status === 200 && result.data) {
         renderMessages(result.data);
         lastListing = { key: listingKey(), page: result.data };
+        askReplies(result.data);
         if (!state.everywhere && !state.query && !state.before && state.folderId === inboxId) { offlineKeep('list', result.data); }
         return;
       }
@@ -1621,6 +1626,8 @@
     clear(el('search-suggest-list'));
     dueShownForget();
     followUps.day = '';
+    replied = {};
+    askedReplies = {};
     prefetched = {};
     current = null;
     lastListing = null;
@@ -3189,6 +3196,55 @@
   el('snooze-tomorrow').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-week').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-go').addEventListener('click', function () { var at = fromPicker(el('snooze-at').value); if (at.length === 16) { snoozeUntil(at); } else { say('mail-status', t('Choose when.'), false); } });
+  // ---- Nudges: a reply or a follow-up that seems owed, as Gmail suggests ----
+  // Computed from what a row already carries. A message received three to
+  // thirty days ago, not answered, not from the reader, not muted, that
+  // asked a question - a question mark in its subject or its first line -
+  // is nudged to be replied to. A message in the Sent folder that old is
+  // nudged to be followed up when nothing answered it, which the listing
+  // cannot say: the page asks it of the server once, in_reply_to: for each
+  // such message on the page joined by OR, and keeps the answer - a reply
+  // once seen stays seen, the rest are asked about again after a while. A
+  // preference turns nudges off. Nothing is nudged in a search.
+  var NUDGE_DAYS_MIN = 3;
+  var NUDGE_DAYS_MAX = 30;
+  var nudgesOn = function () { return pref('nudges') !== '0'; };
+  var daysOld = function (m) { var d = dateOf(m); return d ? Math.floor((Date.now() - d.getTime()) / 86400000) : -1; };
+  var oldEnough = function (m) { var days = daysOld(m); return days >= NUDGE_DAYS_MIN && days <= NUDGE_DAYS_MAX; };
+  var fromMe = function (m) { return !!me && addressOf(m.from || '').toLowerCase() === me; };
+  var asksAQuestion = function (m) { return /\?/.test(m.subject || '') || /\?/.test(m.snippet || ''); };
+  var messageIdOf = function (s) { return String(s || '').replace(/[<>]/g, '').trim().toLowerCase(); };
+  var replied = {};
+  var askedReplies = {};
+  var nudgeFor = function (m, folderId) {
+    if (!nudgesOn() || state.query || state.everywhere || !m.flags || m.flags.draft || !oldEnough(m)) { return ''; }
+    if (folderIs(folderId, 'Sent')) {
+      var id = messageIdOf(m.message_id);
+      return id && !replied[id] ? tf('Sent {0} days ago. Follow up?', daysOld(m)) : '';
+    }
+    if (folderIs(folderId, 'Drafts') || folderIs(folderId, 'Junk') || folderIs(folderId, 'Trash')) { return ''; }
+    if (m.flags.answered || fromMe(m) || isMuted(m) || !asksAQuestion(m)) { return ''; }
+    return tf('Received {0} days ago. Reply?', daysOld(m));
+  };
+  var askReplies = function (page) {
+    if (!nudgesOn() || state.query || state.everywhere || !folderIs(state.folderId, 'Sent')) { return; }
+    var wanted = [];
+    page.messages.forEach(function (m) {
+      var id = messageIdOf(m.message_id);
+      if (id && !replied[id] && oldEnough(m) && wanted.length < 16 && !(askedReplies[id] && Date.now() - askedReplies[id] < 5 * 60 * 1000)) { wanted.push(m.message_id); askedReplies[id] = Date.now(); }
+    });
+    if (!wanted.length) { return; }
+    call('GET', '/api/v1/me/search?q=' + encodeURIComponent(wanted.map(function (id) { return 'in_reply_to:' + id; }).join(' OR ')) + '&limit=200').then(function (result) {
+      if (result.status !== 200 || !result.data) { return; }
+      var learned = false;
+      (result.data.messages || []).forEach(function (r) {
+        String((r.in_reply_to || '') + ' ' + (r.references || '')).split(/\s+/).forEach(function (ref) { var id = messageIdOf(ref); if (id && !replied[id]) { replied[id] = true; learned = true; } });
+      });
+      // The rows nudged a moment ago that turn out to have been answered lose the nudge, in place.
+      if (!learned) { return; }
+      listRows.forEach(function (r) { if (r.nudge && !nudgeFor(r.m, r.folderId)) { r.nudge.parentNode.removeChild(r.nudge); r.nudge = null; } });
+    });
+  };
   // ---- Follow-up flags: a flag with a date, as Outlook has them -------------
   // A follow-up is the star, the $FollowUp keyword and a $Due-YYYY-MM-DD
   // keyword beside it, all on the message: it travels with the message
@@ -3398,7 +3454,7 @@
   // Kept with the account (GET/PUT /api/v1/me/preferences); the browser's
   // storage holds only the theme, for the sign-in page before there is one.
   var prefs = {};
-  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '' };
+  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '', nudges: '1' };
   var renderListTools = function () {
     el('view-threads').textContent = pref('view') === 'threads' ? t('Show messages one by one') : t('Show conversations');
     var emptyable = !state.everywhere && (folderIs(state.folderId, 'Junk') || folderIs(state.folderId, 'Trash'));
@@ -3490,6 +3546,7 @@
     el('pref-undo').value = String(undoSeconds());
     if (!el('pref-undo').value) { el('pref-undo').value = '5'; }
     el('pref-notify').checked = pref('notify') === '1';
+    el('pref-nudges').checked = nudgesOn();
     el('pref-inbox').value = inboxMode();
     el('pref-language').value = knownLanguage(pref('language') || '') || languageActive;
     renderNotifyFolders();
@@ -3625,7 +3682,7 @@
     var labels = el('notify-folders').children;
     for (var i = 0; i < labels.length; i++) { var tick = labels[i].children[0]; if (tick && tick.checked) { ticked.push(tick.value); } }
     savePrefs({ language: el('pref-language').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
-                notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(','), inbox: el('pref-inbox').value }).then(function (ok) {
+                notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(','), inbox: el('pref-inbox').value, nudges: el('pref-nudges').checked ? '1' : '0' }).then(function (ok) {
       if (ok) { say('prefs-status', t('Saved.'), true); if (lastPage) { renderMessages(lastPage); } }
     });
   });

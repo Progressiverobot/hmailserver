@@ -1590,6 +1590,48 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("in_reply_to: narrows to messages whose In-Reply-To or References names the message-id, given with or without its angle brackets and matched in them so one id is not the head of another - the replies to a message, which is what the Sent folder's nudge asks - turned round with a minus, and in a folder listing")]
+      public void InReplyToNarrowsToTheRepliesToAMessage()
+      {
+         string to = "To: " + Address + "\r\n";
+         SmtpClientSimulator.StaticSendRaw("alice@example.com", Address,
+            "From: alice@example.com\r\n" + to + "Subject: The question\r\nMessage-ID: <question-1@example.com>\r\n\r\nWhen?\r\n");
+         SmtpClientSimulator.StaticSendRaw("bob@example.org", Address,
+            "From: bob@example.org\r\n" + to + "Subject: Tuesday then\r\nIn-Reply-To: <question-1@example.com>\r\n\r\nTuesday.\r\n");
+         SmtpClientSimulator.StaticSendRaw("carol@example.net", Address,
+            "From: carol@example.net\r\n" + to + "Subject: Wednesday then\r\nReferences: <question-1@example.com> <other@example.org>\r\nIn-Reply-To: <other@example.org>\r\n\r\nWednesday.\r\n");
+         SmtpClientSimulator.StaticSendRaw("dave@example.org", Address,
+            "From: dave@example.org\r\n" + to + "Subject: Unrelated\r\nIn-Reply-To: <question-1@example.com.au>\r\n\r\nNothing to do with it.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 4);
+
+         string replies = SearchBody("in_reply_to:<question-1@example.com>");
+         StringAssert.Contains("Tuesday then", replies);
+         StringAssert.Contains("Wednesday then", replies);
+         StringAssert.DoesNotContain("The question", replies);
+         StringAssert.DoesNotContain("Unrelated", replies);
+         string bare = SearchBody("in_reply_to:question-1@example.com");
+         StringAssert.Contains("Tuesday then", bare);
+         StringAssert.Contains("Wednesday then", bare);
+         StringAssert.DoesNotContain("Unrelated", bare);
+         string others = SearchBody("-in_reply_to:<question-1@example.com>");
+         StringAssert.Contains("The question", others);
+         StringAssert.Contains("Unrelated", others);
+         StringAssert.DoesNotContain("Tuesday then", others);
+         StringAssert.DoesNotContain("Wednesday then", others);
+         string either = SearchBody("in_reply_to:<question-1@example.com> OR in_reply_to:<question-1@example.com.au>");
+         StringAssert.Contains("Tuesday then", either);
+         StringAssert.Contains("Unrelated", either);
+         StringAssert.DoesNotContain("The question", either);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) listed = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("in_reply_to:<question-1@example.com>"), UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("Tuesday then", listed.body);
+         StringAssert.DoesNotContain("Unrelated", listed.body);
+      }
+
+      [Test]
       [Description("An app password is made once with its clear text - the account's own password proving who asks - listed without it, signs in, may not mint or revoke another or end the account's sessions, and is removed")]
       public void AppPasswordsAreMadeListedAndRemoved()
       {
