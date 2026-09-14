@@ -423,7 +423,6 @@
       row.appendChild(older);
     }
     list.appendChild(row);
-    if (false) list.appendChild(node('div', t('Narrow a search with from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name, and "quoted phrases".'), 'note'));
   };
   // ---- Archive, Junk and Trash, and conversations ---------------------------
   var folderIs = function (folderId, use) {
@@ -4022,9 +4021,10 @@
     runSearch(q);
   });
   el('adv-reset').addEventListener('click', function () {
-    ['adv-from', 'adv-to', 'adv-subject', 'adv-words', 'adv-label', 'adv-after', 'adv-before'].forEach(function (id) { el(id).value = ''; });
+    ['adv-from', 'adv-to', 'adv-subject', 'adv-words', 'adv-label', 'adv-after', 'adv-before', 'adv-size', 'adv-age'].forEach(function (id) { el(id).value = ''; });
     ['adv-attachment', 'adv-unread', 'adv-flagged'].forEach(function (id) { el(id).checked = false; });
     el('adv-where').value = 'folder';
+    el('adv-size-kind').value = 'larger';
   });
   el('mail-search').addEventListener('input', function () { el('mail-search-clear').hidden = !el('mail-search').value && !state.query; });
   window.addEventListener('hashchange', function () { el('mail-search-clear').hidden = !state.query && !el('mail-search').value; });
