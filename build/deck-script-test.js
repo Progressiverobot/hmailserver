@@ -469,6 +469,16 @@ function accountRecord(address, active) {
       ad_enabled: false, ad_domain: '', ad_username: '', sieve_script: '' };
 }
 
+// The distribution list's schemas and descriptions as RestApiServer.cpp emits
+// them: the create takes the address and the members, the update neither.
+const LIST_PROPS = {
+   active: { type: 'boolean' }, require_auth: { type: 'boolean' }, mode: { type: 'string', enum: ['public', 'membership', 'announcement', 'domain_members'] },
+   require_sender_address: { type: 'string' }, moderator_address: { type: 'string' }, bounce_address: { type: 'string' }
+};
+const LIST_CREATE_PROPS = Object.assign({ address: { type: 'string' }, members: { type: 'array', items: { type: 'string' } } }, LIST_PROPS);
+const LISTS_POST = 'Body: address (required, in this domain), members (an array of addresses), active (default true), require_auth (default false), mode (public, membership, announcement or domain_members; default public, and any other word is refused as put_Mode refuses it), require_sender_address (the one sender an announcement list accepts), moderator_address and bounce_address. Saved as the Control Panel saves a list, with the same limitation check. Scoped to the domain.';
+const LIST_PUT = 'Body: any subset of active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address and bounce_address; a field left out keeps its value, and the members are not changed here. Everything is checked before anything is applied. Scoped to the address\'s domain.';
+
 // The IP range's schema as the ports and certificates literal emits it, every
 // field typed; the update takes any subset of the same keys.
 const RANGE_PROPS = {
@@ -676,6 +686,14 @@ const spec = {
          post: { summary: 'Add a domain alias', description: 'Body: name.', requestBody: body({ name: { type: 'string' } }, ['name']) }
       },
       '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } },
+      '/api/v1/domains/{domain}/lists': {
+         get: { summary: 'List the distribution lists in a domain, with their members', description: 'Each entry: address, active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address, bounce_address and members. Scoped to the domain.' },
+         post: { summary: 'Create a distribution list', description: LISTS_POST, requestBody: body(LIST_CREATE_PROPS, ['address']) }
+      },
+      '/api/v1/lists/{address}': {
+         put: { summary: 'Change a distribution list', description: LIST_PUT, requestBody: body(LIST_PROPS) },
+         delete: { summary: 'Delete a distribution list' }
+      },
       '/api/v1/accounts/{address}': {
          get: { summary: 'Read an account', description: 'The account whole, as the update answers it, less the password, the hash and the TOTP secret. Scoped to the address\'s domain.' },
          put: { summary: 'Update an account', description: ACCOUNT_PUT, requestBody: body(ACCOUNT_PROPS) },
@@ -733,6 +751,12 @@ const state = {
       'example.com': [Object.assign(accountRecord('anna@example.com', true), { first_name: 'Anna', admin_level: 'domain', sieve_script: 'require ["fileinto"];\r\nif header :contains "subject" "[SPAM]" { fileinto "Junk"; }' }),
          accountRecord('bob@example.com', false)],
       [HOSTILE]: [accountRecord('x@' + HOSTILE, true)],
+      'second.example': []
+   },
+   lists: {
+      'example.com': [{ address: 'all@example.com', active: true, require_auth: false, mode: 'public', require_sender_address: '', moderator_address: '', bounce_address: '',
+         members: ['anna@example.com', 'bob@example.com'] }],
+      [HOSTILE]: [],
       'second.example': []
    },
    fetchAccounts: {
@@ -895,6 +919,33 @@ function answer(method, path, headers, raw) {
          });
          return json(200, record);
       }
+   }
+
+   if (/^\/api\/v1\/domains\/[^/]+\/lists$/.test(path)) {
+      const domain = segment(path, 4);
+      if (!(domain in state.lists)) { return json(404, { error: 'domain not found' }); }
+      if (method === 'GET') { return json(200, state.lists[domain]); }
+      if (method === 'POST') {
+         for (const key of Object.keys(parsed)) { if (!(key in LIST_CREATE_PROPS)) { return json(400, { error: 'unknown field: ' + key }); } }
+         if (!String(parsed.address || '').trim()) { return json(400, { error: 'address is required' }); }
+         if ('mode' in parsed && LIST_PROPS.mode.enum.indexOf(parsed.mode) < 0) { return json(400, { error: 'mode must be public, membership, announcement or domain_members' }); }
+         if (state.lists[domain].some((l) => l.address === parsed.address)) { return json(409, { error: 'a list with that address exists' }); }
+         const list = Object.assign({ active: true, require_auth: false, mode: 'public', require_sender_address: '', moderator_address: '', bounce_address: '', members: [] }, parsed);
+         state.lists[domain].push(list);
+         return json(201, list);
+      }
+   }
+   if (/^\/api\/v1\/lists\/[^/]+$/.test(path)) {
+      const address = segment(path, 4);
+      const domain = Object.keys(state.lists).filter((d) => state.lists[d].some((l) => l.address === address))[0];
+      if (!domain) { return json(404, { error: 'list not found' }); }
+      const at = state.lists[domain].findIndex((l) => l.address === address);
+      if (method === 'PUT') {
+         for (const key of Object.keys(parsed)) { if (!(key in LIST_PROPS)) { return json(400, { error: 'unknown field: ' + key }); } }
+         Object.assign(state.lists[domain][at], parsed);
+         return json(200, state.lists[domain][at]);
+      }
+      if (method === 'DELETE') { state.lists[domain].splice(at, 1); return json(200, { deleted: true }); }
    }
 
    if (/^\/api\/v1\/accounts\/[^/]+\/fetch-accounts(\/\d+(\/download)?)?$/.test(path)) {
@@ -1339,6 +1390,73 @@ async function main() {
    click(act('accounts', { domain: 'example.com' }));
    await flush();
    check('the way back re-reads the accounts of the domain', called(before, 'GET', '/api/v1/domains/example.com/accounts').length === 1 && rows().length === 2 && act('accountedit', { address: 'carla@example.com' }) !== null);
+
+   // ---- the distribution lists of a domain
+   click(act('domains'));
+   await flush();
+   before = requests.length;
+   click(act('lists', { domain: 'example.com' }));
+   await flush();
+   check('Lists reads the domain\'s lists', called(before, 'GET', '/api/v1/domains/example.com/lists').length === 1, paths(before));
+   check('a list row shows its address, state, who may send and its members', rows().length === 1 && rows()[0].textContent.indexOf('all@example.com') >= 0 && rows()[0].textContent.indexOf('Active') >= 0 &&
+      rows()[0].textContent.indexOf('Public') >= 0 && rows()[0].textContent.indexOf('2') >= 0 && rows()[0].textContent.indexOf('anna@example.com') >= 0, rows().length ? rows()[0].textContent : 'no rows');
+   const drawnListNew = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('listnew_') === 0).map((id) => id.slice(8)).sort();
+   check('the new-list form has every key of the create and nothing else, the members as a list', JSON.stringify(drawnListNew) === JSON.stringify(Object.keys(LIST_CREATE_PROPS).sort()) &&
+      document.getElementById('listnew_members').tagName === 'TEXTAREA', JSON.stringify(drawnListNew));
+   check('and starts at the defaults the description states, the mode\'s word picked out of its sentence', document.getElementById('listnew_active').checked === true && document.getElementById('listnew_require_auth').checked === false &&
+      document.getElementById('listnew_mode').value === 'public' && document.getElementById('listnew_mode').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'public,membership,announcement,domain_members' &&
+      document.getElementById('listnew_address').closest('.fr').textContent.indexOf('required') >= 0,
+      'mode=' + document.getElementById('listnew_mode').value);
+   before = requests.length;
+   click(act('listnew', { domain: 'example.com' }));
+   await flush();
+   check('an empty address is refused by the page', called(before, 'POST', /lists/).length === 0 && document.getElementById('err_listnew').textContent.indexOf('required') >= 0);
+   setValue('listnew_address', 'team@example.com');
+   setValue('listnew_members', 'anna@example.com\n\ncarla@example.com\n');
+   setValue('listnew_mode', 'membership');
+   setChecked('listnew_require_auth', true);
+   before = requests.length;
+   click(act('listnew', { domain: 'example.com' }));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/domains/example.com/lists');
+   check('creating a list posts the form with the members as an array and the defaults', !!posted && posted.address === 'team@example.com' && JSON.stringify(posted.members) === '["anna@example.com","carla@example.com"]' &&
+      posted.mode === 'membership' && posted.require_auth === true && posted.active === true && posted.moderator_address === '', JSON.stringify(posted));
+   check('and the re-read list has it', called(before, 'GET', '/api/v1/domains/example.com/lists').length === 1 && rows().length === 2 && rows()[1].textContent.indexOf('team@example.com') >= 0 && toastText() === 'List created: team@example.com');
+   nextRefusal = 'The domain has reached its list limit.';
+   setValue('listnew_address', 'more@example.com');
+   click(act('listnew', { domain: 'example.com' }));
+   await flush();
+   check('a refused create is the server\'s sentence beside the form', document.getElementById('err_listnew').textContent === 'The domain has reached its list limit.');
+   click(act('listedit', { address: 'all@example.com' }));
+   await flush();
+   const drawnList = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('list_') === 0).map((id) => id.slice(5)).sort();
+   check('editing draws the update\'s keys with the list\'s values and the members without a control', JSON.stringify(drawnList) === JSON.stringify(Object.keys(LIST_PROPS).sort()) &&
+      document.getElementById('list_mode').value === 'public' && document.getElementById('list_active').checked === true && content().textContent.indexOf('bob@example.com') >= 0 &&
+      content().textContent.indexOf('the update does not change them') >= 0, JSON.stringify(drawnList));
+   setValue('list_mode', 'announcement');
+   setValue('list_require_sender_address', 'news@example.com');
+   before = requests.length;
+   click(act('listsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/lists/all%40example.com');
+   check('saving sends only what changed, by address', JSON.stringify(put) === '{"mode":"announcement","require_sender_address":"news@example.com"}', JSON.stringify(put));
+   check('then reads the lists again and stays in the editor on the server\'s values', called(before, 'GET', '/api/v1/domains/example.com/lists').length === 1 && document.getElementById('list_mode').value === 'announcement' && toastText() === 'List saved');
+   nextRefusal = 'An announcement list needs a sender.';
+   setValue('list_require_sender_address', '');
+   click(act('listsave'));
+   await flush();
+   check('a refused save keeps the editor open with the server\'s sentence', document.getElementById('err_listedit').textContent === 'An announcement list needs a sender.' && document.getElementById('list_mode') !== null);
+   click(act('lists', { domain: 'example.com' }));
+   await flush();
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('listdel', { address: 'team@example.com' }));
+   await flush();
+   check('deleting a list asks, naming it', called(before, 'DELETE', /lists/).length === 0 && confirmations[confirmations.length - 1].indexOf('team@example.com') >= 0);
+   confirmAnswer = true;
+   click(act('listdel', { address: 'team@example.com' }));
+   await flush();
+   check('yes deletes by address and the re-read list is without it', called(before, 'DELETE', '/api/v1/lists/team%40example.com').length === 1 && rows().length === 1 && rows()[0].textContent.indexOf('all@example.com') >= 0);
 
    // ---- the domain editor
    click(act('domains'));

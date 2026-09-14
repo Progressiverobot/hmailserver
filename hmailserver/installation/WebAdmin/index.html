@@ -227,7 +227,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],
   /* The fetch view's chosen domain and account, kept across its re-reads. */
   fetch:{domain:"",address:"",accounts:[],items:[]}};
 
@@ -397,6 +397,11 @@ $("#content").addEventListener("click",e=>{
   if(d.act==="accounts")showAccounts(d.domain);
   else if(d.act==="accountedit")openAccount(d.address,d.domain);
   else if(d.act==="accountsave")saveAccount();
+  else if(d.act==="lists")showLists(d.domain);
+  else if(d.act==="listnew")createList(d.domain);
+  else if(d.act==="listedit")openList(d.address,d.domain);
+  else if(d.act==="listsave")saveList();
+  else if(d.act==="listdel")deleteList(d.address,d.domain);
   else if(d.act==="domains"){editing=null;render();}
   else if(d.act==="domainnew")createDomain();
   else if(d.act==="domainedit")openDomain(d.name);
@@ -510,6 +515,13 @@ function documentedDefaults(path,method,props){
     const type=props[key].type||"string";
     if(type==="boolean"){if(raw==="true"||raw==="false")out[key]=raw==="true";return;}
     if(type==="integer"){const n=Number(raw);if(isFinite(n))out[key]=n;return;}
+    // "mode (...; default public, and any other word is refused)": for a key
+    // with words, the first word of the match that is one of them.
+    if(props[key]["enum"]){
+      const word=raw.split(/[^A-Za-z0-9_]+/).filter(w=>props[key]["enum"].indexOf(w)>=0)[0];
+      if(word)out[key]=word;
+      return;
+    }
     out[key]=raw;
   });
   return out;
@@ -699,12 +711,14 @@ async function renderDomains(){
   cache.domains=asList(await api("/api/v1/domains"),"domains");
   if(editing&&editing.kind==="domain"){renderDomainEditor();return;}
   if(editing&&editing.kind==="account"){await openAccount(editing.address,editing.domain);return;}
+  if(editing&&editing.kind==="list"){await openList(editing.address,editing.domain);return;}
   const rows=cache.domains.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
         <td>${escHtml(x.postmaster||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button>
+          <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(x.name)}">Lists ›</button>
           <button class="btn ghost sm" data-act="domainedit" data-name="${escHtml(x.name)}">Edit</button>
           <button class="btn danger sm" data-act="domaindel" data-name="${escHtml(x.name)}">Delete</button>
           <div class="err" id="err_domain_${escHtml(x.name)}"></div></td></tr>`).join("");
@@ -980,6 +994,118 @@ async function saveAccount(){
     toast("Account saved");
     renderAccountEditor();
   }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_accountedit",e.message);}
+}
+
+/* ---------- Distribution lists ----------
+   The lists of a domain, over GET and POST /api/v1/domains/{domain}/lists and
+   PUT and DELETE /api/v1/lists/{address}. The new-list form is built from the
+   create's schema, which types every key, gives the mode its four words and
+   carries the members as an array, and starts at the defaults the create's
+   description states; the editor of an existing list is built from the
+   update's schema, and shows the members without a control, since the
+   update does not change them - the route says so, and the note repeats it.
+   The captions are the desktop dialog's. */
+const LIST_HINTS={
+  address:"The list's address, in this domain.",
+  members:"The members, one address per line. Set when the list is made; the update does not change them.",
+  active:"List is active.",require_auth:"Require SMTP authentication to send to the list.",
+  mode:"Who may send to this list: public is anyone, membership the members, announcement the one sender named below, domain_members the accounts of the domain.",
+  require_sender_address:"Require sender address (empty = any).",moderator_address:"Moderator (empty = no moderation).",
+  bounce_address:"Bounce address (empty = bounces go to the poster)."
+};
+function listProps(method){
+  const props=properties(method==="post"?"/api/v1/domains/{domain}/lists":"/api/v1/lists/{address}",method), out={};
+  Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&LIST_HINTS[k])out[k].description=LIST_HINTS[k];});
+  return out;
+}
+async function showLists(domain){
+  editing=null;
+  await loadSpec();
+  const lists=asList(await api("/api/v1/domains/"+encodeURIComponent(domain)+"/lists"),"lists");
+  cache.lists=lists;
+  const rows=lists.map(x=>`
+    <tr><td><b>${escHtml(x.address)}</b></td>
+        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td>${escHtml(humanise(x.mode||""))}</td>
+        <td>${escHtml((x.members||[]).length)}${(x.members||[]).length?'<div class="hint muted">'+escHtml((x.members||[]).slice(0,3).join(", ")+((x.members||[]).length>3?", …":""))+'</div>':""}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="listedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Edit</button>
+          <button class="btn danger sm" data-act="listdel" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button>
+          <div class="err" id="err_list_${escHtml(x.address)}"></div></td></tr>`).join("");
+  const props=listProps("post");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
+    <div class="sect"><h2>${escHtml(domain)} — distribution lists</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/lists","get").description||"")}</p>
+        <div class="tablewrap"><table><thead><tr><th>Address</th><th>Status</th><th>Who may send</th><th>Members</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="5" class="empty">No distribution lists in this domain.</td></tr>'}</tbody></table></div>
+      </div></div>
+    <div class="sect"><h2>New list</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/lists","post").description||"")}</p>
+        <div class="form">${formHtml("listnew",props,documentedDefaults("/api/v1/domains/{domain}/lists","post",props),{required:requiredOf("/api/v1/domains/{domain}/lists","post")})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="listnew" data-domain="${escHtml(domain)}">Create list</button>
+          <div class="err" id="err_listnew"></div>
+        </div>
+      </div></div></div>`;
+}
+async function createList(domain){
+  setErr("err_listnew","");
+  const props=listProps("post");
+  let body;
+  try{body=readForm("listnew",props,{});}catch(e){setErr("err_listnew",e.message);return;}
+  if(!String(body.address||"").trim()){setErr("err_listnew","A list address is required.");return;}
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(domain)+"/lists",{method:"POST",body:JSON.stringify(body)});
+    toast("List created: "+body.address);await showLists(domain);
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_listnew",e.message);}
+}
+async function openList(address,domain){
+  await loadSpec();
+  cache.lists=asList(await api("/api/v1/domains/"+encodeURIComponent(domain)+"/lists"),"lists");
+  const existing=cache.lists.filter(l=>l.address===address)[0];
+  if(!existing){await showLists(domain);return;}
+  editing={kind:"list",address:address,domain:domain,values:JSON.parse(JSON.stringify(existing))};
+  renderListEditor();
+}
+function renderListEditor(){
+  const props=listProps("put");
+  const members=(editing.values.members||[]).map(m=>'<div class="row erow"><code>'+escHtml(m)+'</code></div>').join("")||'<div class="note">No members.</div>';
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(editing.domain)}">‹ Lists of ${escHtml(editing.domain)}</button>
+    <div class="sect"><h2>List ${escHtml(editing.address)}</h2>
+      <div class="card flat"><p class="note">${escHtml(operation("/api/v1/lists/{address}","put").description||"")}</p>
+        <div class="form">${formHtml("list",props,editing.values,{})}</div></div></div>
+    <div class="sect"><h2>Members</h2>
+      <div class="card flat"><p class="note">${escHtml(LIST_HINTS.members)}</p>${members}</div></div>
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="listsave">Save list</button>
+      <button class="btn ghost" data-act="lists" data-domain="${escHtml(editing.domain)}">Cancel</button>
+      <button class="btn danger" data-act="listdel" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">Delete list</button>
+      <div class="err" id="err_listedit"></div>
+    </div></div></div>`;
+}
+async function saveList(){
+  setErr("err_listedit","");
+  const props=listProps("put");
+  let all;
+  try{all=readForm("list",props,{});}catch(e){setErr("err_listedit",e.message);return;}
+  const body={};
+  Object.keys(all).forEach(k=>{if(all[k]!==undefined&&all[k]!==editing.values[k])body[k]=all[k];});
+  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  try{
+    await api("/api/v1/lists/"+encodeURIComponent(editing.address),{method:"PUT",body:JSON.stringify(body)});
+    toast("List saved");await openList(editing.address,editing.domain);
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_listedit",e.message);}
+}
+async function deleteList(address,domain){
+  if(!confirm("Delete the distribution list "+address+"?"))return;
+  const where=editing&&editing.kind==="list"?"err_listedit":"err_list_"+address;
+  setErr(where,"");
+  try{await api("/api/v1/lists/"+encodeURIComponent(address),{method:"DELETE"});toast("List deleted: "+address);await showLists(domain);}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
 }
 
 /* ---------- Delivery queue ---------- */
