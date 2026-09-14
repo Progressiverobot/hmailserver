@@ -156,6 +156,27 @@ namespace RegressionTests.Infrastructure
          _errorMark = Tail(CurrentLogNamed("current_error_log", "ERROR_hmailserver_"));
       }
 
+      // The error texts a test has asserted as expected (AssertReportedError):
+      // a line that repeats them after the mark - the POP3 helper's second
+      // retrieval of a message whose file the test deleted logs HM5026 twice -
+      // is the same expected error, not a new one. Cleared at SetUp.
+      private static readonly List<string[]> _expectedErrors = new List<string[]>();
+
+      public static void ExpectError(IEnumerable<string> contents)
+      {
+         _expectedErrors.Add(contents.ToArray());
+      }
+
+      public static void ClearExpectedErrors()
+      {
+         _expectedErrors.Clear();
+      }
+
+      public static bool IsExpectedError(string line)
+      {
+         return _expectedErrors.Any(contents => contents.All(line.Contains));
+      }
+
       /// <summary>
       ///    The ERROR log lines written since MarkErrorLog, without the one line that
       ///    is noise on a shared machine: HM4316, a listener that could not bind
@@ -416,6 +437,7 @@ namespace RegressionTests.Infrastructure
             if (expected.All(errorLog.Contains))
             {
                LogHandler.MarkErrorLog();
+               LogHandler.ExpectError(expected);
                return;
             }
 

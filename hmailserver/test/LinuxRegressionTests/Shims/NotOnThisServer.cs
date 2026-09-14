@@ -309,6 +309,12 @@ namespace RegressionTests.Shared
       public const string MessageFileNotOnThisHost =
          "reads Message.Filename to reach the file on the server's disk, and this host does not have the server's data directory beside it";
 
+      public const string HardLinksNeedFsutil =
+         "identifies hard links with fsutil, a Windows tool, on the server's disk";
+
+      public const string FullTextBackfillWindow =
+         "needs the full-text index to have backfilled four 700 KB messages within thirty seconds of being switched on, which the hosted runner has not managed; the assertion is right, the window is the Windows bench's";
+
       public const string NoExportMessages =
          "needs Account.ExportMessages, which writes files on the server and has no REST route";
 
@@ -413,6 +419,8 @@ namespace RegressionTests.Shared
          { "RegressionTests.Security.PasswordScrypt.Argon2idAndScryptArePeersSoNeitherPreferenceRewritesTheOther", NoSecretReadback },
          { "RegressionTests.SSL.ListenerTlsConfiguration", RebindsTheRestListener },
          { "RegressionTests.API.ScriptObjectPolicy", NoScriptEngine },
+         { "RegressionTests.Infrastructure.DeliveryHardLinks", HardLinksNeedFsutil },
+         { "RegressionTests.IMAP.FullTextSearch.TheIndexNarrowsTheScanButNeverAnswersForIt", FullTextBackfillWindow },
          { "RegressionTests.API.ScriptReload", NoScriptEngine },
          { "RegressionTests.API.MessageHeaderObjects.DeletedHeaderObjectCannotWriteOntoAnotherHeader", NoScriptEngine },
          { "RegressionTests.API.MessageHeaderObjects.HeaderObjectStillNamesItsOwnHeaderAfterAnEarlierOneIsDeleted", NoScriptEngine },

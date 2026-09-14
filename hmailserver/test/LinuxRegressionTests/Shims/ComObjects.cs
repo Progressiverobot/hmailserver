@@ -3916,11 +3916,15 @@ namespace hMailServer
 
       public MessageHeader Add() { throw NotOnThisServer.Skipped(NotOnThisServer.NoMessageObject); }
 
+      // InterfaceMessageHeaders::get_Item enforces the bound on the count and
+      // answers a COM error for an index outside it; the fixtures assert that.
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public MessageHeader this[int index] => _headers[index];
+      public MessageHeader this[int index] => get_Item(index);
 
       public MessageHeader get_Item(int index)
       {
+         if (index < 0 || index >= _headers.Count)
+            throw new System.Runtime.InteropServices.COMException("Index out of range.", unchecked((int) 0x80020009));
          return _headers[index];
       }
 
@@ -3942,7 +3946,26 @@ namespace hMailServer
 
    public class MessageHeader
    {
-      public string Name { get; set; }
+      private string _name;
+
+      // put_Name refuses a name that would break the message structure - a
+      // colon, a control character, nothing at all - with a COM error and
+      // leaves the field alone; that much the shim does here. A name the COM
+      // property would accept cannot be written through: a stored message's
+      // MIME is not rewritten over REST, so that is a skip.
+      public string Name
+      {
+         get { return _name; }
+         set
+         {
+            if (value == null || value.Length == 0 || value.IndexOf(':') >= 0 || value.Any(c => c < ' ' || c == (char) 127))
+               throw new System.Runtime.InteropServices.COMException("The header name may not be empty or contain a colon or a control character.", unchecked((int) 0x80004005));
+            if (_name != null && !string.Equals(_name, value, StringComparison.Ordinal))
+               NotOnThisServer.Ignore(NotOnThisServer.NoMessageObject);
+            _name = value;
+         }
+      }
+
       public string Value { get; set; }
 
       public void Save()

@@ -81,6 +81,7 @@ namespace RegressionTests.Shared
          _domain = SingletonProvider<TestSetup>.Instance.PerformBasicSetup();
 
          LogHandler.MarkErrorLog();
+         LogHandler.ClearExpectedErrors();
          LogHandler.MarkDefaultLog();
       }
 
@@ -162,8 +163,11 @@ namespace RegressionTests.Shared
       {
          var noArgon2id = !ServerApi.Capability("argon2id");
          var classicalOnly = !ServerApi.Capability("post_quantum_key_exchange");
+         var noScriptEngine = !ServerApi.Capability("script_engine");
          return errorLines
+            .Where(line => !LogHandler.IsExpectedError(line))
             .Where(line => !(line.Contains("HM6406") && line.Contains("resolves names through the Windows DNS client")))
+            .Where(line => !(noScriptEngine && line.Contains("HM5710") && line.Contains("no script engine")))
             .Where(line => !(noArgon2id && line.Contains("HM5607") && line.Contains("has no Argon2id KDF")))
             .Where(line => !(classicalOnly && line.Contains("HM5720") && line.Contains("Failed to set the TLS key exchange groups")))
             .ToArray();
