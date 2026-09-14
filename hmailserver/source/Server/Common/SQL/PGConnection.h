@@ -35,6 +35,12 @@ namespace HM
       // that does escape would let a trailing backslash swallow the closing
       // quote.
       static bool StandardConformingStrings();
+
+      // Re-reads standard_conforming_strings from the connection's own
+      // parameter set - libpq keeps it current from the ParameterStatus
+      // message a reload sends - so a change made under a running server is
+      // seen by the next statement rather than by the next connect.
+      static void NoteServerParameters(PGconn *connection);
       virtual void OnConnected();
 
       virtual bool BeginTransaction(String &sErrorMessage);

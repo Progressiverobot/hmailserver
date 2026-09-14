@@ -56,6 +56,7 @@ namespace HM
          }
 
          PGconn *pPG = pConn->GetConnection();
+         PGConnection::NoteServerParameters(pPG);
 
          // DALRecordset::Open calls TryOpen up to six times, reconnecting
          // between attempts. Each attempt overwrote result_ with a fresh

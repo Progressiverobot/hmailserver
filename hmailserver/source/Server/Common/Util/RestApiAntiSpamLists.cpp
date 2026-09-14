@@ -320,7 +320,12 @@ namespace
          return Refusal(bridge, 400, error);
 
       if (!TPersistent::SaveObject(item))
+      {
+         // The fields were read onto the live item, which every message
+         // consults; a refused save must not leave them there.
+         collection->Refresh();
          return Refusal(bridge, 500, AnsiString("the ") + noun + " could not be saved; see the error log");
+      }
 
       LOG_APPLICATION("RestApi: " + String(noun) + " " + item->GetDNSHost() + " updated.");
 
@@ -450,7 +455,10 @@ namespace
          return Refusal(bridge, 400, error);
 
       if (!PersistentWhiteListAddress::SaveObject(item))
+      {
+         collection->Refresh();
          return Refusal(bridge, 500, "the white-list address could not be saved; see the error log");
+      }
 
       LOG_APPLICATION("RestApi: White-list address " + item->GetLowerIPAddressString() + " - " + item->GetUpperIPAddressString() + " updated.");
 
@@ -554,7 +562,10 @@ namespace
          return Refusal(bridge, 400, error);
 
       if (!PersistentBlockedSender::SaveObject(item))
+      {
+         collection->Refresh();
          return Refusal(bridge, 500, "the blocked sender could not be saved; see the error log");
+      }
 
       LOG_APPLICATION("RestApi: Blocked sender " + item->GetAddress() + " updated.");
 
@@ -677,7 +688,10 @@ namespace
          return Refusal(bridge, 400, error);
 
       if (!PersistentIncomingRelay::SaveObject(item))
+      {
+         collection->Refresh();
          return Refusal(bridge, 500, "the incoming relay could not be saved; see the error log");
+      }
 
       LOG_APPLICATION("RestApi: Incoming relay " + item->GetName() + " updated.");
 

@@ -609,18 +609,15 @@ namespace HM
          // reads it). -1 in a threshold or the retention means the server's
          // or the domain's own value; the dates are YYYY-MM-DD as stored.
          AnsiString numbers;
-         numbers.Format(",\"antispam_enabled\":%hs,\"spam_mark_threshold\":%d,\"spam_delete_threshold\":%d,\"forward_abort_spam_flagged\":%hs,\"message_retention_days\":%d",
+         // The retention and the five vacation fields are written above, with
+         // the listing's fields; two writers joined by a rebase had written
+         // them twice (the review of 14 September 2026).
+         numbers.Format(",\"antispam_enabled\":%hs,\"spam_mark_threshold\":%d,\"spam_delete_threshold\":%d,\"forward_abort_spam_flagged\":%hs",
             account->GetAntiSpamEnabled() ? "true" : "false",
             account->GetSpamMarkThreshold(),
             account->GetSpamDeleteThreshold(),
-            account->GetForwardAbortSpamFlagged() ? "true" : "false",
-            account->GetMessageRetentionDays());
+            account->GetForwardAbortSpamFlagged() ? "true" : "false");
          entry += numbers;
-         flag("vacation_enabled", account->GetVacationMessageIsOn());
-         entry += ",\"vacation_subject\":\"" + quote(account->GetVacationSubject()) + "\"";
-         entry += ",\"vacation_message\":\"" + quote(account->GetVacationMessage()) + "\"";
-         flag("vacation_expires", account->GetVacationExpires());
-         entry += ",\"vacation_expires_date\":\"" + quote(account->GetVacationExpiresDate()) + "\"";
          entry += ",\"vacation_begin_date\":\"" + quote(account->GetVacationBeginDate()) + "\"";
          flag("vacation_abort_spam_flagged", account->GetVacationAbortSpamFlagged());
          flag("ad_enabled", account->GetIsAD());

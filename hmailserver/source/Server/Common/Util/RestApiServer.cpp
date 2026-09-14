@@ -1483,7 +1483,7 @@ namespace HM
             return HandleCreateDomain_(GetRequestBody_(request));
 
          case RouteDomainUpdate:
-            return HandleUpdateDomain_(String(route.identifier), GetRequestBody_(request));
+            return HandleUpdateDomain_(caller, String(route.identifier), GetRequestBody_(request));
 
          case RouteDomainDelete:
             return HandleDeleteDomain_(String(route.identifier));
@@ -3243,6 +3243,15 @@ namespace HM
       case RouteApiKeyList:
       case RouteApiKeyCreate:
       case RouteApiKeyRevoke:
+      // The [Settings] section of hMailServer.ini holds the server's secrets
+      // (the OAuth2 HMAC secret, the password pepper, the service account's
+      // password) and the commands it runs (AutoBanCommand, as the service):
+      // the administrator password's, never a key's of any scope. Found by
+      // the review of 14 September 2026.
+      case RouteIniSettingList:
+      case RouteIniSettingGet:
+      case RouteIniSettingPut:
+      case RouteIniSettingDelete:
          return true;
 
       default:
@@ -5655,18 +5664,29 @@ namespace HM
       // polls GET /api/v1/status until it answers again. Reinitialize holds
       // its own mutex, so two callers restart twice, in turn, and never at
       // once.
+      // One thread while one restart is pending: two hundred requests in one
+      // rate window queued two hundred stop-and-start cycles behind the mutex.
+      bool notPending = false;
+      if (!reinitialize_pending_.compare_exchange_strong(notPending, true))
+      {
+         LOG_APPLICATION("RestApi: Reinitialize requested while one is pending; the pending one serves both.");
+         return BuildResponse_(202, "{\"reinitializing\":true}");
+      }
       LOG_APPLICATION("RestApi: Reinitialize requested; the services restart in a moment.");
-
       boost::thread(&ReinitializeAfterTheAnswer_).detach();
-
       return BuildResponse_(202, "{\"reinitializing\":true}");
    }
+
+   std::atomic<bool> RestApiServer::reinitialize_pending_(false);
 
    void
    RestApiServer::ReinitializeAfterTheAnswer_()
    {
       boost::this_thread::sleep_for(boost::chrono::milliseconds(500));
 
+      // Cleared before the restart, so a request that arrives during it
+      // queues one more restart rather than none.
+      reinitialize_pending_ = false;
       String error = Application::Instance()->Reinitialize();
 
       if (error.IsEmpty())

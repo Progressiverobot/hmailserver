@@ -370,6 +370,10 @@ namespace HM
 
          static bool IsNameChar_(char c)
          {
+            // Neither an ampersand, a semicolon nor a control byte is part of an
+            // XML name; admitted, they were reflected as written into the 207.
+            if (c == '&' || c == ';' || (unsigned char) c < 0x20 || c == 0x7f)
+               return false;
             return !(c == ' ' || c == '\t' || c == '\r' || c == '\n' || c == '/' || c == '>' || c == '=' || c == '<' || c == '\"' || c == '\'');
          }
 
@@ -397,8 +401,21 @@ namespace HM
                   continue;
                }
 
-               int semicolon = value.Find(";", i);
-               if (semicolon < 0 || semicolon - i > 10)
+               // The semicolon is looked for within ten bytes and no further: a
+               // text run of a million ampersands with no semicolon in it made
+               // every one of them scan to the end of the run before the limit
+               // was applied, tens of seconds on one worker thread (found by
+               // the review of 14 September 2026).
+               int semicolon = -1;
+               for (int k = i + 1; k < value.GetLength() && k <= i + 10; k++)
+               {
+                  if (value[k] == ';')
+                  {
+                     semicolon = k;
+                     break;
+                  }
+               }
+               if (semicolon < 0)
                {
                   result += c;
                   continue;
@@ -1953,13 +1970,20 @@ namespace HM
 
          AnsiString xml = MultistatusOpen();
          size_t hrefs = 0;
+         // An href asked for twice is answered once: five thousand copies of one
+         // href, each answered with a megabyte card escaped for XML, was a
+         // twenty-gigabyte response (the review of 14 September 2026). And the
+         // whole multistatus is bounded, since even distinct cards add up.
+         std::set<AnsiString> answered;
+         const size_t MaxMultistatusBytes = 64 * 1024 * 1024;
          for (size_t i = 0; i < report.children.size(); i++)
          {
             if (!report.children[i].Is(NsDav, "href"))
                continue;
-
             if (++hrefs > MaxMultigetHrefs)
                return Text(400, "too many hrefs in one multiget");
+            if (xml.GetLength() > MaxMultistatusBytes)
+               return Text(507, "the response would be too large; ask for fewer cards in one multiget");
 
             // An href may be absolute; only its path is compared, decoded, so
             // that a client's own encoding of the address still matches.
@@ -1975,6 +1999,8 @@ namespace HM
             // sides so a client's own encoding of the address still matches;
             // no lookup in the store per href.
             AnsiString wanted = PercentDecode(href);
+            if (!answered.insert(wanted).second)
+               continue;
             const Member *found = nullptr;
             for (size_t j = 0; !found && j < context.members.size(); j++)
             {

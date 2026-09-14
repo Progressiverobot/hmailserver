@@ -75,6 +75,9 @@ public:
 
 private:
    HRESULT EnsureDatabaseConnectivity_();
+   // The connection alone, without the loaded configuration the one above
+   // also insists on: what Application.Settings needs on a refused database.
+   HRESULT EnsureDatabaseConnection_();
    std::shared_ptr<HM::COMAuthentication> authentication_;
 };
 

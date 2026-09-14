@@ -117,8 +117,7 @@ namespace HM
          // character; every string escaped from here on follows its answer.
          // A server that does not report it (none since 8.2) is taken to
          // escape, the safe reading.
-         const char *conforming = PQparameterStatus(dbconn_, "standard_conforming_strings");
-         standard_conforming_strings_ = (conforming != nullptr && strcmp(conforming, "on") == 0);
+         NoteServerParameters(dbconn_);
 
          // statement_timeout is a session setting and this session has just been
          // created, so it starts at whatever postgresql.conf says - normally no
@@ -155,6 +154,7 @@ namespace HM
    DALConnection::ExecutionResult
    PGConnection::TryExecute(const SQLCommand &command, String &sErrorMessage, __int64 *iInsertID, int iIgnoreErrors) 
    {
+      NoteServerParameters(dbconn_);
       String SQL = command.GetQueryString();
 
       try
@@ -400,6 +400,15 @@ namespace HM
    PGConnection::StandardConformingStrings()
    {
       return standard_conforming_strings_;
+   }
+
+   void
+   PGConnection::NoteServerParameters(PGconn *connection)
+   {
+      if (connection == nullptr)
+         return;
+      const char *conforming = PQparameterStatus(connection, "standard_conforming_strings");
+      standard_conforming_strings_ = (conforming != nullptr && strcmp(conforming, "on") == 0);
    }
 
    void

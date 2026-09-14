@@ -63,6 +63,7 @@
 #include <memory>
 #include <vector>
 #include <map>
+#include <atomic>
 
 #include "HttpServer.h"
 
@@ -755,7 +756,7 @@ namespace HM
       // update answers is exactly what the next listing will show.
       static AnsiString DomainEntryJson_(const std::shared_ptr<Domain> &domain);
       static HttpResponse HandleCreateDomain_(const AnsiString &requestBody);
-      static HttpResponse HandleUpdateDomain_(const String &domainName, const AnsiString &requestBody);
+      static HttpResponse HandleUpdateDomain_(const Caller &caller, const String &domainName, const AnsiString &requestBody);
       static HttpResponse HandleDeleteDomain_(const String &domainName);
       static HttpResponse HandleListAccounts_(const String &domainName);
       static HttpResponse HandleCreateAccount_(const String &domainName, const AnsiString &requestBody);
@@ -799,6 +800,7 @@ namespace HM
       HttpResponse HandleSettings_();
       HttpResponse HandleServerReinitialize_();
       static void ReinitializeAfterTheAnswer_();
+      static std::atomic<bool> reinitialize_pending_;
 
       // Wave 162: the write surface. Each group lives in its own translation
       // unit beside this one - RestApiSettings.cpp, RestApiRules.cpp,

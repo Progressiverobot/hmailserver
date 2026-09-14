@@ -656,6 +656,20 @@ namespace RegressionTests.API
 
             Assert.AreEqual(logDebug, logging.LogDebug, "No refused PUT may have changed a setting.");
 
+            // The [Settings] section of hMailServer.ini holds the server's secrets
+            // and the commands it runs: the administrator password's alone. A key
+            // of any scope gets the 401 the api-key routes give, so the refusal
+            // says nothing about the key (the review of 14 September 2026 found a
+            // read-only key reading the OAuth2 secret and a write key setting
+            // AutoBanCommand).
+            foreach (string key in new[] { scopedKey, readOnlyKey, fullKey })
+            {
+               Assert.AreEqual(401, Bearer("GET", "/api/v1/settings/ini", key).status, "No key lists the ini section.");
+               Assert.AreEqual(401, Bearer("GET", "/api/v1/settings/ini/" + IniProbeKey, key).status, "No key reads an ini key.");
+               Assert.AreEqual(401, Bearer("PUT", "/api/v1/settings/ini/" + IniProbeKey, key, "{\"value\":\"x\"}").status, "No key writes an ini key.");
+               Assert.AreEqual(401, Bearer("DELETE", "/api/v1/settings/ini/" + IniProbeKey, key).status, "No key removes an ini key.");
+            }
+
             (int status, string body) = Bearer("PUT", "/api/v1/settings/logging", fullKey, "{\"log_debug\":" + (!logDebug).ToString().ToLowerInvariant() + "}");
             Assert.AreEqual(200, status, body);
             Assert.AreEqual(!logDebug, logging.LogDebug, "An unrestricted full key carries the administrator's authority.");

@@ -414,7 +414,7 @@ create table hm_contacts
 	contactcreated datetime not null,
 	contacturi varchar(255) not null default '',
 	contactuid varchar(255) not null default '',
-	contactvcard text not null
+	contactvcard mediumtext not null
 ) DEFAULT CHARSET=utf8;
 
 CREATE UNIQUE INDEX idx_hm_contacts_account ON hm_contacts (contactaccountid, contactaddress);

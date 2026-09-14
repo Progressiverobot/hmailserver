@@ -278,6 +278,10 @@ private:
    
 
    
+   // The refusal every getter of the configuration answers on a database the
+   // server refused: the guard's sentence, with the reason.
+   HRESULT NotLoaded_() const;
+
    HM::Configuration *config_;
    HM::IniFileSettings *ini_file_settings_;
    

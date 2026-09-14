@@ -115,7 +115,11 @@ STDMETHODIMP InterfaceApplication::get_Settings(IInterfaceSettings **pVal)
       if (!authentication_->GetIsServerAdmin())
          return authentication_->GetAccessDenied();
    
-      HRESULT hResult = EnsureDatabaseConnectivity_();
+      // A connection is needed; a loaded configuration is not - the settings
+      // object refuses its own getters with the reason when there is none, and
+      // its directories answer from hMailServer.ini, which is what DBUpdater
+      // reads on a database the server refused (issue #263).
+      HRESULT hResult = EnsureDatabaseConnection_();
       if (hResult != S_OK)
          return hResult;
    
@@ -498,13 +502,22 @@ STDMETHODIMP InterfaceApplication::get_Rules(IInterfaceRules **pVal)
 }
 
 HRESULT
-InterfaceApplication::EnsureDatabaseConnectivity_()
+InterfaceApplication::EnsureDatabaseConnection_()
 {
    std::shared_ptr<HM::DatabaseConnectionManager> pConnectionManager = HM::Application::Instance()->GetDBManager();
    if (!pConnectionManager || !pConnectionManager->GetIsConnected())
    {
       return COMError::GenerateError("The connection to the database is not available. Please check the hMailServer error log for details.");
    }
+   return S_OK;
+}
+
+HRESULT
+InterfaceApplication::EnsureDatabaseConnectivity_()
+{
+   HRESULT connected = EnsureDatabaseConnection_();
+   if (connected != S_OK)
+      return connected;
 
    // Connected is not enough. A database this server opened and then refused -
    // its schema older or newer than this build requires (HM5011), or its

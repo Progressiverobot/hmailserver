@@ -565,7 +565,7 @@ namespace HM
    }
 
    HttpResponse
-   RestApiServer::HandleUpdateDomain_(const String &domainName, const AnsiString &requestBody)
+   RestApiServer::HandleUpdateDomain_(const Caller &caller, const String &domainName, const AnsiString &requestBody)
    {
       Quote quote = [](const String &value) { return JsonEscape_(Utf8_(value)); };
 
@@ -580,6 +580,23 @@ namespace HM
       if (!active || active->IsNull())
          return BuildResponse_(400, "{\"error\":\"active is required\"}");
 
+      // The eleven fields COM gates on the server administrator (put_MaxSize,
+      // put_MaxMessageSize, put_MaxAccountSize, the three counts and their
+      // switches, put_MessageRetentionDays, put_PlusAddressingEnabled): a key
+      // restricted to this domain may not lift its own limits through them.
+      if (!caller.domains.empty())
+      {
+         static const char *const serverAdministratorsOnly[] =
+         {
+            "max_message_size_kb", "max_size_mb", "max_account_size_mb", "max_accounts", "max_aliases", "max_lists",
+            "max_accounts_enabled", "max_aliases_enabled", "max_lists_enabled", "message_retention_days", "plus_addressing_enabled"
+         };
+         for (size_t i = 0; i < sizeof(serverAdministratorsOnly) / sizeof(serverAdministratorsOnly[0]); i++)
+         {
+            if (body.Get(serverAdministratorsOnly[i]))
+               return BuildResponse_(403, "{\"error\":\"" + AnsiString(serverAdministratorsOnly[i]) + " is the server administrator's to set; a key restricted to a domain cannot change its limits\"}");
+         }
+      }
       std::shared_ptr<Domain> domain = DomainByName(domainName);
       if (!domain)
          return BuildResponse_(404, "{\"error\":\"domain not found\"}");

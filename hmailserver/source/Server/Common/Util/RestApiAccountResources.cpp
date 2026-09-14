@@ -632,7 +632,7 @@ namespace
          std::shared_ptr<const Account> named = CacheContainer::Instance()->GetAccount(accountAddress);
          if (!named)
          {
-            error = "no account with the address " + Utf8(accountAddress);
+            error = "no such account, or not one this credential may name";
             return false;
          }
          accountId = named->GetID();
@@ -669,7 +669,7 @@ namespace
          }
          if (!CacheContainer::Instance()->GetAccount(accountId))
          {
-            error.Format("no account with the id %I64d", accountId);
+            error = "no such account, or not one this credential may name";
             return false;
          }
          if (accountId == owner->GetID())
@@ -882,7 +882,9 @@ namespace
    // Messages: the rows, as COM's Message reports them.
    // ------------------------------------------------------------------------
 
-   const __int64 MaxMessageBytes = 25 * 1024 * 1024;
+   // The listener admits 16 MB on its large-body routes (RestApiServer.cpp),
+   // so that is the ceiling here too; a larger figure was never reachable.
+   const __int64 MaxMessageBytes = 16 * 1024 * 1024;
    const int MaxHeaderBytes = 64 * 1024;
 
    // Every IMAP session on the folder is told, the way APPEND, STORE and
@@ -1128,7 +1130,7 @@ namespace
       if (requestBody.size() == 0)
          return Refusal(bridge, 400, "the body is the message, as a .eml file");
       if ((__int64) requestBody.size() > MaxMessageBytes)
-         return Refusal(bridge, 413, "a message is at most 25 MB here");
+         return Refusal(bridge, 413, "a message is at most 16 MB here");
 
       int colon = requestBody.Find(":");
       int lineEnd = requestBody.Find("\n");
@@ -1219,7 +1221,7 @@ namespace
          return Refusal(bridge, 404, "the message file is missing");
 
       if ((__int64) FileUtilities::FileSize(fileName) > MaxMessageBytes)
-         return Refusal(bridge, 413, "the message is larger than 25 MB; fetch it with a mail client");
+         return Refusal(bridge, 413, "the message is larger than 16 MB; fetch it with a mail client");
 
       AnsiString bytes;
       {
@@ -1372,12 +1374,12 @@ namespace
       "\"delete\":{\"summary\":\"Delete every message of an account (administrator)\",\"description\":\"What Account.DeleteMessages does over COM, to the call - PersistentAccount::DeleteMessages: the account's messages go with the folders the server does not keep, the inbox and the designated folders stay emptied, and the account's caches are dropped. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account\"}}}},"
       "\"/api/v1/accounts/{address}/folders/{id}/messages\":{"
       "\"get\":{\"summary\":\"A folder's messages, every one of them (administrator)\",\"description\":\"What IMAPFolder.Messages is over COM: the folder's whole collection, the live one every IMAP session shares, in UID order - a message flagged deleted and not yet expunged included. folder_id, total, and messages, each the row as GET /api/v1/accounts/{address}/messages describes it. The folder is one of the account's own.\",\"responses\":{\"200\":{\"description\":\"folder_id, total, messages\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"}}},"
-      "\"post\":{\"summary\":\"Add a message to a folder from its text (administrator)\",\"description\":\"The body is the message, as a .eml file; a bare-LF body is given CRLF. What Messages.Add and Message.Save do over COM, and what APPEND does: the bytes are written where the server keeps a delivered message, the row saved with its UID and the state delivered, and every session on the folder told. flags= in the query names the flags to store it with, comma-separated from seen, flagged, answered, draft and deleted, as APPEND's flag list goes beside the literal; from= the envelope sender the row carries, as Message.FromAddress sets it. Nothing in the text is changed or added.\",\"requestBody\":{\"content\":{\"message/rfc822\":{\"schema\":{\"type\":\"string\"}}}},\"responses\":{\"201\":{\"description\":\"The row, with its id and uid\"},\"400\":{\"description\":\"An empty body, one that does not begin with a header line, or an unknown flag\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"},\"413\":{\"description\":\"Over 25 MB\"}}}},"
+      "\"post\":{\"summary\":\"Add a message to a folder from its text (administrator)\",\"description\":\"The body is the message, as a .eml file; a bare-LF body is given CRLF. What Messages.Add and Message.Save do over COM, and what APPEND does: the bytes are written where the server keeps a delivered message, the row saved with its UID and the state delivered, and every session on the folder told. flags= in the query names the flags to store it with, comma-separated from seen, flagged, answered, draft and deleted, as APPEND's flag list goes beside the literal; from= the envelope sender the row carries, as Message.FromAddress sets it. Nothing in the text is changed or added.\",\"requestBody\":{\"content\":{\"message/rfc822\":{\"schema\":{\"type\":\"string\"}}}},\"responses\":{\"201\":{\"description\":\"The row, with its id and uid\"},\"400\":{\"description\":\"An empty body, one that does not begin with a header line, or an unknown flag\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"},\"413\":{\"description\":\"Over 16 MB\"}}}},"
       "\"/api/v1/accounts/{address}/messages/{id}\":{"
       "\"get\":{\"summary\":\"One message: its row, its header fields and every header (administrator)\",\"description\":\"The row as the listing shows it, then file - the path on the server's own disk, the COM Filename - and file_exists, then subject, from, to, cc and date decoded from the header block, and headers: every field as written, name and value in order, which is what Message.Headers and Message.HeaderValue answer over COM. The header block is read to 64 KB. A message of another account, or in a folder outside the account's tree, is not found.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"No such account or message\"}}},"
       "\"put\":{\"summary\":\"Change a message's flags (administrator)\",\"description\":\"Body: any of seen, deleted, flagged, answered and draft, true or false; a flag not named keeps its value. Written on the path STORE takes, with the folder's next mod-sequence, and every session told. Answers the row as changed.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"The row\"},\"400\":{\"description\":\"No flag named, an unknown field, or a value that is not true or false\"},\"404\":{\"description\":\"No such account or message\"}}},"
       "\"delete\":{\"summary\":\"Delete a message (administrator)\",\"description\":\"What Messages.DeleteByDBID does over COM and EXPUNGE does for one message: the row and the file go, through the folder's live collection, and every session is told.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account or message\"}}}},"
-      "\"/api/v1/accounts/{address}/messages/{id}/source\":{\"get\":{\"summary\":\"A message's file (administrator)\",\"description\":\"The bytes as stored, message/rfc822, as a download; up to 25 MB.\",\"responses\":{\"200\":{\"description\":\"The message file\"},\"404\":{\"description\":\"No such account or message, or the file is missing\"},\"413\":{\"description\":\"Over 25 MB\"}}}}";
+      "\"/api/v1/accounts/{address}/messages/{id}/source\":{\"get\":{\"summary\":\"A message's file (administrator)\",\"description\":\"The bytes as stored, message/rfc822, as a download; up to 16 MB.\",\"responses\":{\"200\":{\"description\":\"The message file\"},\"404\":{\"description\":\"No such account or message, or the file is missing\"},\"413\":{\"description\":\"Over 16 MB\"}}}}";
 }
 
 namespace HM

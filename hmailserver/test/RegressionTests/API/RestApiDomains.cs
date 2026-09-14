@@ -295,6 +295,16 @@ namespace RegressionTests.API
             Assert.AreEqual(200, ownUpdate.status,
                "A domain-scoped key with full scope may update the domain it was issued for. Body: " + ownUpdate.body);
 
+            // The limits are the server administrator's - COM gates the eleven
+            // setters on it - and not a domain-scoped key's, not even on its own
+            // domain: the refusal names the field and changes nothing.
+            foreach (string field in new[] { "\"max_size_mb\":0", "\"max_accounts_enabled\":false", "\"message_retention_days\":1", "\"plus_addressing_enabled\":true" })
+            {
+               (int status, string body) limit = Bearer("PUT", "/api/v1/domains/example.test", scopedKey, "{\"active\":true," + field + "}");
+               Assert.AreEqual(403, limit.status, "A domain-scoped key must not set " + field + ". Body: " + limit.body);
+               StringAssert.Contains("server administrator", limit.body);
+            }
+
             // A read-only key reaches none of the three.
             Assert.AreEqual(403, Bearer("POST", "/api/v1/domains", readOnlyKey, "{\"name\":\"" + name + "\"}").status);
             Assert.AreEqual(403, Bearer("PUT", "/api/v1/domains/" + other, readOnlyKey, "{\"active\":false}").status);
