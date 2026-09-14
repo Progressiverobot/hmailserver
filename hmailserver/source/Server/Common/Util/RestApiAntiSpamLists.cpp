@@ -1,6 +1,8 @@
+// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's five small collections - DNS black lists, SURBL servers, white-list addresses, blocked senders and incoming relays - as resources. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's five small collections - DNS black lists, SURBL servers, white-list addresses, blocked senders and incoming relays - as resources. See RestApiServer.h.
 //
 // Five collections the Control Panel edits through COM that had no REST
 // resource at all, each in the IP range resource's shape - a listing and a

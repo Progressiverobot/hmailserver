@@ -1122,12 +1122,6 @@ namespace HM
       bool signatureEnabled = account->GetEnableSignature();
       String signaturePlainText = account->GetSignaturePlainText();
       String signatureHtml = account->GetSignatureHTML();
-      bool vacationEnabled = account->GetVacationMessageIsOn();
-      String vacationSubject = account->GetVacationSubject();
-      String vacationMessage = account->GetVacationMessage();
-      bool vacationExpires = account->GetVacationExpires();
-      String vacationExpiresDate = account->GetVacationExpiresDate();
-      long retentionDays = account->GetMessageRetentionDays();
       String password;
 
       if (!ReadBool(body, "active", active, error) ||
@@ -1140,32 +1134,9 @@ namespace HM
           !ReadBool(body, "signature_enabled", signatureEnabled, error) ||
           !ReadString(body, "signature_plain_text", signaturePlainText, error) ||
           !ReadString(body, "signature_html", signatureHtml, error) ||
-          !ReadBool(body, "vacation_enabled", vacationEnabled, error) ||
-          !ReadString(body, "vacation_subject", vacationSubject, error) ||
-          !ReadString(body, "vacation_message", vacationMessage, error) ||
-          !ReadBool(body, "vacation_expires", vacationExpires, error) ||
-          !ReadString(body, "vacation_expires_date", vacationExpiresDate, error) ||
-          !ReadInteger(body, "message_retention_days", -1, 36500L, retentionDays, error) ||
           !ReadString(body, "password", password, error))
       {
          return BuildResponse_(400, ErrorBody(quote, String(error)));
-      }
-
-      // The expiry date, as PUT /api/v1/me/vacation takes it: YYYY-MM-DD, and
-      // only looked at when the message expires. Checked only when the body
-      // touches the expiry, so that an account whose date was left odd over COM
-      // can still have its name changed.
-      if (HasMember(body, "vacation_expires") || HasMember(body, "vacation_expires_date"))
-      {
-         vacationExpiresDate.Trim();
-         if (vacationExpiresDate.GetLength() > 10)
-            vacationExpiresDate = vacationExpiresDate.Mid(0, 10);
-         bool wellFormed = vacationExpiresDate.GetLength() == 10 && vacationExpiresDate[4] == '-' && vacationExpiresDate[7] == '-';
-         for (int i = 0; wellFormed && i < 10; i++)
-            if (i != 4 && i != 7 && (vacationExpiresDate[i] < '0' || vacationExpiresDate[i] > '9'))
-               wellFormed = false;
-         if (vacationExpires && !wellFormed)
-            return BuildResponse_(400, "{\"error\":\"vacation_expires_date must be YYYY-MM-DD when vacation_expires is true\"}");
       }
 
       forwardAddress.Trim();
