@@ -384,6 +384,7 @@ namespace HM
          RouteAccountMessageFlags,
          RouteAccountMessageDelete,
          RouteAccountMessageSource,
+         RouteAccountAppPasswordUpdate,
          RouteOpenApi
       };
 

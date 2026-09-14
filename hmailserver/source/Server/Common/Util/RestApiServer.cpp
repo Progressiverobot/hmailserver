@@ -1935,6 +1935,7 @@ namespace HM
          case RouteAccountMessageFlags:
          case RouteAccountMessageDelete:
          case RouteAccountMessageSource:
+         case RouteAccountAppPasswordUpdate:
             return HandleAccountResources_(route, GetRequestBody_(request));
 
          case RouteOpenApi:
@@ -3397,6 +3398,7 @@ namespace HM
       case RouteAccountFolderMessageCreate:
       case RouteAccountMessageFlags:
       case RouteAccountMessageDelete:
+      case RouteAccountAppPasswordUpdate:
          return true;
 
       default:
@@ -3661,6 +3663,7 @@ namespace HM
       case RouteAccountMessageFlags:
       case RouteAccountMessageDelete:
       case RouteAccountMessageSource:
+      case RouteAccountAppPasswordUpdate:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 

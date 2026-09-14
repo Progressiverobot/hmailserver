@@ -158,6 +158,45 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("A password revoked with active false is refused without being deleted, put back with active true, and renamed - the two things Save changes on a stored one over COM - with COM seeing each.")]
+      public void ARevokedPasswordIsRefusedAndCanBePutBack()
+      {
+         Account account = AddAccount("apppw5");
+
+         (int status, string body) created = Http("POST", Base(account), "{\"name\":\"Old phone\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string clearText = Extract(created.body, "password");
+         long id = long.Parse(Extract(created.body, "id"));
+
+         (int status, string body) revoked = Http("PUT", Base(account) + "/" + id, "{\"active\":false}");
+         Assert.AreEqual(200, revoked.status, revoked.body);
+         StringAssert.Contains("\"name\":\"Old phone\"", revoked.body, "A field left out keeps its value.");
+         StringAssert.Contains("\"active\":false", revoked.body);
+         StringAssert.DoesNotContain("\"password\"", revoked.body);
+         Assert.IsFalse(account.AppPasswords[0].Active, "COM sees it revoked.");
+         Assert.AreEqual(1, account.AppPasswords.Count, "Revoked, not deleted.");
+         Assert.IsFalse(new Pop3ClientSimulator().ConnectAndLogon(account.Address, clearText), "A revoked password is refused.");
+
+         (int status, string body) restored = Http("PUT", Base(account) + "/" + id, "{\"active\":true,\"name\":\"New phone\"}");
+         Assert.AreEqual(200, restored.status, restored.body);
+         StringAssert.Contains("\"name\":\"New phone\",", restored.body);
+         StringAssert.Contains("\"active\":true", restored.body);
+         Assert.AreEqual("New phone", account.AppPasswords[0].Name);
+         Assert.IsTrue(account.AppPasswords[0].Active);
+
+         var pop3 = new Pop3ClientSimulator();
+         Assert.IsTrue(pop3.ConnectAndLogon(account.Address, clearText), "Put back, it opens the mailbox again - the point of a flag rather than a delete.");
+         pop3.Disconnect();
+
+         (int status, string body) unnamed = Http("PUT", Base(account) + "/" + id, "{\"name\":\" \"}");
+         Assert.AreEqual(400, unnamed.status, unnamed.body);
+         StringAssert.Contains("name is required", unnamed.body);
+         Assert.AreEqual(400, Http("PUT", Base(account) + "/" + id, "{\"password\":\"a-new-secret-here\"}").status, "The secret is not changed here: delete and issue another.");
+         Assert.AreEqual(404, Http("PUT", Base(account) + "/999999999", "{\"active\":false}").status);
+         Assert.AreEqual("New phone", account.AppPasswords[0].Name, "A refused change changed nothing.");
+      }
+
+      [Test]
       [Description("A refusal names what is wrong: no name, an unknown field, a body that is not an object, an account that does not exist, another account's password, and the store's ceiling of twenty.")]
       public void RefusalsNameWhatIsWrong()
       {
@@ -220,11 +259,14 @@ namespace RegressionTests.API
             Assert.AreEqual(1, account.AppPasswords.Count);
 
             Assert.AreEqual(403, Bearer("DELETE", Base(account) + "/" + id, elsewhereKey).status);
+            Assert.AreEqual(403, Bearer("PUT", Base(account) + "/" + id, elsewhereKey, "{\"active\":false}").status);
 
             Assert.AreEqual(200, Bearer("GET", Base(account), readOnlyKey).status, "A read-only key lists.");
             Assert.AreEqual(403, Bearer("POST", Base(account), readOnlyKey, create).status, "And issues nothing.");
+            Assert.AreEqual(403, Bearer("PUT", Base(account) + "/" + id, readOnlyKey, "{\"active\":false}").status, "Nor revokes anything.");
             Assert.AreEqual(403, Bearer("DELETE", Base(account) + "/" + id, readOnlyKey).status, "Nor removes anything.");
             Assert.AreEqual(1, account.AppPasswords.Count);
+            Assert.IsTrue(account.AppPasswords[0].Active, "The refused revocation changed nothing.");
 
             Assert.AreEqual(200, Bearer("DELETE", Base(account) + "/" + id, hereKey).status);
             Assert.AreEqual(0, account.AppPasswords.Count);

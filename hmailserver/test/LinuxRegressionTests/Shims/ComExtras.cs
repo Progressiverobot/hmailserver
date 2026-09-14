@@ -495,12 +495,27 @@ namespace hMailServer
          Issue(password);
       }
 
+      /// <summary>
+      ///    A stored row: the PUT of its name and active flag, the two things the
+      ///    COM setters change on one. A new row was written already by Generate
+      ///    or SetPassword; a Save with neither is what the store refuses over COM
+      ///    too, a row with no hash.
+      /// </summary>
       public void Save()
       {
-         // Written already by Generate or SetPassword. A Save with neither is
-         // what the store refuses over COM too: a row with no hash.
          if (ID != 0)
+         {
+            AppPasswords.RouteOrSkip();
+
+            var path = _owner.Base + "/" + ID;
+            var answer = ServerApi.Put(path, "{\"name\":" + ServerApi.Quote(Name ?? string.Empty) + ",\"active\":" + (Active ? "true" : "false") + "}");
+            if (answer.Status == 400)
+               throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+            answer.Expect(200, "PUT " + path);
+            Read(answer.Json.Value);
             return;
+         }
 
          throw new System.Runtime.InteropServices.COMException(
             "An app password with no stored hash would authenticate nothing, and a row that cannot be used is a row nobody will think to delete.");

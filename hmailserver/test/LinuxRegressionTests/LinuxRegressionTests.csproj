@@ -320,6 +320,7 @@
     <Compile Include="..\RegressionTests\API\RestApiAccountAppPasswords.cs" Link="API\RestApiAccountAppPasswords.cs" />
     <Compile Include="..\RegressionTests\API\RestApiFolderPermissions.cs" Link="API\RestApiFolderPermissions.cs" />
     <Compile Include="..\RegressionTests\API\RestApiAccountMessages.cs" Link="API\RestApiAccountMessages.cs" />
+    <Compile Include="..\RegressionTests\Security\AppPasswords.cs" Link="Security\AppPasswords.cs" />
   </ItemGroup>
 
   <!-- The embedded messages, under the manifest names the Windows assembly gives

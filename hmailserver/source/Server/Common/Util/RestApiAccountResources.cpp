@@ -14,6 +14,7 @@
 //
 //    GET    /api/v1/accounts/{address}/app-passwords         the account's app passwords
 //    POST   /api/v1/accounts/{address}/app-passwords         make one; the clear text is in the answer and nowhere else
+//    PUT    /api/v1/accounts/{address}/app-passwords/{id}    rename it, or revoke it without deleting (active) and put it back
 //    DELETE /api/v1/accounts/{address}/app-passwords/{id}    remove one
 //
 //    GET    /api/v1/accounts/{address}/folders               the account's own folder tree, with ids
@@ -369,6 +370,57 @@ namespace
       LOG_APPLICATION("REST API: app password \"" + name + "\" made for " + account->GetAddress() + " by the administrator.");
 
       return bridge.respond(201, bridge.appPasswordJson(password, clearText), "");
+   }
+
+   // The two things the COM setters change on a stored app password - its
+   // name, and whether it may authenticate, which is how one is revoked
+   // without being deleted so it can be put back - saved as Save saves them.
+   HttpResponse UpdateAppPassword(const Bridge &bridge, std::shared_ptr<Account> account, __int64 id, const AnsiString &requestBody)
+   {
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      static const char *const keys[] = { "name", "active" };
+      AnsiString error;
+      if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
+         return Refusal(bridge, 400, String(error));
+
+      AppPasswords list;
+      list.Refresh(account->GetID());
+
+      std::shared_ptr<AppPassword> password = list.GetItemByDBID((unsigned __int64) id);
+      if (!password || password->GetAccountID() != account->GetID())
+         return Refusal(bridge, 404, "no such app password");
+
+      String name = password->GetName();
+      bool active = password->GetActive();
+      if (!ReadString(body, "name", name, error) ||
+          !ReadBool(body, "active", active, error))
+         return Refusal(bridge, 400, String(error));
+
+      name.TrimLeft();
+      name.TrimRight();
+      if (name.IsEmpty())
+         return Refusal(bridge, 400, "name is required: what the password is for");
+      if (name.GetLength() > 255)
+         return Refusal(bridge, 400, "name is at most 255 characters");
+
+      password->SetName(name);
+      password->SetActive(active);
+
+      String result;
+      if (!PersistentAppPassword::SaveObject(password, result, PersistenceModeNormal))
+      {
+         if (!result.IsEmpty())
+            return Refusal(bridge, 400, result);
+         return Refusal(bridge, 500, "the app password could not be saved; see the error log");
+      }
+      PersistentAppPassword::InvalidateExistenceCache();
+
+      LOG_APPLICATION("REST API: app password \"" + name + "\" of " + account->GetAddress() + (active ? " kept active" : " revoked") + " by the administrator.");
+
+      return bridge.respond(200, bridge.appPasswordJson(password, String()), "");
    }
 
    HttpResponse DeleteAppPassword(const Bridge &bridge, std::shared_ptr<Account> account, __int64 id)
@@ -1281,7 +1333,9 @@ namespace
       ",\"/api/v1/accounts/{address}/app-passwords\":{"
       "\"get\":{\"summary\":\"An account's app passwords (administrator)\",\"description\":\"What Account.AppPasswords lists over COM: id, name, created, last_used, active - never the password. The same entries the account's own GET /api/v1/me/app-passwords shows. A key restricted to named domains reaches the accounts of those domains only.\",\"responses\":{\"200\":{\"description\":\"app_passwords\"},\"404\":{\"description\":\"No such account\"}}},"
       "\"post\":{\"summary\":\"Make an app password for an account (administrator)\",\"description\":\"Body: name (required: what the password is for), password (optional: a chosen secret of at least 12 characters that the password policy accepts, as InterfaceAppPassword.SetPassword requires; left out, one is generated as Generate does) and active (default true). Saved as InterfaceAppPassword.Save saves it: the store judges the name, the hash and the ceiling of twenty per account, and its sentence is the 400. The answer carries the password in clear text, the only time it exists outside the caller. No account password is asked for - the administrator credential is the proof - and the issue is logged with the account's address.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"password\":{\"type\":\"string\",\"writeOnly\":true},\"active\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, name, created, last_used, active, password\"},\"400\":{\"description\":\"No name, a chosen password the policy or the floor of twelve refuses, an unknown field, or twenty already\"},\"404\":{\"description\":\"No such account\"}}}},"
-      "\"/api/v1/accounts/{address}/app-passwords/{id}\":{\"delete\":{\"summary\":\"Remove an account's app password (administrator)\",\"description\":\"Through the account's collection, as InterfaceAppPasswords.DeleteByDBID goes; an app password of another account is not found here. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account, or no app password with that id in it\"}}}},"
+      "\"/api/v1/accounts/{address}/app-passwords/{id}\":{"
+      "\"put\":{\"summary\":\"Rename an app password, or revoke it without deleting (administrator)\",\"description\":\"Body: name and/or active - the two things the COM setters change on a stored app password, saved as InterfaceAppPassword.Save saves them. active false refuses the credential without deleting it, so it can be put back with active true; the secret is never changed here (delete and issue another). A field left out keeps its value. Logged with the account's address.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, name, created, last_used, active\"},\"400\":{\"description\":\"An empty name, an unknown field, or a value of the wrong type\"},\"404\":{\"description\":\"No such account, or no app password with that id in it\"}}},"
+      "\"delete\":{\"summary\":\"Remove an account's app password (administrator)\",\"description\":\"Through the account's collection, as InterfaceAppPasswords.DeleteByDBID goes; an app password of another account is not found here. Logged with the account's address.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account, or no app password with that id in it\"}}}},"
       "\"/api/v1/accounts/{address}/folders\":{\"get\":{\"summary\":\"An account's folders (administrator)\",\"description\":\"The account's own folder tree - what Account.IMAPFolders is over COM - as GET /api/v1/me/folders shows it to the account itself: delimiter, and folders each with its id, name, path, parent_id, subfolders and the rest of that entry, read here without the account's password so that a folder's id can be named in the permission routes. The public namespace and the folders other owners share with the account are not listed; they are not this account's. A key restricted to named domains reaches the accounts of those domains only.\",\"responses\":{\"200\":{\"description\":\"delimiter, folders\"},\"404\":{\"description\":\"No such account\"}}}},"
       "\"/api/v1/accounts/{address}/folders/{id}/permissions\":{"
       "\"get\":{\"summary\":\"A folder's access-control list (administrator)\",\"description\":\"The rows of the folder's ACL - IMAPFolder.Permissions over COM, GETACL over IMAP - read as ACLManager reads them for every decision. Each: id, folder_id, type (user, group or anyone), account_id and account (the address, for a user permission), group_id and group (the name, for a group permission), rights - the eleven RFC 4314 rights by the names eACLPermission gives them (lookup, read, write_seen, write_others, insert, post, create, delete_mailbox, write_deleted, expunge, administer), each true or false - and rights_text, the same as the letters SETACL takes. The folder is one of the account's own; a public folder is not reached here.\",\"responses\":{\"200\":{\"description\":\"Array of permissions\"},\"404\":{\"description\":\"No such account, or no folder with that id in its tree\"}}},"
@@ -1326,9 +1380,9 @@ namespace HM
       {
          AnsiString idPart = tail.Mid(appPasswords.GetLength() + 1);
          __int64 id = 0;
-         if (method == "DELETE" && idPart.Find("/") < 0 && ParseId(idPart, id))
+         if ((method == "DELETE" || method == "PUT") && idPart.Find("/") < 0 && ParseId(idPart, id))
          {
-            route.kind = RouteAccountAppPasswordDelete;
+            route.kind = method == "PUT" ? RouteAccountAppPasswordUpdate : RouteAccountAppPasswordDelete;
             route.record_id = id;
          }
 
@@ -1473,6 +1527,8 @@ namespace HM
          return ListAppPasswords(bridge, account);
       case RouteAccountAppPasswordCreate:
          return CreateAppPassword(bridge, account, requestBody);
+      case RouteAccountAppPasswordUpdate:
+         return UpdateAppPassword(bridge, account, route.record_id, requestBody);
       case RouteAccountAppPasswordDelete:
          return DeleteAppPassword(bridge, account, route.record_id);
 
