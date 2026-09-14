@@ -143,3 +143,113 @@ Transport is done: TLS everywhere, DANE, MTA-STS, a post-quantum key exchange, a
 | ⬜ | **Zero-access mailboxes** | Opt-in per account, the Proton model: after the filters have run - spam, virus, rules, which need the text - a delivered message is encrypted to the account's public key and the plaintext never touches the disk; the private key is encrypted under a key derived from the password with Argon2id and unlocked in the browser, and a recovery key the user writes down is the only other way in. The administrator cannot read the mail, cannot search it, and cannot recover it. Written down as the trade-offs it is: search runs over the client's own index or the headers the server kept; IMAP and POP see ciphertext, so an account with this on is a webmail account until a local bridge exists; a forgotten password without the recovery key is the mail lost, and the page says so before it is switched on. |
 | ⬜ | **A password-protected message to anyone** | For the correspondent with no key: the sender sets a password, the page encrypts the body and attachments (OpenPGP, symmetric) and sends a short message with a link to a reading page on this server; the recipient enters the password there and the browser decrypts; a reply written on that page goes back the same way. End to end, because the plaintext is never in the message that crosses the internet and never on this server; unlike "confidential mode", it promises only what it can keep. |
 | ⬜ | **Trust made visible** | A correspondent's key is remembered the first time it is seen and a change is a warning in the reader, not a silent switch - the one thing a man in the middle needs is silence. Fingerprints shown, verifiable by voice or in person, and a green mark on a verified correspondent from then on. |
+
+## 10. The second sweep: product by product, feature by feature
+
+Gmail and Google Workspace, Outlook.com and Microsoft 365 with Exchange behind it, Proton Mail, Fastmail, Tuta, Zoho, Zimbra, Stalwart, mailcow and iRedMail, MDaemon, Kerio and Axigen, each walked through its own feature list and settings pages, and every item below checked against Roadmap.md and the page's own script before it was written down. Where a name is given in brackets it is the product that people know the feature from. Sorted by who feels the gap.
+
+### Normal users: reading and writing mail
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Attachment reminder** (Gmail, Outlook) | "attached", "see the attachment", "enclosed" in the body and nothing attached: one question before it sends. The compose form has the words in front of it already; it only has to read them. |
+| ⬜ | **@mentions in the body** (Outlook) | Typing `@` opens the contact completion; the person chosen is added to To and their name is a link in the message; a message that mentions the reader shows an @ in the list. |
+| ⬜ | **Shift-click and Ctrl-click in the list** (every desktop client) | The list has one way to select several rows - the boxes, one at a time. Shift-click for a range, Ctrl-click to add one, as the folder page and every file manager does. Checked: the script has no shift-key handling at all. |
+| ⬜ | **Nudges** (Gmail) | "Sent 3 days ago, no reply" on a message the reader sent that got none, and "received 3 days ago, not answered" on one that asked a question - a heuristic on dates and the answered flag, no learning. |
+| ⬜ | **Follow-up flags with a date, and a reminder** (Outlook) | A flag is on or off today. A flag with a due date, a Flagged view sorted by it, and a notification when it comes due; the date is the `$FollowUp` keyword plus a date the page keeps, so other clients still see a flag. |
+| ⬜ | **Quick steps** (Outlook) | One button the reader defines: move to a folder, mark read, label, forward to an address, in one press, with a keyboard shortcut of its own. |
+| ⬜ | **Clean up conversation** (Outlook) | Delete the messages of a conversation whose whole text is quoted in a later one, so a thread of twenty is the three that said something. |
+| ⬜ | **Message pop-out** (Outlook, Gmail) | Open a message, or the compose form, in its own window, so a person can read one while writing another. |
+| ⬜ | **Search operators the two have and this one lacks** | `cc:`, `bcc:`, `filename:`, `larger:10M`, `smaller:`, `older_than:7d`, `newer_than:`, `is:muted`, `is:pinned`, `category:promotions`, `has:link`, `-word` to exclude, `OR`. The operators today: from, to, subject, has:attachment, before, after, in, is:unread/read/flagged/unflagged/answered, label. Each new one is a line in the server's search and a line in the options panel. |
+| ⬜ | **Search history and suggestions** (Gmail) | The last searches offered under the box as it is focused, and a contact's name completing to `from:` as it is typed. |
+| ⬜ | **Saved searches** | Section 7. |
+| ⬜ | **Recover deleted items** (Outlook) | The server keeps expunged messages for a retention period already (the IMAP expunge retention task). The page has no way to see them: a Recover page listing what was deleted in the window, restored with one click. |
+| ⬜ | **Auto-delete and auto-archive the reader chooses** (Proton, Outlook) | "Delete Trash and Junk after 30 days", "archive Inbox mail older than a year" as the reader's own settings, run by the server's retention task; today retention is the administrator's, per domain and account. |
+| ⬜ | **Masked addresses** (Fastmail's Masked Email, Proton's hide-my-email, Apple's Hide My Email) | An alias the reader makes in a click for one shop or one sign-up, named for it, forwarding to the mailbox, with a reply from the mailbox rewritten to come from the alias, and a switch that turns it off the day it starts to receive spam. The server's aliases are the administrator's; these are the reader's own, bounded per account. |
+| ⬜ | **Other accounts, fetched** (Gmail's "check mail from other accounts") | The server fetches external POP3 and IMAP accounts for an account; only an administrator can set one up. A page in the webmail where the reader adds their old provider's account and sees its mail arrive here. |
+| ⬜ | **Send-as an address that is verified** (Gmail) | An identity is what an administrator gave. A reader should be able to add an address they own elsewhere, prove it with a code sent to it, and send as it from then on. |
+| ⬜ | **Signatures with images and layout** (Outlook, Gmail) | The signature is text with formatting; a logo, a card layout and a per-identity signature with an image are what every business signature has. |
+| ⬜ | **Trackers, counted** (Proton, Apple Mail) | Remote images are blocked; the page does not say how many, or which senders track. "3 trackers blocked" on the message, and a sender's habit shown on their avatar. |
+| ⬜ | **Report phishing** (Gmail, Outlook) | Beside Junk: a report that files the message, sends its headers to the administrator's abuse address, blocks the sender, and adds the URL to the SURBL-style local list, so the next reader is warned. |
+| ⬜ | **Safe senders** (Outlook) | A reader's own allow list - never junk from this address or domain - fed to the spam filter, beside the block list that exists. |
+| ⬜ | **Conditional formatting of the list** (Outlook) | Rows coloured by a rule: mail from the boss in red, from a list in grey. The labels have colours; this is a rule on the row. |
+| ⬜ | **Multiple stars** (Gmail) | The star is one. Gmail's set of star and flag icons, cycled by pressing the star again, kept as `$Star2`-style keywords other clients ignore. |
+| ⬜ | **Snooze presets and custom swipe actions** (Gmail, Proton) | The snooze times and the two swipe actions as settings. |
+| ⬜ | **A mailbox export** (Google Takeout, Proton's export) | The reader downloads their whole mailbox as mbox and their contacts as vCard, from Settings, with no administrator involved - data portability as the law and decency require. |
+| ⬜ | **Import from the old provider** (Proton's Easy Switch, Fastmail's import) | The reader's side of the migration: sign in to Gmail or Outlook.com over IMAP (OAuth for the two), pick folders, and watch them arrive - the server's IMAP mirror, driven from the page for one account. |
+| ⬜ | **Right-to-left languages** | Twenty catalogues, none right-to-left. Arabic, Hebrew and Persian, with the layout mirrored, which is a stylesheet's `dir` and a day of checking every view. |
+| ⬜ | **The reader's own time zone** | Dates are shown in the browser's zone; a reader travelling, or reading from a server on another continent, sets the zone once and every date, rule and scheduled send uses it. |
+| ⬜ | **Undo more** | Undo covers filing and sending. Undo for a label removed, a rule saved, a contact deleted, a sender blocked. |
+
+### Normal users: the phone
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **The app badge** (every mail app) | The installed webmail's icon shows the unread count - the App Badging API, from the service worker, updated by the change probe. |
+| ⬜ | **Share to the webmail** (every mail app) | A photo or a link shared from another app opens the compose form with it attached - the Web Share Target in the manifest. |
+| ⬜ | **The mailto: handler** | The installed webmail registers as the handler for `mailto:` links, so a link on a website opens a new message here - `registerProtocolHandler`, offered once. |
+| ⬜ | **Offline for the last thirty days** (Gmail offline) | Offline holds the last listing and an outbox. The last thirty days of bodies and attachments kept in the browser's storage, searched offline, bounded by a setting. |
+| ⬜ | **Web Push** | Section 7. |
+
+### Normal users: contacts and the organisation
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **The organisation's directory** (Outlook's Global Address List, Google's directory) | Every account and list of the domain in the completion and on a directory page, with a photo, a title and a phone number the administrator or the person sets, and an opt-out per account. Today the completion knows only the reader's own contacts. |
+| ⬜ | **Collected addresses** (Gmail's "Other contacts", Outlook's suggested recipients) | Everyone the reader has written to, offered in completion without being a contact, promoted to one in a click. |
+| ⬜ | **Contact photos, birthdays, notes and custom fields** | The contact is name and addresses. A photo (shown as the avatar), a birthday (shown on the day), notes and the vCard's other fields, in the page and over CardDAV. |
+| ⬜ | **Shared address books** (Zimbra, Kerio) | An address book shared by a team, read-only or writable, over CardDAV too. |
+
+### Administrators: day to day
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Accounts from a spreadsheet** (every hosted admin console) | A CSV of addresses, names and passwords imported into a domain, with a dry run that lists what would be made, and the same file exported. The import tool reads mbox and text; it does not read a list of accounts. |
+| ⬜ | **Reports** (Google Workspace, Microsoft 365, Axigen) | Per domain and per day: messages in and out, spam and virus counts, top senders and recipients, largest mailboxes, storage growth, delivery failures by reason - the metrics history is kept; a page that reads it is not. |
+| ⬜ | **Follow one connection live** (Stalwart's tracing) | A session id in the Deck, and every line the server logs for it as it happens - the debugging that a grep through a gigabyte of log stands in for today. |
+| ⬜ | **syslog** (every Linux administrator's first question) | RFC 5424 to a UDP or TLS collector beside the JSON files and the OTLP exporter; on Linux, the journal. |
+| ⬜ | **Country blocking** (MDaemon's location screening, every firewall) | Connections and sign-ins by country, from a GeoIP database the administrator supplies, allowed and denied per listener, and the country on every sign-in line and session. |
+| ⬜ | **`winget install hMailServer`** (and Chocolatey) | The manifest in the winget repository, updated by the release workflow, so the installer is one command and the update is `winget upgrade`. |
+| ⬜ | **A PowerShell module and a Linux command-line client** | `hmconfig.ps1`'s successor: `Get-HmDomain`, `New-HmAccount`, `Set-HmSetting` over the REST API, with completion; and `hmctl` on Linux, the same verbs. The API has the routes; the shells do not have the words. |
+| ⬜ | **Restore one mailbox, or one message, from a backup** (every hosted service) | The backup restores the whole server. An administrator restoring one person's mailbox as it was last Tuesday, or one deleted message, from the Deck. |
+| ⬜ | **Mailbox rename and move** | An address renamed with the old one kept as an alias and mail redirected; a mailbox moved between domains on the same server. |
+
+### Enterprise: policy, compliance and identity
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **External-sender tagging and first-contact tips** (Microsoft 365, Google) | "[EXTERNAL]" in the subject or a banner in the reader on mail from outside the organisation; "you don't usually get mail from this sender" on a first contact; both per domain, both off by default. The page already warns about links; this is the sender. |
+| ⬜ | **Impersonation protection** (Microsoft 365's anti-phishing policies) | A display name matching an account or a protected person on mail from outside; a sender domain one edit from ours or from a protected partner (homoglyphs included); quarantined or banner-flagged, per domain. |
+| ⬜ | **Mail flow rules** (Exchange transport rules, Google's routing) | Conditions on sender, recipient, headers, size, attachment types, words, and actions: add a disclaimer, stamp a header, redirect, BCC to an address, reject with a text, require TLS, quarantine. The rules today act for an account; these act for the server and the domain, before delivery. |
+| ⬜ | **A domain disclaimer** (every business) | The one mail flow rule everyone asks for first: a legal footer, text and HTML, appended to outbound mail per domain, once, not on every reply. |
+| ⬜ | **Journaling and dual delivery** (Exchange journaling, Google's dual delivery) | A copy of every message of a domain, or of chosen accounts, to an external address or a second system - compliance archives and migrations both want it. The archive on disk exists; the copy to elsewhere does not. |
+| ⬜ | **Remote-domain settings** (Exchange) | Per remote domain: whether automatic replies and forwards may go there, the message format, the TLS required. |
+| ⬜ | **Restricted delivery** (Google Workspace's restrict delivery) | Accounts, or a whole domain, that may only exchange mail with named domains - schools and regulated desks. |
+| ⬜ | **Allow and block lists for the server** (Microsoft 365's tenant allow/block list) | Senders, domains and URLs allowed or blocked for every account, with an expiry on each entry and the reason kept. |
+| ⬜ | **eDiscovery** (Google Vault, Microsoft Purview) | Search across every mailbox and the archive by person, date, words and attachment, the results held or exported as EML or PST with a manifest, and every search logged - the legal-hold rows have the hold; this is the finding. |
+| ⬜ | **Roles** (every admin console) | Beyond the one administrator and the domain-scoped API key: a help-desk role that resets passwords and nothing else, a read-only auditor, a domain administrator who signs in to the Deck for their domain. |
+| ⬜ | **SCIM provisioning** (Entra ID, Okta, Google) | Accounts created, renamed, suspended and removed by the organisation's identity provider over SCIM 2.0, with the aliases and the lists. The LDAP backend authenticates; SCIM provisions. |
+| ⬜ | **SAML, beside OIDC** | The identity providers that still speak only SAML, for the webmail and the Deck sign-in. |
+| ⬜ | **Delegated mailboxes announced to Outlook** (Exchange automapping) | A mailbox an account is delegated to appears in Outlook by itself through Autodiscover, as it does with Exchange. |
+| ⬜ | **An organisation CA for S/MIME** (Exchange with AD CS) | Certificates issued to every account by the server's own CA and published for lookup, so S/MIME works inside the organisation without anyone buying a certificate. |
+| ⬜ | **Gateway encryption to partner domains** | Mail to a named partner domain encrypted at the server with the partner's S/MIME or OpenPGP key, whatever the sender's client - the enterprise shape of the end-to-end section. |
+| ⬜ | **A user's data, exported** (GDPR article 20) | Everything the server holds on one person - mail, contacts, settings, logs that name them - as one archive, from the Deck, with the erasure that follows it. |
+| ⬜ | **`security.txt`** (RFC 9116) | Served at `/.well-known/security.txt` on the web listener with the project's disclosure address, and the same file in the repository. |
+| ⬜ | **Session policies** | Idle timeout, absolute lifetime, one session per device, and a session bound to the network it began on, as settings; a new sign-in from a new device announced to the recovery address. |
+
+### Deliverability and the mail path
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **IP warm-up** (every sending service) | A schedule for a new outbound address: so many messages a day to each large provider, rising over weeks, enforced by the queue, with the counts on the Deck. |
+| ⬜ | **Mandatory TLS per domain** (mailcow's TLS policy map, Exchange connectors) | Outbound mail to a named domain refused rather than sent in the clear when TLS cannot be had or the certificate does not verify; inbound from a named domain likewise - the row that makes REQUIRETLS an administrator's policy rather than a sender's request. |
+| ⬜ | **Recipient callout for backup MX** | A backup MX that asks the primary whether an address exists before accepting, so it does not become a backscatter source when the primary is down. |
+| ⬜ | **Bounce handling for lists** | Section 7's list manager: VERP addresses, hard bounces unsubscribing, soft bounces counted. |
+
+### Recovery and account safety, for the person
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Recovery address and codes** (every provider) | A recovery email address and a set of one-time recovery codes, set in the webmail, so a forgotten password or a lost authenticator is a self-service reset and not a ticket. Today only an administrator can reset either. |
+| ⬜ | **A breach check on the password** | Section 7. |
+| ⬜ | **Passkeys** | Section 7. |
