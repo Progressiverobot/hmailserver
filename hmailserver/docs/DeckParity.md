@@ -9,28 +9,29 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 330 |
-| of them writable over REST | 322 |
+| of them writable over REST | 328 |
 | of them reachable from a Deck view | 322 |
-| missing over REST | 8 |
-| over REST but not reached by any Deck view | 0 |
+| missing over REST | 2 |
+| over REST but not reached by any Deck view | 6 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 199, 92 of them writes |
+| REST routes (path and method) | 216, 98 of them writes |
 | Deck views | 15 |
 
 ## Missing over REST, by interface
 
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
-| IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
-| AppPassword | 2 | `Active`, `Name` |
 | Group | 1 | `Name` |
 | GroupMember | 1 | `AccountID` |
 
 ## Over REST but not reached by any Deck view
 
-Every property writable over REST is reached by a Deck view.
+| Interface | Count | Properties |
+|---|---|---|
+| IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
+| AppPassword | 2 | `Active`, `Name` |
 
 ## Left out of the count
 
@@ -655,6 +656,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | Route | Resource | Keys | Deck |
 |---|---|---|---|
 | `PUT /api/v1/accounts/{address}` | Account | `active`, `ad_domain`, `ad_enabled`, `ad_username`, `admin_level`, `antispam_enabled`, `first_name`, `forward_abort_spam_flagged`, `forward_address`, `forward_enabled`, `forward_keep_original`, `last_name`, `max_size_mb`, `message_retention_days`, `password`, `sieve_script`, `signature_enabled`, `signature_html`, `signature_plain_text`, `spam_delete_threshold`, `spam_mark_threshold`, `vacation_abort_spam_flagged`, `vacation_begin_date`, `vacation_enabled`, `vacation_expires`, `vacation_expires_date`, `vacation_message`, `vacation_subject` | yes |
+| `POST /api/v1/accounts/{address}/app-passwords` | AppPassword | `account`, `active`, `name`, `password`, `text` | - |
+| `PUT /api/v1/accounts/{address}/app-passwords/{id}` | AppPassword | `account`, `active`, `field`, `name`, `password`, `text`, `value` | - |
 | `POST /api/v1/accounts/{address}/fetch-accounts` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `PUT /api/v1/accounts/{address}/fetch-accounts/{id}` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `POST /api/v1/accounts/{address}/fetch-accounts/{id}/download` | FetchAccount | - | yes |
@@ -666,33 +669,33 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
 | `POST /api/v1/backup` | BackupSettings, Backup | - | yes |
-| `POST /api/v1/blocked-attachments` | BlockedAttachment | `description`, `message`, `name`, `wildcard` | yes |
-| `PUT /api/v1/blocked-attachments/{id}` | BlockedAttachment | `body`, `description`, `field`, `message`, `name`, `value`, `wildcard` | - |
-| `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `score` | yes |
-| `PUT /api/v1/blocked-senders/{id}` | BlockedSender | `address`, `body`, `description`, `field`, `message`, `score`, `value` | - |
+| `POST /api/v1/blocked-attachments` | BlockedAttachment | `description`, `message`, `name`, `read`, `wildcard` | yes |
+| `PUT /api/v1/blocked-attachments/{id}` | BlockedAttachment | `body`, `description`, `field`, `message`, `name`, `read`, `value`, `wildcard` | - |
+| `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `read`, `score` | yes |
+| `PUT /api/v1/blocked-senders/{id}` | BlockedSender | `address`, `body`, `description`, `field`, `message`, `read`, `score`, `value` | - |
 | `POST /api/v1/certificates` | SSLCertificate | `certificate_file`, `name`, `private_key_file`, `private_key_password` | yes |
-| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score`, `wildcard` | yes |
-| `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value`, `wildcard` | - |
+| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `read`, `reject_message`, `score`, `wildcard` | yes |
+| `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `read`, `reject_message`, `score`, `value`, `wildcard` | - |
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | yes |
 | `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | yes |
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
-| `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | yes |
+| `POST /api/v1/domains/{domain}/aliases` | Alias | `account`, `active`, `address`, `message`, `name`, `to`, `value` | yes |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | yes |
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | yes |
-| `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address` | yes |
-| `PUT /api/v1/greylisting-white-addresses/{id}` | GreyListingWhiteAddress | `address`, `body`, `description`, `field`, `ip_address`, `value` | - |
-| `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | yes |
-| `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `upper_ip`, `value` | - |
-| `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
-| `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `body`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | yes |
+| `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address`, `read` | yes |
+| `PUT /api/v1/greylisting-white-addresses/{id}` | GreyListingWhiteAddress | `address`, `body`, `description`, `field`, `ip_address`, `read`, `value` | - |
+| `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `read`, `upper_ip` | yes |
+| `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `read`, `upper_ip`, `value` | - |
+| `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `lower`, `name`, `priority`, `read`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
+| `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `body`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `field`, `lower`, `name`, `priority`, `read`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | yes |
 | `PUT /api/v1/lists/{address}` | DistributionList | `active`, `bounce_address`, `domain_members`, `field`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to`, `value` | yes |
-| `POST /api/v1/me/app-passwords` | AppPassword | `address`, `name`, `password`, `text`, `to` | - |
-| `POST /api/v1/me/contacts` | ? | `address`, `name` | - |
-| `PUT /api/v1/me/contacts/{id}` | ? | `address`, `name` | - |
-| `POST /api/v1/me/drafts` | ? | `bcc`, `cc`, `deleted`, `draft`, `folder`, `from`, `message`, `new`, `replace_id`, `subject`, `text`, `to` | - |
-| `POST /api/v1/me/drafts/{id}/schedule` | ? | `draft`, `folder`, `new`, `send_at` | - |
-| `POST /api/v1/me/files` | ? | `days`, `max_days`, `max_mb`, `name`, `password`, `quota_mb`, `size`, `to`, `type` | - |
-| `PUT /api/v1/me/files/{id}` | ? | `days`, `from`, `max_days`, `max_mb`, `name`, `password`, `quota_mb`, `size`, `to`, `type` | - |
+| `POST /api/v1/me/app-passwords` | AppPassword | `account`, `address`, `name`, `password`, `text`, `to` | - |
+| `POST /api/v1/me/contacts` | ? | `account`, `address`, `name` | - |
+| `PUT /api/v1/me/contacts/{id}` | ? | `account`, `address`, `name` | - |
+| `POST /api/v1/me/drafts` | ? | `account`, `bcc`, `cc`, `deleted`, `draft`, `folder`, `from`, `message`, `new`, `read`, `replace_id`, `subject`, `text`, `to` | - |
+| `POST /api/v1/me/drafts/{id}/schedule` | ? | `account`, `draft`, `folder`, `new`, `send_at` | - |
+| `POST /api/v1/me/files` | ? | `account`, `days`, `max_days`, `max_mb`, `name`, `password`, `quota_mb`, `size`, `to`, `type` | - |
+| `PUT /api/v1/me/files/{id}` | ? | `account`, `days`, `from`, `max_days`, `max_mb`, `name`, `password`, `quota_mb`, `size`, `to`, `type` | - |
 | `PUT /api/v1/me/files/{id}/content` | ? | - | - |
 | `PUT /api/v1/me/filters` | ? | `from`, `message`, `script` | - |
 | `POST /api/v1/me/folders` | IMAPFolder | `account`, `create`, `first`, `folder`, `message`, `name`, `new`, `parent_id`, `to` | - |
@@ -735,21 +738,21 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/settings/indexing` | MessageIndexing | `enabled` | yes |
 | `POST /api/v1/settings/indexing/clear` | MessageIndexing | - | yes |
 | `POST /api/v1/settings/indexing/index` | MessageIndexing | - | yes |
-| `PUT /api/v1/settings/ini/{name}` | - | `from`, `to`, `value` | - |
+| `PUT /api/v1/settings/ini/{name}` | - | `from`, `read`, `to`, `value` | - |
 | `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip` | yes |
 | `POST /api/v1/settings/logon-failures/clear` | - | - | - |
-| `PUT /api/v1/settings/messages/{name}` | ServerMessage | `text` | yes |
+| `PUT /api/v1/settings/messages/{name}` | ServerMessage | `read`, `text` | yes |
 | `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | yes |
 | `POST /api/v1/settings/scripting/check` | Scripting | - | yes |
 | `POST /api/v1/settings/scripting/reload` | Scripting | - | yes |
 | `POST /api/v1/sieve/evaluate` | - | `action`, `address`, `body`, `message`, `script` | - |
-| `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `reject_message`, `score` | yes |
-| `PUT /api/v1/surbl-servers/{id}` | SURBLServer | `active`, `body`, `dns_host`, `domains`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
+| `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `read`, `reject_message`, `score` | yes |
+| `PUT /api/v1/surbl-servers/{id}` | SURBLServer | `active`, `body`, `dns_host`, `domains`, `expected_result`, `field`, `message`, `read`, `reject_message`, `score`, `value` | - |
 | `POST /api/v1/update/check` | - | - | - |
 | `POST /api/v1/update/download` | - | - | - |
 | `POST /api/v1/update/install` | - | - | - |
-| `POST /api/v1/whitelist-addresses` | WhiteListAddress | `address`, `description`, `email_address`, `lower_ip`, `message`, `upper_ip` | yes |
-| `PUT /api/v1/whitelist-addresses/{id}` | WhiteListAddress | `address`, `body`, `description`, `email_address`, `field`, `lower_ip`, `message`, `upper_ip`, `value` | - |
+| `POST /api/v1/whitelist-addresses` | WhiteListAddress | `address`, `description`, `email_address`, `lower_ip`, `message`, `read`, `upper_ip` | yes |
+| `PUT /api/v1/whitelist-addresses/{id}` | WhiteListAddress | `address`, `body`, `description`, `email_address`, `field`, `lower_ip`, `message`, `read`, `upper_ip`, `value` | - |
 
 ## Deck views
 
