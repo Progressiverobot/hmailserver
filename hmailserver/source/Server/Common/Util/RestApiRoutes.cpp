@@ -24,6 +24,15 @@
 //     put_Password's policy and reuse checks and hashing, then
 //     PersistentAccount::SaveObject with the same limitation check and the
 //     Cache<Account> eviction that makes the next IMAP logon read the new row.
+//     It takes everything the Control Panel's account dialog writes: beside the
+//     names, size, forwarding, signature and level, the per-account spam
+//     switch and thresholds, the retention, the automatic reply with its two
+//     dates (checked as put_VacationMessageExpiresDate and
+//     put_VacationMessageBeginDate check them), the Active Directory binding,
+//     and the Sieve script, which put_SieveScript writes to the account's
+//     file rather than the row - parsed first, as the portal's own filter
+//     save and ManageSieve's PUTSCRIPT parse it, and put back as it was if
+//     the row's save is then refused.
 //
 // Bodies are parsed as JSON documents (JsonDocument.h) rather than searched by
 // key, because a route carries an array and the account update has to name a
@@ -54,6 +63,8 @@
 #include "../Persistence/PersistentRoute.h"
 #include "../Persistence/PersistentRouteAddress.h"
 #include "../Persistence/PersistenceMode.h"
+#include "../Sieve/SieveScript.h"
+#include "../Sieve/SieveStorage.h"
 #include "../TCPIP/SocketConstants.h"
 #include "../../SMTP/SMTPConfiguration.h"
 
@@ -192,6 +203,29 @@ namespace HM
          const JsonValue *member = object.Get(key);
          return member != nullptr && !member->IsNull();
       }
+
+      // put_VacationMessageExpiresDate's rule, which put_VacationMessageBeginDate
+      // shares: a value beginning 0000 or empty means today, and anything else
+      // must be a ten-character date the calendar has. False is the property's
+      // refusal; the caller carries its sentence.
+      bool VacationDate(String &date)
+      {
+         if (date.Left(4) == _T("0000"))
+            date = "";
+
+         if (date.GetLength() == 0)
+         {
+            date = Time::GetCurrentDate();
+            return true;
+         }
+
+         return date.GetLength() == 10 && Time::IsValidSystemDate(date);
+      }
+
+      // The bound the portal's own filter save puts on a script
+      // (HandleMeFiltersPut_ in RestApiServer.cpp), so that the administrator's
+      // route and the account's own agree on what is too large.
+      const int MaxSieveScriptLength = 256 * 1024;
 
       String Utf8ToString(const std::string &utf8)
       {
@@ -563,7 +597,32 @@ namespace HM
          entry += ",\"message_retention_days\":" + retention;
          entry += ",\"admin_level\":\"";
          entry += AdminLevelWord(account->GetAdminLevel());
-         entry += "\"}";
+         entry += "\"";
+
+         // The rest of what the Control Panel's account dialog holds, in its
+         // order: spam, retention, the automatic reply, Active Directory and
+         // the Sieve script (read from the account's file, as get_SieveScript
+         // reads it). -1 in a threshold or the retention means the server's
+         // or the domain's own value; the dates are YYYY-MM-DD as stored.
+         AnsiString numbers;
+         numbers.Format(",\"antispam_enabled\":%hs,\"spam_mark_threshold\":%d,\"spam_delete_threshold\":%d,\"forward_abort_spam_flagged\":%hs,\"message_retention_days\":%d",
+            account->GetAntiSpamEnabled() ? "true" : "false",
+            account->GetSpamMarkThreshold(),
+            account->GetSpamDeleteThreshold(),
+            account->GetForwardAbortSpamFlagged() ? "true" : "false",
+            account->GetMessageRetentionDays());
+         entry += numbers;
+         flag("vacation_enabled", account->GetVacationMessageIsOn());
+         entry += ",\"vacation_subject\":\"" + quote(account->GetVacationSubject()) + "\"";
+         entry += ",\"vacation_message\":\"" + quote(account->GetVacationMessage()) + "\"";
+         flag("vacation_expires", account->GetVacationExpires());
+         entry += ",\"vacation_expires_date\":\"" + quote(account->GetVacationExpiresDate()) + "\"";
+         entry += ",\"vacation_begin_date\":\"" + quote(account->GetVacationBeginDate()) + "\"";
+         flag("vacation_abort_spam_flagged", account->GetVacationAbortSpamFlagged());
+         flag("ad_enabled", account->GetIsAD());
+         entry += ",\"ad_domain\":\"" + quote(account->GetADDomain()) + "\"";
+         entry += ",\"ad_username\":\"" + quote(account->GetADUsername()) + "\"";
+         entry += ",\"sieve_script\":\"" + quote(SieveStorage::GetActiveScript(account->GetAddress())) + "\"}";
 
          return entry;
       }
@@ -590,7 +649,7 @@ namespace HM
          ",\"/api/v1/accounts/{address}\":{"
          "\"get\":{\"summary\":\"Read an account\",\"description\":\"The account whole, as the update answers it: address and active first, then max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date, message_retention_days and admin_level - what InterfaceAccount reports over COM, less the password, the hash and the TOTP secret. Scoped to the address's domain.\",\"responses\":{\"200\":{\"description\":\"The account\"},\"404\":{\"description\":\"Unknown account\"}}},"
          "\"delete\":{\"summary\":\"Delete an account\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown account\"}}},"
-         "\"put\":{\"summary\":\"Update an account\",\"description\":\"Any subset of active, password, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date (YYYY-MM-DD, required when vacation_expires is true), message_retention_days (0: the domain's policy applies; -1: this account keeps everything whatever the domain says; days otherwise) and admin_level (user, domain or server); a field the body does not name is left as it is, and an unknown field is refused by name. A password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it. Who is asking decides what admin_level may become, as over COM: the administrator password or a key issued for every domain may set all three levels and may update an account that is a server administrator; a key restricted to named domains may set user or domain only, and may not touch an account that is a server administrator. Scoped to the address's domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"active\":{\"type\":\"boolean\"},\"password\":{\"type\":\"string\"},\"max_size_mb\":{\"type\":\"integer\"},\"first_name\":{\"type\":\"string\"},\"last_name\":{\"type\":\"string\"},\"forward_enabled\":{\"type\":\"boolean\"},\"forward_address\":{\"type\":\"string\"},\"forward_keep_original\":{\"type\":\"boolean\"},\"signature_enabled\":{\"type\":\"boolean\"},\"signature_plain_text\":{\"type\":\"string\"},\"signature_html\":{\"type\":\"string\"},\"admin_level\":{\"type\":\"string\",\"enum\":[\"user\",\"domain\",\"server\"]}}}}}},\"responses\":{\"200\":{\"description\":\"The account as saved: address, active, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level\"},\"400\":{\"description\":\"Nothing to update, an unknown field, a field of the wrong type, an admin_level that is not user, domain or server, a password the policy refuses, or the save refused (the reason is in error)\"},\"403\":{\"description\":\"A domain-restricted key naming admin_level server, or updating an account that is a server administrator\"},\"404\":{\"description\":\"Unknown account\"},\"409\":{\"description\":\"The password was used recently on this account\"}}}}";
+         "\"put\":{\"summary\":\"Update an account\",\"description\":\"Any subset of active, password, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level (user, domain or server), antispam_enabled, spam_mark_threshold and spam_delete_threshold (-1 is the server's own value), forward_abort_spam_flagged, message_retention_days (-1 keeps forever, 0 follows the domain), vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date and vacation_begin_date (YYYY-MM-DD; empty means today, as the Control Panel takes them), vacation_abort_spam_flagged, ad_enabled, ad_domain, ad_username and sieve_script (the account's active Sieve filter, parsed before it is stored, as the portal and ManageSieve parse one; empty removes it); a field the body does not name is left as it is, and an unknown field is refused by name. A password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it. Who is asking decides what admin_level may become, as over COM: the administrator password or a key issued for every domain may set all three levels and may update an account that is a server administrator; a key restricted to named domains may set user or domain only, and may not touch an account that is a server administrator. Scoped to the address's domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"active\":{\"type\":\"boolean\"},\"password\":{\"type\":\"string\"},\"max_size_mb\":{\"type\":\"integer\"},\"first_name\":{\"type\":\"string\"},\"last_name\":{\"type\":\"string\"},\"forward_enabled\":{\"type\":\"boolean\"},\"forward_address\":{\"type\":\"string\"},\"forward_keep_original\":{\"type\":\"boolean\"},\"signature_enabled\":{\"type\":\"boolean\"},\"signature_plain_text\":{\"type\":\"string\"},\"signature_html\":{\"type\":\"string\"},\"admin_level\":{\"type\":\"string\",\"enum\":[\"user\",\"domain\",\"server\"]},\"antispam_enabled\":{\"type\":\"boolean\"},\"spam_mark_threshold\":{\"type\":\"integer\"},\"spam_delete_threshold\":{\"type\":\"integer\"},\"forward_abort_spam_flagged\":{\"type\":\"boolean\"},\"message_retention_days\":{\"type\":\"integer\"},\"vacation_enabled\":{\"type\":\"boolean\"},\"vacation_subject\":{\"type\":\"string\"},\"vacation_message\":{\"type\":\"string\"},\"vacation_expires\":{\"type\":\"boolean\"},\"vacation_expires_date\":{\"type\":\"string\"},\"vacation_begin_date\":{\"type\":\"string\"},\"vacation_abort_spam_flagged\":{\"type\":\"boolean\"},\"ad_enabled\":{\"type\":\"boolean\"},\"ad_domain\":{\"type\":\"string\"},\"ad_username\":{\"type\":\"string\"},\"sieve_script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The account as saved: address, active, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level, antispam_enabled, spam_mark_threshold, spam_delete_threshold, forward_abort_spam_flagged, message_retention_days, vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date, vacation_begin_date, vacation_abort_spam_flagged, ad_enabled, ad_domain, ad_username, sieve_script\"},\"400\":{\"description\":\"Nothing to update, an unknown field, a field of the wrong type, an admin_level that is not user, domain or server, a threshold or retention below -1, a date that is not YYYY-MM-DD, a Sieve script that does not parse (the parser's message is in error), a password the policy refuses, or the save refused (the reason is in error)\"},\"403\":{\"description\":\"A domain-restricted key naming admin_level server, or updating an account that is a server administrator\"},\"404\":{\"description\":\"Unknown account\"},\"409\":{\"description\":\"The password was used recently on this account\"}}}}";
    }
 
    // The account whole, as the update answers it - what InterfaceAccount
@@ -996,8 +1055,11 @@ namespace HM
       {
          "active", "password", "max_size_mb", "first_name", "last_name", "forward_enabled",
          "forward_address", "forward_keep_original", "signature_enabled", "signature_plain_text",
-         "signature_html", "admin_level", "vacation_enabled", "vacation_subject", "vacation_message",
-         "vacation_expires", "vacation_expires_date", "message_retention_days"
+         "signature_html", "admin_level",
+         "antispam_enabled", "spam_mark_threshold", "spam_delete_threshold", "forward_abort_spam_flagged",
+         "message_retention_days", "vacation_enabled", "vacation_subject", "vacation_message",
+         "vacation_expires", "vacation_expires_date", "vacation_begin_date", "vacation_abort_spam_flagged",
+         "ad_enabled", "ad_domain", "ad_username", "sieve_script"
       };
 
       std::string unknown = FirstUnknownKey(body, knownKeys, sizeof(knownKeys) / sizeof(knownKeys[0]));
@@ -1119,6 +1181,74 @@ namespace HM
             return BuildResponse_(400, "{\"error\":\"forwarding to the account itself would loop\"}");
       }
 
+      // The rest of the account dialog. A threshold or the retention below -1
+      // is refused by name rather than clamped as put_SpamMarkThreshold clamps
+      // it: -1 already means the server's (or the domain's) own value, and
+      // nothing below it can have been meant.
+      bool antiSpamEnabled = account->GetAntiSpamEnabled();
+      long spamMarkThreshold = account->GetSpamMarkThreshold();
+      long spamDeleteThreshold = account->GetSpamDeleteThreshold();
+      bool forwardAbortSpamFlagged = account->GetForwardAbortSpamFlagged();
+      long retentionDays = account->GetMessageRetentionDays();
+      bool vacationEnabled = account->GetVacationMessageIsOn();
+      String vacationSubject = account->GetVacationSubject();
+      String vacationMessage = account->GetVacationMessage();
+      bool vacationExpires = account->GetVacationExpires();
+      String vacationExpiresDate = account->GetVacationExpiresDate();
+      String vacationBeginDate = account->GetVacationBeginDate();
+      bool vacationAbortSpamFlagged = account->GetVacationAbortSpamFlagged();
+      bool adEnabled = account->GetIsAD();
+      String adDomain = account->GetADDomain();
+      String adUsername = account->GetADUsername();
+      String sieveScript;
+
+      if (!ReadBool(body, "antispam_enabled", antiSpamEnabled, error) ||
+          !ReadInteger(body, "spam_mark_threshold", -1, 2147483647L, spamMarkThreshold, error) ||
+          !ReadInteger(body, "spam_delete_threshold", -1, 2147483647L, spamDeleteThreshold, error) ||
+          !ReadBool(body, "forward_abort_spam_flagged", forwardAbortSpamFlagged, error) ||
+          !ReadInteger(body, "message_retention_days", -1, 2147483647L, retentionDays, error) ||
+          !ReadBool(body, "vacation_enabled", vacationEnabled, error) ||
+          !ReadString(body, "vacation_subject", vacationSubject, error) ||
+          !ReadString(body, "vacation_message", vacationMessage, error) ||
+          !ReadBool(body, "vacation_expires", vacationExpires, error) ||
+          !ReadString(body, "vacation_expires_date", vacationExpiresDate, error) ||
+          !ReadString(body, "vacation_begin_date", vacationBeginDate, error) ||
+          !ReadBool(body, "vacation_abort_spam_flagged", vacationAbortSpamFlagged, error) ||
+          !ReadBool(body, "ad_enabled", adEnabled, error) ||
+          !ReadString(body, "ad_domain", adDomain, error) ||
+          !ReadString(body, "ad_username", adUsername, error) ||
+          !ReadString(body, "sieve_script", sieveScript, error))
+      {
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+      }
+
+      // The two dates, as put_VacationMessageExpiresDate and
+      // put_VacationMessageBeginDate take them, in their sentences.
+      if (HasMember(body, "vacation_expires_date") && !VacationDate(vacationExpiresDate))
+         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply expiry date\"}");
+
+      if (HasMember(body, "vacation_begin_date") && !VacationDate(vacationBeginDate))
+         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply begin date\"}");
+
+      // The Sieve script, parsed as the portal's filter save and ManageSieve's
+      // PUTSCRIPT parse it, so that a script that does not parse is never
+      // installed; an empty script removes the filter. put_SieveScript's guard
+      // against a domain administrator reaching a server administrator's
+      // script is the refusal above, which covers every field of this route.
+      const bool sieveGiven = HasMember(body, "sieve_script");
+      if (sieveGiven)
+      {
+         if (sieveScript.GetLength() > MaxSieveScriptLength)
+            return BuildResponse_(400, "{\"error\":\"sieve_script is at most 256 KB\"}");
+
+         if (!sieveScript.IsEmpty())
+         {
+            String syntaxError = SieveScript::CheckSyntax(sieveScript);
+            if (!syntaxError.IsEmpty())
+               return BuildResponse_(400, ErrorBody(quote, syntaxError));
+         }
+      }
+
       // The password, exactly as InterfaceAccount::put_Password: the policy,
       // then the reuse history, then the old hash recorded before the new one
       // replaces it, then the configured hash and the age clock.
@@ -1159,12 +1289,32 @@ namespace HM
       account->SetEnableSignature(signatureEnabled);
       account->SetSignaturePlainText(signaturePlainText);
       account->SetSignatureHTML(signatureHtml);
+      account->SetAntiSpamEnabled(antiSpamEnabled);
+      account->SetSpamMarkThreshold((int) spamMarkThreshold);
+      account->SetSpamDeleteThreshold((int) spamDeleteThreshold);
+      account->SetForwardAbortSpamFlagged(forwardAbortSpamFlagged);
+      account->SetMessageRetentionDays((int) retentionDays);
       account->SetVacationMessageIsOn(vacationEnabled);
       account->SetVacationSubject(vacationSubject);
       account->SetVacationMessage(vacationMessage);
       account->SetVacationExpires(vacationExpires);
       account->SetVacationExpiresDate(vacationExpiresDate);
-      account->SetMessageRetentionDays((int) retentionDays);
+      account->SetVacationBeginDate(vacationBeginDate);
+      account->SetVacationAbortSpamFlagged(vacationAbortSpamFlagged);
+      account->SetIsAD(adEnabled);
+      account->SetADDomain(adDomain);
+      account->SetADUsername(adUsername);
+
+      // The script goes to the account's file before the row is saved, as
+      // put_SieveScript writes it, and back to what it was if the save is then
+      // refused, so a refused PUT leaves the file and the row as they were.
+      String previousScript;
+      if (sieveGiven)
+      {
+         previousScript = SieveStorage::GetActiveScript(account->GetAddress());
+         if (!SieveStorage::SetActiveScript(account->GetAddress(), sieveScript))
+            return BuildResponse_(500, "{\"error\":\"The Sieve script could not be written to disk. Check the hMailServer error log.\"}");
+      }
 
       String saveError;
 
@@ -1174,6 +1324,9 @@ namespace HM
       // reads the row just written.
       if (!PersistentAccount::SaveObject(account, saveError, true, PersistenceModeNormal))
       {
+         if (sieveGiven)
+            SieveStorage::SetActiveScript(account->GetAddress(), previousScript);
+
          if (!saveError.IsEmpty())
          {
             LOG_APPLICATION("RestApi: Refused to update account " + address + ": " + saveError);
