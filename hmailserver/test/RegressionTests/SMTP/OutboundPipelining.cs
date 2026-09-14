@@ -167,6 +167,12 @@ namespace RegressionTests.SMTP
          {
             server.AdvertisePipelining = true;
             server.AdvertiseChunking = true;
+            // Held, as in the envelope test above: whether RCPT TO and BDAT were
+            // already in the simulator's buffer when it answered MAIL FROM is
+            // the one observation of pipelining that does not depend on how TCP
+            // segmented the commands - and without the hold the hosted runner
+            // answered before they had arrived.
+            server.HoldMailFromReplyFor = TimeSpan.FromSeconds(2);
             server.AddRecipientResult(Results(Accepted(Remote)));
             server.StartListen();
 
