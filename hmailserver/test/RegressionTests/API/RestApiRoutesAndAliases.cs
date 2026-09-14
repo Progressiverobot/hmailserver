@@ -692,7 +692,9 @@ namespace RegressionTests.API
          Assert.IsFalse(reread.IsAD);
          Assert.AreEqual(7, reread.SpamMarkThreshold, "Left out, so left alone.");
          Assert.AreEqual("AD", reread.ADDomain);
-         Assert.IsTrue(reread.VacationMessageIsOn);
+         // An expiry of today has passed the moment the day began: the read
+         // switches the message off, as it always has for a date now is past.
+         Assert.IsFalse(reread.VacationMessageIsOn, "A message set to expire today is off by the time it is read.");
 
          // Refused - a threshold or retention below -1, a date that is not
          // YYYY-MM-DD, a wrong type, a script that does not parse - and

@@ -1200,10 +1200,10 @@ namespace HM
       // The two dates, as put_VacationMessageExpiresDate and
       // put_VacationMessageBeginDate take them, in their sentences.
       if (HasMember(body, "vacation_expires_date") && !VacationDate(vacationExpiresDate))
-         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply expiry date\"}");
+         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply expiry date: vacation_expires_date must be YYYY-MM-DD, or empty for today\"}");
 
       if (HasMember(body, "vacation_begin_date") && !VacationDate(vacationBeginDate))
-         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply begin date\"}");
+         return BuildResponse_(400, "{\"error\":\"Invalid auto-reply begin date: vacation_begin_date must be YYYY-MM-DD, or empty for today\"}");
 
       // The Sieve script, parsed as the portal's filter save and ManageSieve's
       // PUTSCRIPT parse it, so that a script that does not parse is never
