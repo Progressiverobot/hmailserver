@@ -1,0 +1,1241 @@
+// Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// The Control Deck's script, executed. build/check-deck-script.py lifts the one
+// inline script out of hmailserver/installation/WebAdmin/index.html and hands
+// the page and the script here; this builds a small DOM from the markup,
+// answers fetch out of a recorded server whose state the writes change, runs
+// the script in that world and then asserts what the administrator would see:
+// each view drawn from its answers, each form sending the JSON its route takes,
+// each refusal shown in the server's own words, each change read back after
+// the round trip.
+//
+// The DOM is deliberately small and hand-written, as the portal's is: no
+// dependency, so this runs on a bare runner with nothing installed, and nothing
+// in it is magic - a call the script makes that is not here fails with its
+// name rather than passing quietly. What the Deck needs beyond the portal:
+// innerHTML, because every view is drawn by assigning it; a selector engine
+// for the shapes the page uses (#id, .class, tag, [attr], [attr=value], the
+// descendant and child combinators, a comma); closest; dataset; on<event>
+// handler properties beside addEventListener; a select whose value is its
+// selected option; and entity decoding, because everything the server says
+// goes through escHtml before it is drawn and the assertions want it back.
+// Timers are a queue this file fires by hand, so the restart's polling loop is
+// tested without waiting a minute.
+
+'use strict';
+
+const fs = require('fs');
+const vm = require('vm');
+
+const out = console;
+
+const [pagePath, scriptPath] = process.argv.slice(2);
+if (!pagePath || !scriptPath) {
+   out.error('usage: node build/deck-script-test.js <index.html> <deck.js>');
+   process.exit(2);
+}
+
+/* ------------------------------------------------------------------ the DOM */
+
+const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr']);
+const RAW = new Set(['script', 'style']);
+const NAMED = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', hellip: '…' };
+
+function decodeEntities(text) {
+   if (text.indexOf('&') < 0) { return text; }
+   return text.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (whole, body) => {
+      if (body[0] === '#') {
+         const code = body[1] === 'x' || body[1] === 'X' ? parseInt(body.slice(2), 16) : parseInt(body.slice(1), 10);
+         return isFinite(code) ? String.fromCodePoint(code) : whole;
+      }
+      return body in NAMED ? NAMED[body] : whole;
+   });
+}
+
+function encodeText(text) {
+   return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+class TextNode {
+   constructor(data) { this.data = data; this.parentNode = null; this.childNodes = []; this.nodeType = 3; }
+   get textContent() { return this.data; }
+   set textContent(v) { this.data = String(v); }
+}
+
+/* Selectors: a list of chains, a chain a list of compounds from ancestor to
+   target, each compound a tag, an id, classes and attribute tests. */
+function parseCompound(text) {
+   const c = { tag: null, id: null, classes: [], attrs: [] };
+   let rest = text;
+   const re = /^(?:([a-zA-Z][\w-]*)|#([\w-]+)|\.([\w-]+)|\[([\w-]+)(?:=(?:"([^"]*)"|'([^']*)'|([^\]]*)))?\]|(\*))/;
+   while (rest.length) {
+      const m = re.exec(rest);
+      if (!m) { throw new Error('a selector this DOM does not understand: ' + text); }
+      if (m[1]) { c.tag = m[1].toUpperCase(); }
+      else if (m[2]) { c.id = m[2]; }
+      else if (m[3]) { c.classes.push(m[3]); }
+      else if (m[4]) { c.attrs.push({ name: m[4], value: m[5] !== undefined ? m[5] : m[6] !== undefined ? m[6] : m[7] !== undefined ? m[7] : null }); }
+      rest = rest.slice(m[0].length);
+   }
+   return c;
+}
+
+function parseSelector(text) {
+   return String(text).split(',').map((part) => {
+      const chain = [];
+      let child = false;
+      part.trim().split(/\s+/).filter(Boolean).forEach((token) => {
+         if (token === '>') { child = true; return; }
+         chain.push({ compound: parseCompound(token), child });
+         child = false;
+      });
+      if (!chain.length) { throw new Error('an empty selector: ' + text); }
+      return chain;
+   });
+}
+
+function matchesCompound(node, c) {
+   if (!(node instanceof Element) || node.tagName[0] === '#') { return false; }
+   if (c.tag && node.tagName !== c.tag) { return false; }
+   if (c.id && node.attributes.id !== c.id) { return false; }
+   const classes = node.className ? node.className.split(/\s+/) : [];
+   if (c.classes.some((k) => classes.indexOf(k) < 0)) { return false; }
+   return c.attrs.every((a) => (a.value === null ? a.name in node.attributes : node.attributes[a.name] === a.value));
+}
+
+function matchesChain(node, chain) {
+   let at = chain.length - 1;
+   if (!matchesCompound(node, chain[at].compound)) { return false; }
+   let here = node;
+   while (at > 0) {
+      const link = chain[at];
+      at -= 1;
+      here = here.parentNode;
+      if (link.child) {
+         if (!matchesCompound(here, chain[at].compound)) { return false; }
+      } else {
+         while (here && !matchesCompound(here, chain[at].compound)) { here = here.parentNode; }
+         if (!here) { return false; }
+      }
+   }
+   return true;
+}
+
+function walk(node, visit) {
+   node.childNodes.forEach((child) => {
+      if (child instanceof Element) { visit(child); walk(child, visit); }
+   });
+}
+
+function serialize(node) {
+   if (node instanceof TextNode) { return encodeText(node.data); }
+   const tag = node.tagName.toLowerCase();
+   const attrs = Object.keys(node.attributes).map((k) => ' ' + k + '="' + String(node.attributes[k]).replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '"').join('');
+   if (VOID.has(tag)) { return '<' + tag + attrs + '>'; }
+   return '<' + tag + attrs + '>' + node.childNodes.map(serialize).join('') + '</' + tag + '>';
+}
+
+class Element {
+   constructor(tag) {
+      this.tagName = String(tag).toUpperCase();
+      this.nodeName = this.tagName;
+      this.nodeType = 1;
+      this.attributes = Object.create(null);
+      this.childNodes = [];
+      this.parentNode = null;
+      this.listeners = Object.create(null);
+      this.style = {};
+      this.hidden = false;
+      this.checked = false;
+      this.disabled = false;
+      this.scrollTop = 0;
+      this.scrollHeight = 0;
+      this.focused = 0;
+      this._value = undefined;
+   }
+   get id() { return this.attributes.id || ''; }
+   set id(v) { this.attributes.id = String(v); }
+   get children() { return this.childNodes.filter((n) => n instanceof Element); }
+   get firstChild() { return this.childNodes.length ? this.childNodes[0] : null; }
+   get className() { return this.attributes.class || ''; }
+   set className(v) { this.attributes.class = String(v); }
+   get classList() {
+      const self = this;
+      const parts = () => (self.className ? self.className.split(/\s+/).filter(Boolean) : []);
+      const write = (list) => { self.className = list.join(' '); };
+      return {
+         contains: (c) => parts().indexOf(c) >= 0,
+         add: (c) => { const p = parts(); if (p.indexOf(c) < 0) { p.push(c); write(p); } },
+         remove: (c) => write(parts().filter((x) => x !== c)),
+         toggle: (c, force) => {
+            const on = force === undefined ? parts().indexOf(c) < 0 : !!force;
+            if (on) { const p = parts(); if (p.indexOf(c) < 0) { p.push(c); write(p); } }
+            else { write(parts().filter((x) => x !== c)); }
+            return on;
+         }
+      };
+   }
+   get dataset() {
+      const self = this;
+      const name = (key) => 'data-' + String(key).replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+      return new Proxy({}, {
+         get: (_, key) => (typeof key === 'string' ? self.attributes[name(key)] : undefined),
+         set: (_, key, v) => { self.attributes[name(key)] = String(v); return true; },
+         has: (_, key) => name(key) in self.attributes
+      });
+   }
+   /* A select answers with its selected option, a textarea with its text, and
+      anything assigned wins over both - as in a browser. */
+   get value() {
+      if (this._value !== undefined) { return this._value; }
+      if (this.tagName === 'SELECT') {
+         const options = [];
+         walk(this, (n) => { if (n.tagName === 'OPTION') { options.push(n); } });
+         const chosen = options.filter((o) => 'selected' in o.attributes)[0] || options[0];
+         return chosen ? ('value' in chosen.attributes ? chosen.attributes.value : chosen.textContent) : '';
+      }
+      if (this.tagName === 'TEXTAREA') { return this.textContent; }
+      return 'value' in this.attributes ? this.attributes.value : '';
+   }
+   set value(v) { this._value = String(v); }
+   get textContent() {
+      return this.childNodes.map((n) => (n instanceof Element ? n.textContent : n.data)).join('');
+   }
+   set textContent(v) {
+      this.childNodes.forEach((n) => { n.parentNode = null; });
+      this.childNodes = [];
+      if (v !== '' && v !== null && v !== undefined) { this.appendChild(new TextNode(String(v))); }
+   }
+   get innerHTML() { return this.childNodes.map(serialize).join(''); }
+   set innerHTML(text) {
+      this.childNodes.forEach((n) => { n.parentNode = null; });
+      this.childNodes = [];
+      parseHtml(String(text)).root.childNodes.slice().forEach((n) => this.appendChild(n));
+   }
+   appendChild(child) {
+      if (child.parentNode) { child.parentNode.removeChild(child); }
+      child.parentNode = this;
+      this.childNodes.push(child);
+      return child;
+   }
+   removeChild(child) {
+      const at = this.childNodes.indexOf(child);
+      if (at >= 0) { this.childNodes.splice(at, 1); child.parentNode = null; }
+      return child;
+   }
+   setAttribute(name, value) {
+      this.attributes[name] = String(value);
+      if (name === 'hidden') { this.hidden = true; }
+      if (name === 'value') { this._value = String(value); }
+      if (name === 'type') { this.type = String(value); }
+   }
+   getAttribute(name) { return name in this.attributes ? this.attributes[name] : null; }
+   hasAttribute(name) { return name in this.attributes; }
+   removeAttribute(name) { delete this.attributes[name]; if (name === 'hidden') { this.hidden = false; } }
+   addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); }
+   removeEventListener(type, fn) {
+      const list = this.listeners[type] || [];
+      const at = list.indexOf(fn);
+      if (at >= 0) { list.splice(at, 1); }
+   }
+   dispatchEvent(event) {
+      event.target = event.target || this;
+      let node = this;
+      while (node) {
+         const own = node['on' + event.type];
+         if (typeof own === 'function') { own.call(node, event); }
+         (node.listeners[event.type] || []).slice().forEach((fn) => fn.call(node, event));
+         if (event.propagationStopped) { return !event.defaultPrevented; }
+         node = node.parentNode;
+      }
+      return !event.defaultPrevented;
+   }
+   matches(selector) { return parseSelector(selector).some((chain) => matchesChain(this, chain)); }
+   closest(selector) {
+      let node = this;
+      while (node instanceof Element) {
+         if (node.matches(selector)) { return node; }
+         node = node.parentNode;
+      }
+      return null;
+   }
+   querySelectorAll(selector) {
+      const chains = parseSelector(selector);
+      const found = [];
+      walk(this, (n) => { if (chains.some((chain) => matchesChain(n, chain))) { found.push(n); } });
+      return found;
+   }
+   querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
+   focus() { this.focused += 1; document.activeElement = this; }
+   blur() { }
+   select() { }
+   scrollIntoView() { }
+}
+
+function makeEvent(type, extra) {
+   return Object.assign({
+      type,
+      defaultPrevented: false,
+      propagationStopped: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { this.propagationStopped = true; }
+   }, extra || {});
+}
+
+function parseHtml(text) {
+   const root = new Element('#document-fragment');
+   const stack = [root];
+   let i = 0;
+   const top = () => stack[stack.length - 1];
+   while (i < text.length) {
+      const lt = text.indexOf('<', i);
+      if (lt < 0) {
+         if (i < text.length) { top().appendChild(new TextNode(decodeEntities(text.slice(i)))); }
+         break;
+      }
+      if (lt > i) { top().appendChild(new TextNode(decodeEntities(text.slice(i, lt)))); }
+      if (text.startsWith('<!--', lt)) { i = text.indexOf('-->', lt); i = i < 0 ? text.length : i + 3; continue; }
+      if (text.startsWith('<!', lt)) { i = text.indexOf('>', lt); i = i < 0 ? text.length : i + 1; continue; }
+      const gt = text.indexOf('>', lt);
+      if (gt < 0) { break; }
+      const inside = text.slice(lt + 1, gt);
+      i = gt + 1;
+      if (inside.startsWith('/')) {
+         const name = inside.slice(1).trim().toUpperCase();
+         for (let n = stack.length - 1; n > 0; n -= 1) {
+            if (stack[n].tagName === name) { stack.length = n; break; }
+         }
+         continue;
+      }
+      const nameEnd = inside.search(/[\s/]/);
+      const name = (nameEnd < 0 ? inside : inside.slice(0, nameEnd)).toLowerCase();
+      const element = new Element(name);
+      const attrText = nameEnd < 0 ? '' : inside.slice(nameEnd);
+      const attr = /([:\w-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+      let match;
+      while ((match = attr.exec(attrText)) !== null) {
+         const raw = match[2] !== undefined ? match[2] : match[3] !== undefined ? match[3] : match[4] !== undefined ? match[4] : '';
+         element.attributes[match[1]] = decodeEntities(raw);
+      }
+      if ('hidden' in element.attributes) { element.hidden = true; }
+      if ('checked' in element.attributes) { element.checked = true; }
+      if ('disabled' in element.attributes) { element.disabled = true; }
+      if ('type' in element.attributes) { element.type = element.attributes.type; }
+      if ('style' in element.attributes) {
+         element.attributes.style.split(';').forEach((rule) => {
+            const colon = rule.indexOf(':');
+            if (colon > 0) { element.style[rule.slice(0, colon).trim()] = rule.slice(colon + 1).trim(); }
+         });
+      }
+      top().appendChild(element);
+      if (RAW.has(name)) {
+         const close = text.toLowerCase().indexOf('</' + name, i);
+         const end = close < 0 ? text.length : close;
+         if (end > i) { element.appendChild(new TextNode(text.slice(i, end))); }
+         i = close < 0 ? text.length : text.indexOf('>', close) + 1;
+         continue;
+      }
+      if (!VOID.has(name) && !inside.trim().endsWith('/')) { stack.push(element); }
+   }
+   return { root };
+}
+
+const parsed = parseHtml(fs.readFileSync(pagePath, 'utf8'));
+
+const document = new Element('#document');
+document.hidden = false;
+document.activeElement = null;
+parsed.root.childNodes.slice().forEach((n) => document.appendChild(n));
+document.documentElement = document.querySelector('html');
+document.body = document.querySelector('body');
+if (!document.body) { throw new Error('the page has no <body>'); }
+document.getElementById = function (id) {
+   let found = null;
+   walk(document, (n) => { if (!found && n.attributes.id === id) { found = n; } });
+   return found;
+};
+document.createElement = function (tag) { return new Element(tag); };
+
+/* ------------------------------------------------ timers, storage, the rest */
+
+const timers = [];
+const intervals = [];
+let timerId = 1;
+function fireTimers() {
+   const due = timers.splice(0, timers.length);
+   due.forEach((t) => t.fn());
+   return due.length;
+}
+function fireIntervals() { intervals.slice().forEach((t) => t.fn()); }
+
+function storage() {
+   const store = new Map();
+   return {
+      store,
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+      get length() { return store.size; }
+   };
+}
+const localStorage = storage();
+const sessionStorage = storage();
+
+let clock = 0;
+const performance = { now: () => { clock += 1; return clock; } };
+
+const confirmations = [];
+let confirmAnswer = true;
+const consoleErrors = [];
+let clipboard = null;
+
+/* ------------------------------------------------------- the recorded server */
+
+const requests = [];
+let signedIn = false;
+let otpRequired = false;
+let nextRefusal = null;
+let restartProbes = 0;
+let nextId = 100;
+
+const RULES_POST = 'Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header\'s name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to; reply: from_name, from_address (required), subject, body; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.';
+
+const ROUTE_PROPS = {
+   domain_name: { type: 'string' }, description: { type: 'string' }, target_smtp_host: { type: 'string' },
+   target_smtp_port: { type: 'integer' }, number_of_tries: { type: 'integer' }, minutes_between_try: { type: 'integer' },
+   relayer_requires_authentication: { type: 'boolean' }, relayer_auth_username: { type: 'string' },
+   relayer_auth_password: { type: 'string', writeOnly: true },
+   treat_recipient_as_local_domain: { type: 'boolean' }, treat_security_as_local_domain: { type: 'boolean', deprecated: true },
+   treat_sender_as_local_domain: { type: 'boolean' }, all_addresses: { type: 'boolean' },
+   addresses: { type: 'array', items: { type: 'string' } },
+   connection_security: { type: 'string', enum: ['none', 'starttls_optional', 'starttls_required', 'tls'] }
+};
+const ROUTES_POST = 'Body: domain_name and target_smtp_host (required); target_smtp_port (default 25), number_of_tries (default 3), minutes_between_try (default 10), relayer_requires_authentication (default false, and then relayer_auth_username is required), relayer_auth_username, relayer_auth_password (write-only), treat_recipient_as_local_domain or treat_security_as_local_domain (default false), treat_sender_as_local_domain (default false), all_addresses (default true), addresses (an array of e-mail addresses) and connection_security (default none). Persisted and put into effect exactly as a route saved in the Control Panel is: the next message to the domain uses it. Server-wide; refused for domain-restricted keys.';
+
+const PORT_PROPS = {
+   protocol: { type: 'string', enum: ['smtp', 'pop3', 'imap'] }, address: { type: 'string' }, port: { type: 'integer' },
+   connection_security: { type: 'string', enum: ['none', 'tls', 'starttls_optional', 'starttls_required'] },
+   certificate_id: { type: 'integer' },
+   client_certificate_policy: { type: 'string', enum: ['off', 'request', 'require'] },
+   client_certificate_ca_file: { type: 'string' }
+};
+const PORTS_POST = 'The listeners are created when the server starts, so a port added here takes effect when the server restarts. address defaults to 0.0.0.0, connection_security to none, certificate_id to 0 and client_certificate_policy to off. tls and both starttls values need a certificate_id, and a client certificate policy other than off needs a CA file and a security that runs a handshake - the same refusals the Control Panel meets, in the same words. Server-wide; refused for domain-restricted keys.';
+const PORTS_PUT = 'The whole record, with the fields and defaults of POST: a field left out takes its default, so send back what GET returned with the change made. Takes effect when the server restarts. Server-wide; refused for domain-restricted keys.';
+const PORTS_DELETE = 'The row is gone at once; the listener stays up until the server restarts. Server-wide; refused for domain-restricted keys.';
+const REINITIALIZE = 'What the Control Panel\'s Reinitialize does: every service is stopped, the configuration reloaded and the services started again in the same process, so that a port, a certificate binding or a setting the document marks as taking effect on restart takes effect now. Answers before it happens, because the REST listener itself restarts: poll GET /api/v1/status until it answers again. Server-wide; refused for domain-restricted and read-only keys.';
+
+const CERT_PROPS = {
+   name: { type: 'string' }, certificate_file: { type: 'string' }, private_key_file: { type: 'string' },
+   private_key_password: { type: 'string', writeOnly: true }
+};
+
+function body(props, required) {
+   return { content: { 'application/json': { schema: Object.assign({ type: 'object', properties: props }, required ? { required } : {}) } } };
+}
+
+/* The settings groups, in the shape OpenApiProperties emits them: a type, a
+   description, an enum for a word setting, readOnly for a fact, writeOnly for
+   a secret, and "Takes effect when the server restarts." for a key the running
+   server reads only at start. */
+const SETTING_GROUPS = {
+   '/api/v1/settings': {
+      props: {
+         hostname: { type: 'string', description: 'The name the server gives in its SMTP banner.' },
+         max_message_size_kb: { type: 'integer', description: 'The largest message SMTP and IMAP APPEND accept, in KB; 0 is no limit.' },
+         service_smtp: { type: 'boolean', description: 'Whether the SMTP server runs. Takes effect when the server restarts.' },
+         smtp_relayer_host: { type: 'string', description: 'The smart host every outbound message goes through; empty delivers by MX.' },
+         smtp_relayer_connection_security: { type: 'string', description: 'How the connection to the smart host is secured.', enum: ['none', 'tls', 'starttls_optional', 'starttls_required'] },
+         smtp_relayer_password: { type: 'string', description: 'The password for the smart host. Accepted here and never emitted.', writeOnly: true }
+      },
+      values: { hostname: 'mail.example.com', max_message_size_kb: 10240, service_smtp: true, smtp_relayer_host: '', smtp_relayer_connection_security: 'none' }
+   },
+   '/api/v1/settings/antispam': {
+      props: {
+         spam_mark_threshold: { type: 'integer', description: 'The score at which a message is marked as spam.' },
+         spam_delete_threshold: { type: 'integer', description: 'The score at which a message is deleted.' },
+         use_spf: { type: 'boolean', description: 'Whether SPF is checked.' }
+      },
+      values: { spam_mark_threshold: 5, spam_delete_threshold: 20, use_spf: true }
+   },
+   '/api/v1/settings/logging': {
+      props: {
+         enabled: { type: 'boolean', description: 'Whether anything is logged at all.' },
+         log_smtp: { type: 'boolean', description: 'Whether the SMTP conversations are logged.' },
+         log_directory: { type: 'string', description: 'Where the log files are written.', readOnly: true }
+      },
+      values: { enabled: true, log_smtp: false, log_directory: '/var/log/hmailserver' }
+   }
+};
+const secrets = {};
+
+function settingsPath(path) {
+   return { get: { summary: 'The group', description: 'Every key the PUT lists, as the server holds it now; the write-only ones are left out.' },
+      put: { summary: 'Change the group', description: 'Body: any subset of the writable keys below.', requestBody: body(SETTING_GROUPS[path].props) } };
+}
+
+const spec = {
+   openapi: '3.0.0',
+   paths: {
+      '/api/v1/settings': settingsPath('/api/v1/settings'),
+      '/api/v1/settings/antispam': settingsPath('/api/v1/settings/antispam'),
+      '/api/v1/settings/logging': settingsPath('/api/v1/settings/logging'),
+      '/api/v1/rules': {
+         get: { summary: 'List the global rules with their criteria and actions', description: 'Each entry: id, name, active, all_criteria, criteria (field, header, match, value) and actions (type, value). Server-wide; refused for domain-restricted keys.' },
+         post: { summary: 'Create a global rule', description: RULES_POST, requestBody: body({ name: { type: 'string' } }, ['name']) }
+      },
+      '/api/v1/rules/{id}': { put: { summary: 'Replace a global rule' }, delete: { summary: 'Delete a global rule' } },
+      '/api/v1/routes': {
+         get: { summary: 'List the SMTP routes', description: 'The routes the running server delivers by, as the Control Panel lists them.' },
+         post: { summary: 'Create an SMTP route', description: ROUTES_POST, requestBody: body(ROUTE_PROPS, ['domain_name', 'target_smtp_host']) }
+      },
+      '/api/v1/routes/{id}': {
+         put: { summary: 'Replace an SMTP route', description: 'The whole record, with the same fields, defaults and checks as the create.', requestBody: body(ROUTE_PROPS, ['domain_name', 'target_smtp_host']) },
+         delete: { summary: 'Delete an SMTP route' }
+      },
+      '/api/v1/certificates': {
+         get: { summary: 'List the SSL certificates', description: 'Names and file paths, never a private key password.' },
+         post: { summary: 'Add an SSL certificate', description: 'A name and the paths of a PEM certificate file and its private key file on the server.', requestBody: body(CERT_PROPS, ['name', 'certificate_file', 'private_key_file']) }
+      },
+      '/api/v1/certificates/{id}': { delete: { summary: 'Delete an SSL certificate' } },
+      '/api/v1/ports': {
+         get: { summary: 'List the TCP/IP ports', description: 'Every listener the server is configured with.' },
+         post: { summary: 'Add a TCP/IP port', description: PORTS_POST, requestBody: body(PORT_PROPS, ['protocol', 'port']) }
+      },
+      '/api/v1/ports/{id}': {
+         put: { summary: 'Replace a TCP/IP port', description: PORTS_PUT, requestBody: body(PORT_PROPS, ['protocol', 'port']) },
+         delete: { summary: 'Delete a TCP/IP port', description: PORTS_DELETE }
+      },
+      '/api/v1/server/reinitialize': { post: { summary: 'Restart the services in place', description: REINITIALIZE } }
+   }
+};
+
+const HOSTILE = 'evil<img src=x onerror=alert(1)>.test';
+
+const state = {
+   status: { version: '6.3.3', state: 3, processedMessages: 1234, spamMessages: 56, virusesRemoved: 7, sessions: { smtp: 3, imap: 12, pop3: 1 } },
+   domains: [
+      { name: 'example.com', active: true, postmaster: 'postmaster@example.com' },
+      { name: HOSTILE, active: false, postmaster: '' },
+      { name: 'second.example', active: true, postmaster: '' }
+   ],
+   accounts: {
+      'example.com': [{ address: 'anna@example.com', active: true }, { address: 'bob@example.com', active: false }],
+      [HOSTILE]: [{ address: 'x@' + HOSTILE, active: true }],
+      'second.example': []
+   },
+   queue: [
+      { id: 41, from: 'anna@example.com', recipients: 'far@away.example', next_try: '2026-09-14 10:00:00' },
+      { id: 42, from: 'bob@example.com', recipients: 'gone@nowhere.example', next_try: '2026-09-14 10:05:00' }
+   ],
+   tlsa: { records: [{ record: '_25._tcp.mail.example.com. IN TLSA 3 1 1 0123abcd' }, { record: '_465._tcp.mail.example.com. IN TLSA 3 1 1 0123abcd' }] },
+   rules: [
+      { id: 1, name: 'Spam to junk', active: true, all_criteria: true,
+         criteria: [{ field: 'subject', header: '', match: 'contains', value: '[SPAM]' }],
+         actions: [{ type: 'move_to_folder', folder: 'Junk', value: 'Junk' }] }
+   ],
+   routes: [
+      { id: 5, domain_name: 'partner.example', description: 'The partner', target_smtp_host: 'smtp.partner.example', target_smtp_port: 587,
+         number_of_tries: 3, minutes_between_try: 10, relayer_requires_authentication: true, relayer_auth_username: 'relay',
+         treat_security_as_local_domain: false, treat_recipient_as_local_domain: false, treat_sender_as_local_domain: false,
+         all_addresses: true, connection_security: 'starttls_required', addresses: [] }
+   ],
+   certificates: [{ id: 2, name: 'mail.example.com', certificate_file: '/etc/ssl/mail.pem', private_key_file: '/etc/ssl/mail.key' }],
+   ports: [
+      { id: 1, protocol: 'smtp', address: '0.0.0.0', port: 25, connection_security: 'starttls_optional', certificate_id: 2, client_certificate_policy: 'off', client_certificate_ca_file: '' },
+      { id: 2, protocol: 'imap', address: '0.0.0.0', port: 143, connection_security: 'none', certificate_id: 0, client_certificate_policy: 'off', client_certificate_ca_file: '' }
+   ],
+   logs: [
+      { name: 'hmailserver_2026-09-14.log', size: 2048, created: '2026-09-14 00:00:01' },
+      { name: 'ERROR_hmailserver_2026-09-14.log', size: 10, created: '2026-09-14 00:00:02' }
+   ],
+   logLines: ['"SMTPD" 1 "2026-09-14 09:00:00.000" "127.0.0.1" "SENT: 220 mail.example.com"', '"SMTPD" 1 "2026-09-14 09:00:01.000" "127.0.0.1" "RECEIVED: QUIT"']
+};
+
+function json(status, payload, headers) {
+   return { status, body: payload === undefined ? '' : JSON.stringify(payload), headers: headers || {} };
+}
+function clone(x) { return JSON.parse(JSON.stringify(x)); }
+function segment(path, at) { return decodeURIComponent(path.split('?')[0].split('/')[at]); }
+
+function answer(method, path, headers, raw) {
+   const parsed = raw ? JSON.parse(raw) : null;
+   if (method === 'POST' && path === '/api/v1/session') {
+      if (!headers.Authorization) { return json(401, { error: 'A credential is required.' }, { 'WWW-Authenticate': 'Basic realm="hMailServer"' }); }
+      if (headers.Authorization !== 'Basic ' + Buffer.from('Administrator:a-real-password').toString('base64')) {
+         return json(401, { error: 'The password is wrong.' }, { 'WWW-Authenticate': 'Basic realm="hMailServer"' });
+      }
+      if (otpRequired && headers['X-hMailServer-OTP'] !== '123456') { return json(401, { error: 'A one-time code is required.', second_factor: 'required' }); }
+      signedIn = true;
+      return json(201, { session: true });
+   }
+   if (method === 'DELETE' && path === '/api/v1/session') { signedIn = false; return json(200, { ended: true }); }
+   if (path === '/') { restartProbes += 1; return restartProbes < 3 ? { status: 503, body: '', headers: {} } : { status: 200, body: '<!doctype html>', headers: {} }; }
+   if (!signedIn) { return json(401, { error: 'Not signed in.' }, { 'WWW-Authenticate': 'Basic realm="hMailServer"' }); }
+   if (method !== 'GET' && headers['X-Requested-With'] !== 'hMailServer') { return json(403, { error: 'A write from a browser session must carry X-Requested-With.' }); }
+   if (method !== 'GET' && nextRefusal) { const sentence = nextRefusal; nextRefusal = null; return json(400, { error: sentence }); }
+
+   if (path === '/api/v1/status') { return json(200, state.status); }
+   if (path === '/api/v1/openapi.json') { return json(200, spec); }
+
+   if (path === '/api/v1/domains' && method === 'GET') { return json(200, state.domains); }
+   if (/^\/api\/v1\/domains\/[^/]+\/accounts$/.test(path)) {
+      const domain = segment(path, 4);
+      if (!(domain in state.accounts)) { return json(404, { error: 'domain not found' }); }
+      if (method === 'GET') { return json(200, state.accounts[domain]); }
+      if (method === 'POST') {
+         state.accounts[domain].push({ address: parsed.address, active: true });
+         return json(201, { address: parsed.address, active: true });
+      }
+   }
+   if (/^\/api\/v1\/accounts\/[^/]+$/.test(path) && method === 'DELETE') {
+      const address = segment(path, 4);
+      Object.keys(state.accounts).forEach((d) => { state.accounts[d] = state.accounts[d].filter((a) => a.address !== address); });
+      return json(200, { deleted: true });
+   }
+
+   if (path === '/api/v1/queue' && method === 'GET') { return json(200, { messages: state.queue }); }
+   if (/^\/api\/v1\/queue\/\d+\/retry$/.test(path) && method === 'POST') { return json(200, { rescheduled: true }); }
+   if (/^\/api\/v1\/queue\/\d+$/.test(path) && method === 'DELETE') {
+      const id = Number(segment(path, 4));
+      state.queue = state.queue.filter((m) => m.id !== id);
+      return json(200, { deleted: true });
+   }
+
+   if (path === '/api/v1/tlsa') { return json(200, state.tlsa); }
+
+   if (path in SETTING_GROUPS) {
+      const group = SETTING_GROUPS[path];
+      if (method === 'GET') { return json(200, group.values); }
+      if (method === 'PUT') {
+         for (const key of Object.keys(parsed)) {
+            if (!(key in group.props)) { return json(400, { error: 'unknown key: ' + key }); }
+            if (group.props[key].readOnly) { return json(400, { error: key + ' is read-only' }); }
+            if (group.props[key].writeOnly) { secrets[key] = parsed[key]; continue; }
+            group.values[key] = parsed[key];
+         }
+         return json(200, group.values);
+      }
+   }
+
+   if (path === '/api/v1/rules' && method === 'GET') { return json(200, state.rules); }
+   if (path === '/api/v1/rules' && method === 'POST') {
+      const rule = Object.assign({ id: nextId++ }, parsed);
+      state.rules.push(rule);
+      return json(201, rule);
+   }
+   if (/^\/api\/v1\/rules\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.rules.findIndex((r) => r.id === id);
+      if (at < 0) { return json(404, { error: 'No global rule with that id' }); }
+      if (method === 'PUT') { state.rules[at] = Object.assign({ id }, parsed); return json(200, state.rules[at]); }
+      if (method === 'DELETE') { state.rules.splice(at, 1); return json(200, { deleted: true }); }
+   }
+
+   if (path === '/api/v1/routes' && method === 'GET') { return json(200, state.routes); }
+   if (path === '/api/v1/routes' && method === 'POST') {
+      const route = Object.assign({ id: nextId++, addresses: [] }, parsed);
+      delete route.relayer_auth_password;
+      state.routes.push(route);
+      return json(201, route);
+   }
+   if (/^\/api\/v1\/routes\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.routes.findIndex((r) => r.id === id);
+      if (at < 0) { return json(404, { error: 'Unknown id' }); }
+      if (method === 'PUT') {
+         const route = Object.assign({ id, addresses: [] }, parsed);
+         delete route.relayer_auth_password;
+         state.routes[at] = route;
+         return json(200, route);
+      }
+      if (method === 'DELETE') { state.routes.splice(at, 1); return json(200, { deleted: true }); }
+   }
+
+   if (path === '/api/v1/certificates' && method === 'GET') { return json(200, state.certificates); }
+   if (path === '/api/v1/certificates' && method === 'POST') {
+      const cert = { id: nextId++, name: parsed.name, certificate_file: parsed.certificate_file, private_key_file: parsed.private_key_file };
+      if (parsed.private_key_password !== undefined) { secrets.private_key_password = parsed.private_key_password; }
+      state.certificates.push(cert);
+      return json(201, cert);
+   }
+   if (/^\/api\/v1\/certificates\/\d+$/.test(path) && method === 'DELETE') {
+      const id = Number(segment(path, 4));
+      if (state.ports.some((p) => p.certificate_id === id)) { return json(409, { error: 'The certificate is bound by port ' + state.ports.filter((p) => p.certificate_id === id)[0].id + '. Delete or rebind the port first.' }); }
+      state.certificates = state.certificates.filter((c) => c.id !== id);
+      return json(200, { deleted: true });
+   }
+
+   if (path === '/api/v1/ports' && method === 'GET') { return json(200, state.ports); }
+   if (path === '/api/v1/ports' && method === 'POST') {
+      const port = Object.assign({ id: nextId++, address: '0.0.0.0', connection_security: 'none', certificate_id: 0, client_certificate_policy: 'off', client_certificate_ca_file: '' }, parsed);
+      state.ports.push(port);
+      return json(201, port);
+   }
+   if (/^\/api\/v1\/ports\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.ports.findIndex((p) => p.id === id);
+      if (at < 0) { return json(404, { error: 'Unknown id' }); }
+      if (method === 'PUT') { state.ports[at] = Object.assign({ id, address: '0.0.0.0', connection_security: 'none', certificate_id: 0, client_certificate_policy: 'off', client_certificate_ca_file: '' }, parsed); return json(200, state.ports[at]); }
+      if (method === 'DELETE') { state.ports.splice(at, 1); return json(200, { deleted: true }); }
+   }
+   if (path === '/api/v1/server/reinitialize' && method === 'POST') { return json(202, { reinitializing: true }); }
+
+   if (path === '/api/v1/logs' && method === 'GET') { return json(200, state.logs); }
+   if (/^\/api\/v1\/logs\/[^/]+/.test(path) && method === 'GET') {
+      const name = segment(path, 4);
+      // A file that was in the listing a moment ago and has been rotated away
+      // since: listed, and then not there to read.
+      if (name === 'gone.log' || !state.logs.some((l) => l.name === name)) { return json(404, { error: 'No such log file' }); }
+      const lines = Number((/lines=(\d+)/.exec(path) || [0, 200])[1]);
+      return json(200, { lines: state.logLines.slice(-lines) });
+   }
+
+   return json(404, { error: 'No such route: ' + method + ' ' + path });
+}
+
+function fetchStub(path, options) {
+   const method = (options && options.method) || 'GET';
+   const headers = (options && options.headers) || {};
+   requests.push({ method, path, headers, body: options && options.body, credentials: options && options.credentials });
+   const reply = answer(method, path, headers, options && options.body);
+   return Promise.resolve({
+      status: reply.status,
+      ok: reply.status >= 200 && reply.status < 300,
+      headers: { get: (name) => (name in reply.headers ? reply.headers[name] : null) },
+      text: () => Promise.resolve(reply.body)
+   });
+}
+
+/* ------------------------------------------------------------ the assertions */
+
+const failures = [];
+let checks = 0;
+function check(what, ok, detail) {
+   checks += 1;
+   if (!ok) { failures.push(what + (detail ? ' -- ' + detail : '')); }
+}
+function since(n) { return requests.slice(n); }
+function called(from, method, pattern) {
+   return since(from).filter((r) => r.method === method && (typeof pattern === 'string' ? r.path === pattern : pattern.test(r.path)));
+}
+function paths(from) { return JSON.stringify(since(from).map((r) => r.method + ' ' + r.path)); }
+const flush = async () => { for (let i = 0; i < 60; i += 1) { await new Promise((r) => setImmediate(r)); } };
+
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => document.querySelectorAll(s);
+const content = () => $('#content');
+function click(el) { if (!el) { throw new Error('nothing to click'); } el.dispatchEvent(makeEvent('click')); }
+function act(name, attrs) {
+   const all = content().querySelectorAll('button[data-act="' + name + '"]');
+   const hit = all.filter((b) => !attrs || Object.keys(attrs).every((k) => b.attributes['data-' + k] === String(attrs[k])))[0];
+   if (!hit) { throw new Error('the view has no button data-act="' + name + '"' + (attrs ? ' with ' + JSON.stringify(attrs) : '') + '; it has ' + JSON.stringify(all.map((b) => b.attributes))); }
+   return hit;
+}
+async function goTo(view) {
+   const button = $('#nav button[data-view="' + view + '"]');
+   if (!button) { throw new Error('the sidebar has no view ' + view); }
+   click(button);
+   await flush();
+}
+function rows() { return content().querySelectorAll('tbody tr'); }
+function setValue(id, value) { const el = document.getElementById(id); if (!el) { throw new Error('no control #' + id); } el.value = value; return el; }
+function setChecked(id, on) { const el = document.getElementById(id); if (!el) { throw new Error('no control #' + id); } el.checked = on; return el; }
+function lastBody(from, method, pattern) { const list = called(from, method, pattern); return list.length ? JSON.parse(list[list.length - 1].body) : null; }
+function toastText() { return $('#toast').textContent; }
+
+/* ------------------------------------------------------------------ the run */
+
+// Node has globals of its own with these names (navigator, localStorage,
+// fetch, performance), some of them getter-only, so each one is defined over
+// rather than assigned: the script must see this file's world and nothing of
+// node's.
+const world = {
+   document, localStorage, sessionStorage, performance,
+   fetch: fetchStub,
+   setTimeout: (fn, ms) => { const id = timerId++; timers.push({ id, fn, ms }); return id; },
+   clearTimeout: (id) => { const at = timers.findIndex((t) => t.id === id); if (at >= 0) { timers.splice(at, 1); } },
+   setInterval: (fn, ms) => { const id = timerId++; intervals.push({ id, fn, ms }); return id; },
+   clearInterval: (id) => { const at = intervals.findIndex((t) => t.id === id); if (at >= 0) { intervals.splice(at, 1); } },
+   requestAnimationFrame: (fn) => { fn(performance.now() + 5000); return 1; },
+   confirm: (question) => { confirmations.push(question); return confirmAnswer; },
+   navigator: { clipboard: { writeText: (text) => { clipboard = text; return Promise.resolve(); } } },
+   console: { error: (...args) => consoleErrors.push(args), log: () => { }, warn: () => { } }
+};
+Object.keys(world).forEach((name) => {
+   Object.defineProperty(globalThis, name, { value: world[name], writable: true, configurable: true });
+});
+
+async function signIn() {
+   $('#user').value = 'Administrator';
+   $('#pass').value = 'a-real-password';
+   $('#loginForm').dispatchEvent(makeEvent('submit'));
+   await flush();
+}
+
+async function main() {
+   vm.runInThisContext(fs.readFileSync(scriptPath, 'utf8'), { filename: 'deck.js' });
+   await flush();
+
+   // ---- a first visit: the sign-in card, and not one request
+   check('a first visit shows the sign-in card', $('#gate').style.display !== 'none' && $('#app').style.display === 'none',
+      'gate=' + $('#gate').style.display + ' app=' + $('#app').style.display);
+   check('and asks the server nothing before there is a session', requests.length === 0, paths(0));
+   check('the theme starts dark and is the body\'s attribute', document.body.getAttribute('data-theme') === 'dark');
+
+   // ---- a wrong password is the server's sentence
+   $('#user').value = 'Administrator';
+   $('#pass').value = 'wrong';
+   $('#loginForm').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('a refused sign-in shows the server\'s own sentence', $('#loginErr').textContent === 'The password is wrong.', $('#loginErr').textContent);
+   check('and the app stays hidden', $('#app').style.display === 'none');
+
+   // ---- a second factor, when the credential has one
+   otpRequired = true;
+   $('#pass').value = 'a-real-password';
+   $('#loginForm').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('a credential with a second factor makes the code field appear', $('#otp').hidden === false && $('#loginErr').textContent.indexOf('one-time code') >= 0,
+      'otp.hidden=' + $('#otp').hidden + ' err=' + $('#loginErr').textContent);
+   check('the password is still there for the second attempt', $('#pass').value === 'a-real-password');
+   $('#otp').value = '123456';
+   $('#loginForm').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('the code goes in its own header', requests.filter((r) => r.headers['X-hMailServer-OTP'] === '123456').length === 1);
+   otpRequired = false;
+
+   // ---- signed in
+   const withAuth = requests.filter((r) => r.headers && r.headers.Authorization);
+   check('the password went only to the session route', withAuth.every((r) => r.method === 'POST' && r.path === '/api/v1/session'),
+      JSON.stringify(withAuth.map((r) => r.method + ' ' + r.path)));
+   check('the password field is emptied once a session exists', $('#pass').value === '' && $('#otp').value === '' && $('#otp').hidden === true);
+   check('nothing secret is stored in the browser',
+      [...localStorage.store.values(), ...sessionStorage.store.values()].every((v) => v.indexOf('a-real-password') < 0 && v.indexOf('123456') < 0) &&
+      [...localStorage.store.keys(), ...sessionStorage.store.keys()].every((k) => !/pass|token|secret|auth/i.test(k)),
+      JSON.stringify([...sessionStorage.store.entries()]));
+   check('a mark says this tab has a session, so a reload asks the server instead of showing the card', sessionStorage.getItem('hmsSession') === '1');
+   check('the app is shown and the card is not', $('#app').style.display === 'flex' && $('#gate').style.display === 'none');
+   check('the version comes from the status', $('#ver').textContent === '6.3.3', $('#ver').textContent);
+   check('every write carries the header the server demands of a browser session',
+      requests.filter((r) => r.method !== 'GET' && r.method !== 'HEAD').every((r) => r.headers['X-Requested-With'] === 'hMailServer'));
+   check('every request is same-origin, with the cookie and nothing else',
+      requests.filter((r) => r.path !== '/').every((r) => r.credentials === 'same-origin'));
+
+   // ---- the dashboard
+   const locale = (n) => n.toLocaleString();
+   check('the dashboard shows the messages processed', $('#kpiProcessed').textContent === locale(1234), $('#kpiProcessed').textContent);
+   check('the spam and virus counts', $('#kpiSpam').textContent === locale(56) && $('#kpiVirus').textContent === locale(7));
+   check('the state as a badge', $('#kpiState').textContent === 'Running' && $('#kpiState').querySelector('.badge.good') !== null, $('#kpiState').innerHTML);
+   check('the live sessions', $('#sesSmtp').textContent === '3' && $('#sesImap').textContent === '12' && $('#sesPop3').textContent === '1');
+   check('the dashboard polls on an interval', intervals.length === 1 && intervals[0].ms === 3000, intervals.length + ' intervals');
+   const tile = $('#kpiProcessed');
+   const beforePoll = requests.length;
+   state.status.processedMessages = 1300;
+   state.status.state = 4;
+   fireIntervals();
+   await flush();
+   check('the poll reads the status again', called(beforePoll, 'GET', '/api/v1/status').length === 1, paths(beforePoll));
+   check('and updates the tiles in place rather than redrawing the view', $('#kpiProcessed') === tile && tile.textContent === locale(1300), tile.textContent);
+   check('a state other than running is a warning', $('#kpiState').querySelector('.badge.warn') !== null && $('#kpiState').textContent === 'Stopping', $('#kpiState').textContent);
+   state.status.state = 3;
+
+   // ---- domains
+   let before = requests.length;
+   await goTo('domains');
+   check('the domains view reads the domains', called(before, 'GET', '/api/v1/domains').length === 1, paths(before));
+   check('the title follows the view', $('#viewTitle').textContent === 'Domains');
+   check('the sidebar marks the view', $('#nav button[data-view="domains"]').classList.contains('on') && !$('#nav button[data-view="dash"]').classList.contains('on'));
+   check('one row per domain', rows().length === 3, rows().length + ' rows');
+   check('an inactive domain says so', rows()[1].textContent.indexOf('Disabled') >= 0 && rows()[0].textContent.indexOf('Active') >= 0);
+   check('a hostile domain name is text, never markup', content().querySelectorAll('img').length === 0 && rows()[1].textContent.indexOf(HOSTILE) >= 0,
+      rows()[1].innerHTML);
+   check('the poll is not running away from the dashboard', (() => { const n = requests.length; fireIntervals(); return requests.length === n; })());
+
+   before = requests.length;
+   click(act('accounts', { domain: HOSTILE }));
+   await flush();
+   check('the accounts button carries the name as data, and the request encodes it',
+      called(before, 'GET', '/api/v1/domains/' + encodeURIComponent(HOSTILE) + '/accounts').length === 1, paths(before));
+   check('the accounts are listed', rows().length === 1 && rows()[0].textContent.indexOf('x@' + HOSTILE) >= 0, rows().length + ' rows');
+   click(act('domains'));
+   await flush();
+   click(act('accounts', { domain: 'example.com' }));
+   await flush();
+   check('two accounts in example.com', rows().length === 2 && rows()[1].textContent.indexOf('Disabled') >= 0);
+
+   before = requests.length;
+   click(act('add', { domain: 'example.com' }));
+   await flush();
+   check('an empty form is refused by the page, not the server', called(before, 'POST', /accounts/).length === 0 && $('#err_account').textContent.length > 0, $('#err_account').textContent);
+   setValue('newAddr', 'carla@example.com');
+   setValue('newPass', 'pw-for-carla');
+   before = requests.length;
+   click(act('add', { domain: 'example.com' }));
+   await flush();
+   const created = lastBody(before, 'POST', '/api/v1/domains/example.com/accounts');
+   check('creating an account posts the address and the password', !!created && created.address === 'carla@example.com' && created.password === 'pw-for-carla' && Object.keys(created).length === 2,
+      JSON.stringify(created));
+   check('and the listing is read again', called(before, 'GET', '/api/v1/domains/example.com/accounts').length === 1, paths(before));
+   check('so the new account is in it', rows().length === 3 && rows()[2].textContent.indexOf('carla@example.com') >= 0);
+   check('and the toast says so', toastText().indexOf('carla@example.com') >= 0, toastText());
+
+   nextRefusal = 'The address is already taken by an alias.';
+   setValue('newAddr', 'dupe@example.com');
+   setValue('newPass', 'x');
+   click(act('add', { domain: 'example.com' }));
+   await flush();
+   check('a refusal is shown beside the form in the server\'s words', $('#err_account').textContent === 'The address is already taken by an alias.', $('#err_account').textContent);
+   check('and went to the console with the whole exchange', consoleErrors.length > 0 && JSON.stringify(consoleErrors[consoleErrors.length - 1]).indexOf('400') >= 0);
+
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('del', { address: 'bob@example.com' }));
+   await flush();
+   check('deleting asks first, and no means nothing is sent', confirmations[confirmations.length - 1].indexOf('bob@example.com') >= 0 && called(before, 'DELETE', /accounts/).length === 0,
+      paths(before));
+   confirmAnswer = true;
+   click(act('del', { address: 'bob@example.com' }));
+   await flush();
+   check('yes deletes by address', called(before, 'DELETE', '/api/v1/accounts/bob%40example.com').length === 1, paths(before));
+   check('and the listing is read again without the account', rows().length === 2 && rows().every((r) => r.textContent.indexOf('bob@') < 0));
+
+   // ---- the delivery queue
+   before = requests.length;
+   await goTo('queue');
+   check('the queue is read', called(before, 'GET', '/api/v1/queue').length === 1);
+   check('one row per queued message with its recipients and next try', rows().length === 2 && rows()[0].textContent.indexOf('far@away.example') >= 0 && rows()[0].textContent.indexOf('2026-09-14 10:00:00') >= 0);
+   before = requests.length;
+   click(act('retry', { id: 41 }));
+   await flush();
+   check('Retry now posts to the message\'s retry route and re-reads', called(before, 'POST', '/api/v1/queue/41/retry').length === 1 && called(before, 'GET', '/api/v1/queue').length === 1, paths(before));
+   nextRefusal = 'The message is being delivered right now.';
+   click(act('retry', { id: 42 }));
+   await flush();
+   check('a refused retry is shown on its own row', document.getElementById('err_queue_42').textContent === 'The message is being delivered right now.');
+   before = requests.length;
+   click(act('delmsg', { id: 41 }));
+   await flush();
+   check('Delete confirms, deletes and re-reads', confirmations[confirmations.length - 1].indexOf('41') >= 0 && called(before, 'DELETE', '/api/v1/queue/41').length === 1 && rows().length === 1);
+
+   // ---- DANE / TLSA
+   before = requests.length;
+   await goTo('tlsa');
+   check('the TLSA view reads the records', called(before, 'GET', '/api/v1/tlsa').length === 1);
+   check('and shows them one per line', $('#tlsaPre').textContent === state.tlsa.records.map((r) => r.record).join('\n'), $('#tlsaPre').textContent);
+   click(act('copy'));
+   await flush();
+   check('Copy all puts the block on the clipboard', clipboard === $('#tlsaPre').textContent);
+
+   // ---- settings, drawn from the OpenAPI document
+   before = requests.length;
+   await goTo('settings');
+   check('the settings view reads the document and the three groups',
+      called(before, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging'].every((p) => called(before, 'GET', p).length === 1),
+      paths(before));
+   check('a string is a text box with the value', document.getElementById('set_srv_hostname').type === 'text' && document.getElementById('set_srv_hostname').value === 'mail.example.com');
+   check('an integer is a number box', document.getElementById('set_srv_max_message_size_kb').type === 'number' && document.getElementById('set_srv_max_message_size_kb').value === '10240');
+   check('a boolean is a checkbox in its state', document.getElementById('set_srv_service_smtp').type === 'checkbox' && document.getElementById('set_srv_service_smtp').checked === true &&
+      document.getElementById('set_log_log_smtp').checked === false);
+   const words = document.getElementById('set_srv_smtp_relayer_connection_security');
+   check('an enumeration is a select with the document\'s words', words.tagName === 'SELECT' && words.querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'none,tls,starttls_optional,starttls_required' && words.value === 'none',
+      words ? words.innerHTML : 'none');
+   const secret = document.getElementById('set_srv_smtp_relayer_password');
+   check('a write-only key is a password box, empty, marked write-only', secret.type === 'password' && secret.value === '' && secret.closest('.fr').textContent.indexOf('write-only') >= 0);
+   check('a read-only key is shown and has no control', document.getElementById('set_log_log_directory') === null && content().textContent.indexOf('/var/log/hmailserver') >= 0 &&
+      $$('.fr').filter((r) => r.textContent.indexOf('log_directory') >= 0)[0].textContent.indexOf('read-only') >= 0);
+   check('a key that waits for a restart is marked', document.getElementById('set_srv_service_smtp').closest('.fr').textContent.indexOf('restart') >= 0 &&
+      document.getElementById('set_srv_hostname').closest('.fr').querySelector('.badge.warn') === null);
+   check('the description is the hint', document.getElementById('set_srv_hostname').closest('.fr').textContent.indexOf('SMTP banner') >= 0);
+
+   before = requests.length;
+   click(act('setsave', { group: 'srv' }));
+   await flush();
+   check('saving with nothing changed sends nothing', called(before, 'PUT', /settings/).length === 0 && toastText() === 'Nothing changed', toastText());
+   setValue('set_srv_max_message_size_kb', '20480');
+   before = requests.length;
+   click(act('setsave', { group: 'srv' }));
+   await flush();
+   let put = lastBody(before, 'PUT', '/api/v1/settings');
+   check('saving sends only the key that changed, as a number', !!put && JSON.stringify(put) === '{"max_message_size_kb":20480}', JSON.stringify(put));
+   check('then reads the groups again', called(before, 'GET', '/api/v1/settings').length === 1);
+   check('and the control shows what the server holds', document.getElementById('set_srv_max_message_size_kb').value === '20480' && toastText() === '1 setting saved', toastText());
+   setValue('set_srv_smtp_relayer_password', 'hunter2');
+   setChecked('set_srv_service_smtp', false);
+   before = requests.length;
+   click(act('setsave', { group: 'srv' }));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/settings');
+   check('a filled password goes with the change, and nothing unchanged', !!put && put.smtp_relayer_password === 'hunter2' && put.service_smtp === false && Object.keys(put).length === 2, JSON.stringify(put));
+   check('the password box is empty again after the re-read', document.getElementById('set_srv_smtp_relayer_password').value === '' && document.getElementById('set_srv_service_smtp').checked === false);
+   setValue('set_spam_spam_mark_threshold', 'five');
+   before = requests.length;
+   click(act('setsave', { group: 'spam' }));
+   await flush();
+   check('a number that is not a number is refused by the page', called(before, 'PUT', /antispam/).length === 0 && document.getElementById('err_set_spam').textContent.indexOf('whole number') >= 0,
+      document.getElementById('err_set_spam').textContent);
+   setValue('set_spam_spam_mark_threshold', '7');
+   nextRefusal = 'The delete threshold must be above the mark threshold.';
+   click(act('setsave', { group: 'spam' }));
+   await flush();
+   check('a refusal is the server\'s sentence beside the group', document.getElementById('err_set_spam').textContent === 'The delete threshold must be above the mark threshold.');
+   const filter = $('#setFilter');
+   filter.value = 'relayer';
+   filter.dispatchEvent(makeEvent('input'));
+   check('the filter hides the rows that do not match', document.getElementById('set_srv_hostname').closest('.fr').hidden === true && document.getElementById('set_srv_smtp_relayer_host').closest('.fr').hidden === false);
+   filter.value = '';
+   filter.dispatchEvent(makeEvent('input'));
+   check('and clearing it shows them again', document.getElementById('set_srv_hostname').closest('.fr').hidden === false);
+
+   // ---- rules
+   before = requests.length;
+   await goTo('rules');
+   check('the rules view reads the rules and the routes, and the document once only', called(before, 'GET', '/api/v1/rules').length === 1 && called(before, 'GET', '/api/v1/routes').length === 1 &&
+      called(0, 'GET', '/api/v1/openapi.json').length === 1, paths(before));
+   check('a rule row says when and then', rows().length === 1 && rows()[0].textContent.indexOf('Subject contains') >= 0 && rows()[0].textContent.indexOf('[SPAM]') >= 0 && rows()[0].textContent.indexOf('Junk') >= 0,
+      rows()[0].textContent);
+   click(act('rulenew'));
+   await flush();
+   check('New rule opens an empty editor', $('#ruleName') !== null && $('#ruleName').value === '' && $('#ruleActive').checked === true && content().querySelectorAll('[data-r="crit-field"]').length === 0);
+   click(act('critadd'));
+   await flush();
+   const field = content().querySelector('[data-r="crit-field"]');
+   check('a criterion\'s fields are the words of the document\'s sentence', field !== null && field.querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'from,to,cc,subject,body,message_size,recipient_list,delivery_attempts,header',
+      field ? field.innerHTML : 'none');
+   check('and its matches', content().querySelector('[data-r="crit-match"]').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'equals,not_equals,contains,not_contains,less_than,greater_than,regex,wildcard');
+   check('the header name is hidden until the field is header', content().querySelector('[data-r="crit-header"]').hidden === true);
+   field.value = 'header';
+   field.dispatchEvent(makeEvent('change'));
+   await flush();
+   check('choosing header shows the header name', content().querySelector('[data-r="crit-header"]').hidden === false);
+   content().querySelector('[data-r="crit-header"]').value = 'X-Spam-Flag';
+   content().querySelector('[data-r="crit-match"]').value = 'equals';
+   content().querySelector('[data-r="crit-value"]').value = 'YES';
+   click(act('actadd'));
+   await flush();
+   const type = content().querySelector('[data-r="act-type"]');
+   check('an action\'s types are the document\'s', type !== null && type.querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'forward,reply,move_to_folder,script_function,set_header,send_using_route,bind_to_address,delete,stop,copy',
+      type ? type.innerHTML : 'none');
+   type.value = 'send_using_route';
+   type.dispatchEvent(makeEvent('change'));
+   await flush();
+   const routeChoice = content().querySelector('[data-r="act-route_id"]');
+   check('send_using_route offers the routes by name', routeChoice !== null && routeChoice.tagName === 'SELECT' && routeChoice.textContent.indexOf('partner.example') >= 0, routeChoice ? routeChoice.innerHTML : 'none');
+   routeChoice.value = '5';
+   $('#ruleName').value = 'Flagged via partner';
+   $('#ruleAll').value = 'any';
+   before = requests.length;
+   click(act('rulesave'));
+   await flush();
+   let posted = lastBody(before, 'POST', '/api/v1/rules');
+   check('saving a new rule posts the shape the route takes', !!posted && posted.name === 'Flagged via partner' && posted.active === true && posted.all_criteria === false &&
+      JSON.stringify(posted.criteria) === '[{"field":"header","match":"equals","value":"YES","header":"X-Spam-Flag"}]' &&
+      JSON.stringify(posted.actions) === '[{"type":"send_using_route","route_id":5}]', JSON.stringify(posted));
+   check('and returns to the re-read list with the new rule', called(before, 'GET', '/api/v1/rules').length === 1 && rows().length === 2 && rows()[1].textContent.indexOf('Flagged via partner') >= 0);
+   click(act('ruleedit', { id: 1 }));
+   await flush();
+   check('editing shows the rule\'s own values', $('#ruleName').value === 'Spam to junk' && content().querySelector('[data-r="crit-value"]').value === '[SPAM]' && content().querySelector('[data-r="act-folder"]').value === 'Junk');
+   $('#ruleName').value = 'Spam to Junk folder';
+   nextRefusal = 'A rule named that already exists.';
+   before = requests.length;
+   click(act('rulesave'));
+   await flush();
+   check('a refused save keeps the editor open with the server\'s sentence', $('#ruleName') !== null && document.getElementById('err_ruleedit').textContent === 'A rule named that already exists.');
+   click(act('rulesave'));
+   await flush();
+   const replaced = lastBody(before, 'PUT', '/api/v1/rules/1');
+   check('saving an existing rule PUTs it by id', !!replaced && replaced.name === 'Spam to Junk folder' && JSON.stringify(replaced.actions) === '[{"type":"move_to_folder","folder":"Junk"}]', JSON.stringify(replaced));
+   check('the list shows the new name', rows()[0].textContent.indexOf('Spam to Junk folder') >= 0);
+   before = requests.length;
+   click(act('ruledel', { id: 1 }));
+   await flush();
+   check('deleting a rule names it in the question and deletes by id', confirmations[confirmations.length - 1].indexOf('Spam to Junk folder') >= 0 && called(before, 'DELETE', '/api/v1/rules/1').length === 1 && rows().length === 1);
+   click(act('rulenew'));
+   await flush();
+   click(act('cancel'));
+   await flush();
+   check('Cancel returns to the list', $('#ruleName') === null && rows().length === 1);
+
+   // ---- routes
+   before = requests.length;
+   await goTo('routes');
+   check('the routes view reads the routes', called(before, 'GET', '/api/v1/routes').length === 1 && rows().length === 1);
+   check('a route row shows the target, its security and its authentication', rows()[0].textContent.indexOf('smtp.partner.example:587') >= 0 && rows()[0].textContent.indexOf('relay') >= 0 && rows()[0].textContent.indexOf('every recipient') >= 0,
+      rows()[0].textContent);
+   click(act('routenew'));
+   await flush();
+   check('a new route starts at the defaults the document states', document.getElementById('route_target_smtp_port').value === '25' && document.getElementById('route_number_of_tries').value === '3' &&
+      document.getElementById('route_all_addresses').checked === true && document.getElementById('route_relayer_requires_authentication').checked === false && document.getElementById('route_connection_security').value === 'none',
+      'port=' + document.getElementById('route_target_smtp_port').value + ' all=' + document.getElementById('route_all_addresses').checked);
+   check('the COM spelling of the recipient flag is not drawn twice', document.getElementById('route_treat_security_as_local_domain') === null && document.getElementById('route_treat_recipient_as_local_domain') !== null);
+   check('the required keys are marked', document.getElementById('route_domain_name').closest('.fr').textContent.indexOf('required') >= 0 && document.getElementById('route_description').closest('.fr').textContent.indexOf('required') < 0);
+   setValue('route_domain_name', 'other.example');
+   setValue('route_target_smtp_host', 'mx.other.example');
+   setChecked('route_all_addresses', false);
+   setValue('route_addresses', 'a@other.example\n\nb@other.example\n');
+   before = requests.length;
+   click(act('routesave'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/routes');
+   check('saving a new route posts the form with the defaults, the list as an array, and no password', !!posted && posted.domain_name === 'other.example' && posted.target_smtp_port === 25 && posted.all_addresses === false &&
+      JSON.stringify(posted.addresses) === '["a@other.example","b@other.example"]' && !('relayer_auth_password' in posted) && !('treat_security_as_local_domain' in posted), JSON.stringify(posted));
+   check('and the re-read list has it', rows().length === 2 && rows()[1].textContent.indexOf('2 addresses') >= 0, rows().map((r) => r.textContent).join(' | '));
+   click(act('routeedit', { id: 5 }));
+   await flush();
+   check('editing a route shows its values and an empty password box', document.getElementById('route_target_smtp_host').value === 'smtp.partner.example' && document.getElementById('route_relayer_auth_password').value === '' &&
+      document.getElementById('route_connection_security').value === 'starttls_required');
+   setValue('route_relayer_auth_password', 'new-secret');
+   before = requests.length;
+   click(act('routesave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/routes/5');
+   check('saving an existing route PUTs the whole record with the new password', !!put && put.relayer_auth_password === 'new-secret' && put.target_smtp_host === 'smtp.partner.example' && put.relayer_requires_authentication === true, JSON.stringify(put));
+   before = requests.length;
+   click(act('routedel', { id: 5 }));
+   await flush();
+   check('deleting a route names its domain and deletes by id', confirmations[confirmations.length - 1].indexOf('partner.example') >= 0 && called(before, 'DELETE', '/api/v1/routes/5').length === 1 && rows().length === 1);
+
+   // ---- certificates
+   before = requests.length;
+   await goTo('certs');
+   check('the certificates view reads the certificates', called(before, 'GET', '/api/v1/certificates').length === 1 && rows().length === 1 && rows()[0].textContent.indexOf('/etc/ssl/mail.pem') >= 0);
+   check('the form has the document\'s keys and its password box is empty', document.getElementById('cert_name') !== null && document.getElementById('cert_private_key_password').type === 'password' && document.getElementById('cert_private_key_password').value === '');
+   setValue('cert_name', 'second');
+   setValue('cert_certificate_file', '/etc/ssl/second.pem');
+   setValue('cert_private_key_file', '/etc/ssl/second.key');
+   before = requests.length;
+   click(act('certadd'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/certificates');
+   check('adding a certificate posts the paths and no password when none was typed', !!posted && JSON.stringify(posted) === '{"name":"second","certificate_file":"/etc/ssl/second.pem","private_key_file":"/etc/ssl/second.key"}', JSON.stringify(posted));
+   check('and the re-read list shows it', rows().length === 2 && rows()[1].textContent.indexOf('second') >= 0);
+   before = requests.length;
+   click(act('certdel', { id: 2 }));
+   await flush();
+   check('a certificate a port binds is refused, in the server\'s words, on its row', called(before, 'DELETE', '/api/v1/certificates/2').length === 1 && document.getElementById('err_cert_2').textContent.indexOf('bound by port 1') >= 0,
+      document.getElementById('err_cert_2').textContent);
+   const newCert = state.certificates[1].id;
+   click(act('certdel', { id: newCert }));
+   await flush();
+   check('an unbound one is deleted and gone from the re-read list', rows().length === 1);
+
+   // ---- ports
+   before = requests.length;
+   await goTo('ports');
+   check('the ports view reads the ports and the certificates', called(before, 'GET', '/api/v1/ports').length === 1 && called(before, 'GET', '/api/v1/certificates').length === 1 && rows().length === 2);
+   check('a port row names its certificate rather than its id', rows()[0].textContent.indexOf('mail.example.com') >= 0 && rows()[0].textContent.indexOf('0.0.0.0:25') >= 0 && rows()[1].textContent.indexOf('—') >= 0);
+   check('the restart wording is the document\'s', content().textContent.indexOf('takes effect when the server restarts') >= 0 && content().textContent.indexOf(REINITIALIZE.slice(0, 40)) >= 0);
+   click(act('portnew'));
+   await flush();
+   check('a new port starts at the defaults the document states in prose', document.getElementById('port_address').value === '0.0.0.0' && document.getElementById('port_connection_security').value === 'none' &&
+      document.getElementById('port_client_certificate_policy').value === 'off' && document.getElementById('port_certificate_id').tagName === 'SELECT' && document.getElementById('port_certificate_id').value === '0',
+      'address=' + document.getElementById('port_address').value + ' cert=' + document.getElementById('port_certificate_id').value);
+   check('the certificate choice lists the certificates by name', document.getElementById('port_certificate_id').textContent.indexOf('mail.example.com') >= 0 && document.getElementById('port_certificate_id').textContent.indexOf('(none)') >= 0);
+   setValue('port_protocol', 'pop3');
+   setValue('port_port', '995');
+   setValue('port_connection_security', 'tls');
+   setValue('port_certificate_id', '2');
+   before = requests.length;
+   click(act('portsave'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/ports');
+   check('saving a new port posts the record with the certificate id as a number', !!posted && posted.protocol === 'pop3' && posted.port === 995 && posted.connection_security === 'tls' && posted.certificate_id === 2 && posted.address === '0.0.0.0',
+      JSON.stringify(posted));
+   check('and the re-read list has three', rows().length === 3 && rows()[2].textContent.indexOf('0.0.0.0:995') >= 0);
+   click(act('portedit', { id: 2 }));
+   await flush();
+   setValue('port_port', '993');
+   setValue('port_connection_security', 'tls');
+   before = requests.length;
+   click(act('portsave'));
+   await flush();
+   check('a TLS port without a certificate is the server\'s refusal to make, not the page\'s', called(before, 'PUT', '/api/v1/ports/2').length === 1);
+   nextRefusal = null;
+   click(act('portedit', { id: 2 }));
+   await flush();
+   nextRefusal = 'A TLS port needs a certificate.';
+   click(act('portsave'));
+   await flush();
+   check('and the refusal is shown in the editor', document.getElementById('err_portedit').textContent === 'A TLS port needs a certificate.' && $('#port_port') !== null);
+   click(act('cancel'));
+   await flush();
+   before = requests.length;
+   click(act('portdel', { id: 2 }));
+   await flush();
+   check('deleting a port names it and deletes by id', confirmations[confirmations.length - 1].indexOf('imap 0.0.0.0:993') >= 0 && called(before, 'DELETE', '/api/v1/ports/2').length === 1 && rows().length === 2,
+      confirmations[confirmations.length - 1]);
+
+   // ---- the restart, which ends this very session
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('portapply'));
+   await flush();
+   check('the restart asks first', called(before, 'POST', /reinitialize/).length === 0 && confirmations[confirmations.length - 1].indexOf('session ends') >= 0, confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('portapply'));
+   await flush();
+   check('yes posts the restart', called(before, 'POST', '/api/v1/server/reinitialize').length === 1);
+   check('and stops the dashboard poll', intervals.length === 0, intervals.length + ' intervals');
+   for (let i = 0; i < 6 && $('#gate').style.display === 'none'; i += 1) { fireTimers(); await flush(); }
+   const probes = called(before, 'GET', '/');
+   check('then waits for the page to answer again, asked without a credential', probes.length === 3 && probes.every((r) => r.credentials === 'omit'), probes.length + ' probes');
+   check('and returns to the sign-in card saying the session ended with the restart', $('#gate').style.display === 'grid' && $('#loginErr').textContent.indexOf('restarted') >= 0, $('#loginErr').textContent);
+   check('the session mark is gone with it', sessionStorage.getItem('hmsSession') === null);
+
+   // ---- back in, to the logs
+   signedIn = false;
+   await signIn();
+   check('signing in again works after a restart', $('#app').style.display === 'flex');
+   before = requests.length;
+   await goTo('logs');
+   check('the logs view reads the file list', called(before, 'GET', '/api/v1/logs').length === 1 && rows().length === 2 && rows()[0].textContent.indexOf('2.0 KB') >= 0, rows().length ? rows()[0].textContent : 'no rows');
+   before = requests.length;
+   click(act('log', { name: 'hmailserver_2026-09-14.log', lines: 200 }));
+   await flush();
+   check('Last 200 asks for the tail with the count', called(before, 'GET', '/api/v1/logs/hmailserver_2026-09-14.log?lines=200').length === 1, paths(before));
+   check('and shows the lines', $('#logPre').hidden === false && $('#logPre').textContent === state.logLines.join('\n'));
+   click(act('log', { name: 'hmailserver_2026-09-14.log', lines: 2000 }));
+   await flush();
+   check('Last 2000 asks for 2000', called(before, 'GET', /lines=2000$/).length === 1);
+   nextRefusal = null;
+   state.logs.push({ name: 'gone.log', size: 1, created: '' });
+   await goTo('logs');
+   click(act('log', { name: 'gone.log', lines: 200 }));
+   await flush();
+   check('a file the server no longer has is an error under the list, naming it', document.getElementById('err_log').textContent.indexOf('gone.log') >= 0 && document.getElementById('err_log').textContent.indexOf('No such log file') >= 0,
+      document.getElementById('err_log').textContent);
+   state.logs.pop();
+
+   // ---- a session that ends under the page
+   signedIn = false;
+   await goTo('queue');
+   check('a 401 on any view returns to the sign-in card and says why', $('#gate').style.display === 'grid' && $('#loginErr').textContent.indexOf('session ended') >= 0, $('#loginErr').textContent);
+   check('with the session mark removed', sessionStorage.getItem('hmsSession') === null);
+
+   // ---- the theme, and signing out
+   await signIn();
+   click($('#themeBtn'));
+   check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light');
+   check('and is remembered under a name that is not a secret', localStorage.getItem('hmsTheme') === 'light');
+   before = requests.length;
+   click($('#logoutBtn'));
+   await flush();
+   check('signing out ends the session on the server', called(before, 'DELETE', '/api/v1/session').length === 1);
+   check('and shows the card', $('#gate').style.display === 'grid' && $('#app').style.display === 'none' && sessionStorage.getItem('hmsSession') === null);
+   check('and stops the poll', intervals.length === 0);
+   check('no inline handler was needed anywhere: every button is data-act', $$('button[onclick]').length === 0);
+
+   if (failures.length) {
+      out.error('\ndeck script: ' + failures.length + ' of ' + checks + ' checks failed\n');
+      failures.forEach((f) => out.error('  FAILED: ' + f));
+      out.error('');
+      process.exit(1);
+   }
+   out.log('deck script: ' + checks + ' checks passed');
+}
+
+main().catch((why) => {
+   out.error('the deck script did not survive being run:');
+   out.error(why && why.stack ? why.stack : why);
+   process.exit(1);
+});
