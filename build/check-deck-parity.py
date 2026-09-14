@@ -102,6 +102,8 @@ PATH_SCOPE = {
     'antivirus': ['AntiVirus'],
     'logging': ['Logging'],
     'scripting': ['Scripting'],
+    'cache': ['Cache'],
+    'indexing': ['MessageIndexing'],
     'backup': ['BackupSettings', 'Backup'],
     'messages': ['ServerMessage'],
     'dkim': ['Domain'],
@@ -132,7 +134,7 @@ PATH_SCOPE = {
 
 # Trailing path segments that are verbs on the resource before them.
 VERB_SEGMENTS = {'reload', 'check', 'clear', 'retry', 'release', 'hold', 'download',
-                 'run', 'install', 'reinitialize', 'evaluate', 'history', 'start'}
+                 'run', 'install', 'reinitialize', 'evaluate', 'history', 'start', 'index'}
 
 UNIT_SUFFIXES = ('seconds', 'minutes', 'hours', 'days', 'secs', 'mins', 'kb', 'mb', 'ms', 'sec', 'min')
 STOP_WORDS = {'of', 'number', 'no', 'the', 'a', 'an', 'is', 'in', 'to', 'use',
@@ -610,8 +612,10 @@ class Route:
         self.method = method
         self.source = source
         self.keys = set()          # JSON keys the route accepts (raw spelling)
+        self.array_keys = set()    # the keys of them the schema types as arrays
         self.setters = set()       # folded C++ setter names its handler calls
         self.scope = None          # list of short interface names, [] for none, None for unknown
+        self.array_children = {}   # short interface name -> the array key that carries its one value
         self.description = ''
 
     @property
@@ -666,6 +670,36 @@ def top_level_keys(obj_text):
     return keys
 
 
+def top_level_members(obj_text):
+    """(key, value text) for each key of a JSON object's text (without its
+    outer braces); the value text is empty for a scalar."""
+    out, depth, i, n = [], 0, 0, len(obj_text)
+    while i < n:
+        c = obj_text[i]
+        if c == '"':
+            j = i + 1
+            while j < n and obj_text[j] != '"':
+                j += 1 if obj_text[j] != '\\' else 2
+            if depth == 0 and j + 1 < n and obj_text[j + 1] == ':':
+                key = obj_text[i + 1:j]
+                k = j + 2
+                if k < n and obj_text[k] in '{[':
+                    close = '}' if obj_text[k] == '{' else ']'
+                    value = balanced(obj_text, k, obj_text[k], close)
+                    out.append((key, value))
+                    i = k + len(value) + 2
+                    continue
+                out.append((key, ''))
+            i = j + 1
+            continue
+        if c in '{[':
+            depth += 1
+        elif c in '}]':
+            depth -= 1
+        i += 1
+    return out
+
+
 def read_openapi_routes(files):
     routes = {}
     for path_file in files:
@@ -686,6 +720,7 @@ def read_openapi_routes(files):
                     if p >= 0:
                         props = balanced(op, p + len('"properties":'))
                         route.keys.update(top_level_keys(props))
+                        route.array_keys.update(k for k, v in top_level_members(props) if '"type":"array"' in v)
                         # one level down: rule criteria/actions, route addresses
                         for sub in re.finditer(r'"properties":\{', props):
                             route.keys.update(top_level_keys(balanced(props, sub.end() - 1)))
@@ -826,6 +861,33 @@ def add_description_keys(routes, corpus):
                     route.keys.add(w)
 
 
+def settings_subtree(interfaces):
+    """The short names of Settings and every non-collection interface reached
+    from it: the settings groups, which write at once and have no Save."""
+    settings = interfaces.get('IInterfaceSettings')
+    subtree = []
+    if settings:
+        stack, seen = [settings], set()
+        while stack:
+            cur = stack.pop()
+            if cur.name in seen:
+                continue
+            seen.add(cur.name)
+            subtree.append(cur.short)
+            for p in cur.props.values():
+                nxt = interfaces.get(p['type'] or '')
+                if nxt and nxt.item_type() is None and nxt.name not in seen:
+                    stack.append(nxt)
+    return subtree
+
+
+def single_value(iface):
+    """The one writable property of an interface that has exactly one besides
+    its ID - a list recipient's address - or None."""
+    writable = [n for n, p in iface.props.items() if p['put'] and n != 'ID']
+    return writable[0] if len(writable) == 1 else None
+
+
 def read_rest(interfaces):
     files = sorted(os.path.join(REST_DIR, n) for n in os.listdir(REST_DIR)
                    if n.startswith('RestApi') and n.endswith('.cpp'))
@@ -845,25 +907,17 @@ def read_rest(interfaces):
         route.keys -= set(re.findall(r'\{(\w+)\}', route.path))
     inherit_create_keys(routes)
     attach_handler_keys(routes, functions)
-    settings = interfaces.get('IInterfaceSettings')
     grouped = {'AntiSpam', 'Logging', 'Scripting', 'Backup'}
-    subtree = []
-    if settings:
-        stack, seen = [settings], set()
-        while stack:
-            cur = stack.pop()
-            if cur.name in seen:
-                continue
-            seen.add(cur.name)
-            subtree.append(cur.short)
-            for p in cur.props.values():
-                nxt = interfaces.get(p['type'] or '')
-                if nxt and nxt.item_type() is None and nxt.name not in seen:
-                    stack.append(nxt)
+    subtree = settings_subtree(interfaces)
     for route in routes.values():
         route.scope = route_scope(route.path)
         if route.path == '/api/v1/settings':
             route.scope = [s for s in subtree if s not in grouped]
+        # A child resource carried as an array of its one value: the members
+        # of a distribution list are one address each, in the list's body.
+        for key in route.array_keys:
+            for child in PATH_SCOPE.get(key, []):
+                route.array_children[child] = key
     return routes
 
 
@@ -980,16 +1034,21 @@ def read_deck():
 # 5. Matching
 # ---------------------------------------------------------------------------
 
-def match_property(iface, prop, com_setters, routes):
+def match_property(iface, prop, com_setters, routes, interfaces):
     """[(route, channel)] for the write routes that cover Interface.Property."""
     out = []
     names = fold_variants(prop)
     words = word_set(prop)
     setters = com_setters.get((iface, prop), set())
+    own = interfaces.get('IInterface' + iface)
     for route in routes.values():
         if not route.writes() or route.path.startswith('/api/v1/me') or route.path.startswith('/api/v1/portal'):
             continue
         if route.scope is not None and iface not in route.scope:
+            # A child carried as an array of its one value, in its parent's body.
+            key = route.array_children.get(iface)
+            if key and own is not None and single_value(own) == prop:
+                out.append((route, 'array ' + key))
             continue
         channel = None
         if setters and setters & route.setters:
@@ -1007,12 +1066,40 @@ def match_property(iface, prop, com_setters, routes):
                     channel = 'words'
                 elif channel is None and loose and loose == key_words:
                     channel = 'words, loose'
+            # The resource's identity, carried in the path of its own write
+            # route rather than in the body: a server message is addressed by
+            # its name. Reported as its own channel, so it can be judged.
+            if channel is None and names & {fold(p) for p in re.findall(r'\{(\w+)\}', route.path)}:
+                channel = 'path'
             if channel is None:
                 continue
         if route.scope is None:
             channel += ', scope unknown'
         out.append((route, channel))
     return out
+
+
+def left_out_reason(iface_short, prop, interfaces, subtree):
+    """Why a desktop assignment is not a setting, or None when it is one."""
+    by_short = {i.short: i for i in interfaces.values()}
+    iface = by_short.get(iface_short)
+    if iface is None:
+        return None
+    # An interface with methods and neither a Save nor an ID, outside the
+    # settings tree, is a service: its properties are the inputs of its
+    # methods (Diagnostics.LocalDomainName is what PerformTests tests).
+    if iface.methods and 'Save' not in iface.methods and 'ID' not in iface.props and iface_short not in subtree:
+        return 'an input of the methods of %s (%s), which has no Save and no ID' % (
+            iface_short, ', '.join('`%s`' % m for m in iface.methods))
+    # <Parent>ID on the parent's own child (RuleAction.RuleID, RouteAddress.RouteID)
+    # is the link to the parent, set when the row is created; a REST body
+    # carries the parent in its path. GroupMember.AccountID is not this: the
+    # member is the account it names.
+    if prop.endswith('ID') and len(prop) > 2:
+        parent = prop[:-2]
+        if parent in by_short and iface_short != parent and iface_short.startswith(parent):
+            return 'the link to its parent %s, set when the row is created; a REST body carries the parent in its path' % parent
+    return None
 
 
 def match_method(iface, method, routes):
@@ -1060,9 +1147,19 @@ def main():
     by_short = {i.short: n for n, i in enumerate(order)}
     writes = OrderedDict(sorted(writes.items(), key=lambda kv: (by_short.get(kv[0][0], 999), kv[0][1])))
 
+    # The assignments that are not settings: left out of the count, and
+    # listed with the reason so the leaving-out can be judged.
+    subtree = settings_subtree(interfaces)
+    left_out = []
+    for (iface, prop), pages in list(writes.items()):
+        reason = left_out_reason(iface, prop, interfaces, subtree)
+        if reason:
+            left_out.append({'iface': iface, 'prop': prop, 'pages': sorted(pages), 'why': reason})
+            del writes[(iface, prop)]
+
     rows = []
     for (iface, prop), pages in writes.items():
-        matched = match_property(iface, prop, com_setters, routes)
+        matched = match_property(iface, prop, com_setters, routes, interfaces)
         deck_views = set()
         for route, _ch in matched:
             for view, calls in view_calls.items():
@@ -1105,7 +1202,13 @@ def main():
     p('  properties the desktop program writes: %d' % n_total)
     p('  of them writable over REST:            %d' % n_rest)
     p('  of them reachable in the Deck:         %d' % n_deck)
+    p('  assignments left out of the count:     %d' % len(left_out))
     p('')
+    if left_out:
+        p('Left out of the count (%d):' % len(left_out))
+        for r in left_out:
+            p('  %-24s %-24s %s' % (r['iface'], r['prop'], r['why'].replace('`', '')))
+        p('')
     p('Missing over REST, by interface (%d):' % len(missing))
     grouped = OrderedDict()
     for r in missing:
@@ -1134,13 +1237,13 @@ def main():
     # ---- Markdown ---------------------------------------------------------
     if write_doc:
         write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_rows,
-                       n_total, n_rest, n_deck, missing, rest_not_deck, write_routes, deck_routes)
+                       n_total, n_rest, n_deck, missing, rest_not_deck, write_routes, deck_routes, left_out)
 
     return 1 if (strict and missing) else 0
 
 
 def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_rows,
-                   n_total, n_rest, n_deck, missing, rest_not_deck, write_routes, deck_routes):
+                   n_total, n_rest, n_deck, missing, rest_not_deck, write_routes, deck_routes, left_out):
     L = []
     a = L.append
     a('# Control Deck parity')
@@ -1163,12 +1266,16 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
       'REST when a POST, PUT or PATCH route whose path names that resource carries a matching '
       'key, on one of three channels reported per row: **setter** (the C++ setter the COM '
       '`put_` calls is one the handler calls), **name** (the names fold to the same string, '
-      'ignoring case, underscores and a trailing unit such as `_kb`) or **words** (the same '
-      'words once fillers like "of" and "number" are dropped). The matching is heuristic: a '
-      'shared name is not proof of the same semantics, and a property with no match may be '
-      'covered under a name this cannot see. Routes under `/api/v1/me` and `/api/v1/portal` '
-      'act on the caller\'s own account and are not counted; they are the self-service '
-      'surface, not administration.')
+      'ignoring case, underscores and a trailing unit such as `_kb`), **words** (the same '
+      'words once fillers like "of" and "number" are dropped), **path** (the property is the '
+      'resource\'s identity and the route carries it as a path parameter) or **array** (the '
+      'property is a child resource\'s one value and the parent\'s body carries the children as '
+      'an array). The matching is heuristic: a shared name is not proof of the same semantics, '
+      'and a property with no match may be covered under a name this cannot see. Routes under '
+      '`/api/v1/me` and `/api/v1/portal` act on the caller\'s own account and are not counted; '
+      'they are the self-service surface, not administration. An assignment that is not a '
+      'setting - the input of a diagnostic run, the link from a child row to its parent - is '
+      'left out of the count and listed with its reason.')
     a('')
     a('## Summary')
     a('')
@@ -1179,6 +1286,7 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
     a('| of them reachable from a Deck view | %d |' % n_deck)
     a('| missing over REST | %d |' % len(missing))
     a('| over REST but not reached by any Deck view | %d |' % len(rest_not_deck))
+    a('| assignments left out of the count | %d |' % len(left_out))
     a('| COM interfaces in the IDL | %d |' % len(interfaces))
     a('| desktop pages read | %d |' % len(desktop.pages))
     a('| REST routes (path and method) | %d, %d of them writes |' % (len(routes), len(write_routes)))
@@ -1210,6 +1318,21 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
     else:
         a('Every property writable over REST is reached by a Deck view.')
     a('')
+    a('## Left out of the count')
+    a('')
+    a('Assignments the desktop program makes that are not settings an administrator edits, '
+      'each with the rule that left it out. The rules are the script\'s, so a new interface '
+      'that matches one is left out the same way; check this table when the count moves '
+      'without a route or a page having changed.')
+    a('')
+    if left_out:
+        a('| Interface | Property | Desktop page | Why |')
+        a('|---|---|---|---|')
+        for r in left_out:
+            a('| %s | `%s` | %s | %s |' % (r['iface'], r['prop'], ', '.join(r['pages']), md_cell(r['why'])))
+    else:
+        a('Nothing is left out.')
+    a('')
     a('## What the heuristic gets wrong')
     a('')
     a('Read with these in mind. They were found by checking the missing list, and a sample of '
@@ -1218,19 +1341,27 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
     a('')
     a('- **A write that is not a setting.** `Diagnostics.LocalDomainName` and '
       '`TestDomainName` are the inputs of a diagnostic run; `RouteAddress.RouteID`, '
-      '`RuleAction.RuleID`, `RuleCriteria.RuleID` and `GroupMember.AccountID` are the link '
-      'from a child row to its parent, set when the row is created. They are assignments in '
-      'the desktop program, so they are counted, but none of them is something an '
-      'administrator edits, and a REST body carries the parent in its path instead. Read the '
-      '"missing" ones as noise and the matched ones as accidents of naming.')
-    a('- **A name that is fixed by design.** `ServerMessage.Name` is the key of a server '
-      'message, not a value: the desktop program\'s collection editor exposes it as a column, '
-      'and `PUT /api/v1/settings/messages/{name}` carries it in the path. The row is missing '
-      'because a path parameter is not counted as a body key; it is not a gap.')
+      '`RuleAction.RuleID` and `RuleCriteria.RuleID` are the link from a child row to its '
+      'parent, set when the row is created, which a REST body carries in its path. They used '
+      'to be counted, the first two as missing and the last three as matched by accidents of '
+      'naming; two rules now leave them out - an interface with methods and neither a Save nor '
+      'an ID outside the settings tree is a service whose properties are its methods\' inputs, '
+      'and `<Parent>ID` on the parent\'s own child is the link - and the table above lists '
+      'what each rule caught. `GroupMember.AccountID` is left in on purpose: a member is the '
+      'account it names, and the rule asks that the child be named after the parent.')
+    a('- **A name carried in the path.** `ServerMessage.Name` is the key of a server message: '
+      'the desktop program\'s collection editor exposes it as a column, and `PUT '
+      '/api/v1/settings/messages/{name}` addresses the message by it. A path parameter is not '
+      'a body key, so the row read as missing; it is now matched on the **path** channel, which '
+      'says the route carries the identity and not that it can change it - over COM a message '
+      'can be renamed, over REST by design not.')
     a('- **Covered under another shape.** `DistributionListRecipient.RecipientAddress` is what '
       'the `members` array of `POST /api/v1/domains/{domain}/lists` carries, one address per '
-      'entry; `AppPassword.Active` and `Name` are writable at `/api/v1/me/app-passwords`, which '
-      'is excluded as self-service. Both read as missing.')
+      'entry; it is matched on the **array** channel, which applies when a schema key typed as '
+      'an array is named for a resource in the scope table and that resource has exactly one '
+      'writable property. `AppPassword.Active` and `Name` are writable at '
+      '`/api/v1/me/app-passwords`, which is excluded as self-service, and read as missing until '
+      'the administrative route exists.')
     a('- **A synonym the channels cannot cross.** `use_greylisting` writes '
       '`Domain.AntiSpamEnableGreylisting` and `all_criteria` writes `Rule.UseAND`; the words '
       'channel does not reach across a rewording, and these are matched only because the '
@@ -1238,40 +1369,40 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
       'sits in a function the walk does not reach (it follows one hop of callers and one of '
       'callees from the function that reads the keys, within the file) is a false '
       '"missing".')
-    a('- **A setter that fixes a value.** The list create calls `SetListMode(LMPublic)` and '
-      '`SetActive(true)` whatever the body says; a setter called with a bare constant is not '
-      'counted, which is why `DistributionList.Mode` and `Active` are missing rather than '
-      'matched. A constant reached through a variable would still count.')
-    a('- **A generic key held to its resource.** `name`, `active`, `description`, `port` and '
-      '`password` exist on many interfaces; the route\'s path decides which interface it may '
-      'match, so `POST /api/v1/ports` cannot claim `Domain.Name`. A write route whose resource '
-      'is not in the scope table matches any interface and is flagged "scope unknown" in its '
-      'row; there should be none outside `/me` and `/portal`.')
+    a('- **A setter that fixes a value.** A setter called with a bare constant '
+      '(`SetListMode(LMPublic)`, `SetActive(true)`) fixes a value the body cannot change and is '
+      'not counted; until the list routes took the five list settings, this is why '
+      '`DistributionList.Mode` and `Active` read as missing. A constant reached through a '
+      'variable still counts.')
+    a('- **A generic key held to its resource.** `name`, `active`, `description`, `port`, '
+      '`enabled` and `password` exist on many interfaces; the route\'s path decides which '
+      'interface it may match, so `POST /api/v1/ports` cannot claim `Domain.Name` and `PUT '
+      '/api/v1/settings/cache` cannot claim `Logging.Enabled`. A write route whose resource is '
+      'not in the scope table matches any interface and is flagged "scope unknown" in its row; '
+      'there should be none outside `/me` and `/portal`.')
     a('- **Nested bodies.** A rule\'s criteria and actions and a route\'s addresses arrive as '
       'arrays inside the rule or route body; their keys are read one level down and matched '
       'against `RuleCriteria`, `RuleAction` and `RouteAddress`, so a match there says the '
-      'route can carry the value, not that a top-level key exists. `RuleAction.AbortSpamFlagged` '
-      'is the one action field the rules body has no word for.')
+      'route can carry the value, not that a top-level key exists.')
     a('- **Loose word matches.** A COM name may carry a qualifier the key drops (`SSL`, `SMTP`, '
       '`IP`, `Anti`/`Spam`, `Enable`) or its own resource\'s noun (`DomainAlias.AliasName` is '
       'the domain alias\'s `name`); such rows say "words, loose" and are the ones to doubt '
       'first.')
-    a('- **Collections without a route are true gaps, and small ones.** The SURBL servers, DNS '
-      'blacklists, the anti-spam white list, blocked senders and attachments, the greylisting '
-      'white list, incoming relays, groups and their members, and folder permissions are '
-      'edited by collection editors in the desktop program and have no REST resource; the '
-      'anti-virus, cache and message-indexing settings, the per-account spam thresholds and '
-      'vacation dates, and the domain\'s DKIM canonicalisation and secondary key have no '
-      'settings row or body key. Each is one route or one row away.')
+    a('- **Collections without a route are true gaps, and small ones.** Groups and their '
+      'members and the folder permissions are edited by collection editors in the desktop '
+      'program and have no REST resource; the app passwords have only the account\'s own. The '
+      'other collections the first census named - the SURBL servers, DNS blacklists, the '
+      'anti-spam white list, blocked senders, incoming relays, blocked attachments and the '
+      'greylisting white list - have resources since 14 September, the anti-virus, cache and '
+      'message-indexing groups have rows, and the per-account thresholds and dates, the '
+      'domain\'s DKIM fields, the range\'s expiry and the action\'s abort flag have keys.')
     a('- **Deck reach is by route, not by field.** The Deck builds its forms from the OpenAPI '
       'document, so a view that PUTs a settings group reaches every key of that group; a '
       'property is "reachable" when a view calls a route that covers it, not when a field '
       'for it is on screen. A helper two views share - the settings save, reached from the '
       'Settings view and the Backup view - carries every settings group\'s PUT to both, so a '
       'view\'s route list can name a group it does not draw; the property count is unaffected. '
-      'What is left over REST but not in the Deck is the account\'s own forwarding, signature '
-      'and admin level, the aliases and distribution lists, the scripting switch and the '
-      'server messages: routes without a view.')
+      'What is over REST but not in the Deck is the table above: routes without a view.')
     a('- **Reads are not measured.** Properties the desktop only displays are outside the '
       'count; the parity question here is what an administrator can change.')
     a('')
