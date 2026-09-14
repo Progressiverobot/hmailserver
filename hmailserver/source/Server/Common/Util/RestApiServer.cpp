@@ -1922,6 +1922,11 @@ namespace HM
          case RouteAccountAppPasswordList:
          case RouteAccountAppPasswordCreate:
          case RouteAccountAppPasswordDelete:
+         case RouteAccountFolderList:
+         case RouteAccountFolderPermissionList:
+         case RouteAccountFolderPermissionCreate:
+         case RouteAccountFolderPermissionUpdate:
+         case RouteAccountFolderPermissionDelete:
             return HandleAccountResources_(route, GetRequestBody_(request));
 
          case RouteOpenApi:
@@ -3377,6 +3382,9 @@ namespace HM
       case RouteSessionDelete:
       case RouteAccountAppPasswordCreate:
       case RouteAccountAppPasswordDelete:
+      case RouteAccountFolderPermissionCreate:
+      case RouteAccountFolderPermissionUpdate:
+      case RouteAccountFolderPermissionDelete:
          return true;
 
       default:
@@ -3628,6 +3636,11 @@ namespace HM
       case RouteAccountAppPasswordList:
       case RouteAccountAppPasswordCreate:
       case RouteAccountAppPasswordDelete:
+      case RouteAccountFolderList:
+      case RouteAccountFolderPermissionList:
+      case RouteAccountFolderPermissionCreate:
+      case RouteAccountFolderPermissionUpdate:
+      case RouteAccountFolderPermissionDelete:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 

@@ -2844,6 +2844,13 @@ namespace hMailServer
             return;
 
          var e = answer.Json.Value;
+
+         // The id, where the route reports one; a server from before it did
+         // leaves ID to its skip.
+         JsonElement id;
+         if (e.TryGetProperty("id", out id))
+            Take("id", () => _id = ServerApi.LongOf(e, "id"));
+
          Take("active", () => _active = ServerApi.FlagOf(e, "active"));
          Take("max_size_mb", () => _maxSize = (int) ServerApi.LongOf(e, "max_size_mb"));
          Take("first_name", () => _firstName = ServerApi.StringOf(e, "first_name") ?? string.Empty);
@@ -2999,13 +3006,24 @@ namespace hMailServer
       }
       private eAdminLevel _adminLevel;
 
+      /// <summary>
+      ///    The database id, as GET /api/v1/accounts/{address} reports it - the
+      ///    id a folder permission names an account by.
+      /// </summary>
       public long ID
       {
          get
          {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountIds);
+            if (!_known.Contains("id"))
+               LoadWhole();
+
+            if (!_known.Contains("id"))
+               throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountIds);
+
+            return _id;
          }
       }
+      private long _id;
 
       /// <summary>
       ///    The account's folders, read through its own GET /api/v1/me/folders. The

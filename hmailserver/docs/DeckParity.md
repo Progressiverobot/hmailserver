@@ -550,10 +550,10 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `PermissionAccountID` | FolderPermissionsDialog | - | - |
-| `PermissionGroupID` | FolderPermissionsDialog | - | - |
-| `PermissionType` | FolderPermissionsDialog | - | - |
-| `Value` | FolderPermissionsDialog | - | - |
+| `PermissionAccountID` | FolderPermissionsDialog | `POST /api/v1/accounts/{address}/folders/{id}/permissions` (setter)<br>`PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` (setter) | - |
+| `PermissionGroupID` | FolderPermissionsDialog | `POST /api/v1/accounts/{address}/folders/{id}/permissions` (setter)<br>`PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` (setter) | - |
+| `PermissionType` | FolderPermissionsDialog | `POST /api/v1/accounts/{address}/folders/{id}/permissions` (setter)<br>`PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` (setter) | - |
+| `Value` | FolderPermissionsDialog | `PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` (setter) | - |
 
 ### IncomingRelay
 
@@ -658,6 +658,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/accounts/{address}/fetch-accounts` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `PUT /api/v1/accounts/{address}/fetch-accounts/{id}` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | yes |
 | `POST /api/v1/accounts/{address}/fetch-accounts/{id}/download` | FetchAccount | - | yes |
+| `POST /api/v1/accounts/{address}/folders/{id}/permissions` | IMAPFolderPermission | `account`, `account_id`, `administer`, `create`, `delete_mailbox`, `expunge`, `folder`, `group`, `group_id`, `insert`, `lookup`, `name`, `post`, `read`, `rights`, `type`, `write_deleted`, `write_others`, `write_seen` | - |
+| `PUT /api/v1/accounts/{address}/folders/{id}/permissions/{pid}` | IMAPFolderPermission | `account`, `account_id`, `administer`, `body`, `create`, `delete_mailbox`, `expunge`, `field`, `folder`, `group`, `group_id`, `insert`, `lookup`, `name`, `new`, `post`, `read`, `rights`, `to`, `type`, `value`, `write_deleted`, `write_others`, `write_seen` | - |
 | `POST /api/v1/accounts/{address}/support-session` | - | - | - |
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
@@ -691,18 +693,18 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/me/files/{id}` | ? | `days`, `from`, `max_days`, `max_mb`, `name`, `password`, `quota_mb`, `size`, `to`, `type` | - |
 | `PUT /api/v1/me/files/{id}/content` | ? | - | - |
 | `PUT /api/v1/me/filters` | ? | `from`, `message`, `script` | - |
-| `POST /api/v1/me/folders` | IMAPFolder | `first`, `folder`, `message`, `name`, `new`, `parent_id`, `to` | - |
-| `PUT /api/v1/me/folders/{id}` | IMAPFolder | `first`, `folder`, `message`, `name`, `new`, `parent_id`, `to` | - |
+| `POST /api/v1/me/folders` | IMAPFolder | `account`, `create`, `first`, `folder`, `message`, `name`, `new`, `parent_id`, `to` | - |
+| `PUT /api/v1/me/folders/{id}` | IMAPFolder | `account`, `create`, `first`, `folder`, `message`, `name`, `new`, `parent_id`, `to` | - |
 | `POST /api/v1/me/folders/{id}/empty` | ? | `older_than_days` | - |
 | `POST /api/v1/me/folders/{id}/messages` | ServerMessage | - | - |
-| `POST /api/v1/me/messages` | ServerMessage | `address`, `answered_id`, `attachments`, `bcc`, `cc`, `data`, `folder`, `from`, `in_reply_to`, `message`, `name`, `references`, `subject`, `text`, `to`, `type` | - |
-| `PUT /api/v1/me/messages/{id}/flags` | ? | `answered`, `deleted`, `draft`, `flagged`, `folder`, `seen` | - |
-| `POST /api/v1/me/messages/{id}/move` | ? | `destination`, `folder`, `folder_id`, `name`, `new`, `to` | - |
+| `POST /api/v1/me/messages` | ServerMessage | `account`, `address`, `answered_id`, `attachments`, `bcc`, `cc`, `data`, `folder`, `from`, `in_reply_to`, `message`, `name`, `post`, `read`, `references`, `subject`, `text`, `to`, `type` | - |
+| `PUT /api/v1/me/messages/{id}/flags` | ? | `answered`, `deleted`, `draft`, `flagged`, `folder`, `rights`, `seen` | - |
+| `POST /api/v1/me/messages/{id}/move` | ? | `account`, `destination`, `folder`, `folder_id`, `name`, `new`, `to` | - |
 | `POST /api/v1/me/messages/{id}/receipt` | ? | - | - |
-| `POST /api/v1/me/messages/{id}/snooze` | ? | `folder`, `message`, `to`, `until` | - |
+| `POST /api/v1/me/messages/{id}/snooze` | ? | `account`, `folder`, `message`, `to`, `until` | - |
 | `POST /api/v1/me/messages/{id}/unsubscribe` | ? | - | - |
-| `POST /api/v1/me/password` | ? | `current`, `new`, `password`, `to` | - |
-| `PUT /api/v1/me/preferences` | ? | - | - |
+| `POST /api/v1/me/password` | ? | `account`, `current`, `new`, `password`, `to` | - |
+| `PUT /api/v1/me/preferences` | ? | `account` | - |
 | `POST /api/v1/me/quarantine/{id}/release` | - | - | - |
 | `PUT /api/v1/me/settings` | Settings | `forwarding`, `name`, `signature` | - |
 | `POST /api/v1/me/smime/chain` | ? | `certificates`, `chain`, `first`, `not_after`, `purpose`, `subject` | - |

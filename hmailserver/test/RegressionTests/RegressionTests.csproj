@@ -715,6 +715,7 @@
     <Compile Include="Infrastructure\MetricsSecurity.cs" />
     <Compile Include="Infrastructure\ScheduledBackup.cs" />
     <Compile Include="API\RestApiAccountAppPasswords.cs" />
+    <Compile Include="API\RestApiFolderPermissions.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Messages\MultipartMessageWithNoMainBodyText.txt" />

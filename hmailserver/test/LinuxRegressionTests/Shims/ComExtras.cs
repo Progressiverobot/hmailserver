@@ -524,64 +524,214 @@ namespace hMailServer
       }
    }
 
-   /// <summary>An IMAP folder's ACL, which no REST route reads or writes.</summary>
+   /// <summary>
+   ///    IMAPFolder.Permissions over GET and POST
+   ///    /api/v1/accounts/{address}/folders/{id}/permissions and PUT and DELETE
+   ///    .../permissions/{pid}: the folder's ACL rows, read from the server on
+   ///    every use as ACLManager reads them for every decision. The
+   ///    administrator's credential, as the COM collection takes it; the folder
+   ///    is one of the account's own, which is the only kind this project's
+   ///    IMAPFolder ever stands for (the public namespace has no route).
+   /// </summary>
    public class IMAPFolderPermissions
    {
-      public int Count
+      private readonly Account _account;
+      private readonly long _folderId;
+
+      internal IMAPFolderPermissions(Account account, long folderId)
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
-         }
+         _account = account;
+         _folderId = folderId;
       }
+
+      internal long FolderID => _folderId;
+
+      internal string Base => "/api/v1/accounts/" + _account.Address + "/folders/" + _folderId + "/permissions";
+
+      internal static void RouteOrSkip()
+      {
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/folders/{id}/permissions", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
+      }
+
+      private List<IMAPFolderPermission> Load()
+      {
+         RouteOrSkip();
+         var answer = ServerApi.Get(Base).Expect(200, "GET " + Base);
+         return ServerApi.Array(answer).Select(entry => IMAPFolderPermission.From(this, entry)).ToList();
+      }
+
+      public int Count => Load().Count;
 
       public IMAPFolderPermission Add()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
+         RouteOrSkip();
+         return new IMAPFolderPermission(this);
       }
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public IMAPFolderPermission this[int index]
-      {
-         get { throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl); }
-      }
+      public IMAPFolderPermission this[int index] => Load()[index];
 
       public IMAPFolderPermission get_Item(int index)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
+         return Load()[index];
+      }
+
+      public IMAPFolderPermission get_ItemByDBID(long id)
+      {
+         return Load().FirstOrDefault(permission => permission.ID == id);
+      }
+
+      public void Delete(int index)
+      {
+         DeleteByDBID(Load()[index].ID);
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
+         RouteOrSkip();
+         ServerApi.Delete(Base + "/" + id).Expect(200, "DELETE " + Base + "/" + id);
       }
 
       public void Clear()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
+         foreach (var permission in Load())
+            DeleteByDBID(permission.ID);
+      }
+
+      public void Refresh()
+      {
       }
    }
 
+   /// <summary>
+   ///    One ACL row. The rights are kept as the COM Value bit mask the
+   ///    eACLPermission values are, and sent by name; Save is the POST for a new
+   ///    row and the PUT for one the server already has, and a 400 - the shape
+   ///    the store insists on, an unknown account, the folder's owner - is the
+   ///    COMException it is over COM, with nothing stored.
+   /// </summary>
    public class IMAPFolderPermission
    {
-      public long ID { get; set; }
+      private static readonly KeyValuePair<string, eACLPermission>[] Rights =
+      {
+         new KeyValuePair<string, eACLPermission>("lookup", eACLPermission.ePermissionLookup),
+         new KeyValuePair<string, eACLPermission>("read", eACLPermission.ePermissionRead),
+         new KeyValuePair<string, eACLPermission>("write_seen", eACLPermission.ePermissionWriteSeen),
+         new KeyValuePair<string, eACLPermission>("write_others", eACLPermission.ePermissionWriteOthers),
+         new KeyValuePair<string, eACLPermission>("insert", eACLPermission.ePermissionInsert),
+         new KeyValuePair<string, eACLPermission>("post", eACLPermission.ePermissionPost),
+         new KeyValuePair<string, eACLPermission>("create", eACLPermission.ePermissionCreate),
+         new KeyValuePair<string, eACLPermission>("delete_mailbox", eACLPermission.ePermissionDeleteMailbox),
+         new KeyValuePair<string, eACLPermission>("write_deleted", eACLPermission.ePermissionWriteDeleted),
+         new KeyValuePair<string, eACLPermission>("expunge", eACLPermission.ePermissionExpunge),
+         new KeyValuePair<string, eACLPermission>("administer", eACLPermission.ePermissionAdminister)
+      };
+
+      private readonly IMAPFolderPermissions _owner;
+
+      internal IMAPFolderPermission(IMAPFolderPermissions owner)
+      {
+         _owner = owner;
+         PermissionType = eACLPermissionType.ePermissionTypeUser;
+      }
+
+      internal static IMAPFolderPermission From(IMAPFolderPermissions owner, JsonElement entry)
+      {
+         var permission = new IMAPFolderPermission(owner);
+         permission.Read(entry);
+         return permission;
+      }
+
+      private void Read(JsonElement entry)
+      {
+         ID = ServerApi.LongOf(entry, "id");
+         PermissionType = TypeOf(ServerApi.StringOf(entry, "type"));
+         PermissionAccountID = ServerApi.LongOf(entry, "account_id");
+         PermissionGroupID = ServerApi.LongOf(entry, "group_id");
+
+         long value = 0;
+         JsonElement rights;
+         if (entry.TryGetProperty("rights", out rights) && rights.ValueKind == JsonValueKind.Object)
+         {
+            foreach (var right in Rights)
+            {
+               if (ServerApi.FlagOf(rights, right.Key))
+                  value |= (long) right.Value;
+            }
+         }
+         Value = value;
+      }
+
+      private static eACLPermissionType TypeOf(string word)
+      {
+         switch (word)
+         {
+            case "group": return eACLPermissionType.ePermissionTypeGroup;
+            case "anyone": return eACLPermissionType.ePermissionTypeAnyone;
+            default: return eACLPermissionType.ePermissionTypeUser;
+         }
+      }
+
+      private static string WordOf(eACLPermissionType type)
+      {
+         switch (type)
+         {
+            case eACLPermissionType.ePermissionTypeGroup: return "group";
+            case eACLPermissionType.ePermissionTypeAnyone: return "anyone";
+            default: return "user";
+         }
+      }
+
+      public long ID { get; private set; }
+      public long ShareFolderID => _owner.FolderID;
       public eACLPermissionType PermissionType { get; set; }
       public long PermissionAccountID { get; set; }
       public long PermissionGroupID { get; set; }
+      public long Value { get; set; }
 
-      public void Save()
+      public bool get_Permission(eACLPermission permission)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
+         return (Value & (long) permission) != 0;
       }
 
       public void set_Permission(eACLPermission permission, bool value)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoFolderAcl);
+         if (value)
+            Value |= (long) permission;
+         else
+            Value &= ~(long) permission;
       }
 
-      public bool get_Permission(eACLPermission permission)
+      private string Body()
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderAcl);
+         var rights = string.Join(",", Rights.Select(right => "\"" + right.Key + "\":" + (get_Permission(right.Value) ? "true" : "false")));
+
+         return "{\"type\":" + ServerApi.Quote(WordOf(PermissionType)) +
+                ",\"account_id\":" + PermissionAccountID +
+                ",\"group_id\":" + PermissionGroupID +
+                ",\"rights\":{" + rights + "}}";
+      }
+
+      public void Save()
+      {
+         IMAPFolderPermissions.RouteOrSkip();
+
+         var answer = ID == 0
+            ? ServerApi.Post(_owner.Base, Body())
+            : ServerApi.Put(_owner.Base + "/" + ID, Body());
+
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(ID == 0 ? 201 : 200, (ID == 0 ? "POST " : "PUT ") + _owner.Base);
+         Read(answer.Json.Value);
+      }
+
+      public void Delete()
+      {
+         if (ID != 0)
+            _owner.DeleteByDBID(ID);
       }
    }
 }

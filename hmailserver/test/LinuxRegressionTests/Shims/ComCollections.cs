@@ -1664,7 +1664,8 @@ namespace hMailServer
 
       public IMAPFolders SubFolders => new IMAPFolders(Account, ID);
 
-      public IMAPFolderPermissions Permissions { get; } = new IMAPFolderPermissions();
+      /// <summary>The folder's ACL, under the account's address on the API.</summary>
+      public IMAPFolderPermissions Permissions => new IMAPFolderPermissions(Account, ID);
 
       public Messages Messages => new Messages(Account, ID);
 

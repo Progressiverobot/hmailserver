@@ -177,7 +177,7 @@ namespace RegressionTests.Shared
          "needs a domain's database id, and the REST API addresses a domain by name only";
 
       public const string NoAccountIds =
-         "needs an account's database id, and the REST API addresses an account by address only";
+         "needs an account's database id, and this server's GET /api/v1/accounts/{address} does not report one (it arrived after 6.3.2)";
 
       public const string NoAliasIds =
          "needs an alias's database id, and the REST API addresses an alias by name only";
@@ -318,7 +318,7 @@ namespace RegressionTests.Shared
          "drives the updater through Status.CheckForUpdate / DownloadUpdate, and the REST update routes are a different shape (GET /api/v1/update and POST /api/v1/update/check)";
 
       public const string NoFolderAcl =
-         "needs an IMAP folder's access-control list, and no REST route reads or writes one";
+         "needs an IMAP folder's access-control list, and this server's REST API has no /api/v1/accounts/{address}/folders/{id}/permissions (it arrived after 6.3.2)";
 
       public const string NoServerRestart =
          "needs the server restarted so that it reads hMailServer.ini again, and this server's REST API has no POST /api/v1/server/reinitialize";
