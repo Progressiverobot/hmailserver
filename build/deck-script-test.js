@@ -545,6 +545,16 @@ const SETTING_GROUPS = {
       },
       values: { enabled: true, log_smtp: false, log_directory: '/var/log/hmailserver' }
    },
+   '/api/v1/settings/antivirus': {
+      props: {
+         clamav_enabled: { type: 'boolean', description: 'Whether messages are scanned by a ClamAV daemon.' },
+         clamav_host: { type: 'string', description: 'The ClamAV daemon\'s host.' },
+         clamav_port: { type: 'integer', description: 'The ClamAV daemon\'s port, 1 to 65535.' },
+         action: { type: 'string', description: 'What is done with a message a scanner flags.', enum: ['delete_email', 'delete_attachments'] },
+         maximum_message_size_kb: { type: 'integer', description: 'Messages larger than this, in KB, are not scanned; 0 scans every size.' }
+      },
+      values: { clamav_enabled: false, clamav_host: 'localhost', clamav_port: 3310, action: 'delete_attachments', maximum_message_size_kb: 0 }
+   },
    '/api/v1/settings/backup': {
       props: {
          destination: { type: 'string', description: 'The directory a backup is written to.' },
@@ -570,6 +580,7 @@ const spec = {
       '/api/v1/settings': settingsPath('/api/v1/settings'),
       '/api/v1/settings/antispam': settingsPath('/api/v1/settings/antispam'),
       '/api/v1/settings/logging': settingsPath('/api/v1/settings/logging'),
+      '/api/v1/settings/antivirus': settingsPath('/api/v1/settings/antivirus'),
       '/api/v1/rules': {
          get: { summary: 'List the global rules with their criteria and actions', description: 'Each entry: id, name, active, all_criteria, criteria (field, header, match, value) and actions (type, value). Server-wide; refused for domain-restricted keys.' },
          post: { summary: 'Create a global rule', description: RULES_POST, requestBody: body({ name: { type: 'string' } }, ['name']) }
@@ -1521,8 +1532,8 @@ async function main() {
    // ---- settings, drawn from the OpenAPI document
    before = requests.length;
    await goTo('settings');
-   check('the settings view reads the three groups, and the document was read once for the whole session',
-      called(0, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging'].every((p) => called(before, 'GET', p).length === 1),
+   check('the settings view reads the four groups, and the document was read once for the whole session',
+      called(0, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging', '/api/v1/settings/antivirus'].every((p) => called(before, 'GET', p).length === 1),
       paths(before));
    check('a string is a text box with the value', document.getElementById('set_srv_hostname').type === 'text' && document.getElementById('set_srv_hostname').value === 'mail.example.com');
    check('an integer is a number box', document.getElementById('set_srv_max_message_size_kb').type === 'number' && document.getElementById('set_srv_max_message_size_kb').value === '10240');
