@@ -241,8 +241,11 @@
     return into;
   };
   var folderName = function (id) { var f = foldersById[id]; return f ? (f.path.toUpperCase() === 'INBOX' ? t('Inbox') : f.path) : 'Mail'; };
-  var fillFolderSelect = function (select, homeId) {
+  // The folders a message may be moved to, as options; an option given
+  // first (such as "leave it") goes before them.
+  var fillFolderSelect = function (select, homeId, first) {
     clear(select);
+    if (first) { select.appendChild(first); }
     var home = foldersById[homeId];
     allFolders.forEach(function (f) {
       if (f.id === homeId || !f.writable || (home && f.account_id !== home.account_id)) { return; }
@@ -330,7 +333,7 @@
   };
   var loadFolders = function () {
     return call('GET', '/api/v1/me/folders').then(function (result) {
-      if (result.status === 200 && result.data) { renderFolders(result.data); }
+      if (result.status === 200 && result.data) { renderFolders(result.data); renderQuickSteps(); }
       return result;
     });
   };
@@ -1628,6 +1631,7 @@
     followUps.day = '';
     replied = {};
     askedReplies = {};
+    clear(el('quick-steps'));
     prefetched = {};
     current = null;
     lastListing = null;
@@ -3551,11 +3555,138 @@
     el('pref-language').value = knownLanguage(pref('language') || '') || languageActive;
     renderNotifyFolders();
     renderTemplates();
+    renderQuickSteps();
     renderSupport();
     refreshLabelColours();
     applyLanguagePref();
     updateTitle();
   };
+  // ---- Quick steps: a button of the reader's own, as Outlook has them -------
+  // Kept in the preferences as qs.<slug> -> {name, key, read, move, label,
+  // forward}, so they follow the account between browsers. One runs on the
+  // ticked messages, failing those on the open message, failing that on the
+  // row under the cursor: mark as read, the label, the forward - the compose
+  // window primed from the message, attachments and all, before anything
+  // moves it - and then the move, whose toast has Undo as any filing's has.
+  // A key from 1 to 9 runs it from the list.
+  var quickSteps = function () {
+    var list = [];
+    Object.keys(prefs).forEach(function (k) {
+      if (k.indexOf('qs.') !== 0) { return; }
+      try {
+        var v = JSON.parse(prefs[k]);
+        if (v && v.name) {
+          list.push({ key: k, name: String(v.name), shortcut: /^[1-9]$/.test(String(v.key || '')) ? String(v.key) : '', read: !!v.read, move: Number(v.move) || 0, label: String(v.label || ''), forward: String(v.forward || '') });
+        }
+      } catch (e) { /* a value that is not a quick step is left alone */ }
+    });
+    return list.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  };
+  var quickStepByKey = function (digit) { return quickSteps().filter(function (s) { return s.shortcut === digit; })[0] || null; };
+  var describeQuickStep = function (s) {
+    var parts = [];
+    if (s.read) { parts.push(t('Mark as read')); }
+    if (s.label) { parts.push(t('Label') + ' ' + s.label); }
+    if (s.forward) { parts.push(t('Forward to') + ' ' + s.forward); }
+    if (s.move) { parts.push(t('Move to') + ' ' + folderName(s.move)); }
+    return parts.join(', ');
+  };
+  var quickStepTargets = function () {
+    if (selectedIds().length) { return selectedEntries(); }
+    if (current && !el('message-view').hidden) { return Promise.resolve([{ id: current.id, folderId: current.folder_id }]); }
+    var r = cursor >= 0 ? listRows[cursor] : null;
+    if (r) { return Promise.resolve((r.ids || [r.id]).map(function (id) { return { id: id, folderId: r.folderId || state.folderId }; })); }
+    return Promise.resolve([]);
+  };
+  // The compose window primed as Forward would prime it, addressed, and the
+  // address bar told; the route then finds the form already holds it.
+  var forwardTo = function (id, address) {
+    composeKey = 'forward:' + id;
+    return call('GET', '/api/v1/me/messages/' + id).then(function (result) {
+      if (result.status !== 200 || !result.data) { say('mail-status', describe(result, t('Could not read the message being answered')), false); return null; }
+      return prime('forward', result.data).then(function () {
+        afterPrime('forward', result.data);
+        el('compose-to').value = address;
+        openCompose('forward', id);
+        go('/compose?forward=' + id);
+      });
+    });
+  };
+  var runQuickStep = function (step) {
+    quickStepTargets().then(function (entries) {
+      if (!entries.length) { say('mail-status', t('Nothing to run it on.'), false); return; }
+      var ids = entries.map(function (e) { return e.id; });
+      var chain = Promise.resolve();
+      if (step.read) { ids.forEach(function (id) { chain = chain.then(function () { return call('PUT', '/api/v1/me/messages/' + id + '/flags', { seen: true }); }); }); }
+      if (step.label) { chain = chain.then(function () { return setKeywordOn(ids, step.label, true); }); }
+      if (step.forward) { chain = chain.then(function () { return forwardTo(entries[0].id, step.forward); }); }
+      chain.then(function () {
+        if (step.move) {
+          return fileMany(entries, step.move).then(function (ok) { if (ok && current && ids.indexOf(current.id) >= 0) { closeMessage(true); } });
+        }
+        toast(tf('Quick step {0} done.', step.name));
+        return null;
+      }).then(function () {
+        clearSelection();
+        lastListing = null;
+        loadFolders();
+        if (!el('mail-section').hidden) { reloadKeepingPlace(); }
+      });
+    }, function (r) { say('mail-status', describe(r, t('Could not read the folder')), false); });
+  };
+  var renderQuickSteps = function () {
+    var list = quickSteps();
+    var bar = el('quick-steps');
+    clear(bar);
+    list.forEach(function (s) {
+      var b = node('button', s.name, 'textbtn'); b.type = 'button';
+      b.setAttribute('title', describeQuickStep(s) + (s.shortcut ? ' (' + s.shortcut + ')' : ''));
+      b.addEventListener('click', function () { runQuickStep(s); });
+      bar.appendChild(b);
+    });
+    var rows = el('quickstep-rows');
+    clear(rows);
+    list.forEach(function (s) {
+      var tr = document.createElement('tr');
+      tr.appendChild(node('td', s.name));
+      tr.appendChild(node('td', s.shortcut || t('None')));
+      tr.appendChild(node('td', describeQuickStep(s)));
+      var actions = document.createElement('td');
+      var remove = button(t('Remove'));
+      remove.addEventListener('click', function () { var change = {}; change[s.key] = null; savePrefs(change).then(function (ok) { if (ok) { say('quickstep-status', t('Removed.'), true); } }); });
+      actions.appendChild(remove);
+      tr.appendChild(actions);
+      rows.appendChild(tr);
+    });
+    el('quickstep-empty').hidden = list.length > 0;
+    el('quickstep-table').hidden = list.length === 0;
+    // The folders a step may move to, the choice kept while they are redrawn.
+    var move = el('quickstep-move');
+    var chosen = move.value;
+    var leave = node('option', t('Leave it where it is')); leave.value = '';
+    fillFolderSelect(move, 0, leave);
+    move.value = chosen || '';
+  };
+  el('quickstep-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var name = el('quickstep-name').value.trim().slice(0, 40);
+    var label = el('quickstep-label').value.trim();
+    var forward = el('quickstep-forward').value.trim();
+    var move = Number(el('quickstep-move').value) || 0;
+    var read = el('quickstep-read').checked;
+    if (!name) { say('quickstep-status', t('Give the quick step a name.'), false); return; }
+    if (label && !validLabel(label)) { say('quickstep-status', t('Give the label: one word, no spaces, quotes or brackets.'), false); return; }
+    if (forward && forward.indexOf('@') < 1) { say('quickstep-status', t('Give an address to forward to.'), false); return; }
+    if (!read && !label && !forward && !move) { say('quickstep-status', t('Give the quick step something to do.'), false); return; }
+    var slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'step';
+    var change = {};
+    change['qs.' + slug] = JSON.stringify({ name: name, key: el('quickstep-key').value, read: read, move: move, label: label, forward: forward });
+    savePrefs(change).then(function (ok) {
+      if (!ok) { return; }
+      say('quickstep-status', t('Saved.'), true);
+      el('quickstep-name').value = ''; el('quickstep-key').value = ''; el('quickstep-read').checked = false; el('quickstep-move').value = ''; el('quickstep-label').value = ''; el('quickstep-forward').value = '';
+    });
+  });
   // ---- Templates: kept in the preferences as tpl.<slug> -> {name, subject, text}
   var templates = function () {
     var list = [];
@@ -4293,6 +4424,8 @@
     if (event.key === '/') { event.preventDefault(); el('mail-search').focus(); return; }
     if (event.key === 'c') { event.preventDefault(); go('/compose'); return; }
     if (el('mail-section').hidden) { return; }
+    // A digit runs the quick step given that key.
+    if (/^[1-9]$/.test(event.key)) { var step = quickStepByKey(event.key); if (step) { event.preventDefault(); runQuickStep(step); } return; }
     var open = current && !el('message-view').hidden;
     if (event.key === 'u' || (event.key === 'Escape' && open)) { if (open) { event.preventDefault(); closeMessage(false); } return; }
     if (open && event.key === 'r') { event.preventDefault(); go('/compose?reply=' + current.id); return; }

@@ -300,6 +300,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .msg .what .snip{color:var(--muted);overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
 .msg .what .snip::before{content:" - "}
 .msg .what .chips{flex:none}
+#quick-steps{display:flex;align-items:center;gap:4px;margin-left:4px}
+#quick-steps:empty{display:none}
 .msg .what .nudge{color:var(--warn);flex:none;overflow:hidden;text-overflow:ellipsis}
 .msg .what .nudge::before{content:" - "}
 .msg .meta{display:flex;align-items:center;gap:6px;flex:none;padding-left:8px;color:var(--muted)}
@@ -703,6 +705,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <select id="bulk-move" aria-label="Move to"></select><button class="textbtn" id="bulk-move-go" type="button">Move</button>
 <button class="textbtn" id="bulk-clear" type="button">Clear</button>
 </div>
+<span id="quick-steps"></span>
 <div class="sp"></div>
 <span class="count" id="list-count"></span>
 <button class="iconbtn sm" id="page-newer" type="button" title="Newer" aria-label="Newer" hidden><svg class="i"><use href="#i-left"/></svg></button>
@@ -918,6 +921,26 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <table class="list" id="template-table"><thead><tr><th>Name</th><th>Subject</th><th></th></tr></thead><tbody id="template-rows"></tbody></table>
 <div id="template-empty" class="hint" hidden>No templates. Write one in a new message and press "Save as template".</div>
 <div id="template-status" class="status" aria-live="polite"></div>
+</div>
+<div class="card">
+<h2>Quick steps</h2>
+<p class="note">A button of your own that does several things at once to the ticked messages, or to the one under the cursor - and a key from 1 to 9 for it.</p>
+<form id="quickstep-form" class="form">
+<div class="row">
+<div style="flex:1;min-width:12rem"><label for="quickstep-name">Name</label><input id="quickstep-name" type="text" maxlength="40" autocomplete="off"></div>
+<div style="flex:0 1 8rem"><label for="quickstep-key">Shortcut</label><select id="quickstep-key"><option value="">None</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option></select></div>
+</div>
+<div class="row">
+<div style="flex:1;min-width:12rem"><label for="quickstep-move">Move to</label><select id="quickstep-move"></select></div>
+<div style="flex:1;min-width:12rem"><label for="quickstep-label">Label</label><input id="quickstep-label" type="text" maxlength="60" autocomplete="off"></div>
+<div style="flex:1;min-width:12rem"><label for="quickstep-forward">Forward to</label><input id="quickstep-forward" type="text" autocomplete="off"></div>
+</div>
+<label class="inline"><input id="quickstep-read" type="checkbox"> Mark as read</label>
+<div><button class="btn" type="submit">Add the quick step</button></div>
+</form>
+<table class="list" id="quickstep-table" hidden><thead><tr><th>Name</th><th>Shortcut</th><th>What it does</th><th></th></tr></thead><tbody id="quickstep-rows"></tbody></table>
+<div id="quickstep-empty" class="hint">No quick steps yet.</div>
+<div id="quickstep-status" class="status" aria-live="polite"></div>
 </div>
 <div class="card">
 <h2>Labels</h2>

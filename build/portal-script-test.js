@@ -1234,6 +1234,90 @@ async function main() {
    check('the preference turns nudges off, with the account', !!nudgePref && JSON.parse(nudgePref.body).nudges === '0' && !nudgeOf(rowBySubject('Draft agenda')),
       (nudgePref ? nudgePref.body : 'no preferences call') + ' nudge=' + !!nudgeOf(rowBySubject('Draft agenda')));
 
+   // ---- quick steps: a button of the reader's own, kept with the account, run by a click or a key
+   location.hash = '#/settings';
+   await flush();
+   const stepButtons = () => document.getElementById('quick-steps').children;
+   const stepRows = () => document.getElementById('quickstep-rows').children;
+   const defineStep = async (name, key, read, move, label, forward) => {
+      document.getElementById('quickstep-name').value = name;
+      document.getElementById('quickstep-key').value = key;
+      document.getElementById('quickstep-read').checked = read;
+      document.getElementById('quickstep-move').value = move;
+      document.getElementById('quickstep-label').value = label;
+      document.getElementById('quickstep-forward').value = forward;
+      document.getElementById('quickstep-form').dispatchEvent(makeEvent('submit'));
+      await flush();
+   };
+   const beforeStep = requests.length;
+   await defineStep('File it', '1', true, '3', 'done', '');
+   const stepPref = since(beforeStep).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   const stepSaved = stepPref && JSON.parse(stepPref.body)['qs.file-it'] ? JSON.parse(JSON.parse(stepPref.body)['qs.file-it']) : null;
+   check('a quick step is kept with the account\'s preferences', !!stepSaved && stepSaved.key === '1' && stepSaved.read === true && stepSaved.move === 3 && stepSaved.label === 'done',
+      stepPref ? stepPref.body : 'no preferences call');
+   check('and appears as a button over the list', stepButtons().length === 1 && stepButtons()[0].textContent === 'File it', stepButtons().length + ' buttons');
+   check('and in the settings table with what it does', stepRows().length === 1 && stepRows()[0].textContent.indexOf('Mark as read') >= 0 && stepRows()[0].textContent.indexOf('Label done') >= 0 && stepRows()[0].textContent.indexOf('Move to INBOX.Work') >= 0,
+      stepRows().length ? stepRows()[0].textContent : 'no rows');
+   const beforeIdle = requests.length;
+   await defineStep('Idle', '', false, '', '', '');
+   check('a step with nothing to do is refused', requests.length === beforeIdle && document.getElementById('quickstep-status').textContent === 'Give the quick step something to do.',
+      document.getElementById('quickstep-status').textContent);
+   location.hash = '#/f/1';
+   await flush();
+   boxOf(rowBySubject('Second')).checked = true;
+   boxOf(rowBySubject('Second')).dispatchEvent(makeEvent('click'));
+   const beforeRun = requests.length;
+   stepButtons()[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   await flush();
+   const ran = since(beforeRun).map((r) => ({ method: r.method, path: r.path, body: r.body ? JSON.parse(r.body) : {} }));
+   const readAt = ran.findIndex((r) => r.method === 'PUT' && r.path === '/api/v1/me/messages/102/flags' && r.body.seen === true);
+   const labelAt = ran.findIndex((r) => r.method === 'PUT' && r.path === '/api/v1/me/messages/102/flags' && JSON.stringify(r.body.keywords_add) === '["done"]');
+   const moveAt = ran.findIndex((r) => r.method === 'POST' && r.path === '/api/v1/me/messages/102/move' && r.body.folder_id === 3);
+   check('the button marks the ticked message read, labels it and moves it, in that order', readAt >= 0 && labelAt > readAt && moveAt > labelAt,
+      JSON.stringify(ran.map((r) => r.method + ' ' + r.path)));
+   check('with the filing\'s own toast and Undo, and the selection cleared', toasts.textContent.indexOf('Undo') >= 0 && ticked() === 0, toasts.textContent + ' ' + ticked() + ' ticked');
+   dismissAllToasts();
+   const beforeKey = requests.length;
+   document.dispatchEvent(makeEvent('keydown', { key: '1', target: document.body }));
+   await flush();
+   await flush();
+   const keyed = since(beforeKey);
+   check('the key 1 runs it on the row under the cursor', keyed.some((r) => r.method === 'PUT' && /\/messages\/\d+\/flags$/.test(r.path) && JSON.parse(r.body).seen === true) && keyed.some((r) => r.method === 'POST' && /\/messages\/\d+\/move$/.test(r.path)),
+      JSON.stringify(keyed.map((r) => r.method + ' ' + r.path)));
+   dismissAllToasts();
+   const beforeNoStep = requests.length;
+   document.dispatchEvent(makeEvent('keydown', { key: '2', target: document.body }));
+   await flush();
+   check('a digit with no step does nothing', requests.length === beforeNoStep, JSON.stringify(since(beforeNoStep).map((r) => r.path)));
+   // A step that forwards primes the compose window from the message before anything moves it.
+   location.hash = '#/settings';
+   await flush();
+   await defineStep('Send on', '2', false, '3', '', 'boss@example.net');
+   location.hash = '#/f/1';
+   await flush();
+   boxOf(rowBySubject('Second')).checked = true;
+   boxOf(rowBySubject('Second')).dispatchEvent(makeEvent('click'));
+   const beforeForward = requests.length;
+   stepButtons().filter((b) => b.textContent === 'Send on')[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   await flush();
+   await flush();
+   const fwd = since(beforeForward);
+   const gotAt = fwd.findIndex((r) => r.method === 'GET' && r.path === '/api/v1/me/messages/102');
+   const movedAt = fwd.findIndex((r) => r.method === 'POST' && r.path === '/api/v1/me/messages/102/move');
+   check('a forwarding step reads the message into the compose window, addressed, before the move', gotAt >= 0 && movedAt > gotAt && compose.hidden === false && document.getElementById('compose-to').value === 'boss@example.net' && location.hash === '#/compose?forward=102',
+      'got=' + gotAt + ' moved=' + movedAt + ' to=' + document.getElementById('compose-to').value + ' ' + location.hash);
+   dismissAllToasts();
+   location.hash = '#/settings';
+   await flush();
+   const beforeRemove = requests.length;
+   stepRows()[0].children[3].children[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   const removePref = since(beforeRemove).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   check('Remove takes it out of the preferences and off the list', !!removePref && JSON.parse(removePref.body)['qs.file-it'] === null && stepButtons().length === 1 && stepButtons()[0].textContent === 'Send on',
+      (removePref ? removePref.body : 'no preferences call') + ' ' + stepButtons().length + ' buttons');
+
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',

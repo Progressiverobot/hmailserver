@@ -32,6 +32,7 @@ use.
 | `m` | Mute or unmute the conversation: it leaves the inbox, and a rule the page writes files its replies into the archive folder |
 | `c` | Write a new message |
 | `r` `a` `f` | Reply, reply to all, forward the open message |
+| `1` to `9` | Run the quick step given that key (Settings, Quick steps): on the ticked messages, else the open message, else the row under the cursor |
 | `/` | Search |
 | `Ctrl` + `K` | The palette: an action, a page, a folder or a contact |
 | `?` | The list of shortcuts |
