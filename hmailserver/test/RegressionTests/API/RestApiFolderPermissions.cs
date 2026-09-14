@@ -250,8 +250,11 @@ namespace RegressionTests.API
          Refused("{}", "type is required");
          Refused("{\"type\":\"owner\"}", "type must be user, group or anyone");
          Refused("{\"type\":\"user\"}", "names the account it is for");
-         Refused("{\"type\":\"user\",\"account_id\":999999999}", "no account with the id 999999999");
-         Refused("{\"type\":\"user\",\"account\":\"nobody@" + _domain.Name + "\"}", "no account with the address nobody@" + _domain.Name);
+         // One sentence for an account that is not there and for one the
+         // credential may not name, so that a key restricted to a domain
+         // learns nothing of the accounts outside it.
+         Refused("{\"type\":\"user\",\"account_id\":999999999}", "no such account, or not one this credential may name");
+         Refused("{\"type\":\"user\",\"account\":\"nobody@" + _domain.Name + "\"}", "no such account, or not one this credential may name");
          Refused("{\"type\":\"user\",\"account_id\":" + owner.ID + "}", "The folder owner's rights are implicit and cannot be changed.");
          Refused("{\"type\":\"user\",\"account_id\":" + other.ID + ",\"group_id\":1}", "names no group");
          Refused("{\"type\":\"group\"}", "names the group it is for");

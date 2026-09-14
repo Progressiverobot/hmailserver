@@ -78,6 +78,19 @@ namespace RegressionTests.Infrastructure
             RestartServerAndReacquireCom();
          }
 
+         // The refusal is the error log's HM5011 line, expected and consumed
+         // here so that the next fixture's SetUp does not read it as an error
+         // of its own - and read only now, since the log's name comes from
+         // Settings.Logging, which the refused database refuses too. A refused
+         // database is reported once per initialisation; whatever else the
+         // steps logged is that same refusal and nothing else.
+         Assert.IsTrue(File.Exists(LogHandler.GetErrorLogFileName()), "The refusal was reported in the error log.");
+         string reported = LogHandler.ReadAndDeleteErrorLog();
+         StringAssert.Contains("HM5011", reported);
+         StringAssert.Contains("too old", reported);
+         foreach (string line in reported.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            StringAssert.Contains("HM5011", line, "An error other than the expected refusal was logged: " + line);
+
          Assert.AreEqual(required, _application.Database.CurrentVersion);
          Assert.IsNotNull(_application.Domains, "The server is back with its configuration loaded.");
       }
