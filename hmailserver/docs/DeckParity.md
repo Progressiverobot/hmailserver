@@ -9,10 +9,10 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 263 |
+| of them writable over REST | 272 |
 | of them reachable from a Deck view | 167 |
-| missing over REST | 72 |
-| over REST but not reached by any Deck view | 96 |
+| missing over REST | 63 |
+| over REST but not reached by any Deck view | 105 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
 | REST routes (path and method) | 170, 77 of them writes |
@@ -23,7 +23,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
 | Domain | 9 | `ADDomainName`, `DKIMBodyCanonicalizationMethod`, `DKIMHeaderCanonicalizationMethod`, `DKIMSecondaryPrivateKeyFile`, `DKIMSecondarySelector`, `DKIMSignAliasesEnabled`, `VacationExternalOverride`, `VacationInternalMessage`, `VacationInternalSubject` |
-| Account | 9 | `ADDomain`, `ADUsername`, `ForwardAbortSpamFlagged`, `IsAD`, `SieveScript`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate` |
 | Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
 | DistributionList | 5 | `Active`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
@@ -50,8 +49,8 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties |
 |---|---|---|
 | Domain | 35 | `Active`, `AddSignaturesToLocalMail`, `AddSignaturesToReplies`, `AntiSpamEnableGreylisting`, `DKIMPrivateKeyFile`, `DKIMSelector`, `DKIMSignEnabled`, `DKIMSigningAlgorithm`, `MaxAccountSize`, `MaxMessageSize`, `MaxNumberOfAccounts`, `MaxNumberOfAccountsEnabled`, `MaxNumberOfAliases`, `MaxNumberOfAliasesEnabled`, `MaxNumberOfDistributionLists`, `MaxNumberOfDistributionListsEnabled`, `MaxSize`, `MessageRetentionDays`, `Name`, `PlusAddressingCharacter`, `PlusAddressingEnabled`, `Postmaster`, `RelayConnectionSecurity`, `RelayHost`, `RelayPassword`, `RelayPort`, `RelayRequiresAuthentication`, `RelayUsername`, `SignatureEnabled`, `SignatureHTML`, `SignatureMethod`, `SignaturePlainText`, `VacationMessage`, `VacationMessageIsOn`, `VacationSubject` |
+| Account | 23 | `ADDomain`, `ADUsername`, `AdminLevel`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
 | SecurityRange | 18 | `AllowDeliveryFromLocalToLocal`, `AllowDeliveryFromLocalToRemote`, `AllowDeliveryFromRemoteToLocal`, `AllowDeliveryFromRemoteToRemote`, `AllowIMAPConnections`, `AllowPOP3Connections`, `AllowSMTPConnections`, `EnableAntiVirus`, `EnableSpamProtection`, `LowerIP`, `Name`, `Priority`, `RequireSMTPAuthExternalToExternal`, `RequireSMTPAuthExternalToLocal`, `RequireSMTPAuthLocalToExternal`, `RequireSMTPAuthLocalToLocal`, `RequireSSLTLSForAuth`, `UpperIP` |
-| Account | 14 | `AdminLevel`, `AntiSpamEnabled`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `MessageRetentionDays`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `VacationMessage`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
 | FetchAccount | 13 | `ConnectionSecurity`, `DaysToKeepMessages`, `Enabled`, `MinutesBetweenFetch`, `MirrorFolders`, `Name`, `Password`, `Port`, `ServerAddress`, `ServerType`, `UseAntiSpam`, `UseAntiVirus`, `Username` |
 | BackupSettings | 5 | `BackupDomains`, `BackupMessages`, `BackupSettings`, `CompressDestinationFiles`, `Destination` |
 | Alias | 3 | `Active`, `Name`, `Value` |
@@ -198,31 +197,31 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `ADDomain` | AccountDialog | - | - |
-| `ADUsername` | AccountDialog | - | - |
+| `ADDomain` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `ADUsername` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `Active` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `Address` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `AdminLevel` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
-| `AntiSpamEnabled` | AccountDialog | `PUT /api/v1/settings/cache` (words, loose, scope unknown)<br>`PUT /api/v1/settings/indexing` (words, loose, scope unknown) | - |
-| `ForwardAbortSpamFlagged` | AccountDialog | - | - |
+| `AntiSpamEnabled` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`PUT /api/v1/settings/cache` (words, loose, scope unknown)<br>`PUT /api/v1/settings/indexing` (words, loose, scope unknown) | - |
+| `ForwardAbortSpamFlagged` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `ForwardAddress` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `ForwardEnabled` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `ForwardKeepOriginal` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
-| `IsAD` | AccountDialog | - | - |
+| `IsAD` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `MaxSize` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `MessageRetentionDays` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `Password` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `PersonFirstName` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `PersonLastName` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
-| `SieveScript` | AccountDialog | - | - |
+| `SieveScript` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `SignatureEnabled` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `SignatureHTML` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `SignaturePlainText` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
-| `SpamDeleteThreshold` | AccountDialog | - | - |
-| `SpamMarkThreshold` | AccountDialog | - | - |
+| `SpamDeleteThreshold` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `SpamMarkThreshold` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `VacationMessage` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
-| `VacationMessageAbortSpamFlagged` | AccountDialog | - | - |
-| `VacationMessageBeginDate` | AccountDialog | - | - |
+| `VacationMessageAbortSpamFlagged` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `VacationMessageBeginDate` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `VacationMessageExpires` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `VacationMessageExpiresDate` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `VacationMessageIsOn` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
@@ -682,7 +681,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 
 | Route | Resource | Keys | Deck |
 |---|---|---|---|
-| `PUT /api/v1/accounts/{address}` | Account | `active`, `admin_level`, `first_name`, `forward_address`, `forward_enabled`, `forward_keep_original`, `last_name`, `max_size_mb`, `message_retention_days`, `password`, `signature_enabled`, `signature_html`, `signature_plain_text`, `vacation_enabled`, `vacation_expires`, `vacation_expires_date`, `vacation_message`, `vacation_subject` | - |
+| `PUT /api/v1/accounts/{address}` | Account | `active`, `ad_domain`, `ad_enabled`, `ad_username`, `admin_level`, `antispam_enabled`, `first_name`, `forward_abort_spam_flagged`, `forward_address`, `forward_enabled`, `forward_keep_original`, `last_name`, `max_size_mb`, `message_retention_days`, `password`, `sieve_script`, `signature_enabled`, `signature_html`, `signature_plain_text`, `spam_delete_threshold`, `spam_mark_threshold`, `vacation_abort_spam_flagged`, `vacation_begin_date`, `vacation_enabled`, `vacation_expires`, `vacation_expires_date`, `vacation_message`, `vacation_subject` | - |
 | `POST /api/v1/accounts/{address}/fetch-accounts` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | - |
 | `PUT /api/v1/accounts/{address}/fetch-accounts/{id}` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | - |
 | `POST /api/v1/accounts/{address}/fetch-accounts/{id}/download` | FetchAccount | - | - |

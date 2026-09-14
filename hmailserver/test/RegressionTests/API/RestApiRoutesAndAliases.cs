@@ -640,6 +640,85 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("PUT /api/v1/accounts/<address> takes the rest of the account dialog - the spam switch and thresholds, retention, the automatic reply with its dates, the Active Directory binding and the Sieve script - with COM reading back every value, the response carrying them, an empty date meaning today and an empty script removing the filter, and a refused value changing nothing.")]
+      public void AccountAdministratorFieldsRoundTrip()
+      {
+         Account account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "tux@example.test", "test");
+         string expires = DateTime.Now.AddDays(30).ToString("yyyy-MM-dd");
+         string begins = DateTime.Now.AddDays(-1).ToString("yyyy-MM-dd");
+         const string script = "require [\"fileinto\"]; if header :contains \"Subject\" \"newsletter\" { fileinto \"Newsletters\"; }";
+         string scriptJson = script.Replace("\"", "\\\"");
+
+         (int status, string body) updated = Http("PUT", "/api/v1/accounts/" + account.Address,
+            "{\"antispam_enabled\":false,\"spam_mark_threshold\":7,\"spam_delete_threshold\":21,\"forward_abort_spam_flagged\":true," +
+            "\"message_retention_days\":45,\"vacation_enabled\":true,\"vacation_subject\":\"Away\",\"vacation_message\":\"Back soon\"," +
+            "\"vacation_expires\":true,\"vacation_expires_date\":\"" + expires + "\",\"vacation_begin_date\":\"" + begins + "\"," +
+            "\"vacation_abort_spam_flagged\":true,\"ad_enabled\":true,\"ad_domain\":\"AD\",\"ad_username\":\"tux\"," +
+            "\"sieve_script\":\"" + scriptJson + "\"}");
+         Assert.AreEqual(200, updated.status, updated.body);
+         StringAssert.Contains("\"spam_mark_threshold\":7,", updated.body);
+         StringAssert.Contains("\"message_retention_days\":45", updated.body);
+         StringAssert.Contains("\"vacation_expires_date\":\"" + expires + "\"", updated.body);
+         StringAssert.Contains("\"ad_username\":\"tux\"", updated.body);
+         StringAssert.Contains("\"sieve_script\":\"" + scriptJson + "\"", updated.body);
+
+         Account reread = AccountOverCom(account.Address);
+         Assert.IsFalse(reread.AntiSpamEnabled);
+         Assert.AreEqual(7, reread.SpamMarkThreshold);
+         Assert.AreEqual(21, reread.SpamDeleteThreshold);
+         Assert.IsTrue(reread.ForwardAbortSpamFlagged);
+         Assert.AreEqual(45, reread.MessageRetentionDays);
+         Assert.IsTrue(reread.VacationMessageIsOn);
+         Assert.AreEqual("Away", reread.VacationSubject);
+         Assert.AreEqual("Back soon", reread.VacationMessage);
+         Assert.IsTrue(reread.VacationMessageExpires);
+         StringAssert.StartsWith(expires, reread.VacationMessageExpiresDate);
+         StringAssert.StartsWith(begins, reread.VacationMessageBeginDate);
+         Assert.IsTrue(reread.VacationMessageAbortSpamFlagged);
+         Assert.IsTrue(reread.IsAD);
+         Assert.AreEqual("AD", reread.ADDomain);
+         Assert.AreEqual("tux", reread.ADUsername);
+         Assert.AreEqual(script, reread.SieveScript);
+
+         // A body naming a few of them leaves the rest as they were; an empty
+         // date means today, as put_VacationMessageExpiresDate takes it, and
+         // an empty script removes the filter.
+         string today = DateTime.Now.ToString("yyyy-MM-dd");
+         Assert.AreEqual(200, Http("PUT", "/api/v1/accounts/" + account.Address,
+            "{\"vacation_expires_date\":\"\",\"sieve_script\":\"\",\"ad_enabled\":false}").status);
+         reread = AccountOverCom(account.Address);
+         StringAssert.StartsWith(today, reread.VacationMessageExpiresDate);
+         Assert.AreEqual("", reread.SieveScript);
+         Assert.IsFalse(reread.IsAD);
+         Assert.AreEqual(7, reread.SpamMarkThreshold, "Left out, so left alone.");
+         Assert.AreEqual("AD", reread.ADDomain);
+         Assert.IsTrue(reread.VacationMessageIsOn);
+
+         // Refused - a threshold or retention below -1, a date that is not
+         // YYYY-MM-DD, a wrong type, a script that does not parse - and
+         // nothing changed, the script included.
+         foreach (string refused in new[]
+         {
+            "{\"spam_mark_threshold\":-2}", "{\"message_retention_days\":-2}", "{\"vacation_begin_date\":\"tomorrow\"}",
+            "{\"ad_enabled\":\"yes\"}", "{\"sieve_script\":42}", "{\"spam_mark_threshold\":3,\"sieve_script\":\"if header\"}"
+         })
+         {
+            (int refusedStatus, string refusedBody) = Http("PUT", "/api/v1/accounts/" + account.Address, refused);
+            Assert.AreEqual(400, refusedStatus, refused + " -> " + refusedBody);
+         }
+
+         (int dateStatus, string dateBody) = Http("PUT", "/api/v1/accounts/" + account.Address, "{\"vacation_expires_date\":\"31/12/2099\"}");
+         Assert.AreEqual(400, dateStatus, dateBody);
+         StringAssert.Contains("Invalid auto-reply expiry date", dateBody, "The property's own sentence.");
+
+         reread = AccountOverCom(account.Address);
+         Assert.AreEqual(7, reread.SpamMarkThreshold);
+         Assert.AreEqual(45, reread.MessageRetentionDays);
+         StringAssert.StartsWith(today, reread.VacationMessageExpiresDate);
+         Assert.AreEqual("", reread.SieveScript, "A script that does not parse is not installed.");
+      }
+
+      [Test]
       [Description("The administrator password sets admin_level to domain, server and back to user, read back through COM, and may update an account that is a server administrator; the level is persisted as InterfaceAccount::put_AdminLevel + Save persist it.")]
       public void AccountAdminLevelByTheAdministrator()
       {
