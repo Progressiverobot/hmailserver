@@ -1,14 +1,16 @@
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+// The REST API's settings routes: PUT /api/v1/settings, the anti-spam, anti-virus, logging and directories groups, the INI keys and the logon-failure list. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // The REST API's settings routes: PUT /api/v1/settings, the anti-spam, logging and directories groups, the INI keys and the logon-failure list. See RestApiServer.h.
 //
-// Three groups of settings, each a flat JSON object of snake_case keys, each
+// The groups of settings, each a flat JSON object of snake_case keys, each
 // read with GET and changed with PUT:
 //
 //    /api/v1/settings            the server-wide group InterfaceSettings holds
 //    /api/v1/settings/antispam   InterfaceAntiSpam's scalars
+//    /api/v1/settings/antivirus  InterfaceAntiVirus's scalars
 //    /api/v1/settings/logging    InterfaceLogging's scalars
 //    /api/v1/settings/directories  InterfaceDirectories, read-only: where the server runs
 //
@@ -217,6 +219,7 @@ namespace
    std::shared_ptr<IMAPConfiguration> Imap() { return Configuration::Instance()->GetIMAPConfiguration(); }
    std::shared_ptr<POP3Configuration> Pop3() { return Configuration::Instance()->GetPOP3Configuration(); }
    AntiSpamConfiguration &AntiSpam() { return Configuration::Instance()->GetAntiSpamConfiguration(); }
+   AntiVirusConfiguration &AntiVirus() { return Configuration::Instance()->GetAntiVirusConfiguration(); }
    IniFileSettings *Ini() { return IniFileSettings::Instance(); }
 
    // The words the ports and routes use for eConnectionSecurity, in the order
@@ -247,6 +250,20 @@ namespace
       { "ncsa", 1 },
       { nullptr, 0 }
    };
+
+   // InterfaceAntiVirus::put_Action's two values - eAntivirusAction over COM,
+   // hDeleteEmail and hDeleteAttachments - in the order the Control Panel
+   // lists them. Anything else is refused there rather than stored, and here.
+   const Word AntiVirusActionWords[] =
+   {
+      { "delete_email", AntiVirusConfiguration::ActionDelete },
+      { "delete_attachments", AntiVirusConfiguration::ActionStripAttachments },
+      { nullptr, 0 }
+   };
+
+   // A port the ClamAV client could never connect to is refused before it is
+   // stored, as the ports and routes refuse one.
+   const char *ClamAVPortRefusal = "ClamAVPort must be between 1 and 65535.";
 
    // InterfaceSettings::put_IMAPHierarchyDelimiter's sentence, verbatim.
    const char *HierarchyDelimiterRefusal =
@@ -618,6 +635,69 @@ namespace
         ROW_NUMBER(AntiSpam().GetAntiSpamMaxSizeKB()), ROW_SET(AntiSpam().SetAntiSpamMaxSizeKB((int) v.number)), ROW_NO_CHECK },
    };
 
+   // InterfaceAntiVirus's fourteen scalars, through the same
+   // AntiVirusConfiguration the COM properties write. The scanners read that
+   // object each time a message is scanned (VirusScanner, ClamAVVirusScanner,
+   // ClamWinVirusScanner, CustomVirusScanner), so a change is in force for the
+   // next message; nothing here waits for a restart. The blocked-attachment
+   // patterns themselves are AntiVirus.BlockedAttachments over COM, a
+   // collection and not a setting, and are not in this group.
+   const Row AntiVirusRows[] =
+   {
+      // ClamAV, over TCP.
+      { "clamav_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether messages are scanned by a ClamAV daemon.",
+        ROW_FLAG(AntiVirus().GetClamAVEnabled()), ROW_SET(AntiVirus().SetClamAVEnabled(v.flag)), ROW_NO_CHECK },
+      { "clamav_host", KindString, ReadWrite, EffectNow, nullptr,
+        "The ClamAV daemon's host.",
+        ROW_TEXT(AntiVirus().GetClamAVHost()), ROW_SET(AntiVirus().SetClamAVHost(v.text)), ROW_NO_CHECK },
+      { "clamav_port", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The ClamAV daemon's port, 1 to 65535.",
+        ROW_NUMBER(AntiVirus().GetClamAVPort()), ROW_SET(AntiVirus().SetClamAVPort((int) v.number)),
+        [] (const Value &v) { return (v.number < 1 || v.number > 65535) ? String(ClamAVPortRefusal) : String(); } },
+
+      // ClamWin, run as a program.
+      { "clamwin_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether messages are scanned by running the ClamWin scanner.",
+        ROW_FLAG(AntiVirus().ClamWinEnabled()), ROW_SET(AntiVirus().ClamWinEnabled(v.flag)), ROW_NO_CHECK },
+      { "clamwin_executable", KindString, ReadWrite, EffectNow, nullptr,
+        "The full path of the ClamWin scanner program.",
+        ROW_TEXT(AntiVirus().ClamWinExecutable()), ROW_SET(AntiVirus().ClamWinExecutable(v.text)), ROW_NO_CHECK },
+      { "clamwin_db_folder", KindString, ReadWrite, EffectNow, nullptr,
+        "The directory holding the ClamWin virus database.",
+        ROW_TEXT(AntiVirus().ClamWinDatabase()), ROW_SET(AntiVirus().ClamWinDatabase(v.text)), ROW_NO_CHECK },
+
+      // Any other scanner, run as a program.
+      { "custom_scanner_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether messages are scanned by running the custom scanner command.",
+        ROW_FLAG(AntiVirus().GetCustomScannerEnabled()), ROW_SET(AntiVirus().SetCustomScannerEnabled(v.flag)), ROW_NO_CHECK },
+      { "custom_scanner_executable", KindString, ReadWrite, EffectNow, nullptr,
+        "The command line of the custom scanner; %FILE% in it stands for the message file.",
+        ROW_TEXT(AntiVirus().GetCustomScannerExecutable()), ROW_SET(AntiVirus().SetCustomScannerExecutable(v.text)), ROW_NO_CHECK },
+      { "custom_scanner_return_value", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The exit code the custom scanner returns when it finds a virus.",
+        ROW_NUMBER(AntiVirus().GetCustomScannerReturnValue()), ROW_SET(AntiVirus().SetCustomScannerReturnValue(v.number)), ROW_NO_CHECK },
+
+      // What happens to a message a scanner flags, and who is told.
+      { "action", KindEnum, ReadWrite, EffectNow, AntiVirusActionWords,
+        "What is done with a message a scanner flags: delete_email drops it, delete_attachments strips its attachments and delivers the rest.",
+        ROW_NUMBER(AntiVirus().AVAction()), ROW_SET(AntiVirus().AVAction((AntiVirusConfiguration::eAVAction) v.number)), ROW_NO_CHECK },
+      { "notify_sender", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the sender is told that a virus was found.",
+        ROW_FLAG(AntiVirus().AVNotifySender()), ROW_SET(AntiVirus().AVNotifySender(v.flag)), ROW_NO_CHECK },
+      { "notify_receiver", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether the recipient is told that a virus was found.",
+        ROW_FLAG(AntiVirus().AVNotifyReceiver()), ROW_SET(AntiVirus().AVNotifyReceiver(v.flag)), ROW_NO_CHECK },
+      { "maximum_message_size_kb", KindInteger, ReadWrite, EffectNow, nullptr,
+        "Messages larger than this, in KB, are not scanned; 0 is no limit.",
+        ROW_NUMBER(AntiVirus().GetVirusScanMaxSize()), ROW_SET(AntiVirus().SetVirusScanMaxSize((int) v.number)), ROW_NO_CHECK },
+
+      // Attachments removed by name, whatever the scanners say.
+      { "attachment_blocking_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether attachments whose names match the blocked-attachment list are removed.",
+        ROW_FLAG(AntiVirus().GetEnableAttachmentBlocking()), ROW_SET(AntiVirus().SetEnableAttachmentBlocking(v.flag)), ROW_NO_CHECK },
+   };
+
    const Row LoggingRows[] =
    {
       { "enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
@@ -849,6 +929,7 @@ namespace
 
    const Group ServerGroup = { "server", "/api/v1/settings", ServerRows, sizeof(ServerRows) / sizeof(ServerRows[0]) };
    const Group AntiSpamGroup = { "antispam", "/api/v1/settings/antispam", AntiSpamRows, sizeof(AntiSpamRows) / sizeof(AntiSpamRows[0]) };
+   const Group AntiVirusGroup = { "antivirus", "/api/v1/settings/antivirus", AntiVirusRows, sizeof(AntiVirusRows) / sizeof(AntiVirusRows[0]) };
    const Group LoggingGroup = { "logging", "/api/v1/settings/logging", LoggingRows, sizeof(LoggingRows) / sizeof(LoggingRows[0]) };
    const Group DirectoriesGroup = { "directories", "/api/v1/settings/directories", DirectoriesRows, sizeof(DirectoriesRows) / sizeof(DirectoriesRows[0]) };
    const Group ScriptingGroup = { "scripting", "/api/v1/settings/scripting", ScriptingRows, sizeof(ScriptingRows) / sizeof(ScriptingRows[0]) };
@@ -1559,6 +1640,7 @@ namespace HM
       AnsiString paths;
       paths += OpenApiPath(ServerGroup, "The server-wide settings", "Change server-wide settings", bridge);
       paths += OpenApiPath(AntiSpamGroup, "The anti-spam settings", "Change anti-spam settings", bridge);
+      paths += OpenApiPath(AntiVirusGroup, "The anti-virus settings", "Change anti-virus settings", bridge);
       paths += OpenApiPath(LoggingGroup, "The logging settings", "Change logging settings", bridge);
       paths += OpenApiReadOnlyPath(DirectoriesGroup, "The directories the server runs in",
          "What Settings.Directories reports over COM, and the hMailServer.ini the settings came from. Facts about the installation, set when it was made; nothing here is written. Server-wide; refused for domain-restricted keys.", bridge);
@@ -1591,6 +1673,20 @@ namespace HM
    {
       Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
       return GroupPut(AntiSpamGroup, requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsAntiVirus_()
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupGet(AntiVirusGroup, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleSettingsAntiVirusPut_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return GroupPut(AntiVirusGroup, requestBody, bridge);
    }
 
    HttpResponse

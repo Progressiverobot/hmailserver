@@ -77,6 +77,21 @@ namespace RegressionTests.API
          public bool DkimVerificationEnabled;
          public int AntiSpamMaximumMessageSize;
 
+         public bool ClamAvEnabled;
+         public string ClamAvHost;
+         public int ClamAvPort;
+         public bool ClamWinEnabled;
+         public string ClamWinExecutable;
+         public string ClamWinDbFolder;
+         public bool CustomScannerEnabled;
+         public string CustomScannerExecutable;
+         public int CustomScannerReturnValue;
+         public eAntivirusAction AntiVirusAction;
+         public bool NotifySender;
+         public bool NotifyReceiver;
+         public int AntiVirusMaximumMessageSize;
+         public bool AttachmentBlockingEnabled;
+
          public bool LogDebug;
          public bool LogTcpIp;
          public bool KeepFilesOpen;
@@ -96,6 +111,7 @@ namespace RegressionTests.API
       private Snapshot Take()
       {
          hMailServer.AntiSpam antiSpam = _settings.AntiSpam;
+         hMailServer.AntiVirus antiVirus = _settings.AntiVirus;
          Logging logging = _settings.Logging;
 
          return new Snapshot
@@ -130,6 +146,21 @@ namespace RegressionTests.API
             GreyListingInitialDelay = antiSpam.GreyListingInitialDelay,
             DkimVerificationEnabled = antiSpam.DKIMVerificationEnabled,
             AntiSpamMaximumMessageSize = antiSpam.MaximumMessageSize,
+
+            ClamAvEnabled = antiVirus.ClamAVEnabled,
+            ClamAvHost = antiVirus.ClamAVHost,
+            ClamAvPort = antiVirus.ClamAVPort,
+            ClamWinEnabled = antiVirus.ClamWinEnabled,
+            ClamWinExecutable = antiVirus.ClamWinExecutable,
+            ClamWinDbFolder = antiVirus.ClamWinDBFolder,
+            CustomScannerEnabled = antiVirus.CustomScannerEnabled,
+            CustomScannerExecutable = antiVirus.CustomScannerExecutable,
+            CustomScannerReturnValue = antiVirus.CustomScannerReturnValue,
+            AntiVirusAction = antiVirus.Action,
+            NotifySender = antiVirus.NotifySender,
+            NotifyReceiver = antiVirus.NotifyReceiver,
+            AntiVirusMaximumMessageSize = antiVirus.MaximumMessageSize,
+            AttachmentBlockingEnabled = antiVirus.EnableAttachmentBlocking,
 
             LogDebug = logging.LogDebug,
             LogTcpIp = logging.LogTCPIP,
@@ -188,6 +219,22 @@ namespace RegressionTests.API
          if (antiSpam.GreyListingInitialDelay != s.GreyListingInitialDelay) antiSpam.GreyListingInitialDelay = s.GreyListingInitialDelay;
          if (antiSpam.DKIMVerificationEnabled != s.DkimVerificationEnabled) antiSpam.DKIMVerificationEnabled = s.DkimVerificationEnabled;
          if (antiSpam.MaximumMessageSize != s.AntiSpamMaximumMessageSize) antiSpam.MaximumMessageSize = s.AntiSpamMaximumMessageSize;
+
+         hMailServer.AntiVirus antiVirus = _settings.AntiVirus;
+         if (antiVirus.ClamAVEnabled != s.ClamAvEnabled) antiVirus.ClamAVEnabled = s.ClamAvEnabled;
+         if (antiVirus.ClamAVHost != s.ClamAvHost) antiVirus.ClamAVHost = s.ClamAvHost;
+         if (antiVirus.ClamAVPort != s.ClamAvPort) antiVirus.ClamAVPort = s.ClamAvPort;
+         if (antiVirus.ClamWinEnabled != s.ClamWinEnabled) antiVirus.ClamWinEnabled = s.ClamWinEnabled;
+         if (antiVirus.ClamWinExecutable != s.ClamWinExecutable) antiVirus.ClamWinExecutable = s.ClamWinExecutable;
+         if (antiVirus.ClamWinDBFolder != s.ClamWinDbFolder) antiVirus.ClamWinDBFolder = s.ClamWinDbFolder;
+         if (antiVirus.CustomScannerEnabled != s.CustomScannerEnabled) antiVirus.CustomScannerEnabled = s.CustomScannerEnabled;
+         if (antiVirus.CustomScannerExecutable != s.CustomScannerExecutable) antiVirus.CustomScannerExecutable = s.CustomScannerExecutable;
+         if (antiVirus.CustomScannerReturnValue != s.CustomScannerReturnValue) antiVirus.CustomScannerReturnValue = s.CustomScannerReturnValue;
+         if (antiVirus.Action != s.AntiVirusAction) antiVirus.Action = s.AntiVirusAction;
+         if (antiVirus.NotifySender != s.NotifySender) antiVirus.NotifySender = s.NotifySender;
+         if (antiVirus.NotifyReceiver != s.NotifyReceiver) antiVirus.NotifyReceiver = s.NotifyReceiver;
+         if (antiVirus.MaximumMessageSize != s.AntiVirusMaximumMessageSize) antiVirus.MaximumMessageSize = s.AntiVirusMaximumMessageSize;
+         if (antiVirus.EnableAttachmentBlocking != s.AttachmentBlockingEnabled) antiVirus.EnableAttachmentBlocking = s.AttachmentBlockingEnabled;
 
          Logging logging = _settings.Logging;
          if (logging.LogDebug != s.LogDebug) logging.LogDebug = s.LogDebug;
@@ -389,6 +436,98 @@ namespace RegressionTests.API
          Assert.AreEqual(2048, antiSpam.MaximumMessageSize);
 
          Assert.AreEqual(putBody, Http("GET", "/api/v1/settings/antispam").body);
+      }
+
+      [Test]
+      [Description("The anti-virus group is read, a PUT of all fourteen keys is read back through COM as the Control Panel reads them, the response is the whole group, and a GET afterwards agrees with the PUT.")]
+      public void AntiVirusGroupRoundTripsThroughCom()
+      {
+         hMailServer.AntiVirus antiVirus = _settings.AntiVirus;
+
+         (int status, string body) = Http("GET", "/api/v1/settings/antivirus");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"clamav_enabled\":" + (antiVirus.ClamAVEnabled ? "true" : "false"), body);
+         StringAssert.Contains("\"clamav_host\":\"" + antiVirus.ClamAVHost + "\"", body);
+         StringAssert.Contains("\"clamav_port\":" + antiVirus.ClamAVPort + ",", body);
+         StringAssert.Contains("\"action\":\"" + (antiVirus.Action == eAntivirusAction.hDeleteAttachments ? "delete_attachments" : "delete_email") + "\"", body);
+         StringAssert.Contains("\"maximum_message_size_kb\":" + antiVirus.MaximumMessageSize + ",", body);
+         StringAssert.DoesNotContain("spam_mark_threshold", body, "The anti-virus group is its own resource.");
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/settings/antivirus",
+            "{\"clamav_enabled\":true," +
+            "\"clamav_host\":\"clam.rest-settings.test\"," +
+            "\"clamav_port\":3311," +
+            "\"clamwin_enabled\":false," +
+            "\"clamwin_executable\":\"C:\\\\ClamWin\\\\bin\\\\clamscan.exe\"," +
+            "\"clamwin_db_folder\":\"C:\\\\ClamWin\\\\db\"," +
+            "\"custom_scanner_enabled\":false," +
+            "\"custom_scanner_executable\":\"C:\\\\Scanner\\\\scan.exe %FILE%\"," +
+            "\"custom_scanner_return_value\":7," +
+            "\"action\":\"delete_attachments\"," +
+            "\"notify_sender\":true," +
+            "\"notify_receiver\":true," +
+            "\"maximum_message_size_kb\":4096," +
+            "\"attachment_blocking_enabled\":true}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"clamav_host\":\"clam.rest-settings.test\"", putBody);
+         StringAssert.Contains("\"clamav_port\":3311,", putBody);
+         StringAssert.Contains("\"action\":\"delete_attachments\"", putBody);
+         StringAssert.Contains("\"clamwin_db_folder\":\"C:\\\\ClamWin\\\\db\"", putBody, "A Windows path comes back with its backslashes doubled, as JSON requires.");
+         StringAssert.Contains("\"notify_receiver\":true", putBody, "A PUT answers with the whole group.");
+
+         // COM reads back what the Control Panel would show.
+         Assert.IsTrue(antiVirus.ClamAVEnabled);
+         Assert.AreEqual("clam.rest-settings.test", antiVirus.ClamAVHost);
+         Assert.AreEqual(3311, antiVirus.ClamAVPort);
+         Assert.IsFalse(antiVirus.ClamWinEnabled);
+         Assert.AreEqual("C:\\ClamWin\\bin\\clamscan.exe", antiVirus.ClamWinExecutable);
+         Assert.AreEqual("C:\\ClamWin\\db", antiVirus.ClamWinDBFolder);
+         Assert.IsFalse(antiVirus.CustomScannerEnabled);
+         Assert.AreEqual("C:\\Scanner\\scan.exe %FILE%", antiVirus.CustomScannerExecutable);
+         Assert.AreEqual(7, antiVirus.CustomScannerReturnValue);
+         Assert.AreEqual(eAntivirusAction.hDeleteAttachments, antiVirus.Action);
+         Assert.IsTrue(antiVirus.NotifySender);
+         Assert.IsTrue(antiVirus.NotifyReceiver);
+         Assert.AreEqual(4096, antiVirus.MaximumMessageSize);
+         Assert.IsTrue(antiVirus.EnableAttachmentBlocking);
+
+         Assert.AreEqual(putBody, Http("GET", "/api/v1/settings/antivirus").body);
+      }
+
+      [Test]
+      [Description("On the anti-virus group an unknown key beside an acceptable one, a ClamAV port outside 1 to 65535, an action that is not one of its two words, a value of the wrong type and another group's key are each 400, name the key or carry the refusal sentence, and change nothing.")]
+      public void AntiVirusRefusalsChangeNothing()
+      {
+         hMailServer.AntiVirus antiVirus = _settings.AntiVirus;
+         string host = antiVirus.ClamAVHost;
+         int port = antiVirus.ClamAVPort;
+         eAntivirusAction action = antiVirus.Action;
+         int maximumMessageSize = antiVirus.MaximumMessageSize;
+
+         (int status, string body) unknown = Http("PUT", "/api/v1/settings/antivirus", "{\"clamav_host\":\"changed.test\",\"no_such_setting\":1}");
+         Assert.AreEqual(400, unknown.status, unknown.body);
+         StringAssert.Contains("no_such_setting", unknown.body);
+         Assert.AreEqual(host, antiVirus.ClamAVHost, "The acceptable key beside an unknown one must not have been applied.");
+
+         (int status, string body) badPort = Http("PUT", "/api/v1/settings/antivirus", "{\"clamav_host\":\"changed.test\",\"clamav_port\":70000}");
+         Assert.AreEqual(400, badPort.status, badPort.body);
+         StringAssert.Contains("ClamAVPort must be between 1 and 65535.", badPort.body);
+         Assert.AreEqual(port, antiVirus.ClamAVPort);
+         Assert.AreEqual(host, antiVirus.ClamAVHost, "A refused PUT applies none of its keys.");
+
+         (int status, string body) badAction = Http("PUT", "/api/v1/settings/antivirus", "{\"action\":\"quarantine\"}");
+         Assert.AreEqual(400, badAction.status, badAction.body);
+         StringAssert.Contains("delete_attachments", badAction.body, "The refusal lists the words the key takes.");
+         Assert.AreEqual(action, antiVirus.Action);
+
+         (int status, string body) wrongType = Http("PUT", "/api/v1/settings/antivirus", "{\"maximum_message_size_kb\":\"big\"}");
+         Assert.AreEqual(400, wrongType.status, wrongType.body);
+         StringAssert.Contains("maximum_message_size_kb must be an integer", wrongType.body);
+         Assert.AreEqual(maximumMessageSize, antiVirus.MaximumMessageSize);
+
+         (int status, string body) otherGroup = Http("PUT", "/api/v1/settings/antivirus", "{\"spam_mark_threshold\":3}");
+         Assert.AreEqual(400, otherGroup.status, otherGroup.body);
+         StringAssert.Contains("spam_mark_threshold is not a setting in this group", otherGroup.body);
       }
 
       [Test]
