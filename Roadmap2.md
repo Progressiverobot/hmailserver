@@ -69,3 +69,77 @@ What it has, measured against the two on 14 September: a reading pane (right, be
 | ⬜ | **Native coverage, measured** | The two silver-badge rows in Roadmap.md: the C++ server has never been measured. A coverage build on the bench, the number published. |
 | ⬜ | **The bench, doubled** | One Windows bench runs one gate at a time, about ninety minutes each, and the queue of 14 September was six deep. The Ubuntu VM as a second bench for the Linux suite, in parallel. |
 | ⬜ | **A fuzzing job that never stops** | The release step fuzzes once; a nightly job over the parsers (MIME, IMAP, SMTP, Sieve, iCalendar when it exists) with the corpus kept. |
+
+## 7. What the deep dive of 14 September found missing
+
+Each of these was checked against Roadmap.md before it was written here: none has a row that ships it, and several have a row that says, in so many words, that it does not exist. Grouped by who feels the gap first.
+
+### The administrator
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Alerts** | Nothing tells an administrator anything unless they read a log or a metric. A queue that stalls, a disk that fills, a certificate a week from expiry, an auto-ban storm, a minidump, a backup that failed: each becomes a message to the administrator's address and a webhook, with a daily digest as the quiet default. The disk-space and work-queue tasks already know; they only log. |
+| ⬜ | **Outbound webhooks** | The roadmap row says it plainly: no configurable webhook exists, only an event script an administrator writes by hand. A configured URL per event - message received, delivered, bounced, quarantined, account locked - with a signed body and retries. |
+| ⬜ | **An audit trail** | Every administrative change - who, what, when, from where, over COM, REST or a page - in an append-only, hash-chained log the Deck shows. Exchange has it; a regulated customer asks for it first. |
+| ⬜ | **Declarative configuration** | Export the whole configuration - settings, domains, accounts, rules, routes, certificates, listeners - as one file; apply one with a diff shown first; a GitOps loop that applies a repository on change. Stalwart's file and Postfix's main.cf are what people compare against, and the REST write surface is most of the work already done. |
+| ⬜ | **The reports our own domains receive, read** | The server sends DMARC and TLS-RPT reports; it does not read the ones that come back for its own domains. A mailbox address per domain, the aggregate reports parsed, and a Deck page that charts who sends as the domain, with what result, the way dmarcian does for a fee. |
+| ⬜ | **Own-reputation watch** | The server's outbound addresses checked against the major DNSBLs once a day, and an alert when one lists them - the first thing an administrator learns otherwise is a bounce. |
+| ⬜ | **Compromised-account detection** | Per-account sending limits exist. What is missing is the shape of an account takeover: a sudden change in volume, recipients, hour or client address, which locks the account, keeps the mail in the queue for review and alerts. |
+| ⬜ | **Outbound content policy (DLP)** | Rules on what leaves: card and account numbers by pattern, attachment types, size, an external recipient on a message marked internal - block, quarantine for review or warn the sender. Exchange has it; no open server does it well. |
+| ⬜ | **Quarantine digests for users** | A daily message to each account whose quarantine holds something new, with one-click release from the webmail's held-mail page. |
+| ⬜ | **PST import** | Every migration from Exchange and Outlook has a PST somewhere. A reader for the PST format in the import tool, so a migration is drag, wait, done. |
+| ⬜ | **Event scripts on Linux** | The Windows build hosts VBScript and JScript through Active Scripting; the Linux build has no engine, and the roadmap's Linux row skips every scripting test for it. One cross-platform engine - JavaScript through an embeddable interpreter - for the same events on both, with the Windows engines kept. |
+| ⬜ | **Passkeys and single sign-on** | Passkeys (WebAuthn) for the webmail and Deck sign-in with TOTP as the fallback; OIDC sign-in so an organisation's identity provider is the front door. The server already validates bearer tokens for SMTP and IMAP; the pages should take the same identity. |
+| ⬜ | **A password checked against known breaches** | At every password change, the k-anonymity check against the breach corpus (five characters of the hash leave the server, nothing else), refused when found. |
+| ⬜ | **Spam traps** | Addresses that were never real; a message to one auto-bans the sender and trains the score. |
+
+### The organisation
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Active-active nodes** | The warm-standby topology is documented and tested; what remains is two or more nodes serving the same domains at once - shared database, shared or replicated message store, queue ownership by node, sessions on any node - so a node can be taken down without a failover. |
+| ⬜ | **Object storage for the message store** | Messages on S3-compatible or Azure Blob storage with the database as the index, which is how a store grows past one disk and how the active-active row shares a store. |
+| ⬜ | **Mailbox encryption at rest** | A key per account, the message files encrypted with it, the key unlocked by the password at sign-in and by a recovery key held by the administrator - Dovecot's mail-crypt shape. The search index has to be built with the same care or it leaks what the files hide. |
+| ⬜ | **Storage compression and attachment de-duplication** | Messages compressed on the way to disk and the same attachment stored once, measured on a real mailbox before it is claimed. |
+| ⬜ | **A list manager** | Distribution lists with moderation exist. A list a person subscribes to by mail and by page, with an archive, digests, per-member delivery settings and the List-* headers filled in, is what replaces Mailman for a small organisation. |
+| ⬜ | **Message recall within the server** | An unread message sent to accounts on this server can be withdrawn by its sender, which Outlook does within Exchange and nothing does across the internet. |
+
+### The person reading mail
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Web Push** | Notifications while the page is open exist. Web Push through the browser's push service, with the server holding the subscriptions, means new mail is announced when the installed app is closed, which is the difference between a page and an app. |
+| ⬜ | **Saved searches as folders** | Outlook's search folders: a search saved with a name, shown in the folder list, always current. |
+| ⬜ | **Manage subscriptions** | One page listing every sender that offers an unsubscribe, with how much it sends and one button per row - Gmail's, and the reason most people go looking for it. |
+| ⬜ | **Brand logos** | BIMI on receipt: the logo a sender publishes, verified, as the avatar in the list, which Gmail and Outlook.com both show. |
+| ⬜ | **Contacts in and out** | vCard and CSV import and export in the address book, and a Google and Outlook contacts export walked through in the wiki. |
+| ⬜ | **Snooze, scheduled send and reminders on the phone** | The same features exist; whether they are reachable and readable on a phone is what the UX audit in section 3 measures. |
+
+### The project
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **Published numbers** | Messages per second in and out, IMAP sessions per core, memory per session, on named hardware, against Postfix and Dovecot on the same machine, with the load generator in the repository so anyone can repeat it. The claim in this file's first line is not one until this row is done. |
+| ⬜ | **Windows on ARM** | The Linux port builds for AArch64; the Windows build does not. Visual Studio's ARM64 tools and the same installer. |
+| ⬜ | **macOS** | The POSIX port should build on macOS with little work; a Homebrew formula makes it a developer's local server. |
+| ⬜ | **A Helm chart and a compose file** | The container image exists; the two files people expect beside it, with the probes already served. |
+
+## 8. Declined in the deep dive, with reasons
+
+| | Item | Why not |
+|---|---|---|
+| ⏸️ | **Apple push for iOS Mail** | Dovecot's XAPPLEPUSHSERVICE needs a certificate only Apple's own server program is issued; without it the extension is a promise the server cannot keep. IMAP IDLE and the installed webmail's Web Push are the honest answers. |
+| ⏸️ | **Publishing BIMI for our domains** | It is DNS and a Verified Mark Certificate that costs a sender money each year; the server can document the record but there is nothing to ship. |
+| ⏸️ | **A Bayesian classifier of our own** | Deferred in Roadmap.md and still right: rspamd and SpamAssassin are integrated and learn; a second learner in the server would be worse than both. |
+
+## 9. End-to-end encryption
+
+Transport is done: TLS everywhere, DANE, MTA-STS, a post-quantum key exchange, and S/MIME in the page since 11 September. What is not done is mail that stays unreadable to the server itself, and to anyone who takes the server. Proton and Tuta built businesses on that; theirs is proprietary in the sense that only their client reads their format. This server's version is built on OpenPGP, so that any client with a key reads the mail and no one is locked in - the standard is the feature. Roadmap.md deferred OpenPGP in the browser on 11 September as "the S/MIME page's design on another format"; it is un-deferred here, as the first row of the four.
+
+| | Item | Detail |
+|---|---|---|
+| ⬜ | **OpenPGP in the page** | The S/MIME module's shape - keys made or imported in the browser, kept encrypted under a passphrase, unlocked for a session - for OpenPGP: sign, encrypt, decrypt, verify, with the lock and the signature badge the S/MIME messages already show; a key page with fingerprints, expiry and revocation; Autocrypt headers on outgoing mail so a correspondent's client learns the key, and Autocrypt read on incoming; keys of correspondents looked up by WKD and, where a domain has none, by a keyserver. Interoperates with Thunderbird, GnuPG, Mailvelope, Proton and every client that speaks the standard. |
+| ⬜ | **The server publishes its users' keys** | Web Key Directory for every domain the server hosts: `/.well-known/openpgpkey/` on the web-services listener, advanced method, so that any client on the internet finds a user's key from the address alone. The keys are the ones made in the page or uploaded by an administrator for a client that keeps its own. |
+| ⬜ | **Zero-access mailboxes** | Opt-in per account, the Proton model: after the filters have run - spam, virus, rules, which need the text - a delivered message is encrypted to the account's public key and the plaintext never touches the disk; the private key is encrypted under a key derived from the password with Argon2id and unlocked in the browser, and a recovery key the user writes down is the only other way in. The administrator cannot read the mail, cannot search it, and cannot recover it. Written down as the trade-offs it is: search runs over the client's own index or the headers the server kept; IMAP and POP see ciphertext, so an account with this on is a webmail account until a local bridge exists; a forgotten password without the recovery key is the mail lost, and the page says so before it is switched on. |
+| ⬜ | **A password-protected message to anyone** | For the correspondent with no key: the sender sets a password, the page encrypts the body and attachments (OpenPGP, symmetric) and sends a short message with a link to a reading page on this server; the recipient enters the password there and the browser decrypts; a reply written on that page goes back the same way. End to end, because the plaintext is never in the message that crosses the internet and never on this server; unlike "confidential mode", it promises only what it can keep. |
+| ⬜ | **Trust made visible** | A correspondent's key is remembered the first time it is seen and a change is a warning in the reader, not a silent switch - the one thing a man in the middle needs is silence. Fingerprints shown, verifiable by voice or in person, and a green mark on a verified correspondent from then on. |
