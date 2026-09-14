@@ -353,6 +353,15 @@ const SENT_LISTING = [
    { id: 403, uid: 3, subject: 'Thanks', from: 'user@example.com', to: 'carol@example.net', date: stampDaysAgo(1), size: 300, message_id: '<thanks@example.com>', flags: { seen: true, flagged: false, draft: false } }
 ];
 
+// The Work folder: one conversation of three. The first is quoted whole in
+// the second; the second is not quoted in the third. Clean up should take
+// the first alone.
+const WORK_THREAD = [
+   { id: 503, uid: 3, subject: 'Re: Plan', from: 'b@example.net', to: 'user@example.com', date: '2026-09-03 11:00', size: 300, message_id: '<plan-3@example.net>', in_reply_to: '<plan-2@example.net>', references: '<plan@example.net> <plan-2@example.net>', flags: { seen: true, flagged: false, draft: false }, text: 'Ten it is, with the figures.' },
+   { id: 502, uid: 2, subject: 'Re: Plan', from: 'user@example.com', to: 'b@example.net', date: '2026-09-02 11:00', size: 300, message_id: '<plan-2@example.net>', in_reply_to: '<plan@example.net>', references: '<plan@example.net>', flags: { seen: true, flagged: false, draft: false }, text: 'Ten works.\n\nOn Tuesday, b@example.net wrote:\n> Shall we meet at ten?\n> Bring the  figures.' },
+   { id: 501, uid: 1, subject: 'Plan', from: 'b@example.net', to: 'user@example.com', date: '2026-09-01 11:00', size: 300, message_id: '<plan@example.net>', in_reply_to: '', references: '', flags: { seen: true, flagged: false, draft: false }, text: 'Shall we meet at ten?\nBring the figures.\n-- \nB' }
+];
+
 // The rest of the folder, two pages deep: what the page asks for with before_uid.
 const OLDER = [
    { id: 100, uid: 10, subject: 'Older', from: 'e@example.net', to: 'user@example.com', date: '2026-09-06 09:00', size: 500, flags: { seen: true, flagged: false, draft: false } },
@@ -415,6 +424,7 @@ function answer(method, path, body) {
       return json(200, { total: 6, messages: [ARRIVAL].concat(LISTING.messages).map(withState) });
    }
    if (path.startsWith('/api/v1/me/folders/2/messages')) { return json(200, { total: SENT_LISTING.length, messages: SENT_LISTING.map(withState) }); }
+   if (path.startsWith('/api/v1/me/folders/3/messages')) { return json(200, { total: WORK_THREAD.length, messages: WORK_THREAD.map((m) => withState(Object.assign({}, m, { text: undefined }))) }); }
    if (path.startsWith('/api/v1/me/search?')) {
       // Every folder, for the three queries the page makes of it: the Starred
       // view's, the follow-up reminder's, and the Sent folder's nudges asking
@@ -437,6 +447,12 @@ function answer(method, path, body) {
       return { status: 200, body: 'PNGBYTES', headers: { 'Content-Type': types[index] || 'application/octet-stream' } };
    }
    if (path === '/api/v1/me/messages/102' && method === 'GET') { return json(200, withState(JSON.parse(JSON.stringify(WITH_IMAGE)))); }
+   if (/^\/api\/v1\/me\/messages\/5\d\d$/.test(path) && method === 'GET') {
+      const one = WORK_THREAD.filter((m) => m.id === Number(path.split('/').pop()))[0];
+      if (one) { return json(200, withState(Object.assign({ folder_id: 3, cc: '', html: '', attachments: [] }, one))); }
+   }
+   // A deletion moves the message to Trash and says where it went, as the server does.
+   if (/^\/api\/v1\/me\/messages\/\d+$/.test(path) && method === 'DELETE') { return json(200, { id: 900 + Number(path.split('/').pop()), folder_id: 6, deleted: false }); }
    if (/^\/api\/v1\/me\/messages\/\d+$/.test(path) && method === 'GET') {
       return json(200, withState(Object.assign(JSON.parse(JSON.stringify(WITH_IMAGE)), { id: Number(path.split('/').pop()), html: '', text: 'plain' })));
    }
@@ -1317,6 +1333,40 @@ async function main() {
    const removePref = since(beforeRemove).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
    check('Remove takes it out of the preferences and off the list', !!removePref && JSON.parse(removePref.body)['qs.file-it'] === null && stepButtons().length === 1 && stepButtons()[0].textContent === 'Send on',
       (removePref ? removePref.body : 'no preferences call') + ' ' + stepButtons().length + ' buttons');
+
+   // ---- clean up conversation: a message whose whole text a later one quotes goes to Trash
+   location.hash = '#/f/3';
+   await flush();
+   check('the Work folder lists its conversation as one row', rows().length === 1 && rows()[0].className.indexOf('thread') >= 0, rows().length + ' rows ' + (rows()[0] ? rows()[0].className : ''));
+   rows()[0].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   const cleanItem = menuItem('cleanup');
+   check('the row menu offers Clean up conversation', !!cleanItem && cleanItem.hidden === false, cleanItem ? 'hidden=' + cleanItem.hidden : 'no item');
+   const beforeClean = requests.length;
+   cleanItem.dispatchEvent(makeEvent('click', { target: cleanItem }));
+   await flush();
+   await flush();
+   await flush();
+   const cleaned = since(beforeClean);
+   check('every message of the conversation is read', [501, 502, 503].every((id) => cleaned.some((r) => r.method === 'GET' && r.path === '/api/v1/me/messages/' + id)),
+      JSON.stringify(cleaned.map((r) => r.method + ' ' + r.path)));
+   check('the one quoted whole by a later message goes to Trash, and only that one', cleaned.filter((r) => r.method === 'DELETE').map((r) => r.path).join(' ') === '/api/v1/me/messages/501',
+      JSON.stringify(cleaned.filter((r) => r.method === 'DELETE').map((r) => r.path)));
+   check('with a toast that offers Undo', toasts.textContent.indexOf('Undo') >= 0, toasts.textContent);
+   dismissAllToasts();
+   location.hash = '#/f/1';
+   await flush();
+   rows()[0].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   check('a row that is one message offers no clean-up', menuItem('cleanup').hidden === true);
+   document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.body }));
+   location.hash = '#/m/103';
+   await flush();
+   const beforeLone = requests.length;
+   document.getElementById('message-cleanup').dispatchEvent(makeEvent('click'));
+   await flush();
+   await flush();
+   check('the open message, alone in its conversation, has nothing to clean up and nothing is deleted', !since(beforeLone).some((r) => r.method === 'DELETE') && toasts.textContent.indexOf('Nothing to clean up') >= 0,
+      toasts.textContent + ' ' + JSON.stringify(since(beforeLone).map((r) => r.method + ' ' + r.path)));
+   dismissAllToasts();
 
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));

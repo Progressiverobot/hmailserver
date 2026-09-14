@@ -3200,6 +3200,61 @@
   el('snooze-tomorrow').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-week').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-go').addEventListener('click', function () { var at = fromPicker(el('snooze-at').value); if (at.length === 16) { snoozeUntil(at); } else { say('mail-status', t('Choose when.'), false); } });
+  // ---- Clean up conversation, as Outlook has it -----------------------------
+  // The messages of a conversation whose whole text a later message of it
+  // quotes are redundant: each is read, oldest first, and one whose every
+  // line of three characters or more is found in a later one - the quote
+  // markers and the spacing taken out of both, so a quote re-wrapped or
+  // nested still counts - goes to Trash with the others, with Undo. The
+  // newest message stays, as does one unread, starred or carrying an
+  // attachment, since a reader may not have seen it and a quote carries no
+  // file. Fifty messages at most are read for it. From a conversation row's
+  // menu, or the open message's, whose conversation is the listing's.
+  var cleanLines = function (text) {
+    return String(text || '').split(/\r?\n/).map(function (line) { return line.replace(/^[\s>]+/, '').replace(/\s+/g, ' ').trim(); }).filter(function (line) { return line.length >= 3; });
+  };
+  var quotedIn = function (earlier, later) {
+    var lines = cleanLines(earlier);
+    if (!lines.length) { return false; }
+    var haystack = cleanLines(later).join('\n');
+    return lines.every(function (line) { return haystack.indexOf(line) >= 0; });
+  };
+  var hasAttachments = function (m) { return !!(m.has_attachments || (m.attachments && m.attachments.length)); };
+  var cleanUpConversation = function (members) {
+    var list = (members || []).filter(function (m) { return m && m.id; }).slice(0, 50);
+    var nothing = function () { toast(t('Nothing to clean up: every message says something the later ones do not.')); };
+    if (list.length < 2) { nothing(); return; }
+    list.sort(function (a, b) { var da = dateOf(a), db = dateOf(b); return (da ? da.getTime() : 0) - (db ? db.getTime() : 0); });
+    Promise.all(list.map(function (m) {
+      return call('GET', '/api/v1/me/messages/' + m.id).then(function (result) { return result.status === 200 && result.data ? textOf(result.data) : null; });
+    })).then(function (texts) {
+      var redundant = [];
+      list.forEach(function (m, i) {
+        if (i === list.length - 1 || texts[i] === null || !m.flags || !m.flags.seen || m.flags.flagged || hasAttachments(m)) { return; }
+        for (var j = i + 1; j < list.length; j++) {
+          if (texts[j] !== null && quotedIn(texts[i], texts[j])) { redundant.push({ id: m.id, folderId: m.folder_id || state.folderId }); break; }
+        }
+      });
+      if (!redundant.length) { nothing(); return; }
+      var ids = redundant.map(function (e) { return e.id; });
+      fileMany(redundant, 'delete').then(function (ok) {
+        if (!ok) { return; }
+        if (current && ids.indexOf(current.id) >= 0) { closeMessage(true); }
+        lastListing = null;
+        loadMessages();
+      });
+    });
+  };
+  // The open message's conversation: the listing's messages with its key, and itself.
+  var conversationOfCurrent = function () {
+    if (!current) { return []; }
+    var page = lastListing && lastListing.page;
+    var key = threadKey(current);
+    var members = page ? page.messages.filter(function (x) { return threadKey(x) === key; }) : [];
+    if (!members.some(function (x) { return x.id === current.id; })) { members.push(current); }
+    return members;
+  };
+  el('message-cleanup').addEventListener('click', function () { closeMenus(); cleanUpConversation(conversationOfCurrent()); });
   // ---- Nudges: a reply or a follow-up that seems owed, as Gmail suggests ----
   // Computed from what a row already carries. A message received three to
   // thirty days ago, not answered, not from the reader, not muted, that
@@ -4842,6 +4897,8 @@
       if (act === 'star') { items[i].textContent = m.flags.flagged ? t('Unstar') : t('Star'); }
       if (act === 'pin') { items[i].textContent = isPinned(m) ? t('Unpin') : t('Pin'); }
       if (act === 'mute') { items[i].textContent = isMuted(m) ? t('Unmute') : t('Mute'); }
+      // Only a conversation has anything to clean up.
+      if (act === 'cleanup') { items[i].hidden = !(entry.ms && entry.ms.length > 1); }
       if (act === 'junk') { items[i].textContent = folderIs(entry.folderId, 'Junk') ? t('Not junk') : t('Junk'); }
     }
     renderContextTabs(m);
@@ -4869,6 +4926,7 @@
     else if (act === 'block') { blockSender(addressOf(m.from)); }
     else if (act === 'sweep') { sweepSender(addressOf(m.from), entry.folderId); }
     else if (act === 'mute') { muteThread(entry, !isMuted(m)); }
+    else if (act === 'cleanup') { cleanUpConversation(entry.ms || [m]); }
     else if (act === 'tab') { moveSenderToTab(addressOf(m.from), event.target.getAttribute('data-tab')); }
   });
   document.addEventListener('click', function (event) {
