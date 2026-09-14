@@ -1568,6 +1568,10 @@ namespace HM
          case RouteIncomingRelayCreate:
          case RouteIncomingRelayUpdate:
          case RouteIncomingRelayDelete:
+         case RouteGreyListingWhiteAddressList:
+         case RouteGreyListingWhiteAddressCreate:
+         case RouteGreyListingWhiteAddressUpdate:
+         case RouteGreyListingWhiteAddressDelete:
             return HandleAntiSpamLists_(route.kind, route.record_id, GetRequestBody_(request));
          case RouteBlockedAttachmentList:
          case RouteBlockedAttachmentCreate:
@@ -2814,6 +2818,7 @@ namespace HM
             { "/api/v1/blocked-senders", RouteBlockedSenderList, RouteBlockedSenderCreate, RouteBlockedSenderUpdate, RouteBlockedSenderDelete },
             { "/api/v1/incoming-relays", RouteIncomingRelayList, RouteIncomingRelayCreate, RouteIncomingRelayUpdate, RouteIncomingRelayDelete },
             { "/api/v1/blocked-attachments", RouteBlockedAttachmentList, RouteBlockedAttachmentCreate, RouteBlockedAttachmentUpdate, RouteBlockedAttachmentDelete },
+            { "/api/v1/greylisting-white-addresses", RouteGreyListingWhiteAddressList, RouteGreyListingWhiteAddressCreate, RouteGreyListingWhiteAddressUpdate, RouteGreyListingWhiteAddressDelete },
          };
 
          for (const SmallCollection &collection : collections)
@@ -3281,6 +3286,9 @@ namespace HM
       case RouteBlockedAttachmentCreate:
       case RouteBlockedAttachmentUpdate:
       case RouteBlockedAttachmentDelete:
+      case RouteGreyListingWhiteAddressCreate:
+      case RouteGreyListingWhiteAddressUpdate:
+      case RouteGreyListingWhiteAddressDelete:
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
@@ -3495,6 +3503,10 @@ namespace HM
       case RouteBlockedAttachmentCreate:
       case RouteBlockedAttachmentUpdate:
       case RouteBlockedAttachmentDelete:
+      case RouteGreyListingWhiteAddressList:
+      case RouteGreyListingWhiteAddressCreate:
+      case RouteGreyListingWhiteAddressUpdate:
+      case RouteGreyListingWhiteAddressDelete:
       case RouteCertificateList:
       case RouteRuleList:
       case RouteLogList:

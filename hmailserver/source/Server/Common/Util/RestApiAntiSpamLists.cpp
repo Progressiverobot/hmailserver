@@ -2,9 +2,9 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// The REST API's five small collections - DNS black lists, SURBL servers, white-list addresses, blocked senders and incoming relays - as resources. See RestApiServer.h.
+// The REST API's six small collections - DNS black lists, SURBL servers, white-list addresses, blocked senders, incoming relays and the greylisting white list - as resources. See RestApiServer.h.
 //
-// Five collections the Control Panel edits through COM that had no REST
+// Six collections the Control Panel edits through COM that had no REST
 // resource at all, each in the IP range resource's shape - a listing and a
 // create at the collection's path, an update and a delete at /{id}, one
 // entry that every route answers with, and a body read whole before anything
@@ -16,6 +16,7 @@
 //    /api/v1/whitelist-addresses  AntiSpam.WhiteListAddresses (InterfaceWhiteListAddress)
 //    /api/v1/blocked-senders      AntiSpam.BlockedSenders  (InterfaceBlockedSender)
 //    /api/v1/incoming-relays      Settings.IncomingRelays  (InterfaceIncomingRelay)
+//    /api/v1/greylisting-white-addresses  AntiSpam.GreyListingWhiteAddresses (InterfaceGreyListingWhiteAddress)
 //
 // Each write reaches the same setters and the same Persistent*::SaveObject or
 // DeleteObject the COM item's Save and Delete reach, and takes effect the way
@@ -28,7 +29,9 @@
 // The white list and the blocked senders are read by the server through
 // WhiteListCache and BlockedSenderCache, which the persistence layer marks
 // for reload on every save and delete, so those two work on a fresh
-// collection, as InterfaceAntiSpam hands one out.
+// collection, as InterfaceAntiSpam hands one out. The greylisting white list
+// is asked of the database for every connection (IsSenderWhitelisted), so it
+// too works on a fresh collection, and nothing holds a stale one.
 
 #include "StdAfx.h"
 #include "RestApiServer.h"
@@ -44,11 +47,15 @@
 #include "../BO/BlockedSender.h"
 #include "../BO/IncomingRelays.h"
 #include "../BO/IncomingRelay.h"
+#include "../BO/GreyListingWhiteAddresses.h"
+#include "../BO/GreyListingWhiteAddress.h"
 #include "../Persistence/PersistentDNSBlacklist.h"
 #include "../Persistence/PersistentSURBLServer.h"
 #include "../Persistence/PersistentWhiteListAddress.h"
 #include "../Persistence/PersistentBlockedSender.h"
 #include "../Persistence/PersistentIncomingRelay.h"
+#include "../Persistence/PersistentGreyListingWhiteAddress.h"
+#include "../Persistence/PersistenceMode.h"
 #include "../TCPIP/IPAddress.h"
 #include "../../SMTP/SMTPConfiguration.h"
 
@@ -677,6 +684,111 @@ namespace
       return bridge.respond(200, IncomingRelayEntryJson(bridge, item), "");
    }
 
+   // ------------------------------------------------------------------------
+   // The greylisting white list: an address pattern, with wildcards as the
+   // Control Panel takes them, whose connections are never greylisted.
+   // ------------------------------------------------------------------------
+
+   AnsiString GreyListingWhiteEntryJson(const Bridge &bridge, const std::shared_ptr<GreyListingWhiteAddress> &item)
+   {
+      AnsiString entry;
+      entry.Format("{\"id\":%I64d,\"ip_address\":\"%hs\",\"description\":\"%hs\"}",
+         item->GetID(),
+         Quoted(bridge, item->GetUserEditableIPAddress()).c_str(),
+         Quoted(bridge, item->GetDescription()).c_str());
+      return entry;
+   }
+
+   // The address goes through SetUserEditableIPAddress, as put_IPAddress
+   // sends it: the wildcards a person types become the pattern the lookup
+   // matches. What the address must be is the persistence layer's to say.
+   bool ReadGreyListingWhiteFields(const JsonValue &body, std::shared_ptr<GreyListingWhiteAddress> item, AnsiString &error)
+   {
+      static const char *const keys[] = { "ip_address", "description" };
+      if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
+         return false;
+
+      String address = item->GetUserEditableIPAddress(), description = item->GetDescription();
+      if (!ReadString(body, "ip_address", address, error) ||
+          !ReadString(body, "description", description, error))
+         return false;
+
+      address.Trim();
+      item->SetUserEditableIPAddress(address);
+      item->SetDescription(description);
+      return true;
+   }
+
+   HttpResponse SaveRefusal(const Bridge &bridge, const String &error)
+   {
+      if (error.IsEmpty())
+         return Refusal(bridge, 500, "the greylisting white address could not be saved; see the error log");
+      return bridge.respond(400, "{\"error\":\"" + Quoted(bridge, error) + "\"}", "");
+   }
+
+   HttpResponse ListGreyListingWhite(const Bridge &bridge)
+   {
+      std::shared_ptr<GreyListingWhiteAddresses> collection = AntiSpam().GetGreyListingWhiteAddresses();
+
+      AnsiString json = "[";
+      int count = 0;
+      for (std::shared_ptr<GreyListingWhiteAddress> item : collection->GetSnapshot())
+      {
+         if (!item)
+            continue;
+         if (count > 0)
+            json += ",";
+         json += GreyListingWhiteEntryJson(bridge, item);
+         count++;
+      }
+      json += "]";
+      return bridge.respond(200, json, "");
+   }
+
+   HttpResponse CreateGreyListingWhite(const Bridge &bridge, const AnsiString &requestBody)
+   {
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      std::shared_ptr<GreyListingWhiteAddress> item(new GreyListingWhiteAddress);
+      AnsiString error;
+      if (!ReadGreyListingWhiteFields(body, item, error))
+         return Refusal(bridge, 400, error);
+
+      String saveError;
+      if (!PersistentGreyListingWhiteAddress::SaveObject(item, saveError, PersistenceModeNormal))
+         return SaveRefusal(bridge, saveError);
+
+      LOG_APPLICATION("RestApi: Greylisting white address " + item->GetUserEditableIPAddress() + " created.");
+
+      return bridge.respond(201, GreyListingWhiteEntryJson(bridge, item), "");
+   }
+
+   HttpResponse UpdateGreyListingWhite(const Bridge &bridge, __int64 id, const AnsiString &requestBody)
+   {
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      std::shared_ptr<GreyListingWhiteAddresses> collection = AntiSpam().GetGreyListingWhiteAddresses();
+      std::shared_ptr<GreyListingWhiteAddress> item = collection->GetItemByDBID(id);
+      if (!item)
+         return Refusal(bridge, 404, "greylisting white address not found");
+
+      AnsiString error;
+      if (!ReadGreyListingWhiteFields(body, item, error))
+         return Refusal(bridge, 400, error);
+
+      String saveError;
+      if (!PersistentGreyListingWhiteAddress::SaveObject(item, saveError, PersistenceModeNormal))
+         return SaveRefusal(bridge, saveError);
+
+      LOG_APPLICATION("RestApi: Greylisting white address " + item->GetUserEditableIPAddress() + " updated.");
+
+      return bridge.respond(200, GreyListingWhiteEntryJson(bridge, item), "");
+   }
+
    // The OpenAPI entries, one per resource, in the IP range entry's shape.
    const char *AntiSpamListsPaths =
       ",\"/api/v1/dns-blacklists\":{"
@@ -708,7 +820,13 @@ namespace
       "\"post\":{\"summary\":\"Add an incoming relay\",\"description\":\"Body: name, lower_ip and upper_ip (all required). Saved as one saved in the Control Panel is, and in force for the next session. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"lower_ip\",\"upper_ip\"],\"properties\":{\"name\":{\"type\":\"string\"},\"lower_ip\":{\"type\":\"string\"},\"upper_ip\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: the entry as the listing shows it\"},\"400\":{\"description\":\"name missing, an address that does not parse, a field of the wrong type or an unknown field (error names it)\"}}}},"
       "\"/api/v1/incoming-relays/{id}\":{"
       "\"put\":{\"summary\":\"Change an incoming relay\",\"description\":\"Body: any subset of the fields POST takes; a field left out keeps its value. Nothing changes when the body is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"string\"},\"lower_ip\":{\"type\":\"string\"},\"upper_ip\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The entry as saved\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
-      "\"delete\":{\"summary\":\"Remove an incoming relay\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}}";
+      "\"delete\":{\"summary\":\"Remove an incoming relay\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
+      "\"/api/v1/greylisting-white-addresses\":{"
+      "\"get\":{\"summary\":\"List the greylisting white list\",\"description\":\"AntiSpam.GreyListingWhiteAddresses over COM: the address patterns whose connections are never greylisted. Each entry: id, ip_address (with the wildcards as typed), description. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of greylisting white addresses\"}}},"
+      "\"post\":{\"summary\":\"Add a greylisting white address\",\"description\":\"Body: ip_address (required; an address, or a pattern such as 192.168.* or 2001:db8:*) and description. Saved as one saved in the Control Panel is, and consulted for the next connection. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"ip_address\"],\"properties\":{\"ip_address\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: the entry as the listing shows it\"},\"400\":{\"description\":\"ip_address empty, a field of the wrong type or an unknown field (error names it)\"}}}},"
+      "\"/api/v1/greylisting-white-addresses/{id}\":{"
+      "\"put\":{\"summary\":\"Change a greylisting white address\",\"description\":\"Body: any subset of the fields POST takes; a field left out keeps its value. Nothing changes when the body is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"ip_address\":{\"type\":\"string\"},\"description\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The entry as saved\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
+      "\"delete\":{\"summary\":\"Remove a greylisting white address\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}}";
 }
 
 namespace HM
@@ -719,9 +837,9 @@ namespace HM
       return AnsiString(AntiSpamListsPaths);
    }
 
-   // The one entry point the dispatcher reaches for the twenty routes: the
-   // kind says which collection and which verb, the id names the entry for
-   // the update and the delete.
+   // The one entry point the dispatcher reaches for the twenty-four routes:
+   // the kind says which collection and which verb, the id names the entry
+   // for the update and the delete.
    HttpResponse
    RestApiServer::HandleAntiSpamLists_(RouteKind kind, __int64 id, const AnsiString &requestBody)
    {
@@ -773,6 +891,15 @@ namespace HM
          return UpdateIncomingRelay(bridge, Configuration::Instance()->GetSMTPConfiguration()->GetIncomingRelays(), id, requestBody);
       case RouteIncomingRelayDelete:
          return DeleteEntry<IncomingRelays, IncomingRelay>(bridge, Configuration::Instance()->GetSMTPConfiguration()->GetIncomingRelays(), id, "incoming relay");
+
+      case RouteGreyListingWhiteAddressList:
+         return ListGreyListingWhite(bridge);
+      case RouteGreyListingWhiteAddressCreate:
+         return CreateGreyListingWhite(bridge, requestBody);
+      case RouteGreyListingWhiteAddressUpdate:
+         return UpdateGreyListingWhite(bridge, id, requestBody);
+      case RouteGreyListingWhiteAddressDelete:
+         return DeleteEntry<GreyListingWhiteAddresses, GreyListingWhiteAddress>(bridge, AntiSpam().GetGreyListingWhiteAddresses(), id, "greylisting white address");
 
       default:
          break;

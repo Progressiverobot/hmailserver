@@ -42,16 +42,28 @@ namespace HM
       return true;
    }
 
-   bool 
-   PersistentGreyListingWhiteAddress::SaveObject(std::shared_ptr<GreyListingWhiteAddress> pObject, String &errorMessage, PersistenceMode mode)
-   {
-      // errorMessage - not supported yet.
-      return SaveObject(pObject);
-   }
-
-   bool 
+   bool
    PersistentGreyListingWhiteAddress::SaveObject(std::shared_ptr<GreyListingWhiteAddress> pObject)
    {
+      String errorMessage;
+      return SaveObject(pObject, errorMessage, PersistenceModeNormal);
+   }
+
+   bool
+   PersistentGreyListingWhiteAddress::SaveObject(std::shared_ptr<GreyListingWhiteAddress> pObject, String &errorMessage, PersistenceMode mode)
+   {
+      // The address is the pattern IsSenderWhitelisted matches the connecting
+      // address against; an empty one matches nothing and is a row that
+      // does nothing. Refused here, where the value is owned, so the COM item
+      // and the REST route meet the same sentence.
+      String address = pObject->GetIPAddress();
+      address.Trim();
+      if (address.IsEmpty())
+      {
+         errorMessage = "The IP address must not be empty.";
+         return false;
+      }
+
       SQLStatement oStatement;
       oStatement.SetTable("hm_greylisting_whiteaddresses");
       

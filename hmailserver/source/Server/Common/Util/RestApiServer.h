@@ -359,6 +359,12 @@ namespace HM
          RouteBlockedAttachmentCreate,
          RouteBlockedAttachmentUpdate,
          RouteBlockedAttachmentDelete,
+         // The greylisting white list, the sixth collection of
+         // RestApiAntiSpamLists.cpp; server-wide.
+         RouteGreyListingWhiteAddressList,
+         RouteGreyListingWhiteAddressCreate,
+         RouteGreyListingWhiteAddressUpdate,
+         RouteGreyListingWhiteAddressDelete,
          RouteOpenApi
       };
 
@@ -868,10 +874,11 @@ namespace HM
       HttpResponse HandleUpdateList_(const String &address, const AnsiString &requestBody);
       static AnsiString ListEntryJson_(const std::shared_ptr<DistributionList> &list);
       static AnsiString OpenApiAdministrationPaths_();
-      // The five small collections - DNS black lists, SURBL servers,
-      // white-list addresses, blocked senders and incoming relays - as
-      // resources (RestApiAntiSpamLists.cpp): one entry point for the twenty
-      // routes, the kind saying which collection and which verb.
+      // The six small collections - DNS black lists, SURBL servers,
+      // white-list addresses, blocked senders, incoming relays and the
+      // greylisting white list - as resources (RestApiAntiSpamLists.cpp): one
+      // entry point for the twenty-four routes, the kind saying which
+      // collection and which verb.
       HttpResponse HandleAntiSpamLists_(RouteKind kind, __int64 id, const AnsiString &requestBody);
       static AnsiString OpenApiAntiSpamListsPaths_();
       // The blocked attachments as a resource (RestApiBlockedAttachments.cpp),

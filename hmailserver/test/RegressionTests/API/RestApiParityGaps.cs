@@ -101,6 +101,10 @@ namespace RegressionTests.API
             hMailServer.BlockedAttachments attachments = _settings.AntiVirus.BlockedAttachments;
             for (int i = attachments.Count - 1; i >= 0; i--)
                if (attachments[i].Wildcard.EndsWith(".rest-blocked", StringComparison.Ordinal)) attachments.DeleteByDBID(attachments[i].ID);
+
+            hMailServer.GreyListingWhiteAddresses whiteAddresses = _settings.AntiSpam.GreyListingWhiteAddresses;
+            for (int i = whiteAddresses.Count - 1; i >= 0; i--)
+               if (whiteAddresses[i].Description.StartsWith("rest-greylist", StringComparison.Ordinal)) whiteAddresses.DeleteByDBID(whiteAddresses[i].ID);
          }
          finally
          {
@@ -281,6 +285,53 @@ namespace RegressionTests.API
          Assert.AreEqual(404, Http("DELETE", "/api/v1/blocked-attachments/" + id).status);
          StringAssert.DoesNotContain("rest-blocked", Http("GET", "/api/v1/blocked-attachments").body);
          StringAssert.Contains("\"/api/v1/blocked-attachments\"", Http("GET", "/api/v1/openapi.json").body);
+      }
+
+      [Test]
+      [Description("A greylisting white address is created with its wildcard as typed, listed, read back through COM as the Control Panel reads it, changed with what the body leaves out left alone, refused for an empty address in the owner's sentence with nothing changed, deleted and gone; the owner refuses the same over COM.")]
+      public void GreyListingWhiteAddressesRoundTrip()
+      {
+         (int status, string body) created = Http("POST", "/api/v1/greylisting-white-addresses", "{\"ip_address\":\"10.95.*\",\"description\":\"rest-greylist\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"ip_address\":\"10.95.*\",\"description\":\"rest-greylist\"", Http("GET", "/api/v1/greylisting-white-addresses").body);
+
+         // The wildcard as typed, which is what put_IPAddress stores and
+         // get_IPAddress hands back, not the pattern the lookup matches.
+         var viaCom = _settings.AntiSpam.GreyListingWhiteAddresses.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("10.95.*", viaCom.IPAddress);
+         Assert.AreEqual("rest-greylist", viaCom.Description);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/greylisting-white-addresses/" + id, "{\"ip_address\":\"10.95.1.?\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"ip_address\":\"10.95.1.?\"", putBody);
+         viaCom = _settings.AntiSpam.GreyListingWhiteAddresses.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("10.95.1.?", viaCom.IPAddress);
+         Assert.AreEqual("rest-greylist", viaCom.Description, "Left out, so left alone.");
+
+         (int emptyStatus, string emptyBody) = Http("PUT", "/api/v1/greylisting-white-addresses/" + id, "{\"ip_address\":\" \"}");
+         Assert.AreEqual(400, emptyStatus, emptyBody);
+         StringAssert.Contains("The IP address must not be empty", emptyBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/greylisting-white-addresses/" + id, "{\"description\":false}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/greylisting-white-addresses/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(404, Http("PUT", "/api/v1/greylisting-white-addresses/999999999", "{\"description\":\"x\"}").status);
+         (int noneStatus, string noneBody) = Http("POST", "/api/v1/greylisting-white-addresses", "{\"description\":\"rest-greylist, no address\"}");
+         Assert.AreEqual(400, noneStatus, noneBody);
+         StringAssert.Contains("The IP address must not be empty", noneBody);
+         Assert.AreEqual("10.95.1.?", _settings.AntiSpam.GreyListingWhiteAddresses.get_ItemByDBID(int.Parse(id)).IPAddress, "A refused change changes nothing.");
+         StringAssert.DoesNotContain("no address", Http("GET", "/api/v1/greylisting-white-addresses").body);
+
+         // The owner of the value says the same over COM.
+         var item = _settings.AntiSpam.GreyListingWhiteAddresses.Add();
+         item.IPAddress = "";
+         item.Description = "rest-greylist, empty";
+         var refusal = Assert.Throws<System.Runtime.InteropServices.COMException>(() => item.Save());
+         StringAssert.Contains("The IP address must not be empty", refusal.Message);
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/greylisting-white-addresses/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/greylisting-white-addresses/" + id).status);
+         StringAssert.DoesNotContain("rest-greylist", Http("GET", "/api/v1/greylisting-white-addresses").body);
+         StringAssert.Contains("\"/api/v1/greylisting-white-addresses\"", Http("GET", "/api/v1/openapi.json").body);
       }
 
       private static (int status, string body) Http(string method, string path, string requestBody = null)

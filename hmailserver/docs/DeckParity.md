@@ -9,13 +9,13 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 318 |
+| of them writable over REST | 320 |
 | of them reachable from a Deck view | 250 |
-| missing over REST | 17 |
-| over REST but not reached by any Deck view | 68 |
+| missing over REST | 15 |
+| over REST but not reached by any Deck view | 70 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 195, 90 of them writes |
+| REST routes (path and method) | 199, 92 of them writes |
 | Deck views | 13 |
 
 ## Missing over REST, by interface
@@ -24,7 +24,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|---|
 | IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
 | AppPassword | 2 | `Active`, `Name` |
-| GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
 | Diagnostics | 2 | `LocalDomainName`, `TestDomainName` |
 | Settings | 1 | `UserInterfaceLanguage` |
 | DistributionListRecipient | 1 | `RecipientAddress` |
@@ -49,6 +48,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | Scripting | 2 | `Enabled`, `Language` |
 | BlockedAttachment | 2 | `Description`, `Wildcard` |
+| GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
 | ServerMessage | 1 | `Text` |
 | MessageIndexing | 1 | `Enabled` |
 
@@ -504,8 +504,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | - | - |
-| `IPAddress` | CollectionSpecs | - | - |
+| `Description` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | - |
+| `IPAddress` | CollectionSpecs | `POST /api/v1/greylisting-white-addresses` (setter)<br>`PUT /api/v1/greylisting-white-addresses/{id}` (setter) | - |
 
 ### TCPIPPort
 
@@ -693,6 +693,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | - |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | yes |
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | - |
+| `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address` | - |
+| `PUT /api/v1/greylisting-white-addresses/{id}` | GreyListingWhiteAddress | `address`, `body`, `description`, `field`, `ip_address`, `value` | - |
 | `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | - |
 | `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `upper_ip`, `value` | - |
 | `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
