@@ -181,6 +181,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
     <nav class="nav" id="nav">
       <button data-view="dash" class="on"><span class="ico">◈</span>Dashboard</button>
       <button data-view="domains"><span class="ico">⌂</span>Domains</button>
+      <button data-view="ipranges"><span class="ico">⌗</span>IP ranges</button>
       <button data-view="queue"><span class="ico">⇶</span>Delivery queue</button>
       <button data-view="tlsa"><span class="ico">⛨</span>DANE / TLSA</button>
       <button data-view="settings"><span class="ico">⚙</span>Settings</button>
@@ -224,7 +225,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[]};
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[]};
 
 /* The editor a view has open, if any: {kind, id, values} - id 0 is a new one. */
 let editing=null;
@@ -355,7 +356,7 @@ $("#nav").addEventListener("click",e=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   view=b.dataset.view;editing=null;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",
+const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",queue:"Delivery queue",tlsa:"DANE / TLSA",settings:"Settings",
   rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
 
 async function render(silent){
@@ -363,6 +364,7 @@ async function render(silent){
   try{
     if(view==="dash")await renderDash(silent);
     else if(view==="domains")await renderDomains();
+    else if(view==="ipranges")await renderIpRanges();
     else if(view==="queue")await renderQueue();
     else if(view==="tlsa")await renderTlsa();
     else if(view==="settings")await renderSettings();
@@ -394,6 +396,10 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="domaindel")deleteDomain(d.name);
   else if(d.act==="daliasadd")addDomainAlias();
   else if(d.act==="daliasdel")deleteDomainAlias(d.name);
+  else if(d.act==="rangenew")openRange(0);
+  else if(d.act==="rangeedit")openRange(Number(d.id));
+  else if(d.act==="rangedel")deleteRange(Number(d.id),d.label);
+  else if(d.act==="rangesave")saveRange();
   else if(d.act==="add")addAccount(d.domain);
   else if(d.act==="del")delAccount(d.address,d.domain);
   else if(d.act==="retry")retryMsg(d.id);
@@ -1361,6 +1367,116 @@ async function deleteRoute(id,name){
   setErr("err_route_"+id,"");
   try{await api("/api/v1/routes/"+id,{method:"DELETE"});toast("Route deleted");await render();}
   catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_route_"+id,e.message);}
+}
+
+/* ---------- IP ranges ----------
+   Access control: which addresses may connect and what they may do. The form
+   is built from the schema of POST /api/v1/ipranges, which names every field
+   with its type, and drawn in the groups the desktop dialog uses - General,
+   Connections, Relaying, Require auth, Protection - with a key the document
+   gains later falling into a group of its own rather than out of sight. The
+   document gives the keys no wording, so the captions here are the desktop
+   dialog's. A new range starts where the create handler puts a key left out;
+   the document does not state those defaults, so they are here, with the
+   desktop's 15 for the priority (the handler's 0 would lose to every range
+   there is). expires is the server's own mark on a range the auto-ban placed;
+   it is shown and never sent. */
+const RANGE_GROUPS=[
+  {title:"General",keys:["name","lower","upper","priority"]},
+  {title:"Connections",keys:["allow_smtp","allow_imap","allow_pop3"]},
+  {title:"Relaying",keys:["deliver_local_to_local","deliver_local_to_remote","deliver_remote_to_local","deliver_remote_to_remote"]},
+  {title:"Require auth",keys:["require_auth_local_to_local","require_auth_local_to_remote","require_auth_remote_to_local","require_auth_remote_to_remote","require_tls_for_auth"]},
+  {title:"Protection",keys:["spam_protection","virus_protection"]}
+];
+const RANGE_HINTS={
+  name:"A name for the range.",lower:"The lowest address of the range, IPv4 or IPv6.",upper:"The highest address of the range.",
+  priority:"Higher wins when ranges overlap.",
+  allow_smtp:"Allow SMTP connections from the range.",allow_imap:"Allow IMAP connections.",allow_pop3:"Allow POP3 connections.",
+  deliver_local_to_local:"Local sender to local recipient.",deliver_local_to_remote:"Local sender to external recipient (relay out).",
+  deliver_remote_to_local:"External sender to local recipient (incoming mail).",deliver_remote_to_remote:"External sender to external recipient - an open relay unless authentication is required.",
+  require_auth_local_to_local:"Require SMTP authentication for local to local.",require_auth_local_to_remote:"Require SMTP authentication for local to external.",
+  require_auth_remote_to_local:"Require SMTP authentication for external to local.",require_auth_remote_to_remote:"Require SMTP authentication for external to external.",
+  require_tls_for_auth:"Require SSL/TLS when authenticating.",
+  spam_protection:"Run the anti-spam checks on mail from this range.",virus_protection:"Run the anti-virus scan on mail from this range."
+};
+const RANGE_DEFAULTS={priority:15,allow_smtp:true,allow_imap:true,allow_pop3:true,
+  deliver_local_to_local:true,deliver_local_to_remote:false,deliver_remote_to_local:true,deliver_remote_to_remote:false,
+  require_auth_local_to_local:false,require_auth_local_to_remote:true,require_auth_remote_to_local:false,require_auth_remote_to_remote:true,
+  require_tls_for_auth:false,spam_protection:true,virus_protection:true};
+function rangeProps(){
+  const props=properties("/api/v1/ipranges","post"), out={};
+  Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&RANGE_HINTS[k])out[k].description=RANGE_HINTS[k];});
+  return out;
+}
+/* The groups, each with the keys of the schema it names, and then whatever
+   the schema has that no group names. */
+function groupedKeys(groups,props){
+  const named={};
+  const out=groups.map(g=>({title:g.title,keys:g.keys.filter(k=>{named[k]=true;return k in props;})})).filter(g=>g.keys.length);
+  const rest=Object.keys(props).filter(k=>!named[k]);
+  if(rest.length)out.push({title:"Other",keys:rest});
+  return out;
+}
+function pick(props,keys){const out={};keys.forEach(k=>{out[k]=props[k];});return out;}
+const yesNo=v=>v?'<span class="badge good">yes</span>':'<span class="badge warn">no</span>';
+async function renderIpRanges(){
+  await loadSpec();
+  cache.ranges=asList(await api("/api/v1/ipranges"),"ranges");
+  if(editing&&editing.kind==="range"){renderRangeEditor();return;}
+  const rows=cache.ranges.map(r=>`
+    <tr><td><b>${escHtml(r.name)}</b>${r.expires?' <span class="badge info">auto-ban, expires</span>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
+        <td><code>${escHtml(r.lower)}</code></td><td><code>${escHtml(r.upper)}</code></td>
+        <td>${escHtml(r.priority)}</td>
+        <td>${yesNo(r.allow_smtp)}</td><td>${yesNo(r.allow_imap)}</td><td>${yesNo(r.allow_pop3)}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="rangeedit" data-id="${escHtml(r.id)}">Edit</button>
+          <button class="btn danger sm" data-act="rangedel" data-id="${escHtml(r.id)}" data-label="${escHtml(r.name+" ("+r.lower+" – "+r.upper+")")}">Delete</button>
+          <div class="err" id="err_range_${escHtml(r.id)}"></div></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">Access control: which addresses may connect and what they are allowed to do. Higher priority wins when ranges overlap. ${escHtml(operation("/api/v1/ipranges","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Lower IP</th><th>Upper IP</th><th>Priority</th><th>SMTP</th><th>IMAP</th><th>POP3</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="8" class="empty">No IP ranges: nothing may connect.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="rangenew">Add a range</button></div>
+    </div></div>`;
+}
+function openRange(id){
+  const existing=cache.ranges.filter(r=>Number(r.id)===Number(id))[0];
+  const values=existing?JSON.parse(JSON.stringify(existing)):Object.assign({},RANGE_DEFAULTS);
+  editing={kind:"range",id:Number(id)||0,values:values};
+  renderRangeEditor();
+}
+function renderRangeEditor(){
+  const props=rangeProps(), required=requiredOf("/api/v1/ipranges","post");
+  const cards=groupedKeys(RANGE_GROUPS,props).map(g=>`
+    <div class="sect"><h2>${escHtml(g.title)}</h2>
+      <div class="card flat"><div class="form">${formHtml("range",pick(props,g.keys),editing.values,{required:required})}</div></div></div>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All IP ranges</button>
+    <div class="sect"><h2>${editing.id?"Edit IP range "+escHtml(editing.id):"New IP range"}</h2>
+      <div class="card flat"><p class="note">${escHtml(operation(editing.id?"/api/v1/ipranges/{id}":"/api/v1/ipranges",editing.id?"put":"post").description||operation("/api/v1/ipranges","post").summary||"")}</p></div></div>
+    ${cards}
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="rangesave">Save IP range</button>
+      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <div class="err" id="err_rangeedit"></div>
+    </div></div></div>`;
+}
+async function saveRange(){
+  setErr("err_rangeedit","");
+  let body;
+  try{body=readForm("range",rangeProps(),{});}catch(e){setErr("err_rangeedit",e.message);return;}
+  try{
+    if(editing.id)await api("/api/v1/ipranges/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/ipranges",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast("IP range saved");await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_rangeedit",e.message);}
+}
+async function deleteRange(id,label){
+  if(!confirm("Delete the IP range "+label+"?"))return;
+  setErr("err_range_"+id,"");
+  try{await api("/api/v1/ipranges/"+id,{method:"DELETE"});toast("IP range deleted");await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_range_"+id,e.message);}
 }
 
 /* ---------- Logs ---------- */

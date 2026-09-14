@@ -444,6 +444,24 @@ const DOMAIN_KEYS = ['name', 'active', 'postmaster', 'max_message_size_kb', 'max
 const DOMAIN_PUT = 'Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message. A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.';
 const DOMAINS_POST = 'Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.';
 
+// The IP range's schema as the ports and certificates literal emits it, every
+// field typed; the update takes any subset of the same keys.
+const RANGE_PROPS = {
+   name: { type: 'string' }, lower: { type: 'string' }, upper: { type: 'string' }, priority: { type: 'integer' },
+   allow_smtp: { type: 'boolean' }, allow_imap: { type: 'boolean' }, allow_pop3: { type: 'boolean' },
+   deliver_local_to_local: { type: 'boolean' }, deliver_local_to_remote: { type: 'boolean' }, deliver_remote_to_local: { type: 'boolean' }, deliver_remote_to_remote: { type: 'boolean' },
+   require_auth_local_to_local: { type: 'boolean' }, require_auth_local_to_remote: { type: 'boolean' }, require_auth_remote_to_local: { type: 'boolean' }, require_auth_remote_to_remote: { type: 'boolean' },
+   require_tls_for_auth: { type: 'boolean' }, spam_protection: { type: 'boolean' }, virus_protection: { type: 'boolean' }
+};
+const RANGE_PUT = 'Body: any subset of the fields POST takes - name, lower, upper, priority and the permission flags; a field left out keeps its value. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.';
+// The defaults HandleCreateIpRange_ applies to a flag left out.
+const RANGE_CREATE_DEFAULTS = { allow_smtp: true, allow_imap: true, allow_pop3: true,
+   deliver_local_to_local: true, deliver_local_to_remote: false, deliver_remote_to_local: true, deliver_remote_to_remote: false,
+   require_auth_local_to_local: false, require_auth_local_to_remote: true, require_auth_remote_to_local: false, require_auth_remote_to_remote: true,
+   require_tls_for_auth: false, spam_protection: true, virus_protection: true };
+const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
+function ipAddress(text) { return IPV4.test(text) || /^[0-9a-f:]+$/i.test(text) && text.indexOf(':') >= 0; }
+
 // A domain as DomainEntryJson_ emits it: every field, the relay password
 // never among them.
 function domainRecord(name, active, postmaster) {
@@ -547,7 +565,15 @@ const spec = {
          get: { summary: 'The domain\'s aliases - other names the domain answers to', description: 'Each entry: id, name.' },
          post: { summary: 'Add a domain alias', description: 'Body: name.', requestBody: body({ name: { type: 'string' } }, ['name']) }
       },
-      '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } }
+      '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } },
+      '/api/v1/ipranges': {
+         get: { summary: 'List the IP ranges', description: 'Server-wide; refused for domain-restricted keys.' },
+         post: { summary: 'Create an IP range', requestBody: body(RANGE_PROPS, ['name', 'lower', 'upper']) }
+      },
+      '/api/v1/ipranges/{id}': {
+         put: { summary: 'Change an IP range', description: RANGE_PUT, requestBody: body({}) },
+         delete: { summary: 'Delete an IP range' }
+      }
    }
 };
 
@@ -570,6 +596,13 @@ const state = {
       [HOSTILE]: [{ address: 'x@' + HOSTILE, active: true }],
       'second.example': []
    },
+   ranges: [
+      Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false }, RANGE_CREATE_DEFAULTS,
+         { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
+      Object.assign({ id: 2, name: 'Internet', lower: '0.0.0.0', upper: '255.255.255.255', priority: 10, expires: false }, RANGE_CREATE_DEFAULTS),
+      Object.assign({ id: 3, name: 'Auto-ban: 203.0.113.9', lower: '203.0.113.9', upper: '203.0.113.9', priority: 20, expires: true }, RANGE_CREATE_DEFAULTS,
+         { allow_smtp: false, allow_imap: false, allow_pop3: false })
+   ],
    queue: [
       { id: 41, from: 'anna@example.com', recipients: 'far@away.example', next_try: '2026-09-14 10:00:00' },
       { id: 42, from: 'bob@example.com', recipients: 'gone@nowhere.example', next_try: '2026-09-14 10:05:00' }
@@ -695,6 +728,32 @@ function answer(method, path, headers, raw) {
       const address = segment(path, 4);
       Object.keys(state.accounts).forEach((d) => { state.accounts[d] = state.accounts[d].filter((a) => a.address !== address); });
       return json(200, { deleted: true });
+   }
+
+   if (path === '/api/v1/ipranges' && method === 'GET') { return json(200, state.ranges); }
+   if (path === '/api/v1/ipranges' && method === 'POST') {
+      // As HandleCreateIpRange_ reads it: three required, the addresses
+      // parsed, a flag left out taking its default, and only the id back.
+      if (!parsed.name || !parsed.lower || !parsed.upper) { return json(400, { error: 'name, lower and upper are required' }); }
+      if (!ipAddress(parsed.lower) || !ipAddress(parsed.upper)) { return json(400, { error: 'lower and upper must be IP addresses' }); }
+      const range = Object.assign({ id: nextId++, priority: 0, expires: false }, RANGE_CREATE_DEFAULTS, parsed);
+      state.ranges.push(range);
+      return json(201, { id: range.id });
+   }
+   if (/^\/api\/v1\/ipranges\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.ranges.findIndex((r) => r.id === id);
+      if (method === 'PUT') {
+         for (const key of Object.keys(parsed)) {
+            if (!(key in RANGE_PROPS)) { return json(400, { error: 'unknown field: ' + key }); }
+         }
+         if (at < 0) { return json(404, { error: 'ip range not found' }); }
+         if ('lower' in parsed && !ipAddress(parsed.lower) || 'upper' in parsed && !ipAddress(parsed.upper)) { return json(400, { error: 'lower and upper must be IP addresses' }); }
+         Object.assign(state.ranges[at], parsed);
+         return json(200, state.ranges[at]);
+      }
+      if (at < 0) { return json(404, { error: 'ip range not found' }); }
+      if (method === 'DELETE') { state.ranges.splice(at, 1); return json(200, { deleted: true }); }
    }
 
    if (path === '/api/v1/queue' && method === 'GET') { return json(200, { messages: state.queue }); }
@@ -1146,6 +1205,86 @@ async function main() {
    click(act('domaindel', { name: 'second.example' }));
    await flush();
    check('a refused delete is shown on the domain\'s row', document.getElementById('err_domain_second.example').textContent === 'The domain is named by a route.' && rows().length === 3);
+
+   // ---- IP ranges
+   before = requests.length;
+   await goTo('ipranges');
+   check('the IP ranges view reads the ranges', called(before, 'GET', '/api/v1/ipranges').length === 1 && $('#viewTitle').textContent === 'IP ranges', paths(before));
+   check('one row per range with the desktop list\'s columns', rows().length === 3 && rows()[1].textContent.indexOf('Internet') >= 0 && rows()[1].textContent.indexOf('0.0.0.0') >= 0 &&
+      rows()[1].textContent.indexOf('255.255.255.255') >= 0 && rows()[1].textContent.indexOf('10') >= 0, rows().length ? rows()[1].textContent : 'no rows');
+   check('the connection flags are shown as yes and no', rows()[1].querySelectorAll('.badge.good').length === 3 && rows()[2].querySelectorAll('.badge.warn').length === 3);
+   check('a range the auto-ban placed says so', rows()[2].textContent.indexOf('auto-ban') >= 0 && rows()[0].textContent.indexOf('auto-ban') < 0);
+   click(act('rangenew'));
+   await flush();
+   let rangeHeadings = content().querySelectorAll('h2').map((h) => h.textContent.trim());
+   check('the editor is grouped as the desktop dialog is', ['General', 'Connections', 'Relaying', 'Require auth', 'Protection'].every((g) => rangeHeadings.indexOf(g) >= 0) && rangeHeadings.indexOf('Other') < 0,
+      JSON.stringify(rangeHeadings));
+   const drawnRange = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('range_') === 0).map((id) => id.slice(6)).sort();
+   check('every key of the schema has a control, and nothing else', JSON.stringify(drawnRange) === JSON.stringify(Object.keys(RANGE_PROPS).sort()), JSON.stringify(drawnRange));
+   check('a new range starts where the create handler puts a key left out, with the desktop\'s priority',
+      Object.keys(RANGE_CREATE_DEFAULTS).every((k) => document.getElementById('range_' + k).checked === RANGE_CREATE_DEFAULTS[k]) && document.getElementById('range_priority').value === '15' &&
+      document.getElementById('range_name').value === '' && document.getElementById('range_lower').value === '',
+      Object.keys(RANGE_CREATE_DEFAULTS).map((k) => k + '=' + document.getElementById('range_' + k).checked).join(' '));
+   check('the required keys are marked and the flags carry the desktop\'s wording', document.getElementById('range_lower').closest('.fr').textContent.indexOf('required') >= 0 &&
+      document.getElementById('range_priority').closest('.fr').textContent.indexOf('required') < 0 && document.getElementById('range_deliver_remote_to_remote').closest('.fr').textContent.indexOf('open relay') >= 0);
+   setValue('range_name', 'Office');
+   setValue('range_lower', '10.0.0.0');
+   setValue('range_upper', '10.0.0.255');
+   setValue('range_priority', 'high');
+   before = requests.length;
+   click(act('rangesave'));
+   await flush();
+   check('a priority that is not a number is refused by the page', called(before, 'POST', /ipranges/).length === 0 && document.getElementById('err_rangeedit').textContent.indexOf('whole number') >= 0);
+   setValue('range_priority', '25');
+   setChecked('range_deliver_local_to_remote', true);
+   setValue('range_upper', 'ten.0.0.255');
+   click(act('rangesave'));
+   await flush();
+   check('an address that does not parse is the server\'s refusal, shown in the editor', called(before, 'POST', '/api/v1/ipranges').length === 1 &&
+      document.getElementById('err_rangeedit').textContent === 'lower and upper must be IP addresses' && document.getElementById('range_name').value === 'Office');
+   setValue('range_upper', '10.0.0.255');
+   before = requests.length;
+   click(act('rangesave'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/ipranges');
+   check('saving a new range posts every field, the priority as a number', !!posted && Object.keys(posted).length === Object.keys(RANGE_PROPS).length && posted.name === 'Office' && posted.lower === '10.0.0.0' &&
+      posted.priority === 25 && posted.deliver_local_to_remote === true && posted.deliver_remote_to_remote === false, JSON.stringify(posted));
+   check('and the re-read list has it', called(before, 'GET', '/api/v1/ipranges').length === 1 && rows().length === 4 && rows()[3].textContent.indexOf('Office') >= 0 && toastText() === 'IP range saved');
+   click(act('rangeedit', { id: 2 }));
+   await flush();
+   check('editing shows the range\'s own values', document.getElementById('range_name').value === 'Internet' && document.getElementById('range_upper').value === '255.255.255.255' &&
+      document.getElementById('range_priority').value === '10' && document.getElementById('range_require_auth_local_to_remote').checked === true);
+   setChecked('range_allow_pop3', false);
+   setChecked('range_require_tls_for_auth', true);
+   before = requests.length;
+   click(act('rangesave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/ipranges/2');
+   check('saving an existing range PUTs the whole record by id', !!put && put.allow_pop3 === false && put.require_tls_for_auth === true && put.name === 'Internet' && Object.keys(put).length === Object.keys(RANGE_PROPS).length,
+      JSON.stringify(put));
+   check('and the re-read list shows the change', rows()[1].querySelectorAll('.badge.warn').length === 1);
+   click(act('rangeedit', { id: 2 }));
+   await flush();
+   nextRefusal = 'The range overlaps My computer with the same priority.';
+   click(act('rangesave'));
+   await flush();
+   check('a refused save keeps the editor open with the server\'s sentence', document.getElementById('err_rangeedit').textContent === 'The range overlaps My computer with the same priority.' && $('#range_name') !== null);
+   click(act('cancel'));
+   await flush();
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('rangedel', { id: 3 }));
+   await flush();
+   check('deleting a range asks, naming it and its addresses', called(before, 'DELETE', /ipranges/).length === 0 && confirmations[confirmations.length - 1].indexOf('Auto-ban: 203.0.113.9 (203.0.113.9 – 203.0.113.9)') >= 0,
+      confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('rangedel', { id: 3 }));
+   await flush();
+   check('yes deletes by id and the re-read list is without it', called(before, 'DELETE', '/api/v1/ipranges/3').length === 1 && rows().length === 3 && rows().every((r) => r.textContent.indexOf('auto-ban') < 0));
+   nextRefusal = 'The last range cannot be deleted.';
+   click(act('rangedel', { id: 1 }));
+   await flush();
+   check('a refused delete is shown on its row', document.getElementById('err_range_1').textContent === 'The last range cannot be deleted.' && rows().length === 3);
 
    // ---- the delivery queue
    before = requests.length;
