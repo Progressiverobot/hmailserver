@@ -44,7 +44,7 @@
 #include "../BO/BlockedSender.h"
 #include "../BO/IncomingRelays.h"
 #include "../BO/IncomingRelay.h"
-#include "../Persistence/PersistentDNSBlackList.h"
+#include "../Persistence/PersistentDNSBlacklist.h"
 #include "../Persistence/PersistentSURBLServer.h"
 #include "../Persistence/PersistentWhiteListAddress.h"
 #include "../Persistence/PersistentBlockedSender.h"
