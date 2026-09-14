@@ -256,6 +256,17 @@ namespace RegressionTests.API
          return end < 0 ? headers.Substring(start) : headers.Substring(start, end - start);
       }
 
+      // The id in the entry every small-collection route answers with.
+      private static string IdOf(string body)
+      {
+         int at = body.IndexOf("\"id\":", StringComparison.Ordinal);
+         Assert.IsTrue(at >= 0, "No id in: " + body);
+         int start = at + 5, end = start;
+         while (end < body.Length && char.IsDigit(body[end]))
+            end++;
+         return body.Substring(start, end - start);
+      }
+
       private static (int status, string body) Http(string method, string path, string requestBody = null)
       {
          string credentials = Convert.ToBase64String(Encoding.ASCII.GetBytes("Administrator:" + AdminPassword));
@@ -445,6 +456,208 @@ namespace RegressionTests.API
             "{\"name\":\"bad\",\"lower\":\"not-an-address\",\"upper\":\"10.0.0.1\"}").status);
          Assert.AreEqual(400, Http("POST", "/api/v1/ipranges", "{\"lower\":\"10.0.0.1\",\"upper\":\"10.0.0.2\"}").status,
             "a range without a name is refused");
+      }
+
+      [Test]
+      [Description("A DNS black list is created, listed, read back through COM, changed with what the body leaves out left alone, refused with nothing changed, deleted and gone; a create without a host is refused.")]
+      public void DnsBlackListsRoundTrip()
+      {
+         var lists = _settings.AntiSpam.DNSBlackLists;
+         for (int i = lists.Count - 1; i >= 0; i--)
+            if (lists[i].DNSHost.StartsWith("rest-dnsbl")) lists.DeleteByDBID(lists[i].ID);
+
+         (int status, string body) created = Http("POST", "/api/v1/dns-blacklists",
+            "{\"dns_host\":\"rest-dnsbl.test\",\"expected_result\":\"127.0.0.2\",\"reject_message\":\"Listed\",\"score\":3,\"active\":false}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"active\":false,\"dns_host\":\"rest-dnsbl.test\",\"expected_result\":\"127.0.0.2\",\"reject_message\":\"Listed\",\"score\":3", created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"active\":false,\"dns_host\":\"rest-dnsbl.test\"", Http("GET", "/api/v1/dns-blacklists").body);
+
+         var viaCom = _settings.AntiSpam.DNSBlackLists.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("rest-dnsbl.test", viaCom.DNSHost);
+         Assert.AreEqual("127.0.0.2", viaCom.ExpectedResult);
+         Assert.AreEqual("Listed", viaCom.RejectMessage);
+         Assert.AreEqual(3, viaCom.Score);
+         Assert.IsFalse(viaCom.Active);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/dns-blacklists/" + id, "{\"score\":5,\"reject_message\":\"Listed by rest\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"score\":5", putBody);
+         StringAssert.Contains("\"dns_host\":\"rest-dnsbl.test\"", putBody, "Left out, so left alone.");
+         viaCom = _settings.AntiSpam.DNSBlackLists.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual(5, viaCom.Score);
+         Assert.AreEqual("Listed by rest", viaCom.RejectMessage);
+         Assert.AreEqual("127.0.0.2", viaCom.ExpectedResult);
+         Assert.IsFalse(viaCom.Active);
+
+         Assert.AreEqual(400, Http("PUT", "/api/v1/dns-blacklists/" + id, "{\"score\":\"high\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/dns-blacklists/" + id, "{\"dns_host\":\"\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/dns-blacklists/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(404, Http("PUT", "/api/v1/dns-blacklists/999999999", "{\"score\":1}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/dns-blacklists", "{\"score\":1}").status, "dns_host is required");
+         Assert.AreEqual(5, _settings.AntiSpam.DNSBlackLists.get_ItemByDBID(int.Parse(id)).Score, "A refused change changes nothing.");
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/dns-blacklists/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/dns-blacklists/" + id).status);
+         StringAssert.DoesNotContain("rest-dnsbl.test", Http("GET", "/api/v1/dns-blacklists").body);
+      }
+
+      [Test]
+      [Description("A SURBL server is created, listed, read back through COM, changed with what the body leaves out left alone, refused with nothing changed, deleted and gone; the suite's own SURBL server is not touched.")]
+      public void SurblServersRoundTrip()
+      {
+         var servers = _settings.AntiSpam.SURBLServers;
+         for (int i = servers.Count - 1; i >= 0; i--)
+            if (servers[i].DNSHost.StartsWith("rest-surbl")) servers.DeleteByDBID(servers[i].ID);
+         int before = _settings.AntiSpam.SURBLServers.Count;
+
+         (int status, string body) created = Http("POST", "/api/v1/surbl-servers",
+            "{\"dns_host\":\"rest-surbl.test\",\"expected_result\":\"127.0.0.2-255\",\"reject_message\":\"Domain listed\",\"score\":4,\"active\":false}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"active\":false,\"dns_host\":\"rest-surbl.test\",\"expected_result\":\"127.0.0.2-255\"", Http("GET", "/api/v1/surbl-servers").body);
+
+         var viaCom = _settings.AntiSpam.SURBLServers.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("rest-surbl.test", viaCom.DNSHost);
+         Assert.AreEqual("127.0.0.2-255", viaCom.ExpectedResult);
+         Assert.AreEqual("Domain listed", viaCom.RejectMessage);
+         Assert.AreEqual(4, viaCom.Score);
+         Assert.IsFalse(viaCom.Active);
+         Assert.AreEqual(before + 1, _settings.AntiSpam.SURBLServers.Count);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/surbl-servers/" + id, "{\"expected_result\":\"127.0.0.2\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"expected_result\":\"127.0.0.2\"", putBody);
+         viaCom = _settings.AntiSpam.SURBLServers.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("127.0.0.2", viaCom.ExpectedResult);
+         Assert.AreEqual(4, viaCom.Score, "Left out, so left alone.");
+
+         Assert.AreEqual(400, Http("PUT", "/api/v1/surbl-servers/" + id, "{\"active\":\"yes\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/surbl-servers/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(404, Http("PUT", "/api/v1/surbl-servers/999999999", "{\"score\":1}").status);
+         Assert.AreEqual("127.0.0.2", _settings.AntiSpam.SURBLServers.get_ItemByDBID(int.Parse(id)).ExpectedResult, "A refused change changes nothing.");
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/surbl-servers/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/surbl-servers/" + id).status);
+         StringAssert.DoesNotContain("rest-surbl.test", Http("GET", "/api/v1/surbl-servers").body);
+         Assert.AreEqual(before, _settings.AntiSpam.SURBLServers.Count);
+      }
+
+      [Test]
+      [Description("A white-list address is created with its range and sender, listed, read back through COM, changed with what the body leaves out left alone, refused for an address that does not parse with nothing changed, deleted and gone.")]
+      public void WhiteListAddressesRoundTrip()
+      {
+         var addresses = _settings.AntiSpam.WhiteListAddresses;
+         for (int i = addresses.Count - 1; i >= 0; i--)
+            if (addresses[i].Description == "rest-whitelist") addresses.DeleteByDBID(addresses[i].ID);
+
+         (int status, string body) created = Http("POST", "/api/v1/whitelist-addresses",
+            "{\"lower_ip\":\"10.98.1.1\",\"upper_ip\":\"10.98.1.254\",\"email_address\":\"*@partner.test\",\"description\":\"rest-whitelist\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"lower_ip\":\"10.98.1.1\",\"upper_ip\":\"10.98.1.254\",\"email_address\":\"*@partner.test\",\"description\":\"rest-whitelist\"", Http("GET", "/api/v1/whitelist-addresses").body);
+
+         var viaCom = _settings.AntiSpam.WhiteListAddresses.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("10.98.1.1", viaCom.LowerIPAddress);
+         Assert.AreEqual("10.98.1.254", viaCom.UpperIPAddress);
+         Assert.AreEqual("*@partner.test", viaCom.EmailAddress);
+         Assert.AreEqual("rest-whitelist", viaCom.Description);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/whitelist-addresses/" + id, "{\"upper_ip\":\"10.98.1.100\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"upper_ip\":\"10.98.1.100\"", putBody);
+         viaCom = _settings.AntiSpam.WhiteListAddresses.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("10.98.1.100", viaCom.UpperIPAddress);
+         Assert.AreEqual("10.98.1.1", viaCom.LowerIPAddress, "Left out, so left alone.");
+         Assert.AreEqual("*@partner.test", viaCom.EmailAddress);
+
+         (int refusedStatus, string refusedBody) = Http("PUT", "/api/v1/whitelist-addresses/" + id, "{\"lower_ip\":\"not-an-address\"}");
+         Assert.AreEqual(400, refusedStatus, refusedBody);
+         StringAssert.Contains("lower_ip and upper_ip must be IP addresses", refusedBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/whitelist-addresses/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/whitelist-addresses", "{\"lower_ip\":\"10.98.2.1\"}").status, "both ends of the range are required");
+         Assert.AreEqual(404, Http("PUT", "/api/v1/whitelist-addresses/999999999", "{\"description\":\"x\"}").status);
+         Assert.AreEqual("10.98.1.1", _settings.AntiSpam.WhiteListAddresses.get_ItemByDBID(int.Parse(id)).LowerIPAddress, "A refused change changes nothing.");
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/whitelist-addresses/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/whitelist-addresses/" + id).status);
+         StringAssert.DoesNotContain("rest-whitelist", Http("GET", "/api/v1/whitelist-addresses").body);
+      }
+
+      [Test]
+      [Description("A blocked sender is created, listed, read back through COM, changed with what the body leaves out left alone, refused with nothing changed, deleted and gone; a create without an address is refused.")]
+      public void BlockedSendersRoundTrip()
+      {
+         var senders = _settings.AntiSpam.BlockedSenders;
+         for (int i = senders.Count - 1; i >= 0; i--)
+            if (senders[i].Address.EndsWith("rest-blocked.test")) senders.DeleteByDBID(senders[i].ID);
+
+         (int status, string body) created = Http("POST", "/api/v1/blocked-senders",
+            "{\"address\":\"spammer@rest-blocked.test\",\"score\":7,\"description\":\"rest\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"address\":\"spammer@rest-blocked.test\",\"score\":7,\"description\":\"rest\"", Http("GET", "/api/v1/blocked-senders").body);
+
+         var viaCom = _settings.AntiSpam.BlockedSenders.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("spammer@rest-blocked.test", viaCom.Address);
+         Assert.AreEqual(7, viaCom.Score);
+         Assert.AreEqual("rest", viaCom.Description);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/blocked-senders/" + id, "{\"score\":9}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"score\":9", putBody);
+         viaCom = _settings.AntiSpam.BlockedSenders.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual(9, viaCom.Score);
+         Assert.AreEqual("spammer@rest-blocked.test", viaCom.Address, "Left out, so left alone.");
+
+         Assert.AreEqual(400, Http("PUT", "/api/v1/blocked-senders/" + id, "{\"address\":\"\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/blocked-senders/" + id, "{\"score\":1.5}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/blocked-senders/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/blocked-senders", "{\"score\":1}").status, "address is required");
+         Assert.AreEqual(404, Http("PUT", "/api/v1/blocked-senders/999999999", "{\"score\":1}").status);
+         Assert.AreEqual(9, _settings.AntiSpam.BlockedSenders.get_ItemByDBID(int.Parse(id)).Score, "A refused change changes nothing.");
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/blocked-senders/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/blocked-senders/" + id).status);
+         StringAssert.DoesNotContain("rest-blocked.test", Http("GET", "/api/v1/blocked-senders").body);
+      }
+
+      [Test]
+      [Description("An incoming relay is created with its name and range, listed, read back through COM, changed with what the body leaves out left alone, refused with nothing changed, deleted and gone.")]
+      public void IncomingRelaysRoundTrip()
+      {
+         var relays = _settings.IncomingRelays;
+         for (int i = relays.Count - 1; i >= 0; i--)
+            if (relays[i].Name.StartsWith("rest-relay")) relays.DeleteByDBID(relays[i].ID);
+
+         (int status, string body) created = Http("POST", "/api/v1/incoming-relays",
+            "{\"name\":\"rest-relay\",\"lower_ip\":\"10.97.1.1\",\"upper_ip\":\"10.97.1.254\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"name\":\"rest-relay\",\"lower_ip\":\"10.97.1.1\",\"upper_ip\":\"10.97.1.254\"", Http("GET", "/api/v1/incoming-relays").body);
+
+         var viaCom = _settings.IncomingRelays.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("rest-relay", viaCom.Name);
+         Assert.AreEqual("10.97.1.1", viaCom.LowerIP);
+         Assert.AreEqual("10.97.1.254", viaCom.UpperIP);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/incoming-relays/" + id, "{\"upper_ip\":\"10.97.1.100\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"upper_ip\":\"10.97.1.100\"", putBody);
+         viaCom = _settings.IncomingRelays.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("10.97.1.100", viaCom.UpperIP);
+         Assert.AreEqual("rest-relay", viaCom.Name, "Left out, so left alone.");
+
+         Assert.AreEqual(400, Http("PUT", "/api/v1/incoming-relays/" + id, "{\"name\":\"\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/incoming-relays/" + id, "{\"lower_ip\":\"not-an-address\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/incoming-relays/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/incoming-relays", "{\"name\":\"rest-relay-2\",\"lower_ip\":\"10.97.2.1\"}").status, "both ends of the range are required");
+         Assert.AreEqual(404, Http("PUT", "/api/v1/incoming-relays/999999999", "{\"name\":\"x\"}").status);
+         Assert.AreEqual("10.97.1.100", _settings.IncomingRelays.get_ItemByDBID(int.Parse(id)).UpperIP, "A refused change changes nothing.");
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/incoming-relays/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/incoming-relays/" + id).status);
+         StringAssert.DoesNotContain("rest-relay", Http("GET", "/api/v1/incoming-relays").body);
       }
 
       [Test]
@@ -757,7 +970,10 @@ namespace RegressionTests.API
          {
             "/api/v1/ipranges", "/api/v1/ipranges/{id}", "/api/v1/domains/{domain}/lists", "/api/v1/lists/{address}",
             "/api/v1/certificates", "/api/v1/domains/{domain}/dkim", "/api/v1/rules", "/api/v1/logs", "/api/v1/logs/{name}",
-            "/api/v1/backup", "/api/v1/settings", "/api/v1/settings/antivirus"
+            "/api/v1/backup", "/api/v1/settings", "/api/v1/settings/antivirus",
+            "/api/v1/dns-blacklists", "/api/v1/dns-blacklists/{id}", "/api/v1/surbl-servers", "/api/v1/surbl-servers/{id}",
+            "/api/v1/whitelist-addresses", "/api/v1/whitelist-addresses/{id}", "/api/v1/blocked-senders", "/api/v1/blocked-senders/{id}",
+            "/api/v1/incoming-relays", "/api/v1/incoming-relays/{id}"
          })
          {
             StringAssert.Contains("\"" + path + "\"", body, "The OpenAPI document must describe " + path);
