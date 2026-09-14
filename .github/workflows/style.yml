@@ -112,6 +112,17 @@ jobs:
       - name: The self-service portal's script does what the page needs
         run: python3 build/check-portal-script.py
 
+      # The Control Deck is one file - markup, a style block and one inline
+      # script - and the only graphical administration a Linux server has.
+      # This lifts the script out, checks the markup against the policy the
+      # server sends for the page (read from RestApiServer.cpp, so the two
+      # cannot drift apart) and RUNS the script against a small DOM and a
+      # recorded server: each view drawn from its answers, each form sending
+      # the JSON its route takes, each refusal shown in the server's words,
+      # each change read back after the round trip.
+      - name: The Control Deck's script does what the page needs
+        run: python3 build/check-deck-script.py
+
       # Every language's catalogue has every text the page has and nothing
       # else, keeps the tokens a reader types verbatim, and the embedded unit
       # is what the generator writes now.
