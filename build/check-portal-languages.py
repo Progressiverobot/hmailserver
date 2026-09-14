@@ -38,7 +38,7 @@ GENERATED = os.path.join(ROOT, "hmailserver", "source", "Server", "Common", "Uti
 GENERATOR = os.path.join(ROOT, "build", "generate-portal-languages.py")
 
 # What must survive translation, when the English has it.
-SURVIVORS = ["from:", "to:", "subject:", "has:attachment", "before:", "after:", "in:folder", "is:unread", "is:read",
+SURVIVORS = ["from:", "to:", "subject:", "has:attachment", "has:link", "before:", "after:", "in:folder", "is:unread", "is:read",
              "is:flagged", "is:unflagged", "is:answered", "label:name", "cc:", "bcc:", "filename:", "larger:", "smaller:",
              "older_than:", "newer_than:", "is:muted", "is:pinned", "category:", "INBOX", "Ctrl+K", ".eml", "{first_name}",
              "{subject}", "{name}", "Sieve", "IMAP", "SMTP", "hMailServer"]

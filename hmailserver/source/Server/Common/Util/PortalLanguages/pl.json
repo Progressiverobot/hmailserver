@@ -504,7 +504,7 @@
   "What the password is for": "Do czego służy hasło",
   "When": "Kiedy",
   "When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.": "Gdy nadchodzi wiadomość: warunek, działanie. Zapisywane w poniższym skrypcie filtru jako Sieve i odczytywane z niego; skrypt napisany ręcznie pozostaje nietknięty.",
-  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "Słowa, &quot;frazy w cudzysłowie&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
+  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "Słowa, &quot;frazy w cudzysłowie&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
   "Write": "Napisz",
   "Write a new message": "Napisz nową wiadomość",
   "Write your message": "Napisz wiadomość",

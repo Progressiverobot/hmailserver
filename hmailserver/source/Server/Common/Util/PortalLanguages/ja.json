@@ -504,7 +504,7 @@
   "What the password is for": "パスワードの用途",
   "When": "条件",
   "When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.": "メッセージが届いたときの条件と動作です。下のフィルタースクリプトに Sieve として書き込まれ、そこから読み戻されます。手書きのスクリプトはそのまま残されます。",
-  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "単語、&quot;引用符で囲んだ語句&quot;、from:、to:、cc:、bcc:、subject:、has:attachment、filename:、larger:10M、smaller:、before:2026-01-31、after:、older_than:7d、newer_than:、in:folder、is:unread、is:read、is:flagged、is:unflagged、is:answered、is:muted、is:pinned、label:name、category:、-word、a OR b",
+  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "単語、&quot;引用符で囲んだ語句&quot;、from:、to:、cc:、bcc:、subject:、has:attachment、has:link、filename:、larger:10M、smaller:、before:2026-01-31、after:、older_than:7d、newer_than:、in:folder、is:unread、is:read、is:flagged、is:unflagged、is:answered、is:muted、is:pinned、label:name、category:、-word、a OR b",
   "Write": "作成",
   "Write a new message": "新しいメッセージを作成",
   "Write your message": "メッセージを入力",

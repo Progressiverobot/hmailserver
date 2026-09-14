@@ -6613,10 +6613,10 @@ namespace HM
       // the index.
       // A search as a reader writes it: words, "quoted phrases", and the
       // operators every webmail has taught - from:, to:, cc:, bcc:, subject:,
-      // has:attachment, filename:, larger:10M, smaller:, before:YYYY-MM-DD,
-      // after:, older_than:7d, newer_than:, in:folder, is:unread, is:read,
-      // is:flagged, is:unflagged, is:answered, is:muted, is:pinned,
-      // label:name, category:promotions. Every word must be found; the
+      // has:attachment, has:link, filename:, larger:10M, smaller:,
+      // before:YYYY-MM-DD, after:, older_than:7d, newer_than:, in:folder,
+      // is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted,
+      // is:pinned, label:name, category:promotions. Every word must be found; the
       // operators narrow further. A term after a minus is one the message
       // must not match, and terms joined by OR are choices of which one must
       // match: each is a query of its own, held here and asked against the
@@ -6640,6 +6640,7 @@ namespace HM
          __int64 largerThan;
          __int64 smallerThan;
          bool hasAttachment;
+         bool hasLink;
          bool wantUnread;
          bool wantRead;
          bool wantFlagged;
@@ -6654,7 +6655,7 @@ namespace HM
 
          SearchQuery() :
             largerThan(-1), smallerThan(-1),
-            hasAttachment(false), wantUnread(false), wantRead(false), wantFlagged(false), wantUnflagged(false), wantAnswered(false),
+            hasAttachment(false), hasLink(false), wantUnread(false), wantRead(false), wantFlagged(false), wantUnflagged(false), wantAnswered(false),
             wantMuted(false), wantPinned(false)
          {
          }
@@ -6770,6 +6771,42 @@ namespace HM
          return value == _T("primary") || value == _T("social") || value == _T("promotions") || value == _T("updates") || value == _T("forums");
       }
 
+      bool StartsWithWebScheme(const String &text, int at)
+      {
+         return text.Find(_T("http://"), at) == at || text.Find(_T("https://"), at) == at;
+      }
+
+      // Whether the message carries a link a reader could follow: an http or
+      // https address written in the text part, or an anchor whose href is
+      // one in the HTML part. An image fetched from the web is not a link,
+      // so the HTML is read for href= and not for any address in it. Both
+      // parts arrive lower-cased.
+      bool HasWebLink(const String &bodyLower, const String &htmlLower)
+      {
+         if (bodyLower.Find(_T("http://")) >= 0 || bodyLower.Find(_T("https://")) >= 0)
+            return true;
+
+         int at = htmlLower.Find(_T("href"));
+         while (at >= 0)
+         {
+            int i = at + 4;
+            while (i < htmlLower.GetLength() && (htmlLower[i] == ' ' || htmlLower[i] == '\t' || htmlLower[i] == '\r' || htmlLower[i] == '\n'))
+               i++;
+            if (i < htmlLower.GetLength() && htmlLower[i] == '=')
+            {
+               i++;
+               while (i < htmlLower.GetLength() && (htmlLower[i] == ' ' || htmlLower[i] == '\t' || htmlLower[i] == '\r' || htmlLower[i] == '\n'))
+                  i++;
+               if (i < htmlLower.GetLength() && (htmlLower[i] == '"' || htmlLower[i] == '\''))
+                  i++;
+               if (StartsWithWebScheme(htmlLower, i))
+                  return true;
+            }
+            at = htmlLower.Find(_T("href"), at + 4);
+         }
+         return false;
+      }
+
       // One term applied to a query: an operator sets its field, a term the
       // parser does not know is a word.
       void ApplyTerm(SearchQuery &q, const String &token)
@@ -6806,6 +6843,8 @@ namespace HM
             q.inFolder = value;
          else if (key == _T("has") && value == _T("attachment"))
             q.hasAttachment = true;
+         else if (key == _T("has") && value == _T("link"))
+            q.hasLink = true;
          else if (key == _T("filename") && !value.IsEmpty())
             q.filename = value;
          else if (key == _T("larger") && ParseSize(value) >= 0)
@@ -7045,7 +7084,7 @@ namespace HM
             if (!ContainsNoCase(subject, q.terms[i]) && !ContainsNoCase(from, q.terms[i]))
                pending.push_back(q.terms[i]);
 
-         if (pending.empty() && q.to.IsEmpty() && q.filename.IsEmpty())
+         if (pending.empty() && q.to.IsEmpty() && q.filename.IsEmpty() && !q.hasLink)
             return true;
 
          if (message->GetSize() > MaxMessageBodyBytes)
@@ -7079,11 +7118,16 @@ namespace HM
                return false;
          }
 
-         if (pending.empty())
+         if (pending.empty() && !q.hasLink)
             return true;
 
          const String body = ToLowerCopy(data.GetBody());
          const String html = ToLowerCopy(data.GetHTMLBody());
+         // has:link: an address in the text, or an anchor to one in the HTML,
+         // read from the same two parts the words are.
+         if (q.hasLink && !HasWebLink(body, html))
+            return false;
+
          for (size_t i = 0; i < pending.size(); i++)
          {
             const String &term = pending[i];
@@ -10249,7 +10293,7 @@ namespace HM
          "\"/api/v1/me/drafts\":{\"post\":{\"summary\":\"Keep a draft in the Drafts folder\",\"description\":\"Body: to, cc, bcc, subject, text, from (as on a send), and optionally replace_id - the draft this one supersedes, expunged once the new one is saved (new content is a new message with a new UID, as IMAP requires). The Drafts folder is made as Drafts when the account has none. The draft carries the \\\\Draft and \\\\Seen flags and is read, moved and deleted through the message routes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"},\"replace_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"id, folder_id\"},\"403\":{\"description\":\"The Drafts folder does not allow it\"},\"413\":{\"description\":\"The mailbox is full\"}}}},"
          "\"/api/v1/me/settings\":{\"get\":{\"summary\":\"The signed-in account's own settings\",\"responses\":{\"200\":{\"description\":\"name (first, last), forwarding (enabled, address, keep_original), signature (enabled, text, html)\"}}},\"put\":{\"summary\":\"Change the signed-in account's own settings\",\"description\":\"Each of name, forwarding and signature the body names is applied whole; one it does not name is left as it is. A forwarding that is enabled needs an e-mail address, and not the account's own.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"name\":{\"type\":\"object\"},\"forwarding\":{\"type\":\"object\"},\"signature\":{\"type\":\"object\"}}}}}},\"responses\":{\"200\":{\"description\":\"The settings as saved\"},\"400\":{\"description\":\"Nothing named, a name or signature too long, or a forwarding address refused\"}}}},"
          "\"/api/v1/me/filters\":{\"get\":{\"summary\":\"The signed-in account's active Sieve script\",\"responses\":{\"200\":{\"description\":\"active (the script, empty when none), name (the active script's name when ManageSieve set one)\"}}},\"put\":{\"summary\":\"Set the signed-in account's active Sieve script\",\"description\":\"Body: script. Checked as ManageSieve's PUTSCRIPT checks it, with the same wording in error; an empty script removes the filter. The script runs on every message that arrives from then on.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\"],\"properties\":{\"script\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"active\"},\"400\":{\"description\":\"script missing, over 256 KB, or not parsing (the reason is in error)\"}}}},"
-         "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, -term (a word, phrase or operator the message must not match), a OR b (one of the two must match, and so on through a OR b OR c; OR in capitals), and from:, to:, cc:, bcc: (address or name in that header; Bcc only where the sender's own copy kept it), subject:, has:attachment, filename: (an attachment's file name contains), larger:10M and smaller: (bytes, or K, M, G for multiples of 1024), before:YYYY-MM-DD, after:YYYY-MM-DD, older_than:7d and newer_than: (d, w, m or y, against the time the message was stored, as before: and after: are), in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned (the $Muted and $Pinned keywords), label:name (an IMAP keyword the message carries; several must all be there), category: (primary, social, promotions, updates or forums - the tab the listing gives the message); a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
+         "\"/api/v1/me/search\":{\"get\":{\"x-operators\":\"q takes words (every one must be found), quoted phrases, -term (a word, phrase or operator the message must not match), a OR b (one of the two must match, and so on through a OR b OR c; OR in capitals), and from:, to:, cc:, bcc: (address or name in that header; Bcc only where the sender's own copy kept it), subject:, has:attachment, has:link (an http or https address in the text, or a link to one in the HTML; the message is read for it), filename: (an attachment's file name contains), larger:10M and smaller: (bytes, or K, M, G for multiples of 1024), before:YYYY-MM-DD, after:YYYY-MM-DD, older_than:7d and newer_than: (d, w, m or y, against the time the message was stored, as before: and after: are), in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned (the $Muted and $Pinned keywords), label:name (an IMAP keyword the message carries; several must all be there), category: (primary, social, promotions, updates or forums - the tab the listing gives the message); a folder listing's q takes the same, without in:.\",\"summary\":\"Search every folder of the signed-in account\",\"description\":\"Query parameters: q (required) and limit (1-200, default 50). The same match as q on a folder listing, over every folder the account may read, newest first; at most 2000 messages are looked at per request (scanned, complete), and more says whether hits beyond limit were cut. Each hit names its folder_id and folder path.\",\"responses\":{\"200\":{\"description\":\"query, scanned, complete, more, messages\"},\"400\":{\"description\":\"q missing\"}}}},"
          "\"/api/v1/me/messages\":{\"post\":{\"x-body\":\"text and, when given, html (the message goes as multipart/alternative); attachments; from (one of the identities); receipt; in_reply_to, references, answered_id; or mime - the MIME entity the page built (a signed or an encrypted message: its Content-Type headers, a blank line, its body, 7-bit), sent under this server's headers in place of text, html and attachments.\",\"summary\":\"Send a message as the signed-in account\",\"description\":\"Body: to, cc, bcc (address lists, comma or semicolon separated, display names allowed), subject, text, and from - one of the account's identities (GET /api/v1/me/identities: its own address, an alias of it, or an address whose owner granted it the post right), as address or Name <address>; optionally in_reply_to and references (written as the headers of those names, so the recipient's client threads the reply) and answered_id (the id of the message this answers, which gets \\\\Answered). Every address is put through the checks RCPT TO makes for an authenticated sender, and a refused one is named in error. The message is queued through the same delivery pipeline as SMTP submission, and a copy marked read is kept in the folder designated \\\\Sent when the account has one and its quota allows. attachments is an array of {name, type, data} with data as base64 - at most 20, twelve megabytes together; this route and the drafts route take a request of up to sixteen megabytes.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"to\":{\"type\":\"string\"},\"cc\":{\"type\":\"string\"},\"bcc\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"queued, recipients, sent_id (0 when no copy was kept)\"},\"400\":{\"description\":\"No recipient, or an address refused (named in error)\"},\"413\":{\"description\":\"Larger than the server allows\"}}}},"
          "\"/api/v1/me/messages/{id}\":{\"get\":{\"summary\":\"One message, read\",\"description\":\"The listing's fields plus folder_id, to, cc, text, html and attachments (index, name, size, content_type, content_id). content_type is the media type the part declares, lower-cased and without its parameters, and is the empty string when the part declares none; content_id is the part's Content-ID with the angle brackets stripped - the form a cid: URL in html uses - and is the empty string when the part carries none. An inline image is an attachment here like any other part, so a page renders one by matching a cid: URL in html against content_id and pointing at the attachment route. A message over one megabyte is described with truncated true and no body. Another account's message, or one in a folder the ACL keeps from this account, is 404.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"Not this account's message\"}}},\"delete\":{\"summary\":\"Delete one message\",\"description\":\"Moved to the folder designated \\\\Trash when the account has one and the message is not in it already; expunged instead when the account has no Trash folder, when the message is already in it, or when the caller adds ?permanent=1. The rights EXPUNGE asks for.\",\"responses\":{\"200\":{\"description\":\"deleted true, or deleted false with moved_to and the new id\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"
          "\"/api/v1/me/messages/{id}/flags\":{\"put\":{\"summary\":\"Change one message's flags\",\"description\":\"Body: any of seen, flagged, answered, draft, deleted as booleans; only the flags named change. The rights STORE asks for - seen, deleted and the rest are three permissions. Every IMAP session on the folder is told.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"id, folder_id, flags\"},\"400\":{\"description\":\"No flag named\"},\"403\":{\"description\":\"The folder does not allow it\"},\"404\":{\"description\":\"Not this account's message\"}}}},"

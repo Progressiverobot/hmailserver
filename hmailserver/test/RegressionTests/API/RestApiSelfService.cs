@@ -1552,6 +1552,44 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("has:link narrows to messages carrying an http or https address in the text or an anchor to one in the HTML - not an image fetched from the web, and not a word in the subject - in the search, turned round with a minus, and in a folder listing")]
+      public void HasLinkNarrowsToAWebAddress()
+      {
+         string to = "To: " + Address + "\r\n";
+         SmtpClientSimulator.StaticSendRaw("alice@example.com", Address,
+            "From: alice@example.com\r\n" + to + "Subject: Read this\r\n\r\nThe minutes are at https://example.org/minutes for everyone.\r\n");
+         SmtpClientSimulator.StaticSendRaw("shop@example.com", Address,
+            "From: shop@example.com\r\n" + to + "Subject: Your order\r\nContent-Type: text/html; charset=us-ascii\r\n\r\n<p>Track it <a href = 'http://example.com/track/1'>here</a>.</p>\r\n");
+         SmtpClientSimulator.StaticSendRaw("news@example.com", Address,
+            "From: news@example.com\r\n" + to + "Subject: Picture only\r\nContent-Type: text/html; charset=us-ascii\r\n\r\n<p>Look.</p><img src=\"https://example.com/pixel.gif\" alt=\"\">\r\n");
+         SmtpClientSimulator.StaticSendRaw("bob@example.org", Address,
+            "From: bob@example.org\r\n" + to + "Subject: The https link I promised\r\n\r\nI will send it tomorrow.\r\n");
+         Pop3ClientSimulator.AssertMessageCount(Address, UserPassword, 4);
+
+         string linked = SearchBody("has:link");
+         StringAssert.Contains("Read this", linked);
+         StringAssert.Contains("Your order", linked);
+         StringAssert.DoesNotContain("Picture only", linked);
+         StringAssert.DoesNotContain("The https link I promised", linked);
+         string unlinked = SearchBody("-has:link");
+         StringAssert.Contains("Picture only", unlinked);
+         StringAssert.Contains("The https link I promised", unlinked);
+         StringAssert.DoesNotContain("Read this", unlinked);
+         StringAssert.DoesNotContain("Your order", unlinked);
+         string narrowed = SearchBody("has:link from:shop");
+         StringAssert.Contains("Your order", narrowed);
+         StringAssert.DoesNotContain("Read this", narrowed);
+
+         (int status, string body) tree = Http("GET", "/api/v1/me/folders", UserHeader(UserPassword));
+         long inboxId = IdBefore(tree.body, "\"path\":\"INBOX\"");
+         (int status, string body) listed = Http("GET", "/api/v1/me/folders/" + inboxId + "/messages?q=" + Uri.EscapeDataString("has:link"), UserHeader(UserPassword));
+         Assert.AreEqual(200, listed.status, "Body: " + listed.body);
+         StringAssert.Contains("Read this", listed.body);
+         StringAssert.Contains("Your order", listed.body);
+         StringAssert.DoesNotContain("Picture only", listed.body);
+      }
+
+      [Test]
       [Description("An app password is made once with its clear text - the account's own password proving who asks - listed without it, signs in, may not mint or revoke another or end the account's sessions, and is removed")]
       public void AppPasswordsAreMadeListedAndRemoved()
       {

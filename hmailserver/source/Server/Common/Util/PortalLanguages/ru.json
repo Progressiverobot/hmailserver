@@ -504,7 +504,7 @@
   "What the password is for": "Для чего пароль",
   "When": "Когда",
   "When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.": "Когда приходит письмо: условие, действие. Записывается в скрипт фильтра ниже на Sieve и читается из него; написанный вручную скрипт не трогается.",
-  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "Слова, &quot;фразы в кавычках&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
+  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "Слова, &quot;фразы в кавычках&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
   "Write": "Написать",
   "Write a new message": "Написать новое сообщение",
   "Write your message": "Напишите сообщение",

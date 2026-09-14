@@ -60,6 +60,7 @@ with `OR`.
 | `cc:` / `bcc:` | An address or name in that header. Bcc is only in the sender's own copy of a message. |
 | `subject:` | The subject. |
 | `has:attachment` | Messages carrying an attachment. |
+| `has:link` | Messages carrying a link: an `http` or `https` address in the text, or a link to one in the HTML (an image fetched from the web is not a link); the message is read whole for it. |
 | `filename:` | Messages carrying an attachment whose file name contains the text; the message is read whole for it. |
 | `larger:` / `smaller:` | By size: bytes, or with `K`, `M` or `G` for multiples of 1024, as in `larger:10M`. |
 | `before:YYYY-MM-DD` | Messages dated before that day. |
@@ -75,4 +76,5 @@ with `OR`.
 
 Examples: `from:alice is:unread`, `subject:"quarterly report" has:attachment`,
 `in:Archive after:2026-01-01 label:travel`, `from:alice OR from:bob -is:read`,
-`larger:5M older_than:1y filename:.zip`, `category:promotions newer_than:7d`.
+`larger:5M older_than:1y filename:.zip`, `category:promotions newer_than:7d`,
+`from:bank has:link -is:read`.

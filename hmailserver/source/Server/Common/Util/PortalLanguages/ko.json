@@ -504,7 +504,7 @@
   "What the password is for": "비밀번호 용도",
   "When": "조건",
   "When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.": "메시지가 도착하면: 조건과 동작. 아래 필터 스크립트에 Sieve로 기록되고 거기서 다시 읽힙니다. 직접 작성한 스크립트는 그대로 둡니다.",
-  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "단어, &quot;따옴표로 묶은 구문&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
+  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "단어, &quot;따옴표로 묶은 구문&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b",
   "Write": "쓰기",
   "Write a new message": "새 메시지 쓰기",
   "Write your message": "메시지를 입력하세요",

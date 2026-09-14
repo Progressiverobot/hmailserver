@@ -504,7 +504,7 @@
   "What the password is for": "密码的用途",
   "When": "条件",
   "When a message arrives: a condition, an action. Written into the filter script below as Sieve, and read back from it; a script written by hand is left alone.": "邮件到达时：一个条件，一个操作。以 Sieve 形式写入下方的筛选脚本并从中读回；手写的脚本不会被改动。",
-  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "词语、&quot;带引号的短语&quot;、from:、to:、cc:、bcc:、subject:、has:attachment、filename:、larger:10M、smaller:、before:2026-01-31、after:、older_than:7d、newer_than:、in:folder、is:unread、is:read、is:flagged、is:unflagged、is:answered、is:muted、is:pinned、label:name、category:、-word、a OR b",
+  "Words, &quot;quoted phrases&quot;, from:, to:, cc:, bcc:, subject:, has:attachment, has:link, filename:, larger:10M, smaller:, before:2026-01-31, after:, older_than:7d, newer_than:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, is:muted, is:pinned, label:name, category:, -word, a OR b": "词语、&quot;带引号的短语&quot;、from:、to:、cc:、bcc:、subject:、has:attachment、has:link、filename:、larger:10M、smaller:、before:2026-01-31、after:、older_than:7d、newer_than:、in:folder、is:unread、is:read、is:flagged、is:unflagged、is:answered、is:muted、is:pinned、label:name、category:、-word、a OR b",
   "Write": "写信",
   "Write a new message": "写新邮件",
   "Write your message": "输入邮件内容",
