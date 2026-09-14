@@ -224,7 +224,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[]};
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[]};
 
 /* The editor a view has open, if any: {kind, id, values} - id 0 is a new one. */
 let editing=null;
@@ -387,7 +387,13 @@ $("#content").addEventListener("click",e=>{
   const b=e.target.closest("button[data-act]");if(!b)return;
   const d=b.dataset;
   if(d.act==="accounts")showAccounts(d.domain);
-  else if(d.act==="domains")render();
+  else if(d.act==="domains"){editing=null;render();}
+  else if(d.act==="domainnew")createDomain();
+  else if(d.act==="domainedit")openDomain(d.name);
+  else if(d.act==="domainsave")saveDomain();
+  else if(d.act==="domaindel")deleteDomain(d.name);
+  else if(d.act==="daliasadd")addDomainAlias();
+  else if(d.act==="daliasdel")deleteDomainAlias(d.name);
   else if(d.act==="add")addAccount(d.domain);
   else if(d.act==="del")delAccount(d.address,d.domain);
   else if(d.act==="retry")retryMsg(d.id);
@@ -421,6 +427,15 @@ $("#content").addEventListener("click",e=>{
 $("#content").addEventListener("change",e=>{
   const el=e.target.closest("[data-r]");if(!el)return;
   if(el.dataset.r==="crit-field"||el.dataset.r==="act-type"){readRuleForm();renderRuleEditor();}
+});
+/* Enter in a text box inside a row marked data-enter presses that row's
+   button, so the small forms - a new account, a new domain, another name for
+   one - are completed from the keyboard as a form would be. */
+$("#content").addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||!e.target||e.target.tagName!=="INPUT"||e.target.type==="checkbox")return;
+  const box=e.target.closest("[data-enter]");if(!box)return;
+  const b=box.querySelector('button[data-act="'+box.dataset.enter+'"]');
+  if(b){e.preventDefault();b.click();}
 });
 
 /* ---------- The OpenAPI document ---------- */
@@ -502,6 +517,8 @@ function controlHtml(prefix,key,prop,value,opts){
     return '<input type="number" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
   if(type==="array")
     return '<textarea id="'+id+'" rows="4" placeholder="One per line">'+escHtml((Array.isArray(value)?value:[]).join("\n"))+'</textarea>';
+  if(prop.format==="multiline")
+    return '<textarea id="'+id+'" rows="5">'+escHtml(value===undefined||value===null?"":value)+'</textarea>';
   if(isPassword(key,prop))
     return '<input type="password" id="'+id+'" value="" autocomplete="new-password" placeholder="'+escHtml(opts.passwordHint||"left unchanged unless filled")+'">';
   return '<input type="text" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
@@ -593,17 +610,200 @@ async function renderDash(update){
   $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+escHtml(states[s.state]||("State "+s.state))+'</span>';
 }
 
-/* ---------- Domains and accounts ---------- */
+/* ---------- Domains and accounts ----------
+   The domain's editor holds every field PUT /api/v1/domains/{domain} takes,
+   grouped as the desktop Control Panel's domain dialog groups them. That
+   route's schema names three keys and lists the rest in its description, so
+   this table is that prose, typed: each key's type, its words and whether it
+   is write-only are as the handler reads them. The handler refuses a key it
+   does not take, by name, so a key here that the server no longer takes is a
+   refusal shown on the page rather than a change lost in silence. Save sends
+   active, which the route requires, and the keys whose control differs from
+   the record as it was read; a filled password goes as well. */
+const DOMAIN_GROUPS=[
+  {title:"General",props:{
+    active:{type:"boolean",description:"Whether the domain receives mail and its accounts can sign in."},
+    name:{type:"string",description:"The domain name. Changing it renames the domain and moves every account, alias and list with it."},
+    postmaster:{type:"string",description:"Mail to an unknown recipient in the domain is redirected to this address; empty means it is refused."}}},
+  {title:"Limits",props:{
+    max_size_mb:{type:"integer",description:"Maximum domain size in MB; 0 is unlimited."},
+    max_message_size_kb:{type:"integer",description:"Maximum message size in KB; 0 is unlimited."},
+    max_account_size_mb:{type:"integer",description:"Maximum size for accounts created in this domain, in MB; 0 is unlimited."},
+    message_retention_days:{type:"integer",description:"Delete messages in this domain's mailboxes older than this many days; 0 is no policy, and an account's own value overrides it."},
+    max_accounts_enabled:{type:"boolean",description:"Limit the number of accounts."},
+    max_accounts:{type:"integer",description:"The most accounts the domain may hold, when limited."},
+    max_aliases_enabled:{type:"boolean",description:"Limit the number of aliases."},
+    max_aliases:{type:"integer",description:"The most aliases the domain may hold, when limited."},
+    max_lists_enabled:{type:"boolean",description:"Limit the number of distribution lists."},
+    max_lists:{type:"integer",description:"The most distribution lists the domain may hold, when limited."},
+    plus_addressing_enabled:{type:"boolean",description:"Enable plus addressing: mail to user+anything@domain reaches user@domain."},
+    plus_addressing_character:{type:"string",description:"The one character that separates the address from its tag."},
+    use_greylisting:{type:"boolean",description:"Enable greylisting for this domain."}}},
+  {title:"Signature",props:{
+    signature_enabled:{type:"boolean",description:"Add a signature to outgoing messages."},
+    signature_method:{type:"string","enum":["set_if_not_specified","overwrite","append"],description:"Use the domain's signature only if the account has none, overwrite the account's signature, or append to it."},
+    signature_plain_text:{type:"string",format:"multiline",description:"The plain-text signature."},
+    signature_html:{type:"string",format:"multiline",description:"The HTML signature."},
+    signature_add_to_replies:{type:"boolean",description:"Add the signature to replies."},
+    signature_add_to_local_mail:{type:"boolean",description:"Add the signature to local e-mail."}}},
+  {title:"Relay",props:{
+    relay_host:{type:"string",description:"Where mail FROM this domain leaves through. Empty means the domain has no opinion and the server-wide SMTP relayer applies; a route still wins over both, because a route is a statement about the destination."},
+    relay_port:{type:"integer",description:"The relay's port; 0 is 25."},
+    relay_connection_security:{type:"string","enum":["none","starttls_optional","starttls_required","tls"],description:"How the connection to the relay is secured."},
+    relay_requires_auth:{type:"boolean",description:"The relay requires authentication."},
+    relay_username:{type:"string",description:"The user name for the relay."},
+    relay_password:{type:"string",writeOnly:true,description:"The password for the relay. Accepted here and never shown."}}},
+  {title:"Out of office",props:{
+    vacation_enabled:{type:"boolean",description:"Send a domain-wide out-of-office reply. It answers only for accounts that have no vacation message of their own, and at most one reply answers any message."},
+    vacation_subject:{type:"string",description:"The reply's subject."},
+    vacation_message:{type:"string",format:"multiline",description:"The reply's text."}}},
+  {title:"DKIM",props:{
+    dkim_enabled:{type:"boolean",description:"Sign outgoing mail from this domain."},
+    dkim_selector:{type:"string",description:"The selector, which names the DNS record the public key is published under."},
+    dkim_private_key_file:{type:"string",description:"The path of the private key file on the server."},
+    dkim_signing_algorithm:{type:"string","enum":["sha1","sha256"],description:"The signing algorithm."}}}
+];
+function domainProps(){const all={};DOMAIN_GROUPS.forEach(g=>Object.assign(all,g.props));return all;}
+
 async function renderDomains(){
-  const d=await api("/api/v1/domains");
-  const list=asList(d,"domains");
-  const rows=list.map(x=>`
+  await loadSpec();
+  cache.domains=asList(await api("/api/v1/domains"),"domains");
+  if(editing&&editing.kind==="domain"){renderDomainEditor();return;}
+  const rows=cache.domains.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button></td></tr>`).join("");
-  $("#content").innerHTML=`<div class="card view">
-    <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="3" class="empty">No domains configured.</td></tr>'}</tbody></table></div></div>`;
+        <td>${escHtml(x.postmaster||"—")}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button>
+          <button class="btn ghost sm" data-act="domainedit" data-name="${escHtml(x.name)}">Edit</button>
+          <button class="btn danger sm" data-act="domaindel" data-name="${escHtml(x.name)}">Delete</button>
+          <div class="err" id="err_domain_${escHtml(x.name)}"></div></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/domains","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Status</th><th>Postmaster</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="empty">No domains configured.</td></tr>'}</tbody></table></div>
+    </div>
+    <div class="sect"><h2>New domain</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/domains","post").description||"")}</p>
+        <div class="row" data-enter="domainnew">
+          <input id="newDomain" placeholder="example.com" aria-label="Domain name" style="flex:1;min-width:220px">
+          <input id="newPostmaster" placeholder="Postmaster address (optional)" aria-label="Postmaster address" style="flex:1;min-width:220px">
+          <label class="row" style="gap:7px"><input type="checkbox" id="newDomainActive" checked> Active</label>
+          <button class="btn" data-act="domainnew">Create domain</button>
+          <div class="err" id="err_domainnew"></div>
+        </div>
+      </div></div></div>`;
+}
+async function createDomain(){
+  setErr("err_domainnew","");
+  const name=$("#newDomain").value.trim(),postmaster=$("#newPostmaster").value.trim(),active=$("#newDomainActive").checked;
+  if(!name){setErr("err_domainnew","A domain name is required.");return;}
+  try{
+    await api("/api/v1/domains",{method:"POST",body:JSON.stringify({name:name,active:active,postmaster:postmaster})});
+    toast("Domain created: "+name);
+    // Read back, and then straight into the editor of the domain as the
+    // server holds it, where the rest of its settings are.
+    cache.domains=asList(await api("/api/v1/domains"),"domains");
+    if(cache.domains.some(d=>d.name===name))await openDomain(name);else await render();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_domainnew",e.message);}
+}
+async function openDomain(name){
+  const existing=cache.domains.filter(d=>d.name===name)[0];
+  if(!existing)return;
+  editing={kind:"domain",name:name,values:JSON.parse(JSON.stringify(existing)),aliases:[],aliasError:""};
+  try{await reloadDomainAliases();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}editing.aliasError=e.message;}
+  renderDomainEditor();
+}
+async function reloadDomainAliases(){
+  editing.aliases=asList(await api("/api/v1/domains/"+encodeURIComponent(editing.name)+"/domain-aliases"),"aliases");
+}
+function domainNamesHtml(){
+  const list=editing.aliases.map(a=>`
+    <div class="row erow"><code style="flex:1">${escHtml(a.name)}</code>
+      <button class="btn ghost sm" data-act="daliasdel" data-name="${escHtml(a.name)}">Remove</button></div>`).join("")
+    ||'<div class="note">No other names: mail is accepted for the domain name only.</div>';
+  return `<p class="note">${escHtml(operation("/api/v1/domains/{domain}/domain-aliases","get").summary||"")}</p>
+    ${list}
+    <div class="row" style="margin-top:14px" data-enter="daliasadd">
+      <input id="newDomainAlias" placeholder="Another name for this domain" aria-label="Another name for this domain" style="flex:1;min-width:220px">
+      <button class="btn ghost sm" data-act="daliasadd">Add name</button>
+      <div class="err" id="err_dalias">${escHtml(editing.aliasError||"")}</div>
+    </div>`;
+}
+function renderDomainEditor(){
+  const cards=DOMAIN_GROUPS.map(g=>`
+    <div class="sect"><h2>${escHtml(g.title)}</h2>
+      <div class="card flat"><div class="form">${formHtml("dom",g.props,editing.values,{required:["active"]})}</div></div></div>`);
+  // The names the domain answers to, between General and Limits as the
+  // desktop dialog has them; drawn into their own box so that adding or
+  // removing one redraws the box and not the edits in the other groups.
+  cards.splice(1,0,`<div class="sect"><h2>Names</h2><div class="card flat" id="domainNames">${domainNamesHtml()}</div></div>`);
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">‹ All domains</button>
+    <div class="sect"><h2>Domain ${escHtml(editing.name)}</h2>
+      <div class="card flat"><p class="note">${escHtml(operation("/api/v1/domains/{domain}","put").description||"")}</p></div></div>
+    ${cards.join("")}
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="domainsave">Save domain</button>
+      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <button class="btn danger" data-act="domaindel" data-name="${escHtml(editing.name)}">Delete domain</button>
+      <div class="err" id="err_domainedit"></div>
+    </div></div>
+  </div>`;
+}
+async function saveDomain(){
+  setErr("err_domainedit","");
+  const props=domainProps();
+  let all;
+  try{all=readForm("dom",props,{});}catch(e){setErr("err_domainedit",e.message);return;}
+  const body={active:!!all.active};
+  Object.keys(all).forEach(k=>{
+    if(k==="active"||all[k]===undefined)return;
+    if(isPassword(k,props[k])){body[k]=all[k];return;}
+    if(all[k]!==editing.values[k])body[k]=all[k];
+  });
+  if(Object.keys(body).length===1&&body.active===!!editing.values.active){toast("Nothing changed");return;}
+  const oldName=editing.name;
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(oldName),{method:"PUT",body:JSON.stringify(body)});
+    // The domain as the server holds it now, read back rather than taken
+    // from the answer, and the editor redrawn from that - under its new name
+    // when it was renamed.
+    cache.domains=asList(await api("/api/v1/domains"),"domains");
+    const newName=body.name!==undefined?body.name:oldName;
+    const fresh=cache.domains.filter(d=>d.name===newName)[0]||cache.domains.filter(d=>d.name===oldName)[0];
+    if(!fresh){editing=null;toast("Domain saved");await render();return;}
+    editing.name=fresh.name;editing.values=JSON.parse(JSON.stringify(fresh));
+    toast(fresh.name!==oldName?"Domain renamed to "+fresh.name:"Domain saved");
+    renderDomainEditor();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_domainedit",e.message);}
+}
+async function deleteDomain(name){
+  if(!confirm("Delete the domain "+name+" with every account, alias and list in it? Their messages go with them."))return;
+  const where=editing&&editing.kind==="domain"?"err_domainedit":"err_domain_"+name;
+  setErr(where,"");
+  try{await api("/api/v1/domains/"+encodeURIComponent(name),{method:"DELETE"});editing=null;toast("Domain deleted: "+name);await render();}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
+}
+async function addDomainAlias(){
+  setErr("err_dalias","");
+  const name=$("#newDomainAlias").value.trim();
+  if(!name){setErr("err_dalias","A name is required.");return;}
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(editing.name)+"/domain-aliases",{method:"POST",body:JSON.stringify({name:name})});
+    toast("Name added: "+name);editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_dalias",e.message);}
+}
+async function deleteDomainAlias(name){
+  if(!confirm("Remove the name "+name+" from "+editing.name+"?"))return;
+  setErr("err_dalias","");
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(editing.name)+"/domain-aliases/"+encodeURIComponent(name),{method:"DELETE"});
+    toast("Name removed: "+name);editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_dalias",e.message);}
 }
 
 async function showAccounts(domain){
@@ -621,9 +821,9 @@ async function showAccounts(domain){
       <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div></div>
     </div>
     <div class="sect"><h2>New account</h2>
-      <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <input id="newAddr" placeholder="user@${escHtml(domain)}" style="flex:1;min-width:220px">
-        <input id="newPass" type="password" placeholder="Password" style="flex:1;min-width:160px">
+      <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center" data-enter="add">
+        <input id="newAddr" placeholder="user@${escHtml(domain)}" aria-label="Address" style="flex:1;min-width:220px">
+        <input id="newPass" type="password" placeholder="Password" aria-label="Password" style="flex:1;min-width:160px">
         <button class="btn" data-act="add" data-domain="${escHtml(domain)}">Create account</button>
         <div class="err" id="err_account"></div>
       </div>
