@@ -415,6 +415,61 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("PUT /api/v1/domains/{name} takes the rest of the domain dialog - DKIM canonicalisation, the secondary key and selector, alias signing, the internal automatic reply, the external override and the Active Directory domain - with COM reading every value the API set, the listing showing them, and a refused word changing nothing.")]
+      public void DomainAdministratorFieldsRoundTripThroughCom()
+      {
+         string name = UniqueDomainName();
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + name + "\"}").status);
+
+         (int status, string body) = Http("PUT", "/api/v1/domains/" + name,
+            "{\"active\":true,\"dkim_header_canonicalization\":\"simple\",\"dkim_body_canonicalization\":\"relaxed\"," +
+            "\"dkim_secondary_selector\":\"next\",\"dkim_secondary_private_key_file\":\"C:\\\\keys\\\\next.pem\",\"dkim_sign_aliases\":true," +
+            "\"vacation_internal_subject\":\"Out (internal)\",\"vacation_internal_message\":\"Ask my team\",\"vacation_external_override\":true," +
+            "\"ad_domain_name\":\"CORP\"}");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"dkim_header_canonicalization\":\"simple\"", body);
+         StringAssert.Contains("\"dkim_body_canonicalization\":\"relaxed\"", body);
+         StringAssert.Contains("\"dkim_secondary_selector\":\"next\"", body);
+         StringAssert.Contains("\"dkim_sign_aliases\":true", body);
+         StringAssert.Contains("\"vacation_internal_subject\":\"Out (internal)\"", body);
+         StringAssert.Contains("\"vacation_external_override\":true", body);
+         StringAssert.Contains("\"ad_domain_name\":\"CORP\"", body);
+
+         Domain domain = DomainOverCom(name);
+         Assert.AreEqual(eDKIMCanonicalizationMethod.eCanonicalizationSimple, domain.DKIMHeaderCanonicalizationMethod);
+         Assert.AreEqual(eDKIMCanonicalizationMethod.eCanonicalizationRelaxed, domain.DKIMBodyCanonicalizationMethod);
+         Assert.AreEqual("next", domain.DKIMSecondarySelector);
+         Assert.AreEqual("C:\\keys\\next.pem", domain.DKIMSecondaryPrivateKeyFile);
+         Assert.IsTrue(domain.DKIMSignAliasesEnabled);
+         Assert.AreEqual("Out (internal)", domain.VacationInternalSubject);
+         Assert.AreEqual("Ask my team", domain.VacationInternalMessage);
+         Assert.IsTrue(domain.VacationExternalOverride);
+         Assert.AreEqual("CORP", domain.ADDomainName);
+
+         // The listing carries the same fields.
+         StringAssert.Contains("\"dkim_secondary_selector\":\"next\"", Http("GET", "/api/v1/domains").body);
+
+         // A body naming one of them leaves the rest alone.
+         Assert.AreEqual(200, Http("PUT", "/api/v1/domains/" + name, "{\"active\":true,\"dkim_header_canonicalization\":\"relaxed\"}").status);
+         domain = DomainOverCom(name);
+         Assert.AreEqual(eDKIMCanonicalizationMethod.eCanonicalizationRelaxed, domain.DKIMHeaderCanonicalizationMethod);
+         Assert.AreEqual(eDKIMCanonicalizationMethod.eCanonicalizationRelaxed, domain.DKIMBodyCanonicalizationMethod);
+         Assert.AreEqual("next", domain.DKIMSecondarySelector, "Left out, so left alone.");
+         Assert.IsTrue(domain.VacationExternalOverride);
+
+         // Refused - a word that is neither simple nor relaxed, a string for a
+         // switch - and nothing changed.
+         (int refusedStatus, string refusedBody) = Http("PUT", "/api/v1/domains/" + name, "{\"active\":true,\"dkim_secondary_selector\":\"other\",\"dkim_body_canonicalization\":\"strict\"}");
+         Assert.AreEqual(400, refusedStatus, refusedBody);
+         StringAssert.Contains("dkim_body_canonicalization must be simple or relaxed", refusedBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/domains/" + name, "{\"active\":true,\"dkim_sign_aliases\":\"yes\"}").status);
+         domain = DomainOverCom(name);
+         Assert.AreEqual("next", domain.DKIMSecondarySelector, "A refused PUT applies nothing.");
+         Assert.AreEqual(eDKIMCanonicalizationMethod.eCanonicalizationRelaxed, domain.DKIMBodyCanonicalizationMethod);
+         Assert.IsTrue(domain.DKIMSignAliasesEnabled);
+      }
+
+      [Test]
       [Description("A new name in PUT /api/v1/domains/{name} renames the domain as the Control Panel does: the old name is gone, the new one is there through COM and over the API, and the account in it answers to the new name.")]
       public void DomainRenameFollowsEveryAddress()
       {
