@@ -285,6 +285,19 @@ namespace HM
 
          if (!PersistentMessageIndex::SaveTermsForMessage(messageToIndex.MessageID, messageToIndex.AccountID, terms, overflowed))
          {
+            // A message deleted between the listing and this save is not a
+            // failure of the index: its row is gone, the terms have no row to
+            // hang off, and there is nothing left to index. On PostgreSQL the
+            // foreign key refuses the save where SQL Server Compact accepted
+            // it, which is how the Linux run of 14 September 2026 saw an error
+            // reported for a message a test had just expunged.
+            std::shared_ptr<Message> stillThere = std::shared_ptr<Message>(new Message);
+            if (!PersistentMessage::ReadObject(stillThere, messageToIndex.MessageID) || stillThere->GetID() == 0)
+            {
+               LOG_DEBUG(Formatter::Format(_T("MessageIndexer: message {0} was deleted before its terms were saved; nothing to index."), messageToIndex.MessageID));
+               continue;
+            }
+
             String errorMessage;
             errorMessage.Format(_T("Failed to save full-text index terms for message %I64d. The batch will be retried."),
                messageToIndex.MessageID);
