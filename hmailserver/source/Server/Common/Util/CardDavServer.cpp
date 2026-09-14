@@ -1287,7 +1287,11 @@ namespace HM
             {
                if (property.name == "supported-address-data")
                {
-                  innerXml = "<C:address-data-type content-type=\"text/vcard\" version=\"3.0\"/>";
+                  // Both versions are accepted on PUT and a card is served back as it
+                  // was sent, so both are advertised - 3.0 first, being what a client
+                  // sends unless told otherwise.
+                  innerXml = "<C:address-data-type content-type=\"text/vcard\" version=\"3.0\"/>"
+                             "<C:address-data-type content-type=\"text/vcard\" version=\"4.0\"/>";
                   return true;
                }
                if (property.name == "addressbook-description")

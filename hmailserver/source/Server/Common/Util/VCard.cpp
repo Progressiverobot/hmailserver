@@ -543,8 +543,11 @@ namespace HM
          for (size_t j = 0; j < property.parameters.size(); j++)
          {
             const AnsiString &value = property.parameters[j].second;
-            // The parser took the quotes off; a value with a delimiter in it gets them back.
-            bool quote = value.Find(";") >= 0 || value.Find(":") >= 0 || value.Find(",") >= 0;
+            // The parser took the quotes off; a value with a delimiter in it gets
+            // them back. A comma is not one: in both versions it separates the
+            // values of a list, TYPE=INTERNET,PREF, and quoted it would make them
+            // a single value that no client's TYPE=PREF matches.
+            bool quote = value.Find(";") >= 0 || value.Find(":") >= 0;
             line += ";" + property.parameters[j].first + "=" + (quote ? "\"" + value + "\"" : value);
          }
          line += ":" + property.value;

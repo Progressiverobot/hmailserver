@@ -157,6 +157,7 @@ namespace RegressionTests.API
          Assert.IsNotNull(addressData, "Body: " + book.Body);
          Assert.AreEqual("text/vcard", addressData.Attributes["content-type"].Value);
          Assert.AreEqual("3.0", addressData.Attributes["version"].Value);
+         Assert.IsNotNull(Prop(book, Book, "C:supported-address-data/C:address-data-type[@version='4.0']"), "4.0 is accepted, so it is advertised. Body: " + book.Body);
 
          Assert.IsFalse(string.IsNullOrEmpty(PropText(book, Book, "CS:getctag")), "No getctag. Body: " + book.Body);
          Assert.IsFalse(string.IsNullOrEmpty(PropText(book, Book, "D:sync-token")), "No sync-token. Body: " + book.Body);
@@ -604,7 +605,7 @@ namespace RegressionTests.API
       }
 
       [Test]
-      [Description("A vCard 4.0 card is accepted: FN, the preferred EMAIL by PREF, and a mailto: value")]
+      [Description("A vCard 4.0 card is accepted: FN, the preferred EMAIL by PREF, and a mailto: value; it is served back as it was sent")]
       public void AVCard40CardIsImported()
       {
          string card = string.Join("\r\n", new[]
@@ -628,11 +629,14 @@ namespace RegressionTests.API
          StringAssert.Contains("\"name\":\"Erin Example\"", rest.Body);
          Assert.IsFalse(rest.Body.Contains("erin.second"), "The preferred address is the one kept. Body: " + rest.Body);
 
-         // Served back as 3.0, which is what the collection advertises.
+         // Served back as it was sent - a 4.0 card stays a 4.0 card, the address
+         // as the client spelled it - since the collection advertises both versions.
          Response read = Dav("GET", created.Header("Location"), Auth(Address, UserPassword));
          Assert.AreEqual(200, read.Status, "Body: " + read.Body);
-         StringAssert.Contains("VERSION:3.0", read.Body);
-         StringAssert.Contains("EMAIL;TYPE=INTERNET,PREF:erin@example.com", read.Body);
+         StringAssert.StartsWith("BEGIN:VCARD\r\nVERSION:4.0\r\n", read.Body);
+         StringAssert.Contains("\r\nEMAIL;PREF=1:mailto:Erin@Example.com\r\n", read.Body);
+         StringAssert.Contains("\r\nEMAIL;PREF=2:erin.second@example.com\r\n", read.Body);
+         StringAssert.Contains("\r\nTEL;VALUE=uri:tel:+44-7700-900123\r\n", read.Body);
       }
 
       // ---------------------------------------------------------------- helpers
