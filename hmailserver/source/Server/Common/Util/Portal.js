@@ -1601,6 +1601,8 @@
     offlineForget();
     searchesWrite([]);
     hideSearchHistory();
+    hideSuggestions();
+    clear(el('search-suggest-list'));
     prefetched = {};
     current = null;
     lastListing = null;
@@ -2155,21 +2157,87 @@
   };
   var hideSearchHistory = function () { el('search-history').hidden = true; };
   var historyButtons = function () { return el('search-history-list').children; };
-  var historyKeys = function (e) {
-    var items = historyButtons(); var at = -1;
-    for (var i = 0; i < items.length; i++) { if (items[i] === e.target) { at = i; } }
-    if (e.key === 'ArrowDown') { e.preventDefault(); if (at + 1 < items.length) { items[at + 1].focus(); } }
-    else if (e.key === 'ArrowUp') { e.preventDefault(); if (at > 0) { items[at - 1].focus(); } else { el('mail-search').focus(); } }
-    else if (e.key === 'Escape') { e.preventDefault(); hideSearchHistory(); el('mail-search').focus(); }
+  // The arrow keys through one of the two lists under the box - the history
+  // or the suggestions - and Escape back to the box.
+  var listKeys = function (buttons, hide) {
+    return function (e) {
+      var items = buttons(); var at = -1;
+      for (var i = 0; i < items.length; i++) { if (items[i] === e.target) { at = i; } }
+      if (e.key === 'ArrowDown') { e.preventDefault(); if (at + 1 < items.length) { items[at + 1].focus(); } }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); if (at > 0) { items[at - 1].focus(); } else { el('mail-search').focus(); } }
+      else if (e.key === 'Escape') { e.preventDefault(); hide(); el('mail-search').focus(); }
+    };
   };
-  // Focus leaving the box or an entry closes the list, unless it went to
+  var historyKeys = listKeys(historyButtons, hideSearchHistory);
+  // Focus leaving the box or an entry closes the lists, unless it went to
   // the other of the two: a moment later, so a click on an entry lands first.
   var leaveHistory = function () {
     setTimeout(function () {
       var focus = document.activeElement;
-      if (focus === el('mail-search') || within(focus, el('search-history'))) { return; }
+      if (focus === el('mail-search') || within(focus, el('search-history')) || within(focus, el('search-suggest'))) { return; }
       hideSearchHistory();
+      hideSuggestions();
     }, 150);
+  };
+  // ---- Search suggestions: a contact's name completing to from:<address> --
+  // The token being typed - the text after the last space, with the from:
+  // or to: it may already carry - is asked of the address book the way the
+  // To field asks it, and the contacts it matches are offered under the box
+  // in place of the history. One taken stands in the box as from:<address>
+  // (to: when the token began with to:) in place of the name, beside
+  // whatever else was typed, and the search runs. An operator's value
+  // (is:unread, subject:x) and a quoted phrase are not names, and one
+  // letter asks nothing.
+  var suggestTimer = null;
+  var suggestToken = function () {
+    var v = el('mail-search').value;
+    var cut = Math.max(v.lastIndexOf(' '), v.lastIndexOf('\t')) + 1;
+    var tail = v.slice(cut);
+    var m = /^(from|to):(.*)$/i.exec(tail);
+    return { head: v.slice(0, cut), key: m ? m[1].toLowerCase() : 'from', q: m ? m[2] : tail };
+  };
+  var suggestButtons = function () { return el('search-suggest-list').children; };
+  var hideSuggestions = function () {
+    el('search-suggest').hidden = true;
+    if (suggestTimer) { clearTimeout(suggestTimer); suggestTimer = null; }
+  };
+  var suggestKeys = listKeys(suggestButtons, hideSuggestions);
+  var showSuggestions = function (found, token) {
+    var list = el('search-suggest-list');
+    clear(list);
+    if (!found.length) { hideSuggestions(); return; }
+    el('search-suggest-head').textContent = token.key === 'to' ? t('Search by recipient') : t('Search by sender');
+    found.forEach(function (c) {
+      var b = node('button', undefined, 'q'); b.type = 'button';
+      b.appendChild(icon('person', true));
+      b.appendChild(node('span', c.name || c.address, 'nm'));
+      b.appendChild(node('span', token.key + ':' + c.address, 'ad'));
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        var text = token.head + token.key + ':' + c.address;
+        el('mail-search').value = text;
+        hideSuggestions();
+        runSearch(text);
+      });
+      b.addEventListener('keydown', suggestKeys);
+      b.addEventListener('blur', leaveHistory);
+      list.appendChild(b);
+    });
+    el('search-suggest').hidden = false;
+  };
+  var suggestSearch = function () {
+    var token = suggestToken();
+    if (suggestTimer) { clearTimeout(suggestTimer); suggestTimer = null; }
+    if (token.q.length < 2 || /[:"]/.test(token.q)) { hideSuggestions(); return; }
+    suggestTimer = setTimeout(function () {
+      suggestTimer = null;
+      call('GET', '/api/v1/me/contacts?limit=8&q=' + encodeURIComponent(token.q)).then(function (result) {
+        // The answer to what is still being typed, and no other.
+        var now = suggestToken();
+        if (result.status !== 200 || !result.data || now.q !== token.q || now.key !== token.key) { return; }
+        showSuggestions(result.data.contacts || [], token);
+      });
+    }, 120);
   };
   var showSearchHistory = function () {
     var list = el('search-history-list');
@@ -2201,16 +2269,22 @@
   };
   el('mail-search').addEventListener('focus', showSearchHistory);
   el('mail-search').addEventListener('blur', leaveHistory);
-  el('mail-search').addEventListener('input', function () { if (el('mail-search').value) { hideSearchHistory(); } else { showSearchHistory(); } });
+  el('mail-search').addEventListener('input', function () {
+    if (el('mail-search').value) { hideSearchHistory(); suggestSearch(); } else { hideSuggestions(); showSearchHistory(); }
+  });
   el('mail-search').addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { hideSearchHistory(); return; }
-    if (e.key === 'ArrowDown' && !el('search-history').hidden) { var items = historyButtons(); if (items.length) { e.preventDefault(); items[0].focus(); } }
+    if (e.key === 'Escape') { hideSearchHistory(); hideSuggestions(); return; }
+    if (e.key === 'ArrowDown') {
+      var items = !el('search-history').hidden ? historyButtons() : !el('search-suggest').hidden ? suggestButtons() : [];
+      if (items.length) { e.preventDefault(); items[0].focus(); }
+    }
   });
   el('search-history-clear').addEventListener('mousedown', function (e) { e.preventDefault(); });
   el('search-history-clear').addEventListener('click', function () { searchesWrite([]); hideSearchHistory(); el('mail-search').focus(); });
   el('mail-search-form').addEventListener('submit', function (event) {
     event.preventDefault();
     hideSearchHistory();
+    hideSuggestions();
     runSearch(el('mail-search').value);
   });
   el('mail-search-clear').addEventListener('click', function () {

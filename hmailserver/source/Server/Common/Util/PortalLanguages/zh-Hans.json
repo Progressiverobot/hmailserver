@@ -382,6 +382,8 @@
   "Scheduled": "已计划",
   "Script": "脚本",
   "Search": "搜索",
+  "Search by recipient": "按收件人搜索",
+  "Search by sender": "按发件人搜索",
   "Search in": "搜索范围",
   "Search mail": "搜索邮件",
   "Search older messages": "搜索更早的邮件",

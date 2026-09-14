@@ -422,6 +422,7 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .history button.q{display:flex;align-items:center;gap:10px;color:var(--text)}
 .history button.q svg.i{color:var(--muted)}
 .history button.q:focus-visible{background:var(--surface-2)}
+.history button.q .ad{color:var(--muted);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #compose-text{border:none;border-radius:0;min-height:18rem;padding:16px 4px;font-size:14.5px;line-height:1.6;box-shadow:none}
 #compose-text:focus{box-shadow:none}
 .editor{min-height:18rem;padding:16px 4px;font-size:14.5px;line-height:1.6;outline:none}
@@ -596,6 +597,10 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div id="search-history" class="complete history" hidden>
 <div class="head"><span>Recent searches</span><button id="search-history-clear" type="button">Clear the list</button></div>
 <div id="search-history-list" role="list"></div>
+</div>
+<div id="search-suggest" class="complete history" hidden>
+<div class="head"><span id="search-suggest-head">Search by sender</span></div>
+<div id="search-suggest-list" role="list"></div>
 </div>
 <label class="inline"><input id="mail-search-everywhere" type="checkbox"> All folders</label>
 <button class="btn ghost sm" type="submit">Search</button>

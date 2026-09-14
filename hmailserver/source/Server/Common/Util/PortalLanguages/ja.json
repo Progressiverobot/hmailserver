@@ -382,6 +382,8 @@
   "Scheduled": "予約",
   "Script": "スクリプト",
   "Search": "検索",
+  "Search by recipient": "宛先で検索",
+  "Search by sender": "送信者で検索",
   "Search in": "検索範囲",
   "Search mail": "メールを検索",
   "Search older messages": "以前のメッセージを検索",

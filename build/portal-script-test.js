@@ -373,6 +373,17 @@ function answer(method, path, body) {
    if (path === '/api/v1/me/settings' && method === 'GET') {
       return json(200, { name: { first: 'A', last: 'B' }, forwarding: { enabled: false, address: '', keep_original: true }, signature: { enabled: false, text: '' } });
    }
+   if (path.startsWith('/api/v1/me/contacts?') && method === 'GET') {
+      // The address book, narrowed the way the server narrows it: names and
+      // addresses containing the text.
+      const q = decodeURIComponent((path.split('q=')[1] || '').split('&')[0]).toLowerCase();
+      const book = [
+         { id: 1, name: 'Alice Example', address: 'alice@example.net', source: 'manual' },
+         { id: 2, name: 'Alan Hidden', address: 'al@example.org', source: 'collected' }
+      ];
+      const found = book.filter((c) => c.name.toLowerCase().indexOf(q) >= 0 || c.address.indexOf(q) >= 0);
+      return json(200, { contacts: found, count: found.length, total: book.length });
+   }
    if (path === '/api/v1/me/filters' && method === 'GET') { return json(200, { active: '' }); }
    if (path === '/api/v1/me/filters' && method === 'PUT') { return json(200, { saved: true }); }
    if (path === '/api/v1/me/preferences' && method === 'GET') { return json(200, { preferences: prefsStore }); }
@@ -998,6 +1009,44 @@ async function main() {
    check('and nothing is offered after', historyBox.hidden === true);
    await searchFor('after:2026-09-01');
    check('a search after that starts the list again', store.get('hmPortalSearches') === '["after:2026-09-01"]', store.get('hmPortalSearches'));
+
+   // ---- search suggestions: a contact's name, typed in the box, completes to from:<address>
+   const suggestBox = document.getElementById('search-suggest');
+   const suggestList = document.getElementById('search-suggest-list');
+   const suggestHead = document.getElementById('search-suggest-head');
+   const typeSearch = async (text) => { search.value = text; search.dispatchEvent(makeEvent('input')); fireTimers(); await flush(); };
+   const beforeSuggest = requests.length;
+   await typeSearch('a');
+   check('one letter in the box asks nothing of the address book', !called(beforeSuggest, 'GET', /contacts/) && suggestBox.hidden === true,
+      JSON.stringify(since(beforeSuggest).map((r) => r.path)));
+   await typeSearch('ali');
+   check('a name typed in the box asks the address book for it, as the To field does', called(beforeSuggest, 'GET', '/api/v1/me/contacts?limit=8&q=ali'),
+      JSON.stringify(since(beforeSuggest).map((r) => r.path)));
+   check('and the contact it matches is offered under the box as from:<address>',
+      suggestBox.hidden === false && suggestList.children.length === 1 && suggestList.children[0].textContent === 'Alice Examplefrom:alice@example.net' && suggestHead.textContent === 'Search by sender',
+      'hidden=' + suggestBox.hidden + ' ' + suggestList.children.length + ' entries, head=' + suggestHead.textContent);
+   check('while the history stays closed', historyBox.hidden === true);
+   await typeSearch('invoice to:al');
+   check('a name after to: completes to to:<address>, and the head says so',
+      suggestList.children.length === 2 && suggestList.children[0].textContent === 'Alice Exampleto:alice@example.net' && suggestHead.textContent === 'Search by recipient',
+      suggestList.children.length + ' entries, head=' + suggestHead.textContent);
+   const beforeOperator = requests.length;
+   await typeSearch('is:unread');
+   check('an operator is not a name and asks nothing', !called(beforeOperator, 'GET', /contacts/) && suggestBox.hidden === true,
+      JSON.stringify(since(beforeOperator).map((r) => r.path)));
+   await typeSearch('invoice ali');
+   search.dispatchEvent(makeEvent('keydown', { key: 'ArrowDown', target: search }));
+   check('the arrow key moves into the suggestions', document.activeElement === suggestList.children[0]);
+   suggestList.children[0].dispatchEvent(makeEvent('keydown', { key: 'Escape', target: suggestList.children[0] }));
+   check('Escape closes them and returns to the box', suggestBox.hidden === true && document.activeElement === search);
+   await typeSearch('invoice ali');
+   const beforeTake = requests.length;
+   suggestList.children[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   check('one taken stands in the box as from:<address> beside the words typed, and the search runs in the folder shown',
+      search.value === 'invoice from:alice@example.net' && location.hash === '#/f/1?q=' + encodeURIComponent('invoice from:alice@example.net') && called(beforeTake, 'GET', /\/folders\/1\/messages\?.*q=invoice/) && suggestBox.hidden === true,
+      'value=' + search.value + ' ' + location.hash + ' ' + JSON.stringify(since(beforeTake).map((r) => r.path)));
+   check('and is kept with the recent searches', JSON.parse(store.get('hmPortalSearches'))[0] === 'invoice from:alice@example.net', store.get('hmPortalSearches'));
 
    // ---- pop-out: the message, or the message being written, in a window of its own
    location.hash = '#/m/102';

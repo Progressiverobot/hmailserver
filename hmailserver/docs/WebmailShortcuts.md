@@ -38,6 +38,7 @@ use.
 | `Esc` | Close the list or the palette |
 | `↓` `↑` `Enter` `Tab` | In To, Cc and Bcc: choose a completion |
 | `↓` `↑` `Esc` | In the empty search box: the last ten searches are offered under it (kept in this browser, forgotten at sign-out); the arrows move through them, Enter runs one, Esc closes the list |
+| `↓` `↑` `Enter` `Esc` | In the search box, as a name is typed (on its own, or after `from:` or `to:`): the contacts it matches are offered under the box; one taken becomes `from:<address>` (or `to:`) in place of the name and the search runs |
 
 Search operators
 ----------------
