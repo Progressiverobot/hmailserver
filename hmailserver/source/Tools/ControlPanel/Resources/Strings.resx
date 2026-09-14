@@ -7862,6 +7862,9 @@ It will keep trying as you use the application.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>The two halves fail differently and have different causes. Work out which one you have before anything else.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>The update step could not be run: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ It will keep trying as you use the application.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is "unknown", not "OK": check them on the server itself, or from its External setup page.</value>

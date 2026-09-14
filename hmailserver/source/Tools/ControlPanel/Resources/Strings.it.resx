@@ -7862,6 +7862,9 @@ Continuerà a provare durante l'uso dell'applicazione.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Le due metà falliscono in modo diverso e hanno cause diverse. Prima di ogni altra cosa, capire quale delle due si ha davanti.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>L'helper di aggiornamento è stato avviato. Questo Control Panel si chiude ora perché il programma di installazione possa sostituire i suoi file; riaprilo tra un minuto per vedere l'esito.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Non è stato possibile eseguire il passaggio di aggiornamento: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Continuerà a provare durante l'uso dell'applicazione.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Questi due vanno insieme: la scadenza senza storico insegna alle persone ad alternare due password, cosa peggiore del non far scadere nulla. Lo storico rifiuta soltanto un CAMBIO, nel momento in cui qualcuno è in grado di scegliere qualcos'altro, quindi non blocca fuori nessuno. La scadenza rifiuta un ACCESSO - leggerne la descrizione prima di attivarla.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Questo Control Panel si chiude non appena l'helper è stato avviato, perché il programma di installazione possa sostituire i suoi file; riaprilo tra un minuto per vedere l'esito.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Questo Control Panel è connesso a un server remoto, ed entrambi i file si trovano sul disco di quella macchina - non possono essere letti da questa macchina, quindi nulla al loro riguardo è verificato. Questo è "sconosciuto", non "OK": controllarli sul server stesso, o dalla sua pagina Configurazione esterna.</value>

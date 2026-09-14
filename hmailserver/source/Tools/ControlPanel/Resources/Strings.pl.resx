@@ -7862,6 +7862,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Obie połowy zawodzą inaczej i mają inne przyczyny. Przed czymkolwiek innym należy ustalić, z którą z nich ma się do czynienia.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Pomocnik aktualizacji został uruchomiony. Ten Control Panel zamyka się teraz, aby instalator mógł zastąpić jego pliki; otwórz go ponownie za minutę, aby zobaczyć wynik.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Nie udało się wykonać kroku aktualizacji: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Te ustawienia idą w parze: wygasanie bez historii uczy ludzi przełączania się między dwoma hasłami, co jest gorsze niż brak wygasania w ogóle. Historia odrzuca wyłącznie ZMIANĘ, w chwili gdy ktoś może wybrać coś innego, więc nikogo przez nią nie odcina. Wygasanie odrzuca LOGOWANIE - przed jego włączeniem należy przeczytać jego opis.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Ten Control Panel zamyka się, gdy tylko pomocnik zostanie uruchomiony, aby instalator mógł zastąpić jego pliki; otwórz go ponownie za minutę, aby zobaczyć wynik.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Ten Control Panel jest połączony ze zdalnym serwerem, a oba pliki znajdują się na dysku tamtego komputera - nie da się ich odczytać z tego komputera, więc nic w nich nie zostało zweryfikowane. To stan „nieznane”, a nie „OK”: należy sprawdzić je na samym serwerze albo z jego strony Konfiguracja zewnętrzna.</value>

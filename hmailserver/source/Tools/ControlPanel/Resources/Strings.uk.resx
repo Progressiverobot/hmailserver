@@ -7862,6 +7862,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Дві половини відмовляють по-різному і з різних причин. Насамперед з'ясуйте, яка з них у вас.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Помічник оновлення запущено. Ця Панель керування зараз закриється, щоб інсталятор міг замінити її файли; відкрийте її знову за хвилину, щоб побачити результат.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Крок оновлення не вдалося виконати: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Вони належать одне одному: закінчення терміну без історії привчає людей чергувати два паролі, що гірше, ніж не закінчуватися зовсім. Історія лише відмовляє у ЗМІНІ, у момент, коли хтось може вибрати щось інше, тому нікого вона не замикає. Закінчення терміну відмовляє у ВХОДІ - прочитайте його опис, перш ніж вмикати.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Ця Панель керування закриється, щойно запуститься помічник, щоб інсталятор міг замінити її файли; відкрийте її знову за хвилину, щоб побачити результат.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Ця Панель керування під'єднана до віддаленого сервера, і обидва файли розташовані на диску того комп'ютера - з цього комп'ютера їх прочитати неможливо, тому нічого про них не перевірено. Це «невідомо», а не «OK»: перевірте їх на самому сервері або з його сторінки «Зовнішнє налаштування».</value>

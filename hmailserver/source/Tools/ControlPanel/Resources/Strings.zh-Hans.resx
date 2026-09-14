@@ -7862,6 +7862,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>这两半的失败方式和原因都不同。在做任何其他事之前，先弄清楚您遇到的是哪一种。</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>更新助手已启动。为了让安装程序能够替换其文件，此控制面板现在将关闭；一分钟后请重新打开以查看结果。</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>无法运行更新步骤: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>这两项是配套的: 没有历史记录的过期会教人们在两个密码之间来回切换，这比根本不过期更糟。历史记录只在有人可以选择其他密码的那一刻拒绝一次“更改”，因此不会把任何人锁在外面。过期拒绝的是“登录” - 开启之前请阅读它的说明。</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>为了让安装程序能够替换其文件，此控制面板会在助手启动后立即关闭；一分钟后请重新打开以查看结果。</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>此控制面板连接的是远程服务器，两个文件都在那台机器的磁盘上 - 无法从本机读取，因此未对它们做任何验证。这是“未知”，不是“正常”: 请在服务器本身上检查，或从其“外部设置”页检查。</value>

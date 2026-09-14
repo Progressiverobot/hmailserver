@@ -7862,6 +7862,9 @@ Il continuera d'essayer au fil de votre utilisation de l'application.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Les deux moitiés échouent différemment et ont des causes différentes. Déterminez laquelle vous avez avant toute chose.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>L'assistant de mise à jour a démarré. Ce Control Panel se ferme maintenant pour que l'installateur puisse remplacer ses fichiers ; rouvrez-le dans une minute pour voir le résultat.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>L'étape de mise à jour n'a pas pu être exécutée : {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Il continuera d'essayer au fil de votre utilisation de l'application.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Ces deux-là vont ensemble : une expiration sans historique apprend aux gens à alterner entre deux mots de passe, ce qui est pire que de ne pas expirer du tout. L'historique ne refuse jamais qu'un CHANGEMENT, au moment où quelqu'un est en mesure d'en choisir un autre : personne n'est donc bloqué par lui. L'expiration, elle, refuse une CONNEXION - lisez sa description avant de l'activer.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Ce Control Panel se ferme dès que l'assistant a démarré, pour que l'installateur puisse remplacer ses fichiers ; rouvrez-le dans une minute pour voir le résultat.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Ce Control Panel est connecté à un serveur distant, et les deux fichiers sont sur le disque de cette machine-là - ils ne peuvent pas être lus depuis cette machine-ci, rien à leur sujet n'est donc vérifié. C'est « inconnu », pas « OK » : vérifiez-les sur le serveur lui-même, ou depuis sa page Configuration externe.</value>

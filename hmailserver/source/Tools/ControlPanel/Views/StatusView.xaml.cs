@@ -54,7 +54,8 @@ namespace hMailServer.ControlPanel.Views
             return;
 
          if (action == "install" && MessageBox.Show(
-                L("Install the update now?\n\nThe verified installer is handed to the update helper: the service stops, the new version is installed, and the service starts again. If it does not come back, the previous version is reinstalled. This Control Panel loses its connection while that happens; reconnect afterwards to see the outcome here."),
+                L("Install the update now?\n\nThe verified installer is handed to the update helper: the service stops, the new version is installed, and the service starts again. If it does not come back, the previous version is reinstalled. This Control Panel loses its connection while that happens; reconnect afterwards to see the outcome here.") + "\n\n" +
+                L("This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome."),
                 L("Control Panel"), MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
             return;
 
@@ -69,6 +70,17 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(status);
             if (!done && !string.IsNullOrEmpty(error))
                MessageBox.Show(error, L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            else if (done && action == "install")
+            {
+               // The helper is running, and the installer it starts replaces this
+               // program's files - silent, it aborts at the first one it cannot. The
+               // helper ends a Control Panel it finds running; closing here is the
+               // same outcome without the surprise, and without the "RPC server is
+               // unavailable" a page left open across the service's stop would show.
+               MessageBox.Show(L("The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome."),
+                  L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Information);
+               Application.Current.Shutdown();
+            }
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

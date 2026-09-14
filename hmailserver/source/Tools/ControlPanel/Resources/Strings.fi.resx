@@ -7862,6 +7862,9 @@ Se yrittää edelleen, kun käytät sovellusta.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Kaksi puoliskoa epäonnistuvat eri tavoin ja eri syistä. Selvitä ennen mitään muuta, kumpi sinulla on.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Päivitysapuri on käynnistynyt. Tämä Control Panel sulkeutuu nyt, jotta asennusohjelma voi korvata sen tiedostot; avaa se uudelleen minuutin kuluttua nähdäksesi tuloksen.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Päivitysvaihetta ei voitu ajaa: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Se yrittää edelleen, kun käytät sovellusta.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Nämä kuuluvat yhteen: vanheneminen ilman historiaa opettaa ihmiset vuorottelemaan kahta salasanaa, mikä on pahempi kuin olla vanhenematta lainkaan. Historia hylkää vain VAIHDON, sillä hetkellä, kun joku voi valita jotain muuta, joten se ei lukitse ketään ulos. Vanheneminen hylkää KIRJAUTUMISEN - lue sen kuvaus ennen kuin otat sen käyttöön.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Tämä Control Panel sulkeutuu heti, kun apuri on käynnistynyt, jotta asennusohjelma voi korvata sen tiedostot; avaa se uudelleen minuutin kuluttua nähdäksesi tuloksen.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Tämä Control Panel on yhteydessä etäpalvelimeen, ja molemmat tiedostot ovat sen koneen levyllä - niitä ei voi lukea tältä koneelta, joten niistä ei ole varmistettu mitään. Tämä on "ei tiedossa", ei "OK": tarkista ne itse palvelimella tai sen Ulkoinen määritys -sivulta.</value>

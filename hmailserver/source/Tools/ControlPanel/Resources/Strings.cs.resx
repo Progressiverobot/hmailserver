@@ -7862,6 +7862,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>Obě poloviny selhávají jinak a mají jiné příčiny. Než uděláte cokoli jiného, zjistěte, kterou z nich máte.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Pomocník aktualizace byl spuštěn. Tento Control Panel se nyní zavře, aby instalátor mohl nahradit jeho soubory; za minutu jej znovu otevřete a uvidíte výsledek.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Krok aktualizace nešlo spustit: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Tyto dvě patří k sobě: vypršení bez historie učí lidi střídat dvě hesla, což je horší než nevypršet vůbec. Historie jen odmítne ZMĚNU, ve chvíli, kdy si dotyčný může vybrat něco jiného, takže nikoho nezamkne. Vypršení odmítne PŘIHLÁŠENÍ - než ho zapnete, přečtěte si jeho popis.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Tento Control Panel se zavře, jakmile se pomocník spustí, aby instalátor mohl nahradit jeho soubory; za minutu jej znovu otevřete a uvidíte výsledek.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Tento Control Panel je připojen ke vzdálenému serveru a oba soubory jsou na disku toho počítače - z tohoto počítače je nelze přečíst, takže o nich není nic ověřeno. Je to „neznámo“, ne „OK“: zkontrolujte je na samotném serveru, nebo z jeho stránky Externí nastavení.</value>

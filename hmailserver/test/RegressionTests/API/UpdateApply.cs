@@ -4,6 +4,7 @@
 
 using System;
 using System.CodeDom.Compiler;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -11,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Microsoft.Win32;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -38,7 +40,7 @@ namespace RegressionTests.API
       private const string AdminPassword = "testar";
       private const string LatestPath = "/repos/Progressiverobot/hmailserver/releases/latest";
 
-      private static string _quiet, _stopper, _starter, _failing, _ager, _marker;
+      private static string _quiet, _stopper, _starter, _failing, _loud, _ager, _marker;
 
       private FakeHttpEndpoint _feed;
       private FakeSigstore _sigstore;
@@ -199,6 +201,73 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("An installer that fails is reported with what its own log says went wrong, not only its exit code")]
+      public void AFailedInstallerIsReportedWithWhatItsLogSays()
+      {
+         ServeRelease(_loud, _starter);
+         var status = Downloaded();
+         Assert.IsTrue(status.InstallUpdate(), status.UpdateLastError);
+         string outcome = WaitForOutcome(OutcomePath, 60);
+         StringAssert.StartsWith("failed " + Newer + " the installer exited with 5 but the service is running; the installer's log says: ", outcome);
+         StringAssert.Contains("Dest filename: C:\\Program Files\\hMailServer\\ControlPanel\\hMailCP.exe", outcome);
+         StringAssert.Contains("The process cannot access the file because it is being used by another process.", outcome);
+         StringAssert.Contains("User chose Abort.", outcome);
+         StringAssert.DoesNotContain("starter", File.ReadAllText(_marker), "The service never stopped: no rollback.");
+         _application.Reinitialize();
+         WaitUntil(() => File.Exists(OutcomePath + ".reported"), 30, "The outcome was not reported at startup.");
+         StringAssert.Contains("Update to hMailServer " + Newer + " did not succeed (failed)", LogHandler.ReadErrorLog());
+         Console.WriteLine("hMailServer error log (expected for this fixture):");
+         Console.WriteLine(LogHandler.ReadErrorLog());
+         LogHandler.ClearErrorLogUntilSettled();
+      }
+
+      [Test]
+      [Description("A program running from under the installation - a Control Panel left open - is ended before the installer runs, since a silent installer aborts at the first file it cannot replace")]
+      public void AProgramRunningFromTheInstallationIsEndedBeforeTheInstallerRuns()
+      {
+         // A copy of cmd.exe under the server's own directory tree stands in for the
+         // Control Panel: its image is under the installation, so its files are ones
+         // the installer would replace.
+         string standIn = Paths.Combine(InstallationRoot(), "in-use-test", "hMailCP.exe");
+         Directory.CreateDirectory(Path.GetDirectoryName(standIn));
+         File.Copy(Paths.Combine(Environment.SystemDirectory, "cmd.exe"), standIn, true);
+         var start = new ProcessStartInfo(standIn, "/c ping -n 120 127.0.0.1 >nul") {UseShellExecute = false, CreateNoWindow = true};
+         using (Process process = Process.Start(start))
+         {
+            try
+            {
+               var status = Downloaded();
+               Assert.IsTrue(status.InstallUpdate(), status.UpdateLastError);
+               string outcome = WaitForOutcome(OutcomePath, 60);
+               StringAssert.StartsWith("ok " + Newer, outcome);
+               Assert.IsTrue(process.WaitForExit(30000), "The stand-in kept running: the helper did not end it.");
+               string applyLog = File.ReadAllText(Paths.Combine(_updatesDirectory, "apply-" + Newer + ".log")).ToLowerInvariant();
+               StringAssert.Contains(("Ended hMailCP.exe (process " + process.Id + "), running from " + standIn).ToLowerInvariant(), applyLog);
+               StringAssert.Contains("1 program(s) running from it ended before the installer runs", applyLog);
+            }
+            finally
+            {
+               if (!process.HasExited)
+                  process.Kill();
+               process.WaitForExit(10000);
+            }
+         }
+         Directory.Delete(Path.GetDirectoryName(standIn), true);
+      }
+
+      // The installation the helper is told about: the directory above the service's
+      // Bin, read from the service's own registration, as the server derives it.
+      private static string InstallationRoot()
+      {
+         using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\hMailServer"))
+         {
+            string image = (string) key.GetValue("ImagePath");
+            image = image.StartsWith("\"") ? image.Substring(1, image.IndexOf('"', 1) - 1) : image.Split(' ')[0];
+            return Path.GetDirectoryName(Path.GetDirectoryName(image));
+         }
+      }
+
+      [Test]
       public void NoRollbackImageMeansTheOutcomeSaysSo()
       {
          string newer = Newer;
@@ -307,6 +376,10 @@ namespace RegressionTests.API
          _starter = Compile(directory, "starter",
             "using (var s = new System.ServiceProcess.ServiceController(\"hMailServer\")) { s.Start(); s.WaitForStatus(System.ServiceProcess.ServiceControllerStatus.Running, TimeSpan.FromSeconds(90)); }", 0);
          _failing = Compile(directory, "failing", "", 1);
+         // Fails the way the real one did on 14 September 2026 - exit code 5, and a
+         // log in Inno Setup's shape saying which file it could not replace and why.
+         _loud = Compile(directory, "loud",
+            @"foreach (string a in args) if (a.StartsWith(""/LOG="")) File.WriteAllText(a.Substring(5).Trim('""'), ""2026-09-14 01:38:20.001   Dest filename: C:\Program Files\hMailServer\ControlPanel\hMailCP.exe\r\n2026-09-14 01:38:20.002   Message box (Abort/Retry/Ignore):\r\n   C:\Program Files\hMailServer\ControlPanel\hMailCP.exe\r\n\r\nAn error occurred while trying to replace the existing file:\r\nDeleteFile failed; code 32.\r\nThe process cannot access the file because it is being used by another process.\r\n2026-09-14 01:38:20.003   User chose Abort.\r\n"");", 5);
          // Runs as the service account, so it can do what the suite cannot: age the
          // token file, which only SYSTEM, Administrators and that account may touch.
          _ager = Compile(directory, "ager",

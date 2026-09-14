@@ -296,7 +296,9 @@ backup destination first and does not go ahead when there is no destination or t
 backup fails, because a rollback restores binaries, not the schema, and the backup
 is what would. The Control Panel's status page has *Check for updates*, *Download
 update* and *Install update* for doing any of it by hand, and shows the last
-update's outcome.
+update's outcome. Starting an install from it closes the Control Panel: the
+installer replaces its files, and a silent installer stops at the first file it
+cannot.
 
 Building hMailServer
 ====================

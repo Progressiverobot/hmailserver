@@ -7862,6 +7862,9 @@ Den fortsätter försöka medan du använder programmet.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>De två halvorna misslyckas olika och har olika orsaker. Ta reda på vilken du har före allt annat.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Uppdateringshjälpen har startat. Den här Kontrollpanelen stängs nu så att installationsprogrammet kan ersätta dess filer; öppna den igen om en minut för att se resultatet.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Uppdateringssteget kunde inte köras: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Den fortsätter försöka medan du använder programmet.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>De här hör ihop: utgång utan historik lär människor att växla mellan två lösenord, vilket är värre än att inte gå ut alls. Historik avvisar bara någonsin ett BYTE, i den stund någon kan välja något annat, så ingen låses ute av den. Utgång avvisar en INLOGGNING - läs dess beskrivning innan du slår på den.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Den här Kontrollpanelen stängs så snart hjälpen har startat, så att installationsprogrammet kan ersätta dess filer; öppna den igen om en minut för att se resultatet.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Den här Kontrollpanelen är ansluten till en fjärrserver, och båda filerna finns på den datorns disk - de kan inte läsas från den här datorn, så inget om dem är verifierat. Det här är "okänt", inte "OK": kontrollera dem på själva servern, eller från dess sida Extern konfiguration.</value>

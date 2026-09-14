@@ -11,7 +11,9 @@
 // the new installer's database tool presents to authenticate the schema upgrade.
 //
 // Then, alone:
-//   1. run the installer silently and wait for it;
+//   1. end whatever is running from under the installation - a Control Panel
+//      left open - because the installer replaces those files and, silent, aborts
+//      at the first one it cannot; then run the installer silently and wait for it;
 //   2. wait for the service to be running again, up to --wait seconds;
 //   3. if it is not, run the rollback image and wait again;
 //   4. write one line to --outcome saying what happened, which the server reads and
@@ -24,6 +26,7 @@
 
 #include <string>
 #include <vector>
+#include <tlhelp32.h>
 
 namespace
 {
@@ -37,6 +40,7 @@ namespace
       std::wstring token;
       std::wstring outcome;
       std::wstring log;
+      std::wstring app;
       int wait_seconds;
 
       Arguments() : service(L"hMailServer"), wait_seconds(180) {}
@@ -84,6 +88,7 @@ namespace
          else if (name == L"--token") arguments.token = value;
          else if (name == L"--outcome") arguments.outcome = value;
          else if (name == L"--log") arguments.log = value;
+         else if (name == L"--app") arguments.app = value;
          else if (name == L"--wait") arguments.wait_seconds = _wtoi(value.c_str());
          else return false;
       }
@@ -203,13 +208,245 @@ namespace
    }
 }
 
+namespace
+{
+   // The installation, {app}: what --app names, or else the directory above the
+   // service's own binary (...\Bin\hMailServer.exe), read from the service.
+   std::wstring InstallationRoot(const Arguments &arguments)
+   {
+      if (!arguments.app.empty())
+         return arguments.app;
+      std::wstring root;
+      SC_HANDLE manager = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+      if (!manager)
+         return root;
+      SC_HANDLE handle = OpenServiceW(manager, arguments.service.c_str(), SERVICE_QUERY_CONFIG);
+      if (handle)
+      {
+         DWORD needed = 0;
+         QueryServiceConfigW(handle, nullptr, 0, &needed);
+         if (needed)
+         {
+            std::vector<BYTE> buffer(needed);
+            QUERY_SERVICE_CONFIGW *config = (QUERY_SERVICE_CONFIGW *) buffer.data();
+            if (QueryServiceConfigW(handle, config, needed, &needed) && config->lpBinaryPathName)
+            {
+               // "C:\...\Bin\hMailServer.exe" RunAsService: the quoted path, or the
+               // first word when it is not quoted.
+               std::wstring binary = config->lpBinaryPathName;
+               if (!binary.empty() && binary[0] == L'"')
+               {
+                  size_t close = binary.find(L'"', 1);
+                  binary = close == std::wstring::npos ? binary.substr(1) : binary.substr(1, close - 1);
+               }
+               else
+               {
+                  size_t space = binary.find(L' ');
+                  if (space != std::wstring::npos)
+                     binary = binary.substr(0, space);
+               }
+               root = Directory(Directory(binary));
+            }
+         }
+         CloseServiceHandle(handle);
+      }
+      CloseServiceHandle(manager);
+      return root;
+   }
+
+   DWORD ServiceProcessId(const std::wstring &service)
+   {
+      DWORD processId = 0;
+      SC_HANDLE manager = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+      if (!manager)
+         return 0;
+      SC_HANDLE handle = OpenServiceW(manager, service.c_str(), SERVICE_QUERY_STATUS);
+      if (handle)
+      {
+         SERVICE_STATUS_PROCESS status;
+         DWORD needed = 0;
+         if (QueryServiceStatusEx(handle, SC_STATUS_PROCESS_INFO, (LPBYTE) &status, sizeof(status), &needed))
+            processId = status.dwProcessId;
+         CloseServiceHandle(handle);
+      }
+      CloseServiceHandle(manager);
+      return processId;
+   }
+
+   bool Under(const std::wstring &path, const std::wstring &root)
+   {
+      if (root.empty() || path.size() <= root.size())
+         return false;
+      if (_wcsnicmp(path.c_str(), root.c_str(), root.size()) != 0)
+         return false;
+      wchar_t next = path[root.size()];
+      return next == L'\\' || next == L'/';
+   }
+
+   // Every program running from under the installation is ended before the
+   // installer runs - the Control Panel above all. The installer replaces those
+   // files and, silent, aborts at the first one it cannot replace: on 14 September
+   // 2026 a Control Panel left open in the operator's session, which the Restart
+   // Manager called from session 0 could not close, failed an install and its
+   // rollback alike with exit code 5. The service itself is left to the installer,
+   // which stops it in order, with its drain period; this program, which runs from
+   // the data directory under the installation, is itself.
+   int EndProcessesUnder(const std::wstring &root, const std::wstring &service)
+   {
+      if (root.empty())
+         return 0;
+      const DWORD self = GetCurrentProcessId();
+      const DWORD serviceProcess = ServiceProcessId(service);
+      HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+      if (snapshot == INVALID_HANDLE_VALUE)
+         return 0;
+      int ended = 0;
+      PROCESSENTRY32W entry;
+      entry.dwSize = sizeof(entry);
+      if (Process32FirstW(snapshot, &entry))
+      {
+         do
+         {
+            if (entry.th32ProcessID == 0 || entry.th32ProcessID == self || entry.th32ProcessID == serviceProcess)
+               continue;
+            if (_wcsicmp(entry.szExeFile, L"hMailServer.exe") == 0)
+               continue;
+            HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, entry.th32ProcessID);
+            if (!process)
+               continue;
+            wchar_t image[2 * MAX_PATH];
+            DWORD length = 2 * MAX_PATH;
+            if (QueryFullProcessImageNameW(process, 0, image, &length) && Under(image, root))
+            {
+               const std::wstring name = entry.szExeFile;
+               const std::wstring id = std::to_wstring(entry.th32ProcessID);
+               if (TerminateProcess(process, 1))
+               {
+                  WaitForSingleObject(process, 10000);
+                  ended++;
+                  Log(L"Ended " + name + L" (process " + id + L"), running from " + image +
+                      L": the installer replaces those files, and cannot while they are in use.");
+               }
+               else
+               {
+                  Log(L"Could not end " + name + L" (process " + id + L"), running from " + image +
+                      L": Windows error " + std::to_wstring(GetLastError()) + L"; the installer may fail on its files.");
+               }
+            }
+            CloseHandle(process);
+         } while (Process32NextW(snapshot, &entry));
+      }
+      CloseHandle(snapshot);
+      return ended;
+   }
+
+   std::wstring Decoded(const std::vector<char> &bytes)
+   {
+      if (bytes.size() >= 2 && (BYTE) bytes[0] == 0xFF && (BYTE) bytes[1] == 0xFE)
+         return std::wstring((const wchar_t *) (bytes.data() + 2), (bytes.size() - 2) / 2);
+      size_t skip = bytes.size() >= 3 && (BYTE) bytes[0] == 0xEF && (BYTE) bytes[1] == 0xBB && (BYTE) bytes[2] == 0xBF ? 3 : 0;
+      const char *text = bytes.data() + skip;
+      const int size = (int) (bytes.size() - skip);
+      if (size <= 0)
+         return L"";
+      UINT page = CP_UTF8;
+      int needed = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, size, nullptr, 0);
+      if (!needed)
+      {
+         page = CP_ACP;
+         needed = MultiByteToWideChar(page, 0, text, size, nullptr, 0);
+      }
+      std::wstring out((size_t) needed, L'\0');
+      if (needed)
+         MultiByteToWideChar(page, 0, text, size, &out[0], needed);
+      return out;
+   }
+
+   // What the installer's own log says went wrong, for the outcome, so that the
+   // status page says why rather than only where to look: the last few lines that
+   // name an error, and the file they were about. Inno Setup writes the log with
+   // a timestamp on each line, in UTF-8, or in the system code page from older
+   // versions; both are read.
+   std::wstring InstallerLogSays(const std::wstring &path)
+   {
+      HANDLE file = CreateFileW(path.c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+      if (file == INVALID_HANDLE_VALUE)
+         return L"";
+      LARGE_INTEGER size;
+      size.QuadPart = 0;
+      GetFileSizeEx(file, &size);
+      const LONGLONG most = 512 * 1024;
+      if (size.QuadPart > most)
+      {
+         LARGE_INTEGER from;
+         from.QuadPart = size.QuadPart - most;
+         SetFilePointerEx(file, from, nullptr, FILE_BEGIN);
+         size.QuadPart = most;
+      }
+      std::vector<char> bytes((size_t) size.QuadPart);
+      DWORD readCount = 0;
+      if (!bytes.empty())
+         ReadFile(file, bytes.data(), (DWORD) bytes.size(), &readCount, nullptr);
+      CloseHandle(file);
+      bytes.resize(readCount);
+      const std::wstring text = Decoded(bytes);
+      std::vector<std::wstring> said;
+      std::wstring about;
+      size_t start = 0;
+      while (start < text.size())
+      {
+         size_t end = text.find(L'\n', start);
+         if (end == std::wstring::npos)
+            end = text.size();
+         std::wstring line = text.substr(start, end - start);
+         start = end + 1;
+         while (!line.empty() && (line.back() == L'\r' || line.back() == L' '))
+            line.pop_back();
+         // "2026-09-14 01:38:20.123   text": the stamp goes.
+         if (line.size() > 24 && iswdigit(line[0]) && line[4] == L'-' && line[10] == L' ')
+            line = line.substr(23);
+         while (!line.empty() && line.front() == L' ')
+            line.erase(line.begin());
+         if (line.empty())
+            continue;
+         std::wstring lower = line;
+         for (size_t i = 0; i < lower.size(); i++)
+            lower[i] = towlower(lower[i]);
+         if (lower.find(L"dest filename:") == 0)
+         {
+            about = line;
+            continue;
+         }
+         if (lower.find(L"error") == std::wstring::npos && lower.find(L"abort") == std::wstring::npos && lower.find(L"failed") == std::wstring::npos &&
+             lower.find(L"cannot") == std::wstring::npos && lower.find(L"in use") == std::wstring::npos && lower.find(L"denied") == std::wstring::npos)
+            continue;
+         if (!about.empty())
+         {
+            said.push_back(about);
+            about.clear();
+         }
+         said.push_back(line);
+      }
+      if (said.empty())
+         return L"";
+      if (said.size() > 5)
+         said.erase(said.begin(), said.end() - 5);
+      std::wstring out;
+      for (size_t i = 0; i < said.size(); i++)
+         out += (i ? L" | " : L"") + said[i];
+      if (out.size() > 600)
+         out = out.substr(0, 600) + L"...";
+      return L"; the installer's log says: " + out;
+   }
+}
+
 int wmain(int argc, wchar_t *argv[])
 {
    Arguments arguments;
    if (!Parse(argc, argv, arguments))
    {
       wprintf(L"Usage: hMailServer.Updater --installer <path> --version <v> --outcome <path> [--rollback <path> --rollback-version <v>]\n"
-              L"                           [--service <name>] [--token <token>] [--log <path>] [--wait <seconds>]\n");
+              L"                           [--service <name>] [--token <token>] [--log <path>] [--wait <seconds>] [--app <root>]\n");
       return 2;
    }
 
@@ -223,7 +460,13 @@ int wmain(int argc, wchar_t *argv[])
    Sleep(2000);
 
    std::wstring installLog = Directory(arguments.outcome) + L"\\install-" + arguments.version + L".log";
+   const std::wstring root = InstallationRoot(arguments);
+   if (root.empty())
+      Log(L"The installation's directory is not known, so nothing running from it can be ended before the installer runs.");
+   else
+      Log(L"Installation: " + root + L"; " + std::to_wstring(EndProcessesUnder(root, arguments.service)) + L" program(s) running from it ended before the installer runs.");
    int code = RunInstaller(arguments.installer, arguments.token, installLog);
+   const std::wstring says = code == 0 ? L"" : InstallerLogSays(installLog);
    bool running = WaitForRunning(arguments.service, arguments.wait_seconds);
 
    wchar_t codeText[32];
@@ -238,13 +481,13 @@ int wmain(int argc, wchar_t *argv[])
    if (running)
    {
       WriteOutcome(arguments.outcome, L"failed " + arguments.version + L" the installer exited with " + codeText +
-         L" but the service is running; see " + installLog);
+         L" but the service is running" + says + L"; see " + installLog);
       return 1;
    }
 
    std::wstring reason = code == 0
       ? L"the installer succeeded but the service was not running after " + std::to_wstring(arguments.wait_seconds) + L" seconds (" + StateName(ServiceState(arguments.service)) + L")"
-      : L"the installer exited with " + std::wstring(codeText) + L" and the service was not running (" + StateName(ServiceState(arguments.service)) + L")";
+      : L"the installer exited with " + std::wstring(codeText) + L" and the service was not running (" + StateName(ServiceState(arguments.service)) + L")" + says;
 
    if (arguments.rollback.empty())
    {
@@ -254,7 +497,10 @@ int wmain(int argc, wchar_t *argv[])
 
    Log(L"Rolling back to hMailServer " + arguments.rollback_version + L": " + reason);
    std::wstring rollbackLog = Directory(arguments.outcome) + L"\\rollback-" + arguments.rollback_version + L".log";
+   if (!root.empty())
+      EndProcessesUnder(root, arguments.service);
    int rollbackCode = RunInstaller(arguments.rollback, L"", rollbackLog);
+   const std::wstring rollbackSays = rollbackCode == 0 ? L"" : InstallerLogSays(rollbackLog);
    bool rolledBack = WaitForRunning(arguments.service, arguments.wait_seconds);
 
    wchar_t rollbackText[32];
@@ -268,7 +514,7 @@ int wmain(int argc, wchar_t *argv[])
    }
 
    WriteOutcome(arguments.outcome, L"rollback-failed " + arguments.version + L" " + reason + L"; the rollback to " + arguments.rollback_version +
-      L" exited with " + rollbackText + L" and the service is " + StateName(ServiceState(arguments.service)) +
+      L" exited with " + rollbackText + L" and the service is " + StateName(ServiceState(arguments.service)) + rollbackSays +
       L"; see " + installLog + L" and " + rollbackLog);
    return 1;
 }

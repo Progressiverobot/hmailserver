@@ -7862,6 +7862,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>2 つの半分は失敗の仕方も原因も異なります。まず、自分がどちらに該当するかを見極めてください。</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>更新ヘルパーが起動しました。インストーラーがファイルを置き換えられるように、このコントロールパネルは今すぐ閉じます。結果を確認するには、1 分ほど後にもう一度開いてください。</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>更新ステップを実行できませんでした: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>これらは対になっています。履歴なしの期限切れは、2 つのパスワードを交互に使うことを人々に教え、それは期限切れがまったくないよりも悪い状態です。履歴は、誰かが別のものを選べるその瞬間に「変更」を拒否するだけなので、誰もロックアウトされません。期限切れは「ログオン」を拒否します。オンにする前にその説明を読んでください。</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>インストーラーがファイルを置き換えられるように、ヘルパーが起動するとすぐにこのコントロールパネルは閉じます。結果を確認するには、1 分ほど後にもう一度開いてください。</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>このコントロールパネルはリモート サーバーに接続しており、両方のファイルはそのマシンのディスク上にあります。このコンピューターからは読み取れないため、それらについて何も検証されていません。これは "OK" ではなく "不明" です。サーバー自体で、またはその外部セットアップ ページから確認してください。</value>

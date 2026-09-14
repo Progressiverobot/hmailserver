@@ -7862,6 +7862,9 @@ Het blijft het proberen terwijl u de toepassing gebruikt.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>De twee helften falen op verschillende manieren en hebben verschillende oorzaken. Stel eerst vast welke van de twee u hebt.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>De updatehelper is gestart. Dit Control Panel sluit nu, zodat het installatieprogramma zijn bestanden kan vervangen; open het over een minuut opnieuw om de uitkomst te zien.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>De updatestap kon niet worden uitgevoerd: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Het blijft het proberen terwijl u de toepassing gebruikt.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Deze horen bij elkaar: verlopen zonder geschiedenis leert mensen om tussen twee wachtwoorden te wisselen, wat erger is dan helemaal niet laten verlopen. Geschiedenis weigert alleen een WIJZIGING, op het moment dat iemand iets anders kan kiezen, dus niemand wordt erdoor buitengesloten. Verlopen weigert een AANMELDING - lees de beschrijving daarvan voordat u het inschakelt.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Dit Control Panel sluit zodra de helper is gestart, zodat het installatieprogramma zijn bestanden kan vervangen; open het over een minuut opnieuw om de uitkomst te zien.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Dit Control Panel is verbonden met een server op afstand, en beide bestanden staan op de schijf van die machine - ze kunnen niet vanaf deze machine worden gelezen, dus er is niets aan geverifieerd. Dit is "onbekend", niet "OK": controleer ze op de server zelf, of vanaf de pagina Externe configuratie daar.</value>

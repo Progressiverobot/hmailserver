@@ -7862,6 +7862,9 @@ Uygulamayı kullanırken denemeye devam edecek.</value>
   <data name="The two halves fail differently and have different causes. Work out which one you have before anything else." xml:space="preserve">
     <value>İki yarı farklı biçimde başarısız olur ve nedenleri farklıdır. Başka bir şey yapmadan önce hangisine sahip olduğunuzu belirleyin.</value>
   </data>
+  <data name="The update helper has started. This Control Panel closes now so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Güncelleştirme yardımcısı başlatıldı. Yükleyicinin dosyalarını değiştirebilmesi için bu Denetim Masası şimdi kapanıyor; sonucu görmek için bir dakika sonra yeniden açın.</value>
+  </data>
   <data name="The update step could not be run: {0}" xml:space="preserve">
     <value>Güncelleştirme adımı çalıştırılamadı: {0}</value>
   </data>
@@ -7912,6 +7915,9 @@ Uygulamayı kullanırken denemeye devam edecek.</value>
   </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Bunlar birbirine aittir: geçmiş olmadan süre sonu, insanlara iki parola arasında gidip gelmeyi öğretir; bu, hiç sona erdirmemekten kötüdür. Geçmiş yalnızca bir DEĞİŞİKLİĞİ, birinin başka bir şey seçebildiği anda reddeder; bu yüzden kimse onun yüzünden dışarıda kalmaz. Süre sonu bir OTURUM AÇMAYI reddeder - açmadan önce açıklamasını okuyun.</value>
+  </data>
+  <data name="This Control Panel closes as soon as the helper has started, so that the installer can replace its files; open it again in a minute to see the outcome." xml:space="preserve">
+    <value>Yükleyicinin dosyalarını değiştirebilmesi için bu Denetim Masası, yardımcı başlatılır başlatılmaz kapanır; sonucu görmek için bir dakika sonra yeniden açın.</value>
   </data>
   <data name="This Control Panel is connected to a remote server, and both files are on that machine's disk - they cannot be read from this machine, so nothing about them is verified. This is &quot;unknown&quot;, not &quot;OK&quot;: check them on the server itself, or from its External setup page." xml:space="preserve">
     <value>Bu Denetim Masası uzak bir sunucuya bağlı ve her iki dosya da o makinenin diskinde - bu makineden okunamazlar; bu yüzden haklarında hiçbir şey doğrulanmadı. Bu "Tamam" değil, "bilinmiyor" demektir: onları sunucunun kendisinde veya sunucunun Dış kurulum sayfasından denetleyin.</value>

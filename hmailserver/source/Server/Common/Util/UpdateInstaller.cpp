@@ -268,6 +268,16 @@ namespace HM
          command += _T(" --rollback-version ") + running;
       }
       command += _T(" --service ") + String(SERVICE_NAME);
+      // The installation, the directory above Bin: the helper ends whatever is
+      // running from under it before the installer replaces those files.
+      int binSlash = helperSource.ReverseFind('\\');
+      if (binSlash > 0)
+      {
+         String binDirectory = helperSource.Left(binSlash);
+         int rootSlash = binDirectory.ReverseFind('\\');
+         if (rootSlash > 0)
+            command += _T(" --app ") + Quote_(binDirectory.Left(rootSlash));
+      }
       command += _T(" --token ") + String(token);
       command += _T(" --outcome ") + Quote_(outcome);
       command += _T(" --log ") + Quote_(directory + FileUtilities::PathSeparator + _T("apply-") + snapshot.available_version + _T(".log"));
