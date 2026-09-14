@@ -46,7 +46,7 @@ than a wording problem.
 
 ### Contents and totals
 
-905 items. The counts are the point of this table — they say where the fork is
+906 items. The counts are the point of this table — they say where the fork is
 strong and where it is thin far more honestly than any prose summary.
 
 | Section | ✅ | 🔄 | ⬜ | ⏸️ |
@@ -83,9 +83,9 @@ strong and where it is thin far more honestly than any prose summary.
 | [Future-proofing: standards and protocols](#future-proofing-standards-and-protocols) | 8 | – | – | 3 |
 | [Future-proofing: platform and supply chain](#future-proofing-platform-and-supply-chain) | 8 | 0 | – | 2 |
 | [Future-proofing: deployment and operations](#future-proofing-deployment-and-operations) | 10 | 0 | – | – |
-| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 37 | – | 1 | 1 |
+| [The webmail, from a mail client to the one people would choose](#the-webmail-from-a-mail-client-to-the-one-people-would-choose) | 37 | 1 | 1 | 1 |
 | [Linux and AArch64](#linux-and-aarch64) | 14 | 1 | – | – |
-| **Total** | **863** | **3** | **4** | **35** |
+| **Total** | **863** | **4** | **4** | **35** |
 
 Three things stand out and are worth naming rather than leaving to be inferred.
 **Storage, the administration surface and the core protocol layer are the
