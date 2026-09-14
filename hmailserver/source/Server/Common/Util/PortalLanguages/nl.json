@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Verkeerd wachtwoord. Als een beheerder uw wachtwoord heeft gewijzigd, voer dan het vorige in; de sleutels worden dan opnieuw ingepakt met het huidige.",
   "Your keys were re-wrapped with the new password.": "Uw sleutels zijn opnieuw ingepakt met het nieuwe wachtwoord.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "Uw postvak, in deze browser. Het wachtwoord wordt eenmaal ingewisseld voor een sessiecookie en wordt door deze pagina nooit bewaard.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "Uw bericht noemt een bijlage, maar er is niets bijgevoegd. Toch verzenden?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "Uw eigen adres, elke alias die hierheen wijst, en elk postvak dat u namens zichzelf laat schrijven. De Van-keuze bij een nieuw bericht biedt dezelfde lijst.",
   "Your own password, to prove it is you": "Uw eigen wachtwoord, als bewijs dat u het bent",
   "Your password": "Uw wachtwoord",

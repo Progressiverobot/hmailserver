@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "密码错误。如果管理员更改了您的密码，请输入以前的密码；密钥随后会用当前密码重新封装。",
   "Your keys were re-wrapped with the new password.": "您的密钥已用新密码重新封装。",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "在此浏览器中使用您的邮箱。密码只用于换取一次会话 Cookie，此页面绝不会保存密码。",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "您的邮件提到了附件，但没有附加任何文件。仍要发送吗？",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "您自己的地址、指向此处的每个别名，以及允许您以其名义发信的每个邮箱。新邮件中的发件人选择器提供相同的列表。",
   "Your own password, to prove it is you": "您自己的密码，用于证明是您本人",
   "Your password": "您的密码",

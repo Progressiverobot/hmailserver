@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Fel lösenord. Om en administratör bytte ditt lösenord, ange det du hade förut; nycklarna paketeras då om med det nuvarande.",
   "Your keys were re-wrapped with the new password.": "Dina nycklar paketerades om med det nya lösenordet.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "Din brevlåda, i den här webbläsaren. Lösenordet byts en gång mot en sessionskaka och sparas aldrig av den här sidan.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "Ditt meddelande nämner en bilaga, men inget är bifogat. Skicka ändå?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "Din egen adress, varje alias som pekar hit, och varje brevlåda som låtit dig skriva som den. Från-väljaren i ett nytt meddelande erbjuder samma lista.",
   "Your own password, to prove it is you": "Ditt eget lösenord, som bevis på att det är du",
   "Your password": "Ditt lösenord",

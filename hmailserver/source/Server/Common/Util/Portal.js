@@ -1234,6 +1234,19 @@
       }));
     }, function (why) { return Promise.reject(String(why)); });
   };
+  // The attachment reminder: a body that speaks of an attachment - attached,
+  // attachment, enclosed - in the reader's own lines. A quoted line is what
+  // the other person wrote, and so is everything under a forwarded message's
+  // rule, so neither counts.
+  var mentionsAttachment = function (text) {
+    var own = String(text || '').split('---------- Forwarded message ----------')[0];
+    own = own.split('\n').filter(function (line) { return line.replace(/^\s+/, '').charAt(0) !== '>'; }).join('\n');
+    return /\b(attached|attachments?|enclosed)\b/i.test(own);
+  };
+  var anythingAttached = function () {
+    var picked = el('compose-files').files;
+    return !!((picked && picked.length) || dropped.length || carried.length || linked.length);
+  };
 
   // ---- Held mail ----------------------------------------------------------
   var renderQuarantine = function (held) {
@@ -2011,6 +2024,9 @@
     if (pendingSend) { return; }
     say('compose-status', '', true);
     var body = composeBody();
+    // The message promises an attachment and carries none, not even as a
+    // link: one question. Cancel leaves the message here, as written.
+    if (mentionsAttachment(body.text) && !anythingAttached() && !window.confirm(t('Your message mentions an attachment, but nothing is attached. Send it anyway?'))) { return; }
     readFiles().then(function (files) {
       files = carried.concat(files);
       if (files.length) { body.attachments = files; }

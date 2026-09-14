@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Nesprávné heslo. Pokud vaše heslo změnil správce, zadejte to předchozí; klíče se pak znovu zabalí tím současným.",
   "Your keys were re-wrapped with the new password.": "Vaše klíče byly znovu zabaleny novým heslem.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "Vaše schránka v tomto prohlížeči. Heslo se jednou vymění za cookie relace a tato stránka ho nikdy neuchovává.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "Vaše zpráva zmiňuje přílohu, ale nic není přiloženo. Přesto odeslat?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "Vaše vlastní adresa, každý alias, který sem vede, a každá schránka, která vám dovolila psát jejím jménem. Výběr Od v nové zprávě nabízí stejný seznam.",
   "Your own password, to prove it is you": "Vaše vlastní heslo, jako důkaz, že jste to vy",
   "Your password": "Vaše heslo",

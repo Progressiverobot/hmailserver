@@ -218,6 +218,10 @@ if (!document.body) { throw new Error('the page has no <body>'); }
 /* -------------------------------------------------- window, location, timers */
 
 const window = new Element('#window');
+// A confirm box the test answers: what was asked is recorded, the answer is scripted.
+const confirms = [];
+let confirmAnswer = true;
+window.confirm = (text) => { confirms.push(String(text)); return confirmAnswer; };
 const historyStack = [''];
 let historyAt = 0;
 
@@ -387,6 +391,7 @@ function answer(method, path, body) {
    if (/^\/api\/v1\/me\/messages\/\d+$/.test(path) && method === 'GET') {
       return json(200, Object.assign(JSON.parse(JSON.stringify(WITH_IMAGE)), { id: Number(path.split('/').pop()), html: '', text: 'plain' }));
    }
+   if (path === '/api/v1/me/messages' && method === 'POST') { return json(201, { id: 300 }); }
    if (/\/flags$/.test(path)) { return json(200, { flags: { seen: true, flagged: false, draft: false } }); }
    if (path.startsWith('/api/v1/me/changes')) {
       if (changesMissing) { return json(404, { error: 'Not found.' }); }
@@ -441,6 +446,7 @@ const flush = async () => { for (let i = 0; i < 60; i += 1) { await new Promise(
 const world = {
    document, window, location, history, localStorage,
    fetch: fetchStub,
+   confirm: window.confirm,
    DOMParser: DOMParserStub,
    FileReader: FileReaderStub,
    setTimeout: (fn, ms) => { const id = timerId++; timers.push({ id, fn, ms }); return id; },
@@ -879,6 +885,46 @@ async function main() {
    check('a search across every folder is an address', location.hash === '#/search?q=invoice', location.hash);
    check('and it is what was asked of the server', called(requests.length - 3, 'GET', /\/api\/v1\/me\/search\?q=invoice/),
       JSON.stringify(requests.slice(-3).map((r) => r.path)));
+
+   // ---- the attachment reminder: a message that promises an attachment and carries none is questioned once
+   const compose = document.getElementById('compose-section');
+   // The window opens on the navigation's microtask, and opening blanks the
+   // form, so the fields are filled once that has happened.
+   const writeMessage = async (text) => {
+      document.dispatchEvent(makeEvent('keydown', { key: 'c', target: document.body }));
+      await flush();
+      document.getElementById('compose-to').value = 'a@example.net';
+      document.getElementById('compose-subject').value = 'The report';
+      document.getElementById('compose-text').value = text;
+   };
+   await writeMessage('Please see the attached report.\n> You said you would attach it.');
+   check('c opens the compose window', location.hash === '#/compose' && compose.hidden === false, location.hash + ' hidden=' + compose.hidden);
+   confirmAnswer = false;
+   const beforeAsk = requests.length;
+   document.getElementById('compose-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('a body that says "attached" with nothing attached is questioned', confirms.length === 1 && confirms[0].indexOf('nothing is attached') >= 0, JSON.stringify(confirms));
+   check('Cancel sends nothing', !called(beforeAsk, 'POST', '/api/v1/me/messages') && timers.length === 0, timers.length + ' timers');
+   check('and leaves the message in the open form', compose.hidden === false && document.getElementById('compose-text').value.indexOf('attached report') >= 0, 'hidden=' + compose.hidden);
+   confirmAnswer = true;
+   document.getElementById('compose-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('OK is asked once more and lets it go', confirms.length === 2 && timers.length > 0, confirms.length + ' questions, ' + timers.length + ' timers');
+   fireTimers();
+   await flush();
+   await flush();
+   check('and the message is sent after the undo delay', called(beforeAsk, 'POST', '/api/v1/me/messages'), JSON.stringify(since(beforeAsk).map((r) => r.method + ' ' + r.path)));
+   check('and the form is closed', compose.hidden === true && document.getElementById('compose-text').value === '', 'hidden=' + compose.hidden);
+   dismissAllToasts();
+   await writeMessage('Thanks, received.\n> Please find the report attached.\n> It is enclosed as a PDF.');
+   const beforeQuoted = requests.length;
+   document.getElementById('compose-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   fireTimers();
+   await flush();
+   await flush();
+   check('a mention only in the quoted lines is the other person\'s and is not questioned', confirms.length === 2 && called(beforeQuoted, 'POST', '/api/v1/me/messages'), confirms.length + ' questions');
+   dismissAllToasts();
 
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));

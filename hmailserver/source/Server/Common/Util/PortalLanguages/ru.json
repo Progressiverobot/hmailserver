@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Неверный пароль. Если администратор сменил ваш пароль, введите прежний; ключи будут заново обёрнуты текущим.",
   "Your keys were re-wrapped with the new password.": "Ваши ключи заново обёрнуты новым паролем.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "Ваш почтовый ящик в этом браузере. Пароль один раз обменивается на cookie сеанса и никогда не хранится этой страницей.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "В вашем сообщении упоминается вложение, но ничего не вложено. Всё равно отправить?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "Ваш адрес, каждый псевдоним, ведущий сюда, и каждый ящик, разрешивший вам писать от его имени. Выбор поля От в новом письме предлагает тот же список.",
   "Your own password, to prove it is you": "Ваш собственный пароль, чтобы подтвердить, что это вы",
   "Your password": "Ваш пароль",

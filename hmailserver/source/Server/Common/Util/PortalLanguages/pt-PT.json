@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Palavra-passe errada. Se um administrador alterou a sua palavra-passe, introduza a anterior; as chaves são então protegidas de novo com a atual.",
   "Your keys were re-wrapped with the new password.": "As suas chaves foram protegidas de novo com a nova palavra-passe.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "A sua caixa de correio, neste navegador. A palavra-passe é trocada uma vez por um cookie de sessão e nunca é guardada por esta página.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "A sua mensagem menciona um anexo, mas nada foi anexado. Enviar mesmo assim?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "O seu próprio endereço, cada alias que aponta para aqui e cada caixa de correio que o deixou escrever em nome dela. O seletor De numa nova mensagem oferece a mesma lista.",
   "Your own password, to prove it is you": "A sua própria palavra-passe, para provar que é você",
   "Your password": "A sua palavra-passe",

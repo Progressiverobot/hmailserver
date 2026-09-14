@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "Λάθος κωδικός. Αν ένας διαχειριστής άλλαξε τον κωδικό σας, εισαγάγετε αυτόν που είχατε πριν· τα κλειδιά τυλίγονται τότε ξανά με τον τρέχοντα.",
   "Your keys were re-wrapped with the new password.": "Τα κλειδιά σας τυλίχθηκαν ξανά με τον νέο κωδικό.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "Το γραμματοκιβώτιό σας, σε αυτό το πρόγραμμα περιήγησης. Ο κωδικός ανταλλάσσεται μία φορά με ένα cookie συνεδρίας και δεν κρατείται ποτέ από αυτή τη σελίδα.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "Το μήνυμά σας αναφέρει ένα συνημμένο, αλλά δεν έχει επισυναφθεί τίποτα. Να σταλεί ούτως ή άλλως;",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "Η δική σας διεύθυνση, κάθε ψευδώνυμο που δείχνει εδώ και κάθε γραμματοκιβώτιο που σας επέτρεψε να γράφετε ως αυτό. Ο επιλογέας Από σε νέο μήνυμα προσφέρει την ίδια λίστα.",
   "Your own password, to prove it is you": "Ο δικός σας κωδικός, για να αποδείξετε ότι είστε εσείς",
   "Your password": "Ο κωδικός σας",

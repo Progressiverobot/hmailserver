@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "パスワードが違います。管理者がパスワードを変更した場合は以前のパスワードを入力してください。鍵は現在のパスワードで包み直されます。",
   "Your keys were re-wrapped with the new password.": "鍵は新しいパスワードで包み直されました。",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "このブラウザーで使うあなたのメールボックスです。パスワードは一度だけセッション Cookie と交換され、このページに保存されることはありません。",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "メッセージに添付ファイルについての記述がありますが、何も添付されていません。このまま送信しますか？",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "自分のアドレス、ここに向くすべてのエイリアス、そして代理送信を許可しているすべてのメールボックスです。新しいメッセージの差出人選択にも同じ一覧が表示されます。",
   "Your own password, to prove it is you": "本人確認のためのあなた自身のパスワード",
   "Your password": "あなたのパスワード",

@@ -498,6 +498,7 @@
   "Wrong password. If an administrator changed your password, enter the one you had before; the keys are then re-wrapped with the current one.": "잘못된 비밀번호입니다. 관리자가 비밀번호를 변경했다면 이전 비밀번호를 입력하세요. 그러면 키가 현재 비밀번호로 다시 감싸집니다.",
   "Your keys were re-wrapped with the new password.": "키가 새 비밀번호로 다시 감싸졌습니다.",
   "Your mailbox, in this browser. The password is exchanged once for a session cookie and is never kept by this page.": "이 브라우저의 내 메일함입니다. 비밀번호는 세션 쿠키와 한 번 교환되며 이 페이지에 보관되지 않습니다.",
+  "Your message mentions an attachment, but nothing is attached. Send it anyway?": "메시지에 첨부 파일이 언급되어 있지만 첨부된 파일이 없습니다. 그래도 보내시겠습니까?",
   "Your own address, every alias that points here, and every mailbox that has let you write as it. The From picker on a new message offers the same list.": "내 주소, 여기로 연결되는 모든 별칭, 그리고 내가 대신 보낼 수 있도록 허용한 모든 메일함입니다. 새 메시지의 보낸 사람 선택기에도 같은 목록이 표시됩니다.",
   "Your own password, to prove it is you": "본인 확인을 위한 내 비밀번호",
   "Your password": "비밀번호",
