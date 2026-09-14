@@ -1,7 +1,8 @@
 // https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
-// The REST API's domain update in full, the domain aliases, the distribution list create and update, and the IP range update: what the Control Panel's domain, list and IP range pages do. See RestApiServer.h.
 // SPDX-License-Identifier: AGPL-3.0-or-later
+
+// The REST API's domain update in full, the domain aliases, the distribution list create and update, and the IP range update: what the Control Panel's domain, list and IP range pages do. See RestApiServer.h.
 
 // The REST API's domain update in full, the domain aliases and the IP range update: what the Control Panel's domain and IP range pages do. See RestApiServer.h.
 //
