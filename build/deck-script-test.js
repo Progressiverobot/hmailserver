@@ -268,6 +268,7 @@ class Element {
    }
    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
    focus() { this.focused += 1; document.activeElement = this; }
+   click() { this.dispatchEvent(makeEvent('click')); }
    blur() { }
    select() { }
    scrollIntoView() { }
@@ -430,6 +431,33 @@ const CERT_PROPS = {
    private_key_password: { type: 'string', writeOnly: true }
 };
 
+// The domain's keys as ApplyDomainBody in RestApiAdministration.cpp reads
+// them, and its description, which names three keys in the schema and the
+// rest in prose.
+const DOMAIN_KEYS = ['name', 'active', 'postmaster', 'max_message_size_kb', 'max_size_mb', 'max_account_size_mb',
+   'max_accounts', 'max_aliases', 'max_lists', 'max_accounts_enabled', 'max_aliases_enabled', 'max_lists_enabled',
+   'plus_addressing_enabled', 'plus_addressing_character', 'use_greylisting',
+   'signature_enabled', 'signature_method', 'signature_plain_text', 'signature_html', 'signature_add_to_replies', 'signature_add_to_local_mail',
+   'dkim_enabled', 'dkim_selector', 'dkim_private_key_file', 'dkim_signing_algorithm',
+   'message_retention_days', 'relay_host', 'relay_port', 'relay_requires_auth', 'relay_username', 'relay_password', 'relay_connection_security',
+   'vacation_enabled', 'vacation_subject', 'vacation_message'];
+const DOMAIN_PUT = 'Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message. A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.';
+const DOMAINS_POST = 'Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.';
+
+// A domain as DomainEntryJson_ emits it: every field, the relay password
+// never among them.
+function domainRecord(name, active, postmaster) {
+   return { name, active, postmaster, max_message_size_kb: 0, max_size_mb: 0, max_account_size_mb: 0,
+      max_accounts: 0, max_aliases: 0, max_lists: 0, message_retention_days: 0, relay_port: 0,
+      max_accounts_enabled: false, max_aliases_enabled: false, max_lists_enabled: false,
+      plus_addressing_enabled: false, plus_addressing_character: '+', use_greylisting: false,
+      signature_enabled: false, signature_method: 'set_if_not_specified', signature_plain_text: '', signature_html: '',
+      signature_add_to_replies: false, signature_add_to_local_mail: false,
+      dkim_enabled: false, dkim_selector: '', dkim_private_key_file: '', dkim_signing_algorithm: 'sha256',
+      relay_host: '', relay_requires_auth: false, relay_username: '', relay_connection_security: 'none',
+      vacation_enabled: false, vacation_subject: '', vacation_message: '' };
+}
+
 function body(props, required) {
    return { content: { 'application/json': { schema: Object.assign({ type: 'object', properties: props }, required ? { required } : {}) } } };
 }
@@ -506,7 +534,20 @@ const spec = {
          put: { summary: 'Replace a TCP/IP port', description: PORTS_PUT, requestBody: body(PORT_PROPS, ['protocol', 'port']) },
          delete: { summary: 'Delete a TCP/IP port', description: PORTS_DELETE }
       },
-      '/api/v1/server/reinitialize': { post: { summary: 'Restart the services in place', description: REINITIALIZE } }
+      '/api/v1/server/reinitialize': { post: { summary: 'Restart the services in place', description: REINITIALIZE } },
+      '/api/v1/domains': {
+         get: { summary: 'List domains', description: 'A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.' },
+         post: { summary: 'Create a domain', description: DOMAINS_POST, requestBody: body({ name: { type: 'string' }, active: { type: 'boolean' }, postmaster: { type: 'string' } }, ['name']) }
+      },
+      '/api/v1/domains/{domain}': {
+         put: { summary: 'Change a domain', description: DOMAIN_PUT, requestBody: body({ active: { type: 'boolean' }, postmaster: { type: 'string' }, name: { type: 'string' } }, ['active']) },
+         delete: { summary: 'Delete a domain with everything in it' }
+      },
+      '/api/v1/domains/{domain}/domain-aliases': {
+         get: { summary: 'The domain\'s aliases - other names the domain answers to', description: 'Each entry: id, name.' },
+         post: { summary: 'Add a domain alias', description: 'Body: name.', requestBody: body({ name: { type: 'string' } }, ['name']) }
+      },
+      '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } }
    }
 };
 
@@ -515,10 +556,15 @@ const HOSTILE = 'evil<img src=x onerror=alert(1)>.test';
 const state = {
    status: { version: '6.3.3', state: 3, processedMessages: 1234, spamMessages: 56, virusesRemoved: 7, sessions: { smtp: 3, imap: 12, pop3: 1 } },
    domains: [
-      { name: 'example.com', active: true, postmaster: 'postmaster@example.com' },
-      { name: HOSTILE, active: false, postmaster: '' },
-      { name: 'second.example', active: true, postmaster: '' }
+      domainRecord('example.com', true, 'postmaster@example.com'),
+      domainRecord(HOSTILE, false, ''),
+      domainRecord('second.example', true, '')
    ],
+   domainAliases: {
+      'example.com': [{ id: 1, name: 'example.net' }],
+      [HOSTILE]: [],
+      'second.example': []
+   },
    accounts: {
       'example.com': [{ address: 'anna@example.com', active: true }, { address: 'bob@example.com', active: false }],
       [HOSTILE]: [{ address: 'x@' + HOSTILE, active: true }],
@@ -579,6 +625,63 @@ function answer(method, path, headers, raw) {
    if (path === '/api/v1/openapi.json') { return json(200, spec); }
 
    if (path === '/api/v1/domains' && method === 'GET') { return json(200, state.domains); }
+   if (path === '/api/v1/domains' && method === 'POST') {
+      const name = String(parsed.name || '').trim();
+      if (!name) { return json(400, { error: 'name is required' }); }
+      if (state.domains.some((d) => d.name === name)) { return json(409, { error: 'domain already exists' }); }
+      const record = domainRecord(name, parsed.active !== false, parsed.postmaster || '');
+      state.domains.push(record);
+      state.accounts[name] = [];
+      state.domainAliases[name] = [];
+      return json(201, record);
+   }
+   if (/^\/api\/v1\/domains\/[^/]+$/.test(path)) {
+      const name = segment(path, 4);
+      const at = state.domains.findIndex((d) => d.name === name);
+      if (at < 0) { return json(404, { error: 'domain not found' }); }
+      if (method === 'PUT') {
+         if (!('active' in parsed) || parsed.active === null) { return json(400, { error: 'active is required' }); }
+         for (const key of Object.keys(parsed)) {
+            if (DOMAIN_KEYS.indexOf(key) < 0) { return json(400, { error: 'unknown field: ' + key }); }
+         }
+         const record = state.domains[at];
+         Object.keys(parsed).forEach((key) => {
+            if (key === 'relay_password') { secrets.relay_password = parsed[key]; return; }
+            record[key] = parsed[key];
+         });
+         if (record.name !== name) {
+            state.accounts[record.name] = state.accounts[name] || [];
+            delete state.accounts[name];
+            state.domainAliases[record.name] = state.domainAliases[name] || [];
+            delete state.domainAliases[name];
+         }
+         return json(200, record);
+      }
+      if (method === 'DELETE') {
+         state.domains.splice(at, 1);
+         delete state.accounts[name];
+         delete state.domainAliases[name];
+         return json(200, { deleted: true });
+      }
+   }
+   if (/^\/api\/v1\/domains\/[^/]+\/domain-aliases$/.test(path)) {
+      const domain = segment(path, 4);
+      if (!(domain in state.domainAliases)) { return json(404, { error: 'domain not found' }); }
+      if (method === 'GET') { return json(200, state.domainAliases[domain]); }
+      if (method === 'POST') {
+         const alias = { id: nextId++, name: String(parsed.name || '').trim() };
+         if (!alias.name) { return json(400, { error: 'name is required' }); }
+         state.domainAliases[domain].push(alias);
+         return json(201, alias);
+      }
+   }
+   if (/^\/api\/v1\/domains\/[^/]+\/domain-aliases\/[^/]+$/.test(path) && method === 'DELETE') {
+      const domain = segment(path, 4);
+      const alias = segment(path, 6);
+      if (!(domain in state.domainAliases) || !state.domainAliases[domain].some((a) => a.name === alias)) { return json(404, { error: 'domain alias not found' }); }
+      state.domainAliases[domain] = state.domainAliases[domain].filter((a) => a.name !== alias);
+      return json(200, { deleted: true });
+   }
    if (/^\/api\/v1\/domains\/[^/]+\/accounts$/.test(path)) {
       const domain = segment(path, 4);
       if (!(domain in state.accounts)) { return json(404, { error: 'domain not found' }); }
@@ -776,6 +879,9 @@ async function signIn() {
 async function main() {
    vm.runInThisContext(fs.readFileSync(scriptPath, 'utf8'), { filename: 'deck.js' });
    await flush();
+   let before = 0;
+   let put = null;
+   let posted = null;
 
    // ---- a first visit: the sign-in card, and not one request
    check('a first visit shows the sign-in card', $('#gate').style.display !== 'none' && $('#app').style.display === 'none',
@@ -841,7 +947,7 @@ async function main() {
    state.status.state = 3;
 
    // ---- domains
-   let before = requests.length;
+   before = requests.length;
    await goTo('domains');
    check('the domains view reads the domains', called(before, 'GET', '/api/v1/domains').length === 1, paths(before));
    check('the title follows the view', $('#viewTitle').textContent === 'Domains');
@@ -900,6 +1006,147 @@ async function main() {
    check('yes deletes by address', called(before, 'DELETE', '/api/v1/accounts/bob%40example.com').length === 1, paths(before));
    check('and the listing is read again without the account', rows().length === 2 && rows().every((r) => r.textContent.indexOf('bob@') < 0));
 
+   // ---- the domain editor
+   click(act('domains'));
+   await flush();
+   check('the domain list shows the postmaster and offers Edit and Delete', rows()[0].textContent.indexOf('postmaster@example.com') >= 0 &&
+      act('domainedit', { name: 'example.com' }) !== null && act('domaindel', { name: HOSTILE }) !== null);
+   before = requests.length;
+   click(act('domainedit', { name: 'example.com' }));
+   await flush();
+   check('Edit reads the domain\'s other names', called(before, 'GET', '/api/v1/domains/example.com/domain-aliases').length === 1, paths(before));
+   const headings = content().querySelectorAll('h2').map((h) => h.textContent.trim());
+   check('the editor is grouped as the desktop dialog is', ['General', 'Names', 'Limits', 'Signature', 'Relay', 'Out of office', 'DKIM'].every((g) => headings.indexOf(g) >= 0), JSON.stringify(headings));
+   check('the route\'s own description is the note', content().textContent.indexOf('A field left out keeps its value') >= 0);
+   check('General: active, the name and the postmaster', document.getElementById('dom_active').checked === true && document.getElementById('dom_name').value === 'example.com' &&
+      document.getElementById('dom_postmaster').value === 'postmaster@example.com');
+   check('Limits: numbers as number boxes, switches as checkboxes', document.getElementById('dom_max_size_mb').type === 'number' && document.getElementById('dom_max_size_mb').value === '0' &&
+      document.getElementById('dom_max_accounts_enabled').checked === false && document.getElementById('dom_plus_addressing_character').value === '+');
+   check('Signature: the method\'s three words and the texts as text areas',
+      document.getElementById('dom_signature_method').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'set_if_not_specified,overwrite,append' &&
+      document.getElementById('dom_signature_plain_text').tagName === 'TEXTAREA' && document.getElementById('dom_signature_html').tagName === 'TEXTAREA');
+   check('Relay: the four securities and a write-only password box, empty',
+      document.getElementById('dom_relay_connection_security').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'none,starttls_optional,starttls_required,tls' &&
+      document.getElementById('dom_relay_password').type === 'password' && document.getElementById('dom_relay_password').value === '' &&
+      document.getElementById('dom_relay_password').closest('.fr').textContent.indexOf('write-only') >= 0);
+   check('Out of office and DKIM', document.getElementById('dom_vacation_message').tagName === 'TEXTAREA' &&
+      document.getElementById('dom_dkim_signing_algorithm').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'sha1,sha256' && document.getElementById('dom_dkim_signing_algorithm').value === 'sha256');
+   const drawn = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('dom_') === 0).map((id) => id.slice(4)).sort();
+   check('every key the route takes has a control, and no key it does not', JSON.stringify(drawn) === JSON.stringify(DOMAIN_KEYS.slice().sort()), JSON.stringify(drawn));
+   check('the other names are listed with a Remove each', content().textContent.indexOf('example.net') >= 0 && act('daliasdel', { name: 'example.net' }) !== null);
+
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   check('saving a domain with nothing changed sends nothing', called(before, 'PUT', /domains/).length === 0 && toastText() === 'Nothing changed', toastText());
+   setValue('dom_max_size_mb', '500');
+   setChecked('dom_use_greylisting', true);
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/domains/example.com');
+   check('saving sends active, which the route requires, and only what changed', JSON.stringify(put) === '{"active":true,"max_size_mb":500,"use_greylisting":true}', JSON.stringify(put));
+   check('then reads the domains again and stays in the editor with what the server holds', called(before, 'GET', '/api/v1/domains').length === 1 &&
+      document.getElementById('dom_max_size_mb').value === '500' && document.getElementById('dom_use_greylisting').checked === true && toastText() === 'Domain saved', toastText());
+   setValue('dom_relay_password', 'relay-secret');
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/domains/example.com');
+   check('a filled relay password goes with active and nothing else', JSON.stringify(put) === '{"active":true,"relay_password":"relay-secret"}', JSON.stringify(put));
+   check('and its box is empty again after the re-read', document.getElementById('dom_relay_password').value === '');
+   setValue('dom_max_accounts', 'many');
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   check('a limit that is not a number is refused by the page', called(before, 'PUT', /domains/).length === 0 && document.getElementById('err_domainedit').textContent.indexOf('whole number') >= 0,
+      document.getElementById('err_domainedit').textContent);
+   setValue('dom_max_accounts', '10');
+   nextRefusal = 'The domain name is not valid.';
+   click(act('domainsave'));
+   await flush();
+   check('a refusal keeps the editor open with the server\'s sentence', document.getElementById('err_domainedit').textContent === 'The domain name is not valid.' && document.getElementById('dom_max_accounts').value === '10');
+   setValue('dom_name', 'renamed.example');
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/domains/example.com');
+   check('a new name is PUT to the old name, with the other change', !!put && put.name === 'renamed.example' && put.max_accounts === 10 && Object.keys(put).length === 3, JSON.stringify(put));
+   check('and the editor is redrawn under the new name', content().querySelector('h2').textContent.indexOf('renamed.example') >= 0 && document.getElementById('dom_name').value === 'renamed.example' &&
+      toastText() === 'Domain renamed to renamed.example', toastText());
+
+   document.getElementById('dom_postmaster').value = 'keep-me@renamed.example';
+   setValue('newDomainAlias', 'alias.example');
+   before = requests.length;
+   document.getElementById('newDomainAlias').dispatchEvent(makeEvent('keydown', { key: 'Enter' }));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/domains/renamed.example/domain-aliases');
+   check('Enter in the name box adds the name, under the domain\'s new name', JSON.stringify(posted) === '{"name":"alias.example"}', JSON.stringify(posted));
+   check('the names are read again and the new one is there', called(before, 'GET', '/api/v1/domains/renamed.example/domain-aliases').length === 1 && act('daliasdel', { name: 'alias.example' }) !== null);
+   check('and an edit made in another group survives it', document.getElementById('dom_postmaster').value === 'keep-me@renamed.example');
+   before = requests.length;
+   click(act('daliasdel', { name: 'example.net' }));
+   await flush();
+   check('removing a name asks, deletes it by name and re-reads', confirmations[confirmations.length - 1].indexOf('example.net') >= 0 &&
+      called(before, 'DELETE', '/api/v1/domains/renamed.example/domain-aliases/example.net').length === 1 && content().querySelectorAll('button[data-act="daliasdel"]').length === 1);
+   nextRefusal = 'That name is already a domain.';
+   setValue('newDomainAlias', 'second.example');
+   click(act('daliasadd'));
+   await flush();
+   check('a refused name is the server\'s sentence in the names box', document.getElementById('err_dalias').textContent === 'That name is already a domain.');
+   setChecked('dom_active', false);
+   before = requests.length;
+   click(act('domainsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/domains/renamed.example');
+   check('switching the domain off sends active false, with the postmaster edit that was waiting', JSON.stringify(put) === '{"active":false,"postmaster":"keep-me@renamed.example"}', JSON.stringify(put));
+   click(act('cancel'));
+   await flush();
+   check('Cancel returns to the re-read list, which shows the rename and the state', rows().length === 3 && rows()[0].textContent.indexOf('renamed.example') >= 0 && rows()[0].textContent.indexOf('Disabled') >= 0 &&
+      rows()[0].textContent.indexOf('keep-me@renamed.example') >= 0, rows()[0].textContent);
+   before = requests.length;
+   click(act('domainedit', { name: HOSTILE }));
+   await flush();
+   check('a hostile name is encoded in the path and drawn as text in the editor', called(before, 'GET', '/api/v1/domains/' + encodeURIComponent(HOSTILE) + '/domain-aliases').length === 1 &&
+      content().querySelectorAll('img').length === 0 && document.getElementById('dom_name').value === HOSTILE);
+   click(act('cancel'));
+   await flush();
+
+   setValue('newDomain', 'example.com');
+   before = requests.length;
+   click(act('domainnew'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/domains');
+   check('creating a domain posts its name, active and postmaster', JSON.stringify(posted) === '{"name":"example.com","active":true,"postmaster":""}', JSON.stringify(posted));
+   check('and opens the editor on the domain as read back', called(before, 'GET', '/api/v1/domains').length === 1 && document.getElementById('dom_name') !== null &&
+      document.getElementById('dom_name').value === 'example.com' && toastText() === 'Domain created: example.com', toastText());
+   click(act('cancel'));
+   await flush();
+   setValue('newDomain', 'second.example');
+   before = requests.length;
+   click(act('domainnew'));
+   await flush();
+   check('a domain that exists is the server\'s refusal beside the form', document.getElementById('err_domainnew').textContent === 'domain already exists' && rows().length === 4,
+      document.getElementById('err_domainnew').textContent);
+   setValue('newDomain', '   ');
+   click(act('domainnew'));
+   await flush();
+   check('an empty name is refused by the page', called(before, 'POST', '/api/v1/domains').length === 1 && document.getElementById('err_domainnew').textContent.indexOf('required') >= 0);
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('domaindel', { name: 'example.com' }));
+   await flush();
+   check('deleting a domain asks, naming it and what goes with it', called(before, 'DELETE', /domains/).length === 0 && confirmations[confirmations.length - 1].indexOf('example.com') >= 0 &&
+      confirmations[confirmations.length - 1].indexOf('account') >= 0, confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('domaindel', { name: 'example.com' }));
+   await flush();
+   check('yes deletes by name and the re-read list is without it', called(before, 'DELETE', '/api/v1/domains/example.com').length === 1 && rows().length === 3 && rows().every((r) => r.textContent.indexOf('example.com') < 0));
+   nextRefusal = 'The domain is named by a route.';
+   click(act('domaindel', { name: 'second.example' }));
+   await flush();
+   check('a refused delete is shown on the domain\'s row', document.getElementById('err_domain_second.example').textContent === 'The domain is named by a route.' && rows().length === 3);
+
    // ---- the delivery queue
    before = requests.length;
    await goTo('queue');
@@ -930,8 +1177,8 @@ async function main() {
    // ---- settings, drawn from the OpenAPI document
    before = requests.length;
    await goTo('settings');
-   check('the settings view reads the document and the three groups',
-      called(before, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging'].every((p) => called(before, 'GET', p).length === 1),
+   check('the settings view reads the three groups, and the document was read once for the whole session',
+      called(0, 'GET', '/api/v1/openapi.json').length === 1 && ['/api/v1/settings', '/api/v1/settings/antispam', '/api/v1/settings/logging'].every((p) => called(before, 'GET', p).length === 1),
       paths(before));
    check('a string is a text box with the value', document.getElementById('set_srv_hostname').type === 'text' && document.getElementById('set_srv_hostname').value === 'mail.example.com');
    check('an integer is a number box', document.getElementById('set_srv_max_message_size_kb').type === 'number' && document.getElementById('set_srv_max_message_size_kb').value === '10240');
@@ -956,7 +1203,7 @@ async function main() {
    before = requests.length;
    click(act('setsave', { group: 'srv' }));
    await flush();
-   let put = lastBody(before, 'PUT', '/api/v1/settings');
+   put = lastBody(before, 'PUT', '/api/v1/settings');
    check('saving sends only the key that changed, as a number', !!put && JSON.stringify(put) === '{"max_message_size_kb":20480}', JSON.stringify(put));
    check('then reads the groups again', called(before, 'GET', '/api/v1/settings').length === 1);
    check('and the control shows what the server holds', document.getElementById('set_srv_max_message_size_kb').value === '20480' && toastText() === '1 setting saved', toastText());
@@ -1027,7 +1274,7 @@ async function main() {
    before = requests.length;
    click(act('rulesave'));
    await flush();
-   let posted = lastBody(before, 'POST', '/api/v1/rules');
+   posted = lastBody(before, 'POST', '/api/v1/rules');
    check('saving a new rule posts the shape the route takes', !!posted && posted.name === 'Flagged via partner' && posted.active === true && posted.all_criteria === false &&
       JSON.stringify(posted.criteria) === '[{"field":"header","match":"equals","value":"YES","header":"X-Spam-Flag"}]' &&
       JSON.stringify(posted.actions) === '[{"type":"send_using_route","route_id":5}]', JSON.stringify(posted));
