@@ -701,7 +701,7 @@ namespace RegressionTests.API
          {
             "/api/v1/ipranges", "/api/v1/ipranges/{id}", "/api/v1/domains/{domain}/lists", "/api/v1/lists/{address}",
             "/api/v1/certificates", "/api/v1/domains/{domain}/dkim", "/api/v1/rules", "/api/v1/logs", "/api/v1/logs/{name}",
-            "/api/v1/backup", "/api/v1/settings"
+            "/api/v1/backup", "/api/v1/settings", "/api/v1/settings/antivirus"
          })
          {
             StringAssert.Contains("\"" + path + "\"", body, "The OpenAPI document must describe " + path);

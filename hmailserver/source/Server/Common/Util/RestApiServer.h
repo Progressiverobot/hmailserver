@@ -323,6 +323,9 @@ namespace HM
          RouteFetchAccountDelete,
          RouteFetchAccountDownload,
          RouteServerReinitialize,
+         // The anti-virus settings group, server-wide as the other groups are.
+         RouteSettingsAntiVirusGet,
+         RouteSettingsAntiVirusPut,
          RouteOpenApi
       };
 
@@ -749,6 +752,8 @@ namespace HM
       HttpResponse HandleSettingsAntiSpamPut_(const AnsiString &requestBody);
       HttpResponse HandleSettingsLogging_();
       HttpResponse HandleSettingsLoggingPut_(const AnsiString &requestBody);
+      HttpResponse HandleSettingsAntiVirus_();
+      HttpResponse HandleSettingsAntiVirusPut_(const AnsiString &requestBody);
       static AnsiString OpenApiSettingsPaths_();
       // The Linux suite's route backlog, wave A: the directories the server
       // runs in, the [Settings] section of hMailServer.ini, and the

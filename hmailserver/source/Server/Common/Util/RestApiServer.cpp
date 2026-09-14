@@ -1568,6 +1568,10 @@ namespace HM
             return HandleSettingsAntiSpam_();
          case RouteSettingsAntiSpamPut:
             return HandleSettingsAntiSpamPut_(GetRequestBody_(request));
+         case RouteSettingsAntiVirusGet:
+            return HandleSettingsAntiVirus_();
+         case RouteSettingsAntiVirusPut:
+            return HandleSettingsAntiVirusPut_(GetRequestBody_(request));
          case RouteSettingsLoggingGet:
             return HandleSettingsLogging_();
          case RouteSettingsLoggingPut:
@@ -2937,6 +2941,12 @@ namespace HM
          return;
       }
 
+      if (path == "/api/v1/settings/antivirus" && (method == "GET" || method == "PUT"))
+      {
+         route.kind = method == "GET" ? RouteSettingsAntiVirusGet : RouteSettingsAntiVirusPut;
+         return;
+      }
+
       if (path == "/api/v1/settings/logging" && (method == "GET" || method == "PUT"))
       {
          route.kind = method == "GET" ? RouteSettingsLoggingGet : RouteSettingsLoggingPut;
@@ -3178,6 +3188,7 @@ namespace HM
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
+      case RouteSettingsAntiVirusPut:
       case RouteSettingsLoggingPut:
       case RouteIniSettingPut:
       case RouteIniSettingDelete:
@@ -3374,6 +3385,8 @@ namespace HM
       case RouteSettingsPut:
       case RouteSettingsAntiSpamGet:
       case RouteSettingsAntiSpamPut:
+      case RouteSettingsAntiVirusGet:
+      case RouteSettingsAntiVirusPut:
       case RouteSettingsLoggingGet:
       case RouteSettingsLoggingPut:
       case RouteSettingsDirectoriesGet:

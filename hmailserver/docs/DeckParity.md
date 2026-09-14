@@ -9,23 +9,22 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 240 |
-| of them reachable from a Deck view | 153 |
-| missing over REST | 95 |
-| over REST but not reached by any Deck view | 87 |
+| of them writable over REST | 263 |
+| of them reachable from a Deck view | 167 |
+| missing over REST | 72 |
+| over REST but not reached by any Deck view | 96 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 160, 71 of them writes |
+| REST routes (path and method) | 170, 77 of them writes |
 | Deck views | 10 |
 
 ## Missing over REST, by interface
 
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
-| Account | 16 | `ADDomain`, `ADUsername`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
-| AntiVirus | 14 | `Action`, `ClamAVEnabled`, `ClamAVHost`, `ClamAVPort`, `ClamWinDBFolder`, `ClamWinEnabled`, `ClamWinExecutable`, `CustomScannerEnabled`, `CustomScannerExecutable`, `CustomScannerReturnValue`, `EnableAttachmentBlocking`, `MaximumMessageSize`, `NotifyReceiver`, `NotifySender` |
 | Domain | 9 | `ADDomainName`, `DKIMBodyCanonicalizationMethod`, `DKIMHeaderCanonicalizationMethod`, `DKIMSecondaryPrivateKeyFile`, `DKIMSecondarySelector`, `DKIMSignAliasesEnabled`, `VacationExternalOverride`, `VacationInternalMessage`, `VacationInternalSubject` |
-| Cache | 9 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL`, `Enabled` |
+| Account | 9 | `ADDomain`, `ADUsername`, `ForwardAbortSpamFlagged`, `IsAD`, `SieveScript`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate` |
+| Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
 | DistributionList | 5 | `Active`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
@@ -45,7 +44,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | ServerMessage | 1 | `Name` |
 | Group | 1 | `Name` |
 | GroupMember | 1 | `AccountID` |
-| MessageIndexing | 1 | `Enabled` |
 
 ## Over REST but not reached by any Deck view
 
@@ -53,14 +51,16 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|---|
 | Domain | 35 | `Active`, `AddSignaturesToLocalMail`, `AddSignaturesToReplies`, `AntiSpamEnableGreylisting`, `DKIMPrivateKeyFile`, `DKIMSelector`, `DKIMSignEnabled`, `DKIMSigningAlgorithm`, `MaxAccountSize`, `MaxMessageSize`, `MaxNumberOfAccounts`, `MaxNumberOfAccountsEnabled`, `MaxNumberOfAliases`, `MaxNumberOfAliasesEnabled`, `MaxNumberOfDistributionLists`, `MaxNumberOfDistributionListsEnabled`, `MaxSize`, `MessageRetentionDays`, `Name`, `PlusAddressingCharacter`, `PlusAddressingEnabled`, `Postmaster`, `RelayConnectionSecurity`, `RelayHost`, `RelayPassword`, `RelayPort`, `RelayRequiresAuthentication`, `RelayUsername`, `SignatureEnabled`, `SignatureHTML`, `SignatureMethod`, `SignaturePlainText`, `VacationMessage`, `VacationMessageIsOn`, `VacationSubject` |
 | SecurityRange | 18 | `AllowDeliveryFromLocalToLocal`, `AllowDeliveryFromLocalToRemote`, `AllowDeliveryFromRemoteToLocal`, `AllowDeliveryFromRemoteToRemote`, `AllowIMAPConnections`, `AllowPOP3Connections`, `AllowSMTPConnections`, `EnableAntiVirus`, `EnableSpamProtection`, `LowerIP`, `Name`, `Priority`, `RequireSMTPAuthExternalToExternal`, `RequireSMTPAuthExternalToLocal`, `RequireSMTPAuthLocalToExternal`, `RequireSMTPAuthLocalToLocal`, `RequireSSLTLSForAuth`, `UpperIP` |
+| Account | 14 | `AdminLevel`, `AntiSpamEnabled`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `MessageRetentionDays`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `VacationMessage`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
 | FetchAccount | 13 | `ConnectionSecurity`, `DaysToKeepMessages`, `Enabled`, `MinutesBetweenFetch`, `MirrorFolders`, `Name`, `Password`, `Port`, `ServerAddress`, `ServerType`, `UseAntiSpam`, `UseAntiVirus`, `Username` |
-| Account | 7 | `AdminLevel`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText` |
 | BackupSettings | 5 | `BackupDomains`, `BackupMessages`, `BackupSettings`, `CompressDestinationFiles`, `Destination` |
 | Alias | 3 | `Active`, `Name`, `Value` |
 | DistributionList | 2 | `Address`, `RequireSMTPAuth` |
 | Scripting | 2 | `Enabled`, `Language` |
 | DomainAlias | 1 | `AliasName` |
+| Cache | 1 | `Enabled` |
 | ServerMessage | 1 | `Text` |
+| MessageIndexing | 1 | `Enabled` |
 
 ## What the heuristic gets wrong
 
@@ -203,14 +203,14 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `Active` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `Address` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `AdminLevel` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
-| `AntiSpamEnabled` | AccountDialog | - | - |
+| `AntiSpamEnabled` | AccountDialog | `PUT /api/v1/settings/cache` (words, loose, scope unknown)<br>`PUT /api/v1/settings/indexing` (words, loose, scope unknown) | - |
 | `ForwardAbortSpamFlagged` | AccountDialog | - | - |
 | `ForwardAddress` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `ForwardEnabled` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `ForwardKeepOriginal` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `IsAD` | AccountDialog | - | - |
 | `MaxSize` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
-| `MessageRetentionDays` | AccountDialog | - | - |
+| `MessageRetentionDays` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `Password` | AccountDialog, DomainsView | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `PersonFirstName` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
 | `PersonLastName` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter)<br>`POST /api/v1/domains/{domain}/accounts` (setter) | domains |
@@ -220,13 +220,13 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `SignaturePlainText` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `SpamDeleteThreshold` | AccountDialog | - | - |
 | `SpamMarkThreshold` | AccountDialog | - | - |
-| `VacationMessage` | AccountDialog | - | - |
+| `VacationMessage` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 | `VacationMessageAbortSpamFlagged` | AccountDialog | - | - |
 | `VacationMessageBeginDate` | AccountDialog | - | - |
-| `VacationMessageExpires` | AccountDialog | - | - |
-| `VacationMessageExpiresDate` | AccountDialog | - | - |
-| `VacationMessageIsOn` | AccountDialog | - | - |
-| `VacationSubject` | AccountDialog | - | - |
+| `VacationMessageExpires` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `VacationMessageExpiresDate` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `VacationMessageIsOn` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
+| `VacationSubject` | AccountDialog | `PUT /api/v1/accounts/{address}` (setter) | - |
 
 ### Alias
 
@@ -242,7 +242,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 |---|---|---|---|
 | `AWStatsEnabled` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | settings |
 | `Device` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | settings |
-| `Enabled` | ServerSettingsView, StalledMailView | `PUT /api/v1/settings/logging` (setter) | settings |
+| `Enabled` | ServerSettingsView, StalledMailView | `PUT /api/v1/settings/logging` (setter)<br>`PUT /api/v1/settings/cache` (name, scope unknown)<br>`PUT /api/v1/settings/indexing` (name, scope unknown) | settings |
 | `KeepFilesOpen` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | settings |
 | `LogApplication` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | settings |
 | `LogDebug` | ServerSettingsView, StalledMailView | `PUT /api/v1/settings/logging` (setter) | settings |
@@ -299,20 +299,20 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Action` | ServerSettingsView | - | - |
-| `ClamAVEnabled` | ServerSettingsView | - | - |
-| `ClamAVHost` | ServerSettingsView | - | - |
-| `ClamAVPort` | ServerSettingsView | - | - |
-| `ClamWinDBFolder` | ServerSettingsView | - | - |
-| `ClamWinEnabled` | ServerSettingsView | - | - |
-| `ClamWinExecutable` | ServerSettingsView | - | - |
-| `CustomScannerEnabled` | ServerSettingsView | - | - |
-| `CustomScannerExecutable` | ServerSettingsView | - | - |
-| `CustomScannerReturnValue` | ServerSettingsView | - | - |
-| `EnableAttachmentBlocking` | ServerSettingsView | - | - |
-| `MaximumMessageSize` | ServerSettingsView | - | - |
-| `NotifyReceiver` | ServerSettingsView | - | - |
-| `NotifySender` | ServerSettingsView | - | - |
+| `Action` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
+| `ClamAVEnabled` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `ClamAVHost` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `ClamAVPort` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `ClamWinDBFolder` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
+| `ClamWinEnabled` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
+| `ClamWinExecutable` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
+| `CustomScannerEnabled` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `CustomScannerExecutable` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `CustomScannerReturnValue` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `EnableAttachmentBlocking` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `MaximumMessageSize` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (setter) | settings |
+| `NotifyReceiver` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
+| `NotifySender` | ServerSettingsView | `PUT /api/v1/settings/antivirus` (name) | settings |
 
 ### Route
 
@@ -354,7 +354,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 |---|---|---|---|
 | `ConnectionSecurity` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
 | `DaysToKeepMessages` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
-| `Enabled` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
+| `Enabled` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter)<br>`PUT /api/v1/settings/cache` (name, scope unknown)<br>`PUT /api/v1/settings/indexing` (name, scope unknown) | - |
 | `MinutesBetweenFetch` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
 | `MirrorFolders` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
 | `Name` | CollectionSpecs | `POST /api/v1/accounts/{address}/fetch-accounts` (setter)<br>`PUT /api/v1/accounts/{address}/fetch-accounts/{id}` (setter) | - |
@@ -377,7 +377,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | - |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter)<br>`PUT /api/v1/settings/cache` (name, scope unknown)<br>`PUT /api/v1/settings/indexing` (name, scope unknown) | - |
 | `Language` | ServerSettingsView | `PUT /api/v1/settings/scripting` (setter) | - |
 
 ### DomainAlias
@@ -435,7 +435,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `DistributionListCacheTTL` | ServerSettingsView | - | - |
 | `DomainCacheMaxSizeKb` | ServerSettingsView | - | - |
 | `DomainCacheTTL` | ServerSettingsView | - | - |
-| `Enabled` | ServerSettingsView | - | - |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/cache` (setter, scope unknown)<br>`PUT /api/v1/settings/indexing` (name, scope unknown) | - |
 
 ### BackupSettings
 
@@ -588,7 +588,7 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Enabled` | ServerSettingsView | - | - |
+| `Enabled` | ServerSettingsView | `PUT /api/v1/settings/cache` (name, scope unknown)<br>`PUT /api/v1/settings/indexing` (setter, scope unknown) | - |
 
 ### Diagnostics
 
@@ -607,7 +607,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | Status | `DownloadUpdate` | StatusView | `POST /api/v1/update/download` |
 | Status | `InstallUpdate` | StatusView | `POST /api/v1/update/install` |
 | Settings | `ApplyDirectorySync` | DirectorySyncView | - |
-| Settings | `ClearLogonFailureList` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
+| Settings | `ClearLogonFailureList` | ServerSettingsView | `POST /api/v1/settings/cache/clear`<br>`POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | Settings | `DisableAdministratorTOTP` | AdministratorTwoFactorDialog | - |
 | Settings | `EnrolAdministratorTOTP` | AdministratorTwoFactorDialog | - |
 | Settings | `PreviewDirectorySync` | DirectorySyncView | - |
@@ -662,7 +662,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | DeliveryQueue | `ResetDeliveryTime` | QueueView | - |
 | DeliveryQueue | `StartDelivery` | QueueView | - |
 | IMAPFolders | `Add` | AccountDialog, PublicFoldersView | - |
-| AntiSpam | `ClearGreyListingTriplets` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
+| AntiSpam | `ClearGreyListingTriplets` | ServerSettingsView | `POST /api/v1/settings/cache/clear`<br>`POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | AntiSpam | `TestSpamAssassinConnection` | ServerSettingsView | - |
 | TCPIPPorts | `Add` | TcpIpPortsView | - |
 | TCPIPPorts | `SetDefault` | TcpIpPortsView | - |
@@ -672,8 +672,8 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | IMAPFolderPermissions | `Add` | FolderPermissionsDialog | - |
 | IMAPFolderPermissions | `DeleteByDBID` | FolderPermissionsDialog | - |
 | IncomingRelays | `Add` | UtilityViews | - |
-| MessageIndexing | `Clear` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
-| MessageIndexing | `Index` | ServerSettingsView | - |
+| MessageIndexing | `Clear` | ServerSettingsView | `POST /api/v1/settings/cache/clear`<br>`POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
+| MessageIndexing | `Index` | ServerSettingsView | `POST /api/v1/settings/indexing/index` |
 | Diagnostics | `PerformTests` | UtilityViews | - |
 
 ## Write routes
@@ -682,7 +682,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 
 | Route | Resource | Keys | Deck |
 |---|---|---|---|
-| `PUT /api/v1/accounts/{address}` | Account | `active`, `admin_level`, `first_name`, `forward_address`, `forward_enabled`, `forward_keep_original`, `last_name`, `max_size_mb`, `password`, `signature_enabled`, `signature_html`, `signature_plain_text` | - |
+| `PUT /api/v1/accounts/{address}` | Account | `active`, `admin_level`, `first_name`, `forward_address`, `forward_enabled`, `forward_keep_original`, `last_name`, `max_size_mb`, `message_retention_days`, `password`, `signature_enabled`, `signature_html`, `signature_plain_text`, `vacation_enabled`, `vacation_expires`, `vacation_expires_date`, `vacation_message`, `vacation_subject` | - |
 | `POST /api/v1/accounts/{address}/fetch-accounts` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | - |
 | `PUT /api/v1/accounts/{address}/fetch-accounts/{id}` | FetchAccount | `connection_security`, `days_to_keep_messages`, `enable_route_recipients`, `enabled`, `field`, `first`, `message`, `mime_recipient_headers`, `minutes_between_fetch`, `mirror_folders`, `name`, `password`, `port`, `process_mime_date`, `process_mime_recipients`, `server_address`, `server_type`, `starttls_optional`, `starttls_required`, `type`, `use_antispam`, `use_antivirus`, `username`, `value` | - |
 | `POST /api/v1/accounts/{address}/fetch-accounts/{id}/download` | FetchAccount | - | - |
@@ -734,14 +734,20 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/queue/{id}/retry` | - | - | yes |
 | `POST /api/v1/routes` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
 | `PUT /api/v1/routes/{id}` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
-| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
-| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
+| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
+| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
 | `POST /api/v1/scheduled/run` | - | - | - |
 | `POST /api/v1/server/reinitialize` | - | - | yes |
 | `POST /api/v1/session` | - | - | - |
 | `PUT /api/v1/settings` | Settings, MessageIndexing, Directories, BackupSettings, Cache, AntiVirus | `add_delivered_to_header`, `allow_incorrect_line_endings`, `allow_smtp_auth_plain`, `auto_ban_on_logon_failure`, `create_default_special_use_folders`, `default_domain`, `deny_mail_from_null`, `disconnect_invalid_clients`, `host_name`, `imap_acl_enabled`, `imap_hierarchy_delimiter`, `imap_idle_enabled`, `imap_master_user`, `imap_public_folder_name`, `imap_quota_enabled`, `imap_sasl_initial_response_enabled`, `imap_sasl_plain_enabled`, `imap_sort_enabled`, `ipv6_preferred`, `log_imap_conversations`, `log_pop3_conversations`, `log_smtp_conversations`, `max_asynchronous_threads`, `max_delivery_threads`, `max_imap_connections`, `max_invalid_logon_attempts`, `max_message_size_kb`, `max_number_of_invalid_commands`, `max_number_of_mx_hosts`, `max_pop3_connections`, `max_smtp_connections`, `max_smtp_recipients_in_batch`, `minutes_before_reset`, `minutes_to_ban`, `mirror_email_address`, `rewrite_envelope_from_when_forwarding`, `rule_loop_limit`, `service_imap`, `service_pop3`, `service_smtp`, `smtp_connection_security`, `smtp_delivery_bind_to_ip`, `smtp_minutes_between_try`, `smtp_no_of_tries`, `smtp_relayer`, `smtp_relayer_connection_security`, `smtp_relayer_password`, `smtp_relayer_port`, `smtp_relayer_requires_authentication`, `smtp_relayer_username`, `ssl_cipher_list`, `tcpip_threads`, `tls_prefer_server_ciphers`, `tls_prioritize_chacha`, `tls_version_10_enabled`, `tls_version_11_enabled`, `tls_version_12_enabled`, `tls_version_13_enabled`, `verify_remote_ssl_certificate`, `welcome_imap`, `welcome_pop3`, `welcome_smtp`, `worker_thread_priority` | yes |
 | `PUT /api/v1/settings/antispam` | AntiSpam | `add_header_reason`, `add_header_spam`, `arc_filtering_enabled`, `arc_trusted_sealers`, `bypass_greylisting_on_mail_from_mx`, `bypass_greylisting_on_spf_success`, `check_host_in_helo`, `check_host_in_helo_score`, `check_mx_records`, `check_mx_records_score`, `check_ptr`, `check_ptr_score`, `dkim_verification_enabled`, `dkim_verification_failure_score`, `dmarc_enabled`, `dmarc_failure_score`, `greylisting_enabled`, `greylisting_final_delete`, `greylisting_initial_delay`, `greylisting_initial_delete`, `maximum_message_size_kb`, `prepend_subject`, `prepend_subject_text`, `spam_delete_threshold`, `spam_mark_threshold`, `spamassassin_enabled`, `spamassassin_host`, `spamassassin_merge_score`, `spamassassin_port`, `spamassassin_score`, `tarpit_count`, `tarpit_delay`, `use_spf`, `use_spf_score` | yes |
+| `PUT /api/v1/settings/antivirus` | AntiVirus | `action`, `attachment_blocking_enabled`, `clamav_enabled`, `clamav_host`, `clamav_port`, `clamwin_db_folder`, `clamwin_enabled`, `clamwin_executable`, `custom_scanner_enabled`, `custom_scanner_executable`, `custom_scanner_return_value`, `maximum_message_size_kb`, `notify_receiver`, `notify_sender` | yes |
 | `PUT /api/v1/settings/backup` | BackupSettings, Backup | `backup_domains`, `backup_messages`, `backup_settings`, `compress`, `destination` | - |
+| `PUT /api/v1/settings/cache` | ? | `enabled` | - |
+| `POST /api/v1/settings/cache/clear` | ? | - | - |
+| `PUT /api/v1/settings/indexing` | ? | `enabled` | - |
+| `POST /api/v1/settings/indexing/clear` | ? | - | - |
+| `POST /api/v1/settings/indexing/index` | ? | - | - |
 | `PUT /api/v1/settings/ini/{name}` | - | `from`, `to`, `value` | - |
 | `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip` | yes |
 | `POST /api/v1/settings/logon-failures/clear` | - | - | - |
@@ -749,7 +755,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | - |
 | `POST /api/v1/settings/scripting/check` | Scripting | - | - |
 | `POST /api/v1/settings/scripting/reload` | Scripting | - | - |
-| `POST /api/v1/sieve/evaluate` | - | `address`, `body`, `message`, `script` | - |
+| `POST /api/v1/sieve/evaluate` | - | `action`, `address`, `body`, `message`, `script` | - |
 | `POST /api/v1/update/check` | - | - | - |
 | `POST /api/v1/update/download` | - | - | - |
 | `POST /api/v1/update/install` | - | - | - |
@@ -762,7 +768,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `domains` | `DELETE /api/v1/accounts/{}`, `GET /api/v1/domains`, `GET /api/v1/domains/{}/accounts`, `POST /api/v1/domains/{}/accounts` |
 | `queue` | `GET /api/v1/queue`, `DELETE /api/v1/queue/{}`, `POST /api/v1/queue/{}/retry` |
 | `tlsa` | `GET /api/v1/tlsa` |
-| `settings` | `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/logging`, `PUT /api/v1/settings/logging` |
+| `settings` | `GET /api/v1/openapi.json`, `GET /api/v1/settings`, `PUT /api/v1/settings`, `GET /api/v1/settings/antispam`, `PUT /api/v1/settings/antispam`, `GET /api/v1/settings/antivirus`, `PUT /api/v1/settings/antivirus`, `GET /api/v1/settings/logging`, `PUT /api/v1/settings/logging` |
 | `rules` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `GET /api/v1/rules`, `POST /api/v1/rules`, `DELETE /api/v1/rules/{}`, `PUT /api/v1/rules/{}` |
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |

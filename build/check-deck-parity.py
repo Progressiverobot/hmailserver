@@ -92,6 +92,7 @@ PATH_SCOPE = {
     'fetch-accounts': ['FetchAccount'],
     'settings': ['Settings'],
     'antispam': ['AntiSpam'],
+    'antivirus': ['AntiVirus'],
     'logging': ['Logging'],
     'scripting': ['Scripting'],
     'backup': ['BackupSettings', 'Backup'],
