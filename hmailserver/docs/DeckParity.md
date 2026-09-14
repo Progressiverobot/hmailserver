@@ -9,13 +9,13 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 286 |
+| of them writable over REST | 306 |
 | of them reachable from a Deck view | 167 |
-| missing over REST | 49 |
-| over REST but not reached by any Deck view | 119 |
+| missing over REST | 29 |
+| over REST but not reached by any Deck view | 139 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 171, 78 of them writes |
+| REST routes (path and method) | 191, 88 of them writes |
 | Deck views | 10 |
 
 ## Missing over REST, by interface
@@ -23,12 +23,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
 | Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
-| DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
-| SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
-| WhiteListAddress | 4 | `Description`, `EmailAddress`, `LowerIPAddress`, `UpperIPAddress` |
 | IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
-| BlockedSender | 3 | `Address`, `Description`, `Score` |
-| IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | SecurityRange | 2 | `Expires`, `ExpiresTime` |
 | AppPassword | 2 | `Active`, `Name` |
 | BlockedAttachment | 2 | `Description`, `Wildcard` |
@@ -51,8 +46,13 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | SecurityRange | 18 | `AllowDeliveryFromLocalToLocal`, `AllowDeliveryFromLocalToRemote`, `AllowDeliveryFromRemoteToLocal`, `AllowDeliveryFromRemoteToRemote`, `AllowIMAPConnections`, `AllowPOP3Connections`, `AllowSMTPConnections`, `EnableAntiVirus`, `EnableSpamProtection`, `LowerIP`, `Name`, `Priority`, `RequireSMTPAuthExternalToExternal`, `RequireSMTPAuthExternalToLocal`, `RequireSMTPAuthLocalToExternal`, `RequireSMTPAuthLocalToLocal`, `RequireSSLTLSForAuth`, `UpperIP` |
 | FetchAccount | 13 | `ConnectionSecurity`, `DaysToKeepMessages`, `Enabled`, `MinutesBetweenFetch`, `MirrorFolders`, `Name`, `Password`, `Port`, `ServerAddress`, `ServerType`, `UseAntiSpam`, `UseAntiVirus`, `Username` |
 | DistributionList | 7 | `Active`, `Address`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSMTPAuth`, `RequireSenderAddress` |
+| DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | BackupSettings | 5 | `BackupDomains`, `BackupMessages`, `BackupSettings`, `CompressDestinationFiles`, `Destination` |
+| SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
+| WhiteListAddress | 4 | `Description`, `EmailAddress`, `LowerIPAddress`, `UpperIPAddress` |
 | Alias | 3 | `Active`, `Name`, `Value` |
+| BlockedSender | 3 | `Address`, `Description`, `Score` |
+| IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | Scripting | 2 | `Enabled`, `Language` |
 | DomainAlias | 1 | `AliasName` |
 | Cache | 1 | `Enabled` |
@@ -332,11 +332,11 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | CollectionSpecs | - | - |
-| `DNSHost` | CollectionSpecs | - | - |
-| `ExpectedResult` | CollectionSpecs | - | - |
-| `RejectMessage` | CollectionSpecs | - | - |
-| `Score` | CollectionSpecs | - | - |
+| `Active` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
+| `DNSHost` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
+| `ExpectedResult` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
+| `RejectMessage` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
+| `Score` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | - |
 
 ### RouteAddress
 
@@ -448,11 +448,11 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | CollectionSpecs | - | - |
-| `DNSHost` | CollectionSpecs | - | - |
-| `ExpectedResult` | CollectionSpecs | - | - |
-| `RejectMessage` | CollectionSpecs | - | - |
-| `Score` | CollectionSpecs | - | - |
+| `Active` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
+| `DNSHost` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
+| `ExpectedResult` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
+| `RejectMessage` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
+| `Score` | CollectionSpecs | `POST /api/v1/surbl-servers` (setter)<br>`PUT /api/v1/surbl-servers/{id}` (setter) | - |
 
 ### AntiSpam
 
@@ -530,18 +530,18 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | - | - |
-| `EmailAddress` | CollectionSpecs | - | - |
-| `LowerIPAddress` | CollectionSpecs | - | - |
-| `UpperIPAddress` | CollectionSpecs | - | - |
+| `Description` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
+| `EmailAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
+| `LowerIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
+| `UpperIPAddress` | CollectionSpecs | `POST /api/v1/whitelist-addresses` (setter)<br>`PUT /api/v1/whitelist-addresses/{id}` (setter) | - |
 
 ### BlockedSender
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Address` | CollectionSpecs | - | - |
-| `Description` | CollectionSpecs | - | - |
-| `Score` | CollectionSpecs | - | - |
+| `Address` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
+| `Description` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
+| `Score` | CollectionSpecs | `POST /api/v1/blocked-senders` (setter)<br>`PUT /api/v1/blocked-senders/{id}` (setter) | - |
 
 ### SSLCertificate
 
@@ -577,9 +577,9 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `LowerIP` | UtilityViews | - | - |
-| `Name` | UtilityViews | - | - |
-| `UpperIP` | UtilityViews | - | - |
+| `LowerIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | - |
+| `Name` | UtilityViews | `POST /api/v1/incoming-relays` (setter)<br>`PUT /api/v1/incoming-relays/{id}` (setter) | - |
+| `UpperIP` | UtilityViews | `POST /api/v1/incoming-relays` (name)<br>`PUT /api/v1/incoming-relays/{id}` (name) | - |
 
 ### MessageIndexing
 
@@ -687,13 +687,19 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
 | `POST /api/v1/backup` | BackupSettings, Backup | - | - |
+| `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `score` | - |
+| `PUT /api/v1/blocked-senders/{id}` | BlockedSender | `address`, `body`, `description`, `field`, `message`, `score`, `value` | - |
 | `POST /api/v1/certificates` | SSLCertificate | `certificate_file`, `name`, `private_key_file`, `private_key_password` | yes |
+| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score` | - |
+| `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | - |
 | `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | - |
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
 | `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | - |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | - |
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | - |
+| `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | - |
+| `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `upper_ip`, `value` | - |
 | `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | - |
 | `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | - |
 | `PUT /api/v1/lists/{address}` | DistributionList | `active`, `bounce_address`, `domain_members`, `field`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to`, `value` | - |
@@ -754,9 +760,13 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/settings/scripting/check` | Scripting | - | - |
 | `POST /api/v1/settings/scripting/reload` | Scripting | - | - |
 | `POST /api/v1/sieve/evaluate` | - | `action`, `address`, `body`, `message`, `script` | - |
+| `POST /api/v1/surbl-servers` | SURBLServer | `active`, `dns_host`, `domains`, `expected_result`, `message`, `reject_message`, `score` | - |
+| `PUT /api/v1/surbl-servers/{id}` | SURBLServer | `active`, `body`, `dns_host`, `domains`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
 | `POST /api/v1/update/check` | - | - | - |
 | `POST /api/v1/update/download` | - | - | - |
 | `POST /api/v1/update/install` | - | - | - |
+| `POST /api/v1/whitelist-addresses` | WhiteListAddress | `address`, `description`, `email_address`, `lower_ip`, `message`, `upper_ip` | - |
+| `PUT /api/v1/whitelist-addresses/{id}` | WhiteListAddress | `address`, `body`, `description`, `email_address`, `field`, `lower_ip`, `message`, `upper_ip`, `value` | - |
 
 ## Deck views
 

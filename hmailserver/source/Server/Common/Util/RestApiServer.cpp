@@ -1548,6 +1548,27 @@ namespace HM
             return HandleDeleteList_(String(route.identifier));
          case RouteListUpdate:
             return HandleUpdateList_(String(route.identifier), GetRequestBody_(request));
+         case RouteDnsBlackListList:
+         case RouteDnsBlackListCreate:
+         case RouteDnsBlackListUpdate:
+         case RouteDnsBlackListDelete:
+         case RouteSurblServerList:
+         case RouteSurblServerCreate:
+         case RouteSurblServerUpdate:
+         case RouteSurblServerDelete:
+         case RouteWhiteListAddressList:
+         case RouteWhiteListAddressCreate:
+         case RouteWhiteListAddressUpdate:
+         case RouteWhiteListAddressDelete:
+         case RouteBlockedSenderList:
+         case RouteBlockedSenderCreate:
+         case RouteBlockedSenderUpdate:
+         case RouteBlockedSenderDelete:
+         case RouteIncomingRelayList:
+         case RouteIncomingRelayCreate:
+         case RouteIncomingRelayUpdate:
+         case RouteIncomingRelayDelete:
+            return HandleAntiSpamLists_(route.kind, route.record_id, GetRequestBody_(request));
          case RouteCertificateList:
             return HandleListCertificates_();
          case RouteDkimGet:
@@ -2767,6 +2788,54 @@ namespace HM
             return;
          }
       }
+
+      // The five small collections (RestApiAntiSpamLists.cpp), each in the
+      // IP range's shape: a list and a create at the collection's path, an
+      // update and a delete at /{id}.
+      {
+         struct SmallCollection
+         {
+            const char *path;
+            RouteKind list;
+            RouteKind create;
+            RouteKind update;
+            RouteKind remove;
+         };
+         static const SmallCollection collections[] =
+         {
+            { "/api/v1/dns-blacklists", RouteDnsBlackListList, RouteDnsBlackListCreate, RouteDnsBlackListUpdate, RouteDnsBlackListDelete },
+            { "/api/v1/surbl-servers", RouteSurblServerList, RouteSurblServerCreate, RouteSurblServerUpdate, RouteSurblServerDelete },
+            { "/api/v1/whitelist-addresses", RouteWhiteListAddressList, RouteWhiteListAddressCreate, RouteWhiteListAddressUpdate, RouteWhiteListAddressDelete },
+            { "/api/v1/blocked-senders", RouteBlockedSenderList, RouteBlockedSenderCreate, RouteBlockedSenderUpdate, RouteBlockedSenderDelete },
+            { "/api/v1/incoming-relays", RouteIncomingRelayList, RouteIncomingRelayCreate, RouteIncomingRelayUpdate, RouteIncomingRelayDelete },
+         };
+
+         for (const SmallCollection &collection : collections)
+         {
+            const AnsiString base = collection.path;
+
+            if (path == base)
+            {
+               if (method == "GET")
+                  route.kind = collection.list;
+               else if (method == "POST")
+                  route.kind = collection.create;
+               return;
+            }
+
+            if ((method == "PUT" || method == "DELETE") && path.StartsWith(base + "/"))
+            {
+               AnsiString idPart = path.Mid(base.GetLength() + 1);
+               __int64 id = 0;
+               if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+               {
+                  route.kind = method == "PUT" ? collection.update : collection.remove;
+                  route.record_id = id;
+               }
+               return;
+            }
+         }
+      }
       if (path.StartsWith(domainsPrefix) && path.EndsWith("/lists"))
       {
          AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
@@ -3188,6 +3257,21 @@ namespace HM
       case RouteListCreate:
       case RouteListDelete:
       case RouteListUpdate:
+      case RouteDnsBlackListCreate:
+      case RouteDnsBlackListUpdate:
+      case RouteDnsBlackListDelete:
+      case RouteSurblServerCreate:
+      case RouteSurblServerUpdate:
+      case RouteSurblServerDelete:
+      case RouteWhiteListAddressCreate:
+      case RouteWhiteListAddressUpdate:
+      case RouteWhiteListAddressDelete:
+      case RouteBlockedSenderCreate:
+      case RouteBlockedSenderUpdate:
+      case RouteBlockedSenderDelete:
+      case RouteIncomingRelayCreate:
+      case RouteIncomingRelayUpdate:
+      case RouteIncomingRelayDelete:
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
@@ -3378,6 +3462,26 @@ namespace HM
       case RouteIpRangeList:
       case RouteIpRangeCreate:
       case RouteIpRangeDelete:
+      case RouteDnsBlackListList:
+      case RouteDnsBlackListCreate:
+      case RouteDnsBlackListUpdate:
+      case RouteDnsBlackListDelete:
+      case RouteSurblServerList:
+      case RouteSurblServerCreate:
+      case RouteSurblServerUpdate:
+      case RouteSurblServerDelete:
+      case RouteWhiteListAddressList:
+      case RouteWhiteListAddressCreate:
+      case RouteWhiteListAddressUpdate:
+      case RouteWhiteListAddressDelete:
+      case RouteBlockedSenderList:
+      case RouteBlockedSenderCreate:
+      case RouteBlockedSenderUpdate:
+      case RouteBlockedSenderDelete:
+      case RouteIncomingRelayList:
+      case RouteIncomingRelayCreate:
+      case RouteIncomingRelayUpdate:
+      case RouteIncomingRelayDelete:
       case RouteCertificateList:
       case RouteRuleList:
       case RouteLogList:
@@ -10240,6 +10344,7 @@ namespace HM
       openApiJson += OpenApiRoutesPaths_();
       openApiJson += OpenApiFetchAccountsPaths_();
       openApiJson += OpenApiAdministrationPaths_();
+      openApiJson += OpenApiAntiSpamListsPaths_();
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += openApiTail;
 

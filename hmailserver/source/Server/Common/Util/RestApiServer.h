@@ -330,6 +330,28 @@ namespace HM
          // The distribution list's update, scoped to the address's domain as
          // its delete is.
          RouteListUpdate,
+         // The five small collections of RestApiAntiSpamLists.cpp, each a
+         // list, a create, an update and a delete; all server-wide.
+         RouteDnsBlackListList,
+         RouteDnsBlackListCreate,
+         RouteDnsBlackListUpdate,
+         RouteDnsBlackListDelete,
+         RouteSurblServerList,
+         RouteSurblServerCreate,
+         RouteSurblServerUpdate,
+         RouteSurblServerDelete,
+         RouteWhiteListAddressList,
+         RouteWhiteListAddressCreate,
+         RouteWhiteListAddressUpdate,
+         RouteWhiteListAddressDelete,
+         RouteBlockedSenderList,
+         RouteBlockedSenderCreate,
+         RouteBlockedSenderUpdate,
+         RouteBlockedSenderDelete,
+         RouteIncomingRelayList,
+         RouteIncomingRelayCreate,
+         RouteIncomingRelayUpdate,
+         RouteIncomingRelayDelete,
          RouteOpenApi
       };
 
@@ -834,6 +856,12 @@ namespace HM
       HttpResponse HandleUpdateList_(const String &address, const AnsiString &requestBody);
       static AnsiString ListEntryJson_(const std::shared_ptr<DistributionList> &list);
       static AnsiString OpenApiAdministrationPaths_();
+      // The five small collections - DNS black lists, SURBL servers,
+      // white-list addresses, blocked senders and incoming relays - as
+      // resources (RestApiAntiSpamLists.cpp): one entry point for the twenty
+      // routes, the kind saying which collection and which verb.
+      HttpResponse HandleAntiSpamLists_(RouteKind kind, __int64 id, const AnsiString &requestBody);
+      static AnsiString OpenApiAntiSpamListsPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);
