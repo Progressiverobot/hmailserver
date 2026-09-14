@@ -395,6 +395,8 @@ $("#content").addEventListener("click",e=>{
   const b=e.target.closest("button[data-act]");if(!b)return;
   const d=b.dataset;
   if(d.act==="accounts")showAccounts(d.domain);
+  else if(d.act==="accountedit")openAccount(d.address,d.domain);
+  else if(d.act==="accountsave")saveAccount();
   else if(d.act==="domains"){editing=null;render();}
   else if(d.act==="domainnew")createDomain();
   else if(d.act==="domainedit")openDomain(d.name);
@@ -696,6 +698,7 @@ async function renderDomains(){
   await loadSpec();
   cache.domains=asList(await api("/api/v1/domains"),"domains");
   if(editing&&editing.kind==="domain"){renderDomainEditor();return;}
+  if(editing&&editing.kind==="account"){await openAccount(editing.address,editing.domain);return;}
   const rows=cache.domains.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
@@ -834,12 +837,15 @@ async function deleteDomainAlias(name){
 }
 
 async function showAccounts(domain){
+  editing=null;
   const a=await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts");
   const list=asList(a,"accounts");
   const rows=list.map(x=>`
     <tr><td><b>${escHtml(x.address)}</b></td>
         <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
-        <td style="text-align:right"><button class="btn danger sm" data-act="del" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button></td></tr>`).join("");
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="accountedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Edit</button>
+          <button class="btn danger sm" data-act="del" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button></td></tr>`).join("");
   $("#content").innerHTML=`
   <div class="view">
     <button class="btn ghost sm" data-act="domains">‹ All domains</button>
@@ -871,10 +877,109 @@ async function addAccount(domain){
 
 async function delAccount(address,domain){
   if(!confirm("Delete "+address+"?"))return;
-  setErr("err_account","");
+  const where=editing&&editing.kind==="account"?"err_accountedit":"err_account";
+  setErr(where,"");
   try{await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"DELETE"});
     toast("Deleted "+address);showAccounts(domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);}
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
+}
+
+/* ---------- The account editor ----------
+   Every field PUT /api/v1/accounts/{address} takes, which the route's schema
+   types - the admin level's three words among them - drawn in the groups the
+   desktop Control Panel's account dialog has, with its captions, since the
+   document gives the keys no wording; a key the document gains later falls
+   into a group of its own rather than out of sight. The long texts - the two
+   signatures, the reply, the Sieve script - are text areas. The account is
+   read whole from GET /api/v1/accounts/{address}, and Save sends only the
+   keys whose control differs from that record, a filled password with them,
+   then reads the account again and redraws from what the server holds. The
+   external accounts, app passwords, second factor, rules and folders of the
+   desktop dialog are not here: the external accounts have their own view,
+   and the rest are not on the administrative API. */
+const ACCOUNT_GROUPS=[
+  {title:"General",keys:["active","first_name","last_name","password","max_size_mb","admin_level","message_retention_days"]},
+  {title:"Forwarding",keys:["forward_enabled","forward_address","forward_keep_original","forward_abort_spam_flagged"]},
+  {title:"Auto-reply",keys:["vacation_enabled","vacation_subject","vacation_message","vacation_expires","vacation_expires_date","vacation_begin_date","vacation_abort_spam_flagged"]},
+  {title:"Spam",keys:["antispam_enabled","spam_mark_threshold","spam_delete_threshold"]},
+  {title:"Signature",keys:["signature_enabled","signature_plain_text","signature_html"]},
+  {title:"Sieve",keys:["sieve_script"]},
+  {title:"Directory",keys:["ad_enabled","ad_domain","ad_username"]}
+];
+const ACCOUNT_HINTS={
+  active:"Account enabled: it receives mail and can sign in.",first_name:"The person's first name.",last_name:"The person's last name.",
+  password:"A new password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it.",
+  max_size_mb:"Maximum mailbox size in MB; 0 is unlimited.",
+  admin_level:"user, domain or server. Who is asking decides what it may become: a key restricted to named domains may set user or domain only.",
+  message_retention_days:"Delete messages older than this many days; -1 keeps forever, 0 follows the domain.",
+  forward_enabled:"Forward incoming mail.",forward_address:"The address the mail is forwarded to.",forward_keep_original:"Keep the original message in this mailbox.",
+  forward_abort_spam_flagged:"Do not forward messages flagged as spam.",
+  vacation_enabled:"Send an automatic reply (vacation message).",vacation_subject:"The reply's subject.",vacation_message:"The reply's text.",
+  vacation_expires:"Stop sending replies after a date.",vacation_expires_date:"YYYY-MM-DD; empty means today.",vacation_begin_date:"YYYY-MM-DD; empty means today.",
+  vacation_abort_spam_flagged:"Do not reply to messages flagged as spam.",
+  antispam_enabled:"Apply the server's spam filtering to this account.",spam_mark_threshold:"The score at which a message is marked as spam; -1 is the server's own value.",
+  spam_delete_threshold:"The score at which a message is deleted; -1 is the server's own value.",
+  signature_enabled:"Add a signature to outgoing messages.",signature_plain_text:"The plain-text signature.",signature_html:"The HTML signature.",
+  sieve_script:"The account's active Sieve filter, parsed before it is stored as the portal and ManageSieve parse one; empty removes it.",
+  ad_enabled:"Check this password against Windows (Active Directory, or a local Windows account).",ad_domain:"The Windows domain.",ad_username:"The Windows user name."
+};
+const ACCOUNT_LONG=["signature_plain_text","signature_html","vacation_message","sieve_script"];
+function accountProps(){
+  const props=properties("/api/v1/accounts/{address}","put"), out={};
+  Object.keys(props).forEach(k=>{
+    out[k]=Object.assign({},props[k]);
+    if(!out[k].description&&ACCOUNT_HINTS[k])out[k].description=ACCOUNT_HINTS[k];
+    if(ACCOUNT_LONG.indexOf(k)>=0&&!out[k].format)out[k].format="multiline";
+  });
+  return out;
+}
+async function openAccount(address,domain){
+  setErr("err_account","");
+  let record;
+  try{record=await api("/api/v1/accounts/"+encodeURIComponent(address));}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);return;}
+  editing={kind:"account",address:address,domain:domain,values:record};
+  renderAccountEditor();
+}
+function renderAccountEditor(){
+  const props=accountProps();
+  const cards=groupedKeys(ACCOUNT_GROUPS,props).map(g=>`
+    <div class="sect"><h2>${escHtml(g.title)}</h2>
+      <div class="card flat"><div class="form">${formHtml("acct",pick(props,g.keys),editing.values,{passwordHint:"left unchanged unless filled"})}</div></div></div>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(editing.domain)}">‹ Accounts of ${escHtml(editing.domain)}</button>
+    <div class="sect"><h2>Account ${escHtml(editing.address)}</h2>
+      <div class="card flat"><p class="note">${escHtml(operation("/api/v1/accounts/{address}","put").description||"")}</p></div></div>
+    ${cards}
+    <div class="sect"><div class="row">
+      <button class="btn" data-act="accountsave">Save account</button>
+      <button class="btn ghost" data-act="accounts" data-domain="${escHtml(editing.domain)}">Cancel</button>
+      <button class="btn danger" data-act="del" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">Delete account</button>
+      <div class="err" id="err_accountedit"></div>
+    </div></div>
+  </div>`;
+}
+async function saveAccount(){
+  setErr("err_accountedit","");
+  const props=accountProps();
+  let all;
+  try{all=readForm("acct",props,{});}catch(e){setErr("err_accountedit",e.message);return;}
+  const body={};
+  Object.keys(all).forEach(k=>{
+    if(all[k]===undefined)return;
+    if(isPassword(k,props[k])){body[k]=all[k];return;}
+    if(all[k]!==editing.values[k])body[k]=all[k];
+  });
+  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  const address=editing.address;
+  try{
+    await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"PUT",body:JSON.stringify(body)});
+    // The account as the server holds it now, read back rather than taken
+    // from the answer, and the editor redrawn from that.
+    editing.values=await api("/api/v1/accounts/"+encodeURIComponent(address));
+    toast("Account saved");
+    renderAccountEditor();
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_accountedit",e.message);}
 }
 
 /* ---------- Delivery queue ---------- */

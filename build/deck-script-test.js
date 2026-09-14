@@ -445,6 +445,30 @@ const DOMAIN_KEYS = ['name', 'active', 'postmaster', 'max_message_size_kb', 'max
 const DOMAIN_PUT = 'Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message. A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.';
 const DOMAINS_POST = 'Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.';
 
+// The account's update schema as RestApiRoutes.cpp emits it - every field
+// typed, the admin level's three words - and its description; the GET answers
+// the same keys less the password.
+const ACCOUNT_PROPS = {
+   active: { type: 'boolean' }, password: { type: 'string' }, max_size_mb: { type: 'integer' }, first_name: { type: 'string' }, last_name: { type: 'string' },
+   forward_enabled: { type: 'boolean' }, forward_address: { type: 'string' }, forward_keep_original: { type: 'boolean' },
+   signature_enabled: { type: 'boolean' }, signature_plain_text: { type: 'string' }, signature_html: { type: 'string' },
+   admin_level: { type: 'string', enum: ['user', 'domain', 'server'] },
+   antispam_enabled: { type: 'boolean' }, spam_mark_threshold: { type: 'integer' }, spam_delete_threshold: { type: 'integer' },
+   forward_abort_spam_flagged: { type: 'boolean' }, message_retention_days: { type: 'integer' },
+   vacation_enabled: { type: 'boolean' }, vacation_subject: { type: 'string' }, vacation_message: { type: 'string' },
+   vacation_expires: { type: 'boolean' }, vacation_expires_date: { type: 'string' }, vacation_begin_date: { type: 'string' }, vacation_abort_spam_flagged: { type: 'boolean' },
+   ad_enabled: { type: 'boolean' }, ad_domain: { type: 'string' }, ad_username: { type: 'string' }, sieve_script: { type: 'string' }
+};
+const ACCOUNT_PUT = 'Any subset of active, password, max_size_mb, first_name, last_name, forward_enabled, forward_address, forward_keep_original, signature_enabled, signature_plain_text, signature_html, admin_level (user, domain or server), antispam_enabled, spam_mark_threshold and spam_delete_threshold (-1 is the server\'s own value), forward_abort_spam_flagged, message_retention_days (-1 keeps forever, 0 follows the domain), vacation_enabled, vacation_subject, vacation_message, vacation_expires, vacation_expires_date and vacation_begin_date (YYYY-MM-DD; empty means today, as the Control Panel takes them), vacation_abort_spam_flagged, ad_enabled, ad_domain, ad_username and sieve_script; a field the body does not name is left as it is, and an unknown field is refused by name. Scoped to the address\'s domain.';
+// An account as AccountEntryJson answers it: every field, never the password.
+function accountRecord(address, active) {
+   return { address, active, max_size_mb: 0, first_name: '', last_name: '', forward_enabled: false, forward_address: '', forward_keep_original: false,
+      signature_enabled: false, signature_plain_text: '', signature_html: '', vacation_enabled: false, vacation_subject: '', vacation_message: '',
+      vacation_expires: false, vacation_expires_date: '', message_retention_days: 0, admin_level: 'user', antispam_enabled: true,
+      spam_mark_threshold: -1, spam_delete_threshold: -1, forward_abort_spam_flagged: false, vacation_begin_date: '', vacation_abort_spam_flagged: false,
+      ad_enabled: false, ad_domain: '', ad_username: '', sieve_script: '' };
+}
+
 // The IP range's schema as the ports and certificates literal emits it, every
 // field typed; the update takes any subset of the same keys.
 const RANGE_PROPS = {
@@ -652,6 +676,11 @@ const spec = {
          post: { summary: 'Add a domain alias', description: 'Body: name.', requestBody: body({ name: { type: 'string' } }, ['name']) }
       },
       '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } },
+      '/api/v1/accounts/{address}': {
+         get: { summary: 'Read an account', description: 'The account whole, as the update answers it, less the password, the hash and the TOTP secret. Scoped to the address\'s domain.' },
+         put: { summary: 'Update an account', description: ACCOUNT_PUT, requestBody: body(ACCOUNT_PROPS) },
+         delete: { summary: 'Delete an account' }
+      },
       '/api/v1/ipranges': {
          get: { summary: 'List the IP ranges', description: 'Server-wide; refused for domain-restricted keys.' },
          post: { summary: 'Create an IP range', requestBody: body(RANGE_PROPS, ['name', 'lower', 'upper']) }
@@ -701,8 +730,9 @@ const state = {
       'second.example': []
    },
    accounts: {
-      'example.com': [{ address: 'anna@example.com', active: true }, { address: 'bob@example.com', active: false }],
-      [HOSTILE]: [{ address: 'x@' + HOSTILE, active: true }],
+      'example.com': [Object.assign(accountRecord('anna@example.com', true), { first_name: 'Anna', admin_level: 'domain', sieve_script: 'require ["fileinto"];\r\nif header :contains "subject" "[SPAM]" { fileinto "Junk"; }' }),
+         accountRecord('bob@example.com', false)],
+      [HOSTILE]: [accountRecord('x@' + HOSTILE, true)],
       'second.example': []
    },
    fetchAccounts: {
@@ -835,16 +865,36 @@ function answer(method, path, headers, raw) {
    if (/^\/api\/v1\/domains\/[^/]+\/accounts$/.test(path)) {
       const domain = segment(path, 4);
       if (!(domain in state.accounts)) { return json(404, { error: 'domain not found' }); }
-      if (method === 'GET') { return json(200, state.accounts[domain]); }
+      // The listing carries the two fields HandleListAccounts_ emits.
+      if (method === 'GET') { return json(200, state.accounts[domain].map((a) => ({ address: a.address, active: a.active }))); }
       if (method === 'POST') {
-         state.accounts[domain].push({ address: parsed.address, active: true });
+         state.accounts[domain].push(accountRecord(parsed.address, true));
          return json(201, { address: parsed.address, active: true });
       }
    }
-   if (/^\/api\/v1\/accounts\/[^/]+$/.test(path) && method === 'DELETE') {
+   if (/^\/api\/v1\/accounts\/[^/]+$/.test(path)) {
       const address = segment(path, 4);
-      Object.keys(state.accounts).forEach((d) => { state.accounts[d] = state.accounts[d].filter((a) => a.address !== address); });
-      return json(200, { deleted: true });
+      const domain = Object.keys(state.accounts).filter((d) => state.accounts[d].some((a) => a.address === address))[0];
+      if (method === 'DELETE') {
+         Object.keys(state.accounts).forEach((d) => { state.accounts[d] = state.accounts[d].filter((a) => a.address !== address); });
+         return json(200, { deleted: true });
+      }
+      if (!domain) { return json(404, { error: 'account not found' }); }
+      const record = state.accounts[domain].filter((a) => a.address === address)[0];
+      if (method === 'GET') { return json(200, record); }
+      if (method === 'PUT') {
+         // As HandleUpdateAccount_ reads it: nothing to update refused, an
+         // unknown field refused by name, the password kept aside.
+         if (!Object.keys(parsed).length) { return json(400, { error: 'nothing to update' }); }
+         for (const key of Object.keys(parsed)) {
+            if (!(key in ACCOUNT_PROPS)) { return json(400, { error: 'unknown field: ' + key }); }
+         }
+         Object.keys(parsed).forEach((key) => {
+            if (key === 'password') { secrets.account_password = parsed[key]; return; }
+            record[key] = parsed[key];
+         });
+         return json(200, record);
+      }
    }
 
    if (/^\/api\/v1\/accounts\/[^/]+\/fetch-accounts(\/\d+(\/download)?)?$/.test(path)) {
@@ -1237,6 +1287,58 @@ async function main() {
    await flush();
    check('yes deletes by address', called(before, 'DELETE', '/api/v1/accounts/bob%40example.com').length === 1, paths(before));
    check('and the listing is read again without the account', rows().length === 2 && rows().every((r) => r.textContent.indexOf('bob@') < 0));
+
+   // ---- the account editor: every key of the update, as the desktop dialog groups them
+   before = requests.length;
+   click(act('accountedit', { address: 'anna@example.com' }));
+   await flush();
+   check('Edit reads the account whole', called(before, 'GET', '/api/v1/accounts/anna%40example.com').length === 1 && content().querySelector('h2').textContent.indexOf('anna@example.com') >= 0, paths(before));
+   const accountHeadings = content().querySelectorAll('h2').map((h) => h.textContent.trim());
+   check('the editor is grouped as the desktop dialog is', ['General', 'Forwarding', 'Auto-reply', 'Spam', 'Signature', 'Sieve', 'Directory'].every((g) => accountHeadings.indexOf(g) >= 0) && accountHeadings.indexOf('Other') < 0,
+      JSON.stringify(accountHeadings));
+   const drawnAccount = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('acct_') === 0).map((id) => id.slice(5)).sort();
+   check('every key of the update has a control, and nothing else', JSON.stringify(drawnAccount) === JSON.stringify(Object.keys(ACCOUNT_PROPS).sort()), JSON.stringify(drawnAccount));
+   check('the values are the account\'s own: the name, the level as a select of three words, the script as a text area, the password box empty',
+      document.getElementById('acct_first_name').value === 'Anna' && document.getElementById('acct_admin_level').tagName === 'SELECT' &&
+      document.getElementById('acct_admin_level').querySelectorAll('option').map((o) => o.attributes.value).join(',') === 'user,domain,server' && document.getElementById('acct_admin_level').value === 'domain' &&
+      document.getElementById('acct_sieve_script').tagName === 'TEXTAREA' && document.getElementById('acct_sieve_script').value.indexOf('fileinto') >= 0 &&
+      document.getElementById('acct_password').type === 'password' && document.getElementById('acct_password').value === '' && document.getElementById('acct_spam_mark_threshold').value === '-1' &&
+      document.getElementById('acct_forward_abort_spam_flagged').closest('.fr').textContent.indexOf('Do not forward messages flagged as spam') >= 0);
+   check('the route\'s own description is the note', content().textContent.indexOf('a field the body does not name is left as it is') >= 0);
+   before = requests.length;
+   click(act('accountsave'));
+   await flush();
+   check('saving with nothing changed sends nothing', called(before, 'PUT', /accounts/).length === 0 && toastText() === 'Nothing changed', toastText());
+   setChecked('acct_forward_enabled', true);
+   setValue('acct_forward_address', 'anna@elsewhere.example');
+   setValue('acct_message_retention_days', '90');
+   before = requests.length;
+   click(act('accountsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/accounts/anna%40example.com');
+   check('saving sends only the keys that changed, numbers as numbers', JSON.stringify(put) === '{"forward_enabled":true,"forward_address":"anna@elsewhere.example","message_retention_days":90}', JSON.stringify(put));
+   check('then reads the account again and stays in the editor with what the server holds', called(before, 'GET', '/api/v1/accounts/anna%40example.com').length === 1 &&
+      document.getElementById('acct_forward_address').value === 'anna@elsewhere.example' && document.getElementById('acct_message_retention_days').value === '90' && toastText() === 'Account saved', toastText());
+   setValue('acct_password', 'a-new-one');
+   before = requests.length;
+   click(act('accountsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/accounts/anna%40example.com');
+   check('a filled password goes alone, and its box is empty after the re-read', JSON.stringify(put) === '{"password":"a-new-one"}' && secrets.account_password === 'a-new-one' && document.getElementById('acct_password').value === '', JSON.stringify(put));
+   setValue('acct_max_size_mb', 'lots');
+   before = requests.length;
+   click(act('accountsave'));
+   await flush();
+   check('a size that is not a number is refused by the page', called(before, 'PUT', /accounts/).length === 0 && document.getElementById('err_accountedit').textContent.indexOf('whole number') >= 0);
+   setValue('acct_max_size_mb', '500');
+   nextRefusal = 'The password does not meet the policy.';
+   click(act('accountsave'));
+   await flush();
+   check('a refusal keeps the editor open with the server\'s sentence', document.getElementById('err_accountedit').textContent === 'The password does not meet the policy.' && document.getElementById('acct_max_size_mb').value === '500');
+   before = requests.length;
+   click(act('accounts', { domain: 'example.com' }));
+   await flush();
+   check('the way back re-reads the accounts of the domain', called(before, 'GET', '/api/v1/domains/example.com/accounts').length === 1 && rows().length === 2 && act('accountedit', { address: 'carla@example.com' }) !== null);
 
    // ---- the domain editor
    click(act('domains'));
