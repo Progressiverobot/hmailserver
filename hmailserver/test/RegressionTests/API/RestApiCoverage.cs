@@ -456,7 +456,8 @@ namespace RegressionTests.API
          (int status, string body) created = Http("POST", "/api/v1/domains/example.test/lists",
             "{\"address\":\"everyone@example.test\",\"members\":[\"" + member.Address + "\",\"outside@elsewhere.test\"],\"require_auth\":true}");
          Assert.AreEqual(201, created.status, created.body);
-         StringAssert.Contains("\"members\":2", created.body);
+         StringAssert.Contains("\"address\":\"everyone@example.test\"", created.body, "Created answers the list as the listing shows it.");
+         StringAssert.Contains("\"members\":[\"" + member.Address + "\",\"outside@elsewhere.test\"]", created.body);
 
          (int listStatus, string list) = Http("GET", "/api/v1/domains/example.test/lists");
          Assert.AreEqual(200, listStatus, list);
@@ -477,6 +478,61 @@ namespace RegressionTests.API
          Assert.AreEqual(200, Http("DELETE", "/api/v1/lists/everyone@example.test").status);
          Assert.AreEqual(404, Http("DELETE", "/api/v1/lists/everyone@example.test").status);
          StringAssert.DoesNotContain("everyone@example.test", Http("GET", "/api/v1/domains/example.test/lists").body);
+      }
+
+      [Test]
+      [Description("A distribution list is created with its mode, active flag, required sender, moderator and bounce address, each read back through COM; PUT /api/v1/lists/<address> changes what the body names and leaves the rest; a mode that is not one of the four words, a wrong type and an unknown field are refused and change nothing.")]
+      public void DistributionListFieldsRoundTrip()
+      {
+         Account announcer = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "announcer@example.test", "secret");
+
+         (int status, string body) created = Http("POST", "/api/v1/domains/example.test/lists",
+            "{\"address\":\"news@example.test\",\"active\":false,\"mode\":\"announcement\",\"require_sender_address\":\"" + announcer.Address + "\"," +
+            "\"moderator_address\":\"editor@example.test\",\"bounce_address\":\"owner@example.test\",\"require_auth\":true}");
+         Assert.AreEqual(201, created.status, created.body);
+         StringAssert.Contains("\"active\":false", created.body);
+         StringAssert.Contains("\"mode\":\"announcement\"", created.body);
+         StringAssert.Contains("\"require_sender_address\":\"" + announcer.Address + "\"", created.body);
+         StringAssert.Contains("\"moderator_address\":\"editor@example.test\"", created.body);
+         StringAssert.Contains("\"bounce_address\":\"owner@example.test\"", created.body);
+
+         DistributionList viaCom = _domain.DistributionLists.get_ItemByAddress("news@example.test");
+         Assert.IsFalse(viaCom.Active);
+         Assert.AreEqual(eDistributionListMode.eLMAnnouncement, viaCom.Mode);
+         Assert.AreEqual(announcer.Address, viaCom.RequireSenderAddress);
+         Assert.AreEqual("editor@example.test", viaCom.ModeratorAddress);
+         Assert.AreEqual("owner@example.test", viaCom.BounceAddress);
+         Assert.IsTrue(viaCom.RequireSMTPAuth);
+
+         // Changed: what the body names changes, what it leaves out stays, and COM agrees.
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/lists/news@example.test", "{\"active\":true,\"mode\":\"domain_members\",\"bounce_address\":\"\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"active\":true", putBody);
+         StringAssert.Contains("\"mode\":\"domain_members\"", putBody);
+         StringAssert.Contains("\"moderator_address\":\"editor@example.test\"", putBody, "Left out, so left alone.");
+         viaCom = _domain.DistributionLists.get_ItemByAddress("news@example.test");
+         Assert.IsTrue(viaCom.Active);
+         Assert.AreEqual(eDistributionListMode.eLMDomainMembers, viaCom.Mode);
+         Assert.AreEqual("", viaCom.BounceAddress);
+         Assert.AreEqual("editor@example.test", viaCom.ModeratorAddress);
+         Assert.AreEqual(announcer.Address, viaCom.RequireSenderAddress);
+
+         // Refused - a mode the server does not have, a string for a switch,
+         // a field that is not one - and nothing changed.
+         (int modeStatus, string modeBody) = Http("PUT", "/api/v1/lists/news@example.test", "{\"moderator_address\":\"other@example.test\",\"mode\":\"everyone\"}");
+         Assert.AreEqual(400, modeStatus, modeBody);
+         StringAssert.Contains("mode must be public, membership, announcement or domain_members", modeBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/lists/news@example.test", "{\"active\":\"yes\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/lists/news@example.test", "{\"members\":[]}").status, "The members are not changed here.");
+         Assert.AreEqual(404, Http("PUT", "/api/v1/lists/nobody@example.test", "{\"active\":true}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/domains/example.test/lists", "{\"address\":\"other@example.test\",\"mode\":\"everyone\"}").status,
+            "the create refuses the same word");
+         viaCom = _domain.DistributionLists.get_ItemByAddress("news@example.test");
+         Assert.AreEqual("editor@example.test", viaCom.ModeratorAddress, "A refused PUT applies nothing.");
+         Assert.AreEqual(eDistributionListMode.eLMDomainMembers, viaCom.Mode);
+         Assert.IsTrue(viaCom.Active);
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/lists/news@example.test").status);
       }
 
       [Test]

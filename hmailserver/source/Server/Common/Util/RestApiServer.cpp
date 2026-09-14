@@ -1546,6 +1546,8 @@ namespace HM
             return HandleCreateList_(String(route.identifier), GetRequestBody_(request));
          case RouteListDelete:
             return HandleDeleteList_(String(route.identifier));
+         case RouteListUpdate:
+            return HandleUpdateList_(String(route.identifier), GetRequestBody_(request));
          case RouteCertificateList:
             return HandleListCertificates_();
          case RouteDkimGet:
@@ -2786,12 +2788,12 @@ namespace HM
          }
       }
       const AnsiString listsPrefix = "/api/v1/lists/";
-      if (method == "DELETE" && path.StartsWith(listsPrefix))
+      if ((method == "DELETE" || method == "PUT") && path.StartsWith(listsPrefix))
       {
          AnsiString address = path.Mid(listsPrefix.GetLength());
          if (!address.IsEmpty() && address.Find("/") < 0)
          {
-            route.kind = RouteListDelete;
+            route.kind = method == "DELETE" ? RouteListDelete : RouteListUpdate;
             route.identifier = address;
             return;
          }
@@ -3185,6 +3187,7 @@ namespace HM
       case RouteIpRangeDelete:
       case RouteListCreate:
       case RouteListDelete:
+      case RouteListUpdate:
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
@@ -3458,6 +3461,7 @@ namespace HM
          targetDomain = String(route.identifier);
          break;
       case RouteListDelete:
+      case RouteListUpdate:
       case RouteAliasDelete:
       case RouteAccountUpdate:
       case RouteAccountGet:
@@ -5027,95 +5031,16 @@ namespace HM
          if (!list)
             continue;
 
-         AnsiString members = "[";
-         std::shared_ptr<DistributionListRecipients> recipients = list->GetMembers();
-         if (recipients)
-         {
-            int memberCount = 0;
-            for (int m = 0; m < recipients->GetCount(); m++)
-            {
-               std::shared_ptr<DistributionListRecipient> recipient = recipients->GetItem(m);
-               if (!recipient)
-                  continue;
-               if (memberCount > 0)
-                  members += ",";
-               members += "\"" + JsonEscape_(Utf8_(recipient->GetAddress())) + "\"";
-               memberCount++;
-            }
-         }
-         members += "]";
-
          if (count > 0)
             body += ",";
 
-         AnsiString entry;
-         entry.Format("{\"address\":\"%hs\",\"active\":%hs,\"require_auth\":%hs,\"members\":%hs}",
-            JsonEscape_(Utf8_(list->GetAddress())).c_str(),
-            list->GetActive() ? "true" : "false",
-            list->GetRequireAuth() ? "true" : "false",
-            members.c_str());
-         body += entry;
+         // The same entry the create and the update answer with
+         // (RestApiAdministration.cpp), members included.
+         body += ListEntryJson_(list);
          count++;
       }
       body += "]";
       return BuildResponse_(200, body);
-   }
-
-   HttpResponse
-   RestApiServer::HandleCreateList_(const String &domainName, const AnsiString &requestBody)
-   {
-      AnsiString address = GetJsonStringValue_(requestBody, "address");
-      if (address.IsEmpty())
-         return BuildResponse_(400, "{\"error\":\"address is required\"}");
-
-      String addressDomain = StringParser::ExtractDomain(String(address));
-      if (addressDomain.CompareNoCase(domainName) != 0)
-         return BuildResponse_(400, "{\"error\":\"address does not belong to the domain\"}");
-
-      Domains domains;
-      domains.Refresh();
-      std::shared_ptr<Domain> domain = domains.GetItemByName(domainName);
-      if (!domain)
-         return BuildResponse_(404, "{\"error\":\"domain not found\"}");
-
-      DistributionLists lists(domain->GetID());
-      lists.Refresh();
-      if (lists.GetItemByAddress(String(address)))
-         return BuildResponse_(409, "{\"error\":\"a list with that address exists\"}");
-
-      std::shared_ptr<DistributionList> list(new DistributionList);
-      list->SetDomainID(domain->GetID());
-      list->SetAddress(String(address));
-      list->SetActive(true);
-      list->SetRequireAuth(GetJsonBoolValue_(requestBody, "require_auth", false));
-      list->SetListMode(DistributionList::LMPublic);
-
-      String error;
-      if (!PersistentDistributionList::SaveObject(list, error, PersistenceModeNormal))
-      {
-         AnsiString body;
-         body.Format("{\"error\":\"%hs\"}", JsonEscape_(Utf8_(error)).c_str());
-         return BuildResponse_(400, body);
-      }
-
-      std::vector<AnsiString> members = GetJsonStringArray_(requestBody, "members");
-      int saved = 0;
-      for (const AnsiString &member : members)
-      {
-         if (member.IsEmpty())
-            continue;
-         std::shared_ptr<DistributionListRecipient> recipient(new DistributionListRecipient);
-         recipient->SetListID(list->GetID());
-         recipient->SetAddress(String(member));
-         if (PersistentDistributionListRecipient::SaveObject(recipient))
-            saved++;
-      }
-
-      LOG_APPLICATION("RestApi: Distribution list '" + list->GetAddress() + "' created with " + StringParser::IntToString(saved) + " member(s).");
-
-      AnsiString body;
-      body.Format("{\"address\":\"%hs\",\"members\":%d}", JsonEscape_(address).c_str(), saved);
-      return BuildResponse_(201, body);
    }
 
    HttpResponse
@@ -10278,9 +10203,11 @@ namespace HM
          "\"/api/v1/ipranges/{id}\":{\"put\":{\"summary\":\"Change an IP range\",\"description\":\"Body: any subset of the fields POST takes - name, lower, upper, priority and the permission flags; a field left out keeps its value. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"responses\":{\"200\":{\"description\":\"The range as saved, as the listing shows it\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
          "\"delete\":{\"summary\":\"Delete an IP range\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/domains/{domain}/lists\":{"
-         "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"
-         "\"post\":{\"summary\":\"Create a distribution list\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\"],\"properties\":{\"address\":{\"type\":\"string\"},\"members\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"require_auth\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created\"},\"400\":{\"description\":\"Missing address, or one outside the domain\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"A list with that address exists\"}}}},"
-         "\"/api/v1/lists/{address}\":{\"delete\":{\"summary\":\"Delete a distribution list\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown list\"}}}},"
+         "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"description\":\"Each entry: address, active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address, bounce_address and members. Scoped to the domain.\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"post\":{\"summary\":\"Create a distribution list\",\"description\":\"Body: address (required, in this domain), members (an array of addresses), active (default true), require_auth (default false), mode (public, membership, announcement or domain_members; default public, and any other word is refused as put_Mode refuses it), require_sender_address (the one sender an announcement list accepts), moderator_address and bounce_address. Saved as the Control Panel saves a list, with the same limitation check. Scoped to the domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"address\"],\"properties\":{\"address\":{\"type\":\"string\"},\"members\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"active\":{\"type\":\"boolean\"},\"require_auth\":{\"type\":\"boolean\"},\"mode\":{\"type\":\"string\",\"enum\":[\"public\",\"membership\",\"announcement\",\"domain_members\"]},\"require_sender_address\":{\"type\":\"string\"},\"moderator_address\":{\"type\":\"string\"},\"bounce_address\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: the list as the listing shows it\"},\"400\":{\"description\":\"Missing address, one outside the domain, a mode that is not one of the four words, a field of the wrong type, an unknown field, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"},\"409\":{\"description\":\"A list with that address exists\"}}}},"
+         "\"/api/v1/lists/{address}\":{"
+         "\"put\":{\"summary\":\"Change a distribution list\",\"description\":\"Body: any subset of active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address and bounce_address; a field left out keeps its value, and the members are not changed here. Everything is checked before anything is applied. Scoped to the address's domain.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"active\":{\"type\":\"boolean\"},\"require_auth\":{\"type\":\"boolean\"},\"mode\":{\"type\":\"string\",\"enum\":[\"public\",\"membership\",\"announcement\",\"domain_members\"]},\"require_sender_address\":{\"type\":\"string\"},\"moderator_address\":{\"type\":\"string\"},\"bounce_address\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The list as saved, as the listing shows it\"},\"400\":{\"description\":\"A mode that is not one of the four words, a field of the wrong type, an unknown field, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown list\"}}},"
+         "\"delete\":{\"summary\":\"Delete a distribution list\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown list\"}}}},"
          "\"/api/v1/domains/{domain}/dkim\":{\"get\":{\"summary\":\"The DKIM signing configuration of a domain\",\"responses\":{\"200\":{\"description\":\"enabled, selector, sign_aliases and the private key file\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/logs\":{\"get\":{\"summary\":\"List the log files\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of files with size and creation time\"}}}},"
          "\"/api/v1/logs/{name}\":{\"get\":{\"summary\":\"The last lines of a log file\",\"description\":\"Query parameter lines (default 200, at most 2000). The name must be one the list returns; anything with a path in it is refused.\",\"responses\":{\"200\":{\"description\":\"The lines, newest last\"},\"400\":{\"description\":\"Not a log file name\"},\"404\":{\"description\":\"No such log file\"}}}},"
