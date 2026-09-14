@@ -324,6 +324,15 @@ namespace
       if (name.GetLength() > 255)
          return Refusal(bridge, 400, "name is at most 255 characters");
 
+      // The ceiling the account's own route holds (RestApiAppPasswords.cpp):
+      // twenty. The store's own check is a backstop of twenty-five, which is
+      // how a twenty-first was let through here on 14 September 2026.
+      {
+         AppPasswords existing;
+         existing.Refresh(account->GetID());
+         if (existing.GetCount() >= 20)
+            return Refusal(bridge, 400, "This account already has the maximum of 20 app passwords; remove one that is no longer used first");
+      }
       // As InterfaceAppPasswords::Add makes one, owned by this account.
       std::shared_ptr<AppPassword> password = std::shared_ptr<AppPassword>(new AppPassword());
       password->SetAccountID(account->GetID());
@@ -795,6 +804,21 @@ namespace
       if (!ApplyPermissionBody(body, permission, account, true, error))
          return Refusal(bridge, 400, String(error));
 
+      // One row per (folder, type, group, account) - the table is unique on
+      // them, and the store would answer the duplicate with an integrity
+      // error and a 500. Said here, as a conflict, with the way out.
+      {
+         ACLPermissions existing(folder->GetID());
+         existing.Refresh();
+         for (std::shared_ptr<ACLPermission> other : existing.GetSnapshot())
+         {
+            if (other &&
+                other->GetPermissionType() == permission->GetPermissionType() &&
+                other->GetPermissionAccountID() == permission->GetPermissionAccountID() &&
+                other->GetPermissionGroupID() == permission->GetPermissionGroupID())
+               return Refusal(bridge, 409, "this folder already has a permission for that account, group or anyone: update it (PUT), or delete it first");
+         }
+      }
       if (!PersistentACLPermission::SaveObject(permission))
          return Refusal(bridge, 500, "the permission could not be saved; see the error log");
 

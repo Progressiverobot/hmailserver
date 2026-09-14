@@ -186,6 +186,7 @@ namespace RegressionTests.API
          hMailServer.Group group = _settings.Groups.Add();
          group.Name = "RestAclGroup";
          group.Save();
+         hMailServer.Group group2 = null;
 
          try
          {
@@ -202,10 +203,20 @@ namespace RegressionTests.API
             Assert.AreEqual(group.ID, stored[0].PermissionGroupID);
             Assert.AreEqual(0, stored[0].PermissionAccountID);
 
-            (int status, string body) byId = Http("POST", Permissions(owner, inbox),
+            // The same group again is a conflict, not a second row: the table is
+            // unique on (folder, type, group, account).
+            (int status, string body) again = Http("POST", Permissions(owner, inbox),
                "{\"type\":\"group\",\"group_id\":" + group.ID + "}");
+            Assert.AreEqual(409, again.status, again.body);
+            StringAssert.Contains("already has a permission", again.body);
+
+            group2 = _settings.Groups.Add();
+            group2.Name = "RestAclGroup2";
+            group2.Save();
+            (int status, string body) byId = Http("POST", Permissions(owner, inbox),
+               "{\"type\":\"group\",\"group_id\":" + group2.ID + "}");
             Assert.AreEqual(201, byId.status, byId.body);
-            StringAssert.Contains("\"group\":\"RestAclGroup\"", byId.body);
+            StringAssert.Contains("\"group\":\"RestAclGroup2\"", byId.body);
             StringAssert.Contains("\"rights_text\":\"\"", byId.body, "A right not named is not granted.");
 
             stored.Refresh();
@@ -214,6 +225,8 @@ namespace RegressionTests.API
          finally
          {
             _settings.Groups.DeleteByDBID(group.ID);
+            if (group2 != null)
+               _settings.Groups.DeleteByDBID(group2.ID);
          }
       }
 

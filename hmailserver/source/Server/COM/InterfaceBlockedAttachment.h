@@ -24,6 +24,7 @@ class ATL_NO_VTABLE InterfaceBlockedAttachment :
    public CComObjectRootEx<CComSingleThreadModel>,
    public CComCoClass<InterfaceBlockedAttachment, &CLSID_BlockedAttachment>,
    public IDispatchImpl<IInterfaceBlockedAttachment, &IID_IInterfaceBlockedAttachment, &LIBID_hMailServer, /*wMajor =*/ 1, /*wMinor =*/ 0>,
+   public ISupportErrorInfo,
    public HM::COMAuthenticator
 {
 public:
@@ -37,7 +38,10 @@ DECLARE_REGISTRY_RESOURCEID(IDR_INTERFACEBLOCKEDATTACHMENT)
 BEGIN_COM_MAP(InterfaceBlockedAttachment)
    COM_INTERFACE_ENTRY(IInterfaceBlockedAttachment)
    COM_INTERFACE_ENTRY(IDispatch)
+   COM_INTERFACE_ENTRY(ISupportErrorInfo)
 END_COM_MAP()
+
+   STDMETHOD(InterfaceSupportsErrorInfo)(REFIID riid);
 
 
 

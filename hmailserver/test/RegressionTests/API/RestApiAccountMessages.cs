@@ -253,7 +253,11 @@ namespace RegressionTests.API
          Assert.AreEqual(200, emptied.status, emptied.body);
          StringAssert.Contains("\"deleted\":true", emptied.body);
 
-         Assert.AreEqual(0, account.Messages.Count, "COM sees the mailbox emptied.");
+         // Read afresh: a COM Account keeps the message collection it first
+         // read, and the delete removed it from the server's cache, not from
+         // the object this test holds.
+         Account emptiedAccount = _domain.Accounts.get_ItemByAddress(account.Address);
+         Assert.AreEqual(0, emptiedAccount.Messages.Count, "COM sees the mailbox emptied.");
          imap = new ImapClientSimulator();
          Assert.IsTrue(imap.ConnectAndLogon(account.Address, UserPassword));
          Assert.AreEqual(0, imap.GetMessageCount("INBOX"), "The inbox is kept, emptied.");

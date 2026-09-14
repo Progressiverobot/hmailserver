@@ -265,8 +265,8 @@ namespace RegressionTests.API
             RuleBody(name, "{\"field\":\"from\",\"match\":\"wildcard\",\"value\":\"*@example.test\"}", actions, active: false, allCriteria: false));
          Assert.AreEqual(201, created.status, created.body);
          StringAssert.Contains("\"active\":false,\"all_criteria\":false", created.body);
-         StringAssert.Contains("{\"type\":\"forward\",\"value\":\"forwardee@example.test\",\"to\":\"forwardee@example.test\"}", created.body);
-         StringAssert.Contains("{\"type\":\"reply\",\"value\":\"\",\"from_name\":\"Auto Reply\",\"from_address\":\"noreply@example.test\",\"subject\":\"Re: yours\",\"body\":\"Thank you.\\nWe will answer.\"}", created.body);
+         StringAssert.Contains("{\"type\":\"forward\",\"value\":\"forwardee@example.test\",\"to\":\"forwardee@example.test\",\"abort_spam_flagged\":false}", created.body);
+         StringAssert.Contains("{\"type\":\"reply\",\"value\":\"\",\"from_name\":\"Auto Reply\",\"from_address\":\"noreply@example.test\",\"subject\":\"Re: yours\",\"body\":\"Thank you.\\nWe will answer.\",\"abort_spam_flagged\":false}", created.body);
          StringAssert.Contains("{\"type\":\"set_header\",\"value\":\"applied\",\"header\":\"X-Rest-Rule\"}", created.body);
          StringAssert.Contains("{\"type\":\"send_using_route\",\"value\":\"\",\"route_id\":" + route.ID + "}", created.body);
          StringAssert.Contains("{\"type\":\"bind_to_address\",\"value\":\"127.0.0.1\"}", created.body);

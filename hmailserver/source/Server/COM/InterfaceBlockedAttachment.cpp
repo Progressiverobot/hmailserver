@@ -12,7 +12,33 @@
 
 // InterfaceBlockedAttachment
 
-STDMETHODIMP 
+STDMETHODIMP InterfaceBlockedAttachment::InterfaceSupportsErrorInfo(REFIID riid)
+{
+   try
+   {
+      // Without this the sentence Save() puts in the error info never reaches
+      // a .NET caller - it sees the bare HRESULT - which is how the parity
+      // gate of 14 September 2026 read "Exception from HRESULT: 0x800403E9"
+      // where the store had said what was wrong.
+      static const IID* arr[] =
+      {
+         &IID_IInterfaceBlockedAttachment,
+      };
+
+      for (int i=0;i<sizeof(arr)/sizeof(arr[0]);i++)
+      {
+         if (InlineIsEqualGUID(*arr[i],riid))
+            return S_OK;
+      }
+      return S_FALSE;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+STDMETHODIMP
 InterfaceBlockedAttachment::Save()
 {
    try
