@@ -222,6 +222,9 @@ const window = new Element('#window');
 const confirms = [];
 let confirmAnswer = true;
 window.confirm = (text) => { confirms.push(String(text)); return confirmAnswer; };
+// A new window is recorded, not opened.
+const opened = [];
+window.open = (url, name, features) => { opened.push({ url: String(url), name: String(name || ''), features: String(features || '') }); return null; };
 const historyStack = [''];
 let historyAt = 0;
 
@@ -392,6 +395,7 @@ function answer(method, path, body) {
       return json(200, Object.assign(JSON.parse(JSON.stringify(WITH_IMAGE)), { id: Number(path.split('/').pop()), html: '', text: 'plain' }));
    }
    if (path === '/api/v1/me/messages' && method === 'POST') { return json(201, { id: 300 }); }
+   if (path === '/api/v1/me/drafts' && method === 'POST') { return json(201, { id: 55 }); }
    if (/\/flags$/.test(path)) { return json(200, { flags: { seen: true, flagged: false, draft: false } }); }
    if (path.startsWith('/api/v1/me/changes')) {
       if (changesMissing) { return json(404, { error: 'Not found.' }); }
@@ -994,6 +998,30 @@ async function main() {
    check('and nothing is offered after', historyBox.hidden === true);
    await searchFor('after:2026-09-01');
    check('a search after that starts the list again', store.get('hmPortalSearches') === '["after:2026-09-01"]', store.get('hmPortalSearches'));
+
+   // ---- pop-out: the message, or the message being written, in a window of its own
+   location.hash = '#/m/102';
+   await flush();
+   check('the message is open', location.hash === '#/m/102' && document.getElementById('message-view').hidden === false, location.hash);
+   document.getElementById('message-popout').dispatchEvent(makeEvent('click'));
+   check('the pop-out opens the message at its own address in a new window of a given size',
+      opened.length === 1 && opened[0].url === 'http://portal.test/portal#/m/102' && /width=\d+/.test(opened[0].features) && /height=\d+/.test(opened[0].features), JSON.stringify(opened));
+   check('and this window stays where it was', location.hash === '#/m/102' && document.getElementById('message-view').hidden === false, location.hash);
+   document.dispatchEvent(makeEvent('keydown', { key: 'c', target: document.body }));
+   await flush();
+   document.getElementById('compose-popout').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('an empty compose form pops out at its own address', opened.length === 2 && opened[1].url === 'http://portal.test/portal#/compose', JSON.stringify(opened.slice(1)));
+   check('and closes here', compose.hidden === true, 'hidden=' + compose.hidden);
+   await writeMessage('Half a thought');
+   const beforePop = requests.length;
+   document.getElementById('compose-popout').dispatchEvent(makeEvent('click'));
+   await flush();
+   await flush();
+   const draftCall = since(beforePop).filter((r) => r.method === 'POST' && r.path === '/api/v1/me/drafts')[0];
+   check('a form with something in it is saved as a draft first', !!draftCall && JSON.parse(draftCall.body).text === 'Half a thought', draftCall ? draftCall.body : 'no draft saved');
+   check('and the new window opens on that draft', opened.length === 3 && opened[2].url === 'http://portal.test/portal#/compose?draft=55', JSON.stringify(opened.slice(2)));
+   check('and the form here is closed and blank, so one window edits the draft', compose.hidden === true && document.getElementById('compose-text').value === '', 'hidden=' + compose.hidden + ' text=' + document.getElementById('compose-text').value);
 
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));

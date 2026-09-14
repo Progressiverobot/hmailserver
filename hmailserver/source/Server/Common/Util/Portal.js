@@ -2100,20 +2100,25 @@
     event.preventDefault();
     event.returnValue = '';
   });
-  el('compose-save').addEventListener('click', function () {
+  // The draft, saved: what the form holds and the files with it, over the
+  // draft it came from. Resolves to the draft's id, or 0 when it could not
+  // be saved, having said why.
+  var saveDraft = function () {
     var body = composeBody();
     if (draftId) { body.replace_id = draftId; }
-    readFiles().then(function (files) {
+    return readFiles().then(function (files) {
       files = carried.concat(files);
       if (files.length) { body.attachments = files; }
       appendLinks(body);
       return call('POST', '/api/v1/me/drafts', body);
     }, function (why) { say('compose-status', why, false); return null; }).then(function (result) {
-      if (!result) { return; }
-      if (result.status === 201 && result.data) { draftId = result.data.id; composeKey = 'draft:' + draftId; say('compose-status', t('Draft saved.'), true); loadFolders(); return; }
+      if (!result) { return 0; }
+      if (result.status === 201 && result.data) { draftId = result.data.id; composeKey = 'draft:' + draftId; say('compose-status', t('Draft saved.'), true); loadFolders(); return draftId; }
       say('compose-status', describe(result, t('Could not save the draft')), false);
+      return 0;
     });
-  });
+  };
+  el('compose-save').addEventListener('click', function () { saveDraft(); });
   // Files dropped anywhere on the form join the ones picked.
   el('compose-form').addEventListener('dragover', function (event) { event.preventDefault(); el('compose-form').classList.add('dropping'); });
   el('compose-form').addEventListener('dragleave', function () { el('compose-form').classList.remove('dropping'); });
@@ -4104,6 +4109,31 @@
   el('compose-min').addEventListener('click', function () { el('compose-section').classList.toggle('min'); el('compose-section').classList.remove('full'); });
   el('compose-expand').addEventListener('click', function () { el('compose-section').classList.toggle('full'); el('compose-section').classList.remove('min'); });
   el('compose-title').addEventListener('click', function () { if (el('compose-section').classList.contains('min')) { el('compose-section').classList.remove('min'); } });
+
+  // ---- Pop-out: the message, or the message being written, in a window of its own
+  // The page at that address, in a new window the size of a reading pane, so
+  // a person reads one message while writing another. Nothing is handed to
+  // the new window but the address: it loads as a reload of this page would.
+  var popOut = function (hash) {
+    var url = location.href.split('#')[0] + '#' + hash;
+    try { window.open(url, '_blank', 'popup,width=900,height=720,noopener'); } catch (e) { /* a browser that refuses windows */ }
+  };
+  el('message-popout').addEventListener('click', function () { if (current) { popOut('/m/' + current.id); } });
+  // The message being written is saved as a draft first, so the new window
+  // opens on what was typed, and the form here closes: two windows editing
+  // one draft would each save over the other. A form with nothing in it
+  // opens its own address in the new window.
+  el('compose-popout').addEventListener('click', function () {
+    var written = el('compose-to').value.trim() || el('compose-subject').value.trim() || el('compose-text').value.trim();
+    if (!written) { popOut('/compose' + (composeMode !== 'new' && composeId ? '?' + composeMode + '=' + composeId : '')); closeCompose(); return; }
+    saveDraft().then(function (id) {
+      if (!id) { return; }
+      popOut('/compose?draft=' + id);
+      blankCompose();
+      composeKey = newComposeKey();
+      closeCompose();
+    });
+  });
 
   // ---- The rest of a conversation, above the message opened ---------------
   var conversationOpen = {};
