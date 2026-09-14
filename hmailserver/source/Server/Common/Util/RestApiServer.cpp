@@ -1569,6 +1569,11 @@ namespace HM
          case RouteIncomingRelayUpdate:
          case RouteIncomingRelayDelete:
             return HandleAntiSpamLists_(route.kind, route.record_id, GetRequestBody_(request));
+         case RouteBlockedAttachmentList:
+         case RouteBlockedAttachmentCreate:
+         case RouteBlockedAttachmentUpdate:
+         case RouteBlockedAttachmentDelete:
+            return HandleBlockedAttachments_(route.kind, route.record_id, GetRequestBody_(request));
          case RouteCertificateList:
             return HandleListCertificates_();
          case RouteDkimGet:
@@ -2808,6 +2813,7 @@ namespace HM
             { "/api/v1/whitelist-addresses", RouteWhiteListAddressList, RouteWhiteListAddressCreate, RouteWhiteListAddressUpdate, RouteWhiteListAddressDelete },
             { "/api/v1/blocked-senders", RouteBlockedSenderList, RouteBlockedSenderCreate, RouteBlockedSenderUpdate, RouteBlockedSenderDelete },
             { "/api/v1/incoming-relays", RouteIncomingRelayList, RouteIncomingRelayCreate, RouteIncomingRelayUpdate, RouteIncomingRelayDelete },
+            { "/api/v1/blocked-attachments", RouteBlockedAttachmentList, RouteBlockedAttachmentCreate, RouteBlockedAttachmentUpdate, RouteBlockedAttachmentDelete },
          };
 
          for (const SmallCollection &collection : collections)
@@ -3272,6 +3278,9 @@ namespace HM
       case RouteIncomingRelayCreate:
       case RouteIncomingRelayUpdate:
       case RouteIncomingRelayDelete:
+      case RouteBlockedAttachmentCreate:
+      case RouteBlockedAttachmentUpdate:
+      case RouteBlockedAttachmentDelete:
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
@@ -3482,6 +3491,10 @@ namespace HM
       case RouteIncomingRelayCreate:
       case RouteIncomingRelayUpdate:
       case RouteIncomingRelayDelete:
+      case RouteBlockedAttachmentList:
+      case RouteBlockedAttachmentCreate:
+      case RouteBlockedAttachmentUpdate:
+      case RouteBlockedAttachmentDelete:
       case RouteCertificateList:
       case RouteRuleList:
       case RouteLogList:
@@ -10425,6 +10438,7 @@ namespace HM
       openApiJson += OpenApiFetchAccountsPaths_();
       openApiJson += OpenApiAdministrationPaths_();
       openApiJson += OpenApiAntiSpamListsPaths_();
+      openApiJson += OpenApiBlockedAttachmentsPaths_();
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += openApiTail;
 

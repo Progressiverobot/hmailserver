@@ -97,6 +97,10 @@ namespace RegressionTests.API
             hMailServer.SecurityRanges ranges = _settings.SecurityRanges;
             for (int i = ranges.Count - 1; i >= 0; i--)
                if (ranges[i].Name.StartsWith("rest-expiry", StringComparison.Ordinal)) ranges.DeleteByDBID(ranges[i].ID);
+
+            hMailServer.BlockedAttachments attachments = _settings.AntiVirus.BlockedAttachments;
+            for (int i = attachments.Count - 1; i >= 0; i--)
+               if (attachments[i].Wildcard.EndsWith(".rest-blocked", StringComparison.Ordinal)) attachments.DeleteByDBID(attachments[i].ID);
          }
          finally
          {
@@ -231,6 +235,52 @@ namespace RegressionTests.API
          (int docStatus, string doc) = Http("GET", "/api/v1/openapi.json");
          Assert.AreEqual(200, docStatus);
          StringAssert.Contains("Held in memory only", doc);
+      }
+
+      [Test]
+      [Description("A blocked attachment is created, listed, read back through COM, changed with what the body leaves out left alone, refused for an empty wildcard in the owner's sentence with nothing changed, deleted and gone; the owner refuses the same over COM.")]
+      public void BlockedAttachmentsRoundTrip()
+      {
+         (int status, string body) created = Http("POST", "/api/v1/blocked-attachments", "{\"wildcard\":\"*.rest-blocked\",\"description\":\"rest\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+         StringAssert.Contains("\"id\":" + id + ",\"wildcard\":\"*.rest-blocked\",\"description\":\"rest\"", Http("GET", "/api/v1/blocked-attachments").body);
+
+         var viaCom = _settings.AntiVirus.BlockedAttachments.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("*.rest-blocked", viaCom.Wildcard);
+         Assert.AreEqual("rest", viaCom.Description);
+
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/blocked-attachments/" + id, "{\"description\":\"rest, changed\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"description\":\"rest, changed\"", putBody);
+         viaCom = _settings.AntiVirus.BlockedAttachments.get_ItemByDBID(int.Parse(id));
+         Assert.AreEqual("rest, changed", viaCom.Description);
+         Assert.AreEqual("*.rest-blocked", viaCom.Wildcard, "Left out, so left alone.");
+
+         (int emptyStatus, string emptyBody) = Http("PUT", "/api/v1/blocked-attachments/" + id, "{\"wildcard\":\"  \"}");
+         Assert.AreEqual(400, emptyStatus, emptyBody);
+         StringAssert.Contains("The wildcard must not be empty", emptyBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/blocked-attachments/" + id, "{\"wildcard\":7}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/blocked-attachments/" + id, "{\"bogus\":1}").status);
+         Assert.AreEqual(404, Http("PUT", "/api/v1/blocked-attachments/999999999", "{\"description\":\"x\"}").status);
+         (int noneStatus, string noneBody) = Http("POST", "/api/v1/blocked-attachments", "{\"description\":\"no pattern\"}");
+         Assert.AreEqual(400, noneStatus, noneBody);
+         StringAssert.Contains("The wildcard must not be empty", noneBody);
+         Assert.AreEqual("*.rest-blocked", _settings.AntiVirus.BlockedAttachments.get_ItemByDBID(int.Parse(id)).Wildcard, "A refused change changes nothing.");
+         StringAssert.DoesNotContain("no pattern", Http("GET", "/api/v1/blocked-attachments").body);
+
+         // The owner of the value says the same over COM, as a message rather
+         // than an S_OK over a row that was not written.
+         var item = _settings.AntiVirus.BlockedAttachments.Add();
+         item.Wildcard = "";
+         item.Description = "rest, empty";
+         var refusal = Assert.Throws<System.Runtime.InteropServices.COMException>(() => item.Save());
+         StringAssert.Contains("The wildcard must not be empty", refusal.Message);
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/blocked-attachments/" + id).status);
+         Assert.AreEqual(404, Http("DELETE", "/api/v1/blocked-attachments/" + id).status);
+         StringAssert.DoesNotContain("rest-blocked", Http("GET", "/api/v1/blocked-attachments").body);
+         StringAssert.Contains("\"/api/v1/blocked-attachments\"", Http("GET", "/api/v1/openapi.json").body);
       }
 
       private static (int status, string body) Http(string method, string path, string requestBody = null)

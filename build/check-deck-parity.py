@@ -94,6 +94,7 @@ PATH_SCOPE = {
     'whitelist-addresses': ['WhiteListAddress'],
     'blocked-senders': ['BlockedSender'],
     'incoming-relays': ['IncomingRelay'],
+    'blocked-attachments': ['BlockedAttachment'],
     'fetch-accounts': ['FetchAccount'],
     'settings': ['Settings'],
     'antispam': ['AntiSpam'],

@@ -353,6 +353,12 @@ namespace HM
          RouteIncomingRelayCreate,
          RouteIncomingRelayUpdate,
          RouteIncomingRelayDelete,
+         // The blocked attachments (RestApiBlockedAttachments.cpp), the same
+         // four verbs; server-wide.
+         RouteBlockedAttachmentList,
+         RouteBlockedAttachmentCreate,
+         RouteBlockedAttachmentUpdate,
+         RouteBlockedAttachmentDelete,
          RouteOpenApi
       };
 
@@ -868,6 +874,10 @@ namespace HM
       // routes, the kind saying which collection and which verb.
       HttpResponse HandleAntiSpamLists_(RouteKind kind, __int64 id, const AnsiString &requestBody);
       static AnsiString OpenApiAntiSpamListsPaths_();
+      // The blocked attachments as a resource (RestApiBlockedAttachments.cpp),
+      // in the same shape: one entry point for the four routes.
+      HttpResponse HandleBlockedAttachments_(RouteKind kind, __int64 id, const AnsiString &requestBody);
+      static AnsiString OpenApiBlockedAttachmentsPaths_();
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);

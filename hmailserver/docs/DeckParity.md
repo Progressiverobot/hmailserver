@@ -9,13 +9,13 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 316 |
+| of them writable over REST | 318 |
 | of them reachable from a Deck view | 250 |
-| missing over REST | 19 |
-| over REST but not reached by any Deck view | 66 |
+| missing over REST | 17 |
+| over REST but not reached by any Deck view | 68 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
-| REST routes (path and method) | 191, 88 of them writes |
+| REST routes (path and method) | 195, 90 of them writes |
 | Deck views | 13 |
 
 ## Missing over REST, by interface
@@ -24,7 +24,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|---|
 | IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
 | AppPassword | 2 | `Active`, `Name` |
-| BlockedAttachment | 2 | `Description`, `Wildcard` |
 | GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
 | Diagnostics | 2 | `LocalDomainName`, `TestDomainName` |
 | Settings | 1 | `UserInterfaceLanguage` |
@@ -49,6 +48,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | BlockedSender | 3 | `Address`, `Description`, `Score` |
 | IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | Scripting | 2 | `Enabled`, `Language` |
+| BlockedAttachment | 2 | `Description`, `Wildcard` |
 | ServerMessage | 1 | `Text` |
 | MessageIndexing | 1 | `Enabled` |
 
@@ -490,8 +490,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Description` | CollectionSpecs | - | - |
-| `Wildcard` | CollectionSpecs | - | - |
+| `Description` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | - |
+| `Wildcard` | CollectionSpecs | `POST /api/v1/blocked-attachments` (setter)<br>`PUT /api/v1/blocked-attachments/{id}` (setter) | - |
 
 ### ServerMessage
 
@@ -680,11 +680,13 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
 | `POST /api/v1/backup` | BackupSettings, Backup | - | yes |
+| `POST /api/v1/blocked-attachments` | BlockedAttachment | `description`, `message`, `name`, `wildcard` | - |
+| `PUT /api/v1/blocked-attachments/{id}` | BlockedAttachment | `body`, `description`, `field`, `message`, `name`, `value`, `wildcard` | - |
 | `POST /api/v1/blocked-senders` | BlockedSender | `address`, `description`, `message`, `score` | - |
 | `PUT /api/v1/blocked-senders/{id}` | BlockedSender | `address`, `body`, `description`, `field`, `message`, `score`, `value` | - |
 | `POST /api/v1/certificates` | SSLCertificate | `certificate_file`, `name`, `private_key_file`, `private_key_password` | yes |
-| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score` | - |
-| `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value` | - |
+| `POST /api/v1/dns-blacklists` | DNSBlackList | `active`, `dns_host`, `expected_result`, `message`, `reject_message`, `score`, `wildcard` | - |
+| `PUT /api/v1/dns-blacklists/{id}` | DNSBlackList | `active`, `body`, `dns_host`, `expected_result`, `field`, `message`, `reject_message`, `score`, `value`, `wildcard` | - |
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | yes |
 | `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | yes |
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
@@ -731,8 +733,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/queue/{id}/retry` | - | - | yes |
 | `POST /api/v1/routes` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
 | `PUT /api/v1/routes/{id}` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
-| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
-| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value` | yes |
+| `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
+| `PUT /api/v1/rules/{id}` | Rule, RuleCriteria, RuleAction | `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
 | `POST /api/v1/scheduled/run` | - | - | - |
 | `POST /api/v1/server/reinitialize` | - | - | yes |
 | `POST /api/v1/session` | - | - | - |

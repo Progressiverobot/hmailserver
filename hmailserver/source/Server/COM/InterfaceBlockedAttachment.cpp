@@ -22,14 +22,20 @@ InterfaceBlockedAttachment::Save()
 
       if (!authentication_->GetIsServerAdmin())
          return authentication_->GetAccessDenied();
-   
-      if (HM::PersistentBlockedAttachment::SaveObject(object_))
+
+      // The persistence layer's refusal reaches the caller as the range's
+      // and the domain's do, rather than an S_OK over a row that was not
+      // written.
+      HM::String result;
+      if (HM::PersistentBlockedAttachment::SaveObject(object_, result, HM::PersistenceModeNormal))
       {
          // Add to parent collection
          AddToParentCollection();
+
+         return S_OK;
       }
-   
-      return S_OK;
+
+      return COMError::GenerateError(result);
    }
    catch (...)
    {

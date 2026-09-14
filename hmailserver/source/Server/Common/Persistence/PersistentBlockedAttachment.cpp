@@ -42,16 +42,28 @@ namespace HM
       return true;
    }
 
-   bool 
-   PersistentBlockedAttachment::SaveObject(std::shared_ptr<BlockedAttachment> pObject, String &errorMessage, PersistenceMode mode)
-   {
-      // errorMessage -- not supported yet.
-      return SaveObject(pObject);
-   }
-
-   bool 
+   bool
    PersistentBlockedAttachment::SaveObject(std::shared_ptr<BlockedAttachment> pObject)
    {
+      String errorMessage;
+      return SaveObject(pObject, errorMessage, PersistenceModeNormal);
+   }
+
+   bool
+   PersistentBlockedAttachment::SaveObject(std::shared_ptr<BlockedAttachment> pObject, String &errorMessage, PersistenceMode mode)
+   {
+      // The wildcard is what the scanner matches attachment names against;
+      // an empty one matches nothing and is a row that does nothing. Refused
+      // here, where the value is owned, so the COM item and the REST route
+      // meet the same sentence.
+      String wildcard = pObject->GetWildcard();
+      wildcard.Trim();
+      if (wildcard.IsEmpty())
+      {
+         errorMessage = "The wildcard must not be empty.";
+         return false;
+      }
+
       SQLStatement oStatement;
       oStatement.SetTable("hm_blocked_attachments");
       
