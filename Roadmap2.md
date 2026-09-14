@@ -56,9 +56,10 @@ What it has, measured against the two on 14 September: a reading pane (right, be
 
 ## 5. The Linux port beyond compiling
 
+(The .deb's Boost pin, once a row here, was closed on 11 September: Boost is linked statically and the packages install on Ubuntu 26.04, proven in CI.)
+
 | | Item | Detail |
 |---|---|---|
-| ⬜ | **The .deb pins the builder's Boost** | It depends on `libboost-regex1.83.0-icu74` exactly and will not install on Ubuntu 26.04; the AppImage is portable. Static Boost, or a per-distribution build matrix. |
 | ⬜ | **The service host: systemd, and a live update on Linux** | The update helper is a Windows program; on Linux the apply step is a package upgrade or an AppImage swap under a systemd unit that restarts the server, with the same outcome file and the same rollback. |
 | ⬜ | **The Linux suite's remaining skips** | The message object, distribution lists, the anti-virus settings, application passwords and folder ACLs over REST, each with the shim taught to use it and the skip count re-measured. |
 
