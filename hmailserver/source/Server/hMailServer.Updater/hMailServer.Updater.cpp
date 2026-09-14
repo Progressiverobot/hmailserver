@@ -392,6 +392,7 @@ namespace
       const std::wstring text = Decoded(bytes);
       std::vector<std::wstring> said;
       std::wstring about;
+      std::wstring subject;
       size_t start = 0;
       while (start < text.size())
       {
@@ -420,20 +421,19 @@ namespace
          if (lower.find(L"error") == std::wstring::npos && lower.find(L"abort") == std::wstring::npos && lower.find(L"failed") == std::wstring::npos &&
              lower.find(L"cannot") == std::wstring::npos && lower.find(L"in use") == std::wstring::npos && lower.find(L"denied") == std::wstring::npos)
             continue;
-         if (!about.empty())
-         {
-            said.push_back(about);
-            about.clear();
-         }
+         // The file the first error was about is kept apart, so that it is
+         // never one of the lines trimmed below.
+         if (subject.empty() && !about.empty())
+            subject = about;
          said.push_back(line);
       }
       if (said.empty())
          return L"";
-      if (said.size() > 5)
-         said.erase(said.begin(), said.end() - 5);
-      std::wstring out;
+      if (said.size() > 4)
+         said.erase(said.begin(), said.end() - 4);
+      std::wstring out = subject;
       for (size_t i = 0; i < said.size(); i++)
-         out += (i ? L" | " : L"") + said[i];
+         out += (out.empty() ? L"" : L" | ") + said[i];
       if (out.size() > 600)
          out = out.substr(0, 600) + L"...";
       return L"; the installer's log says: " + out;
