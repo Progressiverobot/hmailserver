@@ -320,6 +320,7 @@ namespace hMailServer
    {
       public const string Server = "/api/v1/settings";
       public const string AntiSpam = "/api/v1/settings/antispam";
+      public const string AntiVirus = "/api/v1/settings/antivirus";
       public const string Logging = "/api/v1/settings/logging";
       public const string Directories = "/api/v1/settings/directories";
       public const string Ini = "/api/v1/settings/ini";
@@ -1286,24 +1287,21 @@ namespace hMailServer
 
    public class AntiVirus
    {
+      // The anti-virus settings are a REST group since 14 September 2026, in the
+      // same shape as the anti-spam group; the scanner test and the failure
+      // policy have no route and stay skipped by name.
       public bool EnableAttachmentBlocking
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "attachment_blocking_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "attachment_blocking_enabled", value); }
       }
 
       public BlockedAttachments BlockedAttachments { get; } = new BlockedAttachments();
 
       public eAntivirusAction Action
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
+         get { return SettingsApi.GetString(SettingsApi.AntiVirus, "action") == "delete_email" ? eAntivirusAction.hDeleteEmail : eAntivirusAction.hDeleteAttachments; }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "action", value == eAntivirusAction.hDeleteEmail ? "delete_email" : "delete_attachments", true); }
       }
 
       public int ScannerFailurePolicy
@@ -1317,11 +1315,20 @@ namespace hMailServer
 
       public bool CustomScannerEnabled
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "custom_scanner_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "custom_scanner_enabled", value); }
+      }
+
+      public string CustomScannerExecutable
+      {
+         get { return SettingsApi.GetString(SettingsApi.AntiVirus, "custom_scanner_executable"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "custom_scanner_executable", value, true); }
+      }
+
+      public int CustomScannerReturnValue
+      {
+         get { return SettingsApi.GetInt(SettingsApi.AntiVirus, "custom_scanner_return_value"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "custom_scanner_return_value", value); }
       }
 
       public string TestClamAVScanner(string host = null, int port = 0)
@@ -1331,11 +1338,56 @@ namespace hMailServer
 
       public bool ClamAVEnabled
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoAntiVirusSettings);
-         }
-         set { NotOnThisServer.Ignore(NotOnThisServer.NoAntiVirusSettings, value); }
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "clamav_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamav_enabled", value); }
+      }
+
+      public string ClamAVHost
+      {
+         get { return SettingsApi.GetString(SettingsApi.AntiVirus, "clamav_host"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamav_host", value, true); }
+      }
+
+      public int ClamAVPort
+      {
+         get { return SettingsApi.GetInt(SettingsApi.AntiVirus, "clamav_port"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamav_port", value); }
+      }
+
+      public bool ClamWinEnabled
+      {
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "clamwin_enabled"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamwin_enabled", value); }
+      }
+
+      public string ClamWinExecutable
+      {
+         get { return SettingsApi.GetString(SettingsApi.AntiVirus, "clamwin_executable"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamwin_executable", value, true); }
+      }
+
+      public string ClamWinDBFolder
+      {
+         get { return SettingsApi.GetString(SettingsApi.AntiVirus, "clamwin_db_folder"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "clamwin_db_folder", value, true); }
+      }
+
+      public bool NotifySender
+      {
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "notify_sender"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "notify_sender", value); }
+      }
+
+      public bool NotifyReceiver
+      {
+         get { return SettingsApi.GetBool(SettingsApi.AntiVirus, "notify_receiver"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "notify_receiver", value); }
+      }
+
+      public int MaximumMessageSize
+      {
+         get { return SettingsApi.GetInt(SettingsApi.AntiVirus, "maximum_message_size_kb"); }
+         set { SettingsApi.Put(SettingsApi.AntiVirus, "maximum_message_size_kb", value); }
       }
    }
 
@@ -2230,6 +2282,12 @@ namespace hMailServer
       private bool _dkim; public bool DKIMSignEnabled { get { return _dkim; } set { _dkim = value; Pend("dkim_enabled", B(value)); } }
       private string _dkimSelector = string.Empty; public string DKIMSelector { get { return _dkimSelector; } set { _dkimSelector = value; Pend("dkim_selector", Q(value)); } }
       private string _dkimKeyFile = string.Empty; public string DKIMPrivateKeyFile { get { return _dkimKeyFile; } set { _dkimKeyFile = value; Pend("dkim_private_key_file", Q(value)); } }
+      private eDKIMCanonicalizationMethod _dkimHeaderCanon = eDKIMCanonicalizationMethod.eCanonicalizationRelaxed; public eDKIMCanonicalizationMethod DKIMHeaderCanonicalizationMethod { get { return _dkimHeaderCanon; } set { _dkimHeaderCanon = value; Pend("dkim_header_canonicalization", Q(value == eDKIMCanonicalizationMethod.eCanonicalizationSimple ? "simple" : "relaxed")); } }
+      private eDKIMCanonicalizationMethod _dkimBodyCanon = eDKIMCanonicalizationMethod.eCanonicalizationRelaxed; public eDKIMCanonicalizationMethod DKIMBodyCanonicalizationMethod { get { return _dkimBodyCanon; } set { _dkimBodyCanon = value; Pend("dkim_body_canonicalization", Q(value == eDKIMCanonicalizationMethod.eCanonicalizationSimple ? "simple" : "relaxed")); } }
+      private bool _dkimSignAliases; public bool DKIMSignAliasesEnabled { get { return _dkimSignAliases; } set { _dkimSignAliases = value; Pend("dkim_sign_aliases", B(value)); } }
+      private string _vacationInternalSubject = string.Empty; public string VacationInternalSubject { get { return _vacationInternalSubject; } set { _vacationInternalSubject = value; Pend("vacation_internal_subject", Q(value)); } }
+      private string _vacationInternalMessage = string.Empty; public string VacationInternalMessage { get { return _vacationInternalMessage; } set { _vacationInternalMessage = value; Pend("vacation_internal_message", Q(value)); } }
+      private bool _vacationExternalOverride; public bool VacationExternalOverride { get { return _vacationExternalOverride; } set { _vacationExternalOverride = value; Pend("vacation_external_override", B(value)); } }
       private eDKIMAlgorithm _dkimAlgorithm = eDKIMAlgorithm.eSHA256; public eDKIMAlgorithm DKIMSigningAlgorithm { get { return _dkimAlgorithm; } set { _dkimAlgorithm = value; Pend("dkim_signing_algorithm", Q(value == eDKIMAlgorithm.eSHA1 ? "sha1" : "sha256")); } }
       private int _retention; public int MessageRetentionDays { get { return _retention; } set { _retention = value; Pend("message_retention_days", N(value)); } }
       private string _relayHost = string.Empty; public string RelayHost { get { return _relayHost; } set { _relayHost = value; Pend("relay_host", Q(value)); } }
@@ -2243,9 +2301,9 @@ namespace hMailServer
       private string _vacationMessage = string.Empty; public string VacationMessage { get { return _vacationMessage; } set { _vacationMessage = value; Pend("vacation_message", Q(value)); } }
 
       // What the route does not carry.
-      public string DKIMSecondarySelector { get { Unsupported("DKIMSecondarySelector"); return null; } set { Unsupported("DKIMSecondarySelector", value); } }
-      public string DKIMSecondaryPrivateKeyFile { get { Unsupported("DKIMSecondaryPrivateKeyFile"); return null; } set { Unsupported("DKIMSecondaryPrivateKeyFile", value); } }
-      public string ADDomainName { get { Unsupported("ADDomainName"); return null; } set { Unsupported("ADDomainName", value); } }
+      private string _dkimSecondarySelector = string.Empty; public string DKIMSecondarySelector { get { return _dkimSecondarySelector; } set { _dkimSecondarySelector = value; Pend("dkim_secondary_selector", Q(value)); } }
+      private string _dkimSecondaryKeyFile = string.Empty; public string DKIMSecondaryPrivateKeyFile { get { return _dkimSecondaryKeyFile; } set { _dkimSecondaryKeyFile = value; Pend("dkim_secondary_private_key_file", Q(value)); } }
+      private string _adDomainName = string.Empty; public string ADDomainName { get { return _adDomainName; } set { _adDomainName = value; Pend("ad_domain_name", Q(value)); } }
       public bool MaxMessageSizeEnabled { get { Unsupported("MaxMessageSizeEnabled"); return false; } set { Unsupported("MaxMessageSizeEnabled", value); } }
       public bool MaxAccountSizeEnabled { get { Unsupported("MaxAccountSizeEnabled"); return false; } set { Unsupported("MaxAccountSizeEnabled", value); } }
       public bool EnableLimitations { get { Unsupported("EnableLimitations"); return false; } set { Unsupported("EnableLimitations", value); } }
@@ -2306,6 +2364,15 @@ namespace hMailServer
          _dkim = ServerApi.FlagOf(element, "dkim_enabled");
          _dkimSelector = ServerApi.StringOf(element, "dkim_selector") ?? string.Empty;
          _dkimKeyFile = ServerApi.StringOf(element, "dkim_private_key_file") ?? string.Empty;
+         _dkimHeaderCanon = ServerApi.StringOf(element, "dkim_header_canonicalization") == "simple" ? eDKIMCanonicalizationMethod.eCanonicalizationSimple : eDKIMCanonicalizationMethod.eCanonicalizationRelaxed;
+         _dkimBodyCanon = ServerApi.StringOf(element, "dkim_body_canonicalization") == "simple" ? eDKIMCanonicalizationMethod.eCanonicalizationSimple : eDKIMCanonicalizationMethod.eCanonicalizationRelaxed;
+         _dkimSignAliases = ServerApi.FlagOf(element, "dkim_sign_aliases");
+         _vacationInternalSubject = ServerApi.StringOf(element, "vacation_internal_subject") ?? string.Empty;
+         _vacationInternalMessage = ServerApi.StringOf(element, "vacation_internal_message") ?? string.Empty;
+         _vacationExternalOverride = ServerApi.FlagOf(element, "vacation_external_override");
+         _dkimSecondarySelector = ServerApi.StringOf(element, "dkim_secondary_selector") ?? string.Empty;
+         _dkimSecondaryKeyFile = ServerApi.StringOf(element, "dkim_secondary_private_key_file") ?? string.Empty;
+         _adDomainName = ServerApi.StringOf(element, "ad_domain_name") ?? string.Empty;
          _dkimAlgorithm = ServerApi.StringOf(element, "dkim_signing_algorithm") == "sha1" ? eDKIMAlgorithm.eSHA1 : eDKIMAlgorithm.eSHA256;
          _retention = (int) ServerApi.LongOf(element, "message_retention_days");
          _relayHost = ServerApi.StringOf(element, "relay_host") ?? string.Empty;
