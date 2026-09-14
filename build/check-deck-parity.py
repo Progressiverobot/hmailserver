@@ -1264,8 +1264,12 @@ def write_markdown(interfaces, desktop, routes, views, view_calls, rows, method_
     a('- **Deck reach is by route, not by field.** The Deck builds its forms from the OpenAPI '
       'document, so a view that PUTs a settings group reaches every key of that group; a '
       'property is "reachable" when a view calls a route that covers it, not when a field '
-      'for it is on screen. The largest "over REST but not in the Deck" groups are the domain '
-      'and the IP range, which the Deck lists but does not edit.')
+      'for it is on screen. A helper two views share - the settings save, reached from the '
+      'Settings view and the Backup view - carries every settings group\'s PUT to both, so a '
+      'view\'s route list can name a group it does not draw; the property count is unaffected. '
+      'What is left over REST but not in the Deck is the account\'s own forwarding, signature '
+      'and admin level, the aliases and distribution lists, the scripting switch and the '
+      'server messages: routes without a view.')
     a('- **Reads are not measured.** Properties the desktop only displays are outside the '
       'count; the parity question here is what an administrator can change.')
     a('')
