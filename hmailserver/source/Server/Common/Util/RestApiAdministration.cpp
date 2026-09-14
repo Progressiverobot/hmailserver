@@ -214,6 +214,27 @@ namespace HM
          return algorithm == 1 ? "sha1" : "sha256";
       }
 
+      // eDKIMCanonicalizationMethod over COM: simple is 1, relaxed is 2, and
+      // Domain stores nothing else (a value that is not 1 reads back as 2).
+      const char *CanonicalizationWord(int method)
+      {
+         return method == 1 ? "simple" : "relaxed";
+      }
+
+      bool ParseCanonicalizationWord(const String &word, int &method)
+      {
+         AnsiString value = word;
+
+         if (value.CompareNoCase("simple") == 0)
+            method = 1;
+         else if (value.CompareNoCase("relaxed") == 0)
+            method = 2;
+         else
+            return false;
+
+         return true;
+      }
+
       // The domain's members, the names the API uses. The relay password is
       // accepted and never emitted.
       const char *const DomainKeys[] =
@@ -224,9 +245,13 @@ namespace HM
          "signature_enabled", "signature_method", "signature_plain_text", "signature_html",
          "signature_add_to_replies", "signature_add_to_local_mail",
          "dkim_enabled", "dkim_selector", "dkim_private_key_file", "dkim_signing_algorithm",
+         "dkim_header_canonicalization", "dkim_body_canonicalization", "dkim_secondary_selector",
+         "dkim_secondary_private_key_file", "dkim_sign_aliases",
          "message_retention_days", "relay_host", "relay_port", "relay_requires_auth", "relay_username",
          "relay_password", "relay_connection_security",
-         "vacation_enabled", "vacation_subject", "vacation_message"
+         "vacation_enabled", "vacation_subject", "vacation_message",
+         "vacation_internal_subject", "vacation_internal_message", "vacation_external_override",
+         "ad_domain_name"
       };
 
       // Applies the body to the domain. Everything is read and checked first;
@@ -244,6 +269,10 @@ namespace HM
          String dkimSelector = String(domain->GetDKIMSelector()), dkimKeyFile = domain->GetDKIMPrivateKeyFile();
          String relayHost = domain->GetRelayHost(), relayUser = domain->GetRelayUsername(), relayPassword = domain->GetRelayPassword();
          String vacationSubject = domain->GetVacationSubject(), vacationMessage = domain->GetVacationMessage();
+         String headerCanonicalization, bodyCanonicalization;
+         String dkimSecondarySelector = String(domain->GetDKIMSecondarySelector()), dkimSecondaryKeyFile = domain->GetDKIMSecondaryPrivateKeyFile();
+         String vacationInternalSubject = domain->GetVacationInternalSubject(), vacationInternalMessage = domain->GetVacationInternalMessage();
+         String adDomainName = domain->GetADDomainName();
 
          if (!ReadString(body, "name", name, error) ||
              !ReadString(body, "postmaster", postmaster, error) ||
@@ -254,12 +283,19 @@ namespace HM
              !ReadString(body, "dkim_selector", dkimSelector, error) ||
              !ReadString(body, "dkim_private_key_file", dkimKeyFile, error) ||
              !ReadString(body, "dkim_signing_algorithm", dkimAlgorithm, error) ||
+             !ReadString(body, "dkim_header_canonicalization", headerCanonicalization, error) ||
+             !ReadString(body, "dkim_body_canonicalization", bodyCanonicalization, error) ||
+             !ReadString(body, "dkim_secondary_selector", dkimSecondarySelector, error) ||
+             !ReadString(body, "dkim_secondary_private_key_file", dkimSecondaryKeyFile, error) ||
              !ReadString(body, "relay_host", relayHost, error) ||
              !ReadString(body, "relay_username", relayUser, error) ||
              !ReadString(body, "relay_password", relayPassword, error) ||
              !ReadString(body, "relay_connection_security", relaySecurity, error) ||
              !ReadString(body, "vacation_subject", vacationSubject, error) ||
-             !ReadString(body, "vacation_message", vacationMessage, error))
+             !ReadString(body, "vacation_message", vacationMessage, error) ||
+             !ReadString(body, "vacation_internal_subject", vacationInternalSubject, error) ||
+             !ReadString(body, "vacation_internal_message", vacationInternalMessage, error) ||
+             !ReadString(body, "ad_domain_name", adDomainName, error))
             return false;
 
          long maxMessageSize = domain->GetMaxMessageSize(), maxSize = domain->GetMaxSizeMB(), maxAccountSize = domain->GetMaxAccountSize();
@@ -283,6 +319,7 @@ namespace HM
          bool signatureEnabled = domain->GetEnableSignature(), signatureReplies = domain->GetAddSignaturesToReplies();
          bool signatureLocal = domain->GetAddSignaturesToLocalMail(), dkimEnabled = domain->GetDKIMEnabled();
          bool relayAuth = domain->GetRelayRequiresAuth(), vacationOn = domain->GetVacationMessageIsOn();
+         bool dkimSignAliases = domain->GetDKIMAliasesEnabled(), vacationExternalOverride = domain->GetVacationExternalOverride();
 
          if (!ReadBool(body, "active", active, error) ||
              !ReadBool(body, "max_accounts_enabled", maxAccountsEnabled, error) ||
@@ -294,9 +331,27 @@ namespace HM
              !ReadBool(body, "signature_add_to_replies", signatureReplies, error) ||
              !ReadBool(body, "signature_add_to_local_mail", signatureLocal, error) ||
              !ReadBool(body, "dkim_enabled", dkimEnabled, error) ||
+             !ReadBool(body, "dkim_sign_aliases", dkimSignAliases, error) ||
              !ReadBool(body, "relay_requires_auth", relayAuth, error) ||
-             !ReadBool(body, "vacation_enabled", vacationOn, error))
+             !ReadBool(body, "vacation_enabled", vacationOn, error) ||
+             !ReadBool(body, "vacation_external_override", vacationExternalOverride, error))
             return false;
+
+         // The two canonicalisation methods, as put_DKIMHeaderCanonicalizationMethod
+         // and put_DKIMBodyCanonicalizationMethod take eDKIMCanonicalizationMethod.
+         int headerMethod = domain->GetDKIMHeaderCanonicalizationMethod();
+         if (!headerCanonicalization.IsEmpty() && !ParseCanonicalizationWord(headerCanonicalization, headerMethod))
+         {
+            error = "dkim_header_canonicalization must be simple or relaxed";
+            return false;
+         }
+
+         int bodyMethod = domain->GetDKIMBodyCanonicalizationMethod();
+         if (!bodyCanonicalization.IsEmpty() && !ParseCanonicalizationWord(bodyCanonicalization, bodyMethod))
+         {
+            error = "dkim_body_canonicalization must be simple or relaxed";
+            return false;
+         }
 
          Domain::DomainSignatureMethod method = domain->GetSignatureMethod();
          if (!signatureMethod.IsEmpty())
@@ -379,6 +434,11 @@ namespace HM
          domain->SetDKIMSelector(dkimSelector);
          domain->SetDKIMPrivateKeyFile(dkimKeyFile);
          domain->SetDKIMSigningAlgorithm(algorithm);
+         domain->SetDKIMHeaderCanonicalizationMethod(headerMethod);
+         domain->SetDKIMBodyCanonicalizationMethod(bodyMethod);
+         domain->SetDKIMSecondarySelector(dkimSecondarySelector);
+         domain->SetDKIMSecondaryPrivateKeyFile(dkimSecondaryKeyFile);
+         domain->SetDKIMAliasesEnabled(dkimSignAliases);
          domain->SetMessageRetentionDays((int) retention);
          domain->SetRelayHost(relayHost);
          domain->SetRelayPort(relayPort);
@@ -389,6 +449,10 @@ namespace HM
          domain->SetVacationMessageIsOn(vacationOn);
          domain->SetVacationSubject(vacationSubject);
          domain->SetVacationMessage(vacationMessage);
+         domain->SetVacationInternalSubject(vacationInternalSubject);
+         domain->SetVacationInternalMessage(vacationInternalMessage);
+         domain->SetVacationExternalOverride(vacationExternalOverride);
+         domain->SetADDomainName(adDomainName);
          return true;
       }
 
@@ -463,6 +527,11 @@ namespace HM
       text("dkim_selector", String(domain->GetDKIMSelector()));
       text("dkim_private_key_file", domain->GetDKIMPrivateKeyFile());
       text("dkim_signing_algorithm", String(DkimAlgorithmWord(domain->GetDKIMSigningAlgorithm())));
+      text("dkim_header_canonicalization", String(CanonicalizationWord(domain->GetDKIMHeaderCanonicalizationMethod())));
+      text("dkim_body_canonicalization", String(CanonicalizationWord(domain->GetDKIMBodyCanonicalizationMethod())));
+      text("dkim_secondary_selector", String(domain->GetDKIMSecondarySelector()));
+      text("dkim_secondary_private_key_file", domain->GetDKIMSecondaryPrivateKeyFile());
+      flag("dkim_sign_aliases", domain->GetDKIMAliasesEnabled());
       text("relay_host", domain->GetRelayHost());
       flag("relay_requires_auth", domain->GetRelayRequiresAuth());
       text("relay_username", domain->GetRelayUsername());
@@ -470,6 +539,10 @@ namespace HM
       flag("vacation_enabled", domain->GetVacationMessageIsOn());
       text("vacation_subject", domain->GetVacationSubject());
       text("vacation_message", domain->GetVacationMessage());
+      text("vacation_internal_subject", domain->GetVacationInternalSubject());
+      text("vacation_internal_message", domain->GetVacationInternalMessage());
+      flag("vacation_external_override", domain->GetVacationExternalOverride());
+      text("ad_domain_name", domain->GetADDomainName());
       entry += "}";
       return entry;
    }

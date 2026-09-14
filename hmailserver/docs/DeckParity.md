@@ -9,10 +9,10 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 272 |
+| of them writable over REST | 281 |
 | of them reachable from a Deck view | 167 |
-| missing over REST | 63 |
-| over REST but not reached by any Deck view | 105 |
+| missing over REST | 54 |
+| over REST but not reached by any Deck view | 114 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
 | REST routes (path and method) | 170, 77 of them writes |
@@ -22,7 +22,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
-| Domain | 9 | `ADDomainName`, `DKIMBodyCanonicalizationMethod`, `DKIMHeaderCanonicalizationMethod`, `DKIMSecondaryPrivateKeyFile`, `DKIMSecondarySelector`, `DKIMSignAliasesEnabled`, `VacationExternalOverride`, `VacationInternalMessage`, `VacationInternalSubject` |
 | Cache | 8 | `AccountCacheMaxSizeKb`, `AccountCacheTTL`, `AliasCacheMaxSizeKb`, `AliasCacheTTL`, `DistributionListCacheMaxSizeKb`, `DistributionListCacheTTL`, `DomainCacheMaxSizeKb`, `DomainCacheTTL` |
 | DistributionList | 5 | `Active`, `BounceAddress`, `Mode`, `ModeratorAddress`, `RequireSenderAddress` |
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
@@ -48,7 +47,7 @@ This measures how far the browser administration page (the Control Deck at `/Web
 
 | Interface | Count | Properties |
 |---|---|---|
-| Domain | 35 | `Active`, `AddSignaturesToLocalMail`, `AddSignaturesToReplies`, `AntiSpamEnableGreylisting`, `DKIMPrivateKeyFile`, `DKIMSelector`, `DKIMSignEnabled`, `DKIMSigningAlgorithm`, `MaxAccountSize`, `MaxMessageSize`, `MaxNumberOfAccounts`, `MaxNumberOfAccountsEnabled`, `MaxNumberOfAliases`, `MaxNumberOfAliasesEnabled`, `MaxNumberOfDistributionLists`, `MaxNumberOfDistributionListsEnabled`, `MaxSize`, `MessageRetentionDays`, `Name`, `PlusAddressingCharacter`, `PlusAddressingEnabled`, `Postmaster`, `RelayConnectionSecurity`, `RelayHost`, `RelayPassword`, `RelayPort`, `RelayRequiresAuthentication`, `RelayUsername`, `SignatureEnabled`, `SignatureHTML`, `SignatureMethod`, `SignaturePlainText`, `VacationMessage`, `VacationMessageIsOn`, `VacationSubject` |
+| Domain | 44 | `ADDomainName`, `Active`, `AddSignaturesToLocalMail`, `AddSignaturesToReplies`, `AntiSpamEnableGreylisting`, `DKIMBodyCanonicalizationMethod`, `DKIMHeaderCanonicalizationMethod`, `DKIMPrivateKeyFile`, `DKIMSecondaryPrivateKeyFile`, `DKIMSecondarySelector`, `DKIMSelector`, `DKIMSignAliasesEnabled`, `DKIMSignEnabled`, `DKIMSigningAlgorithm`, `MaxAccountSize`, `MaxMessageSize`, `MaxNumberOfAccounts`, `MaxNumberOfAccountsEnabled`, `MaxNumberOfAliases`, `MaxNumberOfAliasesEnabled`, `MaxNumberOfDistributionLists`, `MaxNumberOfDistributionListsEnabled`, `MaxSize`, `MessageRetentionDays`, `Name`, `PlusAddressingCharacter`, `PlusAddressingEnabled`, `Postmaster`, `RelayConnectionSecurity`, `RelayHost`, `RelayPassword`, `RelayPort`, `RelayRequiresAuthentication`, `RelayUsername`, `SignatureEnabled`, `SignatureHTML`, `SignatureMethod`, `SignaturePlainText`, `VacationExternalOverride`, `VacationInternalMessage`, `VacationInternalSubject`, `VacationMessage`, `VacationMessageIsOn`, `VacationSubject` |
 | Account | 23 | `ADDomain`, `ADUsername`, `AdminLevel`, `AntiSpamEnabled`, `ForwardAbortSpamFlagged`, `ForwardAddress`, `ForwardEnabled`, `ForwardKeepOriginal`, `IsAD`, `MessageRetentionDays`, `SieveScript`, `SignatureEnabled`, `SignatureHTML`, `SignaturePlainText`, `SpamDeleteThreshold`, `SpamMarkThreshold`, `VacationMessage`, `VacationMessageAbortSpamFlagged`, `VacationMessageBeginDate`, `VacationMessageExpires`, `VacationMessageExpiresDate`, `VacationMessageIsOn`, `VacationSubject` |
 | SecurityRange | 18 | `AllowDeliveryFromLocalToLocal`, `AllowDeliveryFromLocalToRemote`, `AllowDeliveryFromRemoteToLocal`, `AllowDeliveryFromRemoteToRemote`, `AllowIMAPConnections`, `AllowPOP3Connections`, `AllowSMTPConnections`, `EnableAntiVirus`, `EnableSpamProtection`, `LowerIP`, `Name`, `Priority`, `RequireSMTPAuthExternalToExternal`, `RequireSMTPAuthExternalToLocal`, `RequireSMTPAuthLocalToExternal`, `RequireSMTPAuthLocalToLocal`, `RequireSSLTLSForAuth`, `UpperIP` |
 | FetchAccount | 13 | `ConnectionSecurity`, `DaysToKeepMessages`, `Enabled`, `MinutesBetweenFetch`, `MirrorFolders`, `Name`, `Password`, `Port`, `ServerAddress`, `ServerType`, `UseAntiSpam`, `UseAntiVirus`, `Username` |
@@ -148,18 +147,18 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `ADDomainName` | DomainDialog | - | - |
+| `ADDomainName` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `Active` | DomainDialog, DomainsView | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `AddSignaturesToLocalMail` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `AddSignaturesToReplies` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `AntiSpamEnableGreylisting` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
-| `DKIMBodyCanonicalizationMethod` | DomainDialog | - | - |
-| `DKIMHeaderCanonicalizationMethod` | DomainDialog | - | - |
+| `DKIMBodyCanonicalizationMethod` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
+| `DKIMHeaderCanonicalizationMethod` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `DKIMPrivateKeyFile` | DnsRecordsView, DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
-| `DKIMSecondaryPrivateKeyFile` | DomainDialog | - | - |
-| `DKIMSecondarySelector` | DomainDialog | - | - |
+| `DKIMSecondaryPrivateKeyFile` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
+| `DKIMSecondarySelector` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `DKIMSelector` | DnsRecordsView, DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
-| `DKIMSignAliasesEnabled` | DomainDialog | - | - |
+| `DKIMSignAliasesEnabled` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `DKIMSignEnabled` | DnsRecordsView, DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `DKIMSigningAlgorithm` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `MaxAccountSize` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
@@ -186,9 +185,9 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `SignatureHTML` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `SignatureMethod` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `SignaturePlainText` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
-| `VacationExternalOverride` | DomainDialog | - | - |
-| `VacationInternalMessage` | DomainDialog | - | - |
-| `VacationInternalSubject` | DomainDialog | - | - |
+| `VacationExternalOverride` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
+| `VacationInternalMessage` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
+| `VacationInternalSubject` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `VacationMessage` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `VacationMessageIsOn` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
 | `VacationSubject` | DomainDialog | `POST /api/v1/domains` (setter)<br>`PUT /api/v1/domains/{domain}` (setter) | - |
@@ -691,7 +690,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/backup` | BackupSettings, Backup | - | - |
 | `POST /api/v1/certificates` | SSLCertificate | `certificate_file`, `name`, `private_key_file`, `private_key_password` | yes |
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | - |
-| `PUT /api/v1/domains/{domain}` | Domain | `active`, `address`, `dkim_enabled`, `dkim_private_key_file`, `dkim_selector`, `dkim_signing_algorithm`, `field`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_message`, `vacation_subject`, `value` | - |
+| `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | - |
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
 | `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | - |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | - |
