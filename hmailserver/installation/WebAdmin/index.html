@@ -1367,7 +1367,8 @@ async function renderRules(){
       escHtml(humanise(c.field))+(c.header?" "+escHtml(c.header):"")+" "+escHtml(c.match)+" “"+escHtml(c.value)+"”"
     ).join(r.all_criteria?" AND ":" OR ")||"—";
   const actionsText=r=>(r.actions||[]).map(a=>{
-      const params=(words.actions[a.type]||[]).map(p=>a[p]).filter(v=>v!==undefined&&v!=="");
+      // A flag parameter reads as its caption when set and as nothing when not.
+      const params=(words.actions[a.type]||[]).map(p=>typeof a[p]==="boolean"?(a[p]?humanise(p):""):a[p]).filter(v=>v!==undefined&&v!=="");
       const detail=params.length?params.join(", "):(a.value||"");
       return escHtml(humanise(a.type))+(detail?" → "+escHtml(detail):"");
     }).join("; ")||"—";
@@ -1414,6 +1415,9 @@ function renderRuleEditor(){
       const value=a[p]!==undefined?a[p]:(params.length===1?(a.value||""):"");
       if(p==="route_id")
         return '<select data-r="act-'+p+'" data-i="'+i+'">'+optionsHtml(routeChoices,value)+'</select>';
+      // The one flag among the parameters, with the desktop dialog's caption.
+      if(p==="abort_spam_flagged")
+        return '<label class="row" style="gap:7px"><input type="checkbox" data-r="act-'+p+'" data-i="'+i+'"'+(value===true?" checked":"")+'> Abort on messages marked as spam</label>';
       if(p==="body")
         return '<textarea data-r="act-'+p+'" data-i="'+i+'" rows="3" placeholder="Body" style="flex:1;min-width:240px">'+escHtml(value)+'</textarea>';
       return '<input data-r="act-'+p+'" data-i="'+i+'" placeholder="'+escHtml(humanise(p))+'" value="'+escHtml(value)+'" style="flex:1;min-width:170px">';
@@ -1454,7 +1458,7 @@ function readRuleForm(){
   document.querySelectorAll("#content [data-r]").forEach(el=>{
     const i=Number(el.dataset.i), r=el.dataset.r;
     if(r.indexOf("crit-")===0){if(d.criteria[i])d.criteria[i][r.slice(5)]=el.value;}
-    else if(r.indexOf("act-")===0){if(d.actions[i])d.actions[i][r.slice(4)]=el.value;}
+    else if(r.indexOf("act-")===0){if(d.actions[i])d.actions[i][r.slice(4)]=el.type==="checkbox"?el.checked:el.value;}
   });
 }
 async function saveRule(){
@@ -1738,14 +1742,16 @@ async function deleteRoute(id,name){
    dialog's. A new range starts where the create handler puts a key left out;
    the document does not state those defaults, so they are here, with the
    desktop's 15 for the priority (the handler's 0 would lose to every range
-   there is). expires is the server's own mark on a range the auto-ban placed;
-   it is shown and never sent. */
+   there is). expires and expires_time are the expiry the auto-ban gives its
+   ranges and the desktop dialog offers: a range that expires is removed once
+   its time passes, and the time goes only with the flag. */
 const RANGE_GROUPS=[
   {title:"General",keys:["name","lower","upper","priority"]},
   {title:"Connections",keys:["allow_smtp","allow_imap","allow_pop3"]},
   {title:"Relaying",keys:["deliver_local_to_local","deliver_local_to_remote","deliver_remote_to_local","deliver_remote_to_remote"]},
   {title:"Require auth",keys:["require_auth_local_to_local","require_auth_local_to_remote","require_auth_remote_to_local","require_auth_remote_to_remote","require_tls_for_auth"]},
-  {title:"Protection",keys:["spam_protection","virus_protection"]}
+  {title:"Protection",keys:["spam_protection","virus_protection"]},
+  {title:"Expiry",keys:["expires","expires_time"]}
 ];
 const RANGE_HINTS={
   name:"A name for the range.",lower:"The lowest address of the range, IPv4 or IPv6.",upper:"The highest address of the range.",
@@ -1756,9 +1762,11 @@ const RANGE_HINTS={
   require_auth_local_to_local:"Require SMTP authentication for local to local.",require_auth_local_to_remote:"Require SMTP authentication for local to external.",
   require_auth_remote_to_local:"Require SMTP authentication for external to local.",require_auth_remote_to_remote:"Require SMTP authentication for external to external.",
   require_tls_for_auth:"Require SSL/TLS when authenticating.",
-  spam_protection:"Run the anti-spam checks on mail from this range.",virus_protection:"Run the anti-virus scan on mail from this range."
+  spam_protection:"Run the anti-spam checks on mail from this range.",virus_protection:"Run the anti-virus scan on mail from this range.",
+  expires:"Remove the range once the time below passes, as one the auto-ban placed is removed.",
+  expires_time:"YYYY-MM-DD HH:MM:SS on the server's clock, or a date alone for midnight; required when the range expires, and taken only then."
 };
-const RANGE_DEFAULTS={priority:15,allow_smtp:true,allow_imap:true,allow_pop3:true,
+const RANGE_DEFAULTS={priority:15,expires:false,allow_smtp:true,allow_imap:true,allow_pop3:true,
   deliver_local_to_local:true,deliver_local_to_remote:false,deliver_remote_to_local:true,deliver_remote_to_remote:false,
   require_auth_local_to_local:false,require_auth_local_to_remote:true,require_auth_remote_to_local:false,require_auth_remote_to_remote:true,
   require_tls_for_auth:false,spam_protection:true,virus_protection:true};
@@ -1783,7 +1791,7 @@ async function renderIpRanges(){
   cache.ranges=asList(await api("/api/v1/ipranges"),"ranges");
   if(editing&&editing.kind==="range"){renderRangeEditor();return;}
   const rows=cache.ranges.map(r=>`
-    <tr><td><b>${escHtml(r.name)}</b>${r.expires?' <span class="badge info">auto-ban, expires</span>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
+    <tr><td><b>${escHtml(r.name)}</b>${r.expires?' <span class="badge info">expires '+escHtml(r.expires_time||"")+'</span>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
         <td><code>${escHtml(r.lower)}</code></td><td><code>${escHtml(r.upper)}</code></td>
         <td>${escHtml(r.priority)}</td>
         <td>${yesNo(r.allow_smtp)}</td><td>${yesNo(r.allow_imap)}</td><td>${yesNo(r.allow_pop3)}</td>

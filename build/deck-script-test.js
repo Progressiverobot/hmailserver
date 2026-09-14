@@ -401,7 +401,7 @@ let nextRefusal = null;
 let restartProbes = 0;
 let nextId = 100;
 
-const RULES_POST = 'Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header\'s name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to; reply: from_name, from_address (required), subject, body; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.';
+const RULES_POST = 'Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header\'s name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to and abort_spam_flagged; reply: from_name, from_address (required), subject, body and abort_spam_flagged; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.';
 
 const ROUTE_PROPS = {
    domain_name: { type: 'string' }, description: { type: 'string' }, target_smtp_host: { type: 'string' },
@@ -525,9 +525,20 @@ const RANGE_PROPS = {
    allow_smtp: { type: 'boolean' }, allow_imap: { type: 'boolean' }, allow_pop3: { type: 'boolean' },
    deliver_local_to_local: { type: 'boolean' }, deliver_local_to_remote: { type: 'boolean' }, deliver_remote_to_local: { type: 'boolean' }, deliver_remote_to_remote: { type: 'boolean' },
    require_auth_local_to_local: { type: 'boolean' }, require_auth_local_to_remote: { type: 'boolean' }, require_auth_remote_to_local: { type: 'boolean' }, require_auth_remote_to_remote: { type: 'boolean' },
-   require_tls_for_auth: { type: 'boolean' }, spam_protection: { type: 'boolean' }, virus_protection: { type: 'boolean' }
+   require_tls_for_auth: { type: 'boolean' }, spam_protection: { type: 'boolean' }, virus_protection: { type: 'boolean' },
+   expires: { type: 'boolean' }, expires_time: { type: 'string' }
 };
-const RANGE_PUT = 'Body: any subset of the fields POST takes - name, lower, upper, priority and the permission flags; a field left out keeps its value. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.';
+const RANGE_PUT = 'Body: any subset of the fields POST takes - name, lower, upper, priority, the permission flags, expires and expires_time; a field left out keeps its value, and a body that turns expiry on must carry expires_time in it. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.';
+// The expiry as the two handlers read it: the time only with the flag, and
+// the flag turned on only with a time; a time is YYYY-MM-DD HH:MM:SS.
+function expiryProblem(parsed, was) {
+   const time = String(parsed.expires_time || '').trim();
+   const expires = 'expires' in parsed ? parsed.expires : !!(was && was.expires);
+   if (time && !expires) { return 'expires_time is taken only when expires is true'; }
+   if (time && !/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(time)) { return 'expires_time must be a date and time as YYYY-MM-DD HH:MM:SS'; }
+   if (!time && expires && !(was && was.expires)) { return was ? 'expires_time is required when a range is made to expire' : 'expires_time is required when a range expires'; }
+   return null;
+}
 // The defaults HandleCreateIpRange_ applies to a flag left out.
 const RANGE_CREATE_DEFAULTS = { allow_smtp: true, allow_imap: true, allow_pop3: true,
    deliver_local_to_local: true, deliver_local_to_remote: false, deliver_remote_to_local: true, deliver_remote_to_remote: false,
@@ -834,10 +845,10 @@ const state = {
       '/api/v1/incoming-relays': [{ id: 17, name: 'Front relay', lower_ip: '192.0.2.1', upper_ip: '192.0.2.1' }]
    },
    ranges: [
-      Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false }, RANGE_CREATE_DEFAULTS,
+      Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false, expires_time: '' }, RANGE_CREATE_DEFAULTS,
          { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
-      Object.assign({ id: 2, name: 'Internet', lower: '0.0.0.0', upper: '255.255.255.255', priority: 10, expires: false }, RANGE_CREATE_DEFAULTS),
-      Object.assign({ id: 3, name: 'Auto-ban: 203.0.113.9', lower: '203.0.113.9', upper: '203.0.113.9', priority: 20, expires: true }, RANGE_CREATE_DEFAULTS,
+      Object.assign({ id: 2, name: 'Internet', lower: '0.0.0.0', upper: '255.255.255.255', priority: 10, expires: false, expires_time: '' }, RANGE_CREATE_DEFAULTS),
+      Object.assign({ id: 3, name: 'Auto-ban: 203.0.113.9', lower: '203.0.113.9', upper: '203.0.113.9', priority: 20, expires: true, expires_time: '2026-09-14 11:30:00' }, RANGE_CREATE_DEFAULTS,
          { allow_smtp: false, allow_imap: false, allow_pop3: false })
    ],
    queue: [
@@ -1085,7 +1096,10 @@ function answer(method, path, headers, raw) {
       // parsed, a flag left out taking its default, and only the id back.
       if (!parsed.name || !parsed.lower || !parsed.upper) { return json(400, { error: 'name, lower and upper are required' }); }
       if (!ipAddress(parsed.lower) || !ipAddress(parsed.upper)) { return json(400, { error: 'lower and upper must be IP addresses' }); }
-      const range = Object.assign({ id: nextId++, priority: 0, expires: false }, RANGE_CREATE_DEFAULTS, parsed);
+      const expiry = expiryProblem(parsed, null);
+      if (expiry) { return json(400, { error: expiry }); }
+      const range = Object.assign({ id: nextId++, priority: 0, expires: false, expires_time: '' }, RANGE_CREATE_DEFAULTS, parsed);
+      if (!range.expires) { range.expires_time = ''; }
       state.ranges.push(range);
       return json(201, { id: range.id });
    }
@@ -1098,7 +1112,13 @@ function answer(method, path, headers, raw) {
          }
          if (at < 0) { return json(404, { error: 'ip range not found' }); }
          if ('lower' in parsed && !ipAddress(parsed.lower) || 'upper' in parsed && !ipAddress(parsed.upper)) { return json(400, { error: 'lower and upper must be IP addresses' }); }
+         const expiry = expiryProblem(parsed, state.ranges[at]);
+         if (expiry) { return json(400, { error: expiry }); }
+         const time = String(parsed.expires_time || '').trim();
          Object.assign(state.ranges[at], parsed);
+         if (!state.ranges[at].expires) { state.ranges[at].expires_time = ''; }
+         else if (!time) { state.ranges[at].expires_time = state.ranges[at].expires_time || ''; }
+         else { state.ranges[at].expires_time = time.length === 10 ? time + ' 00:00:00' : time; }
          return json(200, state.ranges[at]);
       }
       if (at < 0) { return json(404, { error: 'ip range not found' }); }
@@ -1783,12 +1803,14 @@ async function main() {
    check('one row per range with the desktop list\'s columns', rows().length === 3 && rows()[1].textContent.indexOf('Internet') >= 0 && rows()[1].textContent.indexOf('0.0.0.0') >= 0 &&
       rows()[1].textContent.indexOf('255.255.255.255') >= 0 && rows()[1].textContent.indexOf('10') >= 0, rows().length ? rows()[1].textContent : 'no rows');
    check('the connection flags are shown as yes and no', rows()[1].querySelectorAll('.badge.good').length === 3 && rows()[2].querySelectorAll('.badge.warn').length === 3);
-   check('a range the auto-ban placed says so', rows()[2].textContent.indexOf('auto-ban') >= 0 && rows()[0].textContent.indexOf('auto-ban') < 0);
+   check('a range that expires says so, with its time', rows()[2].textContent.indexOf('expires 2026-09-14 11:30:00') >= 0 && rows()[0].textContent.indexOf('expires') < 0);
    click(act('rangenew'));
    await flush();
    let rangeHeadings = content().querySelectorAll('h2').map((h) => h.textContent.trim());
-   check('the editor is grouped as the desktop dialog is', ['General', 'Connections', 'Relaying', 'Require auth', 'Protection'].every((g) => rangeHeadings.indexOf(g) >= 0) && rangeHeadings.indexOf('Other') < 0,
+   check('the editor is grouped as the desktop dialog is, the expiry in a group of its own', ['General', 'Connections', 'Relaying', 'Require auth', 'Protection', 'Expiry'].every((g) => rangeHeadings.indexOf(g) >= 0) && rangeHeadings.indexOf('Other') < 0,
       JSON.stringify(rangeHeadings));
+   check('a new range does not expire and has no time', document.getElementById('range_expires').checked === false && document.getElementById('range_expires_time').value === '' &&
+      document.getElementById('range_expires_time').closest('.fr').textContent.indexOf("server's clock") >= 0);
    const drawnRange = content().querySelectorAll('input, select, textarea').map((el) => el.id).filter((id) => id.indexOf('range_') === 0).map((id) => id.slice(6)).sort();
    check('every key of the schema has a control, and nothing else', JSON.stringify(drawnRange) === JSON.stringify(Object.keys(RANGE_PROPS).sort()), JSON.stringify(drawnRange));
    check('a new range starts where the create handler puts a key left out, with the desktop\'s priority',
@@ -1839,6 +1861,21 @@ async function main() {
    click(act('rangesave'));
    await flush();
    check('a refused save keeps the editor open with the server\'s sentence', document.getElementById('err_rangeedit').textContent === 'The range overlaps My computer with the same priority.' && $('#range_name') !== null);
+   setChecked('range_expires', true);
+   before = requests.length;
+   click(act('rangesave'));
+   await flush();
+   check('turning expiry on without a time is the server\'s refusal in the editor', called(before, 'PUT', '/api/v1/ipranges/2').length === 1 &&
+      document.getElementById('err_rangeedit').textContent === 'expires_time is required when a range is made to expire' && document.getElementById('range_expires').checked === true);
+   setValue('range_expires_time', '2030-01-02');
+   before = requests.length;
+   click(act('rangesave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/ipranges/2');
+   check('with a time, the PUT carries the flag and the time and the row shows when', !!put && put.expires === true && put.expires_time === '2030-01-02' && rows()[1].textContent.indexOf('expires 2030-01-02 00:00:00') >= 0, JSON.stringify(put));
+   click(act('rangeedit', { id: 3 }));
+   await flush();
+   check('editing a range the auto-ban placed shows its expiry', document.getElementById('range_expires').checked === true && document.getElementById('range_expires_time').value === '2026-09-14 11:30:00');
    click(act('cancel'));
    await flush();
    confirmAnswer = false;
@@ -1850,7 +1887,7 @@ async function main() {
    confirmAnswer = true;
    click(act('rangedel', { id: 3 }));
    await flush();
-   check('yes deletes by id and the re-read list is without it', called(before, 'DELETE', '/api/v1/ipranges/3').length === 1 && rows().length === 3 && rows().every((r) => r.textContent.indexOf('auto-ban') < 0));
+   check('yes deletes by id and the re-read list is without it', called(before, 'DELETE', '/api/v1/ipranges/3').length === 1 && rows().length === 3 && rows().every((r) => r.textContent.indexOf('Auto-ban') < 0));
    nextRefusal = 'The last range cannot be deleted.';
    click(act('rangedel', { id: 1 }));
    await flush();
@@ -2260,15 +2297,27 @@ async function main() {
    const routeChoice = content().querySelector('[data-r="act-route_id"]');
    check('send_using_route offers the routes by name', routeChoice !== null && routeChoice.tagName === 'SELECT' && routeChoice.textContent.indexOf('partner.example') >= 0, routeChoice ? routeChoice.innerHTML : 'none');
    routeChoice.value = '5';
+   click(act('actadd'));
+   await flush();
+   const secondType = content().querySelector('[data-r="act-type"][data-i="1"]');
+   secondType.value = 'forward';
+   secondType.dispatchEvent(makeEvent('change'));
+   await flush();
+   const abortBox = content().querySelector('[data-r="act-abort_spam_flagged"][data-i="1"]');
+   check('a forward action offers its abort flag as a checkbox with the desktop\'s caption, off', abortBox !== null && abortBox.type === 'checkbox' && abortBox.checked === false &&
+      abortBox.closest('label').textContent.indexOf('Abort on messages marked as spam') >= 0 && content().querySelector('[data-r="act-abort_spam_flagged"][data-i="0"]') === null,
+      abortBox ? 'found' : 'no checkbox');
+   content().querySelector('[data-r="act-to"][data-i="1"]').value = 'copy@example.test';
+   abortBox.checked = true;
    $('#ruleName').value = 'Flagged via partner';
    $('#ruleAll').value = 'any';
    before = requests.length;
    click(act('rulesave'));
    await flush();
    posted = lastBody(before, 'POST', '/api/v1/rules');
-   check('saving a new rule posts the shape the route takes', !!posted && posted.name === 'Flagged via partner' && posted.active === true && posted.all_criteria === false &&
+   check('saving a new rule posts the shape the route takes, the flag as a boolean', !!posted && posted.name === 'Flagged via partner' && posted.active === true && posted.all_criteria === false &&
       JSON.stringify(posted.criteria) === '[{"field":"header","match":"equals","value":"YES","header":"X-Spam-Flag"}]' &&
-      JSON.stringify(posted.actions) === '[{"type":"send_using_route","route_id":5}]', JSON.stringify(posted));
+      JSON.stringify(posted.actions) === '[{"type":"send_using_route","route_id":5},{"type":"forward","to":"copy@example.test","abort_spam_flagged":true}]', JSON.stringify(posted));
    check('and returns to the re-read list with the new rule', called(before, 'GET', '/api/v1/rules').length === 1 && rows().length === 2 && rows()[1].textContent.indexOf('Flagged via partner') >= 0);
    click(act('ruleedit', { id: 1 }));
    await flush();
