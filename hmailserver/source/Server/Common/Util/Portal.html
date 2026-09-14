@@ -288,6 +288,10 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .msg .star.on{color:var(--star)}
 .msg .star.on svg.i,.msg-toolbar #message-flag.on svg.i{fill:currentColor}
 #message-flag.on{color:var(--star)}
+#message-followup.on{color:var(--star)}
+.msg .due{font-size:11px;line-height:16px;padding:0 7px;border-radius:999px;background:var(--surface-2);color:var(--text-2);white-space:nowrap}
+.msg .due.now{background:var(--warn-soft);color:var(--warn)}
+.msg .due.late{background:var(--danger-soft);color:var(--danger)}
 .msg .avatar{margin:0 6px 0 2px}
 .msg .who{width:190px;min-width:0;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:var(--text-2);padding-right:8px}
 .msg .who .n{color:var(--text-2);font-weight:400;margin-left:6px;font-size:12.5px}
@@ -718,6 +722,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <span class="sep"></span>
 <button class="iconbtn sm" id="message-unread" type="button" title="Mark as unread" aria-label="Mark as unread"><svg class="i"><use href="#i-mail"/></svg></button>
 <button class="iconbtn sm" id="message-flag" type="button" title="Star" aria-label="Star"><svg class="i"><use href="#i-star"/></svg></button>
+<button class="iconbtn sm" id="message-followup" type="button" title="Follow up" aria-label="Follow up"><svg class="i"><use href="#i-flag"/></svg></button>
 <button class="iconbtn sm" id="message-snooze" type="button" title="Snooze" aria-label="Snooze"><svg class="i"><use href="#i-clock"/></svg></button>
 <button class="iconbtn sm" id="message-label" type="button" title="Label" aria-label="Label"><svg class="i"><use href="#i-label"/></svg></button>
 <select id="message-move" aria-label="Move to"></select><button class="textbtn" id="message-move-go" type="button">Move</button>
@@ -757,6 +762,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div id="message-receipt" class="infobar" hidden>The sender asked to be told when this is read. <button id="receipt-send" class="btn ghost sm" type="button">Send a receipt</button> <button id="receipt-never" class="btn quiet sm" type="button">Never ask</button></div>
 <div id="message-smime" class="infobar" hidden><span id="message-smime-text"></span> <button id="message-smime-unlock" class="btn ghost sm" type="button" hidden>Unlock keys to read</button></div>
 <div id="snooze-menu" class="row" hidden><span class="muted">Bring it back</span><button class="btn ghost sm" id="snooze-3h" type="button">in 3 hours</button><button class="btn ghost sm" id="snooze-tomorrow" type="button">tomorrow at 9</button><button class="btn ghost sm" id="snooze-week" type="button">next week</button><input id="snooze-at" type="datetime-local" aria-label="Until" style="width:auto"><button class="btn sm" id="snooze-go" type="button">Snooze</button></div>
+<div id="followup-menu" class="row" hidden><span class="muted">Follow up by</span><button class="btn ghost sm" id="followup-today" type="button">today</button><button class="btn ghost sm" id="followup-tomorrow" type="button">tomorrow</button><button class="btn ghost sm" id="followup-week" type="button">next week</button><input id="followup-at" type="date" aria-label="A day" style="width:auto"><button class="btn sm" id="followup-go" type="button">Set</button><button class="btn quiet sm" id="followup-clear" type="button" hidden>Clear the flag</button></div>
 <div id="label-menu" class="row" hidden></div>
 <pre id="message-headers" class="headers" hidden></pre>
 <div id="message-remote" class="infobar" hidden>Remote images and styles were not loaded. <button id="remote-once" class="btn ghost sm" type="button">Show them</button><button id="remote-always" class="btn quiet sm" type="button">Always show from this sender</button></div>

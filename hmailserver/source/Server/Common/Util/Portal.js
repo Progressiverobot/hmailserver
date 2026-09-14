@@ -621,6 +621,8 @@
     var meta = node('div', undefined, 'meta');
     if (m.has_attachments) { var clip = node('span', undefined, 'clip'); clip.setAttribute('title', t('Has attachments')); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
     if (isMuted(m)) { meta.appendChild(muteMark()); }
+    var due = dueMark(m);
+    if (due) { meta.appendChild(due); }
     var when = node('span', whenText(m), 'when'); when.setAttribute('title', fullDate(m)); meta.appendChild(when);
     row.appendChild(meta);
     var acts = node('div', undefined, 'acts');
@@ -656,7 +658,9 @@
     step();
   };
   var renderRows = function (page, list, shown) {
-    var ordered = page.messages.filter(isPinned).concat(page.messages.filter(function (m) { return !isPinned(m); }));
+    // The Starred view puts the dated follow-ups first, the soonest at the
+    // top; elsewhere the pinned messages come first.
+    var ordered = state.everywhere && state.query === 'is:flagged' ? byDue(page.messages) : page.messages.filter(isPinned).concat(page.messages.filter(function (m) { return !isPinned(m); }));
     if (pref('view') !== 'threads' || page.query) {
       ordered.forEach(function (m) { shown[m.id] = true; });
       chunkedAppend(ordered, list, function (m) { return messageRow(m, false); });
@@ -706,6 +710,8 @@
       var meta = node('div', undefined, 'meta');
       if (g.messages.some(function (m) { return m.has_attachments; })) { var clip = node('span', undefined, 'clip'); clip.appendChild(icon('clip', true)); meta.appendChild(clip); }
       if (g.messages.some(isMuted)) { meta.appendChild(muteMark()); }
+      var soonest = soonestDue(g.messages);
+      if (soonest) { meta.appendChild(dueMark(soonest)); }
       var when = node('span', whenText(newest), 'when'); when.setAttribute('title', fullDate(newest)); meta.appendChild(when);
       row.appendChild(meta);
       var acts = node('div', undefined, 'acts');
@@ -913,6 +919,13 @@
     flag.classList.toggle('on', !!current.flags.flagged);
     flag.setAttribute('title', current.flags.flagged ? t('Unstar') : t('Star'));
     flag.setAttribute('aria-label', current.flags.flagged ? t('Unstar') : t('Star'));
+    var follow = el('message-followup');
+    var dueDay = dueOf(current);
+    follow.classList.toggle('on', hasFollowUp(current));
+    follow.setAttribute('title', dueDay ? tf('Due {0}', dueText(dueDay)) : t('Follow up'));
+    follow.setAttribute('aria-label', dueDay ? tf('Due {0}', dueText(dueDay)) : t('Follow up'));
+    el('followup-clear').hidden = !hasFollowUp(current);
+    el('followup-menu').hidden = true;
     el('label-menu').hidden = true;
     renderMessageLabels();
     el('message-edit').hidden = !current.flags.draft;
@@ -971,6 +984,7 @@
     el('message-headers-toggle').hidden = !m.headers;
     el('message-receipt').hidden = !(m.receipt_requested_by && pref('receipts') !== 'never');
     el('snooze-menu').hidden = true;
+    el('followup-menu').hidden = true;
     el('message-unsubscribe').hidden = !m.list_unsubscribe;
     el('message-source').setAttribute('href', '/api/v1/me/messages/' + m.id + '/source');
     el('message-source').setAttribute('download', 'message-' + m.id + '.eml');
@@ -1454,6 +1468,8 @@
         var unknown = applyCounts(result.data.folders || []);
         probeIn = document.hidden ? probeSlowly : probeEvery;
         setProbeState('Watching for new mail', false);
+        // A page left open overnight: the follow-ups due today are asked for once the day turns.
+        if (followUps.day && followUps.day !== dueToday()) { followUpsCheck(); }
         if (had && (result.data.changed || unknown)) {
           loadFolders().then(function () {
             if (!el('mail-section').hidden && !el('message-list').hidden) { reloadKeepingPlace(); }
@@ -1603,6 +1619,8 @@
     hideSearchHistory();
     hideSuggestions();
     clear(el('search-suggest-list'));
+    dueShownForget();
+    followUps.day = '';
     prefetched = {};
     current = null;
     lastListing = null;
@@ -1700,6 +1718,7 @@
           if (pending) { var wanted = pending; pending = ''; replaceWith(wanted); }
           else { route(); }
           probeNow();
+          followUpsCheck();
           return true;
         });
       }
@@ -3170,6 +3189,102 @@
   el('snooze-tomorrow').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-week').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-go').addEventListener('click', function () { var at = fromPicker(el('snooze-at').value); if (at.length === 16) { snoozeUntil(at); } else { say('mail-status', t('Choose when.'), false); } });
+  // ---- Follow-up flags: a flag with a date, as Outlook has them -------------
+  // A follow-up is the star, the $FollowUp keyword and a $Due-YYYY-MM-DD
+  // keyword beside it, all on the message: it travels with the message
+  // wherever it is filed and whatever client moves it, a mail program that
+  // does not know the two keywords shows the star and leaves them be, and
+  // label:$FollowUp finds them. The Starred view lists the dated ones
+  // first, the soonest at the top; a row says when one is due; and what is
+  // due today or before is announced once a day.
+  var FOLLOWUP = '$FollowUp';
+  var DUE = '$Due-';
+  var isFollowUpKeyword = function (k) { return String(k).toLowerCase() === FOLLOWUP.toLowerCase(); };
+  var isDueKeyword = function (k) { return String(k).slice(0, DUE.length).toLowerCase() === DUE.toLowerCase() && /^\d{4}-\d{2}-\d{2}$/.test(String(k).slice(DUE.length)); };
+  var keywordsOf = function (m) { return (m && m.flags && m.flags.keywords) || []; };
+  var hasFollowUp = function (m) { return keywordsOf(m).some(isFollowUpKeyword); };
+  var dueOf = function (m) { var found = keywordsOf(m).filter(isDueKeyword); return found.length ? found[0].slice(DUE.length) : ''; };
+  var dueDayOf = function (d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+  var dueToday = function () { return dueDayOf(new Date()); };
+  var dueText = function (day) {
+    var d = new Date(day + 'T00:00:00');
+    if (isNaN(d.getTime())) { return day; }
+    try { return d.toLocaleDateString(languageActive, d.getFullYear() === new Date().getFullYear() ? { day: 'numeric', month: 'short' } : { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return day; }
+  };
+  // The badge a row carries: overdue, due today, or the day.
+  var dueMark = function (m) {
+    var day = dueOf(m);
+    if (!day) { return null; }
+    var now = dueToday();
+    var s = node('span', day < now ? t('Overdue') : day === now ? t('Due today') : tf('Due {0}', dueText(day)), 'due' + (day < now ? ' late' : day === now ? ' now' : ''));
+    s.setAttribute('title', day);
+    return s;
+  };
+  var soonestDue = function (messages) {
+    var best = null;
+    messages.forEach(function (m) { var d = dueOf(m); if (d && (!best || d < dueOf(best))) { best = m; } });
+    return best;
+  };
+  var byDue = function (messages) {
+    var dated = messages.filter(function (m) { return !!dueOf(m); });
+    dated.sort(function (a, b) { var x = dueOf(a), y = dueOf(b); return x < y ? -1 : x > y ? 1 : 0; });
+    return dated.concat(messages.filter(function (m) { return !dueOf(m); }));
+  };
+  // The star, the keyword and the day in one change; a day already there
+  // is taken off first. An empty day clears the flag, star and all.
+  var setFollowUp = function (m, day) {
+    var stale = keywordsOf(m).filter(isDueKeyword);
+    var body = day ? { flagged: true, keywords_add: [FOLLOWUP, DUE + day], keywords_remove: stale } : { flagged: false, keywords_remove: stale.concat([FOLLOWUP]) };
+    return call('PUT', '/api/v1/me/messages/' + m.id + '/flags', body).then(function (result) {
+      if (result.status !== 200 || !result.data || !result.data.flags) { say('mail-status', describe(result, t('Could not change the flags')), false); return false; }
+      m.flags = result.data.flags;
+      if (current && current.id === m.id) { current.flags = result.data.flags; renderActions(); }
+      toast(day ? tf('Follow up by {0}.', dueText(day)) : t('Follow-up flag cleared.'));
+      lastListing = null;
+      loadFolders();
+      if (!el('mail-section').hidden) { reloadKeepingPlace(); }
+      return true;
+    });
+  };
+  var followUpIn = function (days) { var d = new Date(); d.setDate(d.getDate() + days); return dueDayOf(d); };
+  el('message-followup').addEventListener('click', function () { var menu = el('followup-menu'); menu.hidden = !menu.hidden; el('snooze-menu').hidden = true; });
+  el('followup-today').addEventListener('click', function () { if (current) { setFollowUp(current, followUpIn(0)); } });
+  el('followup-tomorrow').addEventListener('click', function () { if (current) { setFollowUp(current, followUpIn(1)); } });
+  el('followup-week').addEventListener('click', function () { if (current) { setFollowUp(current, followUpIn(7)); } });
+  el('followup-go').addEventListener('click', function () {
+    var day = String(el('followup-at').value || '').slice(0, 10);
+    if (current && /^\d{4}-\d{2}-\d{2}$/.test(day)) { setFollowUp(current, day); } else { say('mail-status', t('Choose when.'), false); }
+  });
+  el('followup-clear').addEventListener('click', function () { if (current) { setFollowUp(current, ''); } });
+  // What is due today or before, asked of the server once a day - at
+  // sign-in, and again when the probe sees the day turn - and announced
+  // once per message: a toast that opens it, or the Starred view when there
+  // are several, and a browser notification where those are on. Which were
+  // announced is kept in this browser for the day, and forgotten at
+  // sign-out.
+  var DUE_SHOWN = 'hmPortalDueShown';
+  var followUps = { day: '' };
+  var dueShownRead = function () {
+    try { var v = JSON.parse(localStorage.getItem(DUE_SHOWN) || 'null'); return v && v.day === dueToday() && Array.isArray(v.ids) ? v.ids : []; } catch (e) { return []; }
+  };
+  var dueShownWrite = function (ids) { try { localStorage.setItem(DUE_SHOWN, JSON.stringify({ day: dueToday(), ids: ids })); } catch (e) { /* a browser that keeps nothing */ } };
+  var dueShownForget = function () { try { localStorage.removeItem(DUE_SHOWN); } catch (e) { /* nothing to forget */ } };
+  var followUpsCheck = function () {
+    followUps.day = dueToday();
+    return call('GET', '/api/v1/me/search?q=' + encodeURIComponent('label:' + FOLLOWUP) + '&limit=200').then(function (result) {
+      if (result.status !== 200 || !result.data || el('account').hidden) { return; }
+      var shown = dueShownRead();
+      var due = (result.data.messages || []).filter(function (m) { var d = dueOf(m); return d && d <= dueToday() && shown.indexOf(m.id) < 0; });
+      if (!due.length) { return; }
+      dueShownWrite(shown.concat(due.map(function (m) { return m.id; })));
+      var text = due.length === 1 ? tf('Due for follow-up: {0}', due[0].subject || t('(no subject)')) : tf('{0} messages are due for follow-up', due.length);
+      if (due.length === 1) { toast(text, function () { go('/m/' + due[0].id); }, true, t('Open')); }
+      else { toast(text, function () { go('/starred'); }, true, t('Show them')); }
+      if (pref('notify') === '1' && 'Notification' in window && Notification.permission === 'granted') {
+        try { new Notification(text, { tag: 'hm-followup' }); } catch (e) { /* a browser without notifications is still a browser */ }
+      }
+    });
+  };
   var loadScheduled = function () {
     return call('GET', '/api/v1/me/scheduled').then(function (result) {
       if (result.status !== 200 || !result.data) { say('scheduled-status', describe(result, t('Could not read what is scheduled')), false); return; }
@@ -3791,7 +3906,7 @@
     if (toastTimer && typeof clearTimeout === 'function') { clearTimeout(toastTimer); }
     toastTimer = 0;
   };
-  var toast = function (text, undo, sticky) {
+  var toast = function (text, undo, sticky, label) {
     var box = el('toasts');
     if (!box) { say('mail-status', text, true); return null; }
     clear(box);
@@ -3800,7 +3915,7 @@
     one.appendChild(node('span', text));
     one.appendChild(node('span', undefined, 'sp'));
     if (undo) {
-      var u = node('button', t('Undo')); u.type = 'button';
+      var u = node('button', label || t('Undo')); u.type = 'button';
       u.addEventListener('click', function () { dismissToast(); undo(); });
       one.appendChild(u);
     }

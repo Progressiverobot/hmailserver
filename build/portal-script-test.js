@@ -323,6 +323,15 @@ function folderTree() {
    return { delimiter: '.', folders: [inbox, Object.assign({}, SENT)], shared: [] };
 }
 
+// The flags the page changes, kept per message and answered back in every
+// listing, search and message from then on: the star and the keywords. One
+// message starts with a follow-up due today, so the reminder has something
+// to say at sign-in.
+const todayStamp = (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+const flaggedById = { 101: true };
+const keywordsById = { 101: ['$FollowUp', '$Due-' + todayStamp] };
+const withState = (m) => Object.assign({}, m, { flags: Object.assign({}, m.flags, { flagged: !!flaggedById[m.id], keywords: (keywordsById[m.id] || []).slice() }) });
+
 const LISTING = {
    total: 5,
    messages: [
@@ -389,9 +398,18 @@ function answer(method, path, body) {
    if (path === '/api/v1/me/preferences' && method === 'GET') { return json(200, { preferences: prefsStore }); }
    if (path === '/api/v1/me/preferences' && method === 'PUT') { Object.assign(prefsStore, JSON.parse(body || '{}')); return json(200, { preferences: prefsStore }); }
    if (path.startsWith('/api/v1/me/folders/1/messages')) {
-      if (path.indexOf('before_uid=') >= 0) { return json(200, { total: arrived ? 6 : 5, messages: OLDER }); }
-      if (!arrived) { return json(200, LISTING); }
-      return json(200, { total: 6, messages: [ARRIVAL].concat(LISTING.messages) });
+      if (path.indexOf('before_uid=') >= 0) { return json(200, { total: arrived ? 6 : 5, messages: OLDER.map(withState) }); }
+      if (!arrived) { return json(200, { total: LISTING.total, messages: LISTING.messages.map(withState) }); }
+      return json(200, { total: 6, messages: [ARRIVAL].concat(LISTING.messages).map(withState) });
+   }
+   if (path.startsWith('/api/v1/me/search?')) {
+      // Every folder, for the two queries the page makes of it: the Starred
+      // view's and the follow-up reminder's.
+      const q = decodeURIComponent((path.split('q=')[1] || '').split('&')[0]);
+      const all = LISTING.messages.concat(arrived ? [ARRIVAL] : [], OLDER).map(withState);
+      const hits = q === 'is:flagged' ? all.filter((m) => m.flags.flagged)
+         : q === 'label:$FollowUp' ? all.filter((m) => m.flags.keywords.some((k) => k.toLowerCase() === '$followup')) : [];
+      return json(200, { query: q, scanned: all.length, complete: true, more: false, messages: hits.map((m) => Object.assign({ folder_id: 1, folder: 'INBOX' }, m)) });
    }
    if (/^\/api\/v1\/me\/folders\/\d+\/messages/.test(path)) { return json(200, { total: 0, messages: [] }); }
    if (/^\/api\/v1\/me\/messages\/102\/attachments\/(\d+)$/.test(path)) {
@@ -401,13 +419,23 @@ function answer(method, path, body) {
       const types = { 0: 'text/plain', 1: 'image/png', 2: 'application/octet-stream' };
       return { status: 200, body: 'PNGBYTES', headers: { 'Content-Type': types[index] || 'application/octet-stream' } };
    }
-   if (path === '/api/v1/me/messages/102' && method === 'GET') { return json(200, JSON.parse(JSON.stringify(WITH_IMAGE))); }
+   if (path === '/api/v1/me/messages/102' && method === 'GET') { return json(200, withState(JSON.parse(JSON.stringify(WITH_IMAGE)))); }
    if (/^\/api\/v1\/me\/messages\/\d+$/.test(path) && method === 'GET') {
-      return json(200, Object.assign(JSON.parse(JSON.stringify(WITH_IMAGE)), { id: Number(path.split('/').pop()), html: '', text: 'plain' }));
+      return json(200, withState(Object.assign(JSON.parse(JSON.stringify(WITH_IMAGE)), { id: Number(path.split('/').pop()), html: '', text: 'plain' })));
    }
    if (path === '/api/v1/me/messages' && method === 'POST') { return json(201, { id: 300 }); }
    if (path === '/api/v1/me/drafts' && method === 'POST') { return json(201, { id: 55 }); }
-   if (/\/flags$/.test(path)) { return json(200, { flags: { seen: true, flagged: false, draft: false } }); }
+   if (/\/messages\/\d+\/flags$/.test(path)) {
+      // The star and the keywords are kept, removed first then added, as the server does.
+      const id = Number(path.split('/')[5]);
+      const change = JSON.parse(body || '{}');
+      if (typeof change.flagged === 'boolean') { flaggedById[id] = change.flagged; }
+      let keywords = (keywordsById[id] || []).slice();
+      (change.keywords_remove || []).forEach((k) => { keywords = keywords.filter((have) => have.toLowerCase() !== k.toLowerCase()); });
+      (change.keywords_add || []).forEach((k) => { if (!keywords.some((have) => have.toLowerCase() === k.toLowerCase())) { keywords.push(k); } });
+      keywordsById[id] = keywords;
+      return json(200, { id, folder_id: 1, flags: { seen: true, flagged: !!flaggedById[id], draft: false, keywords: keywords.slice() } });
+   }
    if (path.startsWith('/api/v1/me/changes')) {
       if (changesMissing) { return json(404, { error: 'Not found.' }); }
       changeStep += 1;
@@ -506,6 +534,17 @@ async function main() {
       requests.filter((r) => r.method !== 'GET' && r.path !== '/api/v1/session').every((r) => r.headers['X-Requested-With'] === 'hMailServer'));
    check('the account is shown', app.hidden === false && gate.hidden === true);
    check('the folder tree was read', called(before, 'GET', '/api/v1/me/folders'));
+
+   // ---- a follow-up due today is announced once at sign-in, and the notice opens the message
+   const toastBox = document.getElementById('toasts');
+   check('the follow-ups are asked for once at sign-in', since(before).filter((r) => r.method === 'GET' && r.path === '/api/v1/me/search?q=label%3A%24FollowUp&limit=200').length === 1,
+      JSON.stringify(since(before).map((r) => r.path)));
+   check('and the one due today is announced, with a way to open it', toastBox.textContent.indexOf('Due for follow-up: First') >= 0 && toastBox.textContent.indexOf('Open') >= 0, toastBox.textContent);
+   check('which was announced is kept for the day, in this browser', (() => { try { const v = JSON.parse(store.get('hmPortalDueShown')); return v.day === todayStamp && v.ids.length === 1 && v.ids[0] === 101; } catch (e) { return false; } })(),
+      String(store.get('hmPortalDueShown')));
+   // Dismissed for now; what Open does is checked at the end, on a second sign-in.
+   { const buttons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.getAttribute('aria-label') === 'Dismiss') { buttons.push(c); } if (c.childNodes) { walk(c); } } })(toastBox); buttons.forEach((b) => b.dispatchEvent(makeEvent('click'))); }
+   check('and the notice can be dismissed', toastBox.children.length === 0 && location.hash === '#/settings', toastBox.children.length + ' toasts, ' + location.hash);
 
    // ---- the address the reader arrived at is the one that is restored
    check('a reload lands where the reader was', document.getElementById('settings-section').hidden === false,
@@ -617,6 +656,19 @@ async function main() {
    const pinCall = since(beforePin).filter((r) => r.method === 'PUT' && /\/messages\/102\/flags$/.test(r.path))[0];
    check('Pin adds the pin keyword to the message', !!pinCall && JSON.stringify(JSON.parse(pinCall.body).keywords_add) === '["$Pinned"]', pinCall ? pinCall.body : 'no flags call');
    check('and the menu is gone', document.getElementById('context-menu').hidden === true);
+   // The pin is honoured: the pinned message now heads the list, and Unpin puts it back.
+   const menuItem = (act) => { const menu = document.getElementById('context-menu'); for (let i = 0; i < menu.children.length; i++) { if (menu.children[i].getAttribute('data-act') === act) { return menu.children[i]; } } return null; };
+   check('the pinned message heads the list', rows()[0].textContent.indexOf('Second') >= 0 && rows()[0].className.indexOf('pinned') >= 0, rows()[0].className + ' ' + rows()[0].textContent.slice(0, 30));
+   rows()[0].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
+   check('and its row menu offers Unpin', !!menuItem('pin') && menuItem('pin').textContent === 'Unpin', menuItem('pin') ? menuItem('pin').textContent : 'no pin item');
+   const beforeUnpin = requests.length;
+   menuItem('pin').dispatchEvent(makeEvent('click', { target: menuItem('pin') }));
+   await flush();
+   await flush();
+   const unpinCall = since(beforeUnpin).filter((r) => r.method === 'PUT' && /\/messages\/102\/flags$/.test(r.path))[0];
+   check('Unpin takes the keyword off and the row goes back to its place', !!unpinCall && JSON.stringify(JSON.parse(unpinCall.body).keywords_remove) === '["$Pinned"]' && rows()[1].textContent.indexOf('Second') >= 0 && rows()[0].className.indexOf('pinned') < 0,
+      (unpinCall ? unpinCall.body : 'no flags call') + ' ' + rows().map((r) => r.textContent.slice(0, 20)).join(' | '));
+   dismissAllToasts();
    rows()[1].dispatchEvent(makeEvent('contextmenu', { clientX: 300, clientY: 200 }));
    document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.body }));
    check('Escape closes the row menu', document.getElementById('context-menu').hidden === true);
@@ -1071,6 +1123,66 @@ async function main() {
    check('a form with something in it is saved as a draft first', !!draftCall && JSON.parse(draftCall.body).text === 'Half a thought', draftCall ? draftCall.body : 'no draft saved');
    check('and the new window opens on that draft', opened.length === 3 && opened[2].url === 'http://portal.test/portal#/compose?draft=55', JSON.stringify(opened.slice(2)));
    check('and the form here is closed and blank, so one window edits the draft', compose.hidden === true && document.getElementById('compose-text').value === '', 'hidden=' + compose.hidden + ' text=' + document.getElementById('compose-text').value);
+
+   // ---- follow-up flags: a flag with a date, the badge on the row, the Starred view by due date
+   location.hash = '#/f/1';
+   await flush();
+   const dueOfRow = (row) => { let found = null; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.className && c.className.indexOf('due') === 0) { found = c; } if (c.childNodes) { walk(c); } } })(row); return found; };
+   const rowBySubject = (subject) => rows().filter((r) => r.textContent.indexOf(subject) >= 0)[0];
+   check('a row due today says so', !!dueOfRow(rowBySubject('First')) && dueOfRow(rowBySubject('First')).textContent === 'Due today' && dueOfRow(rowBySubject('First')).className.indexOf('now') >= 0,
+      dueOfRow(rowBySubject('First')) ? dueOfRow(rowBySubject('First')).textContent : 'no badge');
+   check('and a row with no follow-up carries no badge', !dueOfRow(rowBySubject('Second')));
+   location.hash = '#/m/102';
+   await flush();
+   const followBtn = document.getElementById('message-followup');
+   const followMenu = document.getElementById('followup-menu');
+   check('the open message offers Follow up, off', !followBtn.classList.contains('on') && followMenu.hidden === true && document.getElementById('followup-clear').hidden === true,
+      followBtn.className + ' menu hidden=' + followMenu.hidden);
+   followBtn.dispatchEvent(makeEvent('click'));
+   check('the button opens the menu', followMenu.hidden === false);
+   const beforeFollow = requests.length;
+   document.getElementById('followup-tomorrow').dispatchEvent(makeEvent('click'));
+   await flush();
+   const tomorrowStamp = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })();
+   const followCall = since(beforeFollow).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/messages/102/flags')[0];
+   check('tomorrow stars the message and adds the $FollowUp and $Due- keywords in one change',
+      !!followCall && JSON.parse(followCall.body).flagged === true && JSON.stringify(JSON.parse(followCall.body).keywords_add) === JSON.stringify(['$FollowUp', '$Due-' + tomorrowStamp]),
+      followCall ? followCall.body : 'no flags call');
+   check('the button shows it on, the menu closes and Clear the flag is offered', followBtn.classList.contains('on') && followMenu.hidden === true && document.getElementById('followup-clear').hidden === false, followBtn.className);
+   check('and the row carries the day', !!dueOfRow(rowBySubject('Second')) && dueOfRow(rowBySubject('Second')).getAttribute('title') === tomorrowStamp,
+      dueOfRow(rowBySubject('Second')) ? dueOfRow(rowBySubject('Second')).textContent : 'no badge');
+   dismissAllToasts();
+   location.hash = '#/starred';
+   await flush();
+   // The starred messages, the dated ones first and the soonest at the top, the undated after them.
+   check('the Starred view lists the follow-ups by due date, the soonest first', rows().length >= 2 && rows()[0].textContent.indexOf('First') >= 0 && rows()[1].textContent.indexOf('Second') >= 0 && rows().slice(2).every((r) => !dueOfRow(r)),
+      rows().map((r) => r.textContent.slice(0, 40)).join(' | '));
+   location.hash = '#/m/102';
+   await flush();
+   const beforeClear = requests.length;
+   document.getElementById('followup-clear').dispatchEvent(makeEvent('click'));
+   await flush();
+   const clearCall = since(beforeClear).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/messages/102/flags')[0];
+   check('Clear the flag unstars the message and takes both keywords off',
+      !!clearCall && JSON.parse(clearCall.body).flagged === false && JSON.stringify(JSON.parse(clearCall.body).keywords_remove) === JSON.stringify(['$Due-' + tomorrowStamp, '$FollowUp']),
+      clearCall ? clearCall.body : 'no flags call');
+   check('and the button is off again', !followBtn.classList.contains('on') && document.getElementById('followup-clear').hidden === true, followBtn.className + ' clear hidden=' + document.getElementById('followup-clear').hidden);
+   dismissAllToasts();
+   // The reminder's Open: announced again on a fresh sign-in, since what was announced went with the account.
+   document.getElementById('signout').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('sign-out forgets which follow-ups were announced', !store.has('hmPortalDueShown') && gate.hidden === false, String(store.get('hmPortalDueShown')));
+   document.getElementById('address').value = 'user@example.com';
+   document.getElementById('password').value = 'a-real-password';
+   const beforeAgain = requests.length;
+   document.getElementById('signin-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('and the next sign-in announces the one due today again', app.hidden === false && toastBox.textContent.indexOf('Due for follow-up: First') >= 0, toastBox.textContent);
+   { const buttons = []; (function walk(n) { for (let i = 0; i < n.childNodes.length; i++) { const c = n.childNodes[i]; if (c.tagName === 'BUTTON' && c.textContent === 'Open') { buttons.push(c); } if (c.childNodes) { walk(c); } } })(toastBox); if (buttons.length) { buttons[0].dispatchEvent(makeEvent('click')); } }
+   await flush();
+   check('Open opens the message', location.hash === '#/m/101' && called(beforeAgain, 'GET', '/api/v1/me/messages/101') && toastBox.children.length === 0, location.hash + ' ' + toastBox.children.length + ' toasts');
+   document.getElementById('message-back').dispatchEvent(makeEvent('click'));
+   await flush();
 
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));
