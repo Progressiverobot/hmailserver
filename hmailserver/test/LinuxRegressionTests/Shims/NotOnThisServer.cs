@@ -179,6 +179,9 @@ namespace RegressionTests.Shared
       public const string NoAccountIds =
          "needs an account's database id, and this server's GET /api/v1/accounts/{address} does not report one (it arrived after 6.3.2)";
 
+      public const string NoAccountByIdRoute =
+         "deletes an account by its database id, and the REST API addresses an account by its address only";
+
       public const string NoAliasIds =
          "needs an alias's database id, and the REST API addresses an alias by name only";
 

@@ -174,7 +174,7 @@ namespace hMailServer
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoAccountIds);
+         NotOnThisServer.Ignore(NotOnThisServer.NoAccountByIdRoute);
       }
 
       public void Delete(int index)
