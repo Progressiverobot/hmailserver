@@ -1600,6 +1600,8 @@
     prefs = {};
     document.title = baseTitle;
     offlineForget();
+    searchesWrite([]);
+    hideSearchHistory();
     prefetched = {};
     current = null;
     lastListing = null;
@@ -2128,14 +2130,84 @@
     var files = Array.prototype.slice.call(el('compose-files').files || []);
     el('compose-files-note').textContent = files.length ? files.map(function (f) { return f.name + ' (' + format(f.size) + ')'; }).join(', ') : '';
   });
-  el('mail-search-form').addEventListener('submit', function (event) {
-    event.preventDefault();
-    var text = el('mail-search').value.trim();
+  // ---- Search history: the last ten searches, kept in this browser --------
+  // Offered under the box while it is focused and empty; an entry runs that
+  // search again, Clear the list empties it. Nothing of it reaches the
+  // server, and it goes with the account at sign-out.
+  var SEARCHES = 'hmPortalSearches';
+  var searchesRead = function () {
+    try {
+      var list = JSON.parse(localStorage.getItem(SEARCHES) || '[]');
+      return Array.isArray(list) ? list.filter(function (s) { return typeof s === 'string' && s; }).slice(0, 10) : [];
+    } catch (e) { return []; }
+  };
+  var searchesWrite = function (list) {
+    try { if (list.length) { localStorage.setItem(SEARCHES, JSON.stringify(list)); } else { localStorage.removeItem(SEARCHES); } } catch (e) { /* a browser that keeps nothing */ }
+  };
+  var rememberSearch = function (text) {
+    var list = searchesRead().filter(function (s) { return s !== text; });
+    list.unshift(text);
+    searchesWrite(list.slice(0, 10));
+  };
+  var hideSearchHistory = function () { el('search-history').hidden = true; };
+  var historyButtons = function () { return el('search-history-list').children; };
+  var historyKeys = function (e) {
+    var items = historyButtons(); var at = -1;
+    for (var i = 0; i < items.length; i++) { if (items[i] === e.target) { at = i; } }
+    if (e.key === 'ArrowDown') { e.preventDefault(); if (at + 1 < items.length) { items[at + 1].focus(); } }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); if (at > 0) { items[at - 1].focus(); } else { el('mail-search').focus(); } }
+    else if (e.key === 'Escape') { e.preventDefault(); hideSearchHistory(); el('mail-search').focus(); }
+  };
+  // Focus leaving the box or an entry closes the list, unless it went to
+  // the other of the two: a moment later, so a click on an entry lands first.
+  var leaveHistory = function () {
+    setTimeout(function () {
+      var focus = document.activeElement;
+      if (focus === el('mail-search') || within(focus, el('search-history'))) { return; }
+      hideSearchHistory();
+    }, 150);
+  };
+  var showSearchHistory = function () {
+    var list = el('search-history-list');
+    clear(list);
+    var items = searchesRead();
+    if (!items.length || el('mail-search').value) { hideSearchHistory(); return; }
+    items.forEach(function (q) {
+      var b = node('button', undefined, 'q'); b.type = 'button';
+      b.appendChild(icon('clock', true));
+      b.appendChild(node('span', q));
+      b.addEventListener('mousedown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () { el('mail-search').value = q; hideSearchHistory(); runSearch(q); });
+      b.addEventListener('keydown', historyKeys);
+      b.addEventListener('blur', leaveHistory);
+      list.appendChild(b);
+    });
+    el('search-history').hidden = false;
+  };
+  // The one way a search is run, from the box, its options panel or the
+  // history: an empty search is the folder itself, and a real one is kept.
+  var runSearch = function (text) {
+    text = String(text || '').trim();
     state.before = 0;
     lastListing = null;
     if (!text) { go('/f/' + (state.folderId || inboxId)); return; }
+    rememberSearch(text);
     if (el('mail-search-everywhere').checked) { go('/search?q=' + encodeURIComponent(text)); return; }
     go('/f/' + (state.folderId || inboxId) + '?q=' + encodeURIComponent(text));
+  };
+  el('mail-search').addEventListener('focus', showSearchHistory);
+  el('mail-search').addEventListener('blur', leaveHistory);
+  el('mail-search').addEventListener('input', function () { if (el('mail-search').value) { hideSearchHistory(); } else { showSearchHistory(); } });
+  el('mail-search').addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { hideSearchHistory(); return; }
+    if (e.key === 'ArrowDown' && !el('search-history').hidden) { var items = historyButtons(); if (items.length) { e.preventDefault(); items[0].focus(); } }
+  });
+  el('search-history-clear').addEventListener('mousedown', function (e) { e.preventDefault(); });
+  el('search-history-clear').addEventListener('click', function () { searchesWrite([]); hideSearchHistory(); el('mail-search').focus(); });
+  el('mail-search-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    hideSearchHistory();
+    runSearch(el('mail-search').value);
   });
   el('mail-search-clear').addEventListener('click', function () {
     el('mail-search').value = '';
@@ -3939,10 +4011,7 @@
     el('mail-search-everywhere').checked = el('adv-where').value === 'all';
     closeMenus();
     if (!q) { return; }
-    state.before = 0;
-    lastListing = null;
-    if (el('mail-search-everywhere').checked) { go('/search?q=' + encodeURIComponent(q)); return; }
-    go('/f/' + (state.folderId || inboxId) + '?q=' + encodeURIComponent(q));
+    runSearch(q);
   });
   el('adv-reset').addEventListener('click', function () {
     ['adv-from', 'adv-to', 'adv-subject', 'adv-words', 'adv-label', 'adv-after', 'adv-before'].forEach(function (id) { el(id).value = ''; });

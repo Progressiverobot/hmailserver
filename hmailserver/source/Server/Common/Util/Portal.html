@@ -414,6 +414,12 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .complete{position:absolute;top:100%;left:0;right:0;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);z-index:30;max-height:14rem;overflow:auto;padding:6px}
 .complete button{all:unset;display:block;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13.5px}
 .complete button:hover,.complete button.hit{background:var(--surface-2)}
+.history .head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 12px;font-size:12px;color:var(--muted)}
+.history .head button{all:unset;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--accent-text);white-space:nowrap}
+.history .head button:hover,.history .head button:focus-visible{background:var(--surface-2)}
+.history button.q{display:flex;align-items:center;gap:10px;color:var(--text)}
+.history button.q svg.i{color:var(--muted)}
+.history button.q:focus-visible{background:var(--surface-2)}
 #compose-text{border:none;border-radius:0;min-height:18rem;padding:16px 4px;font-size:14.5px;line-height:1.6;box-shadow:none}
 #compose-text:focus{box-shadow:none}
 .editor{min-height:18rem;padding:16px 4px;font-size:14.5px;line-height:1.6;outline:none}
@@ -584,6 +590,10 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <form id="mail-search-form" class="search" role="search">
 <button class="iconbtn sm" id="search-go" type="submit" title="Search" aria-label="Search"><svg class="i"><use href="#i-search"/></svg></button>
 <input id="mail-search" type="search" maxlength="200" placeholder="Search mail" aria-label="Search mail" autocomplete="off" title="Words, &quot;quoted phrases&quot;, from:, to:, subject:, has:attachment, before:2026-01-31, after:, in:folder, is:unread, is:read, is:flagged, is:unflagged, is:answered, label:name">
+<div id="search-history" class="complete history" hidden>
+<div class="head"><span>Recent searches</span><button id="search-history-clear" type="button">Clear the list</button></div>
+<div id="search-history-list" role="list"></div>
+</div>
 <label class="inline"><input id="mail-search-everywhere" type="checkbox"> All folders</label>
 <button class="btn ghost sm" type="submit">Search</button>
 <button id="mail-search-clear" class="iconbtn sm" type="button" title="Clear the search" aria-label="Clear the search" hidden><svg class="i"><use href="#i-close"/></svg></button>
@@ -1098,6 +1108,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <tr><td><kbd>Ctrl</kbd> + <kbd>K</kbd></td><td>The palette: an action, a page, a folder or a contact</td></tr>
 <tr><td><kbd>?</kbd></td><td>This list</td></tr>
 <tr><td><kbd>&darr;</kbd> <kbd>&uarr;</kbd> <kbd>Enter</kbd> <kbd>Tab</kbd></td><td>In To, Cc and Bcc: choose a completion</td></tr>
+<tr><td><kbd>&darr;</kbd> <kbd>&uarr;</kbd> <kbd>Esc</kbd></td><td>In the empty search box: move through the recent searches, or close them</td></tr>
 </tbody></table>
 <p class="row"><button id="keys-close" class="btn ghost sm" type="button">Close</button></p>
 </div>

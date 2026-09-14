@@ -37,6 +37,7 @@ use.
 | `?` | The list of shortcuts |
 | `Esc` | Close the list or the palette |
 | `↓` `↑` `Enter` `Tab` | In To, Cc and Bcc: choose a completion |
+| `↓` `↑` `Esc` | In the empty search box: the last ten searches are offered under it (kept in this browser, forgotten at sign-out); the arrows move through them, Enter runs one, Esc closes the list |
 
 Search operators
 ----------------

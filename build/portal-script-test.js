@@ -951,6 +951,50 @@ async function main() {
    document.getElementById('bulk-clear').dispatchEvent(makeEvent('click'));
    check('and the selection can be cleared', document.getElementById('bulk-bar').hidden === true && ticked() === 0, ticked() + ' rows marked');
 
+   // ---- search history: the last ten searches, kept in this browser and offered under the empty box
+   const search = document.getElementById('mail-search');
+   const historyBox = document.getElementById('search-history');
+   const historyList = document.getElementById('search-history-list');
+   const searchFor = async (text) => { search.value = text; document.getElementById('mail-search-form').dispatchEvent(makeEvent('submit')); await flush(); };
+   check('the search made earlier was kept in this browser', store.get('hmPortalSearches') === '["invoice"]', store.get('hmPortalSearches'));
+   await searchFor('from:alice');
+   check('a new search goes to the front', store.get('hmPortalSearches') === '["from:alice","invoice"]', store.get('hmPortalSearches'));
+   await searchFor('invoice');
+   check('a search made again moves to the front rather than doubling', store.get('hmPortalSearches') === '["invoice","from:alice"]', store.get('hmPortalSearches'));
+   for (let i = 0; i < 12; i += 1) { await searchFor('word' + i); }
+   const kept = JSON.parse(store.get('hmPortalSearches'));
+   check('and the list holds the last ten', kept.length === 10 && kept[0] === 'word11' && kept[9] === 'word2', JSON.stringify(kept));
+   search.value = 'x';
+   search.dispatchEvent(makeEvent('focus'));
+   check('nothing is offered under a box with something in it', historyBox.hidden === true);
+   const beforeShown = requests.length;
+   search.value = '';
+   search.dispatchEvent(makeEvent('input'));
+   check('emptying the box offers the recent searches, newest first', historyBox.hidden === false && historyList.children.length === 10 && historyList.children[0].textContent === 'word11',
+      'hidden=' + historyBox.hidden + ' ' + historyList.children.length + ' entries');
+   check('without asking the server', requests.length === beforeShown, JSON.stringify(since(beforeShown).map((r) => r.path)));
+   historyList.children[1].dispatchEvent(makeEvent('click'));
+   await flush();
+   // The folder shown is the scope, as the box's own search would have it: the inbox, since the list before this one opened it.
+   check('an entry runs that search again, in the folder shown', location.hash === '#/f/1?q=word10' && called(beforeShown, 'GET', /\/folders\/1\/messages\?.*q=word10/) && historyBox.hidden === true,
+      location.hash + ' ' + JSON.stringify(since(beforeShown).map((r) => r.path)));
+   search.value = '';
+   search.dispatchEvent(makeEvent('focus'));
+   check('the box focused and empty offers them', historyBox.hidden === false && historyList.children[0].textContent === 'word10', historyList.children[0].textContent);
+   search.dispatchEvent(makeEvent('keydown', { key: 'ArrowDown', target: search }));
+   check('the arrow key moves into the list', document.activeElement === historyList.children[0]);
+   historyList.children[0].dispatchEvent(makeEvent('keydown', { key: 'ArrowDown', target: historyList.children[0] }));
+   check('and down it', document.activeElement === historyList.children[1]);
+   historyList.children[1].dispatchEvent(makeEvent('keydown', { key: 'Escape', target: historyList.children[1] }));
+   check('Escape closes it and returns to the box', historyBox.hidden === true && document.activeElement === search);
+   search.dispatchEvent(makeEvent('focus'));
+   document.getElementById('search-history-clear').dispatchEvent(makeEvent('click'));
+   check('Clear the list empties it', !store.has('hmPortalSearches') && historyBox.hidden === true, String(store.get('hmPortalSearches')));
+   search.dispatchEvent(makeEvent('focus'));
+   check('and nothing is offered after', historyBox.hidden === true);
+   await searchFor('after:2026-09-01');
+   check('a search after that starts the list again', store.get('hmPortalSearches') === '["after:2026-09-01"]', store.get('hmPortalSearches'));
+
    // ---- the theme is a choice the browser keeps, and it is not a secret
    document.getElementById('theme-btn').dispatchEvent(makeEvent('click'));
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
@@ -988,6 +1032,7 @@ async function main() {
       location.hash);
    check('the draft is blank again', document.getElementById('compose-to').value === '',
       document.getElementById('compose-to').value);
+   check('the recent searches go with the account', !store.has('hmPortalSearches'), String(store.get('hmPortalSearches')));
 
    if (failures.length) {
       console.error('\nportal script: ' + failures.length + ' of ' + checks + ' checks failed\n');
