@@ -82,6 +82,7 @@ namespace HM
    class Message;
    class AppPassword;
    class MessageData;
+   class DateTime;
 
    // The server-wide settings group as one JSON object, from the table in
    // RestApiSettings.cpp that the GET, the PUT and the OpenAPI description all
@@ -850,6 +851,11 @@ namespace HM
       HttpResponse HandleDeleteDomainAlias_(const String &domainName, const String &aliasName);
       HttpResponse HandleUpdateIpRange_(__int64 rangeId, const AnsiString &requestBody);
       static AnsiString IpRangeEntryJson_(const std::shared_ptr<SecurityRange> &range);
+      // A range's expiry as the body spells it - YYYY-MM-DD HH:MM:SS on the
+      // server's clock, or a date alone for midnight - as a DateTime; false
+      // for anything else (RestApiAdministration.cpp, used by the create in
+      // RestApiServer.cpp as well).
+      static bool ParseExpiryTime_(const String &text, DateTime &out);
       // The distribution list's create and update, and the entry every list
       // route answers with (RestApiAdministration.cpp); the listing and the
       // delete stay in RestApiServer.cpp.

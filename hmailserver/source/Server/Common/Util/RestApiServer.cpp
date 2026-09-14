@@ -5083,6 +5083,25 @@ namespace HM
       range->SetSpamProtection(GetJsonBoolValue_(requestBody, "spam_protection", true));
       range->SetVirusProtection(GetJsonBoolValue_(requestBody, "virus_protection", true));
 
+      // The expiry the auto-ban gives its ranges and the desktop dialog
+      // offers: the flag, and a time on the server's clock that goes with it.
+      bool expires = GetJsonBoolValue_(requestBody, "expires", false);
+      String expiresText = String(GetJsonStringValue_(requestBody, "expires_time"));
+      expiresText.Trim();
+      DateTime expiresTime;
+      if (!expiresText.IsEmpty())
+      {
+         if (!expires)
+            return BuildResponse_(400, "{\"error\":\"expires_time is taken only when expires is true\"}");
+         if (!ParseExpiryTime_(expiresText, expiresTime))
+            return BuildResponse_(400, "{\"error\":\"expires_time must be a date and time as YYYY-MM-DD HH:MM:SS\"}");
+      }
+      else if (expires)
+         return BuildResponse_(400, "{\"error\":\"expires_time is required when a range expires\"}");
+      range->SetExpires(expires);
+      if (expires)
+         range->SetExpiresTime(expiresTime);
+
       String result;
       if (!PersistentSecurityRange::SaveObject(range, result, PersistenceModeNormal))
       {
@@ -10363,9 +10382,9 @@ namespace HM
          "\"post\":{\"summary\":\"Create an API key\",\"description\":\"Administrator password only. The token is returned once, at creation.\",\"responses\":{\"201\":{\"description\":\"Created\"}}}},"
          "\"/api/v1/apikeys/{id}\":{\"delete\":{\"summary\":\"Revoke an API key\",\"description\":\"Administrator password only.\",\"responses\":{\"200\":{\"description\":\"Revoked\"}}}},"
          "\"/api/v1/ipranges\":{"
-         "\"get\":{\"summary\":\"List the IP ranges\",\"description\":\"Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of ranges with their permissions\"}}},"
-         "\"post\":{\"summary\":\"Create an IP range\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"lower\",\"upper\"],\"properties\":{\"name\":{\"type\":\"string\"},\"lower\":{\"type\":\"string\"},\"upper\":{\"type\":\"string\"},\"priority\":{\"type\":\"integer\"},\"allow_smtp\":{\"type\":\"boolean\"},\"allow_imap\":{\"type\":\"boolean\"},\"allow_pop3\":{\"type\":\"boolean\"},\"deliver_local_to_local\":{\"type\":\"boolean\"},\"deliver_local_to_remote\":{\"type\":\"boolean\"},\"deliver_remote_to_local\":{\"type\":\"boolean\"},\"deliver_remote_to_remote\":{\"type\":\"boolean\"},\"require_auth_local_to_local\":{\"type\":\"boolean\"},\"require_auth_local_to_remote\":{\"type\":\"boolean\"},\"require_auth_remote_to_local\":{\"type\":\"boolean\"},\"require_auth_remote_to_remote\":{\"type\":\"boolean\"},\"require_tls_for_auth\":{\"type\":\"boolean\"},\"spam_protection\":{\"type\":\"boolean\"},\"virus_protection\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created, with its id\"},\"400\":{\"description\":\"Missing name or an address that does not parse\"}}}},"
-         "\"/api/v1/ipranges/{id}\":{\"put\":{\"summary\":\"Change an IP range\",\"description\":\"Body: any subset of the fields POST takes - name, lower, upper, priority and the permission flags; a field left out keeps its value. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"responses\":{\"200\":{\"description\":\"The range as saved, as the listing shows it\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
+         "\"get\":{\"summary\":\"List the IP ranges\",\"description\":\"Each entry: id, name, lower, upper, priority, the permission flags, expires and expires_time (the time on the server's clock at which an expiring range is removed, as the auto-ban sets it; empty for a range that does not expire). Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of ranges with their permissions\"}}},"
+         "\"post\":{\"summary\":\"Create an IP range\",\"description\":\"Body: name, lower and upper (required), priority, the permission flags, and expires with expires_time (YYYY-MM-DD HH:MM:SS on the server's clock, or a date alone for midnight; required when expires is true and taken only then). A range that expires is removed once that time passes, as one the auto-ban placed is. The same check as saving the range in the Control Panel. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\",\"lower\",\"upper\"],\"properties\":{\"name\":{\"type\":\"string\"},\"lower\":{\"type\":\"string\"},\"upper\":{\"type\":\"string\"},\"priority\":{\"type\":\"integer\"},\"allow_smtp\":{\"type\":\"boolean\"},\"allow_imap\":{\"type\":\"boolean\"},\"allow_pop3\":{\"type\":\"boolean\"},\"deliver_local_to_local\":{\"type\":\"boolean\"},\"deliver_local_to_remote\":{\"type\":\"boolean\"},\"deliver_remote_to_local\":{\"type\":\"boolean\"},\"deliver_remote_to_remote\":{\"type\":\"boolean\"},\"require_auth_local_to_local\":{\"type\":\"boolean\"},\"require_auth_local_to_remote\":{\"type\":\"boolean\"},\"require_auth_remote_to_local\":{\"type\":\"boolean\"},\"require_auth_remote_to_remote\":{\"type\":\"boolean\"},\"require_tls_for_auth\":{\"type\":\"boolean\"},\"spam_protection\":{\"type\":\"boolean\"},\"virus_protection\":{\"type\":\"boolean\"},\"expires\":{\"type\":\"boolean\"},\"expires_time\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created, with its id\"},\"400\":{\"description\":\"Missing name, an address that does not parse, an expiry without its time or a time that is not YYYY-MM-DD HH:MM:SS\"}}}},"
+         "\"/api/v1/ipranges/{id}\":{\"put\":{\"summary\":\"Change an IP range\",\"description\":\"Body: any subset of the fields POST takes - name, lower, upper, priority, the permission flags, expires and expires_time; a field left out keeps its value, and a body that turns expiry on must carry expires_time in it. The same check as saving the range in the Control Panel; nothing changes when it is refused. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\"}}}},\"responses\":{\"200\":{\"description\":\"The range as saved, as the listing shows it\"},\"400\":{\"description\":\"A field refused (error names it); nothing changed\"},\"404\":{\"description\":\"Unknown id\"}}},"
          "\"delete\":{\"summary\":\"Delete an IP range\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown id\"}}}},"
          "\"/api/v1/domains/{domain}/lists\":{"
          "\"get\":{\"summary\":\"List the distribution lists in a domain, with their members\",\"description\":\"Each entry: address, active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address, bounce_address and members. Scoped to the domain.\",\"responses\":{\"200\":{\"description\":\"Array of lists\"},\"404\":{\"description\":\"Unknown domain\"}}},"

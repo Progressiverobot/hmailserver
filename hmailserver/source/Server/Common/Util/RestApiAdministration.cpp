@@ -59,6 +59,8 @@
 #include "../Persistence/PersistentSecurityRange.h"
 #include "../Persistence/PersistenceMode.h"
 #include "../TCPIP/IPAddress.h"
+#include "Time.h"
+#include "VariantDateTime.h"
 
 #include <cmath>
 #include <functional>
@@ -1006,8 +1008,38 @@ namespace HM
       flag("spam_protection", range->GetSpamProtection());
       flag("virus_protection", range->GetVirusProtection());
       flag("expires", range->GetExpires());
-      entry += "}";
+      // The time only when it means something: a range that does not expire
+      // carries the placeholder SaveObject writes, which is not a fact about
+      // the range.
+      entry += ",\"expires_time\":\"";
+      if (range->GetExpires())
+         entry += JsonEscape_(Utf8_(Time::GetTimeStampFromDateTime(range->GetExpiresTime())));
+      entry += "\"}";
       return entry;
+   }
+
+   bool
+   RestApiServer::ParseExpiryTime_(const String &text, DateTime &out)
+   {
+      String candidate = text;
+      candidate.Trim();
+      if (candidate.GetLength() == 10)
+         candidate += " 00:00:00";
+      if (candidate.GetLength() != 19)
+         return false;
+
+      DateTime parsed = Time::GetDateFromSystemDate(candidate);
+      if (parsed.GetStatus() != DateTime::valid)
+         return false;
+
+      // Round-tripped, so that a month of 13 or a minute of 70 - which the
+      // digit reads accept and the date arithmetic may fold into the next
+      // month or hour - is refused rather than moved.
+      if (Time::GetTimeStampFromDateTime(parsed) != candidate)
+         return false;
+
+      out = parsed;
+      return true;
    }
 
    HttpResponse
@@ -1024,7 +1056,7 @@ namespace HM
          "name", "lower", "upper", "priority", "allow_smtp", "allow_imap", "allow_pop3",
          "deliver_local_to_local", "deliver_local_to_remote", "deliver_remote_to_local", "deliver_remote_to_remote",
          "require_auth_local_to_local", "require_auth_local_to_remote", "require_auth_remote_to_local", "require_auth_remote_to_remote",
-         "require_tls_for_auth", "spam_protection", "virus_protection"
+         "require_tls_for_auth", "spam_protection", "virus_protection", "expires", "expires_time"
       };
       AnsiString error;
       if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
@@ -1081,6 +1113,29 @@ namespace HM
           !ReadBool(body, "virus_protection", virus, error))
          return BuildResponse_(400, ErrorBody(quote, String(error)));
 
+      // The expiry, as the desktop dialog and the auto-ban set it: the flag,
+      // and a time on the server's clock that is taken only with the flag.
+      // Turning expiry on needs the time in the same body, because the time a
+      // range that never expired carries is SaveObject's placeholder, and a
+      // range left to it would be removed by the next sweep.
+      bool expires = range->GetExpires();
+      String expiresText;
+      if (!ReadBool(body, "expires", expires, error) ||
+          !ReadString(body, "expires_time", expiresText, error))
+         return BuildResponse_(400, ErrorBody(quote, String(error)));
+
+      expiresText.Trim();
+      DateTime expiresTime = range->GetExpiresTime();
+      if (!expiresText.IsEmpty())
+      {
+         if (!expires)
+            return BuildResponse_(400, "{\"error\":\"expires_time is taken only when expires is true\"}");
+         if (!ParseExpiryTime_(expiresText, expiresTime))
+            return BuildResponse_(400, "{\"error\":\"expires_time must be a date and time as YYYY-MM-DD HH:MM:SS\"}");
+      }
+      else if (expires && !range->GetExpires())
+         return BuildResponse_(400, "{\"error\":\"expires_time is required when a range is made to expire\"}");
+
       range->SetName(name);
       range->SetLowerIP(lower);
       range->SetUpperIP(upper);
@@ -1099,6 +1154,9 @@ namespace HM
       range->SetRequireTLSForAuth(tlsForAuth);
       range->SetSpamProtection(spam);
       range->SetVirusProtection(virus);
+      range->SetExpires(expires);
+      if (expires)
+         range->SetExpiresTime(expiresTime);
 
       String result;
       if (!PersistentSecurityRange::SaveObject(range, result, PersistenceModeNormal))

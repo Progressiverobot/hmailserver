@@ -9,9 +9,9 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Measure | Count |
 |---|---|
 | COM properties the desktop program writes | 335 |
-| of them writable over REST | 314 |
-| of them reachable from a Deck view | 248 |
-| missing over REST | 21 |
+| of them writable over REST | 316 |
+| of them reachable from a Deck view | 250 |
+| missing over REST | 19 |
 | over REST but not reached by any Deck view | 66 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
@@ -23,7 +23,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | Interface | Count | Properties the desktop writes and no route covers |
 |---|---|---|
 | IMAPFolderPermission | 4 | `PermissionAccountID`, `PermissionGroupID`, `PermissionType`, `Value` |
-| SecurityRange | 2 | `Expires`, `ExpiresTime` |
 | AppPassword | 2 | `Active`, `Name` |
 | BlockedAttachment | 2 | `Description`, `Wildcard` |
 | GreyListingWhiteAddress | 2 | `Description`, `IPAddress` |
@@ -274,8 +273,8 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `AllowSMTPConnections` | IPRangeDialog, IPRangesView | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
 | `EnableAntiVirus` | IPRangeDialog | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
 | `EnableSpamProtection` | IPRangeDialog | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
-| `Expires` | IPRangeDialog | - | - |
-| `ExpiresTime` | IPRangeDialog | - | - |
+| `Expires` | IPRangeDialog | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
+| `ExpiresTime` | IPRangeDialog | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
 | `LowerIP` | IPRangeDialog, IPRangesView | `POST /api/v1/ipranges` (words, loose)<br>`PUT /api/v1/ipranges/{id}` (words, loose) | ipranges |
 | `Name` | IPRangeDialog, IPRangesView | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
 | `Priority` | IPRangeDialog, IPRangesView | `POST /api/v1/ipranges` (setter)<br>`PUT /api/v1/ipranges/{id}` (setter) | ipranges |
@@ -694,8 +693,8 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | - |
 | `POST /api/v1/incoming-relays` | IncomingRelay | `lower_ip`, `name`, `upper_ip` | - |
 | `PUT /api/v1/incoming-relays/{id}` | IncomingRelay | `body`, `field`, `lower_ip`, `name`, `upper_ip`, `value` | - |
-| `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
-| `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | yes |
+| `POST /api/v1/ipranges` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `virus_protection` | yes |
+| `PUT /api/v1/ipranges/{id}` | SecurityRange | `allow_imap`, `allow_pop3`, `allow_smtp`, `body`, `deliver_local_to_local`, `deliver_local_to_remote`, `deliver_remote_to_local`, `deliver_remote_to_remote`, `expires`, `expires_time`, `field`, `lower`, `name`, `priority`, `require_auth_local_to_local`, `require_auth_local_to_remote`, `require_auth_remote_to_local`, `require_auth_remote_to_remote`, `require_tls_for_auth`, `spam_protection`, `upper`, `value`, `virus_protection` | yes |
 | `PUT /api/v1/lists/{address}` | DistributionList | `active`, `bounce_address`, `domain_members`, `field`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to`, `value` | - |
 | `POST /api/v1/me/app-passwords` | AppPassword | `address`, `name`, `password`, `text`, `to` | - |
 | `POST /api/v1/me/contacts` | ? | `address`, `name` | - |

@@ -92,12 +92,94 @@ namespace RegressionTests.API
          try
          {
             Restore(_before);
+
+            // The range a test makes, over COM, in case an assertion left it.
+            hMailServer.SecurityRanges ranges = _settings.SecurityRanges;
+            for (int i = ranges.Count - 1; i >= 0; i--)
+               if (ranges[i].Name.StartsWith("rest-expiry", StringComparison.Ordinal)) ranges.DeleteByDBID(ranges[i].ID);
          }
          finally
          {
             RestListener.Stop();
             _application.Reinitialize();
          }
+      }
+
+      [Test]
+      [Description("An IP range's expiry is created with its time, read back through COM, listed, moved, switched off and refused: a time without the flag, a flag without a time, a time that is not a date, and turning expiry on without a time each change nothing.")]
+      public void IpRangeExpiryRoundTrip()
+      {
+         (int status, string body) created = Http("POST", "/api/v1/ipranges",
+            "{\"name\":\"rest-expiry\",\"lower\":\"10.96.1.1\",\"upper\":\"10.96.1.1\",\"priority\":44,\"allow_smtp\":false," +
+            "\"expires\":true,\"expires_time\":\"2030-01-02 03:04:05\"}");
+         Assert.AreEqual(201, created.status, created.body);
+         string id = IdOf(created.body);
+
+         var range = _settings.SecurityRanges.get_ItemByName("rest-expiry");
+         Assert.IsTrue(range.Expires);
+         Assert.AreEqual(new DateTime(2030, 1, 2, 3, 4, 5), Convert.ToDateTime(range.ExpiresTime));
+
+         string list = Http("GET", "/api/v1/ipranges").body;
+         string entry = list.Substring(list.IndexOf("\"name\":\"rest-expiry\"", StringComparison.Ordinal));
+         entry = entry.Substring(0, entry.IndexOf('}'));
+         StringAssert.Contains("\"expires\":true", entry);
+         StringAssert.Contains("\"expires_time\":\"2030-01-02 03:04:05\"", entry);
+
+         // Moved, with a date alone meaning midnight; what the body leaves out stays.
+         (int putStatus, string putBody) = Http("PUT", "/api/v1/ipranges/" + id, "{\"expires_time\":\"2031-06-07\"}");
+         Assert.AreEqual(200, putStatus, putBody);
+         StringAssert.Contains("\"expires\":true", putBody);
+         StringAssert.Contains("\"expires_time\":\"2031-06-07 00:00:00\"", putBody);
+         range = _settings.SecurityRanges.get_ItemByName("rest-expiry");
+         Assert.AreEqual(new DateTime(2031, 6, 7, 0, 0, 0), Convert.ToDateTime(range.ExpiresTime));
+         Assert.AreEqual(44, range.Priority, "Left out, so left alone.");
+         Assert.IsFalse(range.AllowSMTPConnections);
+
+         // Refused, each with nothing changed.
+         (int badStatus, string badBody) = Http("PUT", "/api/v1/ipranges/" + id, "{\"expires_time\":\"2031-13-07 00:00:00\"}");
+         Assert.AreEqual(400, badStatus, badBody);
+         StringAssert.Contains("YYYY-MM-DD HH:MM:SS", badBody);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"expires_time\":\"tomorrow\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"expires_time\":\"2031-06-07 25:00:00\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"expires\":\"yes\"}").status);
+         Assert.AreEqual(400, Http("PUT", "/api/v1/ipranges/" + id, "{\"expires\":false,\"expires_time\":\"2032-01-01 00:00:00\"}").status, "a time is taken only with the flag");
+         range = _settings.SecurityRanges.get_ItemByName("rest-expiry");
+         Assert.IsTrue(range.Expires);
+         Assert.AreEqual(new DateTime(2031, 6, 7, 0, 0, 0), Convert.ToDateTime(range.ExpiresTime));
+
+         // Switched off: the listing no longer shows a time, and turning it on
+         // again needs the time in the same body.
+         (int offStatus, string offBody) = Http("PUT", "/api/v1/ipranges/" + id, "{\"expires\":false}");
+         Assert.AreEqual(200, offStatus, offBody);
+         StringAssert.Contains("\"expires\":false,\"expires_time\":\"\"", offBody);
+         Assert.IsFalse(_settings.SecurityRanges.get_ItemByName("rest-expiry").Expires);
+         (int onStatus, string onBody) = Http("PUT", "/api/v1/ipranges/" + id, "{\"expires\":true}");
+         Assert.AreEqual(400, onStatus, onBody);
+         StringAssert.Contains("expires_time is required", onBody);
+         Assert.IsFalse(_settings.SecurityRanges.get_ItemByName("rest-expiry").Expires, "A refused change changes nothing.");
+         Assert.AreEqual(200, Http("PUT", "/api/v1/ipranges/" + id, "{\"expires\":true,\"expires_time\":\"2033-02-03 04:05:06\"}").status);
+         range = _settings.SecurityRanges.get_ItemByName("rest-expiry");
+         Assert.IsTrue(range.Expires);
+         Assert.AreEqual(new DateTime(2033, 2, 3, 4, 5, 6), Convert.ToDateTime(range.ExpiresTime));
+
+         // A create with the flag and no time, or a time and no flag, is refused before anything is saved.
+         Assert.AreEqual(400, Http("POST", "/api/v1/ipranges",
+            "{\"name\":\"rest-expiry-2\",\"lower\":\"10.96.1.2\",\"upper\":\"10.96.1.2\",\"expires\":true}").status);
+         Assert.AreEqual(400, Http("POST", "/api/v1/ipranges",
+            "{\"name\":\"rest-expiry-2\",\"lower\":\"10.96.1.2\",\"upper\":\"10.96.1.2\",\"expires_time\":\"2030-01-01 00:00:00\"}").status);
+         StringAssert.DoesNotContain("rest-expiry-2", Http("GET", "/api/v1/ipranges").body);
+
+         // The owner of the value refuses the flag without a time over COM as well, in its own sentence.
+         var viaCom = _settings.SecurityRanges.Add();
+         viaCom.Name = "rest-expiry-3";
+         viaCom.LowerIP = "10.96.1.3";
+         viaCom.UpperIP = "10.96.1.3";
+         viaCom.Expires = true;
+         var refusal = Assert.Throws<System.Runtime.InteropServices.COMException>(() => viaCom.Save());
+         StringAssert.Contains("An expiring range needs an expiry time", refusal.Message);
+
+         Assert.AreEqual(200, Http("DELETE", "/api/v1/ipranges/" + id).status);
+         StringAssert.DoesNotContain("rest-expiry", Http("GET", "/api/v1/ipranges").body);
       }
 
       [Test]

@@ -293,6 +293,17 @@ namespace HM
          return false;
       }
 
+      // A range that expires without a time to expire at would be written
+      // with the placeholder SaveObject uses for a time it has none of,
+      // 2001-01-01, and DeleteExpired would remove it before it was ever
+      // consulted. The auto-ban always sets both; the desktop dialog and the
+      // REST routes are told, in this sentence, when they set only the flag.
+      if (pSR->GetExpires() && pSR->GetExpiresTime().GetStatus() != DateTime::valid)
+      {
+         result = "An expiring range needs an expiry time.";
+         return false;
+      }
+
       return true;
    }
 }
