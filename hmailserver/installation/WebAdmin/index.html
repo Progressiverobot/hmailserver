@@ -397,6 +397,9 @@ $("#content").addEventListener("click",e=>{
   if(d.act==="accounts")showAccounts(d.domain);
   else if(d.act==="accountedit")openAccount(d.address,d.domain);
   else if(d.act==="accountsave")saveAccount();
+  else if(d.act==="aliases")showAliases(d.domain);
+  else if(d.act==="aliasnew")createAlias(d.domain);
+  else if(d.act==="aliasdel")deleteAlias(d.name,d.domain);
   else if(d.act==="lists")showLists(d.domain);
   else if(d.act==="listnew")createList(d.domain);
   else if(d.act==="listedit")openList(d.address,d.domain);
@@ -718,6 +721,7 @@ async function renderDomains(){
         <td>${escHtml(x.postmaster||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
           <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button>
+          <button class="btn ghost sm" data-act="aliases" data-domain="${escHtml(x.name)}">Aliases ›</button>
           <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(x.name)}">Lists ›</button>
           <button class="btn ghost sm" data-act="domainedit" data-name="${escHtml(x.name)}">Edit</button>
           <button class="btn danger sm" data-act="domaindel" data-name="${escHtml(x.name)}">Delete</button>
@@ -994,6 +998,66 @@ async function saveAccount(){
     toast("Account saved");
     renderAccountEditor();
   }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_accountedit",e.message);}
+}
+
+/* ---------- Aliases ----------
+   The aliases of a domain, over GET and POST /api/v1/domains/{domain}/aliases
+   and DELETE /api/v1/aliases/{address}: an address in the domain and the
+   address it delivers to. The API has no update for an alias - the desktop
+   deletes and re-creates one as well - so the page lists, makes and removes.
+   The form is built from the create's schema and starts at the default its
+   description states, active. */
+const ALIAS_HINTS={name:"The alias address, in this domain.",value:"The e-mail address it delivers to.",active:"Whether mail to the alias is delivered."};
+function aliasProps(){
+  const props=properties("/api/v1/domains/{domain}/aliases","post"), out={};
+  Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&ALIAS_HINTS[k])out[k].description=ALIAS_HINTS[k];});
+  return out;
+}
+async function showAliases(domain){
+  editing=null;
+  await loadSpec();
+  const aliases=asList(await api("/api/v1/domains/"+encodeURIComponent(domain)+"/aliases"),"aliases");
+  const rows=aliases.map(x=>`
+    <tr><td><b>${escHtml(x.name)}</b></td>
+        <td><code>${escHtml(x.value)}</code></td>
+        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn danger sm" data-act="aliasdel" data-name="${escHtml(x.name)}" data-domain="${escHtml(domain)}">Delete</button>
+          <div class="err" id="err_alias_${escHtml(x.name)}"></div></td></tr>`).join("");
+  const props=aliasProps();
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
+    <div class="sect"><h2>${escHtml(domain)} — aliases</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/aliases","get").summary||"")}. An alias has no update on the API: to change one, delete it and make it again.</p>
+        <div class="tablewrap"><table><thead><tr><th>Alias</th><th>Delivers to</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4" class="empty">No aliases in this domain.</td></tr>'}</tbody></table></div>
+      </div></div>
+    <div class="sect"><h2>New alias</h2>
+      <div class="card flat" data-enter="aliasnew">
+        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/aliases","post").description||"")}</p>
+        <div class="form">${formHtml("aliasnew",props,documentedDefaults("/api/v1/domains/{domain}/aliases","post",props),{required:requiredOf("/api/v1/domains/{domain}/aliases","post")})}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="aliasnew" data-domain="${escHtml(domain)}">Create alias</button>
+          <div class="err" id="err_aliasnew"></div>
+        </div>
+      </div></div></div>`;
+}
+async function createAlias(domain){
+  setErr("err_aliasnew","");
+  let body;
+  try{body=readForm("aliasnew",aliasProps(),{});}catch(e){setErr("err_aliasnew",e.message);return;}
+  if(!String(body.name||"").trim()||!String(body.value||"").trim()){setErr("err_aliasnew","An alias address and the address it delivers to are required.");return;}
+  try{
+    await api("/api/v1/domains/"+encodeURIComponent(domain)+"/aliases",{method:"POST",body:JSON.stringify(body)});
+    toast("Alias created: "+body.name);await showAliases(domain);
+  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_aliasnew",e.message);}
+}
+async function deleteAlias(name,domain){
+  if(!confirm("Delete the alias "+name+"?"))return;
+  setErr("err_alias_"+name,"");
+  try{await api("/api/v1/aliases/"+encodeURIComponent(name),{method:"DELETE"});toast("Alias deleted: "+name);await showAliases(domain);}
+  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_alias_"+name,e.message);}
 }
 
 /* ---------- Distribution lists ----------

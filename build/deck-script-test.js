@@ -686,6 +686,12 @@ const spec = {
          post: { summary: 'Add a domain alias', description: 'Body: name.', requestBody: body({ name: { type: 'string' } }, ['name']) }
       },
       '/api/v1/domains/{domain}/domain-aliases/{name}': { delete: { summary: 'Remove a domain alias' } },
+      '/api/v1/domains/{domain}/aliases': {
+         get: { summary: 'List aliases in a domain' },
+         post: { summary: 'Create an alias', description: 'Body: name (the alias address, in this domain), value (the e-mail address it delivers to) and active (default true). Judged as the Control Panel judges an alias - a name an account or a distribution list already has, or a domain at its alias limit, is refused with the same sentence - and in effect for the next message to the name. Scoped to the domain.',
+            requestBody: body({ name: { type: 'string' }, value: { type: 'string' }, active: { type: 'boolean' } }, ['name', 'value']) }
+      },
+      '/api/v1/aliases/{address}': { delete: { summary: 'Delete an alias', description: 'Scoped to the address\'s domain.' } },
       '/api/v1/domains/{domain}/lists': {
          get: { summary: 'List the distribution lists in a domain, with their members', description: 'Each entry: address, active, require_auth, mode (public, membership, announcement or domain_members), require_sender_address, moderator_address, bounce_address and members. Scoped to the domain.' },
          post: { summary: 'Create a distribution list', description: LISTS_POST, requestBody: body(LIST_CREATE_PROPS, ['address']) }
@@ -756,6 +762,11 @@ const state = {
    lists: {
       'example.com': [{ address: 'all@example.com', active: true, require_auth: false, mode: 'public', require_sender_address: '', moderator_address: '', bounce_address: '',
          members: ['anna@example.com', 'bob@example.com'] }],
+      [HOSTILE]: [],
+      'second.example': []
+   },
+   aliases: {
+      'example.com': [{ name: 'info@example.com', value: 'anna@example.com', active: true }],
       [HOSTILE]: [],
       'second.example': []
    },
@@ -921,6 +932,26 @@ function answer(method, path, headers, raw) {
       }
    }
 
+   if (/^\/api\/v1\/domains\/[^/]+\/aliases$/.test(path)) {
+      const domain = segment(path, 4);
+      if (!(domain in state.aliases)) { return json(404, { error: 'domain not found' }); }
+      if (method === 'GET') { return json(200, state.aliases[domain]); }
+      if (method === 'POST') {
+         for (const key of Object.keys(parsed)) { if (['name', 'value', 'active'].indexOf(key) < 0) { return json(400, { error: 'unknown field: ' + key }); } }
+         if (!parsed.name || !parsed.value) { return json(400, { error: 'name and value are required' }); }
+         if (state.aliases[domain].some((a) => a.name === parsed.name)) { return json(409, { error: 'an alias with that name exists' }); }
+         const alias = { name: parsed.name, value: parsed.value, active: parsed.active !== false };
+         state.aliases[domain].push(alias);
+         return json(201, alias);
+      }
+   }
+   if (/^\/api\/v1\/aliases\/[^/]+$/.test(path) && method === 'DELETE') {
+      const name = segment(path, 4);
+      const domain = Object.keys(state.aliases).filter((d) => state.aliases[d].some((a) => a.name === name))[0];
+      if (!domain) { return json(404, { error: 'alias not found' }); }
+      state.aliases[domain] = state.aliases[domain].filter((a) => a.name !== name);
+      return json(200, { deleted: true });
+   }
    if (/^\/api\/v1\/domains\/[^/]+\/lists$/.test(path)) {
       const domain = segment(path, 4);
       if (!(domain in state.lists)) { return json(404, { error: 'domain not found' }); }
@@ -1457,6 +1488,51 @@ async function main() {
    click(act('listdel', { address: 'team@example.com' }));
    await flush();
    check('yes deletes by address and the re-read list is without it', called(before, 'DELETE', '/api/v1/lists/team%40example.com').length === 1 && rows().length === 1 && rows()[0].textContent.indexOf('all@example.com') >= 0);
+
+   // ---- the aliases of a domain
+   click(act('domains'));
+   await flush();
+   before = requests.length;
+   click(act('aliases', { domain: 'example.com' }));
+   await flush();
+   check('Aliases reads the domain\'s aliases', called(before, 'GET', '/api/v1/domains/example.com/aliases').length === 1 && rows().length === 1 &&
+      rows()[0].textContent.indexOf('info@example.com') >= 0 && rows()[0].textContent.indexOf('anna@example.com') >= 0 && rows()[0].textContent.indexOf('Active') >= 0, paths(before));
+   check('the form has the create\'s three keys, the two required ones marked, active on by the description', document.getElementById('aliasnew_name') !== null && document.getElementById('aliasnew_value') !== null &&
+      document.getElementById('aliasnew_active').checked === true && document.getElementById('aliasnew_name').closest('.fr').textContent.indexOf('required') >= 0 &&
+      document.getElementById('aliasnew_active').closest('.fr').textContent.indexOf('required') < 0 && content().textContent.indexOf('delete it and make it again') >= 0);
+   before = requests.length;
+   click(act('aliasnew', { domain: 'example.com' }));
+   await flush();
+   check('an empty form is refused by the page', called(before, 'POST', /aliases/).length === 0 && document.getElementById('err_aliasnew').textContent.indexOf('required') >= 0);
+   setValue('aliasnew_name', 'sales@example.com');
+   setValue('aliasnew_value', 'carla@example.com');
+   setChecked('aliasnew_active', false);
+   before = requests.length;
+   document.getElementById('aliasnew_value').dispatchEvent(makeEvent('keydown', { key: 'Enter' }));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/domains/example.com/aliases');
+   check('Enter in the form creates the alias with the three keys', JSON.stringify(posted) === '{"name":"sales@example.com","value":"carla@example.com","active":false}', JSON.stringify(posted));
+   check('and the re-read list has it, disabled', called(before, 'GET', '/api/v1/domains/example.com/aliases').length === 1 && rows().length === 2 && rows()[1].textContent.indexOf('sales@example.com') >= 0 &&
+      rows()[1].textContent.indexOf('Disabled') >= 0 && toastText() === 'Alias created: sales@example.com');
+   nextRefusal = 'The name is already an account.';
+   setValue('aliasnew_name', 'anna@example.com');
+   setValue('aliasnew_value', 'carla@example.com');
+   click(act('aliasnew', { domain: 'example.com' }));
+   await flush();
+   check('a refused alias is the server\'s sentence beside the form', document.getElementById('err_aliasnew').textContent === 'The name is already an account.');
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('aliasdel', { name: 'sales@example.com' }));
+   await flush();
+   check('deleting an alias asks, naming it', called(before, 'DELETE', /aliases/).length === 0 && confirmations[confirmations.length - 1].indexOf('sales@example.com') >= 0);
+   confirmAnswer = true;
+   click(act('aliasdel', { name: 'sales@example.com' }));
+   await flush();
+   check('yes deletes by address and the re-read list is without it', called(before, 'DELETE', '/api/v1/aliases/sales%40example.com').length === 1 && rows().length === 1);
+   nextRefusal = 'The alias is named by a rule.';
+   click(act('aliasdel', { name: 'info@example.com' }));
+   await flush();
+   check('a refused delete is shown on its row', document.getElementById('err_alias_info@example.com').textContent === 'The alias is named by a rule.' && rows().length === 1);
 
    // ---- the domain editor
    click(act('domains'));

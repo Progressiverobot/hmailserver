@@ -10,9 +10,9 @@ This measures how far the browser administration page (the Control Deck at `/Web
 |---|---|
 | COM properties the desktop program writes | 330 |
 | of them writable over REST | 322 |
-| of them reachable from a Deck view | 293 |
+| of them reachable from a Deck view | 296 |
 | missing over REST | 8 |
-| over REST but not reached by any Deck view | 29 |
+| over REST but not reached by any Deck view | 26 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 57 |
@@ -35,7 +35,6 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | DNSBlackList | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | SURBLServer | 5 | `Active`, `DNSHost`, `ExpectedResult`, `RejectMessage`, `Score` |
 | WhiteListAddress | 4 | `Description`, `EmailAddress`, `LowerIPAddress`, `UpperIPAddress` |
-| Alias | 3 | `Active`, `Name`, `Value` |
 | BlockedSender | 3 | `Address`, `Description`, `Score` |
 | IncomingRelay | 3 | `LowerIP`, `Name`, `UpperIP` |
 | BlockedAttachment | 2 | `Description`, `Wildcard` |
@@ -224,9 +223,9 @@ Every COM property the desktop program writes, the page that writes it, the REST
 
 | Property | Desktop page | REST route | Deck view |
 |---|---|---|---|
-| `Active` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | - |
-| `Name` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | - |
-| `Value` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | - |
+| `Active` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | domains |
+| `Name` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | domains |
+| `Value` | DomainsView | `POST /api/v1/domains/{domain}/aliases` (setter) | domains |
 
 ### Logging
 
@@ -682,7 +681,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/domains` | Domain | `active`, `name`, `new`, `postmaster` | yes |
 | `PUT /api/v1/domains/{domain}` | Domain | `active`, `ad_domain_name`, `address`, `dkim_body_canonicalization`, `dkim_enabled`, `dkim_header_canonicalization`, `dkim_private_key_file`, `dkim_secondary_private_key_file`, `dkim_secondary_selector`, `dkim_selector`, `dkim_sign_aliases`, `dkim_signing_algorithm`, `field`, `key`, `log`, `max_account_size_mb`, `max_accounts`, `max_accounts_enabled`, `max_aliases`, `max_aliases_enabled`, `max_lists`, `max_lists_enabled`, `max_message_size_kb`, `max_size_mb`, `message_retention_days`, `name`, `new`, `plus_addressing_character`, `plus_addressing_enabled`, `postmaster`, `relay_connection_security`, `relay_host`, `relay_password`, `relay_port`, `relay_requires_auth`, `relay_username`, `set_if_not_specified`, `signature_add_to_local_mail`, `signature_add_to_replies`, `signature_enabled`, `signature_html`, `signature_method`, `signature_plain_text`, `to`, `type`, `use_greylisting`, `vacation_enabled`, `vacation_external_override`, `vacation_internal_message`, `vacation_internal_subject`, `vacation_message`, `vacation_subject`, `value` | yes |
 | `POST /api/v1/domains/{domain}/accounts` | Account | `active`, `address`, `max_size_mb`, `password` | yes |
-| `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | - |
+| `POST /api/v1/domains/{domain}/aliases` | Alias | `active`, `address`, `message`, `name`, `to`, `value` | yes |
 | `POST /api/v1/domains/{domain}/domain-aliases` | DomainAlias | `name` | yes |
 | `POST /api/v1/domains/{domain}/lists` | DistributionList | `active`, `address`, `addresses`, `bounce_address`, `domain_members`, `members`, `mode`, `moderator_address`, `require_auth`, `require_sender_address`, `to` | yes |
 | `POST /api/v1/greylisting-white-addresses` | GreyListingWhiteAddress | `address`, `description`, `ip_address` | - |
@@ -762,7 +761,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | View | Routes called |
 |---|---|
 | `dash` | `GET /api/v1/status` |
-| `domains` | `DELETE /api/v1/accounts/{}`, `GET /api/v1/accounts/{}`, `PUT /api/v1/accounts/{}`, `GET /api/v1/domains`, `POST /api/v1/domains`, `DELETE /api/v1/domains/{}`, `PUT /api/v1/domains/{}`, `GET /api/v1/domains/{}/accounts`, `POST /api/v1/domains/{}/accounts`, `GET /api/v1/domains/{}/domain-aliases`, `POST /api/v1/domains/{}/domain-aliases`, `DELETE /api/v1/domains/{}/domain-aliases/{}`, `GET /api/v1/domains/{}/lists`, `POST /api/v1/domains/{}/lists`, `DELETE /api/v1/lists/{}`, `PUT /api/v1/lists/{}`, `GET /api/v1/openapi.json` |
+| `domains` | `DELETE /api/v1/accounts/{}`, `GET /api/v1/accounts/{}`, `PUT /api/v1/accounts/{}`, `DELETE /api/v1/aliases/{}`, `GET /api/v1/domains`, `POST /api/v1/domains`, `DELETE /api/v1/domains/{}`, `PUT /api/v1/domains/{}`, `GET /api/v1/domains/{}/accounts`, `POST /api/v1/domains/{}/accounts`, `GET /api/v1/domains/{}/aliases`, `POST /api/v1/domains/{}/aliases`, `GET /api/v1/domains/{}/domain-aliases`, `POST /api/v1/domains/{}/domain-aliases`, `DELETE /api/v1/domains/{}/domain-aliases/{}`, `GET /api/v1/domains/{}/lists`, `POST /api/v1/domains/{}/lists`, `DELETE /api/v1/lists/{}`, `PUT /api/v1/lists/{}`, `GET /api/v1/openapi.json` |
 | `ipranges` | `GET /api/v1/ipranges`, `POST /api/v1/ipranges`, `DELETE /api/v1/ipranges/{}`, `PUT /api/v1/ipranges/{}`, `GET /api/v1/openapi.json` |
 | `fetch` | `GET /api/v1/accounts/{}/fetch-accounts`, `POST /api/v1/accounts/{}/fetch-accounts`, `DELETE /api/v1/accounts/{}/fetch-accounts/{}`, `PUT /api/v1/accounts/{}/fetch-accounts/{}`, `POST /api/v1/accounts/{}/fetch-accounts/{}/download`, `GET /api/v1/domains`, `GET /api/v1/domains/{}/accounts`, `GET /api/v1/openapi.json` |
 | `queue` | `GET /api/v1/queue`, `DELETE /api/v1/queue/{}`, `POST /api/v1/queue/{}/retry` |
