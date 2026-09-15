@@ -1,0 +1,24 @@
+HKCR
+{
+	hMailServer.RemoteDomainPolicies.1 = s 'RemoteDomainPolicies Class'
+	{
+		CLSID = s '{228C62B3-8962-49EB-B846-F20CB67B4D6A}'
+	}
+	hMailServer.RemoteDomainPolicies = s 'RemoteDomainPolicies Class'
+	{
+		CLSID = s '{228C62B3-8962-49EB-B846-F20CB67B4D6A}'
+		CurVer = s 'hMailServer.RemoteDomainPolicies.1'
+	}
+	NoRemove CLSID
+	{
+		ForceRemove {228C62B3-8962-49EB-B846-F20CB67B4D6A} = s 'RemoteDomainPolicies Class'
+		{
+			ProgID = s 'hMailServer.RemoteDomainPolicies.1'
+			VersionIndependentProgID = s 'hMailServer.RemoteDomainPolicies'
+			ForceRemove 'Programmable'
+			LocalServer32 = s '%MODULE%'
+			val AppID = s '%APPID%'
+			'TypeLib' = s '{DB241B59-A1B1-4C59-98FC-8D101A2995F2}'
+		}
+	}
+}

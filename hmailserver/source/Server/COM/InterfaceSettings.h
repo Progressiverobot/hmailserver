@@ -121,6 +121,7 @@ END_COM_MAP()
    STDMETHOD(put_MaxDeliveryThreads)(/*[in]*/ long newVal);
 
    STDMETHOD(get_Routes)(IInterfaceRoutes **pVal);
+   STDMETHOD(get_RemoteDomainPolicies)(IInterfaceRemoteDomainPolicies **pVal);
 
    STDMETHOD(get_RuleLoopLimit)(/*[out, retval]*/ long *pVal);
    STDMETHOD(put_RuleLoopLimit)(/*[in]*/ long newVal);

@@ -9,6 +9,7 @@
 #include "../Common/Application/Property.h"
 
 #include "../Common/BO/Routes.h"
+#include "../Common/BO/RemoteDomainPolicies.h"
 
 #include "../Common/TCPIP/SocketConstants.h"
 
@@ -38,6 +39,9 @@ namespace HM
 
       routes_ = std::shared_ptr<Routes> (new Routes());
       routes_->Refresh();
+
+      remote_domain_policies_ = std::shared_ptr<RemoteDomainPolicies> (new RemoteDomainPolicies());
+      remote_domain_policies_->Refresh();
 
       return true;
    }
@@ -333,6 +337,12 @@ namespace HM
       if (!incoming_relays_->XMLStore(pBackupNode, iOptions))
          return false;
 
+      // In the backup like the routes: a configuration backup that restored
+      // every route and none of the policies would put mail back on the wire
+      // to a domain the administrator had required TLS for.
+      if (!remote_domain_policies_->XMLStore(pBackupNode, iOptions))
+         return false;
+
       return true;
    }
 
@@ -351,6 +361,10 @@ namespace HM
 
       incoming_relays_->Refresh();
       if (!incoming_relays_->XMLLoad(pBackupNode, iRestoreOptions))
+         return false;
+
+      remote_domain_policies_->Refresh();
+      if (!remote_domain_policies_->XMLLoad(pBackupNode, iRestoreOptions))
          return false;
 
       return true;

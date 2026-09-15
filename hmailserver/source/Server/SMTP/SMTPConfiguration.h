@@ -11,6 +11,7 @@ namespace HM
 {
    class PropertySet;
    class Routes;
+   class RemoteDomainPolicies;
    class DNSBlackLists;
    class BlockedAttachments;
 
@@ -97,10 +98,20 @@ namespace HM
       std::shared_ptr<IncomingRelays> GetIncomingRelays() {return incoming_relays_;}
       std::shared_ptr<Routes> GetRoutes() {return routes_;}
 
+      // What this server will do for a named remote domain - the TLS it demands
+      // of it, the size and concurrency it will attempt, whether a recipient is
+      // verified with the primary before mail for it is accepted. Beside the
+      // routes because both are read on the delivery path for every message and
+      // both are the SMTP configuration's to own; a route decides WHERE mail
+      // goes, a policy decides what this server will and will not do when it
+      // gets there. See RemoteDomainPolicy.h.
+      std::shared_ptr<RemoteDomainPolicies> GetRemoteDomainPolicies() {return remote_domain_policies_;}
+
    private:
 
       std::shared_ptr<PropertySet> GetSettings_() const;
       std::shared_ptr<IncomingRelays> incoming_relays_;
       std::shared_ptr<Routes> routes_;
+      std::shared_ptr<RemoteDomainPolicies> remote_domain_policies_;
    };
 }

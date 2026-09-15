@@ -33,6 +33,8 @@
 #include "../Common/Util/SignatureAdder.h"
 #include "../Common/BO/Routes.h"
 #include "../Common/BO/RouteAddresses.h"
+#include "../Common/BO/RemoteDomainPolicies.h"
+#include "../Common/BO/RemoteDomainPolicy.h"
 #include "../Common/BO/MessageRecipient.h"
 #include "../Common/BO/MessageRecipients.h"
 #include "../Common/Util/ByteBuffer.h"
@@ -72,6 +74,8 @@
 #include "../Common/Util/DiskSpace.h"
 #include "../Common/Util/RateLimiter.h"
 #include "../Common/SQL/DatabaseUnavailableMarker.h"
+
+#include "RecipientCallout.h"
 
 #include "SMTPConnection.h"
 #include "../Common/Application/ACLManager.h"
@@ -762,6 +766,45 @@ namespace HM
       if (!CheckIfValidSenderAddress(sFromAddress))
          return;
 
+      // The inbound half of a remote domain policy: mail from a named domain
+      // must arrive encrypted.
+      //
+      // The outbound half stops this server sending a partner's mail in the
+      // clear; without this one the partner can still send OURS in the clear,
+      // and a rule that covers one direction of a correspondence is not a rule
+      // about the correspondence. RFC 8689's REQUIRETLS is the sender asking;
+      // this is the administrator saying.
+      //
+      // At MAIL FROM because that is the first moment the sending domain is
+      // known, and before a recipient is validated so that nothing about the
+      // addresses here is revealed over a cleartext session.
+      //
+      // Not applied to an authenticated session: that is one of this server's
+      // own people submitting mail, judged by the port's own connection
+      // security and by the IP range's RequireTLSForAuth, and a policy about a
+      // remote domain has nothing to say about it.
+      if (!isAuthenticated_ && !IsSSLConnection())
+      {
+         std::shared_ptr<RemoteDomainPolicies> policies =
+            Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
+
+         std::shared_ptr<RemoteDomainPolicy> senderPolicy = policies
+            ? policies->GetPolicyForDomain(StringParser::ExtractDomain(sFromAddress).ToLower())
+            : std::shared_ptr<RemoteDomainPolicy>();
+
+         if (senderPolicy && senderPolicy->GetRequireInboundTls())
+         {
+            LOG_SMTP(GetSessionID(), GetIPAddressString(), "MAIL FROM refused: the remote domain policy for " +
+               senderPolicy->GetDomainName() + " requires TLS on inbound mail and this session is not encrypted.");
+
+            // 530 with 5.7.0, which is what this server already answers a
+            // session that must issue STARTTLS first, so a sending server
+            // meets one refusal for one condition however it was reached.
+            SendResponse_(530, _T("5.7.0"), _T("Must issue STARTTLS first. This server requires an encrypted session for mail from this domain."));
+            return;
+         }
+      }
+
       // An authenticated session may only send as an address its account owns or
       // has been granted, when SmtpAuthenticatedSenderCheck is on. Off by default,
       // because until 5 September 2026 nothing constrained this at all and an
@@ -1354,6 +1397,58 @@ namespace HM
          SendErrorResponse_(530, "SMTP authentication is required.");
          AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 530, current_message_->GetID());
          return;
+      }
+
+      // The backup-MX recipient callout, if a policy for this recipient's domain
+      // asks for one.
+      //
+      // HERE, and not earlier, for two reasons. The relay decision above has
+      // already been made, so this server never opens a session to a stranger's
+      // server on behalf of a client it was going to refuse anyway - which is
+      // what would make this a reflector. And CheckDeliveryPossibility has
+      // already run, so an address this server knows the answer to - a local
+      // account, an alias, a list, a route's own address list - never reaches a
+      // callout at all.
+      //
+      // Never for an authenticated session: that is one of our own people
+      // sending, and asking a third party to vet their recipients would leak the
+      // correspondence and slow every submission down.
+      //
+      // RecipientCallout answers Unknown for everything that is not a clear
+      // permanent refusal from the primary, and Unknown accepts - so a primary
+      // that is unreachable, slow, or answering 4xx leaves this server exactly
+      // where it was before the policy existed. It also refuses to call out for
+      // a domain this server is authoritative for.
+      if (!isAuthenticated_)
+      {
+         std::shared_ptr<RemoteDomainPolicies> policies =
+            Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
+
+         std::shared_ptr<RemoteDomainPolicy> recipientPolicy = policies
+            ? policies->GetPolicyForDomain(StringParser::ExtractDomain(sRecipientAddress).ToLower())
+            : std::shared_ptr<RemoteDomainPolicy>();
+
+         if (recipientPolicy && recipientPolicy->GetCalloutEnabled())
+         {
+            String calloutReason;
+
+            if (RecipientCallout::Instance()->Verify(sRecipientAddress, recipientPolicy, calloutReason) ==
+                RecipientCallout::CalloutRejected)
+            {
+               LOG_SMTP(GetSessionID(), GetIPAddressString(), "RCPT TO refused by recipient verification: " + calloutReason);
+
+               AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
+
+               // The remote's own words are deliberately NOT repeated back. This
+               // server is relaying somebody else's answer to a third party, and
+               // a verbatim reply would make it a readable oracle over the other
+               // domain's directory; the exact reply is in this server's log,
+               // where its own administrator can read it.
+               SendResponse_(550, _T("5.1.1"),
+                  _T("Recipient address rejected: the mail server for this domain does not accept it."));
+               return;
+            }
+         }
       }
 
       // This server is the submission server (RFC 6409) for the message if the client

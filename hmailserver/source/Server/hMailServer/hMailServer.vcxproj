@@ -338,6 +338,8 @@ EXIT 0
     <ClCompile Include="..\Common\Bo\MessageRecipient.cpp" />
     <ClCompile Include="..\Common\Bo\MessageRecipients.cpp" />
     <ClCompile Include="..\Common\Bo\Messages.cpp" />
+    <ClCompile Include="..\Common\Bo\RemoteDomainPolicies.cpp" />
+    <ClCompile Include="..\Common\Bo\RemoteDomainPolicy.cpp" />
     <ClCompile Include="..\Common\Bo\Route.cpp" />
     <ClCompile Include="..\Common\Bo\RouteAddress.cpp" />
     <ClCompile Include="..\Common\Bo\RouteAddresses.cpp" />
@@ -412,6 +414,7 @@ EXIT 0
     <ClCompile Include="..\Common\Persistence\PersistentMessageMetaData.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentMessageIndex.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentMessageRecipient.cpp" />
+    <ClCompile Include="..\Common\Persistence\PersistentRemoteDomainPolicy.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentRoute.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentRouteAddress.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentRule.cpp" />
@@ -574,6 +577,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\RestApiAdministration.cpp" />
     <ClCompile Include="..\Common\Util\RestApiAntiSpamLists.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFetchAccounts.cpp" />
+    <ClCompile Include="..\Common\Util\RemoteDomainThrottle.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiRemoteDomains.cpp" />
     <ClCompile Include="..\Common\Util\RestApiRoutes.cpp" />
     <ClCompile Include="..\Common\Util\RestApiMailbox.cpp" />
     <ClCompile Include="..\Common\Util\RestApiContacts.cpp" />
@@ -697,6 +702,8 @@ EXIT 0
     <ClCompile Include="..\COM\InterfaceRecipient.cpp" />
     <ClCompile Include="..\COM\InterfaceRecipients.cpp" />
     <ClCompile Include="..\Com\InterfaceResult.cpp" />
+    <ClCompile Include="..\COM\InterfaceRemoteDomainPolicies.cpp" />
+    <ClCompile Include="..\COM\InterfaceRemoteDomainPolicy.cpp" />
     <ClCompile Include="..\COM\InterfaceRoute.cpp" />
     <ClCompile Include="..\COM\InterfaceRouteAddress.cpp" />
     <ClCompile Include="..\COM\InterfaceRouteAddresses.cpp" />
@@ -882,6 +889,7 @@ EXIT 0
     <ClCompile Include="..\SMTP\PlusAddressing.cpp" />
     <ClCompile Include="..\SMTP\DistributionListSender.cpp" />
     <ClCompile Include="..\Smtp\QuotaWarner.cpp" />
+    <ClCompile Include="..\SMTP\RecipientCallout.cpp" />
     <ClCompile Include="..\Smtp\RecipientParser.cpp" />
     <ClCompile Include="..\Smtp\RuleApplier.cpp" />
     <ClCompile Include="..\SMTP\RuleResult.cpp" />
@@ -1062,6 +1070,8 @@ EXIT 0
     <ClInclude Include="..\Common\Bo\MessageRecipient.h" />
     <ClInclude Include="..\Common\Bo\MessageRecipients.h" />
     <ClInclude Include="..\Common\Bo\Messages.h" />
+    <ClInclude Include="..\Common\Bo\RemoteDomainPolicies.h" />
+    <ClInclude Include="..\Common\Bo\RemoteDomainPolicy.h" />
     <ClInclude Include="..\Common\Bo\Route.h" />
     <ClInclude Include="..\Common\Bo\RouteAddress.h" />
     <ClInclude Include="..\Common\Bo\RouteAddresses.h" />
@@ -1141,6 +1151,7 @@ EXIT 0
     <ClInclude Include="..\Common\Persistence\PersistentMessageMetaData.h" />
     <ClInclude Include="..\Common\Persistence\PersistentMessageIndex.h" />
     <ClInclude Include="..\Common\Persistence\PersistentMessageRecipient.h" />
+    <ClInclude Include="..\Common\Persistence\PersistentRemoteDomainPolicy.h" />
     <ClInclude Include="..\Common\Persistence\PersistentRoute.h" />
     <ClInclude Include="..\Common\Persistence\PersistentRouteAddress.h" />
     <ClInclude Include="..\Common\Persistence\PersistentRule.h" />
@@ -1267,6 +1278,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\TokenIntrospection.h" />
     <ClInclude Include="..\Common\Util\SRS.h" />
     <ClInclude Include="..\Common\Util\BATV.h" />
+    <ClInclude Include="..\Common\Util\RemoteDomainThrottle.h" />
     <ClInclude Include="..\Common\Util\RateLimiter.h" />
     <ClInclude Include="..\Common\Util\DiskSpace.h" />
     <ClInclude Include="..\Common\Util\AddressTraceEraser.h" />
@@ -1407,6 +1419,8 @@ EXIT 0
     <ClInclude Include="..\COM\InterfaceRecipient.h" />
     <ClInclude Include="..\COM\InterfaceRecipients.h" />
     <ClInclude Include="..\Com\InterfaceResult.h" />
+    <ClInclude Include="..\COM\InterfaceRemoteDomainPolicies.h" />
+    <ClInclude Include="..\COM\InterfaceRemoteDomainPolicy.h" />
     <ClInclude Include="..\COM\InterfaceRoute.h" />
     <ClInclude Include="..\COM\InterfaceRouteAddress.h" />
     <ClInclude Include="..\COM\InterfaceRouteAddresses.h" />
@@ -1525,6 +1539,7 @@ EXIT 0
     <ClInclude Include="..\Smtp\DeliveryTask.h" />
     <ClInclude Include="..\SMTP\ExternalDelivery.h" />
     <ClInclude Include="..\SMTP\ExternalDeliveryServerResult.h" />
+    <ClInclude Include="..\SMTP\RecipientCallout.h" />
     <ClInclude Include="..\SMTP\TlsPolicy.h" />
     <ClInclude Include="..\SMTP\GreyListCleanerTask.h" />
     <ClInclude Include="..\SMTP\DmarcRptReporterTask.h" />
@@ -1738,6 +1753,8 @@ EXIT 0
     <None Include="..\COM\InterfaceRecipient.rgs" />
     <None Include="..\COM\InterfaceRecipients.rgs" />
     <None Include="..\Com\InterfaceResult.rgs" />
+    <None Include="..\COM\InterfaceRemoteDomainPolicies.rgs" />
+    <None Include="..\COM\InterfaceRemoteDomainPolicy.rgs" />
     <None Include="..\COM\InterfaceRoute.rgs" />
     <None Include="..\COM\InterfaceRouteAddress.rgs" />
     <None Include="..\COM\InterfaceRouteAddresses.rgs" />

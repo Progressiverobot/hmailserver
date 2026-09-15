@@ -164,6 +164,8 @@ IDR_INTERFACEMESSAGETRACEEVENT REGISTRY            "..\\COM\\InterfaceMessageTra
 IDR_INTERFACEMESSAGETRACE  REGISTRY                "..\\COM\\InterfaceMessageTrace.rgs"
 IDR_INTERFACEBLOCKEDSENDER REGISTRY                "..\\COM\\InterfaceBlockedSender.rgs"
 IDR_INTERFACEBLOCKEDSENDERS REGISTRY               "..\\COM\\InterfaceBlockedSenders.rgs"
+IDR_INTERFACEREMOTEDOMAINPOLICY REGISTRY           "..\\COM\\InterfaceRemoteDomainPolicy.rgs"
+IDR_INTERFACEREMOTEDOMAINPOLICIES REGISTRY         "..\\COM\\InterfaceRemoteDomainPolicies.rgs"
 IDR_INTERFACESCRIPTING  REGISTRY                "..\\COM\\InterfaceScripting.rgs"
 IDR_INTERFACEDOMAINALIASES REGISTRY                "..\\COM\\InterfaceDomainAliases.rgs"
 IDR_INTERFACEDOMAINALIAS REGISTRY                "..\\COM\\InterfaceDomainAlias.rgs"

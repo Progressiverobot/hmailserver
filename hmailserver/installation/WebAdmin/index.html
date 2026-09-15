@@ -194,6 +194,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="messages"><span class="ico">✎</span>Server messages</button>
       <button data-view="rules"><span class="ico">⚖</span>Rules</button>
       <button data-view="routes"><span class="ico">⇥</span>Routes</button>
+      <button data-view="remotedomains"><span class="ico">⇄</span>Remote domains</button>
       <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
       <button data-view="ports"><span class="ico">⊞</span>Ports</button>
       <button data-view="logs"><span class="ico">≡</span>Logs</button>
@@ -333,7 +334,7 @@ let spec=null;
 /* The last listing each view read, so that an editor can be opened on a row
    without asking again. Never written to instead of re-reading: every write is
    followed by a fresh GET. */
-const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],collections:{},messages:[],
+const cache={certificates:[],ports:[],routes:[],rules:[],domains:[],ranges:[],lists:[],collections:{},messages:[],remotedomains:[],
   /* The fetch view's chosen domain and account, kept across its re-reads. */
   fetch:{domain:"",address:"",accounts:[],items:[]}};
 
@@ -467,7 +468,7 @@ $("#nav").addEventListener("click",e=>{
   view=b.dataset.view;editing=null;render();
 });
 const titles={dash:K("Dashboard"),domains:K("Domains"),ipranges:K("IP ranges"),fetch:K("Fetch accounts"),lists:K("Lists"),queue:K("Delivery queue"),tlsa:K("DANE / TLSA"),
-  settings:K("Settings"),backup:K("Backup"),messages:K("Server messages"),rules:K("Rules"),routes:K("Routes"),certs:K("Certificates"),ports:K("Ports"),logs:K("Logs")};
+  settings:K("Settings"),backup:K("Backup"),messages:K("Server messages"),rules:K("Rules"),routes:K("Routes"),remotedomains:K("Remote domains"),certs:K("Certificates"),ports:K("Ports"),logs:K("Logs")};
 
 async function render(silent){
   $("#viewTitle").textContent=t(titles[view]);
@@ -484,6 +485,7 @@ async function render(silent){
     else if(view==="messages")await renderMessages();
     else if(view==="rules")await renderRules();
     else if(view==="routes")await renderRoutes();
+    else if(view==="remotedomains")await renderRemoteDomains();
     else if(view==="certs")await renderCerts();
     else if(view==="ports")await renderPorts();
     else if(view==="logs")await renderLogs();
@@ -563,6 +565,11 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="routeedit")openRoute(Number(d.id));
   else if(d.act==="routedel")deleteRoute(Number(d.id),d.name);
   else if(d.act==="routesave")saveRoute();
+  else if(d.act==="rdnew")openRemoteDomain(0);
+  else if(d.act==="rdedit")openRemoteDomain(Number(d.id));
+  else if(d.act==="rddel")deleteRemoteDomain(Number(d.id),d.name);
+  else if(d.act==="rdsave")saveRemoteDomain();
+  else if(d.act==="rdclearcache")clearVerificationCache();
   else if(d.act==="cancel"){editing=null;render();}
 });
 /* A criterion's field or an action's type decides which further controls the
@@ -1839,6 +1846,99 @@ async function deleteRoute(id,name){
   setErr("err_route_"+id,"");
   try{await api("/api/v1/routes/"+id,{method:"DELETE"});toast(t("Route deleted"));await render();}
   catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_route_"+id,e.message);}
+}
+
+/* ---------- Remote domains ----------
+   What this server will do when it talks to a named remote domain: the TLS it
+   demands of it outbound and inbound, the size and concurrency it will attempt,
+   and whether a recipient is verified with the domain's own server before mail
+   for it is accepted.
+
+   Beside the routes and deliberately not part of them: a route says WHERE mail
+   for a domain goes, a policy says what this server will and will not do when
+   it gets there, and a domain may have both. The form is built from the schema
+   of POST /api/v1/remote-domains, as the routes' is, so a field the record
+   gains appears here without a change to this page. */
+function remoteDomainFormOptions(){
+  return {required:requiredOf("/api/v1/remote-domains","post")};
+}
+async function renderRemoteDomains(){
+  await loadSpec();
+  cache.remotedomains=asList(await api("/api/v1/remote-domains"),"remote-domains");
+  if(editing&&editing.kind==="remotedomain"){renderRemoteDomainEditor();return;}
+  const limits=p=>{
+    const parts=[];
+    if(p.max_message_size_kb)parts.push(tf("{0} KB",p.max_message_size_kb));
+    if(p.max_connections)parts.push(tf("{0} connections",p.max_connections));
+    if(p.max_messages_per_minute)parts.push(tf("{0}/minute",p.max_messages_per_minute));
+    return parts.length?parts.join(", "):t("none");
+  };
+  const rows=cache.remotedomains.map(p=>`
+    <tr><td><b>${escHtml(p.domain_name)}</b>${p.description?'<div class="hint muted">'+escHtml(p.description)+'</div>':""}<div class="hint muted">${tf("id {0}",escHtml(p.id))}${p.active?"":" · "+t("Off")}</div></td>
+        <td>${escHtml(humanise(p.outbound_tls))}</td>
+        <td>${p.require_inbound_tls?t("required"):'<span class="muted">'+t("none")+'</span>'}</td>
+        <td>${escHtml(limits(p))}</td>
+        <td>${p.callout_enabled?t("On"):'<span class="muted">'+t("Off")+'</span>'}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button class="btn ghost sm" data-act="rdedit" data-id="${escHtml(p.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="rddel" data-id="${escHtml(p.id)}" data-name="${escHtml(p.domain_name)}">${t("Delete")}</button>
+          <div class="err" id="err_rd_${escHtml(p.id)}"></div></td></tr>`).join("");
+  $("#content").innerHTML=`<div class="view">
+    <div class="card flat">
+      <p class="note">${escHtml(operation("/api/v1/remote-domains","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>${t("Domain")}</th><th>${t("Outbound TLS")}</th><th>${t("Inbound TLS")}</th><th>${t("Limits")}</th><th>${t("Verification")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">'+t("No remote domain policies are configured; mail to every domain is sent as this server's own settings decide.")+'</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="rdnew">${t("Add a policy")}</button>
+        <button class="btn ghost" data-act="rdclearcache">${t("Forget the remembered verdicts")}</button>
+        <div class="err" id="err_rdcache"></div></div>
+    </div></div>`;
+}
+function openRemoteDomain(id){
+  const existing=cache.remotedomains.filter(p=>Number(p.id)===Number(id))[0];
+  const values=existing
+    ? JSON.parse(JSON.stringify(existing))
+    : documentedDefaults("/api/v1/remote-domains","post",properties("/api/v1/remote-domains","post"));
+  editing={kind:"remotedomain",id:Number(id)||0,values:values};
+  renderRemoteDomainEditor();
+}
+function renderRemoteDomainEditor(){
+  const props=properties("/api/v1/remote-domains","post");
+  $("#content").innerHTML=`<div class="view">
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All remote domains")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit policy {0}",escHtml(editing.id)):t("New policy")}</h2>
+      <div class="card flat">
+        <p class="note">${escHtml(operation(editing.id?"/api/v1/remote-domains/{id}":"/api/v1/remote-domains",editing.id?"put":"post").description||"")}</p>
+        <div class="form">${formHtml("rd",props,editing.values,remoteDomainFormOptions())}</div>
+        <div class="row" style="margin-top:18px">
+          <button class="btn" data-act="rdsave">${t("Save policy")}</button>
+          <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
+          <div class="err" id="err_rdedit"></div>
+        </div>
+      </div></div></div>`;
+}
+async function saveRemoteDomain(){
+  setErr("err_rdedit","");
+  const props=properties("/api/v1/remote-domains","post");
+  let body;
+  try{body=readForm("rd",props,remoteDomainFormOptions());}catch(e){setErr("err_rdedit",e.message);return;}
+  try{
+    if(editing.id)await api("/api/v1/remote-domains/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
+    else await api("/api/v1/remote-domains",{method:"POST",body:JSON.stringify(body)});
+    editing=null;toast(t("Policy saved"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_rdedit",e.message);}
+}
+async function deleteRemoteDomain(id,name){
+  if(!confirm(tf("Delete the remote domain policy for {0}?",name)))return;
+  setErr("err_rd_"+id,"");
+  try{await api("/api/v1/remote-domains/"+id,{method:"DELETE"});toast(t("Policy deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_rd_"+id,e.message);}
+}
+async function clearVerificationCache(){
+  setErr("err_rdcache","");
+  try{
+    const answer=await api("/api/v1/remote-domains/verification-cache/clear",{method:"POST",body:"{}"});
+    toast(tf("{0} verdict(s) forgotten",(answer&&answer.cleared)||0));
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_rdcache",e.message);}
 }
 
 /* ---------- IP ranges ----------

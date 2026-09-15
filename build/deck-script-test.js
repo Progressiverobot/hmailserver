@@ -428,6 +428,17 @@ const ROUTE_PROPS = {
 };
 const ROUTES_POST = 'Body: domain_name and target_smtp_host (required); target_smtp_port (default 25), number_of_tries (default 3), minutes_between_try (default 10), relayer_requires_authentication (default false, and then relayer_auth_username is required), relayer_auth_username, relayer_auth_password (write-only), treat_recipient_as_local_domain or treat_security_as_local_domain (default false), treat_sender_as_local_domain (default false), all_addresses (default true), addresses (an array of e-mail addresses) and connection_security (default none). Persisted and put into effect exactly as a route saved in the Control Panel is: the next message to the domain uses it. Server-wide; refused for domain-restricted keys.';
 
+const REMOTE_DOMAIN_PROPS = {
+   domain_name: { type: 'string' }, description: { type: 'string' }, active: { type: 'boolean' },
+   outbound_tls: { type: 'string', enum: ['none', 'encrypted', 'verified', 'dane'] },
+   require_inbound_tls: { type: 'boolean' },
+   max_message_size_kb: { type: 'integer' }, max_connections: { type: 'integer' }, max_messages_per_minute: { type: 'integer' },
+   allow_automatic_replies: { type: 'boolean' }, allow_forwarding: { type: 'boolean' },
+   callout_enabled: { type: 'boolean' }, callout_host: { type: 'string' }, callout_port: { type: 'integer' },
+   callout_timeout_seconds: { type: 'integer' }, callout_cache_minutes: { type: 'integer' }, callout_max_per_minute: { type: 'integer' }
+};
+const REMOTE_DOMAINS_POST = 'Body: domain_name (required; a domain, or a wildcard pattern such as *.example.com - the most specific active match governs a delivery). description; active (default true); outbound_tls (default none); require_inbound_tls (default false); max_message_size_kb (default 0, no limit); max_connections and max_messages_per_minute (default 0, unlimited); allow_automatic_replies and allow_forwarding (default true); callout_enabled (default false), callout_host, callout_port (default 25), callout_timeout_seconds (default 10, at most 60), callout_cache_minutes (default 60) and callout_max_per_minute (default 10). Server-wide; refused for domain-restricted keys.';
+
 const PORT_PROPS = {
    protocol: { type: 'string', enum: ['smtp', 'pop3', 'imap'] }, address: { type: 'string' }, port: { type: 'integer' },
    connection_security: { type: 'string', enum: ['none', 'tls', 'starttls_optional', 'starttls_required'] },
@@ -722,6 +733,16 @@ const spec = {
          put: { summary: 'Replace an SMTP route', description: 'The whole record, with the same fields, defaults and checks as the create.', requestBody: body(ROUTE_PROPS, ['domain_name', 'target_smtp_host']) },
          delete: { summary: 'Delete an SMTP route' }
       },
+      '/api/v1/remote-domains': {
+         get: { summary: 'List the remote domain policies', description: 'What this server will do when it talks to a named remote domain, as the running server holds them.' },
+         post: { summary: 'Create a remote domain policy', description: REMOTE_DOMAINS_POST, requestBody: body(REMOTE_DOMAIN_PROPS, ['domain_name']) }
+      },
+      '/api/v1/remote-domains/{id}': {
+         put: { summary: 'Replace a remote domain policy', description: 'The whole record, with the same fields, defaults and checks as the create.', requestBody: body(REMOTE_DOMAIN_PROPS, ['domain_name']) },
+         delete: { summary: 'Delete a remote domain policy' }
+      },
+      '/api/v1/remote-domains/effective': { get: { summary: 'The policy that governs a domain' } },
+      '/api/v1/remote-domains/verification-cache/clear': { post: { summary: 'Forget every remembered recipient verification verdict' } },
       '/api/v1/certificates': {
          get: { summary: 'List the SSL certificates', description: 'Names and file paths, never a private key password.' },
          post: { summary: 'Add an SSL certificate', description: 'A name and the paths of a PEM certificate file and its private key file on the server.', requestBody: body(CERT_PROPS, ['name', 'certificate_file', 'private_key_file']) }
@@ -879,6 +900,12 @@ const state = {
          number_of_tries: 3, minutes_between_try: 10, relayer_requires_authentication: true, relayer_auth_username: 'relay',
          treat_security_as_local_domain: false, treat_recipient_as_local_domain: false, treat_sender_as_local_domain: false,
          all_addresses: true, connection_security: 'starttls_required', addresses: [] }
+   ],
+   remotedomains: [
+      { id: 7, domain_name: 'bank.example', description: 'The regulated one', active: true, outbound_tls: 'verified',
+        require_inbound_tls: true, max_message_size_kb: 20480, max_connections: 2, max_messages_per_minute: 30,
+        allow_automatic_replies: false, allow_forwarding: true, callout_enabled: false, callout_host: '',
+        callout_port: 25, callout_timeout_seconds: 10, callout_cache_minutes: 60, callout_max_per_minute: 10 }
    ],
    certificates: [{ id: 2, name: 'mail.example.com', certificate_file: '/etc/ssl/mail.pem', private_key_file: '/etc/ssl/mail.key' }],
    ports: [
@@ -1260,6 +1287,27 @@ function answer(method, path, headers, raw) {
          return json(200, route);
       }
       if (method === 'DELETE') { state.routes.splice(at, 1); return json(200, { deleted: true }); }
+   }
+
+   if (path === '/api/v1/remote-domains' && method === 'GET') { return json(200, state.remotedomains); }
+   if (path === '/api/v1/remote-domains' && method === 'POST') {
+      const policy = Object.assign({ id: nextId++ }, parsed);
+      state.remotedomains.push(policy);
+      return json(201, policy);
+   }
+   if (path === '/api/v1/remote-domains/verification-cache/clear' && method === 'POST') {
+      return json(200, { cleared: 3 });
+   }
+   if (/^\/api\/v1\/remote-domains\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.remotedomains.findIndex((r) => r.id === id);
+      if (at < 0) { return json(404, { error: 'Unknown id' }); }
+      if (method === 'PUT') {
+         const policy = Object.assign({ id }, parsed);
+         state.remotedomains[at] = policy;
+         return json(200, policy);
+      }
+      if (method === 'DELETE') { state.remotedomains.splice(at, 1); return json(200, { deleted: true }); }
    }
 
    if (path === '/api/v1/certificates' && method === 'GET') { return json(200, state.certificates); }
@@ -2408,6 +2456,66 @@ async function main() {
    click(act('routedel', { id: 5 }));
    await flush();
    check('deleting a route names its domain and deletes by id', confirmations[confirmations.length - 1].indexOf('partner.example') >= 0 && called(before, 'DELETE', '/api/v1/routes/5').length === 1 && rows().length === 1);
+
+   // ---- remote domains
+   //
+   // The row that a policy is not a route: it names a domain this server does
+   // not host and says what it will and will not do when it talks to it. The
+   // checks are the ones that would catch the view drawing nothing from a good
+   // answer, sending a key the route refuses, or swallowing a refusal.
+   before = requests.length;
+   await goTo('remotedomains');
+   check('the remote domains view reads the policies', called(before, 'GET', '/api/v1/remote-domains').length === 1 && rows().length === 1);
+   check('a policy row shows the TLS it demands each way, its limits and whether it verifies recipients',
+      rows()[0].textContent.indexOf('Verified') >= 0 && rows()[0].textContent.indexOf('20480 KB') >= 0 &&
+      rows()[0].textContent.indexOf('2 connections') >= 0 && rows()[0].textContent.indexOf('30/minute') >= 0,
+      rows()[0].textContent);
+   click(act('rdnew'));
+   await flush();
+   check('a new policy starts at the defaults the document states - it demands nothing and verifies nothing',
+      document.getElementById('rd_outbound_tls').value === 'none' && document.getElementById('rd_require_inbound_tls').checked === false &&
+      document.getElementById('rd_max_message_size_kb').value === '0' && document.getElementById('rd_callout_enabled').checked === false &&
+      document.getElementById('rd_callout_port').value === '25' && document.getElementById('rd_callout_timeout_seconds').value === '10' &&
+      document.getElementById('rd_allow_forwarding').checked === true,
+      'tls=' + document.getElementById('rd_outbound_tls').value + ' size=' + document.getElementById('rd_max_message_size_kb').value);
+   check('only the domain is required', document.getElementById('rd_domain_name').closest('.fr').textContent.indexOf('required') >= 0 &&
+      document.getElementById('rd_callout_host').closest('.fr').textContent.indexOf('required') < 0);
+   setValue('rd_domain_name', 'partner.example');
+   setValue('rd_outbound_tls', 'dane');
+   setChecked('rd_require_inbound_tls', true);
+   setValue('rd_max_message_size_kb', '10240');
+   before = requests.length;
+   click(act('rdsave'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/remote-domains');
+   check('saving a new policy posts the form with the defaults filled in',
+      !!posted && posted.domain_name === 'partner.example' && posted.outbound_tls === 'dane' && posted.require_inbound_tls === true &&
+      posted.max_message_size_kb === 10240 && posted.callout_port === 25 && posted.allow_automatic_replies === true, JSON.stringify(posted));
+   check('and the re-read list has it', rows().length === 2 && rows()[1].textContent.indexOf('partner.example') >= 0,
+      rows().map((r) => r.textContent).join(' | '));
+   click(act('rdedit', { id: 7 }));
+   await flush();
+   check('editing a policy shows its values', document.getElementById('rd_outbound_tls').value === 'verified' &&
+      document.getElementById('rd_max_connections').value === '2' && document.getElementById('rd_allow_automatic_replies').checked === false);
+   setValue('rd_outbound_tls', 'encrypted');
+   before = requests.length;
+   click(act('rdsave'));
+   await flush();
+   put = lastBody(before, 'PUT', '/api/v1/remote-domains/7');
+   check('saving an existing policy PUTs the whole record', !!put && put.outbound_tls === 'encrypted' && put.domain_name === 'bank.example' &&
+      put.max_connections === 2 && put.allow_automatic_replies === false, JSON.stringify(put));
+   before = requests.length;
+   click(act('rdclearcache'));
+   await flush();
+   check('forgetting the remembered verdicts posts to the cache route and says how many went',
+      called(before, 'POST', '/api/v1/remote-domains/verification-cache/clear').length === 1 &&
+      document.body.textContent.indexOf('3 verdict(s) forgotten') >= 0, document.body.textContent.slice(-200));
+   before = requests.length;
+   click(act('rddel', { id: 7 }));
+   await flush();
+   check('deleting a policy names its domain and deletes by id',
+      confirmations[confirmations.length - 1].indexOf('bank.example') >= 0 &&
+      called(before, 'DELETE', '/api/v1/remote-domains/7').length === 1 && rows().length === 1);
 
    // ---- certificates
    before = requests.length;

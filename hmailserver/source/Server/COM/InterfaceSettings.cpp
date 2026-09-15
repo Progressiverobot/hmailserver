@@ -32,6 +32,7 @@
 
 #include "InterfaceSecurityRanges.h"
 #include "InterfaceRoutes.h"
+#include "InterfaceRemoteDomainPolicies.h"
 #include "InterfaceIMAPFolders.h"
 #include "InterfaceScripting.h"
 #include "InterfaceBackupSettings.h"
@@ -1105,6 +1106,35 @@ STDMETHODIMP InterfaceSettings::DisableAdministratorTOTP()
 
       if (!ini_file_settings_->SetAdministratorTotpSecret(HM::String()))
          return COMError::GenerateError("The secret could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+
+      return S_OK;
+   }
+   catch (...)
+   {
+      return COMError::GenerateGenericMessage();
+   }
+}
+
+// What this server will do for a named remote domain: the TLS it demands of it
+// outbound and inbound, the size and concurrency it will attempt, and whether a
+// recipient is verified with the domain's own server before mail for it is
+// accepted. Server administrators only, like the routes beside it.
+STDMETHODIMP InterfaceSettings::get_RemoteDomainPolicies(IInterfaceRemoteDomainPolicies **pVal)
+{
+   try
+   {
+      if (!config_)
+         return NotLoaded_();
+
+      if (!GetIsServerAdmin())
+         return authentication_->GetAccessDenied();
+
+      CComObject<InterfaceRemoteDomainPolicies>* interfacePolicies = new CComObject<InterfaceRemoteDomainPolicies>();
+      interfacePolicies->SetAuthentication(authentication_);
+      interfacePolicies->LoadSettings();
+
+      interfacePolicies->AddRef();
+      *pVal = interfacePolicies;
 
       return S_OK;
    }

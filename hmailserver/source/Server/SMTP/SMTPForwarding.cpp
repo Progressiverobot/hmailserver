@@ -11,6 +11,7 @@
 #include "../Common/BO/MessageData.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/MessageRecipients.h"
+#include "../Common/BO/RemoteDomainPolicies.h"
 
 #include "../Common/Persistence/PersistentMessage.h"
 
@@ -56,6 +57,19 @@ namespace HM
       if (!pRecipientAccount->GetForwardAddress().CompareNoCase(pRecipientAccount->GetAddress()))
       {
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4334, "SMTPDeliverer::_ApplyForwarding", "Could not forward message since target address as same as account address.");
+         return true;
+      }
+
+      // The remote domain policy's second Exchange switch. An administrator who
+      // has said mail for a domain may not be forwarded there has said it about
+      // every account that has typed that address into its forwarding box, which
+      // is the point: a per-account setting cannot be a per-organisation rule.
+      // Answered true, as every other refusal here is, because the message HAS
+      // been delivered to the mailbox - only the copy onward is withheld.
+      if (!RemoteDomainPolicies::ForwardingPermitted(pRecipientAccount->GetForwardAddress()))
+      {
+         LOG_DEBUG("SMTPForwarding::PerformForwarding aborted: the remote domain policy for " +
+            StringParser::ExtractDomain(pRecipientAccount->GetForwardAddress()) + " does not permit forwarding.");
          return true;
       }
 
@@ -197,6 +211,16 @@ namespace HM
       if (targetAddress.CompareNoCase(pRecipientAccount->GetAddress()) == 0)
       {
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 4334, "SMTPForwarding::RedirectToAddress", "Could not redirect message since target address is the same as the account address.");
+         return false;
+      }
+
+      // A Sieve redirect is a forward with a different name on it, and the same
+      // remote domain policy applies. Without this line the switch above would be
+      // a rule an account could walk around with a three-line filter script.
+      if (!RemoteDomainPolicies::ForwardingPermitted(targetAddress))
+      {
+         LOG_DEBUG("SMTPForwarding::RedirectToAddress aborted: the remote domain policy for " +
+            StringParser::ExtractDomain(targetAddress) + " does not permit forwarding.");
          return false;
       }
 

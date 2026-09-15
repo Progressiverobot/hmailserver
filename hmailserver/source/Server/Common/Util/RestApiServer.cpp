@@ -1705,6 +1705,18 @@ namespace HM
             return HandleUpdateRoute_(route.record_id, GetRequestBody_(request));
          case RouteRouteDelete:
             return HandleDeleteRoute_(route.record_id);
+         case RouteRemoteDomainList:
+            return HandleListRemoteDomains_();
+         case RouteRemoteDomainCreate:
+            return HandleCreateRemoteDomain_(GetRequestBody_(request));
+         case RouteRemoteDomainUpdate:
+            return HandleUpdateRemoteDomain_(route.record_id, GetRequestBody_(request));
+         case RouteRemoteDomainDelete:
+            return HandleDeleteRemoteDomain_(route.record_id);
+         case RouteRemoteDomainEffective:
+            return HandleEffectiveRemoteDomain_(String(QueryParameter_(route.query, "domain")));
+         case RouteRemoteDomainClearCache:
+            return HandleClearRemoteDomainVerificationCache_();
          case RouteAliasCreate:
             return HandleCreateAlias_(String(route.identifier), GetRequestBody_(request));
          case RouteAliasDelete:
@@ -3055,6 +3067,42 @@ namespace HM
          return;
       }
 
+      if (path == "/api/v1/remote-domains" && (method == "GET" || method == "POST"))
+      {
+         route.kind = method == "GET" ? RouteRemoteDomainList : RouteRemoteDomainCreate;
+         return;
+      }
+
+      // Before the {id} tail below, so that neither word is ever read as a
+      // decimal id: "effective" and "verification-cache" are not ids, and
+      // ParseQueueId would refuse them, but the order is stated rather than
+      // relied upon. The query string has already been split off the path.
+      if (method == "GET" && path == "/api/v1/remote-domains/effective")
+      {
+         route.kind = RouteRemoteDomainEffective;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/remote-domains/verification-cache/clear")
+      {
+         route.kind = RouteRemoteDomainClearCache;
+         return;
+      }
+
+      const AnsiString remoteDomainsPrefix = "/api/v1/remote-domains/";
+
+      if ((method == "PUT" || method == "DELETE") && path.StartsWith(remoteDomainsPrefix))
+      {
+         AnsiString idPart = path.Mid(remoteDomainsPrefix.GetLength());
+         __int64 id = 0;
+         if (idPart.Find("/") < 0 && ParseQueueId(idPart, id))
+         {
+            route.kind = method == "PUT" ? RouteRemoteDomainUpdate : RouteRemoteDomainDelete;
+            route.record_id = id;
+            return;
+         }
+      }
+
       const AnsiString routesPrefix = "/api/v1/routes/";
 
       if ((method == "PUT" || method == "DELETE") && path.StartsWith(routesPrefix))
@@ -3465,6 +3513,13 @@ namespace HM
       case RouteRouteCreate:
       case RouteRouteUpdate:
       case RouteRouteDelete:
+      case RouteRemoteDomainCreate:
+      case RouteRemoteDomainUpdate:
+      case RouteRemoteDomainDelete:
+      // Clearing the verification cache changes what the next RCPT TO decides
+      // and makes this server call out again, neither of which a read-only
+      // credential should be able to cause.
+      case RouteRemoteDomainClearCache:
       case RouteAliasCreate:
       case RouteAliasDelete:
       case RouteAccountUpdate:
@@ -3710,6 +3765,17 @@ namespace HM
       case RouteRouteCreate:
       case RouteRouteUpdate:
       case RouteRouteDelete:
+      // A remote domain policy names somebody else's domain, not one hosted
+      // here, so "restricted to these domains" cannot scope it - and what it
+      // decides (whether this server refuses to deliver a domain's mail in the
+      // clear, whether it opens verification sessions to a third party) is the
+      // server's posture rather than any one hosted domain's.
+      case RouteRemoteDomainList:
+      case RouteRemoteDomainCreate:
+      case RouteRemoteDomainUpdate:
+      case RouteRemoteDomainDelete:
+      case RouteRemoteDomainEffective:
+      case RouteRemoteDomainClearCache:
       case RouteServerReinitialize:
       case RouteUpdateGet:
       case RouteUpdateCheck:
@@ -10701,6 +10767,7 @@ namespace HM
       openApiJson += OpenApiRulesPaths_();
       openApiJson += OpenApiCertificatesPaths_();
       openApiJson += OpenApiRoutesPaths_();
+      openApiJson += OpenApiRemoteDomainsPaths_();
       openApiJson += OpenApiFetchAccountsPaths_();
       openApiJson += OpenApiAdministrationPaths_();
       openApiJson += OpenApiAntiSpamListsPaths_();

@@ -1284,6 +1284,9 @@
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
     <value>Автоматичне блокування адреси, з якої входи раз за разом не вдаються. Саме блокування — це IP-діапазон із терміном дії, тому воно перелічене на сторінці «Діапазони IP».</value>
   </data>
+  <data name="Automatic replies may go to this domain" xml:space="preserve">
+    <value>Автовідповіді можна надсилати в цей домен</value>
+  </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV увімкнено, але секрет не задано, тому вихідні відправники не позначаються, а повідомлення про недоставку, що повертаються, не перевіряються — перемикач показує «увімкнено», хоча нічого не робить. Створіть або введіть секрет.</value>
   </data>
@@ -2308,6 +2311,9 @@
   <data name="DANE &amp; DNSSEC" xml:space="preserve">
     <value>DANE та DNSSEC</value>
   </data>
+  <data name="DANE - and the certificate must match a DNSSEC-validated TLSA record" xml:space="preserve">
+    <value>DANE — і сертифікат має збігтися із записом TLSA, перевіреним через DNSSEC</value>
+  </data>
   <data name="DANE for inbound mail - publish TLSA records for your MX hosts" xml:space="preserve">
     <value>DANE для вхідної пошти — опублікуйте TLSA-записи для своїх MX-вузлів</value>
   </data>
@@ -2752,6 +2758,9 @@
   <data name="Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)" xml:space="preserve">
     <value>Домен для адреси відправника mailer-daemon (порожньо = ім'я вузла, інакше локальний домен повідомлення, інакше ім'я комп'ютера)</value>
   </data>
+  <data name="Domain or pattern" xml:space="preserve">
+    <value>Домен або шаблон</value>
+  </data>
   <data name="Domain whose DNS records are shown" xml:space="preserve">
     <value>Домен, чиї записи DNS показано</value>
   </data>
@@ -2910,6 +2919,9 @@
   </data>
   <data name="Encrypted" xml:space="preserve">
     <value>Зашифровано</value>
+  </data>
+  <data name="Encrypted - STARTTLS must succeed; the certificate is not judged" xml:space="preserve">
+    <value>Шифроване — STARTTLS має пройти; сертифікат не оцінюється</value>
   </data>
   <data name="Encrypted key" xml:space="preserve">
     <value>Зашифрований ключ</value>
@@ -3502,6 +3514,9 @@
   <data name="How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a memory dump, stops working once it expires." xml:space="preserve">
     <value>Як довго сесію можна поновити, однаково для закешованих сесій і квитків. Це обмежує, як довго витік секрету поновлення залишається корисним: квиток, записаний з каналу, або сесія, зчитана з дампа пам'яті, перестають працювати після закінчення терміну.</value>
   </data>
+  <data name="How long an answer is remembered, in minutes" xml:space="preserve">
+    <value>Скільки пам'ятати відповідь, у хвилинах</value>
+  </data>
   <data name="How long every worker may be busy before the saturation report. 0 = reporting off." xml:space="preserve">
     <value>Як довго кожен робочий потік може бути зайнятий до звіту про насичення. 0 = звіти вимкнено.</value>
   </data>
@@ -3510,6 +3525,9 @@
   </data>
   <data name="How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely." xml:space="preserve">
     <value>Як довго сервер продовжуватиме фіналізацію прийнятого повідомлення, перш ніж відповість 451 і попросить відправника повторити спробу, замість того щоб тримати з'єднання відкритим нескінченно.</value>
+  </data>
+  <data name="How long to wait, in seconds" xml:space="preserve">
+    <value>Скільки чекати, у секундах</value>
   </data>
   <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
     <value>Як пошта потрапляє всередину, куди йде далі і що з нею відбувається дорогою.</value>
@@ -3534,6 +3552,9 @@
   </data>
   <data name="How often a client may check for mail" xml:space="preserve">
     <value>Як часто клієнт може перевіряти пошту</value>
+  </data>
+  <data name="How often one domain is asked, per minute" xml:space="preserve">
+    <value>Як часто питати один домен, за хвилину</value>
   </data>
   <data name="How the caches are performing" xml:space="preserve">
     <value>Як працюють кеші</value>
@@ -3807,6 +3828,9 @@
   <data name="Language (VBScript or JScript)" xml:space="preserve">
     <value>Мова (VBScript або JScript)</value>
   </data>
+  <data name="Largest message in KB (0 is no limit)" xml:space="preserve">
+    <value>Найбільше повідомлення в KB (0 — без обмеження)</value>
+  </data>
   <data name="Last backup: {0} ({1})." xml:space="preserve">
     <value>Остання резервна копія: {0} ({1}).</value>
   </data>
@@ -4077,6 +4101,9 @@
   <data name="Mail is stuck or slow" xml:space="preserve">
     <value>Пошта застрягла або йде повільно</value>
   </data>
+  <data name="Mail may be forwarded to this domain" xml:space="preserve">
+    <value>Пошту можна пересилати в цей домен</value>
+  </data>
   <data name="Mail servers for {0}, in the order this server would try them:" xml:space="preserve">
     <value>Поштові сервери для {0} в тому порядку, в якому цей сервер їх пробував би:</value>
   </data>
@@ -4289,6 +4316,9 @@
   </data>
   <data name="Message-store consistency" xml:space="preserve">
     <value>Цілісність сховища повідомлень</value>
+  </data>
+  <data name="Messages a minute (0 is unlimited)" xml:space="preserve">
+    <value>Повідомлень за хвилину (0 — без обмеження)</value>
   </data>
   <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
     <value>Повідомлення, утримані для перегляду замість відхилення, і дві дії, доступні для кожного: випустити його отримувачеві або видалити.</value>
@@ -5142,6 +5172,9 @@
   <data name="Out of office" xml:space="preserve">
     <value>Не на місці</value>
   </data>
+  <data name="Outbound TLS" xml:space="preserve">
+    <value>Вихідний TLS</value>
+  </data>
   <data name="Outbound delivery behavior, retries and smart-host relaying." xml:space="preserve">
     <value>Поведінка вихідної доставки, повторні спроби та ретрансляція через смарт-хост.</value>
   </data>
@@ -5290,6 +5323,9 @@
     <value>Призупинити поштовий сервер?
 
 Нові підключення не прийматимуться, а пошта не доставлятиметься, доки роботу не буде відновлено. Служба Windows працює далі, тому ця Панель керування залишається підключеною.</value>
+  </data>
+  <data name="Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up." xml:space="preserve">
+    <value>Для кожного зовнішнього домену: який TLS цей сервер вимагає в кожному напрямку, який розмір і скільки з'єднань він спробує, та перевірка одержувача для домену, для якого він резервний MX.</value>
   </data>
   <data name="Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run." xml:space="preserve">
     <value>Перевизначення загальносерверної обробки спаму для окремого облікового запису, що застосовуються до копії ЦЬОГО облікового запису під час доставки. Вони не можуть повернутися назад у сеанс SMTP: повідомлення, яке глобальні параметри відхиляють, поміщають у карантин або сірий список, зупиняється для кожного отримувача ще до того, як спрацює будь-який параметр облікового запису.</value>
@@ -5812,6 +5848,9 @@
   <data name="Remote domain" xml:space="preserve">
     <value>Віддалений домен</value>
   </data>
+  <data name="Remote domains" xml:space="preserve">
+    <value>Зовнішні домени</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Вилучити _прострочені</value>
   </data>
@@ -5920,6 +5959,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Require TLS for token authentication" xml:space="preserve">
     <value>Вимагати TLS для автентифікації токеном</value>
+  </data>
+  <data name="Require TLS on mail from this domain" xml:space="preserve">
+    <value>Вимагати TLS для пошти з цього домену</value>
   </data>
   <data name="Require _TLS for auth" xml:space="preserve">
     <value>Вимагати _TLS для автентифікації</value>
@@ -6905,6 +6947,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined." xml:space="preserve">
     <value>Simple - типовий метод. Negotiate виконує обмін SSPI (Kerberos, з відкатом до NTLM), який ніколи не передає пароль і підписує з'єднання - це єдиний метод, який приймає сучасний контролер домену з типовою конфігурацією без установленого сертифіката; йому не потрібні ані пошук, ані SearchBase, ані обліковий запис служби, і він працює з вузла, не приєднаного до домену.</value>
   </data>
+  <data name="Simultaneous connections (0 is unlimited)" xml:space="preserve">
+    <value>Одночасних з'єднань (0 — без обмеження)</value>
+  </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Обмеження розміру та сканери…</value>
   </data>
@@ -7683,6 +7728,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="The port is outside the range 1-65535." xml:space="preserve">
     <value>Порт поза діапазоном 1-65535.</value>
   </data>
+  <data name="The port to ask on" xml:space="preserve">
+    <value>Порт, на якому питати</value>
+  </data>
   <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
     <value>Порти, які слухає кожен протокол, їхня адреса прив'язки та безпека з'єднання. Після змін службу потрібно перезапустити. Стовпець «Слухає» читається з відкритих портів цього комп'ютера, а не з конфігурації, тому показує, що відбувається насправді, а не що було запитано.</value>
   </data>
@@ -7814,6 +7862,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured." xml:space="preserve">
     <value>Сервер зберігає це значення і ніколи його не читає - ніщо не задає за ним пріоритет потоків, тому його зміна ні на що не впливає. Його показано, а не прибрано, щоб адміністратор, який задав його роки тому, бачив, що воно все ще тут і чому нічого не сталося; і воно не редагується, бо поле, яке приймає значення, на яке ніщо не реагує, гірше за відсутність поля. Кількості потоків вище дотримуються.</value>
+  </data>
+  <data name="The server to ask (empty asks the domain's MX hosts)" xml:space="preserve">
+    <value>Сервер, у якого питати (порожнє — у MX-вузлів домену)</value>
   </data>
   <data name="The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no &quot;a:&quot; mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it." xml:space="preserve">
     <value>Ім'я вузла сервера («Доставка пошти») ПОРОЖНЄ, тому в HELO/EHLO він оголошує ім'я свого комп'ютера Windows - не публічне ім'я DNS, - і жоден механізм «a:» чесно запропонувати не можна. Пропозиція дозволяє лише MX-вузли домену. Спершу задайте ім'я вузла; воно потрібне кільком записам на цій сторінці.</value>
@@ -8338,8 +8389,14 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Код підтвердження з вашого застосунку-автентифікатора</value>
   </data>
+  <data name="Verified - and the certificate must chain and name the host" xml:space="preserve">
+    <value>З перевіркою — і сертифікат має вибудувати ланцюг і називати вузол</value>
+  </data>
   <data name="Verify DKIM signatures" xml:space="preserve">
     <value>Перевіряти підписи DKIM</value>
+  </data>
+  <data name="Verify a recipient with the domain's own server" xml:space="preserve">
+    <value>Перевіряти одержувача на власному сервері домену</value>
   </data>
   <data name="Verify remote certificates when delivering" xml:space="preserve">
     <value>Перевіряти сертифікати віддалених серверів під час доставки</value>
@@ -8479,11 +8536,17 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>Для чого цей ключ, наприклад «Grafana probe»</value>
   </data>
+  <data name="What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else." xml:space="preserve">
+    <value>Що робить цей сервер, коли спілкується з названим зовнішнім доменом: який TLS він вимагає від з'єднання в кожному напрямку, повідомлення якого розміру та скільки з'єднань він спробує, чи можна надсилати туди автовідповідь або пересилання, і чи перевіряється одержувач на власному сервері домену перед тим, як пошту для нього буде прийнято. Ім'я може містити символ підстановки: доставку вирішує найточніший активний запис. Вимога TLS тут додається до того, що домен публікує сам: запис на цій сторінці ніколи не послаблює політику MTA-STS чи DANE. Перевірка одержувача призначена для домену, для якого цей сервер є резервним MX, і ні для чого іншого.</value>
+  </data>
   <data name="What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing." xml:space="preserve">
     <value>Що цьому серверу потрібно зробити поза ним - записи DNS, файли ключів і ЦС, довірені списки. Для кожного елемента показано стан; там, де відповідь звідси прочитати неможливо, елемент каже, що перевірити, замість того щоб вгадувати.</value>
   </data>
   <data name="What to do: " xml:space="preserve">
     <value>Що робити:</value>
+  </data>
+  <data name="Whatever the server would do anyway - including MTA-STS and DANE" xml:space="preserve">
+    <value>Те, що сервер зробив би й так, разом із MTA-STS і DANE</value>
   </data>
   <data name="Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting." xml:space="preserve">
     <value>Будь-що, що ваш каталог приймає для простої прив'язки: UPN (svc-mail@example.local), DOMAIN\name або повне DN. Якщо залишити порожнім, сервер шукає анонімно - що зазвичай не вдається проти Active Directory, з повідомленою причиною, що називає цей параметр.</value>
@@ -9579,6 +9642,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="rejected" xml:space="preserve">
     <value>відхилено</value>
+  </data>
+  <data name="remote domain policy" xml:space="preserve">
+    <value>правило для зовнішнього домену</value>
   </data>
   <data name="remove a domain" xml:space="preserve">
     <value>вилучити домен</value>

@@ -1284,6 +1284,9 @@
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
     <value>ログオンに失敗し続けるアドレスの自動ロックアウト。ブロック自体は期限付きの IP 範囲なので、IP 範囲ページに一覧表示されます。</value>
   </data>
+  <data name="Automatic replies may go to this domain" xml:space="preserve">
+    <value>このドメインへ自動応答を送ってよい</value>
+  </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV はオンになっていますがシークレットが設定されていないため、送信メールにタグは付かず、戻ってきたバウンスも検証されません。スイッチは有効と表示されますが、何もしていません。シークレットを生成するか入力してください。</value>
   </data>
@@ -2308,6 +2311,9 @@
   <data name="DANE &amp; DNSSEC" xml:space="preserve">
     <value>DANE と DNSSEC</value>
   </data>
+  <data name="DANE - and the certificate must match a DNSSEC-validated TLSA record" xml:space="preserve">
+    <value>DANE - さらに証明書が DNSSEC で検証された TLSA レコードと一致すること</value>
+  </data>
   <data name="DANE for inbound mail - publish TLSA records for your MX hosts" xml:space="preserve">
     <value>受信メールの DANE - MX ホストの TLSA レコードを公開する</value>
   </data>
@@ -2752,6 +2758,9 @@
   <data name="Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)" xml:space="preserve">
     <value>mailer-daemon 送信者アドレスのドメイン (空 = ホスト名、なければメッセージのローカル ドメイン、なければコンピューター名)</value>
   </data>
+  <data name="Domain or pattern" xml:space="preserve">
+    <value>ドメインまたはパターン</value>
+  </data>
   <data name="Domain whose DNS records are shown" xml:space="preserve">
     <value>DNS レコードを表示するドメイン</value>
   </data>
@@ -2910,6 +2919,9 @@
   </data>
   <data name="Encrypted" xml:space="preserve">
     <value>暗号化済み</value>
+  </data>
+  <data name="Encrypted - STARTTLS must succeed; the certificate is not judged" xml:space="preserve">
+    <value>暗号化 - STARTTLS の成立が必要。証明書は判定しない</value>
   </data>
   <data name="Encrypted key" xml:space="preserve">
     <value>暗号化された鍵</value>
@@ -3502,6 +3514,9 @@
   <data name="How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a memory dump, stops working once it expires." xml:space="preserve">
     <value>セッションが再開可能なままでいる期間です。キャッシュされたセッションとチケットの両方に適用されます。漏えいした再開シークレットが使える期間を制限します。通信路から記録されたチケットや、メモリ ダンプから読み取られたセッションは、期限が切れれば機能しなくなります。</value>
   </data>
+  <data name="How long an answer is remembered, in minutes" xml:space="preserve">
+    <value>回答を記憶する分数</value>
+  </data>
   <data name="How long every worker may be busy before the saturation report. 0 = reporting off." xml:space="preserve">
     <value>飽和レポートを出すまでに、すべてのワーカーがビジーであってよい時間。0 = レポート無効。</value>
   </data>
@@ -3510,6 +3525,9 @@
   </data>
   <data name="How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely." xml:space="preserve">
     <value>接続を無期限に開いたままにするのではなく、451 で応答して送信者に再試行を求めるまでに、受け入れたメッセージの最終処理をサーバーが続ける時間。</value>
+  </data>
+  <data name="How long to wait, in seconds" xml:space="preserve">
+    <value>待機する秒数</value>
   </data>
   <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
     <value>メールがどのように入ってきて、次にどこへ向かい、その途中で何が起きるか。</value>
@@ -3534,6 +3552,9 @@
   </data>
   <data name="How often a client may check for mail" xml:space="preserve">
     <value>クライアントがメールを確認できる頻度</value>
+  </data>
+  <data name="How often one domain is asked, per minute" xml:space="preserve">
+    <value>1 分あたりに 1 つのドメインへ問い合わせる回数</value>
   </data>
   <data name="How the caches are performing" xml:space="preserve">
     <value>キャッシュの動作状況</value>
@@ -3807,6 +3828,9 @@
   <data name="Language (VBScript or JScript)" xml:space="preserve">
     <value>言語 (VBScript または JScript)</value>
   </data>
+  <data name="Largest message in KB (0 is no limit)" xml:space="preserve">
+    <value>最大メッセージサイズ KB（0 は無制限）</value>
+  </data>
   <data name="Last backup: {0} ({1})." xml:space="preserve">
     <value>前回のバックアップ: {0} ({1})。</value>
   </data>
@@ -4077,6 +4101,9 @@
   <data name="Mail is stuck or slow" xml:space="preserve">
     <value>メールが詰まっている、または遅い</value>
   </data>
+  <data name="Mail may be forwarded to this domain" xml:space="preserve">
+    <value>このドメインへメールを転送してよい</value>
+  </data>
   <data name="Mail servers for {0}, in the order this server would try them:" xml:space="preserve">
     <value>{0} のメール サーバー (このサーバーが試す順):</value>
   </data>
@@ -4289,6 +4316,9 @@
   </data>
   <data name="Message-store consistency" xml:space="preserve">
     <value>メッセージ ストアの整合性</value>
+  </data>
+  <data name="Messages a minute (0 is unlimited)" xml:space="preserve">
+    <value>1 分あたりのメッセージ数（0 は無制限）</value>
   </data>
   <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
     <value>拒否される代わりに確認のために保留されたメッセージと、それぞれに対してできる 2 つのこと: 受信者に解放するか、削除するか。</value>
@@ -5142,6 +5172,9 @@
   <data name="Out of office" xml:space="preserve">
     <value>不在通知</value>
   </data>
+  <data name="Outbound TLS" xml:space="preserve">
+    <value>送信時の TLS</value>
+  </data>
   <data name="Outbound delivery behavior, retries and smart-host relaying." xml:space="preserve">
     <value>送信配信の動作、再試行、スマート ホスト経由のリレー。</value>
   </data>
@@ -5290,6 +5323,9 @@
     <value>メール サーバーを一時停止しますか?
 
 再開するまで、新しい接続は受け入れられず、メールも配信されません。Windows サービスは動作し続けるため、このコントロールパネルは接続されたままです。</value>
+  </data>
+  <data name="Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up." xml:space="preserve">
+    <value>リモートドメインごとに、双方向で要求する TLS、試みるサイズと接続数、そしてこのサーバーがバックアップ MX を務めるドメインの宛先確認を設定します。</value>
   </data>
   <data name="Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run." xml:space="preserve">
     <value>サーバー全体のスパム処理に対するアカウント単位の上書きで、配信時にこのアカウントのコピーに適用されます。SMTP の通信までさかのぼって作用することはできません。グローバル設定が拒否・検疫・グレイリスティングするメッセージは、アカウント単位の設定が動く前に、すべての受信者について止められます。</value>
@@ -5812,6 +5848,9 @@
   <data name="Remote domain" xml:space="preserve">
     <value>リモート ドメイン</value>
   </data>
+  <data name="Remote domains" xml:space="preserve">
+    <value>リモートドメイン</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>期限切れを削除(_E)</value>
   </data>
@@ -5920,6 +5959,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Require TLS for token authentication" xml:space="preserve">
     <value>トークン認証に TLS を要求する</value>
+  </data>
+  <data name="Require TLS on mail from this domain" xml:space="preserve">
+    <value>このドメインからのメールに TLS を要求する</value>
   </data>
   <data name="Require _TLS for auth" xml:space="preserve">
     <value>認証に TLS を要求(_T)</value>
@@ -6905,6 +6947,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined." xml:space="preserve">
     <value>既定は Simple です。Negotiate は SSPI 交換 (Kerberos、フォールバックで NTLM) を実行し、パスワードを送信せず接続に署名します。証明書がインストールされていない既定構成の最新のドメイン コントローラーが受け入れる唯一の方式であり、検索も SearchBase もサービス アカウントも不要で、ドメインに参加していないホストからでも動作します。</value>
   </data>
+  <data name="Simultaneous connections (0 is unlimited)" xml:space="preserve">
+    <value>同時接続数（0 は無制限）</value>
+  </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>サイズ制限とスキャナー…</value>
   </data>
@@ -7683,6 +7728,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="The port is outside the range 1-65535." xml:space="preserve">
     <value>ポートが 1～65535 の範囲外です。</value>
   </data>
+  <data name="The port to ask on" xml:space="preserve">
+    <value>問い合わせに使うポート</value>
+  </data>
   <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
     <value>各プロトコルが待ち受けるポート、そのバインド アドレス、接続セキュリティ。変更後はサービスの再起動が必要です。「待ち受け中」列は設定ではなくこのコンピューターの開いているポートから読み取られるため、要求された内容ではなく実際に起きていることを示します。</value>
   </data>
@@ -7814,6 +7862,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured." xml:space="preserve">
     <value>サーバーはこの値を保存しますが、決して読み取りません。これからスレッド優先度を設定するものは何もないため、変更しても効果はありません。削除ではなく表示しているのは、何年も前にこれを設定した管理者が、まだ存在していること、そしてなぜ何も起きなかったのかを分かるようにするためです。編集できないのは、何も反応しない値を受け付けるボックスは、ボックスがまったくないよりも悪いからです。上のスレッド数は尊重されます。</value>
+  </data>
+  <data name="The server to ask (empty asks the domain's MX hosts)" xml:space="preserve">
+    <value>問い合わせ先のサーバー（空欄ならドメインの MX ホスト）</value>
   </data>
   <data name="The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no &quot;a:&quot; mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it." xml:space="preserve">
     <value>サーバーのホスト名 (メール配信) が空のため、HELO/EHLO で Windows コンピューター名 (公開 DNS 名ではありません) を名乗っており、"a:" メカニズムを正直に提示することができません。提案はドメインの MX ホストのみを許可します。まずホスト名を設定してください。このページのいくつかのレコードがそれを必要とします。</value>
@@ -8338,8 +8389,14 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>認証アプリの確認コード</value>
   </data>
+  <data name="Verified - and the certificate must chain and name the host" xml:space="preserve">
+    <value>検証済み - さらに証明書が連鎖し、ホスト名と一致すること</value>
+  </data>
   <data name="Verify DKIM signatures" xml:space="preserve">
     <value>DKIM 署名を検証する</value>
+  </data>
+  <data name="Verify a recipient with the domain's own server" xml:space="preserve">
+    <value>ドメイン自身のサーバーへ宛先を確認する</value>
   </data>
   <data name="Verify remote certificates when delivering" xml:space="preserve">
     <value>配信時にリモート証明書を検証する</value>
@@ -8479,11 +8536,17 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>このキーの用途 (例: "Grafana probe")</value>
   </data>
+  <data name="What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else." xml:space="preserve">
+    <value>このサーバーが指定したリモートドメインと通信するときの動作です。双方向の接続に要求する TLS、試みる最大メッセージサイズと接続数、自動応答や転送をそのドメインへ送ってよいか、そしてそのドメイン宛のメールを受け取る前に宛先をそのドメイン自身のサーバーへ確認するかどうか。名前にはワイルドカードを使えます。配送を決めるのは、最も限定的な有効な項目です。ここで設定した TLS の要求は、ドメイン自身が公開している内容に加算されます。このページの項目が MTA-STS や DANE のポリシーを弱めることはありません。宛先確認は、このサーバーがバックアップ MX を務めるドメインのためだけのものです。</value>
+  </data>
   <data name="What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing." xml:space="preserve">
     <value>このサーバーの外で行う必要があること。DNS レコード、鍵と CA のファイル、信頼リスト。各項目は状態を表示し、ここから答えを読み取れない場合は、推測する代わりに何を確認すべきかを示します。</value>
   </data>
   <data name="What to do: " xml:space="preserve">
     <value>対応:</value>
+  </data>
+  <data name="Whatever the server would do anyway - including MTA-STS and DANE" xml:space="preserve">
+    <value>サーバーが本来行う動作のまま（MTA-STS と DANE を含む）</value>
   </data>
   <data name="Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting." xml:space="preserve">
     <value>ディレクトリが簡易バインドで受け入れるもの: UPN (svc-mail@example.local)、DOMAIN\name、または完全な DN。空のままにすると、サーバーは匿名で検索します。これは通常 Active Directory に対して失敗し、この設定を名指しする理由が報告されます。</value>
@@ -9579,6 +9642,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="rejected" xml:space="preserve">
     <value>拒否済み</value>
+  </data>
+  <data name="remote domain policy" xml:space="preserve">
+    <value>リモートドメインのポリシー</value>
   </data>
   <data name="remove a domain" xml:space="preserve">
     <value>ドメインを削除する</value>

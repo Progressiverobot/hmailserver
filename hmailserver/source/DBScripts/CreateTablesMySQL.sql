@@ -4,6 +4,8 @@ drop table if exists hm_settings;
 
 drop table if exists hm_inisettings;
 
+drop table if exists hm_remotedomainpolicies;
+
 drop table if exists hm_calendarobjects;
 
 drop table if exists hm_calendars;
@@ -519,6 +521,29 @@ create table hm_calendarobjects
 CREATE UNIQUE INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi);
 
 CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken);
+
+create table hm_remotedomainpolicies
+(
+	policyid int auto_increment not null, primary key(`policyid`), unique(`policyid`),
+	policydomainname varchar(255) not null,
+	policydescription varchar(255) not null,
+	policyactive tinyint not null,
+	policyoutboundtls int not null,
+	policyinboundtls tinyint not null,
+	policymaxmessagesizekb int not null,
+	policymaxconnections int not null,
+	policymaxperminute int not null,
+	policyallowreplies tinyint not null,
+	policyallowforwarding tinyint not null,
+	policycalloutenabled tinyint not null,
+	policycallouthost varchar(255) not null,
+	policycalloutport int not null,
+	policycallouttimeout int not null,
+	policycalloutcacheminutes int not null,
+	policycalloutperminute int not null
+);
+
+CREATE INDEX idx_hm_remotedomainpolicies_domain ON hm_remotedomainpolicies (policydomainname);
 
 create table hm_rules
 (
@@ -1144,6 +1169,8 @@ ALTER TABLE hm_calendars ENGINE=InnoDB;
 
 ALTER TABLE hm_calendarobjects ENGINE=InnoDB;
 
+ALTER TABLE hm_remotedomainpolicies ENGINE=InnoDB;
+
 ALTER TABLE hm_rules ENGINE=InnoDB;
 
 ALTER TABLE hm_rule_criterias ENGINE=InnoDB;
@@ -1220,4 +1247,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6041);
+insert into hm_dbversion values (6047);

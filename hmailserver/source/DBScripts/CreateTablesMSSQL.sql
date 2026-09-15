@@ -1,3 +1,5 @@
+if exists (select * from sysobjects where id = object_id('hm_remotedomainpolicies') and objectproperty(id, 'isusertable') = 1) drop table hm_remotedomainpolicies
+
 if exists (select * from sysobjects where id = object_id('hm_calendarobjects') and objectproperty(id, 'isusertable') = 1) drop table hm_calendarobjects
 if exists (select * from sysobjects where id = object_id('hm_calendars') and objectproperty(id, 'isusertable') = 1) drop table hm_calendars
 if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
@@ -674,6 +676,31 @@ ALTER TABLE hm_calendarobjects ADD CONSTRAINT hm_calendarobjects_pk PRIMARY KEY 
 CREATE UNIQUE CLUSTERED INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi)
 
 CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken)
+
+create table hm_remotedomainpolicies
+(
+	policyid int identity(1,1) not null,
+	policydomainname nvarchar(255) not null,
+	policydescription nvarchar(255) not null,
+	policyactive tinyint not null,
+	policyoutboundtls int not null,
+	policyinboundtls tinyint not null,
+	policymaxmessagesizekb int not null,
+	policymaxconnections int not null,
+	policymaxperminute int not null,
+	policyallowreplies tinyint not null,
+	policyallowforwarding tinyint not null,
+	policycalloutenabled tinyint not null,
+	policycallouthost nvarchar(255) not null,
+	policycalloutport int not null,
+	policycallouttimeout int not null,
+	policycalloutcacheminutes int not null,
+	policycalloutperminute int not null
+)
+
+ALTER TABLE hm_remotedomainpolicies ADD CONSTRAINT hm_remotedomainpolicies_pk PRIMARY KEY NONCLUSTERED (policyid)
+
+CREATE INDEX idx_hm_remotedomainpolicies_domain ON hm_remotedomainpolicies (policydomainname)
 
 create table hm_rules
 (
@@ -1360,4 +1387,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6041)
+insert into hm_dbversion values (6047)

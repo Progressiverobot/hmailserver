@@ -36,6 +36,20 @@ namespace HM
       // the password. The username still comes from SetAuthInfo - it is the
       // account being relayed as; the token replaces only the proof.
       void SetOAuthBearer(const String &token);
+
+      // Names the rule that required TLS on this connection, and changes what a
+      // failure to get it means.
+      //
+      // Without it, a CSSTARTTLSRequired connection to a remote that does not
+      // offer STARTTLS is answered 500 / 5.7.0, which is PERMANENT: the message
+      // is bounced to its sender on the first attempt. That is the right answer
+      // for a relay whose port was configured wrong and the wrong one for an
+      // administrator's per-domain policy, where the remote is a third party
+      // whose STARTTLS may be back in an hour - RFC 8461 section 5 says as much
+      // of MTA-STS, and the reasoning is the same here. With a reason set, the
+      // same failure is 450 / 4.7.0 and carries the sentence, so the message
+      // waits in the queue and the deferral says which rule held it.
+      void SetTlsPolicyReason(const String &reason);
    protected:
 
       virtual void OnConnected();
@@ -193,6 +207,7 @@ namespace HM
       String username_;
       String password_;
       String oauth_bearer_;
+      String tls_policy_reason_;
 
       unsigned int cur_recipient_;
 

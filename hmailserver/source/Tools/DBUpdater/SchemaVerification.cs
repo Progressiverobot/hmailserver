@@ -507,7 +507,43 @@ namespace DBUpdater
          new SchemaProbe(6041, "hm_calendarobjects.objectdeleted",
                          "update hm_calendarobjects set objectdeleted = objectdeleted where 1 = 0"),
          new SchemaProbe(6041, "hm_calendarobjects.objectmodified",
-                         "update hm_calendarobjects set objectmodified = objectmodified where 1 = 0")
+                         "update hm_calendarobjects set objectmodified = objectmodified where 1 = 0"),
+         // Upgrade6046to6047* - what this server will do for one named remote
+         // domain: the TLS it demands outbound and inbound, the size and
+         // concurrency it will attempt, and the backup-MX recipient callout.
+         // The identity column is never probed.
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policydomainname",
+                         "update hm_remotedomainpolicies set policydomainname = policydomainname where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policydescription",
+                         "update hm_remotedomainpolicies set policydescription = policydescription where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policyactive",
+                         "update hm_remotedomainpolicies set policyactive = policyactive where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policyoutboundtls",
+                         "update hm_remotedomainpolicies set policyoutboundtls = policyoutboundtls where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policyinboundtls",
+                         "update hm_remotedomainpolicies set policyinboundtls = policyinboundtls where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policymaxmessagesizekb",
+                         "update hm_remotedomainpolicies set policymaxmessagesizekb = policymaxmessagesizekb where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policymaxconnections",
+                         "update hm_remotedomainpolicies set policymaxconnections = policymaxconnections where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policymaxperminute",
+                         "update hm_remotedomainpolicies set policymaxperminute = policymaxperminute where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policyallowreplies",
+                         "update hm_remotedomainpolicies set policyallowreplies = policyallowreplies where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policyallowforwarding",
+                         "update hm_remotedomainpolicies set policyallowforwarding = policyallowforwarding where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycalloutenabled",
+                         "update hm_remotedomainpolicies set policycalloutenabled = policycalloutenabled where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycallouthost",
+                         "update hm_remotedomainpolicies set policycallouthost = policycallouthost where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycalloutport",
+                         "update hm_remotedomainpolicies set policycalloutport = policycalloutport where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycallouttimeout",
+                         "update hm_remotedomainpolicies set policycallouttimeout = policycallouttimeout where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycalloutcacheminutes",
+                         "update hm_remotedomainpolicies set policycalloutcacheminutes = policycalloutcacheminutes where 1 = 0"),
+         new SchemaProbe(6047, "hm_remotedomainpolicies.policycalloutperminute",
+                         "update hm_remotedomainpolicies set policycalloutperminute = policycalloutperminute where 1 = 0")
       };
 
       /// <summary>

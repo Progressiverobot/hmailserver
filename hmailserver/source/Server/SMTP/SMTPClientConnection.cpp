@@ -106,6 +106,24 @@ namespace HM
       {
          for(std::shared_ptr<MessageRecipient> recipient : recipients_)
             recipient->SetDeliveryResult(MessageRecipient::ResultOptionalHandshakeFailed);
+
+         return;
+      }
+
+      // A handshake that failed on a connection a remote domain policy required
+      // TLS on. Reached two ways - the certificate did not verify (or did not
+      // match the TLSA record), or the remote answered STARTTLS with anything
+      // but 220 - and both mean the same thing to the administrator: the
+      // encryption their rule demanded could not be had.
+      //
+      // Without this the recipients come back undefined, and ExternalDelivery
+      // reports them as 4.4.2 "Remote server closed connection" - a deferral,
+      // which is right, with a reason that says nothing about the rule that
+      // caused it. The message is the same one an administrator will search the
+      // log for.
+      if (!tls_policy_reason_.IsEmpty())
+      {
+         UpdateAllRecipientsWithError_(450, AnsiString(tls_policy_reason_), false, _T("4.7.0"), false);
       }
    }
 
@@ -456,6 +474,17 @@ namespace HM
                // Remote server does not support STARTTLS
                if (GetConnectionSecurity() == CSSTARTTLSRequired)
                {
+                  if (!tls_policy_reason_.IsEmpty())
+                  {
+                     // A per-domain policy required the encryption. 450 / 4.7.0
+                     // rather than the permanent refusal below: see
+                     // SetTlsPolicyReason. The remote is a third party and its
+                     // STARTTLS may be back before the queue gives up.
+                     UpdateAllRecipientsWithError_(450, AnsiString(tls_policy_reason_), false, _T("4.7.0"), false);
+                     SendQUIT_();
+                     return;
+                  }
+
                   // RFC 3463 X.7.0 "Other or undefined security status". The
                   // message is refused for a security reason of this server's
                   // choosing; RFC 3463 registers no code for "encryption was
@@ -1079,6 +1108,12 @@ namespace HM
    {
       oauth_bearer_ = token;
       use_smtpauth_ = true;
+   }
+
+   void
+   SMTPClientConnection::SetTlsPolicyReason(const String &reason)
+   {
+      tls_policy_reason_ = reason;
    }
    
    void 
