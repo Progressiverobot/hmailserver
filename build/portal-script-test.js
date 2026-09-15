@@ -1399,6 +1399,20 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+      // ---- report phishing: to the postmaster, into junk, the sender blocked
+   location.hash = '#/m/102';
+   await flush();
+   const beforePhish = requests.length;
+   document.getElementById('message-phish').dispatchEvent(makeEvent('click'));
+   await flush();
+   const phishReport = since(beforePhish).filter((r) => r.method === 'POST' && r.path === '/api/v1/me/messages').map((r) => JSON.parse(r.body))[0];
+   check('the report goes to the postmaster of the reader\'s domain with the message named', !!phishReport && phishReport.to === 'postmaster@example.com' && phishReport.subject === 'Phishing report: Second' && phishReport.text.indexOf('b@example.net') >= 0,
+      JSON.stringify(phishReport).slice(0, 200));
+   check('the sender is blocked by a rule', since(beforePhish).some((r) => r.method === 'PUT' && r.path === '/api/v1/me/filters' && /b@example\.net/.test(r.body || '')),
+      JSON.stringify(since(beforePhish).map((r) => r.method + ' ' + r.path).slice(0, 6)));
+   check('and the message is filed', since(beforePhish).some((r) => r.method !== 'GET' && /move|junk/.test(r.path + ' ' + (r.body || ''))),
+      JSON.stringify(since(beforePhish).map((r) => r.method + ' ' + r.path).slice(0, 6)));
+
    // ---- a formatted signature: the editor, its tools, and the field the page saves
    location.hash = '#/settings';
    await flush();

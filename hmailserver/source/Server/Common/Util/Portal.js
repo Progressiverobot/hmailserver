@@ -5416,6 +5416,44 @@
   };
   // A rule that files what the sender sends into Junk - or discards it where
   // the account has no Junk folder - added to the account's own rules.
+  // ---- Report phishing ------------------------------------------------------
+  // Beside Junk: the message's source goes to the domain's postmaster as an
+  // attachment (with what the page knows of it in the text when the source
+  // cannot be fetched), the message is filed as junk, which teaches the
+  // filter, and the sender is blocked - the block's toast carries its Undo.
+  var reportPhishing = function (m) {
+    if (!m) { return Promise.resolve(); }
+    var domain = me && me.indexOf('@') > 0 ? me.split('@')[1] : '';
+    if (!domain) { say('mail-status', t('Could not report the message'), false); return Promise.resolve(); }
+    var sender = addressOf(m.from);
+    var report = {
+      to: 'postmaster@' + domain,
+      subject: t('Phishing report: ') + String(m.subject || ''),
+      text: tf('{0} reported this message as phishing. From: {1}. Subject: {2}. Received: {3}. Its source is attached.', me, m.from || '', m.subject || '', m.date || m.received || '')
+    };
+    var source = fetch('/api/v1/me/messages/' + m.id + '/source', { cache: 'no-store', credentials: 'same-origin' }).then(function (response) {
+      if (response.status !== 200) { return null; }
+      return response.blob().then(function (blob) {
+        return new Promise(function (resolve) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve({ name: 'reported-' + m.id + '.eml', type: 'message/rfc822', data: String(reader.result).split(',')[1] || '' }); };
+          reader.onerror = function () { resolve(null); };
+          reader.readAsDataURL(blob);
+        });
+      });
+    }).catch(function () { return null; });
+    return source.then(function (attachment) {
+      if (attachment) { report.attachments = [attachment]; }
+      return call('POST', '/api/v1/me/messages', report);
+    }).then(function (result) {
+      if (result.status !== 201 && result.status !== 200) { say('mail-status', describe(result, t('Could not report the message')), false); return; }
+      var entry = { id: m.id, folderId: m.folder_id || state.folderId, m: m };
+      if (!folderIs(entry.folderId, 'Junk')) { fileRow(entry, 'junk'); }
+      if (sender) { blockSender(sender); }
+      say('mail-status', t('Reported to the postmaster, filed as junk and the sender blocked.'), true);
+    });
+  };
+  el('message-phish').addEventListener('click', function () { if (current) { closeMenus(); reportPhishing(current); } });
   var blockSender = function (address) {
     address = String(address || '').trim();
     if (!address) { return; }
