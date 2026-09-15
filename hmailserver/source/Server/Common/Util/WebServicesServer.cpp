@@ -1152,8 +1152,10 @@ namespace HM
    }
 
    bool
-   WebServicesServer::GetDavRedirectTarget_(bool calendar, AnsiString &target)
+   WebServicesServer::GetDavRedirectTarget_(bool calendar, AnsiString &target, bool &configured_but_unusable)
    {
+      configured_but_unusable = false;
+
       if (!GetDavRedirectSetting_(calendar, target))
       {
          // Nothing configured. This is the shipped default, so it is silent -
@@ -1196,6 +1198,7 @@ namespace HM
                "WebServicesServer::GetDavRedirectTarget_", message);
          }
 
+         configured_but_unusable = true;
          target = "";
          return false;
       }
@@ -1207,15 +1210,25 @@ namespace HM
    WebServicesServer::HandleWellKnownDavRedirect_(bool calendar, const AnsiString &built_in_target)
    {
       AnsiString target;
+      bool configured_but_unusable = false;
 
-      if (!GetDavRedirectTarget_(calendar, target))
+      if (!GetDavRedirectTarget_(calendar, target, configured_but_unusable))
       {
-         // Both protocols are served by this server, so with no other
-         // server named the well-known URI points at the built-in /dav/.
-         // Before CalDAV was written here (September 2026) the caldav path
-         // answered 404 when unconfigured, on purpose: a redirect to a
-         // server that does not speak the protocol leaves a client retrying
-         // a broken account forever. It speaks it now.
+         // A value that was configured and cannot be used is a refusal, not a
+         // fallback. The administrator pointed discovery at another server and
+         // got the value wrong; sending their clients to this server's own
+         // /dav/ instead would hide that, and HM5780 would sit in a log nobody
+         // reads because everything appeared to work. 404 with the report is
+         // what makes the mistake findable.
+         if (configured_but_unusable)
+            return BuildResponse_(404, "text/plain", "not found");
+
+         // Nothing configured: both protocols are served by this server, so
+         // the well-known URI points at the built-in /dav/. Before CalDAV was
+         // written here (September 2026) the caldav path answered 404 when
+         // unconfigured, on purpose - a redirect to a server that does not
+         // speak the protocol leaves a client retrying a broken account
+         // forever. It speaks it now.
          if (!built_in_target.IsEmpty())
             return BuildRedirectResponse_(built_in_target);
 

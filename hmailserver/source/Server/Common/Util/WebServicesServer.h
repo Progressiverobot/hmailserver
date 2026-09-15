@@ -155,7 +155,7 @@ namespace HM
       // error as a side effect of listing a feature. GetDavRedirectTarget_
       // validates, and is what the request path uses.
       static bool GetDavRedirectSetting_(bool calendar, AnsiString &value);
-      static bool GetDavRedirectTarget_(bool calendar, AnsiString &target);
+      static bool GetDavRedirectTarget_(bool calendar, AnsiString &target, bool &configured_but_unusable);
 
       // Derives the mail domain a client-configuration request is about, from
       // the autoconfig.<domain> host name or the emailaddress parameter, with

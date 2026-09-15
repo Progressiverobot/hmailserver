@@ -235,7 +235,15 @@ namespace RegressionTests.API
          StringAssert.Contains("script-src 'self'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-ancestors 'none'", page.Header("Content-Security-Policy"));
          StringAssert.Contains("frame-src 'self'", page.Header("Content-Security-Policy"));
-         StringAssert.Contains("<iframe id=\"message-html\" sandbox=\"allow-popups allow-popups-to-escape-sandbox\"", page.Body);
+         // The attributes of that one element rather than one spelling of them:
+         // the right-to-left work put dir="auto" between the id and the sandbox on
+         // 15 September 2026, because an English message in an Arabic page has to
+         // settle its own direction, and this assertion failed for a reason that had
+         // nothing to do with the policy it exists to check. The sandbox is what
+         // matters, and it is checked whole - a token added to it is a real change.
+         string messageFrame = Between(page.Body, "<iframe id=\"message-html\"", ">");
+         StringAssert.Contains("sandbox=\"allow-popups allow-popups-to-escape-sandbox\"", messageFrame);
+         StringAssert.Contains("referrerpolicy=\"no-referrer\"", messageFrame);
          StringAssert.Contains("img-src data:", page.Header("Content-Security-Policy"), "The srcdoc frame inherits this policy, and the message's own data-URI images need it.");
          StringAssert.Contains("<input id=\"compose-bcc\"", page.Body);
          StringAssert.Contains("<button id=\"message-reply-all\"", page.Body);
