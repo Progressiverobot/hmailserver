@@ -434,6 +434,9 @@ Spara det här svaga lösenordet ändå?</value>
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>Ett domännamn här kräver att SERVERNS egen dator är ansluten till den domänen, eftersom Windows validerar det med LogonUser. Från en dator som inte är ansluten misslyckas varje försök som om lösenordet vore fel - även när domännamnet helt enkelt är felstavat - så en brevlåda konfigurerad så här på en oansluten server kan aldrig logga in och säger aldrig varför. Om servern inte är domänansluten, använd LDAP-katalogautentisering på sidan Katalogautentisering i stället: den binder till katalogen över nätverket och kräver ingen domänanslutning.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>En domän, en brevlåda, en lyssnare som erbjuder TLS, och vad Översikt gör av det. Fyra minuter; sluta när du vill.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>En grupp finns för att flera konton ska kunna ges samma rättigheter på en gång - ge gruppen åtkomst till en publik mapp under Publika mappar, så får varje konto som listas här den åtkomsten. En tom grupp ger ingen något.</value>
   </data>
@@ -445,6 +448,9 @@ Spara det här svaga lösenordet ändå?</value>
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>En etikett krävs. Det är så den här nyckeln skiljs från de andra om några månader.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>En lyssnare behöver ett certifikat och STARTTLS, så att inget lösenord passerar nätverket i klartext.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>En låg andel på en upptagen server betyder oftast att TTL är kortare än intervallet mellan uppslagningar av samma objekt; en andel på 0 % utan använt minne betyder att inget har slagits upp ännu, vilket inte är samma sak. Använt minne mäts mot storlekstaken ovan, och en cache vid sitt tak kastar ut poster den annars hade behållit.</value>
@@ -1089,6 +1095,9 @@ Alla detaljer skrevs till:
 
 Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>Och detta är serverns egen dom över det du har byggt. Det är sidan att komma tillbaka till.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Bara meddelanden från listägaren</value>
   </data>
@@ -1292,6 +1301,9 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>Bl_äddra…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Tillbaka</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Säkerhetskopiera _domäner (konton, alias, listor)</value>
@@ -1579,6 +1591,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Certifikat (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Certifikat som en lyssnare kan visa upp förvaras här, och ACME kan förnya dem åt dig.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>Certifikat verifieras inte på de anslutningar den här servern gör vid leverans. Det är den normala inställningen för post mellan servrar - de flesta av internets SMTP-certifikat skulle underkännas och posten skulle stanna - men det betyder att utgående TLS bara skyddar mot en passiv lyssnare, inte mot något på vägen. DANE och MTA-STS är sättet en specifik destination får mer än så.</value>
@@ -3202,6 +3217,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>Hittar användarens katalogpost</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Slutför</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>Först: vilken halva har fastnat?</value>
   </data>
@@ -4470,6 +4488,12 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="New rule name" xml:space="preserve">
     <value>Namn på ny regel</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>Ny i hMailServer? En kort rundtur skapar en domän, en brevlåda och en lyssnare som erbjuder TLS, och slutar i Översikt.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Nästa</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Nästa försök</value>
   </data>
@@ -4850,6 +4874,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Meddela avsändaren</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Nu en brevlåda. Ett konto är en adress som någon loggar in på och tar emot post på.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Antal leveransomförsök</value>
@@ -6827,6 +6854,9 @@ Starta om den nu?</value>
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Delade IMAP-mappar, och vilka konton eller grupper som får läsa och skriva i var och en.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>V_isa mig runt</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Kortaste söksträng indexet svarar för (3-64; kortare strängar faller tillbaka på skanningen)</value>
   </data>
@@ -6838,6 +6868,12 @@ Starta om den nu?</value>
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Visa varje stickprov av {0} som en tabell med tal</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Visa mig runt</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Visa mig runt på den här sidan</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Visa tabell</value>
@@ -6907,6 +6943,9 @@ Starta om den nu?</value>
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Storleksgräns och skannrar…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Hoppa över rundturen</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Överhoppade, per orsak</value>
@@ -6992,6 +7031,9 @@ Starta om den nu?</value>
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Börja här: hoppa direkt till en vanlig uppgift, eller tryck Ctrl+K och beskriv vad du vill göra.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Börja med en domän: delen efter @ som den här servern tar emot post för. Lägg till din här.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Börja med vad du vill göra, bläddra per område nedan, eller tryck Ctrl+K för att söka varje sida och inställning.</value>
   </data>
@@ -7012,6 +7054,9 @@ Starta om den nu?</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>Status</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Steg {0} av {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Stoppa regelbehandling</value>
@@ -7288,6 +7333,9 @@ Starta om den nu?</value>
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>Det är leveranshalvan: en fastkilad skanner, en långsam fjärrserver, ett hängt externt verktyg eller databasen.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>Här slutar ”{0}”. Du kan starta rundturen igen när du vill.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>Den nyckelns id är inte i den form det här lagret använder, så dess sektion kan inte identifieras. Ta bort den för hand från {0}.</value>
@@ -7940,6 +7988,9 @@ Den fortsätter försöka medan du använder programmet.</value>
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>De här läses av servern från sektionen [LDAP] i hMailServer.INI, och läses om inom två sekunder efter att de sparats, så ingen omstart behövs. Standardvärdena passar Active Directory; en katalog som inte är Windows saknar sAMAccountName och behöver attributnamnen ändrade.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>Detta är portarna som servern lyssnar på. Submission-porten, 587, är den som ditt eget folk skickar genom.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>De här hör ihop: utgång utan historik lär människor att växla mellan två lösenord, vilket är värre än att inte gå ut alls. Historik avvisar bara någonsin ett BYTE, i den stund någon kan välja något annat, så ingen låses ute av den. Utgång avvisar en INLOGGNING - läs dess beskrivning innan du slår på den.</value>
   </data>
@@ -8106,6 +8157,12 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Token signerade med {0} avvisas: den här servern implementerar bara RS256, ES256 och HS256. Ta bort det servern inte kan verifiera från listan, så att en klient som erbjuder det avvisas av ett skäl loggen gör tydligt i stället för att verka tillåtet.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Rundtur</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Rundturer</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Spåra ett meddelande</value>
@@ -8689,6 +8746,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>Du kom hit från sökpaletten</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Dina domäner finns i den här listan. Öppnar du en får du dess konton, alias och distributionslistor.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Kontoadress</value>
   </data>
@@ -9063,6 +9123,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="_Server" xml:space="preserve">
     <value>Ser_ver</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>_Starta rundturen</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Målvärd för SMTP</value>
@@ -9955,6 +10018,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>{0} ändring(ar) genomförda, ingen misslyckades.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>”{0}” stängd. Den fortsätter där du slutade.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} konfigurerade men bilageblockering är avstängd, så inget av dem tillämpas.</value>
   </data>
@@ -10128,6 +10194,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} inställning(ar) kunde inte skrivas.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>”{0}” stannar här: nästa sak den pekar på finns inte på den här skärmen.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} e-postserverns motor</value>

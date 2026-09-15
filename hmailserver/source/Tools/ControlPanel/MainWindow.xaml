@@ -304,6 +304,15 @@
                     <ContentControl x:Name="ContentHost" Grid.Row="1" AutomationProperties.Name="{loc:L 'Page content'}" />
                 </Grid>
             </Border>
+
+            <!-- The tour. Last child and spanning both columns, so a step can
+                 point at a control in the sidebar as readily as at one on the
+                 page; it has no background of its own, so every pixel under it
+                 - including the control it is pointing at - stays clickable
+                 while a tour runs. Collapsed until one does. -->
+            <scaffold:TourOverlay x:Name="TourLayer" Grid.Column="0" Grid.ColumnSpan="2"
+                                  AutomationProperties.AutomationId="tour-overlay"
+                                  AutomationProperties.Name="{loc:L 'Tour'}" />
         </Grid>
 
         <ui:SnackbarPresenter Grid.Row="2" x:Name="RootSnackbar"

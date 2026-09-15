@@ -278,6 +278,17 @@ class Element {
    }
    querySelector(selector) { return this.querySelectorAll(selector)[0] || null; }
    focus() { this.focused += 1; document.activeElement = this; }
+   /* There is no layout in this DOM, so an element has the rectangle a test
+      gives it (el.rect = {left, top, width, height}) and otherwise none at all.
+      That is enough for the tour, which asks only where the thing it points at
+      is; an element with no rectangle is one the tour draws no ring around,
+      which is exactly what a browser reports for something not on the screen. */
+   getBoundingClientRect() {
+      const r = this.rect || { left: 0, top: 0, width: 0, height: 0 };
+      return { left: r.left, top: r.top, width: r.width, height: r.height, x: r.left, y: r.top,
+               right: r.left + r.width, bottom: r.top + r.height };
+   }
+   get offsetHeight() { return (this.rect || { height: 0 }).height; }
    click() { this.dispatchEvent(makeEvent('click')); }
    blur() { }
    select() { }
@@ -2616,6 +2627,161 @@ async function main() {
       $('#nav button[data-view="rules"]').textContent.indexOf(ja['Rules']) >= 0 && $('#langSel').value === 'ja', $('#gate p').textContent);
    await choose($('#langSelGate'), 'en');
    check('and back', $('#gate p').textContent.indexOf('Sign in with the hMailServer administrator credential') === 0 && $('#langSel').value === 'en');
+
+   // ---- the tour: teaching a view while somebody uses it
+   // Every check here is a way a tour can be wrong that nobody would notice
+   // until they walked it on a real server: a step that hangs on a control the
+   // view does not have, a tour that moves on before the reader has read it, a
+   // Back that closes it, a finished record written for a walk somebody left,
+   // a tour that only works in English.
+   try { localStorage.removeItem('hmsTours'); } catch (e) { /* no storage */ }
+   // From a view no tour visits, so the button starts the walk at its beginning
+   // rather than at its stop on the view showing - which is what it does from a
+   // view a walk does visit, and is checked further down.
+   await goTo('logs');
+   before = requests.length;
+   click($('#tourBtn'));
+   await flush();
+   check('the header button starts the tour and opens the view its first stop is on',
+      $('#tourCard').hidden === false && $('#nav button[data-view="domains"]').className.indexOf('on') >= 0,
+      'card hidden=' + $('#tourCard').hidden + ' view=' + $('#viewTitle').textContent);
+   check('the card names the tour and says where the reader is',
+      $('#tourName').textContent === 'Show me around' && $('#tourStep').textContent === 'Step 1 of 7',
+      $('#tourName').textContent + ' | ' + $('#tourStep').textContent);
+   check('and carries the step\'s own sentence', $('#tourText').textContent.indexOf('Start with a domain') === 0, $('#tourText').textContent);
+   check('there is nowhere to go back to on the first stop', $('#tourBack').hidden === true);
+   check('the tour asks the server for nothing of its own', called(before, 'GET', /tour/).length === 0, paths(before));
+
+   // The ring goes where the element is, the card beside it; an element with no
+   // rectangle - what a browser reports for something not on the screen - takes
+   // the ring away and leaves the sentence, because the sentence still stands.
+   document.getElementById('newDomain').rect = { left: 120, top: 200, width: 220, height: 32 };
+   click($('#tourBack'));
+   await flush();
+   check('Back on the first stop stands still rather than closing the tour',
+      $('#tourCard').hidden === false && $('#tourStep').textContent === 'Step 1 of 7', $('#tourStep').textContent);
+   check('the ring is drawn over the element the step points at',
+      $('#tourRing').hidden === false && $('#tourRing').style.left === '120px' && $('#tourRing').style.top === '200px' &&
+      $('#tourRing').style.width === '220px' && $('#tourRing').style.height === '32px', JSON.stringify($('#tourRing').style));
+   check('and the card is put under it rather than over it', $('#tourCard').style.top === '244px', $('#tourCard').style.top);
+
+   click($('#tourNext'));
+   await flush();
+   check('Next moves to the next stop', $('#tourStep').textContent === 'Step 2 of 7', $('#tourStep').textContent);
+   check('and Back is offered from the second stop on', $('#tourBack').hidden === false);
+
+   // The third stop points at a control that is only drawn when the view has
+   // something to draw it for. Taken away, the step is skipped rather than
+   // waited on, and the walk carries on to the stop after it - which is on
+   // another view, so the view changes with it.
+   content().querySelectorAll('button[data-act="accounts"]').forEach((b) => b.parentNode.removeChild(b));
+   click($('#tourNext'));
+   await flush();
+   check('a stop whose element is not on the view is skipped rather than hung on',
+      $('#tourCard').hidden === false && $('#tourStep').textContent === 'Step 4 of 7', $('#tourStep').textContent);
+   check('and a stop on another view opens that view',
+      $('#nav button[data-view="ports"]').className.indexOf('on') >= 0 && $('#viewTitle').textContent === 'Ports',
+      $('#viewTitle').textContent);
+
+   // Leaving records where the reader got to, and says so out loud.
+   click($('#tourSkip'));
+   await flush();
+   check('leaving takes the ring and the card off the screen', $('#tourCard').hidden === true && $('#tourRing').hidden === true);
+   check('and says so rather than vanishing in silence', toastText().indexOf('picks up where you left off') > 0, toastText());
+   check('where it was left is remembered, in the form the Control Panel keeps in the registry',
+      localStorage.getItem('hmsTours') === '|firstrun@3v1', localStorage.getItem('hmsTours'));
+   await goTo('logs');
+   click($('#tourBtn'));
+   await flush();
+   check('on a view no tour visits the button picks the walk up where it was left',
+      $('#tourStep').textContent === 'Step 4 of 7' && $('#viewTitle').textContent === 'Ports', $('#tourStep').textContent);
+
+   // Escape belongs to the view unless the keyboard is already inside the card.
+   $('#user').focus();
+   document.dispatchEvent(makeEvent('keydown', { key: 'Escape' }));
+   await flush();
+   check('Escape with the keyboard outside the card leaves the tour alone', $('#tourCard').hidden === false);
+   $('#tourNext').focus();
+   $('#tourNext').dispatchEvent(makeEvent('keydown', { key: 'Escape' }));
+   await flush();
+   check('Escape inside the card leaves the tour', $('#tourCard').hidden === true);
+
+   // A condition ends a step when the thing happens - and does not end one that
+   // was already true when the reader arrived, which is what stops the step
+   // about domains vanishing in front of somebody who already has one.
+   await goTo('ports');
+   confirmAnswer = true;
+   before = requests.length;
+   // Every listener goes, so that the step below opens with the thing it waits
+   // for genuinely not yet true. Earlier checks in this file have added
+   // listeners of their own, and a condition that was already satisfied would
+   // prove nothing either way.
+   for (let guard = 0; guard < 20; guard += 1) {
+      const ids = content().querySelectorAll('button[data-act="portdel"]').map((b) => b.attributes['data-id']);
+      if (!ids.length) { break; }
+      click(act('portdel', { id: ids[0] }));
+      await flush();
+   }
+   check('no listener offers TLS now, which is what the step below waits for',
+      content().querySelectorAll('button[data-act="portdel"]').length === 0 && called(before, 'DELETE', /^\/api\/v1\/ports\//).length > 0, paths(before));
+   try { localStorage.removeItem('hmsTours'); } catch (e) { /* no storage */ }
+   click($('#tourBtn'));
+   await flush();
+   check('the button starts the walk at its first stop on the view showing', $('#tourStep').textContent === 'Step 4 of 7', $('#tourStep').textContent);
+   click($('#tourNext'));
+   await flush();
+   check('the stop that waits for a listener with TLS is showing', $('#tourStep').textContent === 'Step 5 of 7', $('#tourStep').textContent);
+   fireIntervals();
+   await flush();
+   check('and it stays there while the thing it waits for has not happened', $('#tourStep').textContent === 'Step 5 of 7', $('#tourStep').textContent);
+   click(act('portnew'));
+   await flush();
+   check('the card stays when the element it points at goes away, because the sentence still stands',
+      $('#tourCard').hidden === false && $('#tourRing').hidden === true);
+   setValue('port_protocol', 'smtp');
+   setValue('port_port', '587');
+   setValue('port_connection_security', 'starttls_required');
+   setValue('port_certificate_id', '2');
+   click(act('portsave'));
+   await flush();
+   fireIntervals();
+   await flush();
+   check('a condition that becomes true while the step is showing moves the tour on by itself',
+      $('#tourStep').textContent === 'Step 6 of 7' && $('#viewTitle').textContent === 'Certificates', $('#tourStep').textContent + ' | ' + $('#viewTitle').textContent);
+   fireIntervals();
+   await flush();
+   check('and a step with no condition is not moved on by anything but the reader', $('#tourStep').textContent === 'Step 6 of 7', $('#tourStep').textContent);
+
+   // Walked to its end: the last stop offers Finish rather than another Next,
+   // the record says finished, and no resume point is left behind.
+   click($('#tourNext'));
+   await flush();
+   check('the last stop is on the dashboard, where the walk was always going',
+      $('#tourStep').textContent === 'Step 7 of 7' && $('#viewTitle').textContent === 'Dashboard', $('#tourStep').textContent);
+   check('and it offers Finish rather than promising another stop', $('#tourNext').textContent === 'Finish', $('#tourNext').textContent);
+   click($('#tourNext'));
+   await flush();
+   check('finishing says so', $('#tourCard').hidden === true && toastText().indexOf('That is the end of') === 0, toastText());
+   check('and is remembered as finished, with no resume point left behind',
+      localStorage.getItem('hmsTours') === 'firstrun=1|', localStorage.getItem('hmsTours'));
+
+   // In the reader's own language, from the catalogues the page already speaks.
+   await choose($('#langSel'), 'de');
+   await goTo('domains');
+   click($('#tourBtn'));
+   await flush();
+   check('the tour is drawn in the reader\'s language: its name', $('#tourName').textContent === de['Show me around'], $('#tourName').textContent);
+   check('its sentence', $('#tourText').textContent === de['Start with a domain: the part after the @ that this server accepts mail for. Add yours here.'], $('#tourText').textContent);
+   check('where the reader is, with its numbers', $('#tourStep').textContent === de['Step {0} of {1}'].replace('{0}', '1').replace('{1}', '7'), $('#tourStep').textContent);
+   check('and the card\'s own buttons, which the markup walk translates',
+      $('#tourNext').textContent === de['Next'] && $('#tourSkip').textContent === de['Skip the tour'],
+      $('#tourNext').textContent + ' | ' + $('#tourSkip').textContent);
+   click($('#tourSkip'));
+   await flush();
+   check('the farewell carries the tour\'s name in that language too',
+      toastText() === de['{0} closed. It picks up where you left off.'].replace('{0}', de['Show me around']), toastText());
+   await choose($('#langSel'), 'en');
+   try { localStorage.removeItem('hmsTours'); } catch (e) { /* no storage */ }
 
    if (failures.length) {
       out.error('\ndeck script: ' + failures.length + ' of ' + checks + ' checks failed\n');

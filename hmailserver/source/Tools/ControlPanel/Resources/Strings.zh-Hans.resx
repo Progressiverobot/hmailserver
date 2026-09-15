@@ -434,6 +434,9 @@
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>在此处填写域名，要求服务器本机加入该域，因为 Windows 是用 LogonUser 来验证的。在未加入域的计算机上，每一次尝试都会像密码错误一样失败 - 包括仅仅是域名拼写有误的情况 - 因此在未加入域的服务器上这样配置的邮箱永远无法登录，也永远不会说明原因。如果服务器未加入域，请改用“目录身份验证”页上的 LDAP 目录身份验证：它通过网络绑定到目录，不需要加入域。</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>一个域、一个邮箱、一个提供 TLS 的监听器，以及仪表板对这一切的判断。四分钟；随时可以退出。</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>设立组是为了一次性给若干账户授予相同的权限 - 在“公用文件夹”中把某个公用文件夹的访问权限授予该组，此处列出的每个账户就都获得该访问权限。空组不会给任何人授予任何权限。</value>
   </data>
@@ -445,6 +448,9 @@
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>必须填写标签。几个月之后，正是靠它把这个密钥与其他密钥区分开。</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>监听器需要证书和 STARTTLS，这样就不会有密码以明文形式穿过网络。</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>在繁忙的服务器上命中率偏低，通常意味着 TTL 短于对同一对象两次查询之间的间隔；而命中率为 0% 且没有占用内存，则表示还没有查询过任何内容，这是两回事。占用的内存是相对于上面的容量上限来衡量的，达到上限的缓存会逐出本来可以保留的条目。</value>
@@ -1089,6 +1095,9 @@
 
 是否立即重启控制面板？选择“否”可尝试继续工作。</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>这是服务器对您所搭建内容的判断。这是值得反复回来查看的页面。</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>仅公告</value>
   </data>
@@ -1292,6 +1301,9 @@
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>浏览(_R)…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>上一步</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>备份域(_D)（账户、别名、列表）</value>
@@ -1579,6 +1591,9 @@
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>证书（ACME）</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>监听器可以出示的证书保存在这里，ACME 可以为您续期。</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>本服务器在投递时建立的连接不验证证书。这是服务器之间邮件传输的正常设置 - 互联网上大多数 SMTP 证书都通不过验证，邮件就会停下来 - 但这确实意味着出站 TLS 只能防范被动窃听者，防不了路径中的中间人。DANE 和 MTA-STS 是让特定目标获得更多保护的方式。</value>
@@ -3202,6 +3217,9 @@
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>查找用户的目录条目</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>完成</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>首先：卡住的是哪一半？</value>
   </data>
@@ -4470,6 +4488,12 @@
   <data name="New rule name" xml:space="preserve">
     <value>新规则名称</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>初次使用 hMailServer？一段简短的导览会建立一个域、一个邮箱和一个提供 TLS 的监听器，并以仪表板收尾。</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>下一步</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>下次尝试</value>
   </data>
@@ -4850,6 +4874,9 @@
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>通知发件人</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>接下来是邮箱。账户就是某个人登录并接收邮件的地址。</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>投递重试次数</value>
@@ -6827,6 +6854,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>共享 IMAP 文件夹，以及哪些账户或组可以读写每个文件夹。</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>服务器导览(_W)</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>索引可应答的最短搜索字符串 (3-64；更短的字符串回退到扫描)</value>
   </data>
@@ -6838,6 +6868,12 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>将 {0} 的每个采样显示为数字表</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>服务器导览</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>本页导览</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>显示表格</value>
@@ -6907,6 +6943,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>大小限制和扫描器…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>跳过导览</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>已跳过，按原因</value>
@@ -6992,6 +7031,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>从这里开始: 直接跳到常见任务，或按 Ctrl+K 描述您想做什么。</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>从域开始：@ 后面的部分，也就是这台服务器为之接收邮件的范围。在这里添加您自己的域。</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>从您想做的事开始，在下方按区域浏览，或按 Ctrl+K 搜索每个页面和设置。</value>
   </data>
@@ -7012,6 +7054,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Status" xml:space="preserve">
     <value>状态</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>第 {0} 步，共 {1} 步</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>停止规则处理</value>
@@ -7288,6 +7333,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>那是投递这一半: 卡住的扫描器、缓慢的远程服务器、挂起的外部工具，或者数据库。</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>“{0}”到此结束。您可以随时重新开始。</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>该密钥的 id 不是此存储使用的格式，因此无法识别其节。请从 {0} 中手动移除它。</value>
@@ -7940,6 +7988,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>这些由服务器从 hMailServer.INI 的 [LDAP] 节读取，并在保存后两秒内重新读取，因此无需重启。默认值适合 Active Directory；非 Windows 的目录没有 sAMAccountName，需要更改属性名称。</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>这些是服务器正在监听的端口。提交端口 587 是您自己的用户用来发信的端口。</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>这两项是配套的: 没有历史记录的过期会教人们在两个密码之间来回切换，这比根本不过期更糟。历史记录只在有人可以选择其他密码的那一刻拒绝一次“更改”，因此不会把任何人锁在外面。过期拒绝的是“登录” - 开启之前请阅读它的说明。</value>
   </data>
@@ -8106,6 +8157,12 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>用 {0} 签名的令牌会被拒绝: 本服务器只实现了 RS256、ES256 和 HS256。请从列表中移除服务器无法验证的项，这样提供它的客户端会因日志明确说明的原因被拒绝，而不是看起来被允许了。</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>导览</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>导览</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>跟踪一封邮件</value>
@@ -8689,6 +8746,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>您是从搜索面板来到这里的</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>您的域都在这个列表里。打开其中一个，就能看到它的账户、别名和分发列表。</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>账户地址(_A)</value>
   </data>
@@ -9063,6 +9123,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="_Server" xml:space="preserve">
     <value>服务器(_S)</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>开始导览(_S)</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>目标 SMTP 主机(_T)</value>
@@ -9955,6 +10018,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>已执行 {0} 项更改，没有失败。</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>“{0}”已关闭。下次会从您离开的地方继续。</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0}配置，但附件拦截已关闭，因此其中没有一条会被应用。</value>
   </data>
@@ -10128,6 +10194,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>有 {0} 项设置无法写入。</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>“{0}”到此为止：它接下来要指向的内容不在这个屏幕上。</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0}邮件服务器引擎</value>

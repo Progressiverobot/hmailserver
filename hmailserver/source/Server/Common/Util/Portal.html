@@ -533,6 +533,21 @@ table.keys td:first-child{white-space:nowrap;width:40%}
   #mail-section .read-pane{display:flex !important}
   .msg-body{overflow:visible}
 }
+
+/* ---------- The tour ----------
+   The ring is a solid outline in the accent AND a dashed one inside it, because
+   a highlight that is only a colour is no highlight in greyscale, under a high
+   contrast theme, or to a reader who does not see this blue. Nothing on this
+   layer takes the pointer except the card itself. */
+#tour-ring{position:fixed;z-index:70;pointer-events:none;border-radius:var(--radius);
+  outline:2px solid var(--accent);outline-offset:2px}
+#tour-ring::after{content:"";position:absolute;inset:3px;border:1px dashed var(--text);border-radius:6px;opacity:.7}
+#tour-card{position:fixed;z-index:71;width:330px;max-width:calc(100vw - 32px);background:var(--surface);
+  border:1px solid var(--accent);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-2)}
+#tour-card .head{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:11.5px;
+  letter-spacing:.4px;text-transform:uppercase}
+#tour-card p{font-size:13.5px;line-height:1.6;margin:10px 0 0}
+#tour-card p.row{margin-top:14px;gap:8px}
 </style>
 </head>
 <body data-theme="light">
@@ -659,6 +674,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div class="who"><div class="pill" id="who"></div><div class="pill muted" style="margin-top:4px"><span class="dot" id="probe-dot"></span><span id="probe-state">Watching for new mail</span></div></div>
 <button class="item" id="menu-settings" type="button"><svg class="i"><use href="#i-gear"/></svg>Settings</button>
 <button class="item" id="menu-security" type="button"><svg class="i"><use href="#i-shield"/></svg>Security</button>
+<button class="item" id="menu-tour" type="button"><svg class="i"><use href="#i-help"/></svg>Show me around</button>
 <button class="item" id="signout" type="button"><svg class="i"><use href="#i-signout"/></svg>Sign out</button>
 </div>
 </div>
@@ -1214,6 +1230,18 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <p class="row"><button class="btn" type="submit">Unlock</button> <button id="smime-unlock-cancel" class="btn ghost sm" type="button">Cancel</button></p>
 </form>
 </div>
+</div>
+<!-- The tour. A ring round what is being talked about and a card beside it.
+     Neither is an overlay: the ring takes no pointer events at all and the card
+     is the only thing on its layer that does, so everything under it - the very
+     thing it points at included - stays usable while a tour runs. Polite rather
+     than assertive, because a step that interrupted whatever a screen reader
+     was saying would be the interruption a tour promises not to be. -->
+<div id="tour-ring" hidden></div>
+<div id="tour-card" hidden role="group" aria-live="polite" aria-label="Tour">
+<div class="head"><span id="tour-name"></span><span id="tour-step"></span></div>
+<p id="tour-text"></p>
+<p class="row"><button id="tour-back" class="btn ghost sm" type="button">Back</button> <button id="tour-next" class="btn sm" type="button">Next</button> <button id="tour-skip" class="btn ghost sm" type="button">Skip the tour</button></p>
 </div>
 <script src="/portal.js"></script>
 <script src="/portal-smime.js"></script>

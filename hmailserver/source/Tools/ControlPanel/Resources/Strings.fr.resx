@@ -434,6 +434,9 @@ Enregistrer quand même ce mot de passe faible ?</value>
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>Un nom de domaine ici exige que l'ordinateur du SERVEUR lui-même soit joint à ce domaine, parce que Windows le valide avec LogonUser. Depuis un ordinateur non joint, chaque tentative échoue comme si le mot de passe était faux - y compris quand le nom de domaine est simplement mal orthographié - si bien qu'une boîte configurée ainsi sur un serveur non joint ne peut jamais se connecter et ne dit jamais pourquoi. Si le serveur n'est pas joint au domaine, utilisez plutôt l'authentification d'annuaire LDAP sur la page Authentification d'annuaire : elle se lie à l'annuaire par le réseau et ne nécessite aucune jonction au domaine.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>Un domaine, une boîte, un écouteur qui propose TLS, et ce que le Tableau de bord en conclut. Quatre minutes ; vous pouvez partir quand vous voulez.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>Un groupe existe pour que plusieurs comptes puissent recevoir les mêmes droits d'un coup - accordez au groupe l'accès à un dossier public sous Dossiers publics, et chaque compte listé ici obtient cet accès. Un groupe vide n'accorde rien à personne.</value>
   </data>
@@ -445,6 +448,9 @@ Enregistrer quand même ce mot de passe faible ?</value>
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>Un libellé est obligatoire. C'est ce qui distinguera cette clé des autres dans quelques mois.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>Un écouteur a besoin d'un certificat et de STARTTLS, pour qu'aucun mot de passe ne traverse le réseau en clair.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>Un taux bas sur un serveur chargé signifie généralement que le TTL est plus court que l'intervalle entre deux recherches du même objet ; un taux de 0 % sans mémoire utilisée signifie que rien n'a encore été recherché, ce qui n'est pas la même chose. La mémoire utilisée est mesurée par rapport aux plafonds de taille ci-dessus, et un cache à son plafond évince des entrées qu'il aurait autrement gardées.</value>
@@ -1089,6 +1095,9 @@ Les détails complets ont été écrits dans :
 
 Redémarrer le Control Panel maintenant ? Choisissez Non pour essayer de continuer à travailler.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>Et voici le verdict du serveur lui-même sur ce que vous avez construit. C'est la page sur laquelle revenir.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Annonces seulement</value>
   </data>
@@ -1292,6 +1301,9 @@ Redémarrer le Control Panel maintenant ? Choisissez Non pour essayer de continu
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>Pa_rcourir…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Retour</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Sauvegarder les _domaines (comptes, alias, listes)</value>
@@ -1579,6 +1591,9 @@ Le sélecteur préparé « {0} » est retiré de la configuration du serveur ; l
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Certificats (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Les certificats qu'un écouteur peut présenter sont conservés ici, et ACME peut les renouveler pour vous.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>Les certificats ne sont pas vérifiés sur les connexions que ce serveur établit pour livrer. C'est le réglage normal pour le courrier entre serveurs - la plupart des certificats SMTP d'Internet échoueraient à la vérification et le courrier s'arrêterait - mais cela signifie que le TLS sortant ne protège que contre un écouteur passif, pas contre quelque chose sur le chemin. DANE et MTA-STS sont la façon dont une destination précise obtient davantage.</value>
@@ -3202,6 +3217,9 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>Recherche de l'entrée d'annuaire de l'utilisateur</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Terminer</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>D'abord : quelle moitié est bloquée ?</value>
   </data>
@@ -4470,6 +4488,12 @@ L'installateur vérifié est remis à l'assistant de mise à jour : le service s
   <data name="New rule name" xml:space="preserve">
     <value>Nom de la nouvelle règle</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>Nouveau sur hMailServer ? Une courte visite crée un domaine, une boîte et un écouteur qui propose TLS, et se termine sur le Tableau de bord.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Suivant</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Prochain essai</value>
   </data>
@@ -4850,6 +4874,9 @@ L'installateur vérifié est remis à l'assistant de mise à jour : le service s
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Avertir l'expéditeur</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Maintenant une boîte. Un compte est une adresse à laquelle quelqu'un se connecte et reçoit du courrier.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Nombre de nouvelles tentatives de livraison</value>
@@ -6827,6 +6854,9 @@ Le redémarrer maintenant ?</value>
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Dossiers IMAP partagés, et quels comptes ou groupes peuvent lire et écrire dans chacun.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>_Visite guidée</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Chaîne de recherche la plus courte à laquelle l'index répond (3-64 ; les chaînes plus courtes se replient sur le parcours séquentiel)</value>
   </data>
@@ -6838,6 +6868,12 @@ Le redémarrer maintenant ?</value>
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Afficher chaque échantillon de {0} sous forme de tableau de nombres</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Visite guidée</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Visite guidée de cette page</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Afficher le tableau</value>
@@ -6907,6 +6943,9 @@ Le redémarrer maintenant ?</value>
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Limite de taille et analyseurs…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Passer la visite</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Ignorés, par motif</value>
@@ -6992,6 +7031,9 @@ Le redémarrer maintenant ?</value>
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Commencez ici : allez directement à une tâche courante, ou appuyez sur Ctrl+K et décrivez ce que vous voulez faire.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Commencez par un domaine : la partie après le @ pour laquelle ce serveur accepte le courrier. Ajoutez le vôtre ici.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Partez de ce que vous voulez faire, parcourez par domaine ci-dessous, ou appuyez sur Ctrl+K pour rechercher dans chaque page et chaque réglage.</value>
   </data>
@@ -7012,6 +7054,9 @@ Le redémarrer maintenant ?</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>État</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Étape {0} sur {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Arrêter le traitement des règles</value>
@@ -7288,6 +7333,9 @@ Le redémarrer maintenant ?</value>
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>C'est la moitié livraison : un analyseur coincé, un serveur distant lent, un outil externe bloqué ou la base de données.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>Ici se termine « {0} ». Vous pouvez relancer la visite quand vous le souhaitez.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>L'identifiant de cette clé n'a pas la forme qu'utilise ce magasin, sa section ne peut donc pas être identifiée. Retirez-la à la main de {0}.</value>
@@ -7940,6 +7988,9 @@ Il continuera d'essayer au fil de votre utilisation de l'application.</value>
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>Ceux-ci sont lus par le serveur dans la section [LDAP] de hMailServer.INI, et relus dans les deux secondes suivant un enregistrement : aucun redémarrage n'est donc nécessaire. Les valeurs par défaut conviennent à Active Directory ; un annuaire qui n'est pas Windows n'aura pas sAMAccountName et nécessite de changer les noms d'attributs.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>Voici les ports sur lesquels le serveur écoute. Le port de soumission, 587, est celui par lequel vos propres utilisateurs envoient.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Ces deux-là vont ensemble : une expiration sans historique apprend aux gens à alterner entre deux mots de passe, ce qui est pire que de ne pas expirer du tout. L'historique ne refuse jamais qu'un CHANGEMENT, au moment où quelqu'un est en mesure d'en choisir un autre : personne n'est donc bloqué par lui. L'expiration, elle, refuse une CONNEXION - lisez sa description avant de l'activer.</value>
   </data>
@@ -8106,6 +8157,12 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Les jetons signés avec {0} sont refusés : ce serveur n'implémente que RS256, ES256 et HS256. Retirez de la liste ce que le serveur ne sait pas vérifier, pour qu'un client qui le propose soit refusé pour une raison que le journal expose clairement, au lieu de sembler autorisé.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Visite guidée</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Visites guidées</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Tracer un message</value>
@@ -8689,6 +8746,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>Vous êtes arrivé ici depuis la palette de recherche</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Vos domaines figurent dans cette liste. En ouvrir un donne accès à ses comptes, alias et listes de diffusion.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Adresse du compte</value>
   </data>
@@ -9063,6 +9123,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Serveur</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>_Démarrer la visite</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>Hôte SMTP _cible</value>
@@ -9955,6 +10018,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>{0} modification(s) effectuée(s), aucun échec.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>« {0} » fermée. Elle reprend là où vous vous êtes arrêté.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} configuré(s) mais le blocage des pièces jointes est désactivé, si bien qu'aucun n'est appliqué.</value>
   </data>
@@ -10128,6 +10194,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} réglage(s) n'ont pas pu être écrits.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>« {0} » s'arrête ici : l'élément suivant qu'elle désigne n'est pas sur cet écran.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} le moteur du serveur de messagerie</value>

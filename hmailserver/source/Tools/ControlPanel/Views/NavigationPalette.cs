@@ -63,6 +63,9 @@ namespace hMailServer.ControlPanel.Views
       /// <summary>The navigation key of the page to open, or null if nothing was chosen.</summary>
       public string SelectedPage { get; private set; }
 
+      /// <summary>The id of the tour to start, or null. Never set together with <see cref="SelectedPage"/>.</summary>
+      public string SelectedTour { get; private set; }
+
       /// <summary>
       /// <paramref name="usage"/> and <paramref name="currentPage"/> shape the
       /// shortcuts offered with an empty query; both may be null.
@@ -287,6 +290,12 @@ namespace hMailServer.ControlPanel.Views
             case PaletteRowKind.Page:
                location = location.Length > 0 ? "in " + location : "";
                break;
+
+            case PaletteRowKind.Tour:
+               // A tour has no location to name - it walks several pages - so
+               // the whole second line is what it will show the reader.
+               location = "";
+               break;
          }
 
          string detail = row.Detail ?? "";
@@ -377,7 +386,10 @@ namespace hMailServer.ControlPanel.Views
          // palette that navigates to the wrong page because the two lists drifted
          // apart would be an unpleasant bug to diagnose, and the Tag is free.
          if (resultsList_.SelectedItem is ListBoxItem container && container.Tag is PaletteRow row && row.IsSelectable)
-            SelectedPage = row.Page;
+         {
+            SelectedTour = row.Tour;
+            SelectedPage = row.Tour == null ? row.Page : null;
+         }
 
          Close();
       }

@@ -22,6 +22,9 @@
   var catalogueHas = function (key) { return Object.prototype.hasOwnProperty.call(catalogue, key) && typeof catalogue[key] === 'string' && catalogue[key] !== ''; };
   var t = function (key) { return catalogueHas(key) ? catalogue[key] : key; };
   var tf = function (key) { var s = t(key); for (var i = 1; i < arguments.length; i++) { s = s.split('{' + (i - 1) + '}').join(String(arguments[i])); } return s; };
+  // Marks a text a table holds for a later t(); the identity. The checker
+  // reads this page's keys out of t(), tf() and K().
+  var K = function (key) { return key; };
   var LOCALISED_ATTRIBUTES = ['placeholder', 'aria-label', 'title', 'alt'];
   var localiseTree = function (root) {
     if (!root || !root.childNodes) { return; }
@@ -4980,6 +4983,235 @@
   el('menu-settings').addEventListener('click', function () { closeMenus(); go('/settings'); });
   el('menu-security').addEventListener('click', function () { closeMenus(); go('/security'); });
   el('settings-btn').addEventListener('click', function () { go('/settings'); });
+  // ---- The tour ----------------------------------------------------------
+  // Teaching the webmail while somebody uses it. One mechanism, the same shape
+  // as the desktop Control Panel's and the Control Deck's: a step is an element
+  // (by its id), one sentence, an optional condition that ends the step when
+  // the thing has happened, and what to do when the element is not on the
+  // screen - skip it, or end the tour saying so. A tour is an ordered list of
+  // those with a name and a version.
+  //
+  // Four properties of it are the feature rather than decoration, and each is
+  // checked by build/portal-script-test.js:
+  //
+  //   * it is never modal - the ring takes no pointer events and the card is
+  //     the only thing on its layer that does, so everything underneath, the
+  //     message being pointed at included, stays usable;
+  //   * it never takes the keyboard - nothing is focused when a step opens, and
+  //     the card's three buttons are ordinary tab stops;
+  //   * a step whose element is not on the screen is skipped rather than waited
+  //     on, because this page hides half of itself depending on what the reader
+  //     is doing;
+  //   * where it got to is kept with the ACCOUNT rather than with the browser,
+  //     so a reader who starts the walk on a laptop finishes it on a phone.
+  //
+  // Every sentence goes through the catalogues like every other text here.
+  var TOURS = [{
+    id: 'firstrun',
+    name: K('Show me around'),
+    version: 1,
+    steps: [
+      { target: 'pane-empty', mail: true, until: 'message-open',
+        text: K('Choose a message in the list and it opens here beside it. The More menu moves this pane, or turns it off.') },
+      { target: 'nav-compose', mail: true, until: 'compose-open',
+        text: K('Compose opens a window you can keep writing in while you read something else.') },
+      { target: 'label-nav', mail: true,
+        text: K('Labels are your own way of marking mail. A message can carry several, and it stays in its folder.') },
+      { target: 'mail-search', missing: 'end',
+        text: K('Search takes words, and from:, is:unread and has:attachment. The magnifier beside it builds one for you.') }
+    ]
+  }];
+  // What a step can wait for: the thing the reader is being asked to try.
+  var TOUR_CONDITIONS = {
+    'message-open': function () { return !el('message-view').hidden; },
+    'compose-open': function () { return !el('compose-section').hidden; }
+  };
+  var tourFind = function (id) {
+    for (var i = 0; i < TOURS.length; i++) { if (TOURS[i].id === id) { return TOURS[i]; } }
+    return null;
+  };
+  // An element counts as on the screen when neither it nor anything between it
+  // and the body is hidden. This page hides by the hidden attribute
+  // throughout, so that is the whole question. The walk stops at the body on
+  // purpose: document.hidden is the Page Visibility API - true whenever the
+  // tab is in the background - and a tour that decided its own steps were
+  // missing because the reader had switched tabs would skip half of itself.
+  var tourVisible = function (id) {
+    var found = el(id);
+    var node = found;
+    while (node && node !== document.body) {
+      if (node.hidden) { return null; }
+      node = node.parentNode;
+    }
+    return found;
+  };
+  // Which tours this account has finished, and where it stopped in one it left.
+  // Kept in the account's preferences rather than in this browser, so it
+  // follows the reader; the value is one line - "firstrun=1|firstrun@2v1" -
+  // which is the form the Control Panel keeps in the registry and the Deck in
+  // localStorage, so all three can be read with one explanation. Every kind of
+  // damage is survivable and silent: the worst it costs is being offered a walk
+  // twice.
+  var tourProgress = function () {
+    var out = { finished: {}, stopped: {} };
+    var halves = String(pref('tours') || '').split('|');
+    halves[0].split(',').forEach(function (pair) {
+      var at = pair.indexOf('=');
+      if (at <= 0) { return; }
+      var version = parseInt(pair.slice(at + 1), 10);
+      if (version > 0) { out.finished[pair.slice(0, at)] = version; }
+    });
+    (halves[1] || '').split(',').forEach(function (pair) {
+      var at = pair.indexOf('@');
+      if (at <= 0) { return; }
+      var rest = pair.slice(at + 1), mark = rest.indexOf('v');
+      if (mark <= 0) { return; }
+      var step = parseInt(rest.slice(0, mark), 10), version = parseInt(rest.slice(mark + 1), 10);
+      if (step > 0 && version > 0) { out.stopped[pair.slice(0, at)] = { step: step, version: version }; }
+    });
+    return out;
+  };
+  var tourSaveProgress = function (progress) {
+    var finished = Object.keys(progress.finished).sort().map(function (id) { return id + '=' + progress.finished[id]; }).join(',');
+    var stopped = Object.keys(progress.stopped).sort().map(function (id) { return id + '@' + progress.stopped[id].step + 'v' + progress.stopped[id].version; }).join(',');
+    return savePrefs({ tours: finished + '|' + stopped });
+  };
+  var tourResumeAt = function (walk) {
+    var stop = tourProgress().stopped[walk.id];
+    return stop && stop.version === walk.version && stop.step < walk.steps.length ? stop.step : 0;
+  };
+  // The tour running now: the tour, the step it is on, and what that step's
+  // condition said when it opened. The last one is why a step does not vanish
+  // in front of a reader who already had a message open - it is the CHANGE
+  // that ends a step, not the state.
+  var tourNow = null;
+  var tourTimer = null;
+  var tourCondition = function (step) {
+    var test = step && step.until ? TOUR_CONDITIONS[step.until] : null;
+    try { return !!test && !!test(); } catch (e) { return false; }
+  };
+  // The element a step points at, with the mail view opened first where the
+  // step lives there: an element on a panel nobody has opened is hidden, and a
+  // hidden element is one there is nothing to point at.
+  var tourElement = function (step) {
+    // replaceWith rather than go: it applies the route at once, where setting
+    // the address applies it on a later turn, and a step asked about one turn
+    // too early would be skipped for living on a panel that is merely not
+    // shown YET. It also keeps the tour out of the back button, which is right
+    // - opening the list to say something about it is not somewhere the reader
+    // asked to go.
+    if (step.mail && el('mail-section').hidden) { replaceWith(listHash()); }
+    return tourVisible(step.target);
+  };
+  // From this step onwards, the first that can be shown. A step whose element
+  // is missing is skipped; one marked missing 'end' stops the tour instead,
+  // which is for the step whose absence makes the rest meaningless.
+  var tourSettle = function (from) {
+    for (var at = from; at < tourNow.walk.steps.length; at++) {
+      var step = tourNow.walk.steps[at];
+      if (tourElement(step)) { tourNow.at = at; tourNow.entry = tourCondition(step); return true; }
+      if (step.missing === 'end') { tourNow.at = at; tourEnd('missing'); return false; }
+    }
+    tourEnd('finished');
+    return false;
+  };
+  var tourPlace = function () {
+    if (!tourNow) { return; }
+    var step = tourNow.walk.steps[tourNow.at];
+    var node = tourVisible(step.target);
+    var ring = el('tour-ring'), card = el('tour-card');
+    if (!node || !node.getBoundingClientRect) { ring.hidden = true; return; }
+    var at = node.getBoundingClientRect();
+    if (!at.width && !at.height) { ring.hidden = true; return; }
+    ring.hidden = false;
+    ring.style.left = at.left + 'px'; ring.style.top = at.top + 'px';
+    ring.style.width = at.width + 'px'; ring.style.height = at.height + 'px';
+    var height = card.offsetHeight || 190;
+    var room = typeof window === 'undefined' || typeof window.innerHeight !== 'number' ? 900 : window.innerHeight;
+    var wide = typeof window === 'undefined' || typeof window.innerWidth !== 'number' ? 1280 : window.innerWidth;
+    var top = at.bottom + 12;
+    if (top + height > room) { top = Math.max(8, at.top - 12 - height); }
+    card.style.top = Math.max(8, Math.min(top, Math.max(8, room - height - 8))) + 'px';
+    card.style.left = Math.max(8, Math.min(at.left, Math.max(8, wide - 346))) + 'px';
+  };
+  var tourDraw = function () {
+    var step = tourNow.walk.steps[tourNow.at];
+    el('tour-name').textContent = t(tourNow.walk.name);
+    el('tour-step').textContent = tf('Step {0} of {1}', tourNow.at + 1, tourNow.walk.steps.length);
+    el('tour-text').textContent = t(step.text);
+    el('tour-back').hidden = tourNow.at === 0;
+    el('tour-next').textContent = tourNow.at === tourNow.walk.steps.length - 1 ? t('Finish') : t('Next');
+    el('tour-card').hidden = false;
+    tourPlace();
+  };
+  var tourTick = function () {
+    if (!tourNow) { if (tourTimer) { clearInterval(tourTimer); tourTimer = null; } return; }
+    tourPlace();
+    var step = tourNow.walk.steps[tourNow.at];
+    if (step.until && !tourNow.entry && tourCondition(step)) { tourNext(); }
+  };
+  var tourStart = function (id, at) {
+    var walk = tourFind(id);
+    if (!walk || el('account').hidden) { return; }
+    tourNow = { walk: walk, at: 0, entry: false };
+    var from = typeof at === 'number' && at >= 0 ? Math.min(at, walk.steps.length - 1) : tourResumeAt(walk);
+    if (!tourSettle(from)) { return; }
+    tourDraw();
+    if (!tourTimer) { tourTimer = setInterval(tourTick, 400); }
+  };
+  var tourNext = function () {
+    if (!tourNow) { return; }
+    if (tourNow.at + 1 >= tourNow.walk.steps.length) { tourEnd('finished'); return; }
+    if (tourSettle(tourNow.at + 1)) { tourDraw(); }
+  };
+  var tourBack = function () {
+    if (!tourNow) { return; }
+    for (var at = tourNow.at - 1; at >= 0; at--) {
+      if (tourElement(tourNow.walk.steps[at])) {
+        tourNow.at = at; tourNow.entry = tourCondition(tourNow.walk.steps[at]); tourDraw(); return;
+      }
+    }
+    // Nowhere to go back to is standing still, never closing the tour: Back is
+    // how somebody re-reads a sentence, and a Back that ended it would be a trap.
+    tourDraw();
+  };
+  // Every ending says something. Silence after a tour that stopped on its own
+  // is how a reader decides the feature is broken.
+  var tourEnd = function (why) {
+    if (!tourNow) { return; }
+    var walk = tourNow.walk, at = tourNow.at;
+    var progress = tourProgress();
+    if (why === 'finished') {
+      progress.finished[walk.id] = Math.max(progress.finished[walk.id] || 0, walk.version);
+      delete progress.stopped[walk.id];
+    } else if (why === 'left' && at > 0) {
+      progress.stopped[walk.id] = { step: at, version: walk.version };
+    } else {
+      delete progress.stopped[walk.id];
+    }
+    tourSaveProgress(progress);
+    tourNow = null;
+    if (tourTimer) { clearInterval(tourTimer); tourTimer = null; }
+    el('tour-card').hidden = true;
+    el('tour-ring').hidden = true;
+    if (why === 'finished') { toast(tf('That is the end of {0}. You can start it again whenever you like.', t(walk.name))); }
+    else if (why === 'missing') { toast(tf('{0} stops here: the next thing it points at is not on this screen.', t(walk.name))); }
+    else { toast(tf('{0} closed. It picks up where you left off.', t(walk.name))); }
+  };
+  el('menu-tour').addEventListener('click', function () { closeMenus(); tourStart('firstrun', -1); });
+  el('tour-next').addEventListener('click', function () { tourNext(); });
+  el('tour-back').addEventListener('click', function () { tourBack(); });
+  el('tour-skip').addEventListener('click', function () { tourEnd('left'); });
+  // Escape leaves the tour only when the keyboard is already inside its card.
+  // Everywhere else Escape still belongs to the page - it closes a menu, it
+  // goes back to the list - and a tour that ate it would be exactly the "in the
+  // way of the keyboard" this promises not to be.
+  document.addEventListener('keydown', function (event) {
+    if (!tourNow || event.key !== 'Escape') { return; }
+    var active = document.activeElement;
+    if (active === el('tour-next') || active === el('tour-back') || active === el('tour-skip')) { tourEnd('left'); }
+  });
+
   el('keys-btn').addEventListener('click', function () { openKeys(); });
   el('storage-link').addEventListener('click', function () { go('/storage'); });
   (function () {

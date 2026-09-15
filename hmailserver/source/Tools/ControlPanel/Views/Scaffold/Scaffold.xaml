@@ -42,8 +42,19 @@
                             <TextBlock x:Name="PART_Subtitle" Text="{TemplateBinding Subtitle}"
                                        Style="{StaticResource TextSecondary}" Margin="0,4,0,0" />
                         </StackPanel>
-                        <ContentPresenter x:Name="PART_Actions" Grid.Column="1" Content="{TemplateBinding Actions}"
-                                          Margin="16,6,0,0" VerticalAlignment="Top" HorizontalAlignment="Right" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="16,6,0,0"
+                                    VerticalAlignment="Top" HorizontalAlignment="Right">
+                            <!-- The page's tour, where it has one. Before the
+                                 page's own actions because it is not one of
+                                 them: it teaches the page rather than changing
+                                 anything on it. Collapsed on a page no tour
+                                 visits - a help button that opens an apology is
+                                 worse than no help button. -->
+                            <ui:Button x:Name="PART_Help" Appearance="Transparent" Padding="8,6"
+                                       Margin="0,0,8,0" Visibility="Collapsed"
+                                       Icon="{ui:SymbolIcon QuestionCircle24}" />
+                            <ContentPresenter x:Name="PART_Actions" Content="{TemplateBinding Actions}" />
+                        </StackPanel>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="Subtitle" Value="{x:Null}">

@@ -42,6 +42,7 @@
                     <scaffold:Toolbar x:Name="DomainSearch" SearchPlaceholder="{loc:L 'Search domains'}"
                                       SearchTextChanged="DomainSearch_TextChanged" Margin="0,0,0,8" />
                     <ListView x:Name="DomainList" Grid.Row="1" SelectionChanged="DomainList_SelectionChanged"
+                              AutomationProperties.AutomationId="domains-grid"
                               BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch"
                               AutomationProperties.Name="{loc:L 'Domains'}">
                         <ListView.ItemTemplate>
@@ -103,6 +104,7 @@
                             <ui:TextBox x:Name="NewDomainBox" PlaceholderText="newdomain.com" />
                         </scaffold:FieldRow>
                         <ui:Button Grid.Column="1" Content="{loc:L '_Add domain'}" Click="AddDomain_Click"
+                                   AutomationProperties.AutomationId="domains-add"
                                    VerticalAlignment="Bottom" Margin="0,0,0,12" />
                     </Grid>
                 </Grid>
@@ -187,6 +189,7 @@
                                    Click="GenerateAccountPassword_Click"
                                    ToolTip="{loc:L 'Generate a strong password (copied to clipboard)'}" />
                         <ui:Button Grid.Column="3" Content="{loc:L '_Create account'}" Appearance="Primary" Click="AddAccount_Click"
+                                   AutomationProperties.AutomationId="domains-accounts"
                                    VerticalAlignment="Bottom" Margin="0,0,0,12" />
                     </Grid>
                 </Grid>

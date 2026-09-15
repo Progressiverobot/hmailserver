@@ -84,7 +84,7 @@ All in `hMailServer.ControlPanel.Views.Scaffold`; import it with `xmlns:scaffold
 
 | Component | What it is | Public surface |
 |---|---|---|
-| `PageHeader` | The top of every page: the title, an optional subtitle under it, an optional status pill beside the title, the page's actions on the right. It is the page's level-1 heading. | `Title`, `Subtitle` (string); `Status`, `Actions` (object slots). Automation: Text, HeadingLevel1, Name = Title, HelpText = Subtitle. |
+| `PageHeader` | The top of every page: the title, an optional subtitle under it, an optional status pill beside the title, the page's help button and the page's actions on the right. It is the page's level-1 heading. | `Title`, `Subtitle` (string); `Status`, `Actions` (object slots); `TourId` (string, null for no help button - the shell sets it as it opens a page, from `TourCatalog`); event `ShowTour`, which bubbles to the shell. Automation: Text, HeadingLevel1, Name = Title, HelpText = Subtitle; the help button is `page-help`. |
 | `Card` | The surface a page groups things on: an optional title and description above the content, an optional footer under a hairline, the card tokens for surface, border, radius and padding. Without a title it is the plain surface the old `Card` Border style gives. | `Title`, `Description` (string); `Footer` (object); `Content`; `Padding` (default `AppCardPadding`). Automation: Group, Name = Title. |
 | `Toolbar` | The row above a grid: a search box, a slot for filters beside it, a slot for the actions on the right. | `SearchText` (string, two-way), `SearchPlaceholder` (string; also the box's accessible name), `ShowSearch` (bool); `Filters`, `Actions` (object slots); event `SearchTextChanged`; `FocusSearch()`. Automation: ToolBar. |
 | `EmptyState` | What a grid shows with nothing in it: a glyph, one sentence saying so and what to do, the action that does it. Shown in the grid's place. | `Icon` (`SymbolRegular`, `Empty` for none), `Text` (string); `Action` (object). Automation: Text, Name = Text. |
@@ -93,6 +93,7 @@ All in `hMailServer.ControlPanel.Views.Scaffold`; import it with `xmlns:scaffold
 | `StatusPill` | A status as a capsule: the level's mark and colour and a short word. | `Level` (`StatusLevel`), `Text` (string). Automation: Text, Name = "Word: text". |
 | `FieldRow` | One field of a form: the caption (with its Alt key, wired to the editor through `Mnemonic`), the editor, an optional hint under it, an optional validation message under that, drawn with the danger colour, a cross and the words. The editor takes its accessible name from the caption and its help text from the hint and the message. | `Label`, `Hint`, `Error` (string; null clears the message); `Content` (the editor). Automation: Group, Name = the caption. |
 | `SettingsSection` | A section of a settings page: a heading, a description, the fields. A level-2 heading under the page's level-1. Named SettingsSection because System.Windows.Documents has a Section and a dozen views import that namespace. | `Heading`, `Description` (string); `Content`. Automation: Group, HeadingLevel2, Name = Heading. |
+| `TourOverlay` | The ring a tour draws round the control a step points at, and the card beside it with the sentence, *Step n of m*, Back, Next (or Finish on the last stop) and Skip. Built in code rather than templated, because it is not laid out in a page but floats over one; it is a `Canvas` with no background, so it is hit-testable only where the card is. | `ShowStep(target, tourName, position, sentence, canGoBack, lastStep)`, `Hide()`, `Reposition()`, `FocusCard()`; `Showing`, `HasFocusWithin`; events `Next`, `Back`, `Skip`. Automation: the card is a polite live region named "tour. position. sentence". |
 | `DialogFrame` | The shape of a dialog's content: heading and description, a body that scrolls past the dialog's maximum height, a footer with a note on the left and the primary button before the secondary. | `Heading`, `Description` (string); `Body`, `Footer`, `PrimaryButton`, `SecondaryButton` (object). Automation: Pane, Name = Heading. |
 
 The dialogs' frame is reached through `FluentDialogWindow`, the base class of every dialog: `UseFrame(heading, body, primary, secondary, description = null, width = 520)` builds a `DialogFrame`, makes it the window's content, gives Enter to the primary button and Escape to the secondary (or to closing the dialog when there is none), sizes the window to the content at that width within `DesignTokens.Dialog` (the height capped at 0.9 of the work area, the body scrolling past it) and puts the keyboard in the first field of the body on load. `SizeToContentWithin(width)` and `FocusFirstFieldOnLoad(root)` are its two halves, for a dialog that keeps its own layout. All eighteen dialogs are on the frame since 15 September 2026, and none of them names a width any more: each is sized to its content within `DesignTokens.Dialog`. `Views/Dialogs.cs`, the themed message boxes, and `Views/NavigationPalette.cs` are on it too. Two helpers live in `Views/DialogFields.cs` beside them rather than in the base class, which is where they belong and where they should move: `FitTabs` sizes a tabbed dialog to its tallest tab and `FillTabs` gives every tab one height, both measuring each tab's content on its own - selecting a tab and measuring the `TabControl` reports the tab before it, because a control outside a visual tree reaches its content presenter a pass later, and that under-measurement hid the whole add-row of one dialog's address tab until a render caught it.
@@ -107,6 +108,80 @@ Grids are styled implicitly in `App.xaml`: the `DataGrid` chains to WPF-UI's own
 - **Colour, shape and word** for every status, and the word first in the accessible name.
 - **Every element keeps its automation name.** A `PageHeader` names the page, a `Card` its group, a `FieldRow` its editor; the ids the shell and the pages carry (`nav-<key>`, `breadcrumb-*`, `dashboard-*`) are what `build/capture-cp.ps1` and any automation hold on to and do not change.
 - **One page, one `ScrollViewer`, padded with `AppPagePadding`.**
+- **A tour is never the only way to do anything, and never blocks the product while it runs.** See *Tours* below.
+
+## Tours
+
+A tour teaches a page while somebody uses it. One mechanism, the same shape in all three surfaces - this
+Control Panel, the browser Control Deck (`hmailserver/installation/WebAdmin/index.html`) and the webmail
+(`Server/Common/Util/Portal.html` and `Portal.js`) - so that the three can be reasoned about, and read in
+the store, with one explanation.
+
+**A step** is an element, one sentence, an optional condition that ends the step when the thing has
+happened, and what to do when the element is not there. The element is named by its automation id in the
+Control Panel and by its element id (or, in the Deck, a stable selector) in the two pages - never by a
+position, because a step pinned to "the third button" survives nothing. A step that cannot find its element
+is **skipped**, unless it is marked as one the rest of the tour is meaningless without, in which case the
+tour ends *saying so*. A step never acts: it does not press the button it points at and it does not fill
+the field. The only thing it does besides pointing is open the page or view its element lives on, because
+an element on a page nobody has opened is in no visual tree to be found in.
+
+**A tour** is an ordered list of steps with an id, a name and a version. The id is what the finished record
+is kept under, so renaming one abandons every reader's record of having done it; the version is raised when
+the steps change enough that somebody who finished the old tour has not seen the new one.
+
+**Where it is kept.** Which tours this person has finished, and where they stopped in one they left, as one
+line: `firstrun=1|firstrun@3v1` - the finished tours with the version each was finished at, then the resume
+points as *step* `v` *version*. The Control Panel keeps it in `HKCU\Software\hMailServer\ControlPanel`
+under `TourProgress`, beside the window bounds, the palette's history and the sidebar's collapsed state; the
+Deck in `localStorage` under `hmsTours`; the webmail in the account's preferences under `tours`
+(`/api/v1/me/preferences`), so that a reader who starts the walk on a laptop finishes it on a phone. Every
+kind of damage to the stored line is survivable and silent in all three: the worst it can cost is being
+offered a tour twice.
+
+**The rules**, which are the feature rather than decoration:
+
+- **Never modal, and never in the way.** The ring takes no pointer events and the card is the only thing on
+  its layer that does, so every control underneath - the very one being pointed at - stays usable while a
+  tour runs. A tour is never the only way to do anything.
+- **Never takes the keyboard.** Nothing is focused when a step opens, and the focus the tour found is put
+  back when it ends. The card's buttons are ordinary tab stops; `F6` reaches them from anywhere, and
+  `Escape` ends the tour **only** while the keyboard is already inside the card - everywhere else Escape
+  still belongs to the page.
+- **No Alt keys on the card.** The one place in this application where a caption carries no access key. The
+  card floats over whichever page the step is on, so any key it claimed would sooner or later be a key that
+  page already owns, and an access key that does the wrong thing on one page in forty-seven is worse than
+  none.
+- **The highlight is not colour alone.** A solid ring in the accent and a dashed one inside it in the text
+  colour, so the highlight survives greyscale, colour blindness and High Contrast - where the accent becomes
+  the system highlight and the dashes are what still separate the ring from an ordinary focus rectangle.
+- **The sentence is announced.** The card is a polite live region and the Control Panel raises a UI
+  Automation notification with the sentence as each step opens, so the tour is usable without sight and
+  without the focus being taken to make that happen.
+- **It is the change that ends a step, not the state.** A step whose condition was already true when the
+  reader arrived stays until they press Next; somebody who already has a domain should read the sentence
+  about domains rather than watch the step vanish before they have read it.
+- **Every ending says something.** Finished, left, or stopped because a step it needed was not on the
+  screen - each is a sentence. Silence after a tour that stopped on its own is how somebody decides the
+  feature is broken.
+- **Every sentence goes through the catalogues**, like every other text: seventeen languages here, twenty in
+  the Deck, twenty-three in the webmail.
+
+**Where the logic lives.** In the Control Panel, everything that can be decided without a window is in
+`Services/Tour.cs` (the steps and the catalogue), `Services/TourSession.cs` (the stepper - which step is
+showing, what Next and Back do, when and why the tour ended) and `Services/TourProgress.cs` (the record),
+all three compiled into `ControlPanel.Core` and tested without WPF, exactly as `ConnectionStatus` and
+`SettingsPageStatus` are. `MainWindow.Tour.cs` is the half that genuinely needs a window: opening the page a
+step is on, finding the control by its automation id, keeping the ring on it while the page moves
+underneath, and answering the conditions from the server. The two browser pages keep the same division by
+convention rather than by compilation, and `build/deck-script-test.js` and `build/portal-script-test.js`
+execute theirs.
+
+**The ways in.** A tour is offered on the Welcome page (a button in the header and, until the walk has been
+finished, a notice above the intents), in the Ctrl+K palette as a row of its own above the page list, and by
+a help button in the header of any page a tour visits - which starts that tour at its first stop *on that
+page*, so the button teaches the page it is on. The Deck's is the `?` button in its header and the
+webmail's is *Show me around* in the account menu; both behave the same way.
 
 ## Migrating a page
 

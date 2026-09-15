@@ -72,6 +72,7 @@ namespace hMailServer.ControlPanel
          ApplySavedTheme();
          RestoreWindowBounds();
          LoadPaletteUsage();
+         LoadTourProgress_();
          RegisterPages();
          BuildNavTree();
          BuildNavRail_();
@@ -92,6 +93,10 @@ namespace hMailServer.ControlPanel
          ServerSession.LinkStateChanged += OnLinkStateChanged;
          Closing += (s, e) => ServerSession.LinkStateChanged -= OnLinkStateChanged;
 
+         // Every page header's help button lands here: the event bubbles out of
+         // whichever page raised it, so no page has to be wired to the shell.
+         AddHandler(Views.Scaffold.PageHeader.ShowTourEvent, new RoutedEventHandler(OnPageHelpRequested_));
+
          // The sidebar follows the window's width: below the threshold it is the
          // rail whatever the administrator chose, above it their choice stands.
          SizeChanged += (s, e) => ApplySidebar_();
@@ -107,9 +112,17 @@ namespace hMailServer.ControlPanel
          SystemParameters.StaticPropertyChanged += OnSystemParametersChanged;
          Closing += (s, e) => SystemParameters.StaticPropertyChanged -= OnSystemParametersChanged;
 
-         // Ctrl+K command palette.
+         // Ctrl+K command palette, and the two keys a running tour claims -
+         // F6 to reach its card, Escape to leave it, and Escape only while the
+         // keyboard is already inside the card, so the page keeps its own.
          PreviewKeyDown += (s, e) =>
          {
+            if (HandleTourKey_(e))
+            {
+               e.Handled = true;
+               return;
+            }
+
             if (connected_ && e.Key == Key.K && Keyboard.Modifiers == ModifierKeys.Control)
             {
                ShowPalette();
@@ -545,6 +558,15 @@ namespace hMailServer.ControlPanel
          var palette = new NavigationPalette(this, paletteUsage_, currentPage_);
          palette.ShowDialog();
 
+         // A tour row before a page row: a tour opens the page it starts on
+         // itself, and navigating first would put the reader on a page and then
+         // move them off it.
+         if (palette.SelectedTour != null)
+         {
+            StartTour(palette.SelectedTour);
+            return;
+         }
+
          if (palette.SelectedPage != null)
             NavigateTo(palette.SelectedPage, true);
       }
@@ -798,6 +820,7 @@ namespace hMailServer.ControlPanel
             // Two-factor verification failed or was cancelled: drop the session
             // and return to the connect screen instead of revealing the UI.
             connected_ = false;
+            EndTour(record: false);
             NavTree.IsEnabled = false;
             NavRail.IsEnabled = false;
             SearchButton.IsEnabled = false;
@@ -989,6 +1012,12 @@ namespace hMailServer.ControlPanel
          }
 
          EnterPage(page);
+
+         // A page's help button starts the tour that visits it, where one
+         // does; and a running tour follows the page, because the control its
+         // step points at is in the tree that has just been replaced.
+         OfferPageTour_(page, key);
+         TourPageChanged_();
       }
 
       /// <summary>

@@ -434,6 +434,9 @@
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>Имя домена здесь требует, чтобы сам компьютер СЕРВЕРА был присоединён к этому домену, поскольку Windows проверяет его через LogonUser. С компьютера, не присоединённого к домену, любая попытка завершается так, будто пароль неверен, — в том числе когда имя домена просто написано с ошибкой, — поэтому настроенный таким образом почтовый ящик на неприсоединённом сервере никогда не сможет войти и никогда не скажет почему. Если сервер не присоединён к домену, используйте вместо этого аутентификацию через каталог LDAP на странице «Аутентификация через каталог»: она выполняет привязку к каталогу по сети и присоединения к домену не требует.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>Домен, почтовый ящик, прослушиватель с TLS и то, что из этого делает Сводка. Четыре минуты; выйти можно в любой момент.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>Группа существует для того, чтобы нескольким учётным записям можно было выдать одни и те же права сразу: предоставьте группе доступ к общей папке в разделе «Общие папки», и каждая перечисленная здесь учётная запись получит этот доступ. Пустая группа не даёт никому ничего.</value>
   </data>
@@ -445,6 +448,9 @@
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>Метка обязательна. Именно по ней этот ключ можно будет отличить от остальных спустя месяцы.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>Прослушивателю нужны сертификат и STARTTLS, чтобы ни один пароль не шёл по сети в открытом виде.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>Низкий показатель на нагруженном сервере обычно означает, что TTL короче интервала между обращениями к одному и тому же объекту; показатель 0 % при нулевом использовании памяти означает, что обращений ещё не было, а это не одно и то же. Использование памяти измеряется относительно заданных выше пределов размера, и кэш, достигший своего предела, вытесняет записи, которые иначе сохранил бы.</value>
@@ -1089,6 +1095,9 @@ Control Panel может читать файлы сообщений только
 
 Перезапустить Control Panel сейчас? Выберите «Нет», чтобы попытаться продолжить работу.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>А это собственный вердикт сервера о том, что вы построили. На эту страницу вы будете возвращаться.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Только объявления</value>
   </data>
@@ -1292,6 +1301,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>_Обзор…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Назад</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Резервное копирование _доменов (учётные записи, псевдонимы, списки)</value>
@@ -1579,6 +1591,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Сертификаты (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Сертификаты, которые может предъявлять прослушиватель, хранятся здесь, а ACME может обновлять их за вас.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>На подключениях, которые этот сервер устанавливает при доставке, сертификаты не проверяются. Для почты между серверами это обычная настройка — большинство SMTP-сертификатов в интернете проверку не прошли бы, и почта встала бы, — но она означает, что исходящий TLS защищает только от пассивного перехвата, а не от того, кто вклинился в канал. DANE и MTA-STS — это способ получить для конкретного получателя больше.</value>
@@ -3202,6 +3217,9 @@ Control Panel может читать файлы сообщений только
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>Поиск записи пользователя в каталоге</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Готово</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>Сначала: какая из двух половин застряла?</value>
   </data>
@@ -4470,6 +4488,12 @@ Control Panel может читать файлы сообщений только
   <data name="New rule name" xml:space="preserve">
     <value>Имя нового правила</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>Впервые в hMailServer? Короткая экскурсия создаст домен, почтовый ящик и прослушиватель с TLS и закончится на Сводке.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Далее</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Следующая попытка</value>
   </data>
@@ -4850,6 +4874,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Уведомлять отправителя</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Теперь почтовый ящик. Учётная запись — это адрес, под которым кто-то входит и на который получает почту.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Количество повторных попыток доставки</value>
@@ -6827,6 +6854,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Общие папки IMAP и то, какие учётные записи или группы могут читать каждую из них и записывать в неё.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>Э_кскурсия по серверу</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Самая короткая строка поиска, на которую отвечает индекс (3-64; более короткие строки обрабатываются полным просмотром)</value>
   </data>
@@ -6838,6 +6868,12 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Показать все образцы {0} в виде таблицы чисел</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Экскурсия по серверу</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Экскурсия по этой странице</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Показать таблицу</value>
@@ -6907,6 +6943,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Ограничение размера и сканеры…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Пропустить экскурсию</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Пропущено, с разбивкой по причинам</value>
@@ -6992,6 +7031,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Начните отсюда: перейдите сразу к обычной задаче или нажмите Ctrl+K и опишите, что вы хотите сделать.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Начните с домена: это часть после @, для которой этот сервер принимает почту. Добавьте свой здесь.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Начните с того, что вы хотите сделать, просмотрите разделы ниже или нажмите Ctrl+K, чтобы искать по всем страницам и параметрам.</value>
   </data>
@@ -7012,6 +7054,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Status" xml:space="preserve">
     <value>Состояние</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Шаг {0} из {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Прекратить обработку правил</value>
@@ -7288,6 +7333,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>Это половина, отвечающая за доставку: застрявший сканер, медленный удалённый сервер, зависшая внешняя программа или база данных.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>Здесь «{0}» заканчивается. Вы можете запустить экскурсию снова в любой момент.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>Идентификатор этого ключа записан не в той форме, которую использует это хранилище, поэтому определить его раздел невозможно. Удалите его вручную из {0}.</value>
@@ -7940,6 +7988,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>Сервер читает их из раздела [LDAP] в hMailServer.INI и перечитывает в течение двух секунд после сохранения, поэтому перезапуск не нужен. Значения по умолчанию подходят Active Directory; в каталоге не от Windows нет sAMAccountName, и имена атрибутов нужно изменить.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>Это порты, которые слушает сервер. Порт отправки 587 — тот, через который отправляют ваши собственные пользователи.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Они принадлежат друг другу: истечение срока без истории учит людей чередовать два пароля, что хуже, чем не истекать вовсе. История только отказывает в ИЗМЕНЕНИИ, в момент, когда кто-то может выбрать что-то другое, поэтому никого она не запирает. Истечение срока отказывает во ВХОДЕ - прочитайте его описание, прежде чем включать.</value>
   </data>
@@ -8106,6 +8157,12 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Токены, подписанные {0}, отклоняются: этот сервер реализует только RS256, ES256 и HS256. Уберите из списка то, что сервер не может проверить, чтобы клиенту, предлагающему это, отказывали по причине, которую журнал делает явной, а не выглядело так, будто это разрешено.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Экскурсия</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Экскурсии</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Отследить одно сообщение</value>
@@ -8689,6 +8746,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>Вы попали сюда из палитры поиска</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Ваши домены находятся в этом списке. Открыв домен, вы получите его учётные записи, псевдонимы и списки рассылки.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Адрес учётной записи</value>
   </data>
@@ -9063,6 +9123,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Сервер</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>_Начать экскурсию</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>Целевой узел _SMTP</value>
@@ -9955,6 +10018,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>Выполнено изменений: {0}, ни одно не завершилось ошибкой.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>«{0}» закрыта. Она продолжится с того места, где вы остановились.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} настроено, но блокировка вложений выключена, поэтому ни одно из них не применяется.</value>
   </data>
@@ -10128,6 +10194,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>Не удалось записать параметров: {0}.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>«{0}» останавливается здесь: следующее, на что она указывает, отсутствует на этом экране.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} движок почтового сервера</value>

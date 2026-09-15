@@ -41,6 +41,7 @@
         <scaffold:Card Grid.Row="2" Padding="8">
             <Grid>
                 <DataGrid x:Name="PortGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                          AutomationProperties.AutomationId="ports-grid"
                           SelectionMode="Single" MouseDoubleClick="Edit_Click"
                           AutomationProperties.Name="{loc:L 'TCP/IP ports'}">
                     <DataGrid.Columns>
@@ -111,6 +112,7 @@
                     </ComboBox>
                 </scaffold:FieldRow>
                 <ui:Button Grid.Column="4" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click"
+                           AutomationProperties.AutomationId="ports-add"
                            VerticalAlignment="Bottom" Margin="0,0,0,12" />
             </Grid>
         </scaffold:Card>

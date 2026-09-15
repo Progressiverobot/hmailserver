@@ -39,6 +39,18 @@
     <Compile Include="..\ControlPanel\Services\IntentIndex.cs" />
     <Compile Include="..\ControlPanel\Services\PaletteUsage.cs" />
     <Compile Include="..\ControlPanel\Services\PaletteSearch.cs" />
+    <!-- The tours: the steps themselves, the stepper that decides which one is
+         showing, and the record of what this administrator has finished. All
+         three are plain data and pure functions - the WPF half is the ring and
+         the card, which is in Views/Scaffold/TourOverlay.cs and is not here -
+         so a test can hold every step to a page that exists, prove that a step
+         whose control is missing is skipped rather than hung on, and prove that
+         an abandoned tour is never recorded as finished. PaletteSearch offers
+         the tours as rows, which is why they are in this project and not only
+         in the application. -->
+    <Compile Include="..\ControlPanel\Services\Tour.cs" />
+    <Compile Include="..\ControlPanel\Services\TourSession.cs" />
+    <Compile Include="..\ControlPanel\Services\TourProgress.cs" />
   </ItemGroup>
 
 </Project>
