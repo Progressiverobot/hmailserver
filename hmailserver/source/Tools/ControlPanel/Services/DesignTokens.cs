@@ -83,6 +83,15 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>
+      /// The widest a form is laid out, whatever the window does. A settings
+      /// page in a maximised window would otherwise run a caption and its
+      /// editor to opposite ends of a 2,560-pixel screen, which is unreadable
+      /// and which both settings waves worked around with a private constant of
+      /// the same value before it was a token.
+      /// </summary>
+      public const double FormWidth = 760;
+
+      /// <summary>
       /// The tint behind an inline notice: the notice's status colour at this
       /// opacity. Zero under High Contrast, where a tinted surface is a colour
       /// the user asked Windows not to show them and the border carries the

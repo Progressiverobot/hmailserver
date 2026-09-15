@@ -104,6 +104,13 @@ namespace hMailServer.ControlPanel.Views.Scaffold
 
          if (Part<TextBlock>("PART_Word") is { } word)
          {
+            // Normal is the level that says nothing, so it says nothing here
+            // either: a notice at that level is a neutral statement, and the
+            // word "Normal" in front of it reads as a status that is not one -
+            // which is what a page wave found in a render and had to work
+            // around by never using the level. The accessible name has always
+            // left the word out at Normal (above); the visual agrees with it.
+            word.Visibility = Level == StatusLevel.Normal ? Visibility.Collapsed : Visibility.Visible;
             word.Text = status.SeverityWord;
             word.SetResourceReference(TextBlock.ForegroundProperty, brushKey);
          }

@@ -924,7 +924,7 @@ namespace hMailServer.ControlPanel.Views
       /// to a wide window puts a caption and its editor a screen apart, which
       /// reads as two separate things; a column is what a form is.
       /// </summary>
-      private const double SettingsColumnWidth = 760;
+
 
       // Most settings on these pages live in the COM settings tree, but a few
       // (log retention) live in hMailServer.ini; IniNumber rows use this store.
@@ -2644,7 +2644,7 @@ namespace hMailServer.ControlPanel.Views
             // scroll bar takes, so that no note runs underneath it.
             var panel = new StackPanel
             {
-               MaxWidth = SettingsColumnWidth,
+               MaxWidth = DesignTokens.FormWidth,
                HorizontalAlignment = HorizontalAlignment.Left,
                Margin = new Thickness(0, DesignTokens.Space.Xs, DesignTokens.Space.Md, DesignTokens.Space.Xs)
             };

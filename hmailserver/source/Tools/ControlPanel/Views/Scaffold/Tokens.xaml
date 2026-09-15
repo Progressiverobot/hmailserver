@@ -41,6 +41,9 @@
     <sys:Double x:Key="AppRailWidth">48</sys:Double>
     <sys:Double x:Key="AppNavRowHeight">34</sys:Double>
 
+    <!-- The widest a form is laid out, whatever the window does. -->
+    <sys:Double x:Key="AppFormWidth">760</sys:Double>
+
     <!-- The type ramp (Services/Typography.cs): Caption 12, Body 14, Subtitle 20, Title 28. -->
     <sys:Double x:Key="AppFontSizeCaption">12</sys:Double>
     <sys:Double x:Key="AppFontSizeBody">14</sys:Double>
