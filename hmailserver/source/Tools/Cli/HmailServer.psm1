@@ -960,6 +960,273 @@ function Export-HmAccount {
 }
 
 # ---------------------------------------------------------------------------
+# The whole configuration as one document
+# ---------------------------------------------------------------------------
+
+# The sections a document holds, in the order they are applied: a domain before
+# the accounts in it. The same list hmctl keeps, and build/check-cli.py holds
+# the two to the same requests.
+$script:ConfigurationSections = @(
+    @{ Name = 'domains';  Collection = '/api/v1/domains';                     Item = '/api/v1/domains/{0}';  Key = 'name';    Parent = $null },
+    @{ Name = 'accounts'; Collection = '/api/v1/domains/{1}/accounts';        Item = '/api/v1/accounts/{0}'; Key = 'address'; Parent = 'domain' },
+    @{ Name = 'aliases';  Collection = '/api/v1/domains/{1}/aliases';         Item = '/api/v1/aliases/{0}';  Key = 'name';    Parent = 'domain' },
+    @{ Name = 'lists';    Collection = '/api/v1/domains/{1}/lists';           Item = '/api/v1/lists/{0}';    Key = 'address'; Parent = 'domain' },
+    @{ Name = 'groups';   Collection = '/api/v1/groups';                      Item = '/api/v1/groups/{0}';   Key = 'name';    Parent = $null },
+    @{ Name = 'rules';    Collection = '/api/v1/rules';                       Item = '/api/v1/rules/{0}';    Key = 'name';    Parent = $null },
+    @{ Name = 'routes';   Collection = '/api/v1/routes';                      Item = '/api/v1/routes/{0}';   Key = 'domain_name'; Parent = $null },
+    @{ Name = 'ports';    Collection = '/api/v1/ports';                       Item = '/api/v1/ports/{0}';    Key = 'port';    Parent = $null },
+    @{ Name = 'ipranges'; Collection = '/api/v1/ipranges';                    Item = '/api/v1/ipranges/{0}'; Key = 'name';    Parent = $null }
+)
+
+# What the server allocated or computed rather than what was configured. None of
+# it travels into a document, and none of it is compared.
+$script:NotConfiguration = @(
+    'id', 'account_id', 'domain_id', 'rule_id', 'route_id', 'parent_id',
+    'account_count', 'alias_count', 'member_count', 'size_mb', 'size',
+    'created', 'modified', 'last_used', 'last_login', 'last_logon'
+)
+
+function ConvertTo-HmConfigurationRow {
+    param([Parameter(Mandatory = $true)] $Row)
+    $ordered = [ordered] @{}
+    foreach ($property in ($Row.PSObject.Properties | Sort-Object Name)) {
+        if ($script:NotConfiguration -contains $property.Name) { continue }
+        if ($property.Name -like '*_id') { continue }
+        $ordered[$property.Name] = $property.Value
+    }
+    $ordered
+}
+
+function Export-HmConfiguration {
+    <#
+    .SYNOPSIS
+        The whole configuration as one object, or one file.
+    .DESCRIPTION
+        The settings groups, the ini keys the server exposes, the domains and
+        their accounts, aliases and distribution lists, the groups, rules,
+        routes, listeners and IP ranges. Sorted throughout and carrying nothing
+        the server allocated, so two exports of an unchanged server are the same
+        bytes - which is what makes a document usable in a repository.
+
+        No passwords: the server does not give them out. No certificates and no
+        directories: files and paths of one machine.
+    .EXAMPLE
+        Export-HmConfiguration -Path .\server.json
+    #>
+    [CmdletBinding()]
+    param([Parameter(Position = 0)] [string] $Path)
+
+    $settings = [ordered] @{}
+    foreach ($group in ($script:SettingGroups | Sort-Object)) {
+        if ($group -eq 'directories') { continue }
+        try {
+            $answer = Invoke-HmApi -Method GET -Path (Get-HmSettingPath -Group $group)
+        }
+        catch {
+            continue
+        }
+        $settings[$group] = ConvertTo-HmConfigurationRow -Row $answer
+    }
+
+    $ini = [ordered] @{}
+    try {
+        foreach ($row in (Get-HmIniSetting | Sort-Object name)) {
+            if ($row.PSObject.Properties.Name -contains 'name') { $ini[[string] $row.name] = $row.value }
+        }
+    }
+    catch { }
+
+    $sections = [ordered] @{ settings = $settings; ini = $ini }
+
+    $domains = @()
+    foreach ($section in $script:ConfigurationSections) {
+        $rows = @()
+        if ($section.Parent -eq 'domain') {
+            foreach ($domain in $domains) {
+                try {
+                    $answer = Invoke-HmApi -Method GET -Path ($section.Collection -f '', [uri]::EscapeDataString($domain))
+                }
+                catch { continue }
+                foreach ($row in (Get-HmCollection -Answer $answer -Key $section.Name)) {
+                    $entry = ConvertTo-HmConfigurationRow -Row $row
+                    $entry['domain'] = $domain
+                    $rows += [pscustomobject] $entry
+                }
+            }
+        }
+        else {
+            try {
+                $answer = Invoke-HmApi -Method GET -Path $section.Collection
+            }
+            catch { continue }
+            foreach ($row in (Get-HmCollection -Answer $answer -Key $section.Name)) {
+                $rows += [pscustomobject] (ConvertTo-HmConfigurationRow -Row $row)
+            }
+        }
+
+        $rows = @($rows | Sort-Object { $_ | ConvertTo-Json -Depth 10 -Compress })
+        $sections[$section.Name] = $rows
+
+        if ($section.Name -eq 'domains') {
+            $domains = @($rows | ForEach-Object { [string] $_.name } | Where-Object { $_ } | Sort-Object)
+        }
+    }
+
+    $document = [ordered] @{ version = 1; sections = $sections }
+
+    if ($Path) {
+        ($document | ConvertTo-Json -Depth 20) | Set-Content -Path $Path -Encoding utf8
+        return
+    }
+
+    $document
+}
+
+function Compare-HmConfiguration {
+    <#
+    .SYNOPSIS
+        What would have to change for the server to match a document.
+    .DESCRIPTION
+        Answers one object per step - Section, Verb, Key, Detail - so that
+        Where-Object and Measure-Object work on the plan. Nothing is changed.
+    .EXAMPLE
+        Compare-HmConfiguration -Path .\server.json | Where-Object Verb -eq delete
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true, Position = 0)] [string] $Path)
+
+    $wanted = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    $live = Export-HmConfiguration
+
+    $plan = @()
+
+    foreach ($group in $wanted.sections.settings.PSObject.Properties.Name) {
+        $here = $live.sections.settings.$group
+        $there = $wanted.sections.settings.$group
+        foreach ($key in ($there.PSObject.Properties.Name | Sort-Object)) {
+            $before = if ($here) { $here.$key } else { $null }
+            if ($before -ne $there.$key) {
+                $plan += [pscustomobject] @{ Section = "settings/$group"; Verb = 'set'; Key = $key
+                                             Detail = "$before -> $($there.$key)" }
+            }
+        }
+    }
+
+    foreach ($key in ($wanted.sections.ini.PSObject.Properties.Name | Sort-Object)) {
+        $before = $live.sections.ini.$key
+        if ($before -ne $wanted.sections.ini.$key) {
+            $plan += [pscustomobject] @{ Section = 'ini'; Verb = 'set'; Key = $key
+                                         Detail = "$before -> $($wanted.sections.ini.$key)" }
+        }
+    }
+
+    foreach ($section in $script:ConfigurationSections) {
+        $here = @{}
+        foreach ($row in @($live.sections.($section.Name))) {
+            if ($row) { $here[[string] $row.($section.Key)] = $row }
+        }
+        $there = @{}
+        foreach ($row in @($wanted.sections.($section.Name))) {
+            if ($row) { $there[[string] $row.($section.Key)] = $row }
+        }
+
+        foreach ($key in ($there.Keys | Sort-Object)) {
+            if (-not $here.ContainsKey($key)) {
+                $plan += [pscustomobject] @{ Section = $section.Name; Verb = 'create'; Key = $key; Detail = '' }
+            }
+            elseif (($here[$key] | ConvertTo-Json -Depth 10 -Compress) -ne ($there[$key] | ConvertTo-Json -Depth 10 -Compress)) {
+                $plan += [pscustomobject] @{ Section = $section.Name; Verb = 'update'; Key = $key; Detail = '' }
+            }
+        }
+
+        foreach ($key in ($here.Keys | Sort-Object)) {
+            if (-not $there.ContainsKey($key)) {
+                $plan += [pscustomobject] @{ Section = $section.Name; Verb = 'delete'; Key = $key; Detail = '' }
+            }
+        }
+    }
+
+    $plan
+}
+
+function Import-HmConfiguration {
+    <#
+    .SYNOPSIS
+        Makes the server match a document.
+    .DESCRIPTION
+        A plan unless -Force, and a deletion needs -AllowDelete on top of that:
+        the common case is a document written from one server and applied to
+        another that has things of its own, and silently removing them is not a
+        thing a configuration tool may do.
+    .EXAMPLE
+        Import-HmConfiguration -Path .\server.json -WhatIf
+    #>
+    [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
+    param(
+        [Parameter(Mandatory = $true, Position = 0)] [string] $Path,
+        [switch] $Force,
+        [switch] $AllowDelete
+    )
+
+    $wanted = Get-Content -Path $Path -Raw | ConvertFrom-Json
+    $plan = @(Compare-HmConfiguration -Path $Path)
+
+    $deletions = @($plan | Where-Object Verb -eq 'delete')
+    if (-not $AllowDelete) { $plan = @($plan | Where-Object Verb -ne 'delete') }
+
+    if (-not $Force) {
+        if ($deletions -and -not $AllowDelete) {
+            Write-Warning ("{0} entr(ies) on the server are not in the document. They are left alone; -AllowDelete removes them." -f $deletions.Count)
+        }
+        if ($plan) { Write-Warning 'Nothing was changed. Add -Force to apply this plan.' }
+        return $plan
+    }
+
+    foreach ($step in $plan) {
+        if (-not $PSCmdlet.ShouldProcess("$($step.Section) $($step.Key)", $step.Verb)) { continue }
+
+        if ($step.Section -like 'settings/*') {
+            $group = $step.Section.Split('/')[1]
+            $value = $wanted.sections.settings.$group.($step.Key)
+            Invoke-HmApi -Method PUT -Path (Get-HmSettingPath -Group $group) -Body @{ $step.Key = $value } | Out-Null
+            continue
+        }
+
+        if ($step.Section -eq 'ini') {
+            Set-HmIniSetting -Name $step.Key -Value ([string] $wanted.sections.ini.($step.Key)) -Confirm:$false | Out-Null
+            continue
+        }
+
+        $section = $script:ConfigurationSections | Where-Object Name -eq $step.Section | Select-Object -First 1
+        $row = @($wanted.sections.($step.Section)) | Where-Object { [string] $_.($section.Key) -eq $step.Key } | Select-Object -First 1
+
+        if ($step.Verb -eq 'delete') {
+            Invoke-HmApi -Method DELETE -Path ($section.Item -f [uri]::EscapeDataString($step.Key)) | Out-Null
+            continue
+        }
+
+        $body = @{}
+        foreach ($property in $row.PSObject.Properties) {
+            if ($property.Name -eq 'domain') { continue }
+            $body[$property.Name] = $property.Value
+        }
+
+        if ($step.Verb -eq 'create') {
+            $path = $section.Collection
+            if ($section.Parent -eq 'domain') {
+                $path = $section.Collection -f '', [uri]::EscapeDataString([string] $row.domain)
+            }
+            Invoke-HmApi -Method POST -Path $path -Body $body | Out-Null
+        }
+        else {
+            Invoke-HmApi -Method PUT -Path ($section.Item -f [uri]::EscapeDataString($step.Key)) -Body $body | Out-Null
+        }
+    }
+
+    $plan
+}
+
+# ---------------------------------------------------------------------------
 # Completion: a domain or an address completes from the server itself
 # ---------------------------------------------------------------------------
 
@@ -1003,5 +1270,7 @@ Export-ModuleMember -Function @(
     'Get-HmQueue', 'Start-HmQueueDelivery', 'Remove-HmQueueMessage',
     'Get-HmQuarantine', 'Restore-HmQuarantineMessage',
     'Get-HmLog', 'Get-HmBackup', 'Start-HmBackup', 'Test-HmRuleCriterion',
-    'Import-HmAccount', 'Export-HmAccount'
+    'Import-HmAccount', 'Export-HmAccount',
+    'Export-HmConfiguration', 'Compare-HmConfiguration', 'Import-HmConfiguration',
+    'ConvertTo-HmConfigurationRow', 'Get-HmSettingPath'
 )

@@ -353,6 +353,88 @@ POWERSHELL_CASES = [
 ]
 
 
+def run_powershell_config_cases(url, tmp, verbose):
+    """The module's configuration verbs, held to the same document and the same
+    refusals as hmctl's. The point of the pair is that they ask for the same
+    thing; a document one writes is a document the other reads."""
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if not pwsh or not os.path.exists(MODULE):
+        return
+
+    document = os.path.join(tmp, "ps-config.json")
+    prologue = ("$ErrorActionPreference='Stop'; Import-Module '%s' -Force; "
+                "Connect-HmServer -Url '%s' -Password (ConvertTo-SecureString '%s' -AsPlainText -Force) | Out-Null; "
+                % (MODULE.replace("'", "''"), url, PASSWORD))
+
+    def run(script):
+        return subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-Command", prologue + script],
+                              capture_output=True, text=True, timeout=180)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Export-HmConfiguration -Path '%s'" % document.replace("'", "''"))
+    with Recorder.lock:
+        exporting = list(Recorder.requests)
+    check(completed.returncode == 0,
+          "Export-HmConfiguration: exit %d - %s" % (completed.returncode, completed.stderr.strip()[:400]))
+    check(all(r["method"] == "GET" for r in exporting),
+          "Export-HmConfiguration made a request that was not a GET: %s" % sorted({r["method"] for r in exporting}))
+
+    if not os.path.exists(document):
+        problem("Export-HmConfiguration wrote no file")
+        return
+
+    with open(document, encoding="utf-8-sig") as handle:
+        written = json.load(handle)
+
+    check(written.get("version") == 1, "the module's document carries no version")
+    names = [row.get("name") for row in written.get("sections", {}).get("domains", [])]
+    check("example.com" in names, "the module's document holds no domains: %s" % names)
+    addresses = [row.get("address") for row in written.get("sections", {}).get("accounts", [])]
+    check("ann@example.com" in addresses, "the module's document holds no accounts: %s" % addresses)
+
+    # The same document, read by the other client: one vocabulary, one file.
+    completed = subprocess.run(
+        [sys.executable, HMCTL, "--url", url, "--password", PASSWORD, "config", "diff", document],
+        capture_output=True, text=True, timeout=120)
+    check(completed.returncode == 0,
+          "hmctl does not agree that the module's document matches the server (exit %d):\n%s"
+          % (completed.returncode, completed.stdout))
+
+    completed = run("Compare-HmConfiguration -Path '%s' | Measure-Object | Select-Object -ExpandProperty Count"
+                    % document.replace("'", "''"))
+    check(completed.returncode == 0 and completed.stdout.strip() in ("0", ""),
+          "Compare-HmConfiguration of a matching document should be empty, said %r %s"
+          % (completed.stdout.strip(), completed.stderr.strip()[:200]))
+
+    # A change, planned but not applied.
+    with open(document, encoding="utf-8-sig") as handle:
+        changed = json.load(handle)
+    changed["sections"]["settings"]["settings"]["max_message_size_kb"] = 51200
+    changed_path = os.path.join(tmp, "ps-changed.json")
+    with open(changed_path, "w", encoding="utf-8") as handle:
+        json.dump(changed, handle, indent=2, sort_keys=True)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Import-HmConfiguration -Path '%s' | Out-Null" % changed_path.replace("'", "''"))
+    with Recorder.lock:
+        planning = list(Recorder.requests)
+    check(completed.returncode == 0,
+          "Import-HmConfiguration without -Force: exit %d - %s" % (completed.returncode, completed.stderr.strip()[:300]))
+    check(all(r["method"] == "GET" for r in planning),
+          "Import-HmConfiguration without -Force wrote something: %s" % [r["method"] for r in planning])
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Import-HmConfiguration -Path '%s' -Force -Confirm:$false | Out-Null" % changed_path.replace("'", "''"))
+    with Recorder.lock:
+        applying = list(Recorder.requests)
+    writes = [(r["method"], r["path"], r["body"]) for r in applying if r["method"] != "GET"]
+    check(("PUT", "/api/v1/settings", {"max_message_size_kb": 51200}) in writes,
+          "Import-HmConfiguration -Force did not write the setting: %s" % writes)
+
+
 def run_powershell_cases(url, verbose):
     pwsh = shutil.which("pwsh") or shutil.which("powershell")
     if not pwsh:
@@ -597,6 +679,8 @@ def main():
         if not arguments.python:
             print("the PowerShell module against the same server")
             powershell_ran = run_powershell_cases(url, arguments.verbose)
+            if powershell_ran:
+                run_powershell_config_cases(url, tmp, arguments.verbose)
     finally:
         server.shutdown()
         shutil.rmtree(tmp, ignore_errors=True)
