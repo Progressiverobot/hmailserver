@@ -350,9 +350,20 @@ namespace HM
    bool
    AlertManager::ReadNewestEvent_(const String &condition, Event &event)
    {
-      SQLCommand command(_T("select * from hm_alertevents where alerteventid = ")
-                         _T("(select max(alerteventid) from hm_alertevents where alerteventcondition = @CONDITION)"));
-      command.AddParameter("@CONDITION", condition);
+      // Two statements, not one with a subquery: SQL Server Compact refuses a
+      // scalar subquery compared with '=', and this runs for every condition on
+      // every evaluation, so on that backend it logged an error a minute for as
+      // long as the server was up. A max() with no matching row is one row
+      // holding NULL, which is "never raised".
+      SQLCommand newestCommand(_T("select max(alerteventid) as newestid from hm_alertevents where alerteventcondition = @CONDITION"));
+      newestCommand.AddParameter("@CONDITION", condition);
+
+      std::shared_ptr<DALRecordset> newest = Application::Instance()->GetDBManager()->OpenRecordset(newestCommand);
+      if (!newest || newest->IsEOF() || newest->GetIsNull("newestid"))
+         return false;
+
+      SQLCommand command(_T("select * from hm_alertevents where alerteventid = @EVENTID"));
+      command.AddParameter("@EVENTID", newest->GetInt64Value("newestid"));
 
       std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
       if (!recordset || recordset->IsEOF())

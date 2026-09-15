@@ -39,6 +39,32 @@ namespace RegressionTests.Shared
       ///    before the fixture ends, or every fixture after it runs against the changed
       ///    configuration.
       /// </summary>
+      // The most of the server log a failing test prints: its tail, where the failure is.
+      //
+      // SetUp deletes the log only after PerformBasicSetup has succeeded, so once setup
+      // itself starts failing - a server that logs the same error every minute fails
+      // every test at AssertNoReportedError - the log is never deleted again, and each
+      // failure used to print all of it. On 15 September 2026 a query SQL Server Compact
+      // refused did exactly that: 2,267 tests each printed a log that had grown past
+      // 30 MB, and the run log reached 73 GB in six hours before anybody looked.
+      private const int MaximumLogReportCharacters = 256 * 1024;
+
+      private static string TailForReport(string log)
+      {
+         if (log.Length <= MaximumLogReportCharacters)
+            return log;
+
+         var start = log.Length - MaximumLogReportCharacters;
+
+         // From the start of a line, so the first line printed is a whole one.
+         var lineBreak = log.IndexOf('\n', start);
+         if (lineBreak >= 0 && lineBreak + 1 < log.Length)
+            start = lineBreak + 1;
+
+         return string.Format("[the first {0:N0} characters of the log are not printed]", start) +
+                Environment.NewLine + log.Substring(start);
+      }
+
       protected void RestartServerAndReacquireCom()
       {
          SingletonProvider<TestSetup>.Instance.RestartServiceAndReacquire();
@@ -87,7 +113,7 @@ namespace RegressionTests.Shared
          if (testFailed || memorySafetyEvents.Length > 0)
          {
             Console.WriteLine("hMailServer log:");
-            Console.WriteLine(LogHandler.ReadCurrentDefaultLog());
+            Console.WriteLine(TailForReport(LogHandler.ReadCurrentDefaultLog()));
             Console.WriteLine();
          }
 

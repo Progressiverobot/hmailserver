@@ -509,7 +509,19 @@ namespace HM
    String
    AuditTrail::ReadHeadHash_()
    {
-      SQLCommand command(_T("select audithash from hm_audit where auditid = (select max(auditid) from hm_audit)"));
+      // Two statements, not one with a subquery: SQL Server Compact refuses
+      // "where auditid = (select max(auditid) from hm_audit)" outright, and on
+      // that backend the one statement failed on every write - so every change
+      // an administrator made logged an error and chained onto an empty hash.
+      // A max() over an empty table is one row holding NULL, not no rows.
+      SQLCommand headCommand(_T("select max(auditid) as headid from hm_audit"));
+
+      std::shared_ptr<DALRecordset> head = Application::Instance()->GetDBManager()->OpenRecordset(headCommand);
+      if (!head || head->IsEOF() || head->GetIsNull("headid"))
+         return String();
+
+      SQLCommand command(_T("select audithash from hm_audit where auditid = @AUDITID"));
+      command.AddParameter("@AUDITID", head->GetInt64Value("headid"));
 
       std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
       if (recordset && !recordset->IsEOF())
