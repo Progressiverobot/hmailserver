@@ -215,12 +215,23 @@ extern "C" int WINAPI _tWinMain(HINSTANCE /*hInstance*/, HINSTANCE /*hPrevInstan
    ServiceStatus.dwWaitHint = 0; 
 
    // Parse the command line.
+   // The mode is the last token of the command line, and the line is
+   // trimmed first: a launcher that appends a space to the arguments -
+   // OpenCppCoverage hands its child "/Debug " - used to leave an empty
+   // last token, which was no mode at all, and the process ended at once
+   // with nothing said (15 September 2026, the first coverage run of 6.3.3).
    HM::String sCommandLine = GetCommandLine();
+   sCommandLine.Trim();
    std::vector<String> vecParams = StringParser::SplitString(sCommandLine, " ");
-
    String sLastParam;
-   if (!vecParams.empty())
-      sLastParam = vecParams[vecParams.size() - 1];
+   for (auto param = vecParams.rbegin(); param != vecParams.rend(); ++param)
+   {
+      if (!param->IsEmpty())
+      {
+         sLastParam = *param;
+         break;
+      }
+   }
 
    _AtlModule.InitializeCom();
 
