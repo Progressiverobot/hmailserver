@@ -74,6 +74,33 @@ fix is `git commit --amend -s` and a push.
   (`build/check-localisation.py`, `build/check-catalogues.py`); every INI setting
   the server reads has a Control Panel editor (`build/check-ini-coverage.py`).
 
+## A new setting goes in the database
+
+The rule, from 15 September 2026: **a setting belongs in the database, not in `hMailServer.ini`.**
+
+Put it in `hm_settings` - the store the COM `Settings` object and the Control Panel's classic pages have
+always used, reached through `Property` and `PropertySet` - and give it a Control Panel editor, which
+`build/check-ini-coverage.py` already requires of every key in the file. Do not add a key to the
+`[Settings]` section.
+
+The file keeps only what is needed to reach the database, or to be let in without one:
+`[Directories]`, `[Database]`, and `[Security]`'s administrator password and second-factor secret. If
+something genuinely has to be readable before the database is open, that is the exception - say so in the
+commit message, and expect to be asked.
+
+Why, in one line each:
+
+* Two nodes cannot share a file, and shared settings are what an active-active pair needs.
+* A configuration backup that does not include the file is not a backup of the configuration.
+* A Control Panel or a Control Deck on another machine has no share to that file.
+* A change to a file setting is saved now and applied at the next service start; a change in the
+  database can be published to the running server.
+
+The 238 keys already in the file are being migrated - `Roadmap2.md`, section 13 - and `hm_inisettings`
+(schema 6011) already mirrors them, so the work is flipping which store is the truth rather than moving
+them one at a time. `IniFileSettings` is the seam that makes that possible, and
+`build/check-ini-coverage.py` proves on every pull request that every section is read through it.
+
 ## Looking at the two browser pages
 
 The webmail (`/portal`) and the browser Control Deck (`/`) are pages a person uses, and a page is judged by looking at it. `.mcp.json` in the repository root declares one Model Context Protocol server for that: **Playwright** (`@playwright/mcp`, pinned), which drives a real Chromium against a running server so an agent - or a contributor pairing with one - can open a view, sign in, click through a flow, take a screenshot and read the accessibility tree rather than guess from the source. It is optional: nothing in the build, the tests or CI uses it, and a checkout that never starts it behaves exactly as before.
