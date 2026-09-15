@@ -304,30 +304,23 @@ namespace RegressionTests.Shared
          if (!Logon(EncodeBase64(username), EncodeBase64(password), out string errorMessage))
             throw new DeliveryFailedException("Login failed: " + errorMessage);
 
-         SendAndReceive("MAIL FROM:<" + sFrom + ">
-");
+         SendAndReceive("MAIL FROM:<" + sFrom + ">\r\n");
 
-         var rcptResponse = SendAndReceive("RCPT TO:<" + sTo + ">
-");
+         var rcptResponse = SendAndReceive("RCPT TO:<" + sTo + ">\r\n");
          if (!rcptResponse.StartsWith("2"))
             throw new DeliveryFailedException("Unexpected response from server: " + rcptResponse);
 
-         SendAndReceive("DATA
-");
+         SendAndReceive("DATA\r\n");
 
          _tcpConnection.Send(text);
-         if (!text.EndsWith("
-"))
-            _tcpConnection.Send("
-");
+         if (!text.EndsWith("\r\n"))
+            _tcpConnection.Send("\r\n");
 
-         var accepted = SendAndReceive(".
-");
+         var accepted = SendAndReceive(".\r\n");
          if (accepted.Substring(0, 3) != "250")
             throw new DeliveryFailedException("Unexpected response from server: " + accepted);
 
-         _tcpConnection.Send("QUIT
-");
+         _tcpConnection.Send("QUIT\r\n");
          _tcpConnection.Receive();
          _tcpConnection.Disconnect();
       }
