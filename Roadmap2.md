@@ -188,9 +188,9 @@ Gmail and Google Workspace, Outlook.com and Microsoft 365 with Exchange behind i
 
 | | Item | Detail |
 |---|---|---|
-| ⬜ | **The app badge** (every mail app) | The installed webmail's icon shows the unread count - the App Badging API, from the service worker, updated by the change probe. |
-| ⬜ | **Share to the webmail** (every mail app) | A photo or a link shared from another app opens the compose form with it attached - the Web Share Target in the manifest. |
-| ⬜ | **The mailto: handler** | The installed webmail registers as the handler for `mailto:` links, so a link on a website opens a new message here - `registerProtocolHandler`, offered once. |
+| ✅ | **The app badge** (every mail app) | **Done 15 September 2026.** `navigator.setAppBadge` with the same total the title carries - the folders the reader asked to be told about - on every count the page reads, cleared at zero; nothing without the API. |
+| ✅ | **Share to the webmail** (every mail app) | **Done 15 September 2026.** The manifest declares a share target (`POST /portal/share`, multipart: title, text, url, files - images, PDFs, text, calendars, `.eml`); the service worker answers the POST by putting what was shared into a cache of its own and sends the page to a new message, which reads the cache once, fills the subject and the text, attaches the files as if dropped, and deletes it. |
+| ✅ | **The mailto: handler** | **Done 15 September 2026.** Settings offers *Open mailto: links here*, which calls `registerProtocolHandler` for `/portal#/compose?mailto=%s` (the manifest declares the same); the compose route parses the mailto: URL - addresses, subject, body, cc, bcc - into a new message. |
 | ⬜ | **Offline for the last thirty days** (Gmail offline) | Offline holds the last listing and an outbox. The last thirty days of bodies and attachments kept in the browser's storage, searched offline, bounded by a setting. |
 | ⬜ | **Web Push** | Section 7. |
 

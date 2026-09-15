@@ -519,7 +519,28 @@ const flush = async () => { for (let i = 0; i < 60; i += 1) { await new Promise(
 // Node has globals of its own with these names (navigator, localStorage,
 // fetch), some of them getter-only, so each one is defined over rather than
 // assigned: the script must see this file's world and nothing of node's.
+// The installed app's world: the App Badging API, the protocol-handler
+// registration and the Cache Storage the service worker leaves a share in,
+// recorded rather than real.
+const badges = [];
+const handlers = [];
+const navigatorStub = {
+   language: 'en', languages: ['en'],
+   setAppBadge: (n) => { badges.push(Number(n)); return Promise.resolve(); },
+   clearAppBadge: () => { badges.push(0); return Promise.resolve(); },
+   registerProtocolHandler: (scheme, url) => { handlers.push({ scheme: String(scheme), url: String(url) }); }
+};
+const cacheStores = new Map();
+const cachesStub = {
+   open: async (name) => {
+      if (!cacheStores.has(name)) { cacheStores.set(name, new Map()); }
+      const m = cacheStores.get(name);
+      return { match: async (k) => m.get(k), put: async (k, r) => { m.set(k, r); }, delete: async (k) => m.delete(k) };
+   },
+   delete: async (name) => cacheStores.delete(name)
+};
 const world = {
+   navigator: navigatorStub, caches: cachesStub,
    document, window, location, history, localStorage,
    fetch: fetchStub,
    confirm: window.confirm,
@@ -1373,6 +1394,37 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- the installed app: the badge, a mailto: link, a share, the handler
+   if (app.hidden) {
+      document.getElementById('address').value = 'user@example.com';
+      document.getElementById('password').value = 'a-real-password';
+      document.getElementById('signin-form').dispatchEvent(makeEvent('submit'));
+      await flush();
+   }
+   const titled = (document.title.match(/^\((\d+)\)/) || [])[1];
+   check('the installed icon carries the unread count the title carries', badges.length > 0 && (titled ? badges[badges.length - 1] === Number(titled) : badges[badges.length - 1] === 0),
+      'title=' + document.title + ' badges=' + JSON.stringify(badges.slice(-3)));
+   location.hash = '#/compose?mailto=' + encodeURIComponent('mailto:x@example.org?subject=Hi%20there&cc=c%40example.org&body=First%20line');
+   await flush();
+   check('a mailto: link opens a new message to its address', document.getElementById('compose-to').value === 'x@example.org', document.getElementById('compose-to').value);
+   check('with its subject, its cc and its body', document.getElementById('compose-subject').value === 'Hi there' && document.getElementById('compose-cc').value === 'c@example.org' && document.getElementById('compose-text').value.indexOf('First line') === 0,
+      document.getElementById('compose-subject').value + ' | ' + document.getElementById('compose-cc').value + ' | ' + document.getElementById('compose-text').value.slice(0, 30));
+   const shareStore = await cachesStub.open('hm-portal-share');
+   await shareStore.put('/portal/share-text', new Response(JSON.stringify({ title: 'A photo', text: 'Look at this', url: 'https://example.org/p', files: ['photo.png'] }), { headers: { 'Content-Type': 'application/json' } }));
+   await shareStore.put('/portal/share-file/0', new Response(new Blob([Uint8Array.from([1, 2, 3])], { type: 'image/png' })));
+   location.hash = '#/compose?share=1';
+   await flush();
+   check('a share from another app becomes a new message with its title and text', document.getElementById('compose-subject').value === 'A photo' && document.getElementById('compose-text').value.indexOf('Look at this\nhttps://example.org/p') === 0,
+      document.getElementById('compose-subject').value + ' | ' + document.getElementById('compose-text').value.slice(0, 40));
+   check('and the shared file attached', document.getElementById('compose-files-note').textContent.indexOf('photo.png') >= 0, document.getElementById('compose-files-note').textContent);
+   check('and the share is read once', !cacheStores.has('hm-portal-share'));
+   location.hash = '#/settings';
+   await flush();
+   document.getElementById('pref-mailto').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('the mailto: handler is offered to the browser for this page', handlers.length === 1 && handlers[0].scheme === 'mailto' && handlers[0].url === 'http://portal.test/portal#/compose?mailto=%s',
+      JSON.stringify(handlers));
+
 
    // ---- signing out ends the session and stops the probe
    const beforeOut = requests.length;

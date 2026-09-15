@@ -1558,14 +1558,101 @@
       if (index >= 0) { setCursor(index, true); }
     });
   };
+  // ---- The installed app ------------------------------------------------
+  // The unread count on the installed app's icon - the App Badging API, the
+  // same total the title carries, which is the folders the reader asked to
+  // be told about. Nothing without the API, nothing said when it refuses.
+  var updateBadge = function (total) {
+    try {
+      if (typeof navigator === 'undefined' || typeof navigator.setAppBadge !== 'function') { return; }
+      var p = total ? navigator.setAppBadge(total) : navigator.clearAppBadge();
+      if (p && p.catch) { p.catch(function () { /* the badge is a courtesy */ }); }
+    } catch (why) { /* the badge is a courtesy */ }
+  };
+  // A mailto: URL (RFC 6068) into the fields of a new message: the addresses
+  // before the question mark, then subject, body, cc and bcc as query keys,
+  // each percent-decoded; anything else the URL carries is ignored.
+  var parseMailto = function (raw) {
+    var text = String(raw || '');
+    if (!/^mailto:/i.test(text)) { return null; }
+    text = text.slice(7);
+    var cut = text.indexOf('?');
+    var out = { to: decodeURIComponent(cut >= 0 ? text.slice(0, cut) : text) };
+    (cut >= 0 ? text.slice(cut + 1) : '').split('&').forEach(function (pair) {
+      if (!pair) { return; }
+      var eq = pair.indexOf('=');
+      var key = decodeURIComponent(eq < 0 ? pair : pair.slice(0, eq)).toLowerCase();
+      var value = eq < 0 ? '' : decodeURIComponent(pair.slice(eq + 1).replace(/\+/g, ' '));
+      if (key === 'to') { out.to = out.to ? out.to + ', ' + value : value; }
+      else if (key === 'subject' || key === 'body' || key === 'cc' || key === 'bcc') { out[key] = value; }
+    });
+    return out;
+  };
+  // What another app shared to the installed webmail: the service worker
+  // answered the share's POST by putting the title, text, link and files into
+  // a cache of their own and sending the page here. Read once, then gone.
+  var readShare = function () {
+    if (typeof caches === 'undefined' || !caches.open) { return Promise.resolve(null); }
+    var name = 'hm-portal-share';
+    return caches.open(name).then(function (c) {
+      return c.match('/portal/share-text').then(function (r) { return r ? r.json() : null; }).then(function (meta) {
+        if (!meta) { return null; }
+        var files = [];
+        var chain = Promise.resolve();
+        (meta.files || []).forEach(function (fileName, i) {
+          chain = chain.then(function () {
+            return c.match('/portal/share-file/' + i).then(function (r) {
+              if (!r) { return null; }
+              return r.blob().then(function (b) { files.push(new File([b], fileName, { type: b.type || 'application/octet-stream' })); });
+            });
+          });
+        });
+        return chain.then(function () { return caches.delete(name); }).then(function () {
+          return { title: meta.title || '', text: meta.text || '', url: meta.url || '', files: files };
+        });
+      });
+    }).catch(function () { return null; });
+  };
+  var fillCompose = function (fields) {
+    if (fields.to) { el('compose-to').value = fields.to; }
+    if (fields.cc) { el('compose-cc').value = fields.cc; }
+    if (fields.bcc) { el('compose-bcc').value = fields.bcc; }
+    if (fields.subject) { el('compose-subject').value = fields.subject; }
+    if (fields.body) {
+      var text = el('compose-text');
+      text.value = fields.body + (text.value ? '\n\n' + text.value : '');
+    }
+    syncComposeRows();
+  };
+  // A new message opened with something already in it: a mailto: link the
+  // browser handed over, the fields as query keys, or what another app
+  // shared. Runs after the form has been blanked and signed.
+  var prefillCompose = function (params) {
+    var fields = params.mailto !== undefined ? (parseMailto(params.mailto) || {}) : {};
+    ['to', 'cc', 'bcc', 'subject', 'body'].forEach(function (key) { if (params[key] !== undefined) { fields[key] = params[key]; } });
+    fillCompose(fields);
+    if (params.share === undefined) { return Promise.resolve(); }
+    return readShare().then(function (shared) {
+      if (!shared) { return; }
+      var body = [shared.text, shared.url].filter(function (s) { return s; }).join('\n');
+      fillCompose({ subject: shared.title, body: body });
+      if (shared.files.length) {
+        shared.files.forEach(function (f) { dropped.push(f); });
+        el('compose-files-note').textContent = 'Attached from the share: ' + shared.files.map(function (f) { return f.name + ' (' + format(f.size) + ')'; }).join(', ');
+      }
+    });
+  };
+  var composePrefilled = function (params) {
+    return ['mailto', 'share', 'to', 'cc', 'bcc', 'subject', 'body'].some(function (key) { return params[key] !== undefined; });
+  };
   var showCompose = function (params) {
     var mode = params.reply !== undefined ? 'reply' : params.replyall !== undefined ? 'replyall' :
       params.forward !== undefined ? 'forward' : params.draft !== undefined ? 'draft' : 'new';
     var id = Number(params[mode] || 0);
     var key = mode + ':' + id;
-    if (composeKey === key) { openCompose(mode, id); el('compose-to').focus(); return; }
+    if (composeKey === key && !composePrefilled(params)) { openCompose(mode, id); el('compose-to').focus(); return; }
     composeKey = key;
-    if (mode === 'new' || !id) { blankCompose(); addSignature(); syncComposeRows(); openCompose('new', 0); el('compose-to').focus(); return; }
+    if (mode === 'new' || !id) { blankCompose(); addSignature(); syncComposeRows(); prefillCompose(params); openCompose('new', 0); el('compose-to').focus(); return; }
     if (current && current.id === id) { var was = current; prime(mode, was).then(function () { afterPrime(mode, was); openCompose(mode, id); }); return; }
     call('GET', '/api/v1/me/messages/' + id).then(function (result) {
       if (result.status === 200 && result.data) { prime(mode, result.data).then(function () { afterPrime(mode, result.data); openCompose(mode, id); }); return; }
@@ -3583,6 +3670,7 @@
     var total = 0;
     notifyFolderIds().forEach(function (id) { var f = foldersById[id]; if (f) { total += f.unseen || 0; } });
     document.title = (total ? '(' + total + ') ' : '') + baseTitle;
+    updateBadge(total);
   };
   var renderNotifyFolders = function () {
     var box = el('notify-folders');
@@ -3862,6 +3950,17 @@
     el('support-note').hidden = !last;
   };
 
+  // The browser is asked to send mailto: links here: registerProtocolHandler,
+  // from a click as browsers require, the %s the link the browser hands
+  // over, which the compose route reads. The browser asks the reader once.
+  el('pref-mailto').addEventListener('click', function () {
+    try {
+      navigator.registerProtocolHandler('mailto', (location.origin || '') + '/portal#/compose?mailto=%s');
+      say('prefs-status', t('This webmail will open mailto: links from now on.'), true);
+    } catch (why) {
+      say('prefs-status', t('This browser did not take the mailto: handler.'), false);
+    }
+  });
   el('prefs-form').addEventListener('submit', function (event) {
     event.preventDefault();
     var ticked = [];
