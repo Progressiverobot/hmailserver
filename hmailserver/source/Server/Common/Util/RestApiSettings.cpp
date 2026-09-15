@@ -1417,9 +1417,9 @@ namespace
    const char *IniValueRefusal =
       "The value is longer than 4000 characters or contains a line break, so it could not be stored or read back as one setting.";
    const char *IniWriteRefusal =
-      "The setting could not be written to hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.";
+      "The setting could not be stored. Settings are held in the database, so this means the server could not write to it. Nothing has been changed.";
    const char *IniRemoveRefusal =
-      "The setting could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.";
+      "The setting could not be removed. Settings are held in the database, so this means the server could not write to it. Nothing has been changed.";
 
    // The name from the path as the store sees it, or the refusal. Not valid
    // UTF-8 is refused with the name sentence too: whatever the bytes were,

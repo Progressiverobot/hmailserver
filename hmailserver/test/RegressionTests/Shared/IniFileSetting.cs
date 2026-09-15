@@ -10,15 +10,27 @@ using NUnit.Framework;
 namespace RegressionTests.Shared
 {
    /// <summary>
-   ///    Writes settings that live in hMailServer.ini rather than in the database.
+   ///    Writes the settings that used to live in hMailServer.ini and now live in
+   ///    hm_inisettings, the settings store.
    ///
-   ///    Most settings are reachable over COM through Settings, but the optional
-   ///    listeners are configured entirely from the [Settings] section of
-   ///    hMailServer.ini - RestApiPort, WebServicesHttpsPort, MetricsServerPort and
-   ///    the certificate paths beside them - and IniFileSettings caches the whole
-   ///    section at InitInstance. So a test that wants to change one has to write the
-   ///    file and then call Application.Reinitialize(), which is the only thing that
-   ///    re-reads it. Stop()/Start() does not.
+   ///    The listeners are configured entirely from these - RestApiPort,
+   ///    WebServicesHttpsPort, MetricsServerPort and the certificate paths beside
+   ///    them - and IniFileSettings latches the lot at InitInstance, so a test that
+   ///    changes one still has to call Application.Reinitialize(), which is the only
+   ///    thing that re-reads them. Stop()/Start() does not.
+   ///
+   ///    WHAT CHANGED. Write and Delete used to edit hMailServer.ini directly, and
+   ///    the server read the file. From schema 6042 the DATABASE decides: a value
+   ///    edited into the file is named in the error log and put back at the next
+   ///    start, and a line deleted from the file is written back from the row. So
+   ///    these go over COM - Settings.SetIniSetting and DeleteIniSetting - which is
+   ///    the same door the Control Panel, the REST API and hmctl use, and which
+   ///    writes the store and the file's copy together. Every one of the 180-odd call
+   ///    sites in this suite therefore still means what it says, and none of them had
+   ///    to change.
+   ///
+   ///    WriteFileOnly is the deliberate exception, for the handful of tests that are
+   ///    ABOUT the file losing: it edits hMailServer.ini and nothing else.
    ///
    ///    Extracted from RestApiApiKeys, which had it privately, once a second fixture
    ///    needed it. The ini is written through WritePrivateProfileString rather than
@@ -54,22 +66,48 @@ namespace RegressionTests.Shared
       }
 
       /// <summary>
-      ///    Writes one [Settings] value to every hMailServer.ini that exists, and
-      ///    flushes the cache so the value is on disk before the server is asked to
-      ///    re-read it. Fails the test if no ini could be found, rather than passing
-      ///    while having changed nothing.
+      ///    Stores one setting, through the same COM call the Control Panel and the
+      ///    REST API use. The server writes the row and the file's copy together, so
+      ///    a test that goes on to read the file still sees the value.
       /// </summary>
       public static void Write(string key, string value)
       {
-         Write("Settings", key, value);
+         SingletonProvider<TestSetup>.Instance.GetApp().Settings.SetIniSetting(key, value);
       }
 
       /// <summary>
       ///    The same, for any section. [Directories] is the other one a test has a
       ///    reason to write (InstallationPaths), and it takes a service restart
-      ///    rather than a Reinitialize to be read.
+      ///    rather than a Reinitialize to be read. [Settings] is routed to the store,
+      ///    because writing the file for one of those is no longer how it is changed.
       /// </summary>
       public static void Write(string section, string key, string value)
+      {
+         if (string.Equals(section, "Settings", System.StringComparison.OrdinalIgnoreCase))
+         {
+            Write(key, value);
+            return;
+         }
+
+         WriteFileOnly(section, key, value);
+      }
+
+      /// <summary>
+      ///    Writes a key straight into every hMailServer.ini that exists, WITHOUT
+      ///    going near the store, and flushes the cache so the value is on disk
+      ///    before the server is asked to re-read it. Fails the test if no ini could
+      ///    be found, rather than passing while having changed nothing.
+      ///
+      ///    For a [Settings] key this is a test writing the LOSING copy on purpose -
+      ///    which is what the settings-store fixture is for - and for any other
+      ///    section it is simply how that section is written.
+      /// </summary>
+      public static void WriteFileOnly(string key, string value)
+      {
+         WriteFileOnly("Settings", key, value);
+      }
+
+      public static void WriteFileOnly(string section, string key, string value)
       {
          bool wroteAny = false;
 
@@ -112,20 +150,39 @@ namespace RegressionTests.Shared
       }
 
       /// <summary>
-      ///    Removes one [Settings] key from every hMailServer.ini that exists.
+      ///    Returns one setting to its default, through the same COM call the Control
+      ///    Panel and the REST API use: the row is dropped and the key removed from
+      ///    the file together.
       ///
-      ///    Removing a key is not the same as setting it to an empty string: it is how
-      ///    a setting is returned to its default, and the database mirror behind these
-      ///    settings has to see the difference. Passing a null value to
-      ///    WritePrivateProfileString is what deletes the line rather than leaving
-      ///    "Key=" behind, so the null here is load-bearing.
+      ///    Deleting is not the same as setting an empty string - an absent key falls
+      ///    back to the caller's default while "Key=" reads as 0 through
+      ///    GetPrivateProfileInt - and it is no longer the same as deleting the line,
+      ///    either: with the store in the database the row would write the line
+      ///    straight back at the next start.
       /// </summary>
       public static void Delete(string key)
       {
-         Delete("Settings", key);
+         SingletonProvider<TestSetup>.Instance.GetApp().Settings.DeleteIniSetting(key);
       }
 
       public static void Delete(string section, string key)
+      {
+         if (string.Equals(section, "Settings", System.StringComparison.OrdinalIgnoreCase))
+         {
+            Delete(key);
+            return;
+         }
+
+         DeleteFileOnly(section, key);
+      }
+
+      /// <summary>
+      ///    Removes one key from every hMailServer.ini that exists and leaves the
+      ///    store alone. Passing a null value to WritePrivateProfileString is what
+      ///    deletes the line rather than leaving "Key=" behind, so the null below is
+      ///    load-bearing.
+      /// </summary>
+      public static void DeleteFileOnly(string section, string key)
       {
          bool deletedAny = false;
 

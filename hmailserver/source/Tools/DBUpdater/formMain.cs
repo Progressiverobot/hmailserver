@@ -1,4 +1,4 @@
-// https://www.progressiverobot.com
+﻿// https://www.progressiverobot.com
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
@@ -249,6 +249,7 @@ namespace DBUpdater
          _upgradeScripts.Add(new UpgradeScript(6038, 6039));
          _upgradeScripts.Add(new UpgradeScript(6039, 6040));
          _upgradeScripts.Add(new UpgradeScript(6040, 6041));
+         _upgradeScripts.Add(new UpgradeScript(6041, 6042));
       }
 
       private void buttonClose_Click(object sender, EventArgs e)
@@ -446,6 +447,8 @@ namespace DBUpdater
                return "hMailServer 6.3 (6040)";
             case 6041:
                return "hMailServer 6.3 (6041)";
+            case 6042:
+               return "hMailServer 6.3 (6042)";
             default:
                return "hMailServer (database version " + version + ")";
          }

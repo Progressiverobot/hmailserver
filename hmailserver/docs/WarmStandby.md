@@ -53,23 +53,35 @@ What is where
 | The delivery queue | the database (`hm_messages` rows) + spool files on disk | database + data-directory replication |
 | Greylisting triplets, auto-ban ranges, login-failure state | the database | sharing the database |
 | **Message files (.eml)** | the **data directory** on disk | **replication — see below** |
-| `[Settings]` section of hMailServer.INI | both — mirrored into `hm_inisettings` | the mirror, automatically (see below) |
-| `[Directories]`, `[Database]` sections of the INI | each machine's own INI | configured per machine, deliberately |
+| The settings the `[Settings]` section used to hold | **the database** (`hm_inisettings`) since schema 6042; the INI section is a cache | sharing the database (see below) |
+| `[Directories]`, `[Database]`, `[Security]`, `[GUILanguages]` sections of the INI | each machine's own INI | configured per machine, deliberately |
+| `[SettingsOverride]` section of the INI | each machine's own INI, and nothing else | **not** shared — it is per-machine on purpose |
 | TLS certificates and private keys | **files on disk** — `hm_sslcertificates` stores *paths* (`sslcertificatefile`, `sslprivatekeyfile`) | replicate the files to the same paths |
 | DKIM signing keys | **files on disk** — `hm_domains` stores *paths* (`domaindkimprivatekeyfile`) | replicate the files to the same paths |
 | Route / external-fetch / per-domain-relay passwords | the database, **DPAPI-protected** | **they do not travel — see below** |
 
 Two rows in that table do more work than the rest:
 
-**The `[Settings]` mirror is what makes the standby's configuration stay
-current.** Every `[Settings]` key is mirrored into `hm_inisettings` and
-reconciled by a three-way merge at service start: a row changed while the local
-file was not is written back into the file. A standby that shares the database
-therefore *inherits the primary's server settings on its next start*, without
-anything copying INI files around. What the mirror deliberately does not carry
-is `[Directories]` and `[Database]` — the paths and the database connection are
-per-machine facts, and they are exactly what you want to differ or verify on
-the standby, not inherit.
+**The settings store is what makes the standby's configuration stay
+current.** From schema 6042 those settings live in `hm_inisettings` and the
+`[Settings]` section of each machine's INI is a cache the server writes to match
+at every start. A standby that shares the database therefore *inherits the
+primary's server settings on its next start*, without anything copying INI files
+around — and a value edited into the standby's own file is reported by name and
+put back, rather than quietly diverging. What the store deliberately does not
+carry is `[Directories]`, `[Database]`, `[Security]` and `[GUILanguages]` — the
+paths, the database connection, the administrator credential and the language
+list are per-machine facts, and they are exactly what you want to differ or
+verify on the standby, not inherit.
+
+**`[SettingsOverride]` is the per-machine escape hatch, and it is a liability on
+a standby.** A key written in that section of a machine's INI is applied over
+whatever the database holds and named in that machine's error log at every
+start. It exists for a support engineer whose database is unreachable or whose
+stored value will not let the server start. Left behind on a standby it is
+exactly the silent divergence this table exists to prevent, so treat "no
+`[SettingsOverride]` section on either machine" as part of the standby
+check-list.
 
 **Certificate and key paths must resolve on both machines.** The database rows
 carry file paths, so if the primary says `C:\certs\mail.pem`, the standby needs
@@ -327,9 +339,10 @@ UnlockAll` in `ExternalFetchManager`. Queue selection is
 (`where messagelocked = 0 and messagenexttrytime <= now`). DPAPI protection is
 `DataProtector`/`Crypt::ProtectSecret` with `CRYPTPROTECT_LOCAL_MACHINE` and a
 fixed description string, used for route, fetch-account, per-domain-relay and
-SSL-key passwords. The `[Settings]` mirror and its three-way merge are
-`IniSettingStore`, whose header documents the file-wins/row-wins rules quoted
-here. Certificate and DKIM key *paths* (not blobs) are `hm_sslcertificates.
+SSL-key passwords. The settings store and the reconciliation that keeps each
+machine's INI matching it are `IniSettingStore`, whose header documents the
+database-wins rules quoted here, and `IniFileSettings::LoadDatabaseSettings`,
+which applies `[SettingsOverride]`. Certificate and DKIM key *paths* (not blobs) are `hm_sslcertificates.
 sslcertificatefile`/`sslprivatekeyfile` and `hm_domains.domaindkimprivatekeyfile`
 in the create scripts. The schema pin is `REQUIRED_DB_VERSION` in `Constants.h`,
 enforced by `Application::OnDatabaseConnected` in both directions. The

@@ -2781,7 +2781,7 @@ STDMETHODIMP InterfaceSettings::SetIniSetting(BSTR Name, BSTR Value)
          return COMError::GenerateError("The value is longer than 4000 characters or contains a line break, so it could not be stored or read back as one setting.");
 
       if (!HM::IniFileSettings::Instance()->WriteSettingsValue(name, value))
-         return COMError::GenerateError("The setting could not be written to hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+         return COMError::GenerateError("The setting could not be stored. Settings are held in the database, so this means the server could not write to it. Nothing has been changed.");
 
       return S_OK;
    }
@@ -2804,7 +2804,7 @@ STDMETHODIMP InterfaceSettings::DeleteIniSetting(BSTR Name)
          return COMError::GenerateError("The setting name is empty, longer than 100 characters, surrounded by whitespace, or contains one of = [ ] or a line break.");
 
       if (!HM::IniFileSettings::Instance()->RemoveSettingsValue(name))
-         return COMError::GenerateError("The setting could not be removed from hMailServer.INI. The account the server runs as needs write access to that file. Nothing has been changed.");
+         return COMError::GenerateError("The setting could not be removed. Settings are held in the database, so this means the server could not write to it. Nothing has been changed.");
 
       return S_OK;
    }

@@ -16,48 +16,63 @@ typedef _tagXMLNode XNode;
 namespace HM
 {
    /// <summary>
-   /// The [Settings] section of hMailServer.INI, mirrored into the database.
+   /// hm_inisettings: the store the [Settings] section of hMailServer.INI used to
+   /// be. From schema 6042 THE DATABASE IS THE TRUTH and the file is its cache.
    ///
-   /// WHY THIS EXISTS. A setting that lives only in hMailServer.INI has three
-   /// problems, and they are one problem: the file exists only on the server.
-   /// It cannot be read or written by a Control Panel connected to another host,
-   /// it does not appear in hmconfig.ps1's configuration-as-code, and - the one
-   /// that loses data - it is in no backup at all. BackupExecuter archives the
-   /// database and the message store; it never touches the ini. An operator who
-   /// restores a backup onto replacement hardware gets their domains, accounts
-   /// and mail back, and none of their server settings.
+   /// WHY THE STORE MOVED. A setting that lives only in hMailServer.INI has four
+   /// problems and they are one problem: the file exists only on the server. It
+   /// cannot be read or written by a Control Panel or a Control Deck connected to
+   /// another host; two nodes cannot share it, so an active-active pair cannot
+   /// share a configuration; a change to it is saved now and applied at the next
+   /// start, with no way to publish it to a running server; and - the one that
+   /// loses data - it is in no backup at all. BackupExecuter archives the database
+   /// and the message store and never touches the ini, so an operator who restores
+   /// onto replacement hardware gets their domains, accounts and mail back and
+   /// none of their server settings. The project's rule since 15 September 2026,
+   /// in .github/CONTRIBUTING.md, is that a setting belongs in the database; this
+   /// is the class that makes that true of the 238 keys already in the file.
    ///
-   /// WHAT THIS IS NOT. It is not a second source of truth that silently
-   /// overrides the file. That would be the worst outcome available: every
-   /// Control Panel INI write - and there are a dozen of them - would appear to
-   /// succeed, read back correctly, and be discarded on the next start. This
-   /// project has spent a great deal of effort removing exactly that shape of
-   /// defect, and reintroducing it wholesale would be a poor trade for a backup.
+   /// WHY THE FILE IS STILL WRITTEN. Because some readers cannot go to the
+   /// database, and one of them by definition never can: hMailServer.exe /Register
+   /// reads [Settings] ServiceAccountName and ServiceAccountPassword with no
+   /// database open at all, because registering the service is what happens before
+   /// there is one. So every row is written into the file as well, and the file
+   /// remains a complete, readable copy of the configuration - a cache, not a
+   /// store. An administrator can still read it; what they can no longer do is
+   /// change a setting by editing it.
    ///
-   /// So the file and the table are kept in step by a three-way merge, and each
-   /// row remembers what the file said when they were last agreed:
+   /// THE MERGE, which is no longer three-way. Each row still remembers what the
+   /// file held when the two last agreed (inisettingfilevalue), but that is now
+   /// used to tell an EDIT from a stale copy rather than to decide who wins:
    ///
-   ///   file != filevalue   the file was edited since the last start, by hand or
-   ///                       by the Control Panel. The FILE WINS; the row is
-   ///                       updated to match.
-   ///   value != filevalue  the row was changed while the file was not - a remote
-   ///                       or restored change. The ROW WINS, and it is written
-   ///                       back into the file so the file keeps telling the
-   ///                       truth.
-   ///   both changed        a conflict. The file wins, because it is the copy the
-   ///                       operator can see, and the key is named in the log
-   ///                       rather than resolved silently.
+   ///   no row                 the file has a key the store has never seen: a
+   ///                          fresh install, or the first start after the
+   ///                          migration. It is ADOPTED into the table and used.
+   ///   file == filevalue      the file is the cache this store last wrote. The
+   ///                          row is used; if the file has drifted from it the
+   ///                          line is rewritten.
+   ///   file != filevalue      somebody EDITED the file. The row is still used -
+   ///                          the database is the store - the key is named in the
+   ///                          error log, and the line is put back to the stored
+   ///                          value so the direct readers stay correct. Reported
+   ///                          once, because after that the two agree again.
+   ///   row with no key        the line was deleted from the file. That is no
+   ///                          longer how a setting is returned to its default -
+   ///                          DELETE over COM or REST is - so the line is written
+   ///                          back rather than the row dropped.
    ///
-   /// Writing the value back into the file is what makes everything that reads
-   /// the ini directly keep working: the two DAV redirect settings in
-   /// WebServicesServer, UseLanguage, hmconfig.ps1, an administrator with a text
-   /// editor - and, importantly, hMailServer.exe /Register, which reads the
-   /// service account with no database open at all.
+   /// THE DOOR. [SettingsOverride] in the same file is applied over everything,
+   /// stored or not, and is named in the error log at every start. It exists for
+   /// the support engineer whose database is unreachable or whose stored value is
+   /// wrong, and it is deliberately a section nobody edits by accident: it is not
+   /// written by the server, not offered by any editor, and it announces itself
+   /// every time the service starts. See IniFileSettings::LoadDatabaseSettings,
+   /// which applies it, because it has to apply even when this table cannot be
+   /// read at all.
    ///
    /// filevalue is only advanced when the file write SUCCEEDS. If the service
    /// account cannot write the ini, the row stays marked as un-synchronised and
-   /// the next start tries again, rather than recording a lie and reverting the
-   /// change.
+   /// the next start tries again, rather than recording a lie.
    /// </summary>
    class IniSettingStore
    {
@@ -67,23 +82,26 @@ namespace HM
       ~IniSettingStore();
 
       /// <summary>
-      /// Reads the table, reconciles it against the [Settings] section of the ini,
+      /// Reads the table, reconciles the [Settings] section of the ini against it,
       /// and returns the values the server should run with. Call once, after the
       /// database is open and its schema version has been accepted.
       ///
       /// False means the table could not be read; the caller should carry on with
       /// the ini alone rather than refuse to start, because a server that will not
-      /// boot because a settings mirror is unavailable is worse than one running
-      /// on the configuration in front of it.
+      /// boot because its settings store is momentarily unavailable is worse than
+      /// one running on the copy sitting in front of it. That fallback is also the
+      /// only reason the file is kept complete.
       /// </summary>
       bool Synchronize(std::map<String, String> &resolvedValues);
 
       /// <summary>
-      /// Writes one key to the table and marks it as agreed with the file. Called
-      /// after the server itself changes a [Settings] value, so the change is not
-      /// lost from the mirror until the next restart.
+      /// The [SettingsOverride] section of the ini: the values an administrator has
+      /// declared must be used whatever the database holds. Read from the FILE and
+      /// never stored, because the case it exists for is a database that cannot be
+      /// reached or cannot be trusted. Static and free of any database call, so
+      /// that it works in exactly that case.
       /// </summary>
-      bool Save(const String &key, const String &value);
+      static void ReadOverrides(std::map<String, String> &values);
 
       // ---- backup -----------------------------------------------------------
 
@@ -97,28 +115,48 @@ namespace HM
       //
       // The COM surface for these settings, which is what lets a Control Panel on
       // another machine administer them at all. The ordering below is the whole
-      // design and is the same as Synchronize's: THE FILE IS WRITTEN FIRST, and the
-      // row is only recorded as agreed with it if that write succeeded. Writing the
-      // row first and the file second would produce, on a service account that
-      // cannot write the ini, a stored value that every direct reader of the file -
-      // hmconfig.ps1, the DAV redirects, /Register - would disagree with, and no
-      // way to tell from either copy which was right.
+      // design, and it INVERTED when the store moved: THE ROW IS WRITTEN FIRST and
+      // the file is brought into line afterwards.
+      //
+      // It has to be that way round now. File-then-row, which is what this did
+      // while the file was the truth, would on a failed row write leave the file
+      // holding a value the store does not have - and the next start, seeing a file
+      // edited away from its stored value, would correctly discard it. A save that
+      // reported success and was silently reverted at the next restart is the exact
+      // defect this project keeps removing, so the authoritative write goes first
+      // and is the one that decides the answer.
 
       /// <summary>
-      /// Sets one [Settings] value from an administrator, in file-then-row order.
-      /// False means the FILE could not be written, and nothing has been changed.
+      /// Sets one [Settings] value from an administrator, in row-then-file order.
+      /// False means the DATABASE could not be written and nothing has been stored.
       ///
-      /// Note what this does NOT do: it does not make the value take effect. Almost
-      /// every one of these is latched into a typed member by LoadSettings() at
-      /// start-up, and reloading them here would rewrite ~150 members underneath
-      /// running sessions. So the value is persisted and applies on the next start,
-      /// which is exactly the behaviour an administrator editing the file gets.
+      /// True with the file write having failed is a real outcome and is reported
+      /// rather than swallowed: the value IS stored and WILL be used, but until the
+      /// file can be written the handful of readers that go to it directly - notably
+      /// hMailServer.exe /Register, which has no database - keep seeing the old one.
+      ///
+      /// Note what this does NOT do: it does not make the value take effect in the
+      /// running process. Almost every one of these is latched into a typed member
+      /// by LoadSettings() at start-up, and reloading them here would rewrite ~150
+      /// members underneath running sessions. So the value is persisted and applies
+      /// on the next start. Publishing a change to a running server is a roadmap row
+      /// of its own (Roadmap2 section 13), and it needs this store first.
       /// </summary>
       static bool WriteSetting(const String &name, const String &value);
 
       /// <summary>
-      /// Removes a key from the file and drops its row, which is how a setting is
-      /// returned to its default. False means the file could not be written.
+      /// Removes a setting's key from the file and drops its row, which is now the
+      /// ONLY way to return a setting to its default - deleting the line by hand no
+      /// longer does it, because the row would simply be written back. False means
+      /// the setting is still set.
+      ///
+      /// The FILE goes first here, which is the opposite of WriteSetting above and
+      /// follows from the same rule: leave behind whichever residue the next start
+      /// repairs, never the one it mistakes for an instruction. A leftover row is
+      /// repaired - Synchronize writes its line back. A leftover line is a key the
+      /// table has never seen and is ADOPTED, so dropping the row first and then
+      /// failing to remove the line would put the setting straight back at the next
+      /// start, after reporting success.
       /// </summary>
       static bool RemoveSetting(const String &name);
 
@@ -133,33 +171,51 @@ namespace HM
       static bool IsStorableValue(const String &value);
 
       /// <summary>
-      /// Every name currently in the [Settings] section, in the order the file has
-      /// them. Read from the FILE rather than the table because the file is the copy
-      /// that decides behaviour, and a name present in one and not the other is
-      /// exactly the state an administrator needs to see rather than have smoothed
-      /// over.
+      /// Every setting name the server holds: the union of the table and the
+      /// [Settings] section, which after a start are the same list.
+      ///
+      /// The union rather than either alone, and the reason is the two states where
+      /// they differ. A row whose line has not been written yet - the file was not
+      /// writable at the time - is a setting that exists and is in force, and
+      /// leaving it out would hide it from configuration-as-code and from the Deck.
+      /// A key in the file with no row is a setting about to be adopted, and hiding
+      /// that would make a value an administrator can see in the file unreachable
+      /// from every tool. Falls back to the file alone when the table cannot be
+      /// read, which is the same fallback Synchronize takes.
       /// </summary>
       static void ReadSettingNames(std::vector<String> &names);
 
    private:
 
-      /// <summary>The whole [Settings] section of the ini, as name -> value.</summary>
-      static void ReadIniSection_(std::map<String, String> &values);
+      /// <summary>One whole section of the ini, as name -> value.</summary>
+      static void ReadIniSection_(const String &section, std::map<String, String> &values);
+
+      /// <summary>
+      /// Puts the standing note in the file: what the [Settings] section now is,
+      /// where the settings actually live, and what [SettingsOverride] is for.
+      /// Written as keys of a [SettingsStore] section rather than as comment lines,
+      /// because the only portable way this process has to write the file is the
+      /// profile API, and it writes keys - the POSIX build implements exactly that
+      /// API and nothing else (Common/Util/IniFile.cpp). Rewritten only when it
+      /// differs, so a start does not dirty the file for nothing.
+      /// </summary>
+      static void WriteFileNotice_();
 
       static bool InsertRow_(const String &name, const String &value, const String &fileValue);
       static bool UpdateRow_(const String &name, const String &value, const String &fileValue);
 
       /// <summary>
-      /// Drops a row whose key has been removed from the file. Removing a key is how
-      /// a setting is returned to its default, so the mirror has to be able to let
-      /// go of one - see the comment in Synchronize for what happens when it cannot.
+      /// Drops a setting's row, which is what returns it to its default. Called only
+      /// from RemoveSetting now: Synchronize used to drop a row whose key had left
+      /// the file, and with the database as the store it writes the line back
+      /// instead - see the comment there for why that inverted with the precedence.
       /// </summary>
       static bool DeleteRow_(const String &name);
 
       /// <summary>
-      /// Writes one key into the ini. Returns false when the write did not take -
-      /// which is not fatal, but must stop filevalue being advanced.
+      /// Writes one key into a section of the ini. Returns false when the write did
+      /// not take - which is not fatal, but must stop filevalue being advanced.
       /// </summary>
-      static bool WriteIniValue_(const String &name, const String &value);
+      static bool WriteIniValue_(const String &section, const String &name, const String &value);
    };
 }

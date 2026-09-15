@@ -91,7 +91,7 @@ anything, and there is no function that enumerates them.
 | `hm_settings` row `backupdestination` | Where backups are written |
 | `hm_settings` rows `avclamwinexec`, `avclamwindb` | ClamWin's scanner and database |
 | `hm_settings` row `customvirusscannerexecutable` | An external scanner command line |
-| `hm_inisettings` | The whole `[Settings]` section, mirrored since schema 6011 |
+| `hm_inisettings` | Every setting the `[Settings]` section used to hold — the store itself since schema 6042, and therefore the copy that has to be corrected; the section in the INI is a cache the server rewrites from it at the next start |
 | `hm_archiveindex.archivepath` | One row per archived copy |
 | `hm_quarantine.quarantinefilename` | Held messages |
 | `hm_rule_actions.actionfilename` | A rule that runs a program or writes a file |
