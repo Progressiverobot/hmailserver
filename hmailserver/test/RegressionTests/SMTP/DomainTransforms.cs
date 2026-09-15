@@ -80,23 +80,35 @@ namespace RegressionTests.SMTP
             capture.StartListen();
 
             var route = _settings.Routes.Add();
-            route.DomainName = domainName;
-            route.TargetSMTPHost = "localhost";
-            route.TargetSMTPPort = capturePort;
-            route.NumberOfTries = 1;
-            route.MinutesBetweenTry = 5;
-            route.Save();
 
-            // Authenticated, because the default ranges require it for
-            // local-to-remote - and because a message relayed in from outside
-            // that merely claimed one of our domains must not get the footer,
-            // which is a rule this path would otherwise never exercise.
-            new SmtpClientSimulator().SendRaw(sender.Address, "test", sender.Address, recipient, message);
-            _application.SubmitEMail();
+            try
+            {
+               route.DomainName = domainName;
+               route.TargetSMTPHost = "localhost";
+               route.TargetSMTPPort = capturePort;
+               route.NumberOfTries = 1;
+               route.MinutesBetweenTry = 5;
+               route.Save();
 
-            capture.WaitForCompletion();
+               // Authenticated, because the default ranges require it for
+               // local-to-remote - and because a message relayed in from outside
+               // that merely claimed one of our domains must not get the footer,
+               // which is a rule this path would otherwise never exercise.
+               new SmtpClientSimulator().SendRaw(sender.Address, "test", sender.Address, recipient, message);
+               _application.SubmitEMail();
 
-            return capture.MessageData;
+               capture.WaitForCompletion();
+
+               return capture.MessageData;
+            }
+            finally
+            {
+               // Taken away again, because a test that sends twice would
+               // otherwise leave two routes for one domain and the second send
+               // would be aimed at the first listener, which has gone.
+               if (route.ID > 0)
+                  _settings.Routes.DeleteByDBID(route.ID);
+            }
          }
       }
 
