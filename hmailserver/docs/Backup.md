@@ -47,6 +47,7 @@ In the archive
 | Files sent as expiring links | `hm_files` | The bytes are already in the message store; this is the record that gives them a name, an owner and an expiry |
 | S/MIME certificates and keys | `hm_smimekeys` | Including the wrapped private key. This server cannot open it, so if a restore lost it nothing would fail — the account would simply never read its own encrypted mail again |
 | The password reuse history | `hm_passwordhistory` | So a restore does not let every account go back to a password it was made to change |
+| Who has written to the account before | `hm_knownsenders` | The memory the first-contact note is decided against, as of the backup. Without it a restore would announce every correspondent of every account as a first contact again — see [DomainTransforms.md](DomainTransforms.md) |
 | Calendars and their events and tasks | `hm_calendars`, `hm_calendarobjects` | Tombstones included, so a CalDAV client's next sync is answered correctly rather than being told nothing was ever deleted |
 
 The per-account stores are carried as rows under their account, in the archive's

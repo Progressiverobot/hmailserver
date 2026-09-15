@@ -145,11 +145,16 @@ because there is nothing for it to be unusual against — but the days after tha
 are noisy by construction. Microsoft 365's first-contact tip behaves the same way
 in a new tenant. Expect a week.
 
-**A restore from backup.** The table restores with the rest of the database, so
-the memory is as of the backup: senders who first wrote after it are forgotten
-and their next message is announced as a first contact again. One redundant note
-each; nothing is lost. A restore of the mail store *without* the database has no
-memory at all and behaves like a fresh installation.
+**A restore from backup.** The memory comes back with either kind of restore: a
+restore of the database, because it is a table in it, and the built-in restore,
+because the archive carries `hm_knownsenders` under each account beside the
+address book and the rest (see [Backup.md](Backup.md)). Either way the memory is
+as of the backup: senders who first wrote after it are forgotten and their next
+message is announced as a first contact again. One redundant note each; nothing
+is lost. A restore of the mail store alone — the message files put back with
+neither the database nor an archive — has no memory at all and behaves like a
+fresh installation, and so does restoring an archive written before the note
+existed, which has no memory to give back.
 
 The domain disclaimer
 ---------------------
@@ -239,3 +244,4 @@ Where the code is
 | `SMTP/SMTPConnection.cpp` | Where the disclaimer and the outgoing half of the memory are called. |
 | `test/RegressionTests/SMTP/DomainTransforms.cs` | The delivery tests. |
 | `test/RegressionTests/API/RestApiDomains.cs` | The REST round trip. |
+| `test/RegressionTests/Infrastructure/BackupAccountStores.cs` | The memory through a backup and a restore. |

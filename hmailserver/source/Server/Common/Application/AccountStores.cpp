@@ -71,6 +71,14 @@ namespace HM
       // account, and the calendar's identity is reassigned by the restore.
       { _T("hm_calendars"), 0 },
       { _T("hm_calendarobjects"), _T("hm_calendars") },
+
+      // Who has written to the account before (schema 6044): the memory the
+      // first-contact note is decided against. Losing it loses no mail, which is
+      // what makes it easy to leave out - but a restore that dropped it would put
+      // every account back to the cold start DomainTransforms.md describes, and
+      // announce every correspondent it has as a first contact until each of them
+      // had written again.
+      { _T("hm_knownsenders"), 0 },
    };
 
    const AccountStores::Column AccountStores::columns_[] =
@@ -151,6 +159,21 @@ namespace HM
       { _T("hm_calendarobjects"), _T("objectlast"),       AccountStores::RoleNumber },
       { _T("hm_calendarobjects"), _T("objectdeleted"),    AccountStores::RoleNumber },
       { _T("hm_calendarobjects"), _T("objectmodified"),   AccountStores::RoleNumber },
+
+      // The two times are RoleText, not RoleTimestamp, because they are not
+      // datetime columns: nvarchar(32) on SQL Server and SQL Server Compact,
+      // varchar(32) on MySQL and PostgreSQL, holding the string
+      // Time::GetCurrentDateTime() produced when PersistentKnownSender wrote the
+      // row. RoleText carries that string exactly as the database holds it.
+      // RoleTimestamp is for a column each backend renders its own way: it would
+      // parse the value, write it back re-formatted, and put the time of the
+      // restore in place of any value it could not parse.
+      { _T("hm_knownsenders"), _T("ksid"),           AccountStores::RoleIdentity },
+      { _T("hm_knownsenders"), _T("ksaccountid"),    AccountStores::RoleAccount },
+      { _T("hm_knownsenders"), _T("ksaddress"),      AccountStores::RoleText },
+      { _T("hm_knownsenders"), _T("kscount"),        AccountStores::RoleNumber },
+      { _T("hm_knownsenders"), _T("ksfirstseen"),    AccountStores::RoleText },
+      { _T("hm_knownsenders"), _T("kslastseen"),     AccountStores::RoleText },
    };
 
    // Per-account tables this file does NOT carry, and why. Every one of them is

@@ -21,8 +21,9 @@ namespace RegressionTests.Infrastructure
    ///    (hm_accountprefs), the messages it has put off (hm_scheduled), the large
    ///    files it has sent as links (hm_files), its S/MIME certificates and keys
    ///    (hm_smimekeys), the history that stops it reusing a password
-   ///    (hm_passwordhistory) and its calendar (hm_calendars, hm_calendarobjects) -
-   ///    and, on each message, the keywords the webmail calls labels.
+   ///    (hm_passwordhistory), its calendar (hm_calendars, hm_calendarobjects) and
+   ///    the memory of who has written to it before (hm_knownsenders) - and, on each
+   ///    message, the keywords the webmail calls labels.
    ///
    ///    Until 15 September 2026 not one of those was in the archive, and because
    ///    every one of those tables cascades from hm_accounts and a restore deletes
@@ -33,9 +34,10 @@ namespace RegressionTests.Infrastructure
    ///    was. Each of them fails on a build without AccountStores, which is the only
    ///    reason to trust them.
    ///
-   ///    The data is made through the REST and DAV listeners rather than by writing
-   ///    rows, so what is proved is what an account actually has rather than what a
-   ///    test put in a table.
+   ///    The data is made through the surfaces that really write it - the REST and
+   ///    DAV listeners, and for the first-contact memory a delivery - rather than by
+   ///    writing rows, so what is proved is what an account actually has rather than
+   ///    what a test put in a table.
    /// </summary>
    [TestFixture]
    public class BackupAccountStores : TestFixtureBase
@@ -45,6 +47,8 @@ namespace RegressionTests.Infrastructure
 
       private const string UserPassword = "Original-Passw0rd!";
       private const string AdminPassword = "testar";
+
+      private const string FirstContactHeader = "X-hMailServer-First-Contact";
 
       private string _backupDirectory;
       private string _address;
@@ -78,6 +82,8 @@ namespace RegressionTests.Infrastructure
       [TearDown]
       public void StopListeners()
       {
+         TurnTheFirstContactNoteOff();
+
          IniFileSetting.Write("WebServicesHttpPort", "0");
          // Put back whatever a test turned on, whether it reached its own last line
          // or not: a setting left behind here runs every fixture after this one.
@@ -328,6 +334,75 @@ namespace RegressionTests.Infrastructure
 
       }
 
+      // ------------------------------------------------------ hm_knownsenders
+
+      [Test]
+      [Description("hm_knownsenders: the memory the first-contact note is decided against survives a backup and a "
+                   + "restore, so a sender the account knew is not announced as a first contact again - while a "
+                   + "sender first seen after the backup still is")]
+      public void TheFirstContactMemoryComesBack()
+      {
+         // Nothing reads this table through an API, so it is proved by what it is
+         // for: whether a delivery carries the note.
+         const string known = "known@outside-stores.test";
+         const string late = "late@outside-stores.test";
+
+         string domainName = _domain.Name;
+
+         // Turned off again in TearDown, on whatever domain the restore left.
+         _domain.FirstContactTip = true;
+         _domain.Save();
+
+         // The account's first message ever. Remembered, not announced: a mailbox
+         // that remembers nobody has nothing for a sender to be unusual against.
+         // That rule is why the two deliveries after the restore are in the order
+         // they are.
+         SmtpClientSimulator.StaticSend(known, _address, "Before the backup", "Body");
+         StringAssert.DoesNotContain(FirstContactHeader,
+            Pop3ClientSimulator.AssertGetFirstMessageText(_address, UserPassword),
+            "The first message an account ever receives carries no note.");
+
+         RunBackup();
+
+         // A sender first seen AFTER the backup was taken, so absent from the archive.
+         // Announced, because the account already remembers the first sender - which
+         // is also what shows that the memory held that sender when the backup ran.
+         SmtpClientSimulator.StaticSend(late, _address, "After the backup", "Body");
+         StringAssert.Contains(FirstContactHeader,
+            Pop3ClientSimulator.AssertGetFirstMessageText(_address, UserPassword),
+            "A sender the account had never had mail from must be announced.");
+
+         DeleteAndRestore();
+
+         Assert.IsTrue(_application.Domains.ItemByName[domainName].FirstContactTip,
+            "The domain came back with the first-contact note off, so no delivery below could show anything.");
+
+         // THE ORDER OF THE NEXT TWO DELIVERIES IS WHAT MAKES THIS A TEST.
+         //
+         // The negative control first: the sender recorded after the backup is not in
+         // the archive, so the restored memory does not know them, and because that
+         // memory is not empty they are announced. On a build whose archive does not
+         // carry hm_knownsenders the restored account remembers nobody, this is the
+         // first message of a mailbox with no memory, it carries no note - and the
+         // test fails here.
+         SmtpClientSimulator.StaticSend(late, _address, "Late sender, after the restore", "Body");
+         StringAssert.Contains(FirstContactHeader,
+            Pop3ClientSimulator.AssertGetFirstMessageText(_address, UserPassword),
+            "A sender first seen after the backup is not in the archive and must be announced again. It was not, "
+            + "which means the restored account remembered nobody at all: hm_knownsenders did not come back.");
+
+         // And the sender the account knew when the backup was taken is not a first
+         // contact. On a build without the table in the archive this one is announced
+         // too, because by now that account remembers the late sender and nobody else.
+         // Asked the other way round, both would pass on that build: an empty memory
+         // announces nobody, and one delivery later it knows exactly one sender.
+         SmtpClientSimulator.StaticSend(known, _address, "Known sender, after the restore", "Body");
+         StringAssert.DoesNotContain(FirstContactHeader,
+            Pop3ClientSimulator.AssertGetFirstMessageText(_address, UserPassword),
+            "The restored account announced a sender it had had mail from before the backup, so the memory of "
+            + "who has written to it did not come back.");
+      }
+
       // --------------------------------------------------- a message's labels
 
       [Test]
@@ -394,7 +469,11 @@ namespace RegressionTests.Infrastructure
       private void BackupDeleteAndRestore()
       {
          RunBackup();
+         DeleteAndRestore();
+      }
 
+      private void DeleteAndRestore()
+      {
          // The disaster, exactly as a restore assumes it: everything gone. Every one
          // of these tables cascades from hm_accounts, so this is also what deletes
          // them - which is why a restore from an archive that does not carry them
@@ -414,6 +493,38 @@ namespace RegressionTests.Infrastructure
          backup.StartRestore();
 
          WaitForRestore(startTime);
+      }
+
+      /// <summary>
+      ///    The first-contact note is a domain setting, and once a restore has run the
+      ///    domain is no longer the object _domain holds - so it is turned off on
+      ///    whatever domains there are rather than through _domain. The next SetUp
+      ///    replaces the domain anyway; this is so that nothing a test here turned on
+      ///    outlives it, whether or not it reached its last line.
+      /// </summary>
+      private void TurnTheFirstContactNoteOff()
+      {
+         try
+         {
+            var domains = _application.Domains;
+
+            for (int index = 0; index < domains.Count; index++)
+            {
+               var domain = domains[index];
+
+               if (domain.FirstContactTip)
+               {
+                  domain.FirstContactTip = false;
+                  domain.Save();
+               }
+            }
+         }
+         catch (Exception tidying) when (!ExceptionPolicy.IsFatal(tidying))
+         {
+            // A restore that failed half way can leave domains nothing can save.
+            // Failing TearDown over that would replace the failure that matters.
+            Console.WriteLine("Could not turn the first-contact note off: " + tidying.Message);
+         }
       }
 
       private void RunBackup()

@@ -22,12 +22,13 @@ namespace HM
    // time a given address writes to a given account. The steady state is two
    // round trips per delivered copy.
    //
-   // After a restore from backup. The table restores with the rest of the
-   // database, so the memory is as of the backup: senders who first wrote after
-   // it are forgotten and their next message is announced as a first contact
-   // again. One redundant note each, and nothing is lost. A restore of the mail
-   // store without the database has no memory at all, which is the same as a
-   // fresh installation - see Result::NoMemoryYet.
+   // After a restore from backup. The table comes back with a restore of the
+   // database, and with the built-in restore, whose archive carries it under
+   // each account (AccountStores). Either way the memory is as of the backup:
+   // senders who first wrote after it are forgotten and their next message is
+   // announced as a first contact again. One redundant note each, and nothing is
+   // lost. A restore of the mail store alone has no memory at all, which is the
+   // same as a fresh installation - see Result::NoMemoryYet.
    class PersistentKnownSender
    {
    public:
