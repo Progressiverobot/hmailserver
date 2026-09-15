@@ -8,6 +8,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     FontFamily="Segoe UI Variable Text, Segoe UI"
     Title="{loc:L 'hMailServer Control Panel'}"
@@ -18,8 +19,13 @@
     WindowCornerPreference="Round"
     WindowStartupLocation="CenterScreen">
 
+    <!-- The shell, top to bottom: the title bar, the command bar, then the
+         sidebar beside the content. Every fixed size is a token
+         (Views/Scaffold/Tokens.xaml); docs/ControlPanelDesign.md describes the
+         frame the pages sit in. -->
     <Grid>
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -30,7 +36,107 @@
             </ui:TitleBar.Icon>
         </ui:TitleBar>
 
-        <Grid Grid.Row="1">
+        <!-- Command bar: the sidebar toggle and the brand on the left, the
+             search in the middle, the server's state, the theme and the
+             administrator's menu on the right. What the sidebar's footer used to
+             hold - the connection badge, the language and theme buttons - lives
+             here now, where every administration console keeps it. -->
+        <Grid Grid.Row="1" x:Name="CommandBar" Height="{StaticResource AppCommandBarHeight}" Margin="8,0,12,0"
+              AutomationProperties.AutomationId="command-bar">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- The tool tip and accessible name are owned by UpdateSidebarToggle_
+                 in code-behind, which points both at what a click will do. -->
+            <ui:Button x:Name="SidebarToggle" Grid.Column="0" Appearance="Transparent" Padding="8,6"
+                       Icon="{ui:SymbolIcon Navigation24}" VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="sidebar-toggle"
+                       Click="SidebarToggle_Click" />
+
+            <!-- Brand -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Center">
+                <Border Width="28" Height="28" CornerRadius="7" Background="{StaticResource BrandGradient}">
+                    <TextBlock Text="hM" FontWeight="SemiBold" FontSize="12" Foreground="White"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Text="hMailServer" FontWeight="SemiBold" FontSize="14" Margin="10,0,0,0"
+                           VerticalAlignment="Center" Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <TextBlock Text="{loc:L 'Control Panel'}" FontSize="12" Margin="6,1,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+            </StackPanel>
+
+            <!-- Search. A button drawn as a field, not a text box: what it opens
+                 is the palette, which is where the typing happens, and a box that
+                 handed its focus to a window as soon as it was clicked would be a
+                 box that lies about what it is. It was previously reachable only
+                 by knowing that Ctrl+K exists, which is not a discoverable
+                 interface; this is a normal tab stop that opens the same palette
+                 and names the shortcut while it does so. -->
+            <ui:Button x:Name="SearchButton" Grid.Column="2" Margin="24,0,24,0" MaxWidth="560"
+                       HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                       VerticalAlignment="Center" Padding="10,6"
+                       Background="{DynamicResource ControlFillColorDefaultBrush}"
+                       BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                       CornerRadius="{StaticResource AppControlCornerRadius}"
+                       Click="Search_Click"
+                       AutomationProperties.AutomationId="nav-search"
+                       AutomationProperties.Name="{loc:L 'Search pages, settings and tasks. Keyboard shortcut Control K.'}"
+                       ToolTip="{loc:L 'Search pages, settings and tasks (Ctrl+K)'}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ui:SymbolIcon Symbol="Search24" FontSize="14" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="1" Text="{loc:L 'Search'}" FontSize="14" Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    <TextBlock Grid.Column="2" Text="Ctrl+K" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </Grid>
+            </ui:Button>
+
+            <!-- The server's state, fed by ServerSession.LinkStateChanged and by
+                 sign-in: colour, shape and word, never colour alone, and the
+                 sentence "Connected to host as user" as its accessible name. -->
+            <scaffold:StatusPill x:Name="ServerStatusPill" Grid.Column="3" Margin="0,0,12,0"
+                                 AutomationProperties.AutomationId="server-status" />
+
+            <!-- The icon, tool tip and accessible name are owned by
+                 UpdateThemeToggle_ in code-behind, which points all three at the
+                 state a click will produce (sun while dark, moon while light) and
+                 re-points them when the OS flips the theme. The XAML icon is only
+                 a placeholder for the instant before ApplySavedTheme runs. -->
+            <ui:Button x:Name="ThemeButton" Grid.Column="4" Appearance="Transparent" Padding="8,6"
+                       Icon="{ui:SymbolIcon WeatherMoon24}" VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="theme-toggle"
+                       Click="Theme_Click" />
+
+            <!-- The administrator's menu: who is signed in and where, the server
+                 version, the language, the theme, and the About page. -->
+            <ui:Button x:Name="AdminButton" Grid.Column="5" Appearance="Transparent" Padding="8,6" Margin="4,0,0,0"
+                       Icon="{ui:SymbolIcon Person24}" VerticalAlignment="Center"
+                       AutomationProperties.AutomationId="admin-menu"
+                       AutomationProperties.Name="{loc:L 'Administrator menu'}"
+                       ToolTip="{loc:L 'Administrator menu'}"
+                       Click="Admin_Click">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="AdminName" FontSize="14" VerticalAlignment="Center" Visibility="Collapsed" />
+                    <ui:SymbolIcon Symbol="ChevronDown24" FontSize="12" Margin="6,1,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </StackPanel>
+            </ui:Button>
+        </Grid>
+
+        <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <!-- Sized by the longest group name, not by taste.
                      "Monitoring & troubleshooting" did not fit and was cut mid-word.
@@ -40,73 +146,29 @@
                      so the pane also gets the width to hold it. The star fraction is
                      what binds at ordinary window sizes; MaxWidth only stops the
                      pane running away on a very wide monitor, and MinWidth is what
-                     protects the content area on a narrow one. -->
-                <ColumnDefinition Width="0.28*" MinWidth="200" MaxWidth="320" />
+                     protects the content area on a narrow one. Collapsed to the
+                     rail, all three become AppRailWidth - see ApplySidebar_. -->
+                <ColumnDefinition x:Name="SidebarColumn" Width="0.28*" MinWidth="200" MaxWidth="320" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
             <!-- Sidebar -->
-            <Grid Grid.Column="0">
+            <Grid Grid.Column="0" Margin="0,4,0,0">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <!-- Brand -->
-                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="18,10,0,12">
-                    <Border Width="34" Height="34" CornerRadius="9" Background="{StaticResource BrandGradient}">
-                        <TextBlock Text="hM" FontWeight="SemiBold" FontSize="14" Foreground="White"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="hMailServer" FontWeight="SemiBold" FontSize="14"
-                                   Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                        <TextBlock Text="{loc:L 'Control Panel'}" FontSize="12" Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </StackPanel>
-                </StackPanel>
-
-                <!-- Search entry point. The palette was previously reachable only
-                     by knowing that Ctrl+K exists, which is not a discoverable
-                     interface; this is a normal tab stop that opens the same
-                     palette and names the shortcut while it does so. -->
-                <!-- HorizontalContentAlignment must be Stretch, not Left. Left makes
-                     the button shrink-wrap its content, which leaves the Grid below no
-                     width to distribute - so its star column collapses and the "Ctrl+K"
-                     hint sits flush against the word "Search" instead of at the far end
-                     of the button. On screen it read as one word: "SearchCtrl+K". -->
-                <ui:Button x:Name="SearchButton" Grid.Row="1" Margin="14,0,14,10"
-                           HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                           Padding="10,7" Click="Search_Click"
-                           AutomationProperties.AutomationId="nav-search"
-                           AutomationProperties.Name="{loc:L 'Search pages, settings and tasks. Keyboard shortcut Control K.'}"
-                           ToolTip="{loc:L 'Search pages, settings and tasks (Ctrl+K)'}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <ui:SymbolIcon Symbol="Search24" FontSize="14" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="{loc:L 'Search'}" FontSize="14" Margin="8,0,0,0"
-                                   VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                        <TextBlock Grid.Column="2" Text="Ctrl+K" FontSize="12" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                    </Grid>
-                </ui:Button>
-
                 <!-- Navigation tree. Built from Services/NavigationMap, which is
                      grouped by what an administrator is trying to achieve; the
                      structure is data so that it can be tested. -->
-                <TreeView x:Name="NavTree" Grid.Row="2" Background="Transparent" BorderThickness="0"
+                <TreeView x:Name="NavTree" Grid.Row="0" Background="Transparent" BorderThickness="0"
                           Margin="8,0" SelectedItemChanged="NavTree_SelectedItemChanged"
                           AutomationProperties.Name="{loc:L 'Main navigation'}"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <TreeView.ItemContainerStyle>
                         <Style TargetType="TreeViewItem">
-                            <Setter Property="Padding" Value="6,6" />
+                            <Setter Property="Padding" Value="6,0" />
                             <Setter Property="Margin" Value="0,1" />
                             <!-- Fluent Body (Typography.Body). The rows sat at 13
                                  through the ramp re-basing, a half-step off both
@@ -121,7 +183,12 @@
                                 <Setter.Value>
                                     <ControlTemplate TargetType="TreeViewItem">
                                         <StackPanel>
-                                            <Border x:Name="Bd" CornerRadius="6" Cursor="Hand"
+                                            <!-- One row is AppNavRowHeight; the radius, the
+                                                 hover fill and the selection pill are the
+                                                 tokens', so a row here and a row in the
+                                                 rail read as the same control. -->
+                                            <Border x:Name="Bd" CornerRadius="{StaticResource AppControlCornerRadius}" Cursor="Hand"
+                                                    MinHeight="{StaticResource AppNavRowHeight}"
                                                     Background="{TemplateBinding Background}" SnapsToDevicePixels="True"
                                                     BorderThickness="1.5" BorderBrush="Transparent">
                                                 <Grid>
@@ -129,9 +196,10 @@
                                                         <ColumnDefinition Width="18" />
                                                         <ColumnDefinition Width="*" />
                                                     </Grid.ColumnDefinitions>
-                                                    <Rectangle x:Name="Pill" Grid.Column="0" Width="3" Height="15"
+                                                    <Rectangle x:Name="Pill" Grid.Column="0" Width="3" Height="16"
                                                                RadiusX="1.5" RadiusY="1.5" HorizontalAlignment="Left"
-                                                               Margin="1,0,0,0" Fill="{StaticResource BrandBrush}" Opacity="0" />
+                                                               VerticalAlignment="Center"
+                                                               Margin="1,0,0,0" Fill="{DynamicResource AppBrandBrush}" Opacity="0" />
                                                     <ToggleButton x:Name="Expander" Grid.Column="0" ClickMode="Press"
                                                                   Style="{StaticResource NavExpanderToggle}"
                                                                   IsChecked="{Binding IsExpanded, RelativeSource={RelativeSource TemplatedParent}}" />
@@ -140,7 +208,10 @@
                                                                       Margin="{TemplateBinding Padding}" />
                                                 </Grid>
                                             </Border>
-                                            <ItemsPresenter x:Name="ItemsHost" Margin="10,0,0,0" />
+                                            <!-- Pages sit under their group's label, not under its
+                                                 glyph: the indent is the glyph column (16) plus its
+                                                 gap (10), so the two text columns line up. -->
+                                            <ItemsPresenter x:Name="ItemsHost" Margin="26,0,0,0" />
                                         </StackPanel>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsExpanded" Value="False">
@@ -174,56 +245,22 @@
                     </TreeView.ItemContainerStyle>
                 </TreeView>
 
-                <!-- Footer -->
-                <!-- A hairline between the scrolling navigation and this fixed
-                     footer. Without it the tree simply stops wherever the scroll
-                     position leaves it and the connection badge begins on the next
-                     line, so a half-scrolled item reads as bleeding into the status
-                     area rather than as a list that continues above. Windows puts a
-                     separator here for the same reason, and it costs one pixel. -->
-                <Border Grid.Row="3" BorderThickness="0,1,0,0" Margin="0,0,0,0"
-                        BorderBrush="{DynamicResource ControlElevationBorderBrush}"
-                        VerticalAlignment="Top" />
-                <StackPanel Grid.Row="3" Margin="18,10,18,14">
-                    <!-- The connection indicator. The dot was a literal #3FB950,
-                         which is the dark theme's success green painted regardless
-                         of theme: on a High Contrast desktop it is an off-palette
-                         green the user has told Windows not to show them, and it is
-                         the only thing on the window that says "connected" - the
-                         text beside it says "user @ host" and never says what the
-                         relationship is. The fill now follows AppSuccessBrush, which
-                         ThemeTokens recomputes from SystemColors under High
-                         Contrast, and ConnText carries the statement in words in its
-                         accessible name (set in OnConnected). -->
-                    <StackPanel x:Name="ConnBadge" Orientation="Horizontal" Visibility="Collapsed">
-                        <Ellipse Width="8" Height="8" Fill="{DynamicResource AppSuccessBrush}" VerticalAlignment="Center" />
-                        <TextBlock x:Name="ConnText" Margin="7,0,0,0" FontSize="12"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-                    </StackPanel>
-                    <Grid Margin="0,6,0,0">
-                        <TextBlock x:Name="VersionText" FontSize="12" Margin="15,4,0,0" VerticalAlignment="Center"
-                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
-                        <!-- The icon, tool tip and accessible name are owned by
-                             UpdateThemeToggle_ in code-behind, which points all
-                             three at the state a click will produce (sun while
-                             dark, moon while light) and re-points them when the
-                             OS flips the theme. The XAML icon is only a
-                             placeholder for the instant before ApplySavedTheme
-                             runs; a fixed DarkTheme24 here once sat on the
-                             button in both states, disagreeing with its verb
-                             half the time. -->
-                        <ui:Button x:Name="LanguageButton" Padding="7,3" Margin="0,0,38,0"
-                                   Icon="{ui:SymbolIcon Globe24}"
-                                   HorizontalAlignment="Right"
-                                   ToolTip="{loc:L 'Change the language'}"
-                                   AutomationProperties.Name="{loc:L 'Change the language'}"
-                                   Click="Language_Click" />
-                        <ui:Button x:Name="ThemeButton" Padding="7,3"
-                                   Icon="{ui:SymbolIcon WeatherMoon24}"
-                                   HorizontalAlignment="Right"
-                                   Click="Theme_Click" />
-                    </Grid>
-                </StackPanel>
+                <!-- The rail: the sidebar collapsed to one glyph per top-level
+                     group, built beside the tree from the same map (BuildNavRail_).
+                     Choosing a glyph expands the sidebar on that group. -->
+                <StackPanel x:Name="NavRail" Grid.Row="0" Visibility="Collapsed" Margin="0,2,0,0"
+                            AutomationProperties.Name="{loc:L 'Main navigation'}"
+                            AutomationProperties.AutomationId="nav-rail" />
+
+                <!-- Footer: the server's version, under a hairline. Without the line
+                     the tree simply stops wherever the scroll position leaves it and
+                     the footer begins on the next line, so a half-scrolled item reads
+                     as bleeding into it rather than as a list that continues above. -->
+                <Border x:Name="SidebarFooter" Grid.Row="1" BorderThickness="0,1,0,0" Padding="18,8,18,10"
+                        BorderBrush="{DynamicResource AppDividerBrush}">
+                    <TextBlock x:Name="VersionText" FontSize="12" TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                </Border>
             </Grid>
 
             <!-- Content -->
@@ -244,8 +281,8 @@
                          security is one question to the user and five pages to
                          us) without duplicating a page into two branches. -->
                     <Border x:Name="BreadcrumbBar" Grid.Row="0" Visibility="Collapsed"
-                            Padding="26,9,20,8" BorderThickness="0,0,0,1"
-                            BorderBrush="{DynamicResource ControlElevationBorderBrush}"
+                            Padding="24,8,20,8" BorderThickness="0,0,0,1"
+                            BorderBrush="{DynamicResource AppDividerBrush}"
                             AutomationProperties.AutomationId="breadcrumb-bar"
                             AutomationProperties.Name="{loc:L 'Location'}">
                         <Grid>
@@ -262,12 +299,14 @@
                         </Grid>
                     </Border>
 
+                    <!-- The pages own their padding (AppPagePadding) and their
+                         scrolling; the host only holds them. -->
                     <ContentControl x:Name="ContentHost" Grid.Row="1" AutomationProperties.Name="{loc:L 'Page content'}" />
                 </Grid>
             </Border>
         </Grid>
 
-        <ui:SnackbarPresenter Grid.Row="1" x:Name="RootSnackbar"
+        <ui:SnackbarPresenter Grid.Row="2" x:Name="RootSnackbar"
                               VerticalAlignment="Bottom" HorizontalAlignment="Center"
                               Margin="0,0,0,24" />
     </Grid>

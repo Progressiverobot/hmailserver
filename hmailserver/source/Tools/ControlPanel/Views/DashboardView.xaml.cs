@@ -300,11 +300,11 @@ namespace hMailServer.ControlPanel.Views
             lastProcessed_ = snap.ProcessedMessages;
             lastSampleUtc_ = nowUtc;
 
-            SubtitleText.Text = F("Live server statistics - last update {0}", nowLocal.ToLongTimeString());
+            Header.Subtitle = F("Live server statistics - last update {0}", nowLocal.ToLongTimeString());
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            SubtitleText.Text = L("Connection to the server lost.");
+            Header.Subtitle = L("Connection to the server lost.");
             timer_.Stop();
          }
       }
@@ -436,11 +436,10 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>The transient state before the first verdict: plain text, no
-      /// mark, because "checking" is not a status and must not borrow one.</summary>
+      /// pill, because "checking" is not a status and must not borrow one.</summary>
       private void ShowSetupChecking_()
       {
-         AttentionMark.Visibility = Visibility.Collapsed;
-         AttentionStateWord.Visibility = Visibility.Collapsed;
+         AttentionPill.Visibility = Visibility.Collapsed;
          AttentionSummary.Text = L("Checking what this server still needs done outside it…");
          AutomationProperties.SetName(AttentionSummary, AttentionSummary.Text);
          AttentionItems.Children.Clear();
@@ -505,17 +504,13 @@ namespace hMailServer.ControlPanel.Views
 
       /// <summary>Colour, shape AND word for the card's overall state - the same
       /// three channels every status badge in this application carries, so the
-      /// meaning survives greyscale, colour blindness and High Contrast.</summary>
+      /// meaning survives greyscale, colour blindness and High Contrast. The pill
+      /// draws all three from the level; the word is the checklist's own.</summary>
       private void SetAttentionHeader_(SetupItemState overall)
       {
-         StatusPresentation presentation = StatusSemantics.For(ExternalSetupChecks.LevelFor(overall));
-
-         ShapeMarkVisuals.ApplyMark(AttentionMark, presentation.Shape, presentation.BrushKey);
-         AttentionMark.Visibility = Visibility.Visible;
-
-         AttentionStateWord.Text = ExternalSetupChecks.StateWord(overall);
-         AttentionStateWord.SetResourceReference(TextBlock.ForegroundProperty, presentation.BrushKey);
-         AttentionStateWord.Visibility = Visibility.Visible;
+         AttentionPill.Level = ExternalSetupChecks.LevelFor(overall);
+         AttentionPill.Text = ExternalSetupChecks.StateWord(overall);
+         AttentionPill.Visibility = Visibility.Visible;
       }
 
       private static string SummaryText_(int action, int unknown, int total)

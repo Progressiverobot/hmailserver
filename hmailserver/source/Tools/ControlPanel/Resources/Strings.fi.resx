@@ -941,6 +941,9 @@ Control Panel voi lukea viestitiedostoja vain, kun se on käynnissä samalla kon
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Ylläpitokäyttöliittymän kieli (vain kolmannen osapuolen COM-työkalut)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Järjestelmänvalvojan valikko</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Ylläpitäjän salasana</value>
   </data>
@@ -1772,6 +1775,9 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
   <data name="Close the recipient list" xml:space="preserve">
     <value>Sulje vastaanottajaluettelo</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Pienennä navigointi</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Komentorivi (käytä %FILE%-merkintää tarkistettavalle tiedostolle)</value>
   </data>
@@ -1805,6 +1811,9 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
   <data name="Connect to server" xml:space="preserve">
     <value>Yhdistä palvelimeen</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Yhdistetty</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Yhdistetty palvelin: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Yhteys epäonnistui.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Yhteys katkesi</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Yhteys palautettu</value>
@@ -3031,6 +3043,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Suoritettavaa tiedostoa ei löytynyt: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Laajenna navigointi</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Odotettu yleisö (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="Loaded from server." xml:space="preserve">
     <value>Ladattu palvelimelta.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Ladataan…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Paikallinen _ulkoiseen (välitys ulos)</value>
   </data>
@@ -4721,6 +4739,9 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Ei vielä tarkistettu. Julkaise tietue, anna aikaa leviämiselle ja paina sitten "Tarkista DNS".</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Ei yhdistetty</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Ei kuuntele</value>
@@ -5661,6 +5682,9 @@ Aja tämä, jos asiakkaat raportoivat viestien näkyvän väärän UID:n alla, t
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Yhdistetty uudelleen kohteeseen {0} palvelun uudelleenkäynnistyksen jälkeen.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Yhdistetään uudelleen…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Tallenna kyseltävissä oleva viestin jäljitys</value>
@@ -8917,6 +8941,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_Ulkopuoliset lähettäjät saavat aina verkkotunnuksen tekstin, vaikka tilillä olisi oma</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Salasana</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>_Keskeytä</value>
   </data>
@@ -9024,6 +9051,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Lähetä kaikille täsmääville tileille</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>_Palvelin</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Kohde-SMTP-kone</value>

@@ -941,6 +941,9 @@ The Control Panel can only read message files when it runs on the same machine a
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Administrator UI language (third-party COM tools only)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Administrator menu</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Administrator password</value>
   </data>
@@ -1772,6 +1775,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   <data name="Close the recipient list" xml:space="preserve">
     <value>Close the recipient list</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Collapse the navigation</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Command line (use %FILE% for the scanned file)</value>
   </data>
@@ -1805,6 +1811,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   <data name="Connect to server" xml:space="preserve">
     <value>Connect to server</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Connected</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Connected server: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Connection failed.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Connection lost</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Connection restored</value>
@@ -3031,6 +3043,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Executable not found: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Expand the navigation</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Expected audience (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="Loaded from server." xml:space="preserve">
     <value>Loaded from server.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Loading…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Local to _external (relay out)</value>
   </data>
@@ -4721,6 +4739,9 @@ The verified installer is handed to the update helper: the service stops, the ne
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Not checked yet. Publish the record, allow time for propagation, then press "Check DNS".</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Not connected</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Not listening</value>
@@ -5661,6 +5682,9 @@ Run this if clients report messages appearing under the wrong UID, or after rest
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Reconnected to {0} after the service restarted.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Reconnecting…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Record a queryable message trace</value>
@@ -8917,6 +8941,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_Outside senders always get the domain's text, even when the account has its own</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Password</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>_Pause</value>
   </data>
@@ -9024,6 +9051,9 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Send to all matching accounts</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>_Server</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Target SMTP host</value>

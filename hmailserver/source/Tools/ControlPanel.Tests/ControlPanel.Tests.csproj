@@ -36,6 +36,14 @@
     <Compile Include="..\ControlPanel\Services\ChartCatalog.cs" />
     <Compile Include="..\ControlPanel\Services\ChartDataTable.cs" />
     <Compile Include="..\ControlPanel\Services\StatusSemantics.cs" />
+    <!-- The design tokens and the server status pill's vocabulary. The numbers,
+         the High Contrast derivation and the colour-vision separation of the
+         information colour are decided in DesignTokens; the pill's word and
+         severity per link state in ConnectionStatus. Both are plain data and
+         pure functions, and both are what the page waves code against. -->
+    <Compile Include="..\ControlPanel\Services\DesignTokens.cs" />
+    <Compile Include="..\ControlPanel\Services\ConnectionStatus.cs" />
+    <Compile Include="..\ControlPanel\Services\Typography.cs" />
     <Compile Include="..\ControlPanel\Services\SpamPipeline.cs" />
     <!-- Same arrangement, for the same reason: the account comparison and the
          command-line parsing behind the service-account check are pure, and both

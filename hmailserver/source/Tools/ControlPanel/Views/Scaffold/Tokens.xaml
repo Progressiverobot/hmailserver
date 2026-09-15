@@ -1,0 +1,112 @@
+<!--
+  https://www.progressiverobot.com
+  Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<!-- The design tokens, as resources. The numbers are the ones in
+     Services/DesignTokens.cs, which is where they are decided and tested; the
+     brushes are declared here with their dark values so that every token exists
+     from the first parse, and Services/ThemeTokens.cs republishes each brush on
+     the application's own dictionary for the theme in force - light, dark or
+     High Contrast - which shadows the declaration below. Every key here is named
+     in docs/ControlPanelDesign.md, and a test holds the two lists equal. -->
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Spacing scale: 4, 8, 12, 16, 24, 32. -->
+    <sys:Double x:Key="AppSpaceXs">4</sys:Double>
+    <sys:Double x:Key="AppSpaceSm">8</sys:Double>
+    <sys:Double x:Key="AppSpaceMd">12</sys:Double>
+    <sys:Double x:Key="AppSpaceLg">16</sys:Double>
+    <sys:Double x:Key="AppSpaceXl">24</sys:Double>
+    <sys:Double x:Key="AppSpaceXxl">32</sys:Double>
+
+    <!-- The scale applied: the margins and paddings a page uses by name. -->
+    <Thickness x:Key="AppPagePadding">24,20,24,24</Thickness>
+    <Thickness x:Key="AppCardPadding">20,16</Thickness>
+    <Thickness x:Key="AppHeaderGap">0,0,0,16</Thickness>
+    <Thickness x:Key="AppCardGap">0,0,0,12</Thickness>
+    <Thickness x:Key="AppFieldGap">0,0,0,12</Thickness>
+    <Thickness x:Key="AppSectionGap">0,0,0,24</Thickness>
+
+    <!-- Corner radii: controls and rows, cards and dialogs, capsules. -->
+    <CornerRadius x:Key="AppControlCornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="AppCardCornerRadius">8</CornerRadius>
+    <CornerRadius x:Key="AppPillCornerRadius">999</CornerRadius>
+
+    <!-- The shell's fixed dimensions. -->
+    <sys:Double x:Key="AppCommandBarHeight">48</sys:Double>
+    <sys:Double x:Key="AppRailWidth">48</sys:Double>
+    <sys:Double x:Key="AppNavRowHeight">34</sys:Double>
+
+    <!-- The type ramp (Services/Typography.cs): Caption 12, Body 14, Subtitle 20, Title 28. -->
+    <sys:Double x:Key="AppFontSizeCaption">12</sys:Double>
+    <sys:Double x:Key="AppFontSizeBody">14</sys:Double>
+    <sys:Double x:Key="AppFontSizeSubtitle">20</sys:Double>
+    <sys:Double x:Key="AppFontSizeTitle">28</sys:Double>
+
+    <!-- The ramp as keyed TextBlock styles. Keyed, never implicit: an implicit
+         TextBlock style reaches into every control template and overrides the
+         on-accent text (see the note in App.xaml). -->
+    <Style x:Key="TextTitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeTitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+    </Style>
+
+    <Style x:Key="TextSubtitle" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeSubtitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="TextBodyStrong" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeBody}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="TextBody" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeBody}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="TextSecondary" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeBody}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="TextCaption" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeCaption}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <Style x:Key="TextCaptionTertiary" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="{StaticResource AppFontSizeCaption}" />
+        <Setter Property="Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!-- The status palette and the surfaces: dark values here, the theme's
+         values from ThemeTokens.Refresh. Reference them with DynamicResource,
+         never StaticResource, or the theme change is missed. -->
+    <SolidColorBrush x:Key="AppBrandBrush" Color="#4C8DFF" />
+    <SolidColorBrush x:Key="AppSuccessBrush" Color="#3FB950" />
+    <SolidColorBrush x:Key="AppWarningBrush" Color="#D29922" />
+    <SolidColorBrush x:Key="AppDangerBrush" Color="#F85149" />
+    <SolidColorBrush x:Key="AppInfoBrush" Color="#A371F7" />
+    <SolidColorBrush x:Key="AppNeutralBrush" Color="#9DA7B0" />
+    <SolidColorBrush x:Key="AppCardBackgroundBrush" Color="#0FFFFFFF" />
+    <SolidColorBrush x:Key="AppCardBorderBrush" Color="#14FFFFFF" />
+    <SolidColorBrush x:Key="AppCardHoverBrush" Color="#15FFFFFF" />
+    <SolidColorBrush x:Key="AppDividerBrush" Color="#14FFFFFF" />
+    <sys:Double x:Key="AppNoticeTintOpacity">0.12</sys:Double>
+</ResourceDictionary>

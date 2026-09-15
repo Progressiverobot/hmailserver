@@ -160,6 +160,23 @@ LOCALISED = {
    "Views/MessageViewerDialog.cs",
    "Views/TotpPromptDialog.cs",
    "Views/FieldDialog.cs",
+   "Views/Scaffold/Scaffold.xaml",
+   "Views/Scaffold/Tokens.xaml",
+   "Views/Scaffold/ScaffoldControl.cs",
+   "Views/Scaffold/PageHeader.cs",
+   "Views/Scaffold/Card.cs",
+   "Views/Scaffold/Toolbar.cs",
+   "Views/Scaffold/EmptyState.cs",
+   "Views/Scaffold/LoadingState.cs",
+   "Views/Scaffold/InlineNotice.cs",
+   "Views/Scaffold/StatusPill.cs",
+   "Views/Scaffold/FieldRow.cs",
+   "Views/Scaffold/SettingsSection.cs",
+   "Views/Scaffold/DialogFrame.cs",
+   "Views/FluentDialogWindow.cs",
+   "Services/DesignTokens.cs",
+   "Services/ConnectionStatus.cs",
+   "Services/ThemeTokens.cs",
 }
 
 # Literal texts that are the same in every language and are not captions to

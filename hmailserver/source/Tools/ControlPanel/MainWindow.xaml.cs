@@ -29,7 +29,18 @@ namespace hMailServer.ControlPanel
       /// </summary>
       private const string PaletteUsageValue = "PaletteUsage";
 
+      /// <summary>
+      /// Where the administrator's choice to collapse the sidebar is kept. A
+      /// per-user convenience like the window bounds beside it; the window also
+      /// collapses the sidebar on its own below DesignTokens.Shell.CollapseSidebarBelow,
+      /// and that is not recorded, because it is the window's size that decided it.
+      /// </summary>
+      private const string SidebarCollapsedValue = "SidebarCollapsed";
+
       private readonly Dictionary<string, UserControl> pageCache_ = new();
+      private readonly List<RadioButton> railItems_ = new();
+      private bool sidebarCollapsedByUser_;
+      private bool railShowing_;
       private readonly Dictionary<string, Func<UserControl>> pageFactories_ = new();
       private PaletteUsage paletteUsage_ = new();
       private string currentPage_;
@@ -63,9 +74,13 @@ namespace hMailServer.ControlPanel
          LoadPaletteUsage();
          RegisterPages();
          BuildNavTree();
+         BuildNavRail_();
+         LoadSidebarPreference_();
 
          NavTree.IsEnabled = false;
+         NavRail.IsEnabled = false;
          SearchButton.IsEnabled = false;
+         ShowLinkState_(LinkState.NotConnected);
          ContentHost.Content = new ConnectView(OnConnected);
 
          Closing += (s, e) => SaveWindowBounds();
@@ -73,6 +88,13 @@ namespace hMailServer.ControlPanel
 
          ServerSession.Reconnected += OnSessionReconnected;
          Closing += (s, e) => ServerSession.Reconnected -= OnSessionReconnected;
+
+         ServerSession.LinkStateChanged += OnLinkStateChanged;
+         Closing += (s, e) => ServerSession.LinkStateChanged -= OnLinkStateChanged;
+
+         // The sidebar follows the window's width: below the threshold it is the
+         // rail whatever the administrator chose, above it their choice stands.
+         SizeChanged += (s, e) => ApplySidebar_();
 
          // Covers every way the theme can change after ApplySavedTheme's own
          // explicit call: the toggle button, and the OS switching while the
@@ -307,6 +329,165 @@ namespace hMailServer.ControlPanel
             item.Items.Add(BuildNavItem(child));
 
          return item;
+      }
+
+      /// <summary>
+      /// The rail: one glyph per top-level group, from the same map the tree is
+      /// built from and in the same order, so the collapsed sidebar is the
+      /// expanded one with its words folded away and not a second navigation.
+      /// A group without a glyph gets its initial, so no group disappears when
+      /// the sidebar collapses. Choosing a glyph expands the sidebar on that
+      /// group; the page on screen is never changed by the rail.
+      /// </summary>
+      private void BuildNavRail_()
+      {
+         NavRail.Children.Clear();
+         railItems_.Clear();
+
+         foreach (NavNode node in NavigationMap.Roots)
+         {
+            object glyph = null;
+            if (!string.IsNullOrEmpty(node.Icon) && System.Enum.TryParse(node.Icon, out Wpf.Ui.Controls.SymbolRegular symbol))
+               glyph = new Wpf.Ui.Controls.SymbolIcon(symbol) { FontSize = 18 };
+
+            glyph ??= new TextBlock
+            {
+               Text = L(node.Title).Length > 0 ? L(node.Title).Substring(0, 1) : "",
+               FontSize = Typography.Body,
+               FontWeight = FontWeights.SemiBold
+            };
+
+            var item = new RadioButton { Tag = glyph, GroupName = "nav-rail", ToolTip = L(node.Title) };
+            item.SetResourceReference(StyleProperty, "NavRailItem");
+            System.Windows.Automation.AutomationProperties.SetName(item, L(node.Title));
+            System.Windows.Automation.AutomationProperties.SetAutomationId(item, "navrail-" + NavigationMap.Slug(node.Title));
+            if (!string.IsNullOrEmpty(node.Purpose))
+               System.Windows.Automation.AutomationProperties.SetHelpText(item, L(node.Purpose));
+
+            // A top-level page (the welcome page, the dashboard) has no group to
+            // reveal: its glyph opens it, and the rail stays as it is.
+            string title = node.Title;
+            string page = node.IsPage ? node.Key : null;
+            item.Click += (s, e) =>
+            {
+               if (page != null)
+               {
+                  NavigateTo(page);
+                  return;
+               }
+
+               sidebarCollapsedByUser_ = false;
+               SaveSidebarPreference_();
+               ApplySidebar_();
+               RevealGroup(title);
+            };
+
+            railItems_.Add(item);
+            NavRail.Children.Add(item);
+         }
+      }
+
+      /// <summary>Marks the rail glyph of the group the page on screen lives in.</summary>
+      private void UpdateRail_(string key)
+      {
+         IReadOnlyList<NavNode> trail = NavigationMap.PathTo(key);
+         string group = trail.Count > 0 ? L(trail[0].Title) : null;
+
+         foreach (RadioButton item in railItems_)
+            item.IsChecked = group != null && string.Equals(item.ToolTip as string, group, StringComparison.Ordinal);
+      }
+
+      /// <summary>
+      /// Shows the tree or the rail. The rail whenever the window is narrower
+      /// than the threshold, or the administrator collapsed the sidebar; the
+      /// tree otherwise. The column's three widths move together, because a
+      /// star width with the old MinWidth would hold the rail open.
+      /// </summary>
+      private void ApplySidebar_()
+      {
+         bool rail = sidebarCollapsedByUser_ || ActualWidth < DesignTokens.Shell.CollapseSidebarBelow;
+
+         if (rail == railShowing_ && IsLoaded)
+            return;
+
+         railShowing_ = rail;
+
+         if (rail)
+         {
+            SidebarColumn.MinWidth = DesignTokens.Shell.RailWidth;
+            SidebarColumn.MaxWidth = DesignTokens.Shell.RailWidth;
+            SidebarColumn.Width = new GridLength(DesignTokens.Shell.RailWidth);
+         }
+         else
+         {
+            SidebarColumn.MaxWidth = DesignTokens.Shell.SidebarMaxWidth;
+            SidebarColumn.MinWidth = DesignTokens.Shell.SidebarMinWidth;
+            SidebarColumn.Width = new GridLength(0.28, GridUnitType.Star);
+         }
+
+         NavTree.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;
+         NavRail.Visibility = rail ? Visibility.Visible : Visibility.Collapsed;
+         SidebarFooter.Visibility = rail ? Visibility.Collapsed : Visibility.Visible;
+
+         UpdateSidebarToggle_();
+      }
+
+      /// <summary>
+      /// Points the sidebar toggle at what a click will do, in the tool tip and
+      /// the accessible name alike - the same rule as the theme toggle.
+      /// </summary>
+      private void UpdateSidebarToggle_()
+      {
+         string action = railShowing_ ? L("Expand the navigation") : L("Collapse the navigation");
+         SidebarToggle.ToolTip = action;
+         System.Windows.Automation.AutomationProperties.SetName(SidebarToggle, action);
+      }
+
+      private void SidebarToggle_Click(object sender, RoutedEventArgs e)
+      {
+         // Toggling from the state on screen, not from the stored choice: on a
+         // narrow window the rail is showing whatever was chosen, and a click
+         // there must open the sidebar, not record a collapse nobody can see.
+         sidebarCollapsedByUser_ = !railShowing_;
+
+         if (!sidebarCollapsedByUser_ && ActualWidth < DesignTokens.Shell.CollapseSidebarBelow
+             && WindowState == WindowState.Normal)
+         {
+            // Too narrow for the tree: widen the window to the threshold rather
+            // than leave a click that does nothing.
+            Width = Math.Max(Width, DesignTokens.Shell.CollapseSidebarBelow);
+         }
+
+         SaveSidebarPreference_();
+         ApplySidebar_();
+      }
+
+      private void LoadSidebarPreference_()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.OpenSubKey(RegistryPath);
+            sidebarCollapsedByUser_ = string.Equals(key?.GetValue(SidebarCollapsedValue) as string, "1", StringComparison.Ordinal);
+         }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+         {
+            sidebarCollapsedByUser_ = false;
+         }
+
+         ApplySidebar_();
+      }
+
+      private void SaveSidebarPreference_()
+      {
+         try
+         {
+            using RegistryKey key = Registry.CurrentUser.CreateSubKey(RegistryPath);
+            key?.SetValue(SidebarCollapsedValue, sidebarCollapsedByUser_ ? "1" : "0");
+         }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+         {
+            // Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding.
+         }
       }
 
       private IEnumerable<TreeViewItem> AllLeaves(ItemCollection items)
@@ -618,9 +799,10 @@ namespace hMailServer.ControlPanel
             // and return to the connect screen instead of revealing the UI.
             connected_ = false;
             NavTree.IsEnabled = false;
+            NavRail.IsEnabled = false;
             SearchButton.IsEnabled = false;
             BreadcrumbBar.Visibility = Visibility.Collapsed;
-            ConnBadge.Visibility = Visibility.Collapsed;
+            ShowLinkState_(LinkState.NotConnected);
             currentPage_ = null;
             ContentHost.Content = new ConnectView(OnConnected);
             return;
@@ -628,17 +810,14 @@ namespace hMailServer.ControlPanel
 
          connected_ = true;
          NavTree.IsEnabled = true;
+         NavRail.IsEnabled = true;
          SearchButton.IsEnabled = true;
 
-         ConnBadge.Visibility = Visibility.Visible;
-         ConnText.Text = ServerSession.Current.UserName + " @ " + ServerSession.Current.Host;
-
          // "admin @ mail.example.test" is a fact, not a statement: nothing in it
-         // says that this is a live connection. That was carried entirely by the
-         // green dot beside it, which is information conveyed by colour alone and
-         // reaches a screen reader not at all - an Ellipse has no automation peer.
-         System.Windows.Automation.AutomationProperties.SetName(ConnText,
-            F("Connected to {0} as {1}", ServerSession.Current.Host, ServerSession.Current.UserName));
+         // says that this is a live connection. The pill says so in colour, shape
+         // and word, and carries "Connected to host as user" as its accessible
+         // name; the administrator's name on the menu button is the fact.
+         ShowLinkState_(LinkState.Connected);
 
          try
          {
@@ -677,6 +856,43 @@ namespace hMailServer.ControlPanel
          {
             automaticNavigation_ = false;
          }
+      }
+
+      /// <summary>
+      /// Puts one link state on the pill and the menu button: the level and the
+      /// word from ConnectionStatus (colour, shape and word - never colour
+      /// alone), the host and the account as the accessible name.
+      /// </summary>
+      private void ShowLinkState_(LinkState state)
+      {
+         ServerSession session = ServerSession.Current;
+         string host = state == LinkState.NotConnected ? null : session?.Host;
+         string user = state == LinkState.NotConnected ? null : session?.UserName;
+         string sentence = ConnectionStatus.Describe(state, host, user);
+
+         ServerStatusPill.Level = ConnectionStatus.LevelFor(state);
+         ServerStatusPill.Text = ConnectionStatus.WordFor(state);
+         ServerStatusPill.ToolTip = sentence;
+         System.Windows.Automation.AutomationProperties.SetName(ServerStatusPill, sentence);
+
+         AdminName.Text = user ?? "";
+         AdminName.Visibility = string.IsNullOrEmpty(user) ? Visibility.Collapsed : Visibility.Visible;
+      }
+
+      /// <summary>
+      /// The session's own report of its link, from inside whichever COM call
+      /// found it gone - possibly on another thread - so it is deferred to the
+      /// message loop and ignored once the shell is back on the sign-in page.
+      /// </summary>
+      private void OnLinkStateChanged(ServerSession session, LinkState state)
+      {
+         Dispatcher.BeginInvoke(new Action(() =>
+         {
+            if (!connected_ || !ReferenceEquals(session, ServerSession.Current))
+               return;
+
+            ShowLinkState_(state);
+         }));
       }
 
       /// <summary>
@@ -758,6 +974,7 @@ namespace hMailServer.ControlPanel
          // Before the page is entered, so that a page whose OnEnter throws still
          // leaves the user able to see where they are and get back out.
          UpdateBreadcrumb(key);
+         UpdateRail_(key);
 
          // Only pages the user chose. OnConnected navigates to the dashboard on every
          // launch, so counting that visit made "Most used" report the dashboard at the
@@ -964,30 +1181,65 @@ namespace hMailServer.ControlPanel
          => UpdateThemeToggle_();
 
       /// <summary>
-      /// The language menu: one entry per catalogue plus "whatever Windows shows",
-      /// the current one ticked. Choosing another restarts the Control Panel
-      /// (LanguageChoice says why); the same choice is offered on the sign-in
-      /// screen, which is where somebody who cannot read the current language
-      /// needs it most.
+      /// The administrator's menu: who is signed in and where and the server's
+      /// version (as facts, not commands), then the language - one entry per
+      /// catalogue plus "whatever Windows shows", the current one ticked;
+      /// choosing another restarts the Control Panel (LanguageChoice says why),
+      /// and the same choice is offered on the sign-in screen, which is where
+      /// somebody who cannot read the current language needs it most - then the
+      /// theme, then the About page.
       /// </summary>
-      private void Language_Click(object sender, RoutedEventArgs e)
+      private void Admin_Click(object sender, RoutedEventArgs e)
       {
          var menu = new ContextMenu
          {
-            PlacementTarget = LanguageButton,
-            Placement = System.Windows.Controls.Primitives.PlacementMode.Top
+            PlacementTarget = AdminButton,
+            Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
          };
 
-         foreach (MenuItem item in Loc.Languages.Select(language => new MenuItem
+         ServerSession session = ServerSession.Current;
+         if (connected_ && session != null)
          {
-            Header = L(language.NativeName),
+            menu.Items.Add(new MenuItem
+            {
+               Header = F("Connected to {0} as {1}", session.Host, session.UserName),
+               IsEnabled = false
+            });
+
+            if (VersionText.Text.Length > 0)
+               menu.Items.Add(new MenuItem { Header = VersionText.Text, IsEnabled = false });
+
+            menu.Items.Add(new Separator());
+         }
+
+         var language = new MenuItem { Header = L("Change the language") };
+         foreach (MenuItem item in Loc.Languages.Select(candidate => new MenuItem
+         {
+            Header = L(candidate.NativeName),
             IsCheckable = true,
-            IsChecked = string.Equals(language.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase),
-            Tag = language.Tag
+            IsChecked = string.Equals(candidate.Tag, LanguageChoice.Stored, StringComparison.OrdinalIgnoreCase),
+            Tag = candidate.Tag
          }))
          {
             item.Click += (s, args) => LanguageChoice.Offer((string)((MenuItem)s).Tag);
-            menu.Items.Add(item);
+            language.Items.Add(item);
+         }
+         menu.Items.Add(language);
+
+         if (!Services.ThemeTokens.IsHighContrast)
+         {
+            bool dark = ApplicationThemeManager.GetAppTheme() == ApplicationTheme.Dark;
+            var theme = new MenuItem { Header = dark ? L("Switch to the light theme") : L("Switch to the dark theme") };
+            theme.Click += Theme_Click;
+            menu.Items.Add(theme);
+         }
+
+         if (connected_)
+         {
+            menu.Items.Add(new Separator());
+            var about = new MenuItem { Header = L(NavigationMap.TitleOf("about")) };
+            about.Click += (s, args) => NavigateTo("about");
+            menu.Items.Add(about);
          }
 
          menu.IsOpen = true;

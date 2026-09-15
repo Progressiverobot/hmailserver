@@ -16,6 +16,10 @@
             <ResourceDictionary.MergedDictionaries>
                 <ui:ThemesDictionary Theme="Dark" />
                 <ui:ControlsDictionary />
+                <!-- The design system: the tokens (Views/Scaffold/Tokens.xaml,
+                     merged inside) and the scaffold components' templates.
+                     docs/ControlPanelDesign.md names every token and component. -->
+                <ResourceDictionary Source="/hMailCP;component/Views/Scaffold/Scaffold.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
             <!-- Brand accents -->
@@ -72,38 +76,40 @@
                 </Setter>
             </Style>
 
-            <!-- Sidebar navigation item -->
-            <Style x:Key="NavItem" TargetType="RadioButton">
+            <!-- A rail item: the sidebar collapsed to icons shows one of these
+                 per top-level group, the group's glyph in its Tag, the brand pill on
+                 the left when the page on screen lives in that group. -->
+            <Style x:Key="NavRailItem" TargetType="RadioButton">
                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
-                <Setter Property="FontSize" Value="13.5" />
-                <Setter Property="Height" Value="38" />
-                <Setter Property="Margin" Value="8,1" />
+                <Setter Property="Width" Value="40" />
+                <Setter Property="Height" Value="40" />
+                <Setter Property="Margin" Value="4,1" />
                 <Setter Property="Cursor" Value="Hand" />
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="RadioButton">
-                            <Border x:Name="Bg" CornerRadius="6" Background="Transparent" Padding="10,0">
+                            <Border x:Name="Bg" CornerRadius="{DynamicResource AppControlCornerRadius}" Background="Transparent"
+                                    BorderThickness="1.5" BorderBrush="Transparent" SnapsToDevicePixels="True">
                                 <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="26" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
                                     <Rectangle x:Name="Pill" Width="3" Height="16" RadiusX="1.5" RadiusY="1.5"
-                                               HorizontalAlignment="Left" Margin="-10,0,0,0"
-                                               Fill="{StaticResource BrandBrush}" Opacity="0" />
-                                    <ContentPresenter x:Name="Icon" Grid.Column="0" Content="{TemplateBinding Tag}"
-                                                      VerticalAlignment="Center" />
-                                    <ContentPresenter Grid.Column="1" VerticalAlignment="Center" Margin="6,0,0,0" />
+                                               HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,0,0,0"
+                                               Fill="{DynamicResource AppBrandBrush}" Opacity="0" />
+                                    <ContentPresenter Content="{TemplateBinding Tag}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 </Grid>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
                                     <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="Bg" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
                                     <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                                     <Setter TargetName="Pill" Property="Opacity" Value="1" />
+                                </Trigger>
+                                <Trigger Property="IsKeyboardFocused" Value="True">
+                                    <Setter TargetName="Bg" Property="BorderBrush" Value="{DynamicResource AppBrandBrush}" />
                                 </Trigger>
                                 <Trigger Property="IsEnabled" Value="False">
                                     <Setter Property="Opacity" Value="0.4" />
@@ -114,13 +120,15 @@
                 </Setter>
             </Style>
 
-            <!-- Settings card -->
+            <!-- Settings card: the plain surface, for the pages not yet on the
+                 scaffold's Card component. Same tokens as the component, so the
+                 two are one surface. -->
             <Style x:Key="Card" TargetType="Border">
-                <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
-                <Setter Property="BorderBrush" Value="{DynamicResource ControlElevationBorderBrush}" />
+                <Setter Property="Background" Value="{DynamicResource AppCardBackgroundBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource AppCardBorderBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
-                <Setter Property="CornerRadius" Value="8" />
-                <Setter Property="Padding" Value="20,16" />
+                <Setter Property="CornerRadius" Value="{DynamicResource AppCardCornerRadius}" />
+                <Setter Property="Padding" Value="{DynamicResource AppCardPadding}" />
             </Style>
 
             <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -337,6 +345,23 @@
                 <Setter Property="BorderBrush" Value="{DynamicResource ControlElevationBorderBrush}" />
                 <Setter Property="HorizontalContentAlignment" Value="Left" />
                 <Setter Property="SeparatorVisibility" Value="Collapsed" />
+            </Style>
+
+            <Style TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+                <Setter Property="GridLinesVisibility" Value="None" />
+                <Setter Property="HeadersVisibility" Value="Column" />
+                <Setter Property="RowHeaderWidth" Value="0" />
+                <Setter Property="CanUserResizeRows" Value="False" />
+                <Setter Property="MinRowHeight" Value="{DynamicResource AppNavRowHeight}" />
+                <Setter Property="SelectionUnit" Value="FullRow" />
+            </Style>
+
+            <!-- A number column's header, right-aligned over its right-aligned
+                 cells (GridNumberText, in Scaffold.xaml, is the cells' style). -->
+            <Style x:Key="GridNumberHeader" TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                <Setter Property="HorizontalContentAlignment" Value="Right" />
             </Style>
 
             <Style TargetType="DataGridRow">

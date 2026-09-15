@@ -941,6 +941,9 @@ Kontrollpanelen kan bara läsa meddelandefiler när den körs på samma dator so
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Administratörens gränssnittsspråk (bara COM-verktyg från tredje part)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Administratörsmeny</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Administratörslösenord</value>
   </data>
@@ -1772,6 +1775,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   <data name="Close the recipient list" xml:space="preserve">
     <value>Stäng mottagarlistan</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Fäll ihop navigeringen</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Kommandorad (använd %FILE% för filen som skannas)</value>
   </data>
@@ -1805,6 +1811,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   <data name="Connect to server" xml:space="preserve">
     <value>Anslut till server</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Ansluten</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Ansluten server: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Anslutningen misslyckades.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Anslutningen bröts</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Anslutningen återupprättad</value>
@@ -3031,6 +3043,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Körbar fil hittades inte: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Fäll ut navigeringen</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Förväntad mottagare (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Loaded from server." xml:space="preserve">
     <value>Läst från servern.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Läser in…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Lokalt till _externt (relä ut)</value>
   </data>
@@ -4721,6 +4739,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Inte kontrollerad ännu. Publicera posten, ge tid för spridning, och tryck sedan på "Kontrollera DNS".</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Inte ansluten</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Lyssnar inte</value>
@@ -5661,6 +5682,9 @@ Kör detta om klienter rapporterar meddelanden som dyker upp under fel UID, elle
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Återansluten till {0} efter att tjänsten startade om.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Ansluter igen…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Registrera en sökbar meddelandespårning</value>
@@ -8917,6 +8941,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_Utomstående avsändare får alltid domänens text, även när kontot har en egen</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Lösenord</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>_Pausa</value>
   </data>
@@ -9024,6 +9051,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Skicka till alla matchande konton</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>Ser_ver</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Målvärd för SMTP</value>

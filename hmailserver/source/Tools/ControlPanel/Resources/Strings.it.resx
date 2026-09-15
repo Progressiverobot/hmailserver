@@ -941,6 +941,9 @@ Il Control Panel può leggere i file dei messaggi solo quando è in esecuzione s
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Lingua dell'interfaccia amministratore (solo strumenti COM di terze parti)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Menu dell'amministratore</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Password di amministratore</value>
   </data>
@@ -1772,6 +1775,9 @@ Il selettore predisposto "{0}" viene rimosso dalla configurazione del server; la
   <data name="Close the recipient list" xml:space="preserve">
     <value>Chiudi l'elenco dei destinatari</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Comprimi la navigazione</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Riga di comando (usa %FILE% per il file da scansionare)</value>
   </data>
@@ -1805,6 +1811,9 @@ Il selettore predisposto "{0}" viene rimosso dalla configurazione del server; la
   <data name="Connect to server" xml:space="preserve">
     <value>Connetti al server</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Connesso</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Server connesso: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ Il selettore predisposto "{0}" viene rimosso dalla configurazione del server; la
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Connessione non riuscita.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Connessione persa</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Connessione ripristinata</value>
@@ -3031,6 +3043,9 @@ Nessuna posta viene toccata - l'indice ne è derivato - ma finché la ricostruzi
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Eseguibile non trovato: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Espandi la navigazione</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Audience attesa (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ Il programma di installazione verificato viene passato all'helper di aggiornamen
   <data name="Loaded from server." xml:space="preserve">
     <value>Caricato dal server.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Caricamento…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Da locale a _esterno (relay in uscita)</value>
   </data>
@@ -4721,6 +4739,9 @@ Il programma di installazione verificato viene passato all'helper di aggiornamen
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Non ancora verificato. Pubblicare il record, lasciare il tempo per la propagazione, poi premere "Verifica DNS".</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Non connesso</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Non in ascolto</value>
@@ -5661,6 +5682,9 @@ Esegui questa operazione se i client segnalano messaggi che compaiono con l'UID 
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Riconnesso a {0} dopo il riavvio del servizio.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Riconnessione in corso…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Registra una traccia dei messaggi interrogabile</value>
@@ -8917,6 +8941,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_I mittenti esterni ricevono sempre il testo del dominio, anche quando l'account ha il proprio</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Password</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>S_ospendi</value>
   </data>
@@ -9024,6 +9051,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Invia a tutti gli account corrispondenti</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>_Server</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Host SMTP di destinazione</value>

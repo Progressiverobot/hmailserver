@@ -941,6 +941,9 @@
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>管理 UI の言語 (サードパーティの COM ツールのみ)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>管理者メニュー</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>管理者パスワード</value>
   </data>
@@ -1772,6 +1775,9 @@
   <data name="Close the recipient list" xml:space="preserve">
     <value>受信者リストを閉じる</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>ナビゲーションを折りたたむ</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>コマンド ライン (スキャン対象ファイルには %FILE% を使用)</value>
   </data>
@@ -1805,6 +1811,9 @@
   <data name="Connect to server" xml:space="preserve">
     <value>サーバーに接続</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>接続済み</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>接続中のサーバー: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>接続に失敗しました。</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>接続が切断されました</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>接続が復旧しました</value>
@@ -3031,6 +3043,9 @@
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>実行ファイルが見つかりません: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>ナビゲーションを展開する</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>期待するオーディエンス (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@
   <data name="Loaded from server." xml:space="preserve">
     <value>サーバーから読み込みました。</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>読み込み中…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>ローカルから外部へ (外部へのリレー)(_E)</value>
   </data>
@@ -4721,6 +4739,9 @@
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>まだ確認していません。レコードを公開し、伝播の時間を置いてから「DNS を確認」を押してください。</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>未接続</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>待ち受けていません</value>
@@ -5661,6 +5682,9 @@
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>サービスの再起動後、{0} に再接続しました。</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>再接続中…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>照会可能なメッセージ トレースを記録する</value>
@@ -8917,6 +8941,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>アカウントに独自のテキストがある場合でも、外部の送信者には常にドメインのテキストを返す(_O)</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>パスワード(_P)</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>一時停止(_P)</value>
   </data>
@@ -9024,6 +9051,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>一致するすべてのアカウントに送信(_S)</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>サーバー(_S)</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>宛先 SMTP ホスト(_T)</value>

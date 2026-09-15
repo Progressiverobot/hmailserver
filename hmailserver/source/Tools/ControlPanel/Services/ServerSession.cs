@@ -66,6 +66,17 @@ namespace hMailServer.ControlPanel.Services
       /// tell the user and refresh whatever page is on screen.</summary>
       public static event Action<ServerSession> Reconnected;
 
+      /// <summary>
+      /// Raised whenever the link's state changes: Connected on sign-in and after
+      /// a successful heal, Reconnecting when a probe finds the link gone and a
+      /// heal is about to be tried, Lost when the heal fails or is not attempted
+      /// because the service is stopped. The shell's server status pill is fed
+      /// from this and from nothing else. It can arrive on any thread, from
+      /// inside somebody else's COM call, so a handler marshals to the
+      /// dispatcher and does no work of its own here.
+      /// </summary>
+      public static event Action<ServerSession, LinkState> LinkStateChanged;
+
       public static ServerSession Current { get; private set; }
 
       public static void SetCurrent(ServerSession session)
@@ -144,6 +155,7 @@ namespace hMailServer.ControlPanel.Services
             lastVerifiedUtc_ = DateTime.UtcNow;
          }
 
+         RaiseLinkState(LinkState.Connected);
          return true;
       }
 
@@ -229,11 +241,13 @@ namespace hMailServer.ControlPanel.Services
                      // the reconnect itself has still succeeded.
                   }
 
+                  RaiseLinkState(LinkState.Connected);
                   RaiseReconnected();
                   return true;
                }
 
                linkBroken_ = true;
+               RaiseLinkState(LinkState.Lost);
                return false;
             }
             finally
@@ -328,11 +342,13 @@ namespace hMailServer.ControlPanel.Services
             if (!ServiceLooksRunning())
             {
                lastHealUtc_ = now;
+               RaiseLinkState(LinkState.Lost);
                return app_;
             }
 
             // Enough attempts to ride out a service that is still starting,
             // short enough not to freeze the UI when the server is simply gone.
+            RaiseLinkState(LinkState.Reconnecting);
             Reconnect(5, TimeSpan.FromMilliseconds(300), out _);
             return app_;
          }
@@ -525,6 +541,18 @@ namespace hMailServer.ControlPanel.Services
          {
             error = ex.Message;
             return false;
+         }
+      }
+
+      private void RaiseLinkState(LinkState state)
+      {
+         try
+         {
+            LinkStateChanged?.Invoke(this, state);
+         }
+         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+         {
+            // The pill is a report of the link, never a reason for the link to fail.
          }
       }
 

@@ -31,6 +31,7 @@ namespace hMailServer.ControlPanel.Services
       public static readonly SolidColorBrush Warning = new();
       public static readonly SolidColorBrush Danger = new();
       public static readonly SolidColorBrush Info = new();
+      public static readonly SolidColorBrush Neutral = new();
 
       // Log-severity palette.
       public static readonly SolidColorBrush LogDefault = new();
@@ -180,7 +181,6 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Recomputes every token colour for the current theme.</summary>
       public static void Refresh()
       {
-         Color brand, success, warning, danger, info;
          Color logDefault, logSmtp, logImap, logPop3, logApp, logError;
 
          // Snapshot what the charts need before we start branching, so there is
@@ -190,10 +190,24 @@ namespace hMailServer.ControlPanel.Services
             ? ChartTheme.HighContrast
             : IsLight() ? ChartTheme.Light : ChartTheme.Dark;
 
+         // The status palette and the surfaces come from DesignTokens - the one
+         // WPF-free table, held by a test - for the theme decided above. The
+         // log-severity palette stays here: it is the log viewer's own, not a
+         // design token. Under High Contrast both take every colour from the
+         // system palette that ReadSystemColors just snapshotted.
+         DesignTokens.StatusArgb status = DesignTokens.Status(CurrentChartTheme, CurrentSystemColors);
+         DesignTokens.SurfaceArgb surfaces = DesignTokens.Surfaces(CurrentChartTheme, CurrentSystemColors);
+
+         Color brand = FromArgb(status.Brand);
+         Color success = FromArgb(status.Success);
+         Color warning = FromArgb(status.Warning);
+         Color danger = FromArgb(status.Danger);
+         Color info = FromArgb(status.Info);
+         Color neutral = FromArgb(status.Neutral);
+
          if (IsHighContrast)
          {
-            brand = info = logApp = SystemColors.HighlightColor;
-            success = warning = danger = SystemColors.WindowTextColor;
+            logApp = SystemColors.HighlightColor;
             logDefault = SystemColors.GrayTextColor;
             logSmtp = logImap = logPop3 = SystemColors.WindowTextColor;
             logError = SystemColors.HotTrackColor;
@@ -201,9 +215,6 @@ namespace hMailServer.ControlPanel.Services
          else if (IsLight())
          {
             // Darker, saturated values: each clears 4.5:1 on a white surface.
-            brand = Hex("#2F6FE0");
-            (success, warning, danger) = StatusColours(light: true);
-            info = Hex("#6639BA");
             logDefault = Hex("#57606A");
             logSmtp = Hex("#1A7F37");
             logImap = Hex("#6639BA");
@@ -214,9 +225,6 @@ namespace hMailServer.ControlPanel.Services
          else
          {
             // Lighter, brighter values for dark surfaces.
-            brand = Hex("#4C8DFF");
-            (success, warning, danger) = StatusColours(light: false);
-            info = Hex("#A371F7");
             logDefault = Hex("#9DA7B0");
             logSmtp = Hex("#3FB950");
             logImap = Hex("#A371F7");
@@ -231,6 +239,7 @@ namespace hMailServer.ControlPanel.Services
          Set(Warning, warning);
          Set(Danger, danger);
          Set(Info, info);
+         Set(Neutral, neutral);
          Set(LogDefault, logDefault);
          Set(LogSmtp, logSmtp);
          Set(LogImap, logImap);
@@ -259,6 +268,18 @@ namespace hMailServer.ControlPanel.Services
          Publish("AppWarningBrush", warning);
          Publish("AppDangerBrush", danger);
          Publish("AppInfoBrush", info);
+         Publish("AppNeutralBrush", neutral);
+
+         // The surfaces and the notice tint, declared with their dark values in
+         // Views/Scaffold/Tokens.xaml so that they exist from the first parse,
+         // and republished here for the theme in force. Setting the key on the
+         // application's own dictionary shadows the merged declaration.
+         Publish("AppCardBackgroundBrush", FromArgb(surfaces.CardBackground));
+         Publish("AppCardBorderBrush", FromArgb(surfaces.CardBorder));
+         Publish("AppCardHoverBrush", FromArgb(surfaces.CardHover));
+         Publish("AppDividerBrush", FromArgb(surfaces.Divider));
+         PublishValue("AppNoticeTintOpacity", DesignTokens.NoticeTintOpacityFor(CurrentChartTheme));
+
          Publish("LogDefaultBrush", logDefault);
          Publish("LogSmtpBrush", logSmtp);
          Publish("LogImapBrush", logImap);
@@ -349,6 +370,13 @@ namespace hMailServer.ControlPanel.Services
          if (Application.Current == null)
             return;
          Application.Current.Resources[key] = new SolidColorBrush(color);
+      }
+
+      private static void PublishValue(string key, object value)
+      {
+         if (Application.Current == null)
+            return;
+         Application.Current.Resources[key] = value;
       }
 
       private static Color Hex(string hex) => (Color)ColorConverter.ConvertFromString(hex);

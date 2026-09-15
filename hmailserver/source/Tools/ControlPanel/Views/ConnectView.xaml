@@ -9,11 +9,16 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
     xmlns:local="clr-namespace:hMailServer.ControlPanel.Views"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
+    <!-- The first screen anybody sees, on the scaffold: a Card, three FieldRows
+         and an InlineNotice for the failure. The rows give the three editors the
+         accessible names and Alt keys the placeholders never did. -->
     <Grid>
-        <Border Style="{StaticResource Card}" MaxWidth="400" MinWidth="300" Padding="34" Margin="20"
-                HorizontalAlignment="Center" VerticalAlignment="Center">
+        <scaffold:Card MaxWidth="420" MinWidth="320" Padding="32,28" Margin="20"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       AutomationProperties.Name="{loc:L 'Connect to server'}">
             <StackPanel>
                 <Border Width="52" Height="52" CornerRadius="14" Background="{StaticResource BrandGradient}"
                         HorizontalAlignment="Left" Margin="0,0,0,16">
@@ -21,27 +26,30 @@
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
 
-                <TextBlock Text="{loc:L 'Connect to server'}" FontSize="20" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
+                <TextBlock Text="{loc:L 'Connect to server'}" Style="{StaticResource TextSubtitle}" />
                 <TextBlock Text="{loc:L 'Sign in with the hMailServer administrator credential.'}"
-                           FontSize="12" Margin="0,4,0,22"
-                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                           Style="{StaticResource TextCaption}" Margin="0,4,0,20" />
 
-                <ui:TextBox x:Name="HostBox" PlaceholderText="{loc:L 'Server (localhost)'}" Margin="0,0,0,10" Text="localhost">
-                    <ui:TextBox.Icon><ui:SymbolIcon Symbol="Server24" /></ui:TextBox.Icon>
-                </ui:TextBox>
+                <scaffold:FieldRow Label="{loc:L '_Server'}">
+                    <ui:TextBox x:Name="HostBox" PlaceholderText="{loc:L 'Server (localhost)'}" Text="localhost">
+                        <ui:TextBox.Icon><ui:SymbolIcon Symbol="Server24" /></ui:TextBox.Icon>
+                    </ui:TextBox>
+                </scaffold:FieldRow>
                 <!-- The user name is NOT translated. It is the account the server
                      authenticates, and hMailServer's is called Administrator in
                      every language; a translated word here is a name no account
                      has, and the sign-in fails with "check the user name and
-                     password" (issue #156). The label and the placeholder beside
-                     it are captions and are translated. -->
-                <ui:TextBox x:Name="UserBox" PlaceholderText="{loc:L 'User name'}" Margin="0,0,0,10" Text="Administrator"> <!-- no-loc -->
-                    <ui:TextBox.Icon><ui:SymbolIcon Symbol="Person24" /></ui:TextBox.Icon>
-                </ui:TextBox>
-                <local:PasswordField x:Name="PasswordBox" PlaceholderText="{loc:L 'Password'}" Margin="0,0,0,18">
-                    <local:PasswordField.Icon><ui:SymbolIcon Symbol="Key24" /></local:PasswordField.Icon>
-                </local:PasswordField>
+                     password" (issue #156). The caption above it is translated. -->
+                <scaffold:FieldRow Label="{loc:L '_User name'}">
+                    <ui:TextBox x:Name="UserBox" Text="Administrator"> <!-- no-loc -->
+                        <ui:TextBox.Icon><ui:SymbolIcon Symbol="Person24" /></ui:TextBox.Icon>
+                    </ui:TextBox>
+                </scaffold:FieldRow>
+                <scaffold:FieldRow Label="{loc:L '_Password'}" Margin="0,0,0,18">
+                    <local:PasswordField x:Name="PasswordBox">
+                        <local:PasswordField.Icon><ui:SymbolIcon Symbol="Key24" /></local:PasswordField.Icon>
+                    </local:PasswordField>
+                </scaffold:FieldRow>
 
                 <!-- The button and the busy indicator occupy the same cell, so the
                      card does not change height when a connection starts. A layout
@@ -59,8 +67,10 @@
                     </StackPanel>
                 </Grid>
 
-                <TextBlock x:Name="ErrorText" AutomationProperties.LiveSetting="Assertive" Foreground="{DynamicResource AppDangerBrush}" FontSize="12" Margin="0,12,0,0"
-                           TextWrapping="Wrap" Visibility="Collapsed" />
+                <!-- Assertive: a failed sign-in is the one thing on this screen a
+                     screen reader must hear at once. -->
+                <scaffold:InlineNotice x:Name="ErrorNotice" Level="Critical" Visibility="Collapsed" Margin="0,12,0,0"
+                                       AutomationProperties.LiveSetting="Assertive" />
 
                 <ui:HyperlinkButton Content="{loc:L 'Set up two-factor authentication…'}" Click="Totp_Click"
                                     HorizontalAlignment="Left" Margin="0,12,0,0" FontSize="12" />
@@ -81,6 +91,6 @@
                               SelectionChanged="Language_SelectionChanged" DropDownClosed="Language_DropDownClosed" />
                 </Grid>
             </StackPanel>
-        </Border>
+        </scaffold:Card>
     </Grid>
 </UserControl>

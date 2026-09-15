@@ -161,8 +161,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void Fail_(string message)
       {
-         ErrorText.Text = message;
-         ErrorText.Visibility = Visibility.Visible;
+         ErrorNotice.Text = message;
+         ErrorNotice.Visibility = Visibility.Visible;
          SetBusy_(false, null);
          PasswordBox.Focus();
       }
@@ -181,7 +181,7 @@ namespace hMailServer.ControlPanel.Views
          if (busy)
          {
             BusyText.Text = message ?? L("Connecting…");
-            ErrorText.Visibility = Visibility.Collapsed;
+            ErrorNotice.Visibility = Visibility.Collapsed;
          }
 
          ConnectButton.Visibility = busy ? Visibility.Collapsed : Visibility.Visible;

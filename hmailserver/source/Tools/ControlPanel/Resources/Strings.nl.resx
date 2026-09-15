@@ -941,6 +941,9 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>UI-taal van de beheerder (alleen COM-hulpmiddelen van derden)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Beheerdersmenu</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Beheerderswachtwoord</value>
   </data>
@@ -1772,6 +1775,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   <data name="Close the recipient list" xml:space="preserve">
     <value>De ontvangerslijst sluiten</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Navigatie samenvouwen</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Opdrachtregel (gebruik %FILE% voor het gescande bestand)</value>
   </data>
@@ -1805,6 +1811,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   <data name="Connect to server" xml:space="preserve">
     <value>Verbinden met server</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Verbonden</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Verbonden server: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Verbinding mislukt.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Verbinding verbroken</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Verbinding hersteld</value>
@@ -3031,6 +3043,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Uitvoerbaar bestand niet gevonden: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Navigatie uitvouwen</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Verwachte audience (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Loaded from server." xml:space="preserve">
     <value>Van de server geladen.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Laden…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Lokaal naar _extern (uitgaande relay)</value>
   </data>
@@ -4721,6 +4739,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Nog niet gecontroleerd. Publiceer het record, geef het tijd om te propageren, en druk dan op "DNS controleren".</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Niet verbonden</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Luistert niet</value>
@@ -5661,6 +5682,9 @@ Voer dit uit als clients melden dat berichten onder de verkeerde UID verschijnen
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Opnieuw verbonden met {0} nadat de service opnieuw was gestart.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Opnieuw verbinden…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Een doorzoekbaar berichtspoor vastleggen</value>
@@ -8917,6 +8941,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_Externe afzenders krijgen altijd de tekst van het domein, ook wanneer het account een eigen tekst heeft</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Wachtwoord</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>_Pauzeren</value>
   </data>
@@ -9024,6 +9051,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Naar alle overeenkomende accounts verzenden</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>_Server</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Doel-SMTP-host</value>

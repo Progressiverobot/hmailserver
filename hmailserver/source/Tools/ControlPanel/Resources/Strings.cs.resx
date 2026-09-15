@@ -941,6 +941,9 @@ Control Panel může číst soubory zpráv pouze tehdy, když běží na stejné
   <data name="Administrator UI language (third-party COM tools only)" xml:space="preserve">
     <value>Jazyk rozhraní správce (pouze pro nástroje třetích stran využívající COM)</value>
   </data>
+  <data name="Administrator menu" xml:space="preserve">
+    <value>Nabídka správce</value>
+  </data>
   <data name="Administrator password" xml:space="preserve">
     <value>Heslo správce</value>
   </data>
@@ -1772,6 +1775,9 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
   <data name="Close the recipient list" xml:space="preserve">
     <value>Zavřít seznam příjemců</value>
   </data>
+  <data name="Collapse the navigation" xml:space="preserve">
+    <value>Sbalit navigaci</value>
+  </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Příkazový řádek (pro kontrolovaný soubor použijte %FILE%)</value>
   </data>
@@ -1805,6 +1811,9 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
   <data name="Connect to server" xml:space="preserve">
     <value>Připojit k serveru</value>
   </data>
+  <data name="Connected" xml:space="preserve">
+    <value>Připojeno</value>
+  </data>
   <data name="Connected server: hMailServer {0} @ {1}" xml:space="preserve">
     <value>Připojený server: hMailServer {0} @ {1}</value>
   </data>
@@ -1831,6 +1840,9 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
   </data>
   <data name="Connection failed." xml:space="preserve">
     <value>Připojení se nezdařilo.</value>
+  </data>
+  <data name="Connection lost" xml:space="preserve">
+    <value>Připojení ztraceno</value>
   </data>
   <data name="Connection restored" xml:space="preserve">
     <value>Připojení obnoveno</value>
@@ -3031,6 +3043,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Executable not found: {0}" xml:space="preserve">
     <value>Spustitelný soubor nenalezen: {0}</value>
   </data>
+  <data name="Expand the navigation" xml:space="preserve">
+    <value>Rozbalit navigaci</value>
+  </data>
   <data name="Expected audience (aud)" xml:space="preserve">
     <value>Očekávané publikum (aud)</value>
   </data>
@@ -3885,6 +3900,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Loaded from server." xml:space="preserve">
     <value>Načteno ze serveru.</value>
   </data>
+  <data name="Loading…" xml:space="preserve">
+    <value>Načítání…</value>
+  </data>
   <data name="Local to _external (relay out)" xml:space="preserve">
     <value>Z místní na _externí (relay ven)</value>
   </data>
@@ -4721,6 +4739,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Not checked yet. Publish the record, allow time for propagation, then press &quot;Check DNS&quot;." xml:space="preserve">
     <value>Zatím nezkontrolováno. Publikujte záznam, dejte čas na jeho rozšíření a poté stiskněte „Zkontrolovat DNS“.</value>
+  </data>
+  <data name="Not connected" xml:space="preserve">
+    <value>Nepřipojeno</value>
   </data>
   <data name="Not listening" xml:space="preserve">
     <value>Nenaslouchá</value>
@@ -5661,6 +5682,9 @@ Spusťte to, pokud klienti hlásí zprávy pod špatným UID, nebo po obnovení 
   </data>
   <data name="Reconnected to {0} after the service restarted." xml:space="preserve">
     <value>Po restartu služby znovu připojeno k {0}.</value>
+  </data>
+  <data name="Reconnecting…" xml:space="preserve">
+    <value>Znovu se připojuje…</value>
   </data>
   <data name="Record a queryable message trace" xml:space="preserve">
     <value>Zaznamenávat dohledatelnou stopu zpráv</value>
@@ -8917,6 +8941,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="_Outside senders always get the domain's text, even when the account has its own" xml:space="preserve">
     <value>_Vnější odesílatelé dostanou vždy text domény, i když má účet vlastní</value>
   </data>
+  <data name="_Password" xml:space="preserve">
+    <value>_Heslo</value>
+  </data>
   <data name="_Pause" xml:space="preserve">
     <value>Po_zastavit</value>
   </data>
@@ -9024,6 +9051,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="_Send to all matching accounts" xml:space="preserve">
     <value>_Odeslat všem odpovídajícím účtům</value>
+  </data>
+  <data name="_Server" xml:space="preserve">
+    <value>_Server</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Cílový SMTP hostitel</value>
