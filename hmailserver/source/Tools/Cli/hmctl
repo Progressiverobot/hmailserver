@@ -761,6 +761,337 @@ def accounts_export(client, arguments):
     return EXIT_OK
 
 
+# ---------------------------------------------------------------------------
+# The whole configuration as one document
+# ---------------------------------------------------------------------------
+
+# What a configuration document holds, in the order it is applied: a domain
+# before the accounts in it, a rule after the accounts it names. Each entry is
+# the resource's key in RESOURCES, the field that identifies one, and whether it
+# is listed under a parent.
+CONFIG_SECTIONS = [
+    {"name": "settings", "kind": "settings"},
+    {"name": "ini", "kind": "ini"},
+    {"name": "domains", "kind": "resource", "resource": "domain"},
+    {"name": "accounts", "kind": "resource", "resource": "account"},
+    {"name": "aliases", "kind": "resource", "resource": "alias"},
+    {"name": "lists", "kind": "resource", "resource": "list"},
+    {"name": "groups", "kind": "resource", "resource": "group"},
+    {"name": "rules", "kind": "resource", "resource": "rule"},
+    {"name": "routes", "kind": "resource", "resource": "route"},
+    {"name": "ports", "kind": "resource", "resource": "port"},
+    {"name": "ipranges", "kind": "resource", "resource": "iprange"},
+]
+
+# Fields the server answers with that describe the world rather than the
+# configuration, and that must not travel into a document or be compared: an
+# identifier the server allocates, a count it computes, a time it recorded.
+NOT_CONFIGURATION = {
+    "id", "account_id", "domain_id", "rule_id", "route_id", "parent_id",
+    "account_count", "alias_count", "member_count", "size_mb", "size",
+    "created", "modified", "last_used", "last_login", "last_logon",
+}
+
+CONFIG_VERSION = 1
+
+
+def configuration_key(section, row):
+    """The field that identifies one entry of a section, as a person names it."""
+    if section["kind"] != "resource":
+        return None
+    resource = RESOURCES[section["resource"]]
+    identifier = resource["id"]
+    if identifier in row:
+        return str(row[identifier])
+    # An alias is identified by the address it answers for, which the listing
+    # calls "name"; a resource whose id field is not in the row falls back to
+    # whatever unique text it does carry.
+    for candidate in ("address", "name", "value"):
+        if candidate in row:
+            return str(row[candidate])
+    return None
+
+
+def strip_configuration(row):
+    return dict((k, v) for k, v in row.items() if k not in NOT_CONFIGURATION and not str(k).endswith("_id"))
+
+
+def read_configuration(client, domains=None):
+    """The live configuration as a document. Deterministic: sorted throughout,
+    no time of day in it, nothing the server allocates - so two exports of an
+    unchanged server are the same bytes and a diff means a change."""
+    document = {"version": CONFIG_VERSION, "sections": {}}
+
+    for section in CONFIG_SECTIONS:
+        if section["kind"] == "settings":
+            groups = {}
+            for group in SETTING_GROUPS:
+                if group == "directories":
+                    continue          # paths of this machine, not configuration to copy
+                path = "/api/v1/settings" if group == "settings" else "/api/v1/settings/" + group
+                try:
+                    answer = client.request("GET", path)
+                except ApiError as error:
+                    if error.status in (403, 404):
+                        continue
+                    raise
+                if isinstance(answer, dict):
+                    groups[group] = dict(sorted(strip_configuration(answer).items()))
+            document["sections"]["settings"] = groups
+            continue
+
+        if section["kind"] == "ini":
+            try:
+                answer = client.request("GET", "/api/v1/settings/ini")
+            except ApiError as error:
+                if error.status in (403, 404):
+                    continue
+                raise
+            values = {}
+            for row in collection(answer, "settings"):
+                if isinstance(row, dict) and "name" in row:
+                    values[str(row["name"])] = row.get("value")
+            document["sections"]["ini"] = dict(sorted(values.items()))
+            continue
+
+        resource = RESOURCES[section["resource"]]
+        rows = []
+        if resource.get("parent") == "domain":
+            for domain in (domains or []):
+                path = resource["collection"].replace("{parent}", urllib.parse.quote(domain, safe=""))
+                try:
+                    answer = client.request("GET", path)
+                except ApiError as error:
+                    if error.status == 404:
+                        continue
+                    raise
+                for row in collection(answer, resource["key"]):
+                    if isinstance(row, dict):
+                        entry = strip_configuration(row)
+                        entry["domain"] = domain
+                        rows.append(entry)
+        elif resource.get("parent"):
+            continue                  # a resource under an account: not in the document yet
+        else:
+            try:
+                answer = client.request("GET", resource["collection"])
+            except ApiError as error:
+                # A server older than this file does not carry every resource,
+                # and a read-only key may be refused one. Either way the
+                # document says nothing about that section rather than the
+                # export failing whole.
+                if error.status in (403, 404):
+                    continue
+                raise
+            for row in collection(answer, resource["key"]):
+                if isinstance(row, dict):
+                    rows.append(strip_configuration(row))
+
+        rows.sort(key=lambda r: json.dumps(r, sort_keys=True))
+        document["sections"][section["name"]] = rows
+
+        if section["name"] == "domains":
+            domains = sorted(str(r.get("name")) for r in rows if r.get("name"))
+
+    return document
+
+
+def configuration_plan(live, wanted):
+    """What would have to happen to make the server match the document: a list
+    of (section, verb, key, detail). Nothing is decided here about whether it
+    may happen - that is apply's business."""
+    plan = []
+
+    live_sections = live.get("sections", {})
+    wanted_sections = wanted.get("sections", {})
+
+    for name in ("settings",):
+        for group in sorted(set(list(live_sections.get(name, {}).keys()) + list(wanted_sections.get(name, {}).keys()))):
+            here = (live_sections.get(name) or {}).get(group, {})
+            there = (wanted_sections.get(name) or {}).get(group, {})
+            for key in sorted(set(list(here.keys()) + list(there.keys()))):
+                if key not in there:
+                    continue          # the document says nothing about it: leave it alone
+                if here.get(key) != there.get(key):
+                    plan.append((name + "/" + group, "set", key, "%r -> %r" % (here.get(key), there.get(key))))
+
+    here = live_sections.get("ini", {})
+    there = wanted_sections.get("ini", {})
+    for key in sorted(there.keys()):
+        if here.get(key) != there.get(key):
+            plan.append(("ini", "set", key, "%r -> %r" % (here.get(key), there.get(key))))
+
+    for section in CONFIG_SECTIONS:
+        if section["kind"] != "resource":
+            continue
+        name = section["name"]
+        here_rows = {}
+        for row in live_sections.get(name, []) or []:
+            key = configuration_key(section, row)
+            if key:
+                here_rows[key] = row
+        there_rows = {}
+        for row in wanted_sections.get(name, []) or []:
+            key = configuration_key(section, row)
+            if key:
+                there_rows[key] = row
+
+        for key in sorted(there_rows):
+            if key not in here_rows:
+                plan.append((name, "create", key, json.dumps(there_rows[key], sort_keys=True)))
+            elif here_rows[key] != there_rows[key]:
+                changed = sorted(k for k in set(list(here_rows[key].keys()) + list(there_rows[key].keys()))
+                                 if here_rows[key].get(k) != there_rows[key].get(k))
+                plan.append((name, "update", key, ", ".join(changed)))
+
+        for key in sorted(here_rows):
+            if key not in there_rows:
+                plan.append((name, "delete", key, ""))
+
+    return plan
+
+
+def render_plan(plan, as_json):
+    if as_json:
+        render([{"section": s, "verb": v, "key": k, "detail": d} for s, v, k, d in plan], True)
+        return
+
+    if not plan:
+        print("The server already matches the document.")
+        return
+
+    counts = {}
+    for section, verb, key, detail in plan:
+        counts[verb] = counts.get(verb, 0) + 1
+        print("  %-8s %-10s %s%s" % (verb, section, key, ("  (" + detail + ")") if detail else ""))
+    print("")
+    print(", ".join("%d to %s" % (counts[v], v) for v in sorted(counts)))
+
+
+def config_export(client, arguments):
+    document = read_configuration(client)
+    text = json.dumps(document, indent=2, sort_keys=True)
+    if not arguments.file or arguments.file == "-":
+        print(text)
+    else:
+        with io.open(arguments.file, "w", encoding="utf-8") as handle:
+            handle.write(text + "\n")
+        print("Written to %s." % arguments.file)
+    return EXIT_OK
+
+
+def config_diff(client, arguments):
+    with io.open(arguments.file, encoding="utf-8") as handle:
+        wanted = json.load(handle)
+    live = read_configuration(client)
+    plan = configuration_plan(live, wanted)
+    render_plan(plan, arguments.json)
+    # A difference is an exit code, so that a pipeline can gate on it the way it
+    # gates on a failing test.
+    return EXIT_OK if not plan else EXIT_ERROR
+
+
+def config_apply(client, arguments):
+    with io.open(arguments.file, encoding="utf-8") as handle:
+        wanted = json.load(handle)
+    live = read_configuration(client)
+    plan = configuration_plan(live, wanted)
+
+    deletions = [step for step in plan if step[1] == "delete"]
+    if deletions and not arguments.allow_delete:
+        plan = [step for step in plan if step[1] != "delete"]
+
+    if not arguments.force:
+        render_plan(plan, arguments.json)
+        if deletions and not arguments.allow_delete:
+            print("")
+            print("%d entr(ies) on the server are not in the document. They are left alone; "
+                  "--allow-delete removes them." % len(deletions))
+        if plan:
+            print("")
+            print("Nothing was changed. Add --force to apply this plan.")
+        return EXIT_OK
+
+    applied, refused = 0, []
+    for section, verb, key, detail in plan:
+        try:
+            apply_one(client, wanted, section, verb, key)
+            applied += 1
+            print("  %-8s %-10s %s" % (verb, section, key))
+        except ApiError as error:
+            refused.append((section, verb, key, error.message))
+            print("  ! %-6s %-10s %s: %s" % (verb, section, key, error.message))
+
+    print("")
+    print("%d applied, %d refused." % (applied, len(refused)))
+    if deletions and not arguments.allow_delete:
+        print("%d entr(ies) not in the document were left alone; --allow-delete removes them." % len(deletions))
+    return EXIT_ERROR if refused else EXIT_OK
+
+
+def apply_one(client, wanted, section, verb, key):
+    """One step of a plan. Kept small and obvious: the interesting decisions are
+    all in configuration_plan, and this only speaks HTTP."""
+    sections = wanted.get("sections", {})
+
+    if section.startswith("settings/"):
+        group = section.split("/", 1)[1]
+        path = "/api/v1/settings" if group == "settings" else "/api/v1/settings/" + group
+        client.request("PUT", path, body={key: sections["settings"][group][key]})
+        return
+
+    if section == "ini":
+        client.request("PUT", "/api/v1/settings/ini/" + urllib.parse.quote(key, safe=""),
+                       body={"value": sections["ini"][key]})
+        return
+
+    definition = None
+    for candidate in CONFIG_SECTIONS:
+        if candidate["name"] == section:
+            definition = candidate
+            break
+    if definition is None:
+        raise ApiError(0, "no such section %r" % section)
+
+    resource = RESOURCES[definition["resource"]]
+    row = None
+    for entry in sections.get(section, []) or []:
+        if configuration_key(definition, entry) == key:
+            row = dict(entry)
+            break
+
+    parent = row.pop("domain", None) if row else None
+
+    if verb == "delete":
+        path = resource["item"].replace("{id}", urllib.parse.quote(key, safe="@"))
+        if "{parent}" in path:
+            raise ApiError(0, "a %s is deleted under its parent, which this plan does not carry" % section)
+        client.request("DELETE", path)
+        return
+
+    if row is None:
+        raise ApiError(0, "the document has no %s named %s" % (section, key))
+
+    if verb == "create":
+        path = resource["collection"]
+        if "{parent}" in path:
+            if not parent:
+                raise ApiError(0, "the document's %s entry %s carries no domain" % (section, key))
+            path = path.replace("{parent}", urllib.parse.quote(parent, safe=""))
+        if definition["resource"] == "account" and "password" not in row:
+            raise ApiError(0, "an account is not created without a password; add one to the document "
+                              "for %s, or make the account first" % key)
+        client.request("POST", path, body=row)
+        return
+
+    path = resource["item"].replace("{id}", urllib.parse.quote(key, safe="@"))
+    if "{parent}" in path:
+        if not parent:
+            raise ApiError(0, "the document's %s entry %s carries no domain" % (section, key))
+        path = path.replace("{parent}", urllib.parse.quote(parent, safe=""))
+    client.request("PUT", path, body=row)
+
+
 def api_command(client, arguments):
     body = None
     if arguments.body:
@@ -923,6 +1254,21 @@ def build_parser():
     exporter.set_defaults(handler=accounts_export)
     exporter.add_argument("domain")
     exporter.add_argument("file", nargs="?", default="-")
+
+    configuration = commands.add_parser("config", help="the whole configuration as one file")
+    configuration_verbs = configuration.add_subparsers(dest="verb")
+    exporter = configuration_verbs.add_parser("export", parents=[common])
+    exporter.set_defaults(handler=config_export)
+    exporter.add_argument("file", nargs="?", default="-")
+    differ = configuration_verbs.add_parser("diff", parents=[common])
+    differ.set_defaults(handler=config_diff)
+    differ.add_argument("file")
+    applier = configuration_verbs.add_parser("apply", parents=[common])
+    applier.set_defaults(handler=config_apply)
+    applier.add_argument("file")
+    applier.add_argument("--force", action="store_true", help="apply the plan; without it nothing is changed")
+    applier.add_argument("--allow-delete", action="store_true",
+                         help="remove what the server has and the document does not; off by default")
 
     api = commands.add_parser("api", parents=[common], help="any method on any path - the escape hatch")
     api.set_defaults(handler=api_command)
