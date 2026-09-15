@@ -172,25 +172,30 @@ it behaves.
 How it is administered: the Control Panel and COM are Windows, so a Linux
 server is administered through its configuration file, its own command line
 (`--set-admin-password`, `--create-database`, `--upgrade-database`,
-`--check-config`), the REST API - which since 6.3.0 writes accounts, aliases,
-distribution lists, SMTP routes, global rules, 108 of the server's settings,
-certificates and the listeners that bind them, and creates, enables and deletes
-domains - and the **Control Deck** at `/`, the
-browser front end for that API, which the packages install. Files written by one
+`--check-config`), the REST API and the **Control Deck** at `/`, the browser
+front end for that API, which the packages install. Since 6.3.3 the API writes
+a domain whole - its limits, its signature, its relay host, its DKIM signing
+(selector, key file, canonicalisation, the secondary key) and its aliases -
+accounts in full, distribution lists and their settings, SMTP routes, rules,
+IP ranges, fetch accounts, the settings groups (anti-spam, anti-virus, backup,
+cache, scripting, indexing, the server messages), certificates and the
+listeners that bind them, application passwords, folder permissions and the
+message store; and the Deck reaches every property its views cover, measured
+by `build/check-deck-parity.py` against the desktop Control Panel's every
+field ([DeckParity.md](hmailserver/docs/DeckParity.md): 322 of 328 on 14
+September 2026). The wiki's *Installing on Linux* page walks from the package
+to a domain with an account, using the Deck. Files written by one
 platform are readable by the other: the UTF-16LE on-disk format is a codec of
 our own on both, rather than a `wchar_t` that is two bytes on Windows and four
 on Linux. Stored secrets are AES-256-GCM under a key file with mode 0600, which
 is what DPAPI does for a Windows installation. MariaDB is proven live alongside
 PostgreSQL - schema created, account made, message delivered and read back.
 
-What is still not there: a domain's own properties beyond its active flag and
-its postmaster - **DKIM signing in particular**, along with per-domain size
-limits, the domain signature and a per-domain relay host, all of which COM sets
-and no route does; a GSSAPI bind for directory authentication; and a command
-that re-keys the secret store. On Windows the Control Panel fills those gaps.
-On Linux they have no supported route yet, so a domain that must sign its
-outbound mail with DKIM is not one to run on this platform today. Each is a row
-in the roadmap's *Linux and AArch64* section, which is the running record.
+What is still not there: groups and their members, which the desktop program
+edits and no route carries; `Account.ExportMessages`, which writes to the
+server's own disk; a GSSAPI bind for directory authentication (LDAP simple
+binds over LDAPS or StartTLS are the Linux route); and a command that re-keys
+the secret store. Each is a row in the roadmap, which is the running record.
 
 The wiki's *Installing on Linux* page is the walk-through;
 `hmailserver/source/Server/platform/packaging/README.md` is the packaging

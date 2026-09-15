@@ -1,0 +1,5 @@
+Contact: https://github.com/Progressiverobot/hmailserver/security/advisories/new
+Expires: 2027-09-15T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://raw.githubusercontent.com/Progressiverobot/hmailserver/master/.well-known/security.txt
+Policy: https://github.com/Progressiverobot/hmailserver/blob/master/.github/SECURITY.md
