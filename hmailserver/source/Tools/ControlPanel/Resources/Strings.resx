@@ -6297,6 +6297,9 @@ Continue?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means "leave the account as it is". To return to LocalSystem, set this to LocalSystem explicitly and re-register.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Saving…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Scan a message with a single recipient as that recipient</value>
   </data>
@@ -8260,6 +8263,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>Unprotected LDAP - cleartext (lab networks only)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Unsaved changes</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail.</value>
   </data>
@@ -8346,9 +8352,6 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Value:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Values read from the server.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Verification code from your authenticator app</value>

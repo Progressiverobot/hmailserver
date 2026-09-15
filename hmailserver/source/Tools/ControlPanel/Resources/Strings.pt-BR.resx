@@ -6297,6 +6297,9 @@ Continuar?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Salvar isto não muda o serviço: o valor é lido quando o serviço é REGISTRADO, então só passa a valer depois que o comando na linha de status abaixo for executado. Limpá-lo também não devolve o serviço ao LocalSystem - em um serviço já registrado, um valor vazio significa "deixar a conta como está". Para voltar ao LocalSystem, defina isto explicitamente como LocalSystem e registre de novo.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Salvando…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Verificar uma mensagem com um único destinatário como esse destinatário</value>
   </data>
@@ -8260,6 +8263,9 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>LDAP desprotegido - texto claro (apenas redes de laboratório)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Alterações não salvas</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Desmarcado, uma mensagem que o servidor classificou como spam ainda é entregue aqui, sem marcação - os cabeçalhos de spam e a etiqueta no assunto são removidos da cópia desta conta. Para o endereço que nunca pode perder um e-mail.</value>
   </data>
@@ -8346,9 +8352,6 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Valor:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Valores lidos do servidor.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Código de verificação do seu aplicativo autenticador</value>

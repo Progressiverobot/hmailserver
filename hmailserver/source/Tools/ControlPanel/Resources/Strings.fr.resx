@@ -6297,6 +6297,9 @@ Continuer ?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Enregistrer ceci ne déplace pas le service : la valeur est lue quand le service est ENREGISTRÉ, elle ne prend donc effet qu'une fois exécutée la commande de la ligne d'état ci-dessous. L'effacer ne ramène pas non plus le service à LocalSystem - sur un service déjà enregistré, une valeur vide signifie « laisser le compte tel quel ». Pour revenir à LocalSystem, indiquez explicitement LocalSystem ici et réenregistrez le service.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Enregistrement…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Analyser un message à destinataire unique en tant que ce destinataire</value>
   </data>
@@ -8260,6 +8263,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>LDAP non protégé - en clair (réseaux de laboratoire uniquement)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Modifications non enregistrées</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Décoché, un message que le serveur a classé comme spam est tout de même livré ici, sans marquage - les en-têtes de spam et le préfixe d'objet sont retirés de la copie de ce compte. Pour l'adresse qui ne doit jamais perdre un message.</value>
   </data>
@@ -8346,9 +8352,6 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Valeur :    {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Valeurs lues depuis le serveur.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Code de vérification de votre application d'authentification</value>

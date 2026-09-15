@@ -6297,6 +6297,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>保存此项不会移动服务: 它在服务被注册时读取，因此只有在运行下方状态行中的命令之后才会生效。清空它也不会把服务移回 LocalSystem - 对已注册的服务来说，空值意味着“保持账户不变”。要恢复为 LocalSystem，请明确将此项设为 LocalSystem 并重新注册。</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>正在保存…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>将只有一个收件人的邮件作为该收件人扫描</value>
   </data>
@@ -8260,6 +8263,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>未受保护的 LDAP - 明文 (仅限实验室网络)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>未保存的更改</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>未勾选时，被服务器归类为垃圾邮件的邮件仍会不加标记地投递到这里 - 此账户的副本中会移除垃圾邮件标头和主题标记。适用于绝不能丢失邮件的地址。</value>
   </data>
@@ -8346,9 +8352,6 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>值:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>从服务器读取的值。</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>来自身份验证器应用的验证码</value>

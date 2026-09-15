@@ -88,7 +88,7 @@ namespace hMailServer.ControlPanel.Services
             case SettingsPageState.Saved:
                return L("Saved");
             case SettingsPageState.Restarting:
-               return L("Restarting…");
+               return L("Restartingâ€¦");
             case SettingsPageState.RestartFailed:
                return L("Not restarted");
             case SettingsPageState.NotConnected:

@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Threading;
 using hMailServer.ControlPanel.Services;
 using TextBox = Wpf.Ui.Controls.TextBox;
 using System.Linq;
@@ -20,6 +21,20 @@ namespace hMailServer.ControlPanel.Views
    /// Mirrors the classic Administrator layout: each section is a TabControl
    /// whose tabs group related cards. Property paths are dotted
    /// ("AntiSpam.SpamMarkThreshold") and resolved against app.Settings.
+   ///
+   /// The definition - which tabs, which cards, which settings on each - is the
+   /// ten Build&lt;Section&gt; methods below and is the page's whole content; what
+   /// turns it into controls is one path, not one per row type. Every row builds
+   /// its editor and nothing else, and <see cref="ComSetting.CreateRow"/> wraps it
+   /// in the scaffold's <see cref="Scaffold.FieldRow"/>, which draws the caption
+   /// with its Alt key, the note under the editor and any validation message, and
+   /// gives the editor its accessible name and help text. That is why a row type
+   /// can no longer silently drop its note, as the COM-backed check box did for
+   /// years: the note is no longer something each row type has to remember to
+   /// print. A card is the scaffold's <see cref="Scaffold.Card"/> for the surface
+   /// holding a <see cref="Scaffold.SettingsSection"/> for the heading, the
+   /// description and the fields - a level-2 heading, so a reader can walk a page
+   /// of a hundred and fifty settings section by section.
    /// </summary>
    public partial class ServerSettingsView : UserControl, IPageLifecycle
    {
@@ -68,8 +83,46 @@ namespace hMailServer.ControlPanel.Views
          /// </summary>
          public string Blurb;
 
+         /// <summary>
+         /// Raised when the editor's value changes, so the page can say it holds
+         /// unsaved changes. Wired by <see cref="Watch"/>, which each row type
+         /// calls on the control it creates; the rows that write nothing - a
+         /// button, a live statistic, the read-only inert row - do not call it,
+         /// because looking at one changes nothing to save.
+         /// </summary>
+         public Action Changed;
+
          public virtual bool WantsInitialValue => true;
-         public abstract FrameworkElement CreateEditor(object value);
+
+         /// <summary>
+         /// The editor, and nothing else: no caption above it, no note under it,
+         /// no margin. Those belong to the <see cref="Scaffold.FieldRow"/> that
+         /// <see cref="CreateRow"/> puts around it for every row type at once.
+         /// </summary>
+         protected abstract FrameworkElement BuildEditor(object value);
+
+         /// <summary>
+         /// False on the two row types that are their own caption: a check box's
+         /// Content is its label, and a row that printed it above as well would
+         /// say the same words twice.
+         /// </summary>
+         protected virtual bool CaptionOnRow => true;
+
+         /// <summary>
+         /// One field of the form: the caption with its Alt key, the editor, the
+         /// note under it. The editor keeps the accessible name
+         /// <see cref="Describe"/> gave it - that one is resolved across the whole
+         /// page and can be more exact than the caption - and takes its help text
+         /// from the note.
+         /// </summary>
+         public Scaffold.FieldRow CreateRow(object value)
+            => new()
+            {
+               Label = CaptionOnRow ? Label : null,
+               Hint = Blurb,
+               Content = BuildEditor(value)
+            };
+
          public abstract object ReadEditor();
 
          // Give the interactive editor control a stable AutomationId so
@@ -99,32 +152,163 @@ namespace hMailServer.ControlPanel.Views
          }
 
          /// <summary>
-         /// Prints <see cref="Blurb"/> under the control and attaches it to the
-         /// control as accessible help text.
+         /// Hooks the editor's change so the page's pill can say what is on screen
+         /// is not what the server holds.
          ///
-         /// Both, deliberately. A caption sitting loose in the panel is a separate
-         /// node in the automation tree, so a listener reaches it only after moving
-         /// past the editor - and a note saying "this value is overridden" or "the
-         /// server does less than this suggests" is exactly the part that has to be
-         /// heard with the control, not after it.
+         /// One switch rather than an event per row type, and ordered innermost
+         /// first on purpose: a WPF-UI NumberBox and a PasswordField are both
+         /// TextBoxes by inheritance, so a plain TextBox case above them would
+         /// swallow both and the two rows would never report a change.
          /// </summary>
-         protected void Annotate(FrameworkElement editor, Panel panel)
+         protected void Watch(FrameworkElement editor)
          {
-            if (string.IsNullOrEmpty(Blurb))
-               return;
-
-            if (editor != null)
-               System.Windows.Automation.AutomationProperties.SetHelpText(editor, Blurb);
-
-            panel?.Children.Add(new TextBlock
+            switch (editor)
             {
-               Text = Blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 4, 0, 0)
-            });
+               case CheckBox box:
+                  box.Checked += (s, e) => Changed?.Invoke();
+                  box.Unchecked += (s, e) => Changed?.Invoke();
+                  break;
+               case Wpf.Ui.Controls.NumberBox number:
+                  number.ValueChanged += (s, e) => Changed?.Invoke();
+                  break;
+               case PasswordField password:
+                  password.PasswordChanged += (s, e) => Changed?.Invoke();
+                  break;
+               case System.Windows.Controls.TextBox text:
+                  text.TextChanged += (s, e) => Changed?.Invoke();
+                  break;
+               case ComboBox combo:
+                  combo.SelectionChanged += (s, e) => Changed?.Invoke();
+                  break;
+            }
          }
+
+         /// <summary>
+         /// The width of every numeric editor on these pages. A count of seconds
+         /// or of connections is four or five digits wide, and a box stretched to
+         /// the column would say it expects a sentence.
+         /// </summary>
+         protected const double NumberWidth = 180;
+
+         /// <summary>
+         /// The up/down box the four numeric row types share, described, watched
+         /// and sized. <paramref name="fallback"/> is what is shown when the value
+         /// is not a number at all, which for an INI row is its documented default
+         /// and for a COM row is zero.
+         /// </summary>
+         protected Wpf.Ui.Controls.NumberBox NumberEditor(object value, int minimum, int fallback)
+         {
+            double current;
+            try { current = Convert.ToDouble(value); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { current = fallback; }
+
+            var box = new Wpf.Ui.Controls.NumberBox
+            {
+               Value = current,
+               Minimum = minimum,
+               MaxDecimalPlaces = 0,
+               SmallChange = 1,
+               LargeChange = 10,
+               FontSize = Typography.Body,
+               Width = NumberWidth,
+               HorizontalAlignment = HorizontalAlignment.Left
+            };
+            Describe(box, Path);
+            Watch(box);
+            return box;
+         }
+
+         /// <summary>
+         /// The text box the free-text rows share. It takes the width of the
+         /// field column rather than a typed-in one, so the editors line up down
+         /// their right edge as well as their left and a long path is readable in
+         /// the box that holds it.
+         /// </summary>
+         protected TextBox TextEditor(string text, string placeholder = null)
+         {
+            var box = new TextBox
+            {
+               Text = text ?? "",
+               FontSize = Typography.Body,
+               HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+
+            if (!string.IsNullOrEmpty(placeholder))
+               box.PlaceholderText = placeholder;
+
+            Describe(box, Path);
+            Watch(box);
+            return box;
+         }
+
+         /// <summary>
+         /// A text editor with a "…" picker beside it: the box takes what is left
+         /// of the column and the button its own width.
+         /// </summary>
+         protected FrameworkElement WithBrowse(TextBox box, bool folder, string filter)
+         {
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(box, 0);
+            row.Children.Add(box);
+
+            var browse = new Wpf.Ui.Controls.Button
+            {
+               Content = "…",
+               MinWidth = 40,
+               Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0),
+               VerticalAlignment = VerticalAlignment.Bottom,
+               ToolTip = folder ? L("Browse for a folder") : L("Browse for a file")
+            };
+            SetAid(browse, Path + "Browse"); // no-loc
+
+            // The button's content is a single ellipsis character, so its content
+            // names it "…" and a listener is told nothing at all about which of the
+            // several browse buttons on the page they are on.
+            System.Windows.Automation.AutomationProperties.SetName(browse,
+               folder
+                  ? F("Browse for a folder for {0}", AccessibleName ?? Label ?? L("this setting"))
+                  : F("Browse for a file for {0}", AccessibleName ?? Label ?? L("this setting")));
+
+            browse.Click += (s, e) =>
+            {
+               string picked = folder
+                  ? Services.PathPicker.PickFolder(box.Text)
+                  : Services.PathPicker.PickFile(box.Text, filter);
+               if (picked != null)
+                  box.Text = picked;
+            };
+            Grid.SetColumn(browse, 1);
+            row.Children.Add(browse);
+            return row;
+         }
+
+         /// <summary>
+         /// The check box the two yes/no row types share. Its Content is its
+         /// caption, which is why those rows put no caption on the field row.
+         /// </summary>
+         protected CheckBox CheckEditor(bool value)
+         {
+            var box = new CheckBox { Content = Label, IsChecked = value, FontSize = Typography.Body };
+            SetAid(box, Path);
+
+            // A checkbox is named by its Content, so it needs an override only
+            // when the resolved name differs from the label - which happens when
+            // the same wording appears on more than one card and has been
+            // qualified with the card title.
+            if (!string.IsNullOrEmpty(AccessibleName) &&
+                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
+            {
+               System.Windows.Automation.AutomationProperties.SetName(box, AccessibleName);
+            }
+
+            Watch(box);
+            return box;
+         }
+
+         /// <summary>The list editor the two combo row types share.</summary>
+         protected ComboBox ComboEditor()
+            => new() { HorizontalAlignment = HorizontalAlignment.Stretch, FontSize = Typography.Body };
 
          protected static string Slug(string text)
          {
@@ -153,37 +337,16 @@ namespace hMailServer.ControlPanel.Views
          /// <summary>The created checkbox (for cross-field dependency wiring).</summary>
          public CheckBox Box => box_;
 
-         public override FrameworkElement CreateEditor(object value)
-         {
-            box_ = new CheckBox { Content = Label, IsChecked = value is bool b && b, FontSize = Typography.Body };
-            SetAid(box_, Path);
+         // Blurb was once silently dropped on this row type: every other editor
+         // wrapped its control and printed the note, and this one returned the
+         // bare checkbox, so a note written on a COM-backed checkbox appeared
+         // nowhere and no build warning said so. It cannot happen again on any row
+         // type, because printing the note is no longer something a row type does:
+         // CreateRow puts every editor in a FieldRow whose Hint is the Blurb.
+         protected override bool CaptionOnRow => false;
 
-            // A checkbox is named by its Content, so it needs an override only
-            // when the resolved name differs from the label - which happens when
-            // the same wording appears on more than one card and has been
-            // qualified with the card title.
-            if (!string.IsNullOrEmpty(AccessibleName) &&
-                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
-            {
-               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
-            }
-
-            // Blurb was silently dropped on this row type: every other editor here
-            // calls Annotate and this one returned the bare checkbox, so a note
-            // written on a COM-backed checkbox appeared nowhere and no build
-            // warning said so. IniBool - the same control backed by the INI file -
-            // has always wrapped and annotated, which is what makes the omission a
-            // bug rather than a decision. Only wrapped when there is something to
-            // say, so the ~60 checkboxes with no Blurb keep the visual tree they
-            // had.
-            if (string.IsNullOrEmpty(Blurb))
-               return box_;
-
-            var panel = new StackPanel();
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
-         }
+         protected override FrameworkElement BuildEditor(object value)
+            => box_ = CheckEditor(value is bool b && b);
 
          public override object ReadEditor() => box_.IsChecked is true;
       }
@@ -212,10 +375,8 @@ namespace hMailServer.ControlPanel.Views
             else if (box_ != null)
                box_.Text = text ?? "";
          }
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
             object shown = value;
             if (Numeric && Divisor > 1 && value != null)
             {
@@ -224,83 +385,10 @@ namespace hMailServer.ControlPanel.Views
 
             // Numeric settings get an up/down NumberBox; everything else a text box.
             if (Numeric)
-            {
-               double current = 0;
-               try { current = Convert.ToDouble(shown); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { current = 0; }
-               number_ = new Wpf.Ui.Controls.NumberBox
-               {
-                  Value = current,
-                  Minimum = 0,
-                  MaxDecimalPlaces = 0,
-                  SmallChange = 1,
-                  LargeChange = 10,
-                  FontSize = Typography.Body,
-                  MaxWidth = 180,
-                  MinWidth = 120,
-                  HorizontalAlignment = HorizontalAlignment.Left
-               };
-               Describe(number_, Path);
-               panel.Children.Add(number_);
-               Annotate(number_, panel);
-               return panel;
-            }
+               return number_ = NumberEditor(shown, 0, 0);
 
-            box_ = new TextBox
-            {
-               Text = Convert.ToString(shown) ?? "",
-               FontSize = Typography.Body,
-               MaxWidth = 520,
-               HorizontalAlignment = HorizontalAlignment.Left,
-               MinWidth = 320
-            };
-            Describe(box_, Path);
-
-            if (BrowseFile || BrowseFolder)
-            {
-               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-               box_.HorizontalAlignment = HorizontalAlignment.Stretch;
-               box_.MaxWidth = double.PositiveInfinity;
-               box_.MinWidth = 0;
-               Grid.SetColumn(box_, 0);
-               row.Children.Add(box_);
-
-               var browse = new Wpf.Ui.Controls.Button
-               {
-                  Content = "\u2026",
-                  MinWidth = 40,
-                  Margin = new Thickness(8, 0, 0, 0),
-                  VerticalAlignment = VerticalAlignment.Bottom,
-                  ToolTip = BrowseFolder ? L("Browse for a folder") : L("Browse for a file")
-               };
-               SetAid(browse, Path + "Browse"); // no-loc
-               // The button's content is a single ellipsis character, so its
-               // content names it "…" and a listener is told nothing at all about
-               // which of the several browse buttons on the page they are on.
-               System.Windows.Automation.AutomationProperties.SetName(browse,
-                  BrowseFolder
-                     ? F("Browse for a folder for {0}", AccessibleName ?? Label ?? L("this setting"))
-                     : F("Browse for a file for {0}", AccessibleName ?? Label ?? L("this setting")));
-               browse.Click += (s, e) =>
-               {
-                  string picked = BrowseFolder
-                     ? Services.PathPicker.PickFolder(box_.Text)
-                     : Services.PathPicker.PickFile(box_.Text, FileFilter);
-                  if (picked != null)
-                     box_.Text = picked;
-               };
-               Grid.SetColumn(browse, 1);
-               row.Children.Add(browse);
-               panel.Children.Add(row);
-            }
-            else
-            {
-               panel.Children.Add(box_);
-            }
-
-            Annotate(box_, panel);
-            return panel;
+            box_ = TextEditor(Convert.ToString(shown));
+            return BrowseFile || BrowseFolder ? WithBrowse(box_, BrowseFolder, FileFilter) : box_;
          }
 
          public override object ReadEditor()
@@ -338,25 +426,16 @@ namespace hMailServer.ControlPanel.Views
 
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         /// <summary>The caption is the check box's own Content; see ComBool.</summary>
+         protected override bool CaptionOnRow => false;
+
+         protected override FrameworkElement BuildEditor(object value)
          {
             bool current = Default;
             if (IniStore != null && IniStore.IsAvailable)
                current = IniStore.ReadBool(Path, Default);
 
-            var panel = new StackPanel();
-
-            box_ = new CheckBox { Content = Label, IsChecked = current, FontSize = Typography.Body };
-            SetAid(box_, Path);
-            if (!string.IsNullOrEmpty(AccessibleName) &&
-                !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
-            {
-               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
-            }
-
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            return box_ = CheckEditor(current);
          }
 
          public override object ReadEditor() => box_?.IsChecked is true;
@@ -394,36 +473,13 @@ namespace hMailServer.ControlPanel.Views
          // The value comes from the INI file, not from a COM property.
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var store = IniStore;
             int current = Default;
-            if (store != null && store.IsAvailable)
-            {
-               string raw = store.Read(Path, Default.ToString());
-               if (!int.TryParse(raw, out current))
-                  current = Default;
-            }
+            if (IniStore != null && IniStore.IsAvailable && !int.TryParse(ReadRaw(), out current))
+               current = Default;
 
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
-            number_ = new Wpf.Ui.Controls.NumberBox
-            {
-               Value = current,
-               Minimum = MinimumValue,
-               MaxDecimalPlaces = 0,
-               SmallChange = 1,
-               LargeChange = 10,
-               FontSize = Typography.Body,
-               MaxWidth = 180,
-               MinWidth = 120,
-               HorizontalAlignment = HorizontalAlignment.Left
-            };
-            Describe(number_, Path);
-            panel.Children.Add(number_);
-            Annotate(number_, panel);
-            return panel;
+            return number_ = NumberEditor(current, MinimumValue, Default);
          }
 
          public override object ReadEditor() => (long)(number_?.Value ?? Default);
@@ -432,74 +488,39 @@ namespace hMailServer.ControlPanel.Views
          /// of the COM write path.</summary>
          public void SaveToIni()
          {
-            var store = IniStore;
-            if (store == null || !store.IsAvailable || number_ == null)
+            if (IniStore == null || !IniStore.IsAvailable || number_ == null)
                return;
 
-            store.Write(Path, ((long)(number_.Value ?? Default)).ToString());
+            WriteRaw(((long)(number_.Value ?? Default)).ToString());
          }
+
+         /// <summary>Where the value is read from and written to - [Settings], unless a subclass says otherwise.</summary>
+         protected virtual string ReadRaw() => IniStore.Read(Path, Default.ToString());
+
+         protected virtual void WriteRaw(string value) => IniStore.Write(Path, value);
 
          /// <summary>Shared store, assigned by the view when the page is built.</summary>
          public IniFeatureStore IniStore;
       }
 
       /// <summary>
-      /// A numeric setting in a named INI section other than [Settings].
+      /// A numeric setting in a named INI section other than [Settings]. The same
+      /// row as <see cref="IniNumber"/> - the same box, the same default, the same
+      /// minimum - pointed at a different section, which is the whole difference
+      /// between the two and now the only thing written here.
       ///
       /// The database tuning values live in [Database]. Editing them through
       /// IniNumber would write keys of the right name into [Settings], where the
       /// server never looks - the value would appear saved, read back correctly on
       /// the next visit, and do nothing at all.
       /// </summary>
-      private class SectionIniNumber : ComSetting, IIniSetting
+      private class SectionIniNumber : IniNumber
       {
          public string Section;
-         public int Default;
-         public int MinimumValue;
-         public IniFeatureStore IniStore;
-         private Wpf.Ui.Controls.NumberBox number_;
 
-         public override bool WantsInitialValue => false;
+         protected override string ReadRaw() => IniStore.ReadFrom(Section, Path, Default.ToString());
 
-         public override FrameworkElement CreateEditor(object value)
-         {
-            int current = Default;
-            if (IniStore != null && IniStore.IsAvailable &&
-                !int.TryParse(IniStore.ReadFrom(Section, Path, Default.ToString()), out current))
-            {
-               current = Default;
-            }
-
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
-            number_ = new Wpf.Ui.Controls.NumberBox
-            {
-               Value = current,
-               Minimum = MinimumValue,
-               MaxDecimalPlaces = 0,
-               SmallChange = 1,
-               LargeChange = 10,
-               FontSize = Typography.Body,
-               MaxWidth = 180,
-               MinWidth = 120,
-               HorizontalAlignment = HorizontalAlignment.Left
-            };
-            Describe(number_, Path);
-            panel.Children.Add(number_);
-            Annotate(number_, panel);
-            return panel;
-         }
-
-         public override object ReadEditor() => (long)(number_?.Value ?? Default);
-
-         public void SaveToIni()
-         {
-            if (IniStore == null || !IniStore.IsAvailable || number_ == null)
-               return;
-
-            IniStore.WriteTo(Section, Path, ((long)(number_.Value ?? Default)).ToString());
-         }
+         protected override void WriteRaw(string value) => IniStore.WriteTo(Section, Path, value);
       }
 
       /// <summary>
@@ -529,64 +550,14 @@ namespace hMailServer.ControlPanel.Views
 
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
             string current = Default;
             if (IniStore != null && IniStore.IsAvailable)
                current = IniStore.Read(Path, Default);
 
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
-            box_ = new TextBox
-            {
-               Text = current,
-               PlaceholderText = Placeholder,
-               FontSize = Typography.Body,
-               HorizontalAlignment = HorizontalAlignment.Stretch
-            };
-            Describe(box_, Path);
-
-            if (BrowseFolder)
-            {
-               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-               Grid.SetColumn(box_, 0);
-               row.Children.Add(box_);
-
-               var browse = new Wpf.Ui.Controls.Button
-               {
-                  Content = "\u2026",
-                  MinWidth = 40,
-                  Margin = new Thickness(8, 0, 0, 0),
-                  VerticalAlignment = VerticalAlignment.Bottom,
-                  ToolTip = L("Browse for a folder")
-               };
-               SetAid(browse, Path + "Browse"); // no-loc
-               // See ComText: "\u2026" is not a name.
-               System.Windows.Automation.AutomationProperties.SetName(browse,
-                  F("Browse for a folder for {0}", AccessibleName ?? Label ?? L("this setting")));
-               browse.Click += (s, e) =>
-               {
-                  string picked = Services.PathPicker.PickFolder(box_.Text);
-                  if (picked != null)
-                     box_.Text = picked;
-               };
-               Grid.SetColumn(browse, 1);
-               row.Children.Add(browse);
-               panel.Children.Add(row);
-            }
-            else
-            {
-               box_.HorizontalAlignment = HorizontalAlignment.Left;
-               box_.MinWidth = 320;
-               box_.MaxWidth = 520;
-               panel.Children.Add(box_);
-            }
-
-            Annotate(box_, panel);
-            return panel;
+            box_ = TextEditor(current, Placeholder);
+            return BrowseFolder ? WithBrowse(box_, folder: true, null) : box_;
          }
 
          public override object ReadEditor() => box_?.Text?.Trim() ?? "";
@@ -612,11 +583,9 @@ namespace hMailServer.ControlPanel.Views
          public int SelectedValue
             => combo_?.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-            combo_ = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = Typography.Body };
+            combo_ = ComboEditor();
             int sel;
             try { sel = Convert.ToInt32(value); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { sel = 0; }
             foreach ((int v, string l) in Options)
@@ -629,9 +598,8 @@ namespace hMailServer.ControlPanel.Views
             if (combo_.SelectedItem == null && combo_.Items.Count > 0)
                combo_.SelectedIndex = 0;
             Describe(combo_, Path);
-            panel.Children.Add(combo_);
-            Annotate(combo_, panel);
-            return panel;
+            Watch(combo_);
+            return combo_;
          }
 
          public override object ReadEditor()
@@ -644,22 +612,16 @@ namespace hMailServer.ControlPanel.Views
          private hMailServer.ControlPanel.Views.PasswordField box_;
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-            box_ = new hMailServer.ControlPanel.Views.PasswordField
+            box_ = new PasswordField
             {
                FontSize = Typography.Body,
-               MinWidth = 320,
-               MaxWidth = 520,
-               Padding = new Thickness(6),
-               HorizontalAlignment = HorizontalAlignment.Left
+               HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Path);
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            Watch(box_);
+            return box_;
          }
 
          public override object ReadEditor() => box_.Password;
@@ -688,13 +650,8 @@ namespace hMailServer.ControlPanel.Views
 
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-
-            if (!string.IsNullOrEmpty(Label))
-               panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
             string text;
             try
             {
@@ -709,14 +666,10 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = text,
                FontSize = Typography.Body,
-               TextWrapping = TextWrapping.Wrap,
-               MaxWidth = 620,
-               HorizontalAlignment = HorizontalAlignment.Left
+               TextWrapping = TextWrapping.Wrap
             };
             Describe(line, Path);
-            panel.Children.Add(line);
-            Annotate(line, panel);
-            return panel;
+            return line;
          }
 
          /// <summary>Nothing to read back: this row edits nothing.</summary>
@@ -754,7 +707,7 @@ namespace hMailServer.ControlPanel.Views
          private System.Windows.Controls.TextBlock result_;
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
             var panel = new StackPanel();
             var btn = new Wpf.Ui.Controls.Button
@@ -763,11 +716,17 @@ namespace hMailServer.ControlPanel.Views
                Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
                HorizontalAlignment = HorizontalAlignment.Left
             };
+            SetAid(btn, "action-" + Slug(ButtonText));
+
+            // Collapsed until there is a result: an empty line still takes its
+            // margin and its line height, which pushed the note under the button
+            // away from the button it belongs to.
             result_ = new System.Windows.Controls.TextBlock
             {
                FontSize = Typography.Caption,
-               Margin = new Thickness(0, 8, 0, 0),
-               TextWrapping = TextWrapping.Wrap
+               Margin = new Thickness(0, DesignTokens.Space.Sm, 0, 0),
+               TextWrapping = TextWrapping.Wrap,
+               Visibility = Visibility.Collapsed
             };
 
             // A polite live region, so the outcome of "Test ClamAV connection" is
@@ -791,30 +750,33 @@ namespace hMailServer.ControlPanel.Views
                try
                {
                   (bool ok, string text) r = Action();
-                  result_.Text = r.text;
-                  result_.Foreground = r.ok
-                     ? Services.ThemeTokens.Success
-                     : Services.ThemeTokens.Danger;
+                  Report_(r.text, r.ok);
                }
                catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
                {
-                  result_.Text = F("Test failed: {0}", ex.Message);
-                  result_.Foreground = Services.ThemeTokens.Danger;
+                  Report_(F("Test failed: {0}", ex.Message), false);
                }
             };
+
             panel.Children.Add(btn);
             panel.Children.Add(result_);
-            SetAid(btn, "action-" + Slug(ButtonText));
-
-            // Blurb was silently dropped on this row type too - the same omission that
-            // was found and fixed on the checkbox row. Every ComAction until now
-            // happened to have no Blurb, so nothing was visibly missing; the first one
-            // that needed a caption (the log folder path) would have set it and got
-            // nothing. Annotate also attaches the text to the button as accessible
-            // help, which is where a caption about what the button will do belongs.
-            Annotate(btn, panel);
-
             return panel;
+         }
+
+         /// <summary>
+         /// The outcome, in its level's colour by resource key rather than in a
+         /// brush held here: ThemeTokens republishes the status brushes on every
+         /// theme change, and a line holding a resolved brush would keep the colour
+         /// of the theme it was pressed under. The words say which it is as well,
+         /// which is what carries the outcome in High Contrast and to an eye that
+         /// cannot separate the two colours.
+         /// </summary>
+         private void Report_(string text, bool ok)
+         {
+            result_.Text = text;
+            result_.Visibility = Visibility.Visible;
+            result_.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty,
+               ok ? "AppSuccessBrush" : "AppDangerBrush");
          }
 
          public override object ReadEditor() => null;
@@ -833,12 +795,9 @@ namespace hMailServer.ControlPanel.Views
          public ComText ReturnTarget;
          public override bool WantsInitialValue => false;
 
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
-            var combo = new ComboBox { MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left, FontSize = Typography.Body };
+            ComboBox combo = ComboEditor();
             combo.Items.Add(new ComboBoxItem { Content = L("Choose a preset\u2026"), Tag = -1 });
             for (int i = 0; i < Presets.Length; i++)
                combo.Items.Add(new ComboBoxItem { Content = Presets[i].Name, Tag = i });
@@ -854,9 +813,11 @@ namespace hMailServer.ControlPanel.Views
                }
             };
 
-            panel.Children.Add(combo);
+            // Not watched: choosing a preset saves nothing of its own. What it
+            // fills in is watched, so the page says it has unsaved changes because
+            // the command line changed, which is what actually happened.
             Describe(combo, "preset-" + Slug(Label));
-            return panel;
+            return combo;
          }
 
          public override object ReadEditor() => null;
@@ -887,31 +848,24 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private class ComInert : ComSetting, INotPersisted
       {
-         public override FrameworkElement CreateEditor(object value)
+         protected override FrameworkElement BuildEditor(object value)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
-            var box = new TextBox
-            {
-               Text = Convert.ToString(value) ?? "",
-               FontSize = Typography.Body,
-               MaxWidth = 180,
-               MinWidth = 120,
-               HorizontalAlignment = HorizontalAlignment.Left,
-               IsReadOnly = true
-            };
-
             // Read-only rather than disabled: a disabled control is skipped by the
             // keyboard and, in most screen readers, not reachable at all - so
             // disabling it would hide the value and the explanation from precisely
             // the reader who cannot see the greyed-out styling either. Read-only
             // keeps it in the tab order and announced, and still refuses the edit.
+            // Not watched, either: nothing here can become unsaved.
+            var box = new TextBox
+            {
+               Text = Convert.ToString(value) ?? "",
+               FontSize = Typography.Body,
+               Width = NumberWidth,
+               HorizontalAlignment = HorizontalAlignment.Left,
+               IsReadOnly = true
+            };
             Describe(box, Path);
-
-            panel.Children.Add(box);
-            Annotate(box, panel);
-            return panel;
+            return box;
          }
 
          public override object ReadEditor() => null;
@@ -951,6 +905,26 @@ namespace hMailServer.ControlPanel.Views
       private string diag_;
       private int failedReads_;
       private Action afterBuildUi_;
+
+      /// <summary>
+      /// What the pill beside the page title says: whether what is on screen has
+      /// reached the server. <see cref="ServerSettingsPageStatus"/> - which is WPF-free
+      /// and tested - decides the word and the severity for each state.
+      /// </summary>
+      private ServerSettingsPageState state_ = ServerSettingsPageState.Clean;
+
+      /// <summary>
+      /// True while the editors are being filled from the server, so that filling
+      /// them is not mistaken for someone typing in them.
+      /// </summary>
+      private bool building_;
+
+      /// <summary>
+      /// How wide the field column is allowed to grow. A settings form stretched
+      /// to a wide window puts a caption and its editor a screen apart, which
+      /// reads as two separate things; a column is what a form is.
+      /// </summary>
+      private const double SettingsColumnWidth = 760;
 
       // Most settings on these pages live in the COM settings tree, but a few
       // (log retention) live in hMailServer.ini; IniNumber rows use this store.
@@ -1038,8 +1012,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildProtocols()
       {
-         TitleText.Text = L("Protocols");
-         SubtitleText.Text = L("Which services this server runs, connection limits and greetings.");
+         Header.Title = L("Protocols");
+         Header.Subtitle = L("Which services this server runs, connection limits and greetings.");
 
          var services = Card(L("Services"),
             L("Enable or disable the protocol servers. Changes apply after pressing Save. ManageSieve (for managing Sieve scripts) is enabled on the API & monitoring page; OAuth2 token authentication is on the Authentication page."));
@@ -1218,8 +1192,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildDelivery()
       {
-         TitleText.Text = L("Delivery of e-mail");
-         SubtitleText.Text = L("Outbound delivery behavior, retries and smart-host relaying.");
+         Header.Title = L("Delivery of e-mail");
+         Header.Subtitle = L("Outbound delivery behavior, retries and smart-host relaying.");
 
          var del = Card(L("Delivery of e-mail"),
             L("Outbound delivery, retries and throttling. Keeping forwarded mail SPF-aligned (SRS) and bounce tagging (BATV) are on the Transport security page."));
@@ -1357,8 +1331,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildAntiSpam()
       {
-         TitleText.Text = L("Anti-spam");
-         SubtitleText.Text = L("Score-based spam filtering: SPF, DKIM, DMARC, host checks, greylisting and SpamAssassin.");
+         Header.Title = L("Anti-spam");
+         Header.Subtitle = L("Score-based spam filtering: SPF, DKIM, DMARC, host checks, greylisting and SpamAssassin.");
 
          var general = Card(L("Thresholds & actions"));
          general.Settings.Add(new ComText { Path = "AntiSpam.SpamMarkThreshold", Label = L("Spam mark threshold (score)"), Numeric = true });
@@ -1611,8 +1585,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildAntiVirus()
       {
-         TitleText.Text = L("Anti-virus");
-         SubtitleText.Text = L("Virus scanning and attachment blocking of received messages.");
+         Header.Title = L("Anti-virus");
+         Header.Subtitle = L("Virus scanning and attachment blocking of received messages.");
 
          var general = Card(L("Action & notifications"));
          general.Settings.Add(new ComCombo { Path = "AntiVirus.Action", Label = L("When a virus is found"), Options = AntivirusAction });
@@ -1719,8 +1693,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildTls()
       {
-         TitleText.Text = L("SSL/TLS");
-         SubtitleText.Text = L("Which TLS versions and ciphers this server negotiates, for its own listeners and for the connections it makes when delivering. Certificates are on the SSL certificates page; DANE and MTA-STS are on Transport security; brute-force lockout is on Auto-ban.");
+         Header.Title = L("SSL/TLS");
+         Header.Subtitle = L("Which TLS versions and ciphers this server negotiates, for its own listeners and for the connections it makes when delivering. Certificates are on the SSL certificates page; DANE and MTA-STS are on Transport security; brute-force lockout is on Auto-ban.");
 
          var ver = Card(L("Protocol versions"), L("TLS 1.2 and 1.3 are the recommended baseline; older versions exist only for legacy clients."));
          var tls10 = new ComBool { Path = "TlsVersion10Enabled", Label = L("TLS 1.0 (legacy)") };
@@ -1848,8 +1822,8 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private void BuildAutoBan()
       {
-         TitleText.Text = L("Auto-ban");
-         SubtitleText.Text = L("Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page.");
+         Header.Title = L("Auto-ban");
+         Header.Subtitle = L("Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page.");
 
          var ban = Card(L("Auto-ban"),
             L("Counted per connecting IP address across every protocol that authenticates - SMTP AUTH, POP3, IMAP, ManageSieve and the REST API all feed the same counter. On reaching the limit the server clears that address's counted failures and creates an IP range named \"Auto-ban: <user>\" at priority 100 covering that one address, which expires on its own."));
@@ -1984,8 +1958,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildLogging()
       {
-         TitleText.Text = L("Logging");
-         SubtitleText.Text = L("What the server writes to its log files (viewable on the Live logs page).");
+         Header.Title = L("Logging");
+         Header.Subtitle = L("What the server writes to its log files (viewable on the Live logs page).");
 
          // One tab holding the three cards: calling Tab() again would add a second
          // tab with the same header rather than reuse this one.
@@ -2157,8 +2131,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildPerformance()
       {
-         TitleText.Text = L("Performance");
-         SubtitleText.Text = L("Thread pools, in-memory caches and message indexing.");
+         Header.Title = L("Performance");
+         Header.Subtitle = L("Thread pools, in-memory caches and message indexing.");
 
          var threads = Card(L("Threads"), L("Thread pool sizing. Defaults suit most installations; raise for very busy servers."));
          threads.Settings.Add(new ComText { Path = "MaxDeliveryThreads", Label = L("Max delivery threads"), Numeric = true });
@@ -2378,8 +2352,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void BuildAdvanced()
       {
-         TitleText.Text = L("Advanced");
-         SubtitleText.Text = L("Server-wide defaults, keeping copies of mail and the scripting engine.");
+         Header.Title = L("Advanced");
+         Header.Subtitle = L("Server-wide defaults, keeping copies of mail and the scripting engine.");
 
          var general = Card(L("General"),
             L("The administrator password and two-factor authentication are on the Administrative access page."));
@@ -2487,8 +2461,8 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private void BuildAdminAccess()
       {
-         TitleText.Text = L("Administrative access");
-         SubtitleText.Text = L("The credentials used to administer this server.");
+         Header.Title = L("Administrative access");
+         Header.Subtitle = L("The credentials used to administer this server.");
 
          var password = Card(L("Administrator password"),
             L("The main hMailServer administration password. It is used by this Control Panel, the REST API and any script that connects through the COM API, and is stored hashed in hMailServer.ini. Changing it does not affect mailbox passwords."));
@@ -2625,7 +2599,7 @@ namespace hMailServer.ControlPanel.Views
       /// them are built.
       ///
       /// It has to be done for the whole page at once, which is why it is not
-      /// simply part of CreateEditor: on the Protocols page "Max simultaneous
+      /// simply part of building an editor: on the Protocols page "Max simultaneous
       /// connections (0 = unlimited)" and "Welcome banner (empty = default)" each
       /// appear three times, once per protocol card, and only a pass over the page
       /// can tell which labels need qualifying with their card title.
@@ -2658,6 +2632,7 @@ namespace hMailServer.ControlPanel.Views
          SettingsTabs.Items.Clear();
          diag_ = null;
          failedReads_ = 0;
+         building_ = true;
 
          AssignAccessibleNames();
 
@@ -2665,35 +2640,20 @@ namespace hMailServer.ControlPanel.Views
          {
             // Cap the settings form to a readable column instead of letting cards
             // stretch the full window width (which left short, left-aligned inputs
-            // floating in empty space).
-            var panel = new StackPanel { Margin = new Thickness(2, 4, 14, 4), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
+            // floating in empty space). The right inset is the room the tab's own
+            // scroll bar takes, so that no note runs underneath it.
+            var panel = new StackPanel
+            {
+               MaxWidth = SettingsColumnWidth,
+               HorizontalAlignment = HorizontalAlignment.Left,
+               Margin = new Thickness(0, DesignTokens.Space.Xs, DesignTokens.Space.Md, DesignTokens.Space.Xs)
+            };
 
             foreach (CardDef card in tab.Cards)
             {
-               var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-               border.SetResourceReference(StyleProperty, "Card");
+               var fields = new StackPanel();
 
-               var inner = new StackPanel();
-               inner.Children.Add(new TextBlock
-               {
-                  Text = card.Title,
-                  FontSize = Typography.SectionHeading,
-                  FontWeight = FontWeights.SemiBold,
-                  Margin = new Thickness(0, 0, 0, string.IsNullOrEmpty(card.Blurb) ? 12 : 4)
-               });
-               if (!string.IsNullOrEmpty(card.Blurb))
-               {
-                  inner.Children.Add(new TextBlock
-                  {
-                     Text = card.Blurb,
-                     FontSize = Typography.Caption,
-                     TextWrapping = TextWrapping.Wrap,
-                     Opacity = 0.65,
-                     Margin = new Thickness(0, 0, 0, 14)
-                  });
-               }
-
-               FrameworkElement lastEditor = null;
+               Scaffold.FieldRow lastRow = null;
                foreach (ComSetting setting in card.Settings)
                {
                   object value = null;
@@ -2712,17 +2672,32 @@ namespace hMailServer.ControlPanel.Views
                      }
                   }
 
-                  FrameworkElement editor = setting.CreateEditor(value);
-                  editor.Margin = new Thickness(0, 0, 0, 12);
-                  inner.Children.Add(editor);
-                  lastEditor = editor;
+                  setting.Changed = MarkUnsaved_;
+                  lastRow = setting.CreateRow(value);
+                  fields.Children.Add(lastRow);
                }
 
-               if (lastEditor != null)
-                  lastEditor.Margin = new Thickness(0, 0, 0, 2);
+               // The last field's own gap would fall inside the card's padding and
+               // make that card taller than the one beside it for no reason.
+               if (lastRow != null)
+                  lastRow.Margin = new Thickness(0);
 
-               border.Child = inner;
-               panel.Children.Add(border);
+               // The card is the surface; the section inside it is the heading, the
+               // description and the fields - and a level-2 heading in the
+               // automation tree, which is how a screen reader walks a page of a
+               // hundred and fifty settings without reading every one of them. Its
+               // own section gap is cleared: the card's padding is the gap here.
+               panel.Children.Add(new Scaffold.Card
+               {
+                  Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md),
+                  Content = new Scaffold.SettingsSection
+                  {
+                     Heading = card.Title,
+                     Description = card.Blurb,
+                     Margin = new Thickness(0),
+                     Content = fields
+                  }
+               });
             }
 
             var scroll = new ScrollViewer
@@ -2742,11 +2717,69 @@ namespace hMailServer.ControlPanel.Views
          if (SettingsTabs.Items.Count == 1 && SettingsTabs.Items[0] is TabItem only)
             only.Visibility = Visibility.Collapsed;
 
-         StatusText.Text = failedReads_ == 0
-            ? L("Values read from the server.")
-            : F("{0} setting(s) could not be read — {1}", failedReads_, diag_);
+         // A page that read cleanly has nothing to say - no pill, no notice. One
+         // that could not read some of its values says how many and why, and says
+         // it at the top of the page rather than on a line under the fold of a
+         // long tab, where it was before.
+         ShowState_(ServerSettingsPageState.Clean);
+         ShowNotice_(ServerSettingsPageStatus.ReadSentence(failedReads_, diag_), StatusLevel.Critical);
 
          afterBuildUi_?.Invoke();
+
+         // The editors were filled above, and a WPF-UI NumberBox raises
+         // ValueChanged while its template is applied - which happens after this
+         // method returns. ContextIdle runs below every priority that layout and
+         // loading use, so the guard is released only once the page has settled
+         // and the page does not announce unsaved changes before anybody has
+         // typed anything.
+         Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(() => building_ = false));
+      }
+
+      /// <summary>
+      /// An editor changed. The pill is the only thing on the page that says what
+      /// is on screen is no longer what the server holds, so it is worth saying at
+      /// the first keystroke and not worth saying twice.
+      /// </summary>
+      private void MarkUnsaved_()
+      {
+         if (building_ || state_ == ServerSettingsPageState.Unsaved)
+            return;
+
+         ShowState_(ServerSettingsPageState.Unsaved);
+      }
+
+      /// <summary>
+      /// Puts the page's state on the pill beside the title. The notice under the
+      /// header is separate on purpose: "27 settings could not be read" is still
+      /// true after the first keystroke, and a page that dropped that warning the
+      /// moment somebody typed would be hiding it at exactly the point it starts
+      /// to matter. Only a reload or a save replaces it.
+      /// </summary>
+      private void ShowState_(ServerSettingsPageState state)
+      {
+         state_ = state;
+
+         StatePill.Level = ServerSettingsPageStatus.LevelFor(state);
+         StatePill.Text = ServerSettingsPageStatus.WordFor(state);
+         StatePill.Visibility = ServerSettingsPageStatus.ShowsPill(state) ? Visibility.Visible : Visibility.Collapsed;
+      }
+
+      /// <summary>
+      /// The sentence under the header, or nothing when there is nothing to say -
+      /// which is the ordinary case, and is why a page that read cleanly shows no
+      /// notice at all rather than a line confirming that nothing went wrong.
+      /// </summary>
+      private void ShowNotice_(string sentence, StatusLevel level)
+      {
+         if (string.IsNullOrEmpty(sentence))
+         {
+            StatusNotice.Visibility = Visibility.Collapsed;
+            return;
+         }
+
+         StatusNotice.Level = level;
+         StatusNotice.Text = sentence;
+         StatusNotice.Visibility = Visibility.Visible;
       }
 
       // ---- live test / dependency helpers ------------------------------------
@@ -3233,6 +3266,14 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save_Click(object sender, RoutedEventArgs e)
       {
+         // The writes below are synchronous COM calls, and a page of a hundred and
+         // fifty of them over a remote link takes long enough to be worth saying
+         // so. Letting the dispatcher paint at Render priority puts the pill on
+         // screen before the first write starts; nothing below Render runs, so no
+         // input is handled in the middle of a save.
+         ShowState_(ServerSettingsPageState.Saving);
+         Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
+
          int saved = 0, failed = 0;
 
          bool iniWritten = false;
@@ -3271,15 +3312,17 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
-         // hMailServer.ini is read when the service starts, so an INI-backed row
-         // does not take effect until it is restarted - don't claim otherwise.
-         string appliedNote = iniWritten
-            ? L(" - server settings applied immediately; hMailServer.ini settings apply after a service restart.")
-            : L(" - applied immediately.");
-
-         StatusText.Text = failed == 0
-            ? F("Saved {0} settings at {1}", saved, DateTime.Now.ToLongTimeString()) + appliedNote
-            : F("Saved {0} settings, {1} could not be written.", saved, failed);
+         // ServerSettingsPageStatus writes the sentence, including the part about
+         // hMailServer.ini being read when the service starts - so an INI-backed
+         // row does not take effect until it is restarted, and the sentence does
+         // not claim otherwise. A save that failed anywhere is Critical, because
+         // what is on screen is then not what the server holds and the reader has
+         // to find out which rows.
+         ServerSettingsPageState outcome = failed == 0 ? ServerSettingsPageState.Saved : ServerSettingsPageState.PartlySaved;
+         ShowState_(outcome);
+         ShowNotice_(
+            ServerSettingsPageStatus.SaveSentence(saved, failed, DateTime.Now.ToLongTimeString(), iniWritten),
+            ServerSettingsPageStatus.LevelFor(outcome));
 
          if (failed == 0)
             Services.Toast.Success(F("Saved {0} settings", saved) + (iniWritten ? L(" \u2014 INI settings need a service restart.") : L(" \u2014 applied immediately.")));

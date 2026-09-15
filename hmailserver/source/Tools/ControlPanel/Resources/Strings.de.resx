@@ -6297,6 +6297,9 @@ Fortfahren?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Das Speichern verschiebt den Dienst nicht: Der Wert wird gelesen, wenn der Dienst REGISTRIERT wird, er wird also erst wirksam, nachdem der Befehl in der Statuszeile unten ausgeführt wurde. Das Leeren setzt den Dienst auch nicht auf LocalSystem zurück - bei einem bereits registrierten Dienst bedeutet ein leerer Wert „das Konto so lassen, wie es ist". Um zu LocalSystem zurückzukehren, setzen Sie dies ausdrücklich auf LocalSystem und registrieren Sie neu.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Wird gespeichert…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Eine Nachricht mit einem einzigen Empfänger als dieser Empfänger scannen</value>
   </data>
@@ -8260,6 +8263,9 @@ Es wird keine Nachricht gelöscht und kein Konto entfernt. Fortfahren?</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>Ungeschütztes LDAP - Klartext (nur Labornetze)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Nicht gespeicherte Änderungen</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Nicht angekreuzt wird eine Nachricht, die der Server als Spam eingestuft hat, hier trotzdem zugestellt, unmarkiert - die Spam-Header und das Betreffpräfix werden aus der Kopie dieses Kontos entfernt. Für die Adresse, die nie eine Mail verlieren darf.</value>
   </data>
@@ -8346,9 +8352,6 @@ Es wird keine Nachricht gelöscht und kein Konto entfernt. Fortfahren?</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Wert:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Vom Server gelesene Werte.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Bestätigungscode aus Ihrer Authenticator-App</value>

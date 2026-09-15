@@ -211,14 +211,21 @@ namespace hMailServer.ControlPanel.Tests.Services
 
       /// <summary>
       /// A COM-backed checkbox silently dropped its note: every other editor on these
-      /// pages calls Annotate and this one returned the bare checkbox, so a caption
+      /// pages printed its own, and this one returned the bare checkbox, so a caption
       /// written beside one appeared nowhere at all. The auto-ban page is the first to
       /// need it - "0 disables auto-ban entirely" belongs on the control, not in a
       /// paragraph above it - which is how the omission was found.
       ///
+      /// Printing the note is no longer something a row type does, which is what
+      /// makes the omission impossible rather than merely fixed: every row builds its
+      /// editor and nothing else, and ComSetting.CreateRow puts that editor in a
+      /// scaffold FieldRow whose Hint is the Blurb. So this holds the one place that
+      /// happens - a row type that stopped going through it would have to override
+      /// CreateRow, and there is no such override - rather than the call each row
+      /// used to have to remember.
+      ///
       /// Scanned rather than rendered, because building the control needs a
-      /// dispatcher and a live COM session; what matters is that the row type reaches
-      /// Annotate at all.
+      /// dispatcher and a live COM session.
       /// </summary>
       [Fact]
       public void AComCheckboxWithANote_ShowsIt()
@@ -227,9 +234,14 @@ namespace hMailServer.ControlPanel.Tests.Services
          if (source == null)
             return;
 
-         string comBool = ClassBody(source, "class ComBool");
-         Assert.True(comBool != null, "ComBool is gone from ServerSettingsView.");
-         Assert.Contains("Annotate(box_", comBool, StringComparison.Ordinal);
+         string comSetting = ClassBody(source, "class ComSetting");
+         Assert.True(comSetting != null, "ComSetting is gone from ServerSettingsView.");
+         Assert.Matches(new Regex(@"FieldRow CreateRow\([\s\S]{0,400}?Hint = Blurb"), comSetting);
+
+         Assert.True(ClassBody(source, "class ComBool") != null, "ComBool is gone from ServerSettingsView.");
+
+         // Not virtual, so no row type can take the note out of its own row again.
+         Assert.DoesNotContain("virtual Scaffold.FieldRow CreateRow", source, StringComparison.Ordinal);
 
          // And the auto-ban page actually uses one, so the path is exercised by the
          // application rather than merely available.

@@ -8,29 +8,51 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <Grid Margin="26,20">
+    <!-- The frame only. Everything under a tab is built in the code-behind from
+         the section's definition: a Card for the surface, a SettingsSection for
+         the heading and its description, a FieldRow for each setting.
+
+         The header carries the page's two actions and the pill that says whether
+         what is on screen has reached the server - unsaved, saving, saved, partly
+         saved - and the notice under it carries the sentence that goes with a
+         read or a save. Both replace the status line that used to sit at the
+         bottom of the page, under the fold of a long tab, where the confirmation
+         that a save had worked was the one thing most easily missed.
+
+         The one rule of the design system this page cannot follow is "one page,
+         one ScrollViewer": a tab strip has to keep its headers in view while the
+         tab's contents scroll, so each tab owns one. The page padding is here on
+         the frame instead, so the header, the tab strip and the fields line up
+         with every other page. -->
+    <Grid Margin="{StaticResource AppPagePadding}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock x:Name="TitleText" Style="{StaticResource PageTitle}" />
-            <TextBlock x:Name="SubtitleText" Style="{StaticResource PageSubtitle}" />
-        </StackPanel>
+        <scaffold:PageHeader x:Name="Header" Margin="{StaticResource AppHeaderGap}">
+            <scaffold:PageHeader.Status>
+                <scaffold:StatusPill x:Name="StatePill" Visibility="Collapsed"
+                                     AutomationProperties.AutomationId="settings-state" />
+            </scaffold:PageHeader.Status>
+            <scaffold:PageHeader.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button Content="{loc:L '_Reload'}" Margin="0,0,8,0" Click="Reload_Click"
+                               AutomationProperties.AutomationId="settings-reload" />
+                    <ui:Button x:Name="SaveButton" Content="{loc:L '_Save changes'}" Appearance="Primary"
+                               Click="Save_Click" AutomationProperties.AutomationId="settings-save" />
+                </StackPanel>
+            </scaffold:PageHeader.Actions>
+        </scaffold:PageHeader>
 
-        <TabControl x:Name="SettingsTabs" Grid.Row="1" Background="Transparent" BorderThickness="0" Padding="0,8,0,0" />
+        <scaffold:InlineNotice x:Name="StatusNotice" Grid.Row="1" Visibility="Collapsed"
+                               Margin="{StaticResource AppCardGap}"
+                               AutomationProperties.AutomationId="settings-status" />
 
-        <Grid Grid.Row="2" Margin="0,14,12,0">
-            <TextBlock x:Name="StatusText" AutomationProperties.LiveSetting="Polite" VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <ui:Button Content="{loc:L '_Reload'}" Margin="0,0,8,0" Click="Reload_Click" />
-                <ui:Button x:Name="SaveButton" Content="{loc:L '_Save changes'}" Appearance="Primary" Click="Save_Click" />
-            </StackPanel>
-        </Grid>
+        <TabControl x:Name="SettingsTabs" Grid.Row="2" Background="Transparent" BorderThickness="0" Padding="0,8,0,0" />
     </Grid>
 </UserControl>

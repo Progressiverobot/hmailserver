@@ -6297,6 +6297,9 @@ Fortsätt?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Att spara detta flyttar inte tjänsten: det läses när tjänsten REGISTRERAS, så det träder i kraft först efter att kommandot på statusraden nedan har körts. Att tömma det flyttar inte heller tillbaka tjänsten till LocalSystem - på en redan registrerad tjänst betyder ett tomt värde "lämna kontot som det är". För att gå tillbaka till LocalSystem, sätt detta uttryckligen till LocalSystem och registrera om.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Sparar…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Skanna ett meddelande med en enda mottagare som den mottagaren</value>
   </data>
@@ -8260,6 +8263,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>Oskyddad LDAP - klartext (bara labbnätverk)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Osparade ändringar</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Avkryssat levereras ett meddelande servern klassade som skräppost ändå hit, omärkt - skräpposrubrikerna och ämnestaggen tas bort från det här kontots kopia. För adressen som aldrig får förlora ett mejl.</value>
   </data>
@@ -8346,9 +8352,6 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Värde:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Värden lästa från servern.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Verifieringskod från din autentiseringsapp</value>

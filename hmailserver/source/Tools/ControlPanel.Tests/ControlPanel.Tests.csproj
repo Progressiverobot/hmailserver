@@ -48,6 +48,10 @@
          the frame to its tallest tab within the work area. -->
     <Compile Include="..\ControlPanel\Services\SettingsPageStatus.cs" />
     <Compile Include="..\ControlPanel\Services\DialogLayout.cs" />
+    <!-- And the server settings page's own, which is a different lifecycle from
+         the INI pages' above: read and written over COM, so it is clean, unsaved,
+         saving, saved or partly saved, with no service restart in it. -->
+    <Compile Include="..\ControlPanel\Services\ServerSettingsPageStatus.cs" />
     <Compile Include="..\ControlPanel\Services\Typography.cs" />
     <Compile Include="..\ControlPanel\Services\SpamPipeline.cs" />
     <!-- Same arrangement, for the same reason: the account comparison and the

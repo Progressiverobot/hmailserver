@@ -6297,6 +6297,9 @@ Pokračovat?</value>
   <data name="Saving this does not move the service: it is read when the service is REGISTERED, so it takes effect only after the command in the status line below has been run. Clearing it does not move the service back to LocalSystem either - on an already-registered service an empty value means &quot;leave the account as it is&quot;. To return to LocalSystem, set this to LocalSystem explicitly and re-register." xml:space="preserve">
     <value>Uložení této hodnoty službu pod jiný účet nepřevede: čte se při REGISTRACI služby, takže se projeví teprve poté, co proběhne příkaz uvedený ve stavovém řádku níže. Ani vymazáním pole se služba zpět pod LocalSystem nevrátí – u již zaregistrované služby znamená prázdná hodnota „ponechat účet beze změny“. Chcete-li se vrátit k LocalSystem, zadejte sem výslovně LocalSystem a proveďte registraci znovu.</value>
   </data>
+  <data name="Saving…" xml:space="preserve">
+    <value>Ukládání…</value>
+  </data>
   <data name="Scan a message with a single recipient as that recipient" xml:space="preserve">
     <value>Zprávu s jediným příjemcem kontrolovat pod tímto příjemcem</value>
   </data>
@@ -8260,6 +8263,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="Unprotected LDAP - cleartext (lab networks only)" xml:space="preserve">
     <value>Nechráněný LDAP - otevřený text (jen laboratorní sítě)</value>
   </data>
+  <data name="Unsaved changes" xml:space="preserve">
+    <value>Neuložené změny</value>
+  </data>
   <data name="Unticked, a message the server classified as spam is still delivered here, unmarked - the spam headers and subject tag are removed from this account's copy. For the address that must never lose a mail." xml:space="preserve">
     <value>Bez zaškrtnutí se zpráva, kterou server klasifikoval jako spam, sem přesto doručí neoznačená - hlavičky spamu a značka v předmětu se z kopie pro tento účet odstraní. Pro adresu, která nikdy nesmí přijít o poštu.</value>
   </data>
@@ -8346,9 +8352,6 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="Value:      {0}" xml:space="preserve">
     <value>Hodnota:      {0}</value>
-  </data>
-  <data name="Values read from the server." xml:space="preserve">
-    <value>Hodnoty přečtené ze serveru.</value>
   </data>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Ověřovací kód z vaší ověřovací aplikace</value>
