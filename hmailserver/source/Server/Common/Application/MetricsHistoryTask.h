@@ -20,6 +20,13 @@ namespace HM
    // two samples, and that is the reader's arithmetic, not the sampler's, so that
    // a restart (which resets every counter to zero) shows as a drop rather than
    // as a negative rate.
+   //
+   // Two of the names are not ServerStatus counters: store_bytes and
+   // store_messages are an aggregate over hm_messages, added on 15 September
+   // 2026 because storage growth cannot be answered from anything else this
+   // server keeps. Reports::CachedStoreTotals runs that aggregate at most once
+   // an hour and the exporter serves the same cached figure, so neither a
+   // sample nor a scrape puts a full table aggregate on the clock.
    class MetricsHistoryTask : public ScheduledTask
    {
    public:

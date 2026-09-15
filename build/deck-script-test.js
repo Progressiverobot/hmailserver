@@ -889,7 +889,72 @@ const state = {
       { name: 'hmailserver_2026-09-14.log', size: 2048, created: '2026-09-14 00:00:01' },
       { name: 'ERROR_hmailserver_2026-09-14.log', size: 10, created: '2026-09-14 00:00:02' }
    ],
-   logLines: ['"SMTPD" 1 "2026-09-14 09:00:00.000" "127.0.0.1" "SENT: 220 mail.example.com"', '"SMTPD" 1 "2026-09-14 09:00:01.000" "127.0.0.1" "RECEIVED: QUIT"']
+   logLines: ['"SMTPD" 1 "2026-09-14 09:00:00.000" "127.0.0.1" "SENT: 220 mail.example.com"', '"SMTPD" 1 "2026-09-14 09:00:01.000" "127.0.0.1" "RECEIVED: QUIT"'],
+   // The reports. The index says what each source is and how far back it can
+   // see; the sections are the tables. One of them is deliberately switched
+   // off (the trace), because the page has to SAY so rather than draw an empty
+   // table that reads as "nothing happened".
+   reportIndex: {
+      today: '2026-09-15',
+      sections: [
+         { name: 'traffic', scope: 'domain', source: 'hm_messagetrace', csv: true, summary: 'Messages in and out.' },
+         { name: 'storage', scope: 'server', source: 'hm_metricsamples', csv: true, summary: 'The store per day.' }
+      ],
+      sources: {
+         message_trace: { table: 'hm_messagetrace', enabled: true, retention_days: 30, oldest: '2026-09-01 08:00:00' },
+         metric_history: { table: 'hm_metricsamples', enabled: true, retention_days: 7, oldest: '2026-09-08 00:00:00' },
+         message_store: { table: 'hm_messages', enabled: true, retention_days: 0, oldest: '' }
+      },
+      not_answerable: ['Spam and virus counts per domain.', 'Storage growth per domain.']
+   },
+   reportOmitted: [],
+   reportSections: {
+      traffic: {
+         section: 'traffic', source: 'hm_messagetrace', enabled: true, truncated: false, note: 'Counted from the message trace.',
+         columns: ['day', 'domain', 'incoming', 'outgoing', 'failed_incoming', 'failed_outgoing'],
+         rows: [
+            { day: '2026-09-14', domain: 'example.com', incoming: 12, outgoing: 3, failed_incoming: 1, failed_outgoing: 0 },
+            { day: '2026-09-14', domain: 'second.example', incoming: 4, outgoing: 0, failed_incoming: 0, failed_outgoing: 2 },
+            { day: '2026-09-15', domain: 'example.com', incoming: 9, outgoing: 5, failed_incoming: 0, failed_outgoing: 0 }
+         ],
+         totals: { incoming: 25, outgoing: 8, failed_incoming: 1, failed_outgoing: 2 }
+      },
+      failures: {
+         section: 'failures', source: 'hm_messagetrace', enabled: true, truncated: false, note: 'The reason is the SMTP status code.',
+         columns: ['domain', 'status', 'reason', 'incoming', 'outgoing', 'total'],
+         rows: [{ domain: 'example.com', status: 550, reason: 'the mailbox was unavailable, or the message was refused', incoming: 1, outgoing: 0, total: 1 }]
+      },
+      senders: {
+         section: 'senders', source: 'hm_messagetrace', enabled: true, truncated: false, note: 'Local senders only.',
+         columns: ['sender', 'domain', 'messages', 'failed'],
+         rows: [{ sender: 'anna@example.com', domain: 'example.com', messages: 8, failed: 0 },
+            { sender: 'bob@example.com', domain: 'example.com', messages: 3, failed: 1 }]
+      },
+      recipients: {
+         section: 'recipients', source: 'hm_messagetrace', enabled: true, truncated: false, note: 'Local recipients only.',
+         columns: ['recipient', 'domain', 'messages', 'failed'],
+         rows: [{ recipient: 'anna@example.com', domain: 'example.com', messages: 21, failed: 1 }]
+      },
+      mailboxes: {
+         section: 'mailboxes', source: 'hm_messages', enabled: true, truncated: false, note: 'A size now, not a history.',
+         columns: ['address', 'domain', 'messages', 'bytes', 'megabytes'],
+         rows: [{ address: 'anna@example.com', domain: 'example.com', messages: 402, bytes: 41943040, megabytes: 40 }],
+         domains: [{ domain: 'example.com', mailboxes: 2, messages: 402, bytes: 41943040, megabytes: 40 }]
+      },
+      volume: {
+         section: 'volume', source: 'hm_metricsamples', enabled: false, truncated: false,
+         note: 'The metric history is switched off, so nothing is being recorded.',
+         columns: ['day', 'processed', 'delivered', 'deferred', 'bounced', 'spam', 'viruses'],
+         rows: []
+      },
+      storage: {
+         section: 'storage', source: 'hm_metricsamples', enabled: true, truncated: false, note: 'Sampled hourly.',
+         columns: ['day', 'bytes', 'megabytes', 'messages'],
+         rows: [{ day: '2026-09-14', bytes: 41943040, megabytes: 40, messages: 400 },
+            { day: '2026-09-15', bytes: 44040192, megabytes: 42, messages: 402 }],
+         growth_bytes: 2097152
+      }
+   }
 };
 
 function json(status, payload, headers) {
@@ -1299,6 +1364,46 @@ function answer(method, path, headers, raw) {
       if (name === 'gone.log' || !state.logs.some((l) => l.name === name)) { return json(404, { error: 'No such log file' }); }
       const lines = Number((/lines=(\d+)/.exec(path) || [0, 200])[1]);
       return json(200, { lines: state.logLines.slice(-lines) });
+   }
+
+   // The reports. The recorded answers echo the window, the domain and the row
+   // count out of the query string, so that what the page ASKED FOR is what the
+   // assertions can read back: the failure this catches is a picker that draws
+   // a date and sends yesterday's.
+   if (path.startsWith('/api/v1/reports') && method === 'GET') {
+      const query = path.indexOf('?') < 0 ? '' : path.slice(path.indexOf('?') + 1);
+      const parameter = (name) => {
+         const hit = query.split('&').filter((p) => p.split('=')[0] === name)[0];
+         return hit ? decodeURIComponent(hit.split('=').slice(1).join('=')) : '';
+      };
+      const section = path.split('?')[0].slice('/api/v1/reports'.length).replace(/^\//, '');
+      const from = parameter('from') || '2026-08-17';
+      const to = parameter('to') || '2026-09-15';
+      const domain = parameter('domain');
+      const top = Number(parameter('top') || 10);
+
+      if (!section) { return json(200, Object.assign({ from, to }, state.reportIndex)); }
+
+      const built = (name) => {
+         const made = clone(state.reportSections[name]);
+         if (domain) { made.rows = made.rows.filter((r) => r.domain === undefined || r.domain === domain); }
+         if (name === 'senders' || name === 'recipients' || name === 'mailboxes') { made.rows = made.rows.slice(0, top); }
+         return made;
+      };
+
+      if (section === 'summary') {
+         const sections = {};
+         Object.keys(state.reportSections).forEach((name) => { sections[name] = built(name); });
+         return json(200, { section: 'summary', from, to, domain, top, sections, omitted: state.reportOmitted });
+      }
+
+      if (!state.reportSections[section]) { return json(404, { error: 'no such report section' }); }
+      if (parameter('format') === 'csv') {
+         const made = built(section);
+         const lines = [made.columns.join(',')].concat(made.rows.map((r) => made.columns.map((c) => r[c]).join(',')));
+         return { status: 200, body: lines.join('\r\n') + '\r\n', headers: { 'Content-Type': 'text/csv; charset=utf-8' } };
+      }
+      return json(200, Object.assign({ from, to, domain, top }, built(section)));
    }
 
    return json(404, { error: 'No such route: ' + method + ' ' + path });
@@ -2519,6 +2624,54 @@ async function main() {
    check('a file the server no longer has is an error under the list, naming it', document.getElementById('err_log').textContent.indexOf('gone.log') >= 0 && document.getElementById('err_log').textContent.indexOf('No such log file') >= 0,
       document.getElementById('err_log').textContent);
    state.logs.pop();
+
+   // ---- the reports
+   before = requests.length;
+   await goTo('reports');
+   check('the reports view reads the index and then one summary, not a request per section',
+      called(before, 'GET', '/api/v1/reports').length === 1 && called(before, 'GET', /^\/api\/v1\/reports\/summary\?/).length === 1 &&
+      called(before, 'GET', /^\/api\/v1\/reports\/traffic/).length === 0, paths(before));
+   check('the window comes from the index rather than from this browser\'s clock',
+      document.getElementById('repFrom').attributes.value === '2026-08-17' && document.getElementById('repTo').attributes.value === '2026-09-15',
+      document.getElementById('repFrom').attributes.value + '..' + document.getElementById('repTo').attributes.value);
+   check('the sources are drawn with their retention and how far back they go',
+      content().textContent.indexOf('2026-09-01 08:00:00') >= 0 && content().textContent.indexOf('Message trace') >= 0, '');
+   check('and what cannot be answered is shown, not hidden',
+      content().textContent.indexOf('Spam and virus counts per domain.') >= 0);
+   check('a section whose source is off says so in the server\'s own words and is marked',
+      content().textContent.indexOf('The metric history is switched off') >= 0 && content().textContent.indexOf('Not recorded') >= 0);
+   const trafficTable = content().querySelectorAll('table')[1];
+   check('the traffic table is drawn from the server\'s own columns',
+      trafficTable && trafficTable.querySelectorAll('th').map((h) => h.textContent).join(',') === 'Day,Domain,Incoming,Outgoing,Failed incoming,Failed outgoing',
+      trafficTable ? trafficTable.querySelectorAll('th').map((h) => h.textContent).join(',') : 'no table');
+   check('and holds a row per day and domain', trafficTable && trafficTable.querySelectorAll('tbody tr').length === 3,
+      trafficTable ? String(trafficTable.querySelectorAll('tbody tr').length) : 'none');
+   check('the chart is drawn in the page, one bar group per day, with no library and nothing fetched',
+      content().querySelectorAll('svg').length === 2 && content().querySelectorAll('rect').length === 6,
+      content().querySelectorAll('svg').length + ' charts, ' + content().querySelectorAll('rect').length + ' bars');
+   check('every table offers its own CSV at the same route with the same window',
+      $('#csv_traffic') && $('#csv_traffic').attributes.href.indexOf('/api/v1/reports/traffic?from=2026-08-17&to=2026-09-15') === 0 &&
+      $('#csv_traffic').attributes.href.indexOf('format=csv') > 0 && 'download' in $('#csv_traffic').attributes,
+      $('#csv_traffic') ? $('#csv_traffic').attributes.href : 'no link');
+   check('the mailboxes section is there too, with its own CSV', !!$('#csv_mailboxes') && !!$('#csv_storage'));
+   before = requests.length;
+   setValue('repFrom', '2026-09-01');
+   setValue('repTo', '2026-09-15');
+   document.getElementById('repDomain').value = 'example.com';
+   setValue('repTop', '5');
+   click(act('repshow'));
+   await flush();
+   check('Show sends the window, the domain and the row count',
+      called(before, 'GET', /reports\/summary\?from=2026-09-01&to=2026-09-15&domain=example\.com&top=5/).length === 1, paths(before));
+   check('and the tables are redrawn for that domain alone',
+      content().querySelectorAll('table')[1].querySelectorAll('tbody tr').length === 2,
+      String(content().querySelectorAll('table')[1].querySelectorAll('tbody tr').length));
+   check('the CSV link follows the window', $('#csv_traffic').attributes.href.indexOf('domain=example.com') > 0);
+   before = requests.length;
+   click(act('repdays', { days: 7 }));
+   await flush();
+   check('Last 7 days counts back whole days from the end of the window, in UTC',
+      called(before, 'GET', /reports\/summary\?from=2026-09-09&to=2026-09-15/).length === 1, paths(before));
 
    // ---- a session that ends under the page
    signedIn = false;

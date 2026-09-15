@@ -407,6 +407,16 @@ namespace HM
          // Utilities.CriteriaMatch over COM. Nothing is read or written;
          // server-wide as the Sieve evaluation is.
          RouteRuleMatch,
+         // The reports (RestApiReports.cpp): what happened on this server,
+         // per domain and per day, aggregated from the message trace, the
+         // metric history and the message store. Read-only. The sections
+         // built from the message trace and from the mailbox sizes carry a
+         // domain and are scoped to it in Authorize_ exactly as the account
+         // routes are; the two built from the server-wide metric history
+         // (volume and storage) are refused for a domain-restricted key, for
+         // the reason the delivery queue is - the counters are the server's
+         // and there is no honest way to narrow them to one domain.
+         RouteReport,
          RouteOpenApi
       };
 
@@ -958,6 +968,20 @@ namespace HM
       static bool GetJsonBoolValue_(const AnsiString &json, const AnsiString &key, bool defaultValue);
       static std::vector<AnsiString> GetJsonStringArray_(const AnsiString &json, const AnsiString &key);
       static bool IsSafeLogName_(const AnsiString &name);
+
+      // The reports (RestApiReports.cpp). One handler for every section,
+      // because they share a window, a domain filter and a CSV writer and
+      // differ only in what they count. domains is the caller's restriction:
+      // empty means every domain, and a non-empty list confines the per-domain
+      // sections to it the way the domain listing is confined.
+      static HttpResponse HandleReport_(const std::vector<String> &domains, const AnsiString &section, const AnsiString &query);
+
+      // Whether a section is built from the server-wide metric history and so
+      // cannot be narrowed to a domain. Read by Authorize_, which is where
+      // that refusal is made.
+      static bool IsServerWideReportSection_(const AnsiString &section);
+      static AnsiString OpenApiReportsPaths_();
+
       HttpResponse HandleOpenApi_();
 
       // True if the id names a message that is really in the delivery queue.

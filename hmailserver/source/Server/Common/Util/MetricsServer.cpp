@@ -8,6 +8,7 @@
 #include "StdAfx.h"
 
 #include "MetricsServer.h"
+#include "Reports.h"
 #include "ServerStatus.h"
 #include "AcmeClient.h"
 #include "FileUtilities.h"
@@ -1521,6 +1522,27 @@ namespace HM
       body += "# HELP hmailserver_viruses_removed_total Number of viruses removed since server start.\n";
       body += "# TYPE hmailserver_viruses_removed_total counter\n";
       line.Format("hmailserver_viruses_removed_total %d\n", status->GetNumberOfRemovedViruses());
+      body += line;
+
+      // The size of the message store. Unlike everything around it this is an
+      // aggregate over hm_messages rather than a counter held in memory, so a
+      // scrape must never run it: Reports::CachedStoreTotals runs it at most
+      // once an hour and hands out the cached figure, which is the same figure
+      // the metric sampler writes to the history. A monitoring system that
+      // scrapes every fifteen seconds therefore sees a value that steps once
+      // an hour, and costs this server nothing to answer.
+      __int64 storeBytes = 0;
+      __int64 storeMessages = 0;
+      Reports::CachedStoreTotals(storeBytes, storeMessages);
+
+      body += "# HELP hmailserver_store_bytes Total size of the messages in the message store, in bytes. Recomputed at most once an hour.\n";
+      body += "# TYPE hmailserver_store_bytes gauge\n";
+      line.Format("hmailserver_store_bytes %I64d\n", storeBytes);
+      body += line;
+
+      body += "# HELP hmailserver_store_messages Number of messages in the message store. Recomputed at most once an hour.\n";
+      body += "# TYPE hmailserver_store_messages gauge\n";
+      line.Format("hmailserver_store_messages %I64d\n", storeMessages);
       body += line;
 
       body += "# HELP hmailserver_tls_handshakes_total Number of completed TLS/SSL handshakes since server start.\n";

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -584,6 +584,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\ICalendar.cpp" />
     <ClCompile Include="..\Common\Util\CalendarStore.cpp" />
     <ClCompile Include="..\Common\Util\CalDavServer.cpp" />
+    <ClCompile Include="..\Common\Util\Reports.cpp" />
+    <ClCompile Include="..\Common\Util\RestApiReports.cpp" />
     <ClCompile Include="..\Common\Util\RestApiBranding.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFiles.cpp" />
     <ClCompile Include="..\Common\Util\RestApiLanguages.cpp" />
@@ -1300,6 +1302,7 @@ EXIT 0
     <ClInclude Include="..\Common\Util\MetricsServer.h" />
     <ClInclude Include="..\Common\Util\OtelTracer.h" />
     <ClInclude Include="..\Common\Util\HttpServer.h" />
+    <ClInclude Include="..\Common\Util\Reports.h" />
     <ClInclude Include="..\Common\Util\RestApiServer.h" />
     <ClInclude Include="..\Common\Util\WebServicesServer.h" />
     <ClInclude Include="..\Common\Util\ContactStore.h" />

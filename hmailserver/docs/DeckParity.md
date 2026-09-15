@@ -16,8 +16,8 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 58 |
-| REST routes (path and method) | 227, 104 of them writes |
-| Deck views | 15 |
+| REST routes (path and method) | 229, 104 of them writes |
+| Deck views | 16 |
 
 ## Missing over REST, by interface
 
@@ -777,5 +777,6 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |
 | `ports` | `GET /api/v1/certificates`, `GET /api/v1/openapi.json`, `GET /api/v1/ports`, `POST /api/v1/ports`, `DELETE /api/v1/ports/{}`, `PUT /api/v1/ports/{}`, `POST /api/v1/server/reinitialize` |
+| `reports` | `GET /api/v1/domains`, `GET /api/v1/reports`, `GET /api/v1/reports/summary?{}` |
 | `logs` | `GET /api/v1/logs`, `GET /api/v1/logs/{}?lines={}`, `GET /api/v1/status` |
 

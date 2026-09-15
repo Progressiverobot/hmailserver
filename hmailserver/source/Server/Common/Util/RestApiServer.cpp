@@ -1444,8 +1444,12 @@ namespace HM
          }
 
          Route route;
-         ParseRoute_(method, path, route);
+         // The query string is attached BEFORE the path is parsed, because
+         // one route decides what it is from it: a report names the domain it
+         // is about in ?domain=, and that domain has to be in the Route for
+         // Authorize_ to judge it. Everything else ignores it at this stage.
          route.query = query;
+         ParseRoute_(method, path, route);
 
          // The single authorisation choke point. Every route is decided here,
          // by kind, before any handler runs - so a handler cannot be reached by
@@ -1519,6 +1523,8 @@ namespace HM
             return HandleSrv_(caller.domains);
          case RouteMetricsHistory:
             return HandleMetricsHistory_(route.query);
+         case RouteReport:
+            return HandleReport_(caller.domains, route.name, route.query);
          case RouteUpdateGet:
             return HandleUpdateGet_();
          case RouteUpdateCheck:
@@ -2710,6 +2716,27 @@ namespace HM
          return;
       }
 
+      // The reports. /api/v1/reports is the index - what sections there are,
+      // what each is built from and what this server cannot answer - and
+      // /api/v1/reports/<section> is one of them. The section is put in name
+      // and the domain the query asks about in identifier, both so that
+      // Authorize_ can decide without parsing anything itself: a route is
+      // data by the time it reaches the choke point.
+      const AnsiString reportsPath = "/api/v1/reports";
+
+      if (method == "GET" && (path == reportsPath || path.StartsWith(reportsPath + "/")))
+      {
+         AnsiString section = path == reportsPath ? AnsiString("") : path.Mid(reportsPath.GetLength() + 1);
+
+         if (section.Find("/") < 0)
+         {
+            route.kind = RouteReport;
+            route.name = section;
+            route.identifier = QueryParameter_(route.query, "domain");
+            return;
+         }
+      }
+
       if (method == "GET" && path == "/api/v1/update")
       {
          route.kind = RouteUpdateGet;
@@ -3616,6 +3643,34 @@ namespace HM
       {
          refusalReason = "this api key is restricted to named domains, and the quarantine is server-wide";
          return AuthorizationForbidden;
+      }
+
+      // The reports. Two of the sections are counted from the server-wide
+      // metric history - the spam and virus totals, the delivered, deferred
+      // and bounced totals, and the size of the message store - and those
+      // counters have no domain in them at all. Narrowing them would mean
+      // inventing an attribution, so they are refused outright, as the queue
+      // is, and for the same reason. The rest are counted from the message
+      // trace and the mailbox sizes, both of which carry an address: a
+      // request that names a domain is judged against the key's list below,
+      // and one that names none is confined to the key's domains by the
+      // handler, as the domain listing is.
+      if (route.kind == RouteReport)
+      {
+         if (IsServerWideReportSection_(route.name))
+         {
+            refusalReason = "this api key is restricted to named domains, and that report section is counted from "
+                            "server-wide metrics that carry no domain";
+            return AuthorizationForbidden;
+         }
+
+         if (!route.identifier.IsEmpty() && !IsDomainAllowed_(caller.domains, String(route.identifier)))
+         {
+            refusalReason = "this api key is not permitted for that domain";
+            return AuthorizationForbidden;
+         }
+
+         return AuthorizationAllowed;
       }
       switch (route.kind)
       {
@@ -10708,6 +10763,7 @@ namespace HM
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += OpenApiAccountResourcesPaths_();
       openApiJson += OpenApiGroupsPaths_();
+      openApiJson += OpenApiReportsPaths_();
       openApiJson += openApiTail;
 
       return BuildResponse_(200, openApiJson);

@@ -82,6 +82,7 @@ hmctl [--url URL] [--api-key KEY | --password PASSWORD | --password-file FILE]
 | `app-password` | list, create, delete | Under an account's address. |
 | `match` | *(a criterion and a value)* | What a rule criterion would decide, without a rule. |
 | `accounts` | import, export | A CSV file, with a dry run. |
+| `report` | *(a section)* | What happened on this server, per domain and per day. `sections` first: it says what can be reported and what cannot. |
 | `api` | *(method and path)* | The escape hatch, for a route newer than this file. |
 
 A few whole commands:
@@ -94,6 +95,9 @@ hmctl settings get antispam use_spf
 hmctl settings set antispam --set use_spf=true --set spam_mark_threshold=5
 hmctl queue list --json | jq '.[] | select(.retry_count > 3)'
 hmctl match contains viagra "cheap viagra here"
+hmctl report sections
+hmctl report traffic --from 2026-09-01 --to 2026-09-15 --domain example.com
+hmctl report mailboxes --top 25 --csv mailboxes.csv
 hmctl api POST /api/v1/server/reinitialize
 ```
 
@@ -106,6 +110,35 @@ Output is a table by default and the server's own JSON with `--json`. The exit
 code is 0 for success, 1 for an error, 2 for a usage mistake, 3 when the server
 refused the credential and 4 when what you named does not exist - so a script
 can tell "no such account" from "wrong password" without reading the text.
+
+Reports
+-------
+
+```bash
+hmctl report sections
+hmctl report summary --from 2026-09-01 --to 2026-09-15
+hmctl report senders --domain example.com --top 25
+hmctl report traffic --csv traffic.csv
+```
+
+The sections are `traffic`, `failures`, `senders`, `recipients`, `mailboxes`,
+`volume`, `storage` and `summary`. The window is `--from` and `--to` as
+`YYYY-MM-DD`, both inclusive, defaulting to the last thirty days ending today on
+the server; `--domain` narrows it to one domain the server hosts; `--top` is how
+many rows the sender, recipient and mailbox sections return.
+
+`--csv FILE` writes the table, and `--csv -` writes it to standard output. It is
+the **server's** CSV, fetched with `format=csv`, rather than one built here out of
+the JSON: two writers of the same table drift, and the file that ends up in a
+spreadsheet should be the one the route promises.
+
+Without `--csv`, the section's own note is printed above the table. Read it. The
+four sections counted from the message trace are empty when the trace is switched
+off - which is the default - and "the message trace is switched off" is not the
+same statement as "nothing happened". `hmctl report sections` says which sources
+are recording, how long each is kept, and the two questions this server cannot
+answer at all: spam and virus counts per domain, and storage growth per domain.
+[Reports.md](Reports.md) is why.
 
 Accounts from a spreadsheet
 ---------------------------

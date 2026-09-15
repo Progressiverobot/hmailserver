@@ -97,7 +97,37 @@ ANSWERS = {
     ("POST", "/api/v1/accounts/ann@example.com/app-passwords"): {"id": 3, "name": "tablet", "password": "abcd-efgh-ijkl"},
     ("GET", "/api/v1/ipranges"): {"ipranges": [
         {"id": 1, "name": "My computer", "lower_ip": "127.0.0.1", "upper_ip": "127.0.0.1", "priority": 15}]},
+    ("GET", "/api/v1/reports"): {
+        "from": "2026-08-17", "to": "2026-09-15", "today": "2026-09-15",
+        "sections": [
+            {"name": "traffic", "scope": "domain", "source": "hm_messagetrace", "csv": True,
+             "summary": "Messages in and out, per day and per local domain."},
+            {"name": "storage", "scope": "server", "source": "hm_metricsamples", "csv": True,
+             "summary": "The size of the message store per day."}],
+        "sources": {
+            "message_trace": {"table": "hm_messagetrace", "enabled": False, "retention_days": 30, "oldest": ""},
+            "metric_history": {"table": "hm_metricsamples", "enabled": True, "retention_days": 7,
+                               "oldest": "2026-09-08 00:00:00"}},
+        "not_answerable": ["Spam and virus counts per domain."]},
+    ("GET", "/api/v1/reports/traffic"): {
+        "from": "2026-09-01", "to": "2026-09-15", "domain": "example.com", "top": 10,
+        "section": "traffic", "source": "hm_messagetrace", "enabled": True, "truncated": False,
+        "note": "Counted from the message trace.",
+        "columns": ["day", "domain", "incoming", "outgoing", "failed_incoming", "failed_outgoing"],
+        "rows": [{"day": "2026-09-14", "domain": "example.com", "incoming": 12, "outgoing": 3,
+                  "failed_incoming": 1, "failed_outgoing": 0}]},
+    ("GET", "/api/v1/reports/summary"): {
+        "section": "summary", "from": "2026-08-17", "to": "2026-09-15", "domain": "", "top": 10,
+        "sections": {"mailboxes": {"section": "mailboxes", "columns": ["address", "megabytes"],
+                                   "rows": [{"address": "ann@example.com", "megabytes": 40}]}},
+        "omitted": [{"section": "volume", "reason": "counted from server-wide metrics that carry no domain"}]},
 }
+
+# The one route that answers something other than JSON. Kept apart from ANSWERS
+# because it is decided by the query string, which ANSWERS is keyed without:
+# the point of the case is that the client ASKS for format=csv.
+REPORT_CSV = ("day,domain,incoming,outgoing\r\n"
+              "2026-09-14,example.com,12,3\r\n")
 
 
 class Recorder(BaseHTTPRequestHandler):
@@ -131,8 +161,18 @@ class Recorder(BaseHTTPRequestHandler):
             return
 
         path = self.path.split("?", 1)[0]
+        query = self.path.split("?", 1)[1] if "?" in self.path else ""
         import urllib.parse as parse
         path = parse.unquote(path)
+
+        if path.startswith("/api/v1/reports/") and "format=csv" in query:
+            payload = REPORT_CSV.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/csv; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
 
         if (method, path) not in ANSWERS:
             payload = json.dumps({"error": "no such route: %s %s" % (method, path)}).encode("utf-8")
@@ -238,6 +278,15 @@ CASES = [
     ("app password create", ["app-password", "ann@example.com", "create", "tablet"],
      "POST", "/api/v1/accounts/ann@example.com/app-passwords", {"name": "tablet"}, ["abcd-efgh-ijkl", "only time"]),
     ("ip ranges", ["iprange", "list"], "GET", "/api/v1/ipranges", None, ["My computer"]),
+    ("report sections", ["report", "sections"], "GET", "/api/v1/reports", None,
+     ["traffic", "NOT RECORDING", "cannot answer"]),
+    ("report one section", ["report", "traffic", "--from", "2026-09-01", "--to", "2026-09-15",
+                            "--domain", "example.com"],
+     "GET", "/api/v1/reports/traffic", None, ["Counted from the message trace", "example.com", "INCOMING"]),
+    ("report summary", ["report", "summary"], "GET", "/api/v1/reports/summary", None,
+     ["mailboxes", "ann@example.com", "not shown"]),
+    ("report as CSV", ["report", "traffic", "--csv", "-"], "GET", "/api/v1/reports/traffic", None,
+     ["day,domain,incoming,outgoing", "2026-09-14,example.com,12,3"]),
     ("the escape hatch", ["api", "GET", "/api/v1/status"], "GET", "/api/v1/status", None, ["6.3.3"]),
 ]
 
@@ -445,6 +494,50 @@ def run_import_cases(url, tmp):
               "accounts export must never write a password column - the server does not have them to give")
 
 
+def run_report_cases(url, tmp):
+    """The reports, whose whole meaning is in the query string.
+
+    Every other case here asserts the path, because that is where a client goes
+    wrong: it asks the wrong route. A report asks the right route with the
+    wrong window, which looks identical in a path assertion and is a wrong
+    number in a spreadsheet - so these assert what came after the "?".
+    """
+    def run(arguments):
+        with Recorder.lock:
+            Recorder.requests = []
+        completed = subprocess.run([sys.executable, HMCTL, "--url", url, "--password", PASSWORD] + arguments,
+                                   capture_output=True, text=True, timeout=60)
+        with Recorder.lock:
+            sent = list(Recorder.requests)
+        return completed, (sent[-1]["path"] if sent else "")
+
+    completed, path = run(["report", "traffic", "--from", "2026-09-01", "--to", "2026-09-15",
+                           "--domain", "example.com", "--top", "25"])
+    check("from=2026-09-01" in path and "to=2026-09-15" in path,
+          "hmctl report must send the window it was given, sent %s" % path)
+    check("domain=example.com" in path, "hmctl report must send the domain, sent %s" % path)
+    check("top=25" in path, "hmctl report must send --top, sent %s" % path)
+    check("format=csv" not in path, "hmctl report without --csv must not ask for CSV, sent %s" % path)
+    check(completed.returncode == 0, "hmctl report: exit %d - %s" % (completed.returncode, completed.stderr))
+
+    out = os.path.join(tmp, "traffic.csv")
+    completed, path = run(["report", "traffic", "--csv", out])
+    check("format=csv" in path, "hmctl report --csv must ask the server for the CSV, sent %s" % path)
+    check(completed.returncode == 0, "hmctl report --csv: exit %d - %s" % (completed.returncode, completed.stderr))
+    if os.path.exists(out):
+        with open(out, encoding="utf-8") as handle:
+            text = handle.read()
+        check(text.startswith("day,domain,incoming,outgoing"),
+              "hmctl report --csv must write the server's own CSV, wrote %r" % text[:80])
+    else:
+        problem("hmctl report --csv wrote no file")
+
+    completed, path = run(["report", "nonsense"])
+    check(completed.returncode != 0 and "nonsense" in (completed.stdout + completed.stderr),
+          "hmctl report with an unknown section must refuse it by name, said: %s%s"
+          % (completed.stdout, completed.stderr))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--python", action="store_true", help="hmctl only")
@@ -472,6 +565,7 @@ def main():
             run_python_cases(url, arguments.verbose)
             run_python_refusals(url)
             run_import_cases(url, tmp)
+            run_report_cases(url, tmp)
         if not arguments.python:
             print("the PowerShell module against the same server")
             powershell_ran = run_powershell_cases(url, arguments.verbose)

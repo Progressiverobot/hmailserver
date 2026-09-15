@@ -9,7 +9,8 @@ The Windows Control Panel is the administration program and always will be; on
 Linux the administration is the browser Control Deck and the REST API. This is
 the third way: the same API from a shell, for the things a shell is better at -
 making fifty accounts from a file, reading a setting in a script, watching the
-queue, or asking what a rule criterion would decide.
+queue, asking what a rule criterion would decide, or pulling last month's
+report out as a CSV.
 
 It speaks nothing but HTTP and JSON, and it is one file with no dependencies
 beyond the Python standard library, so it runs wherever Python 3.8 does -
@@ -761,6 +762,87 @@ def accounts_export(client, arguments):
     return EXIT_OK
 
 
+def report_command(client, arguments):
+    """The reports: a section of one, for a window and optionally one domain.
+
+    The CSV is the SERVER'S csv, fetched with format=csv rather than written
+    here out of the JSON. That is deliberate: two writers of the same table
+    drift, and the one an administrator opens in a spreadsheet should be the
+    one the route promises. It also means a column the route gains appears in
+    the file without a change here.
+    """
+    if arguments.section == "sections":
+        answer = client.request("GET", "/api/v1/reports")
+        if arguments.json:
+            render(answer, True)
+            return EXIT_OK
+        render(collection(answer, "sections"), False, ["name", "scope", "source", "summary"])
+        print("")
+        print("Sources:")
+        for name, source in sorted((answer.get("sources") or {}).items()):
+            print("  %-16s %-14s retention %s days, oldest %s"
+                  % (name, "recording" if source.get("enabled") else "NOT RECORDING",
+                     source.get("retention_days"), source.get("oldest") or "-"))
+        for line in answer.get("not_answerable") or []:
+            print("  cannot answer: %s" % line)
+        return EXIT_OK
+
+    query = []
+    if arguments.set_from:
+        query.append("from=" + urllib.parse.quote(arguments.set_from))
+    if arguments.to:
+        query.append("to=" + urllib.parse.quote(arguments.to))
+    if arguments.domain:
+        query.append("domain=" + urllib.parse.quote(arguments.domain))
+    query.append("top=%d" % arguments.top)
+
+    path = "/api/v1/reports/" + urllib.parse.quote(arguments.section)
+
+    if arguments.csv:
+        query.append("format=csv")
+        # request() hands back a string when the body is not JSON, which a CSV
+        # never is; anything else means the server answered a document rather
+        # than a table and is written out as it came.
+        text = client.request("GET", path + "?" + "&".join(query))
+        if not isinstance(text, str):
+            text = json.dumps(text, indent=2, sort_keys=True)
+        if arguments.csv == "-":
+            sys.stdout.write(text)
+        else:
+            with io.open(arguments.csv, "w", encoding="utf-8", newline="") as handle:
+                handle.write(text)
+            print("%s written to %s." % (arguments.section, arguments.csv))
+        return EXIT_OK
+
+    answer = client.request("GET", path + "?" + "&".join(query))
+    if arguments.json:
+        render(answer, True)
+        return EXIT_OK
+
+    if arguments.section == "summary":
+        for name in sorted((answer.get("sections") or {}).keys()):
+            part = answer["sections"][name]
+            print("")
+            print("== %s" % name)
+            render(part.get("rows") or [], False, part.get("columns"))
+        for skipped in answer.get("omitted") or []:
+            print("")
+            print("== %s: not shown - %s" % (skipped.get("section"), skipped.get("reason")))
+        return EXIT_OK
+
+    # The note is the honest half of a report: "the message trace is switched
+    # off" is not the same statement as an empty table, and a client that
+    # printed only the table would be hiding it.
+    if answer.get("note"):
+        print(answer["note"])
+        print("")
+    render(answer.get("rows") or [], False, answer.get("columns"))
+    if answer.get("truncated"):
+        print("")
+        print("This answer was truncated: the window holds more rows than one report reads.")
+    return EXIT_OK
+
+
 def api_command(client, arguments):
     body = None
     if arguments.body:
@@ -923,6 +1005,21 @@ def build_parser():
     exporter.set_defaults(handler=accounts_export)
     exporter.add_argument("domain")
     exporter.add_argument("file", nargs="?", default="-")
+
+    report = commands.add_parser("report", parents=[common],
+                                 help="what happened on this server, per domain and per day")
+    report.set_defaults(handler=report_command)
+    report.add_argument("section", choices=["sections", "summary", "traffic", "failures", "senders",
+                                            "recipients", "mailboxes", "volume", "storage"],
+                        help="sections lists what can be reported and what cannot")
+    report.add_argument("--from", dest="set_from", metavar="YYYY-MM-DD",
+                        help="the first day of the window; the default is 30 days back")
+    report.add_argument("--to", metavar="YYYY-MM-DD", help="the last day; the default is today on the server")
+    report.add_argument("--domain", help="one local domain; the default is every domain the credential may see")
+    report.add_argument("--top", type=int, default=10, metavar="N",
+                        help="how many rows the senders, recipients and mailboxes sections return (1-200)")
+    report.add_argument("--csv", metavar="FILE", nargs="?", const="-",
+                        help="ask the server for the table as CSV and write it here, or to stdout")
 
     api = commands.add_parser("api", parents=[common], help="any method on any path - the escape hatch")
     api.set_defaults(handler=api_command)
