@@ -805,9 +805,9 @@ namespace RegressionTests.SMTP
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));
          smtpClientSimulator.Send("MAIL FROM: test@example.test\r\n");
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));
-         smtpClientSimulator.Send("RCPT TO: knafve@gmail.com\r\n");
+         smtpClientSimulator.Send("RCPT TO: chris.holloway@gmail.com\r\n");
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));
-         smtpClientSimulator.Send("RCPT TO: knafve@gmail.com\r\n");
+         smtpClientSimulator.Send("RCPT TO: chris.holloway@gmail.com\r\n");
          Assert.IsTrue(smtpClientSimulator.Receive().StartsWith("250"));
 
          smtpClientSimulator.Disconnect();

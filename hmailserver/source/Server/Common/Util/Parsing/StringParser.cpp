@@ -1022,7 +1022,7 @@ namespace HM
       if (!StringParser::IsValidEmailAddress("test@hmailserver.com")) throw;
       if (!StringParser::IsValidEmailAddress("test_test@hmailserver.com")) throw;
       if (!StringParser::IsValidEmailAddress("bill@microsoft.com")) throw;
-      if (!StringParser::IsValidEmailAddress("martin@hmailserver.com")) throw;
+      if (!StringParser::IsValidEmailAddress("chris.holloway@progressiverobot.com")) throw;
       if (!StringParser::IsValidEmailAddress("vaff@test.co.uk")) throw;
       if (!StringParser::IsValidEmailAddress("va'ff@test.co.uk")) throw;
       if (!StringParser::IsValidEmailAddress("\"va ff\"@test.co.uk")) throw;

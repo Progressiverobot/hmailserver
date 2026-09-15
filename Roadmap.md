@@ -1536,7 +1536,6 @@ Saying no is part of a roadmap, and these are reasoned rather than reflexive.
 |---|---|
 | **A rewrite**, in any language | This is upstream hMailServer with a current toolchain and a set of additions — 936 of 980 shared server source files are still byte-identical. That is the point of it. |
 | **Removing the COM API** | It is how the Control Panel and every third-party script talk to the server. |
-| **Matching upstream's dependency downgrades** | Deliberately ahead on OpenSSL, Boost and PostgreSQL. |
 | **32-bit builds** | 64-bit only. |
 | **Active/active clustering** | The ground moved here: Dovecot 2.4 **removed** Director and the replicator outright and now documents CE as single-server, with HA moved to the commercial product. Multi-node is no longer part of the open-source baseline, so its absence is not a gap. Warm standby is the right deliverable. |
 | **Windows containers** | Base image sizes, the GUI tooling problem and thin adoption make this a poor fit, and no competitor does it on Windows. |

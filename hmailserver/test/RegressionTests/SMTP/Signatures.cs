@@ -28,10 +28,10 @@ namespace RegressionTests.SMTP
          _domain.SignatureEnabled = true;
          _domain.AddSignaturesToLocalMail = true;
 
-         _account.PersonFirstName = "Martin";
-         _account.PersonLastName = "Knafve";
+         _account.PersonFirstName = "Christopher";
+         _account.PersonLastName = "Holloway";
          _account.SignatureEnabled = true;
-         _account.SignaturePlainText = "Regards %User.FirstName% %User.Lastname%";
+         _account.SignaturePlainText = "Regards %User.FirstName% %User.LastName%";
          _account.Save();
 
          SmtpClientSimulator.StaticSend(_account.Address, _account.Address, "Test of signature, 2",
@@ -39,7 +39,7 @@ namespace RegressionTests.SMTP
 
          var sMessageData = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
 
-         Assert.IsTrue(sMessageData.Contains("Regards Martin Knafve"));
+         Assert.IsTrue(sMessageData.Contains("Regards Christopher Holloway"));
       }
 
       /// <summary>
@@ -153,8 +153,8 @@ namespace RegressionTests.SMTP
          _domain.SignatureMethod = eDomainSignatureMethod.eSMSetIfNotSpecifiedInAccount;
          _domain.Save();
 
-         _account.PersonFirstName = "Martin";
-         _account.PersonLastName = "Knafve";
+         _account.PersonFirstName = "Christopher";
+         _account.PersonLastName = "Holloway";
          _account.Save();
 
          SmtpClientSimulator.StaticSend(_account.Address, _account.Address, "Test of signature, 2",
@@ -162,7 +162,7 @@ namespace RegressionTests.SMTP
 
          var sMessageData = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
 
-         Assert.IsTrue(sMessageData.Contains("Regards Knafve, Martin"));
+         Assert.IsTrue(sMessageData.Contains("Regards Holloway, Christopher"));
       }
 
       [Test]
@@ -262,7 +262,7 @@ namespace RegressionTests.SMTP
          _domain.Save();
 
          var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "list@example.test", "test");
-         account.PersonFirstName = "Martin";
+         account.PersonFirstName = "Christopher";
 
          var smtpClientSimulator = new SmtpClientSimulator();
          smtpClientSimulator.Send("nonexistant@" + _domain.Name, account.Address, "SignatureTest",

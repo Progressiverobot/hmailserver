@@ -210,7 +210,7 @@ namespace RegressionTests.Rules
          // Sent through a ROUTE rather than to a real external domain.
          //
          // This test is about the bind, and the message previously went to
-         // knafve@gmail.com - so reaching the bind at all meant an MX lookup of
+         // chris.holloway@gmail.com - so reaching the bind at all meant an MX lookup of
          // gmail.com first. That made a rules test depend on live DNS, and on
          // 19 August 2026 it failed mid-gate for exactly that reason: the lookup
          // did not complete, the message was deferred rather than failed, and the

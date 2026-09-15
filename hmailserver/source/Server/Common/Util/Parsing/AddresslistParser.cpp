@@ -304,10 +304,10 @@ namespace HM
    {
       TestAddress_("@", "@", "","");
       TestAddress_("test@example.com", "test@example.com", "test","example.com");
-      TestAddress_("<martin@example.com>", "martin@example.com", "martin","example.com");
+      TestAddress_("<chris@example.com>", "chris@example.com", "chris","example.com");
       TestAddress_("\"servizio@example.it\"<servizio@example.it>", "servizio@example.it", "servizio", "example.it");
-      TestAddress_("\"Martin Knafve\" <martin@example.test>", "Martin Knafve", "martin", "example.test");
-      TestAddress_("Martin Knafve <test@domain.com>", "Martin Knafve", "test", "domain.com");      
+      TestAddress_("\"Christopher Holloway\" <chris@example.test>", "Christopher Holloway", "chris", "example.test");
+      TestAddress_("Christopher Holloway <test@domain.com>", "Christopher Holloway", "test", "domain.com");
       TestAddress_("\"fdsa\\\"\" <test@example.test>", Charset::Encode("fdsa\""), "test", "example.test");      
       TestAddress_("Emanuele Example <emanuele@example.com>", "Emanuele Example", "emanuele", "example.com");      
       TestAddress_("Secunia Research <remove-vuln@example.com>", "Secunia Research", "remove-vuln", "example.com");      
@@ -318,7 +318,7 @@ namespace HM
 
       {  // MORE ADVANCED
          
-         String sTestStr = "\"Martin Knafve\" <martin@example.test>,   \"Test2 Testar\" <testa@testy.com>";
+         String sTestStr = "\"Christopher Holloway\" <chris@example.test>,   \"Test2 Testar\" <testa@testy.com>";
 
          AddresslistParser* pParser= new AddresslistParser();
 
@@ -358,7 +358,7 @@ namespace HM
 
       {  // EVEN MORE ADVANCED. Two addresses seperated by tab, newline and space.
          
-         String sTestStr = "\"Martin Knafve\" <martin@example.test>, \r\n  \"Test2 Testar\" <testa@testy.com>";
+         String sTestStr = "\"Christopher Holloway\" <chris@example.test>, \r\n  \"Test2 Testar\" <testa@testy.com>";
 
          AddresslistParser* pParser= new AddresslistParser();
 
@@ -398,7 +398,7 @@ namespace HM
 
       {  // EVEN MORE ADVANCED. Two addresses without <> around the addresses.
          
-         String sTestStr = "\"Martin Knafve\" <martin@example.test>, \"Test2 Testar\" <testa@testy.com>";
+         String sTestStr = "\"Christopher Holloway\" <chris@example.test>, \"Test2 Testar\" <testa@testy.com>";
 
          AddresslistParser* pParser= new AddresslistParser();
 
@@ -413,13 +413,13 @@ namespace HM
          // Go to the second and check that it's right...
          auto iterFirst = vecResult.begin();
 
-         if ((*iterFirst)->sPersonalName != _T("Martin Knafve"))
+         if ((*iterFirst)->sPersonalName != _T("Christopher Holloway"))
          {
             HM_ASSERT(0);
             throw;
          }
 
-         if ((*iterFirst)->sMailboxName != _T("martin"))
+         if ((*iterFirst)->sMailboxName != _T("chris"))
          {
             HM_ASSERT(0);
             throw;
@@ -457,7 +457,7 @@ namespace HM
 
       {  // EVEN EVEN MORE ADVANCED. Two addresses without "" around the names.
          
-         String sTestStr = "MartinKnafve <martin@example.test>, EyyAo <testa@testy.com>";
+         String sTestStr = "ChristopherHolloway <chris@example.test>, EyyAo <testa@testy.com>";
 
          AddresslistParser* pParser= new AddresslistParser();
 
@@ -472,13 +472,13 @@ namespace HM
          // Go to the second and check that it's right...
          auto iterFirst = vecResult.begin();
 
-         if ((*iterFirst)->sPersonalName != _T("MartinKnafve"))
+         if ((*iterFirst)->sPersonalName != _T("ChristopherHolloway"))
          {
             HM_ASSERT(0);
             throw;
          }
 
-         if ((*iterFirst)->sMailboxName != _T("martin"))
+         if ((*iterFirst)->sMailboxName != _T("chris"))
          {
             HM_ASSERT(0);
             throw;
@@ -538,8 +538,8 @@ namespace HM
 
       {  // SUPER advanced...
          
-         String sTestStr = "<test@example.test>, \"Martin Knafve\" <martin@halvar.com>, \r\n"
-                           "\"Martin Knafve\", test@example.test, Kalle";
+         String sTestStr = "<test@example.test>, \"Christopher Holloway\" <chris.holloway@progressiverobot.com>, \r\n"
+                           "\"Christopher Holloway\", test@example.test, Kalle";
 
          AddresslistParser* pParser= new AddresslistParser();
 

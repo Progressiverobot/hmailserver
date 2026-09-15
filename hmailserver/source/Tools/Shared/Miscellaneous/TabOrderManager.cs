@@ -12,7 +12,7 @@
 // EITHER EXPRESSED OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE IMPLIED WARRANTIES 
 // OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
 //
-// Martin Knafve: According to ReadMe, this may be used for any purposes.
+// Christopher Holloway: according to its ReadMe, this may be used for any purposes.
 //
 //
 ////////////////////////////////////////////////////////////////////////////////////

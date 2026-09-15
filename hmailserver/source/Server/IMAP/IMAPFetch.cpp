@@ -696,7 +696,7 @@ namespace HM
       {
          // RFC: The TEXT part specifier refers to the text body of the message,
          // omitting the [RFC-2822] header.
-         // Martin: All sub-bodies in raw format, except for the current header
+         // All sub-bodies in raw format, except for the current header
          AnsiString body;
          pBodyPart->Store(body, false);
 
@@ -1272,7 +1272,7 @@ namespace HM
    IMAPFetch::CreateEmailStructure_(const String &sField)
    {
       // The input will (hopefully) look like this:
-      // "Martin Knafve" <martin@halvar.com>
+      // "Christopher Holloway" <chris.holloway@progressiverobot.com>
       // The output should look like:
       // ((\"personal name\" NIL \"ey\" \"\"))
       // 
