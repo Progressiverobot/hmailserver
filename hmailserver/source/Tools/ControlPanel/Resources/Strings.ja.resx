@@ -434,6 +434,9 @@
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>ここにドメイン名を指定する場合、サーバー自身のコンピューターがそのドメインに参加している必要があります。Windows が LogonUser で検証するためです。参加していないコンピューターからは、ドメイン名を単に打ち間違えた場合も含め、すべての試行がパスワードが違うときとまったく同じように失敗します。そのため、ドメインに参加していないサーバーでこのように設定したメールボックスは決してログインできず、その理由も示されません。サーバーがドメインに参加していない場合は、代わりに「ディレクトリ認証」ページの LDAP ディレクトリ認証を使用してください。こちらはネットワーク越しにディレクトリへバインドするため、ドメインへの参加は不要です。</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>ドメイン、メールボックス、TLS を提供するリスナー、そしてそれをダッシュボードがどう評価するか。4 分ほどで、いつでも中断できます。</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>グループは、複数のアカウントに同じ権限をまとめて与えるために存在します。「公開フォルダー」でグループに公開フォルダーへのアクセス権を与えると、ここに挙がっているすべてのアカウントがそのアクセス権を得ます。空のグループは誰にも何も与えません。</value>
   </data>
@@ -445,6 +448,9 @@
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>ラベルは必須です。数か月後にこのキーをほかのキーと見分ける手掛かりになります。</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>リスナーには証明書と STARTTLS が必要です。パスワードが平文でネットワークを流れないようにするためです。</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>忙しいサーバーで率が低い場合、通常は TTL が同じオブジェクトを参照する間隔より短いことを意味します。率が 0% でメモリも使われていない場合は、まだ何も参照されていないという別の意味になります。メモリ使用量は上のサイズ上限と対比して測られ、上限に達したキャッシュは、本来なら保持していたはずのエントリを破棄しています。</value>
@@ -1089,6 +1095,9 @@
 
 コントロールパネルを今すぐ再起動しますか? 作業を続けてみる場合は「いいえ」を選んでください。</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>そしてこれが、構築した内容に対するサーバー自身の判定です。何度も戻ってくることになるページです。</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>アナウンスのみ</value>
   </data>
@@ -1292,6 +1301,9 @@
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>参照(_R)…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>戻る</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>ドメインをバックアップする (アカウント、エイリアス、リスト)(_D)</value>
@@ -1579,6 +1591,9 @@
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>証明書 (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>リスナーが提示できる証明書はここに保管され、ACME が更新を代行できます。</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>このサーバーが配信時に行う接続では証明書は検証されません。これはサーバー間のメールでは通常の設定です。インターネット上の SMTP 証明書の大半は検証に失敗し、メールが止まってしまうからです。ただし、送信 TLS が守ってくれるのは受動的な盗聴者に対してだけで、経路上に割り込むものには対抗できません。特定の宛先についてそれ以上を得る手段が DANE と MTA-STS です。</value>
@@ -3202,6 +3217,9 @@
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>ユーザーのディレクトリ エントリの検索</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>完了</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>まず: どちらの半分が詰まっているか?</value>
   </data>
@@ -4470,6 +4488,12 @@
   <data name="New rule name" xml:space="preserve">
     <value>新しいルールの名前</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>hMailServer は初めてですか。短い案内でドメイン、メールボックス、TLS を提供するリスナーを設定し、ダッシュボードで終わります。</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>次へ</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>次の試行</value>
   </data>
@@ -4850,6 +4874,9 @@
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>送信者に通知する</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>次はメールボックスです。アカウントとは、誰かがサインインしてメールを受け取るアドレスです。</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>配信再試行の回数</value>
@@ -6827,6 +6854,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>共有 IMAP フォルダーと、それぞれを読み書きできるアカウントまたはグループ。</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>サーバーの案内(_W)</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>インデックスが応答する最短の検索文字列 (3～64。これより短い文字列はスキャンにフォールバック)</value>
   </data>
@@ -6838,6 +6868,12 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>{0} の各サンプルを数値の表として表示</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>サーバーの案内</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>このページの案内</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>表を表示</value>
@@ -6907,6 +6943,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>サイズ制限とスキャナー…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>案内をスキップ</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>スキップ (理由別)</value>
@@ -6992,6 +7031,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>ここから始めましょう。よくあるタスクに直接ジャンプするか、Ctrl+K を押してやりたいことを入力してください。</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>まずドメインから。@ の後ろの部分で、このサーバーがメールを受け付ける範囲です。ご自分のドメインをここに追加します。</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>やりたいことから始めるか、下の領域別に参照するか、Ctrl+K を押してすべてのページと設定を検索してください。</value>
   </data>
@@ -7012,6 +7054,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Status" xml:space="preserve">
     <value>ステータス</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>ステップ {0}/{1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>ルール処理を停止</value>
@@ -7288,6 +7333,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>それは配信側です。固まったスキャナー、遅いリモート サーバー、ハングした外部ツール、またはデータベースです。</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>「{0}」はここで終わりです。いつでもやり直せます。</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>その鍵の ID はこのストアが使う形式ではないため、そのセクションを特定できません。{0} から手動で削除してください。</value>
@@ -7940,6 +7988,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>これらはサーバーが hMailServer.INI の [LDAP] セクションから読み取り、保存後 2 秒以内に再読み込みするため、再起動は不要です。既定値は Active Directory 向けです。Windows 以外のディレクトリには sAMAccountName がないため、属性名を変更する必要があります。</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>サーバーが待ち受けているポートの一覧です。送信用のポート 587 は、社内の利用者が送信に使うポートです。</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>これらは対になっています。履歴なしの期限切れは、2 つのパスワードを交互に使うことを人々に教え、それは期限切れがまったくないよりも悪い状態です。履歴は、誰かが別のものを選べるその瞬間に「変更」を拒否するだけなので、誰もロックアウトされません。期限切れは「ログオン」を拒否します。オンにする前にその説明を読んでください。</value>
   </data>
@@ -8106,6 +8157,12 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>{0} で署名されたトークンは拒否されます。このサーバーは RS256、ES256、HS256 のみを実装しています。サーバーが検証できないものをリストから削除し、それを提示するクライアントが、許可されているように見えるのではなく、ログに明示される理由で拒否されるようにしてください。</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>案内</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>案内</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>1 通のメッセージを追跡</value>
@@ -8689,6 +8746,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>検索パレットからこのページに来ました</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>ドメインはこの一覧にあります。開くと、そのアカウント、エイリアス、配布リストが表示されます。</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>アカウントのアドレス(_A)</value>
   </data>
@@ -9063,6 +9123,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="_Server" xml:space="preserve">
     <value>サーバー(_S)</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>案内を開始(_S)</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>宛先 SMTP ホスト(_T)</value>
@@ -9955,6 +10018,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>{0} 件の変更を実行し、失敗はありませんでした。</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>「{0}」を閉じました。中断したところから再開します。</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0}設定されていますが、添付ファイルのブロックは無効になっているため、どれも適用されません。</value>
   </data>
@@ -10128,6 +10194,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} 件の設定を書き込めませんでした。</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>「{0}」はここまでです。次に指し示す対象がこの画面にありません。</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>メール サーバー エンジンを{0}</value>

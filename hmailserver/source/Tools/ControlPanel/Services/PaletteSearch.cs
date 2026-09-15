@@ -22,14 +22,21 @@ namespace hMailServer.ControlPanel.Services
       Task,
 
       /// <summary>An individual setting, which opens the page hosting it.</summary>
-      Setting
+      Setting,
+
+      /// <summary>
+      /// A tour to walk rather than a place to go. It carries no page: a tour
+      /// opens the page its first stop is on itself, and a palette that
+      /// navigated first would move the reader twice.
+      /// </summary>
+      Tour
    }
 
    /// <summary>One row of the command palette.</summary>
    public sealed class PaletteRow
    {
       internal PaletteRow(PaletteRowKind kind, string section, string title, string location,
-         string detail, string page, int score)
+         string detail, string page, int score, string tour = null)
       {
          Kind = kind;
          Section = section;
@@ -38,6 +45,7 @@ namespace hMailServer.ControlPanel.Services
          Detail = detail;
          Page = page;
          Score = score;
+         Tour = tour;
       }
 
       public PaletteRowKind Kind { get; }
@@ -59,8 +67,11 @@ namespace hMailServer.ControlPanel.Services
       /// <summary>Supporting line: the purpose of a page, what a task will do, or a setting's key.</summary>
       public string Detail { get; }
 
-      /// <summary>The navigation key to open. Null on a header.</summary>
+      /// <summary>The navigation key to open. Null on a header and on a tour.</summary>
       public string Page { get; }
+
+      /// <summary>The id of the tour to start, on a tour row and nowhere else.</summary>
+      public string Tour { get; }
 
       /// <summary>Match score, lower being better. Zero for the rows of an unfiltered overview.</summary>
       public int Score { get; }
@@ -101,6 +112,7 @@ namespace hMailServer.ControlPanel.Services
       public static readonly string TaskSection = N("Tasks");
       public static readonly string PageSection = N("Pages");
       public static readonly string SettingSection = N("Settings");
+      public static readonly string TourSection = N("Tours");
 
       /// <summary>Rows offered per shortcut section when nothing has been typed.</summary>
       public const int MaxShortcuts = 5;
@@ -123,6 +135,11 @@ namespace hMailServer.ControlPanel.Services
       // setting - a query matching 30 settings and one page title almost always
       // means the page.
       private const int PageTitleBase = 0;
+
+      // A tour is offered before a page of the same name is: somebody who types
+      // "show me around" has said what they want in so many words, and there is
+      // nothing else in the application it could mean.
+      private const int TourBase = -1;
       private const int TaskBase = 2;
       private const int PageAliasBase = 4;
       private const int LegacyPathBase = 6;
@@ -218,6 +235,12 @@ namespace hMailServer.ControlPanel.Services
             AddShortcuts(rows, MostUsedSection, usage.MostUsed, shown);
          }
 
+         // Before the full page list rather than after it: the palette's own
+         // list of forty-seven pages is exactly the thing a tour exists to make
+         // navigable, and a tour offered underneath it would be found by
+         // nobody who needed it.
+         Emit(rows, TourSection, TourRows(null));
+
          var pageRows = new List<PaletteRow>();
          foreach (NavNode page in NavigationMap.Pages)
             pageRows.Add(PageRow(PageSection, page, 0));
@@ -252,6 +275,7 @@ namespace hMailServer.ControlPanel.Services
 
       private static IReadOnlyList<PaletteRow> Matches(SearchQuery query, PaletteUsage usage)
       {
+         List<PaletteRow> tours = TourRows(query);
          List<PaletteRow> tasks = MatchTasks(query);
          List<PaletteRow> pages = MatchPages(query);
          List<PaletteRow> settings = MatchSettings(query);
@@ -271,9 +295,10 @@ namespace hMailServer.ControlPanel.Services
          // it. The fixed order is only the tie-break.
          var sections = new List<(int Order, string Name, List<PaletteRow> Rows)>
          {
-            (0, TaskSection, tasks),
-            (1, PageSection, pages),
-            (2, SettingSection, settings)
+            (0, TourSection, tours),
+            (1, TaskSection, tasks),
+            (2, PageSection, pages),
+            (3, SettingSection, settings)
          };
 
          var rows = new List<PaletteRow>();
@@ -283,6 +308,33 @@ namespace hMailServer.ControlPanel.Services
             .ThenBy(s => s.Order))
          {
             Emit(rows, section.Name, section.Rows);
+         }
+
+         return rows;
+      }
+
+      /// <summary>
+      /// The tours, filtered by the query when there is one. A null query is
+      /// the unfiltered overview, where every tour is offered.
+      /// </summary>
+      private static List<PaletteRow> TourRows(SearchQuery query)
+      {
+         var rows = new List<PaletteRow>();
+
+         foreach (Tour tour in TourCatalog.All)
+         {
+            int score = 0;
+            if (query != null)
+            {
+               score = Min(query.ScoreLoose(L(tour.Name)), query.Score(L(tour.Blurb)));
+               if (score == SearchTerms.NoMatch)
+                  continue;
+
+               score += TourBase;
+            }
+
+            rows.Add(new PaletteRow(PaletteRowKind.Tour, TourSection, L(tour.Name), null,
+               L(tour.Blurb), null, score, tour.Id));
          }
 
          return rows;

@@ -44,6 +44,7 @@
                      Loaded against a different row's data. Certificate lists are a
                      handful of rows, so nothing is lost. -->
                 <DataGrid x:Name="CertGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                          AutomationProperties.AutomationId="certs-grid"
                           EnableRowVirtualization="False"
                           SelectionMode="Single" SelectionChanged="CertGrid_SelectionChanged"
                           AutomationProperties.Name="{loc:L 'SSL certificates'}">

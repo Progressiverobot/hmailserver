@@ -30,7 +30,8 @@
                  click from the page that fixes it. The check starts after first
                  paint and its DNS half runs off the UI thread, so this card never
                  delays the dashboard. -->
-            <scaffold:Card Margin="{StaticResource AppCardGap}" AutomationProperties.Name="{loc:L 'External setup'}">
+            <scaffold:Card Margin="{StaticResource AppCardGap}" AutomationProperties.Name="{loc:L 'External setup'}"
+                           AutomationProperties.AutomationId="dashboard-verdict">
                 <StackPanel>
                     <Grid>
                         <Grid.ColumnDefinitions>

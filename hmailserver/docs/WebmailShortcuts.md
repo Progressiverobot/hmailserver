@@ -81,3 +81,25 @@ Examples: `from:alice is:unread`, `subject:"quarterly report" has:attachment`,
 `in:Archive after:2026-01-01 label:travel`, `from:alice OR from:bob -is:read`,
 `larger:5M older_than:1y filename:.zip`, `category:promotions newer_than:7d`,
 `from:bank has:link -is:read`.
+
+
+Show me around
+--------------
+
+*Show me around*, in the account menu at the top right, walks a new reader
+through the four things this page is: the reading pane, the compose window,
+labels and search. Four stops, each a ring round the thing being talked about
+and one sentence beside it.
+
+It is not a wizard and it never takes the page away. Everything under it stays
+usable while it runs - including the very control it is pointing at, which is
+the point: the step about the reading pane ends when you open a message, and
+the step about the compose window ends when you open one. Nothing is focused
+when a step opens, so the keyboard stays where it was; `F6` reaches the card's
+buttons and `Escape` closes the tour while the keyboard is in it. A step whose
+control this page happens to be hiding is skipped rather than waited on.
+
+Leaving it is not losing it. Where you stopped is kept with your account rather
+than with the browser, so a walk begun on a laptop is picked up on a phone, and
+a walk seen through to the end is not offered again. It is in your own language,
+like the rest of the page.

@@ -434,6 +434,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>Een domeinnaam hier vereist dat de computer van de SERVER zelf lid is van dat domein, omdat Windows het valideert met LogonUser. Vanaf een computer die geen lid is mislukt elke poging alsof het wachtwoord fout is - ook wanneer de domeinnaam gewoon verkeerd gespeld is - zodat een postvak dat zo is geconfigureerd op een server zonder domeinlidmaatschap nooit kan aanmelden en nooit zegt waarom. Is de server geen domeinlid, gebruik dan LDAP-directoryauthenticatie op de pagina Directoryauthenticatie: die bindt via het netwerk aan de directory en heeft geen domeinlidmaatschap nodig.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>Een domein, een postvak, een listener die TLS aanbiedt, en wat het Dashboard daarvan maakt. Vier minuten; u kunt op elk moment stoppen.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>Een groep bestaat zodat meerdere accounts in één keer dezelfde rechten kunnen krijgen - geef de groep toegang tot een openbare map onder Openbare mappen, en elk account dat hier staat krijgt die toegang. Een lege groep geeft niemand iets.</value>
   </data>
@@ -445,6 +448,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>Een label is verplicht. Daaraan wordt deze sleutel over maanden van de andere onderscheiden.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>Een listener heeft een certificaat en STARTTLS nodig, zodat er geen wachtwoord onversleuteld over het netwerk gaat.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>Een lage hit rate op een drukke server betekent meestal dat de TTL korter is dan de tijd tussen opzoekingen van hetzelfde object; een rate van 0% zonder geheugengebruik betekent dat er nog niets is opgezocht, wat niet hetzelfde is. Het geheugengebruik wordt afgezet tegen de groottelimieten hierboven, en een cache op zijn limiet verwijdert vermeldingen die hij anders had bewaard.</value>
@@ -1089,6 +1095,9 @@ De volledige details zijn geschreven naar:
 
 Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>En dit is het oordeel van de server zelf over wat u hebt gebouwd. Dit is de pagina om naar terug te keren.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Alleen aankondigingen</value>
   </data>
@@ -1292,6 +1301,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>B_laderen…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Terug</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Back-up van _domeinen (accounts, aliassen, lijsten)</value>
@@ -1579,6 +1591,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Certificaten (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Certificaten die een listener kan tonen, worden hier bewaard, en ACME kan ze voor u vernieuwen.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>Certificaten worden niet geverifieerd op de verbindingen die deze server maakt bij het bezorgen. Dat is de gebruikelijke instelling voor mail tussen servers - de meeste SMTP-certificaten op internet zouden de verificatie niet doorstaan en de mail zou stoppen - maar het betekent wel dat uitgaande TLS alleen beschermt tegen een passieve meeluisteraar, niet tegen iets in het pad. Via DANE en MTA-STS krijgt een specifieke bestemming meer dan dat.</value>
@@ -3202,6 +3217,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>De directoryvermelding van de gebruiker vinden</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Voltooien</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>Eerst: welke helft zit vast?</value>
   </data>
@@ -4470,6 +4488,12 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="New rule name" xml:space="preserve">
     <value>Naam van de nieuwe regel</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>Nieuw bij hMailServer? Een korte rondleiding maakt een domein, een postvak en een listener die TLS aanbiedt, en eindigt op het Dashboard.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Volgende</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Volgende poging</value>
   </data>
@@ -4850,6 +4874,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Afzender waarschuwen</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Nu een postvak. Een account is een adres waarop iemand zich aanmeldt en post ontvangt.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Aantal bezorgpogingen</value>
@@ -6827,6 +6854,9 @@ Nu herstarten?</value>
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Gedeelde IMAP-mappen, en welke accounts of groepen elke map mogen lezen en beschrijven.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>Rond_leiding</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Kortste zoekterm die de index beantwoordt (3-64; kortere termen vallen terug op de scan)</value>
   </data>
@@ -6838,6 +6868,12 @@ Nu herstarten?</value>
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Elk meetpunt van {0} als een tabel met getallen tonen</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Rondleiding</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Rondleiding door deze pagina</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Tabel tonen</value>
@@ -6907,6 +6943,9 @@ Nu herstarten?</value>
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Groottelimiet en scanners…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Rondleiding overslaan</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Overgeslagen, per reden</value>
@@ -6992,6 +7031,9 @@ Nu herstarten?</value>
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Begin hier: spring meteen naar een veelvoorkomende taak, of druk op Ctrl+K en beschrijf wat u wilt doen.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Begin met een domein: het deel na de @ waarvoor deze server post accepteert. Voeg het uwe hier toe.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Begin met wat u wilt doen, blader hieronder per gebied, of druk op Ctrl+K om elke pagina en instelling te doorzoeken.</value>
   </data>
@@ -7012,6 +7054,9 @@ Nu herstarten?</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>Status</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Stap {0} van {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Regelverwerking stoppen</value>
@@ -7288,6 +7333,9 @@ Nu herstarten?</value>
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>Dat is de bezorgkant: een vastgelopen scanner, een trage externe server, een vastgelopen extern hulpmiddel of de database.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>Hier eindigt “{0}”. U kunt de rondleiding altijd opnieuw starten.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>De id van die sleutel heeft niet de vorm die deze opslag gebruikt, dus zijn sectie kan niet worden geïdentificeerd. Verwijder hem met de hand uit {0}.</value>
@@ -7940,6 +7988,9 @@ Het blijft het proberen terwijl u de toepassing gebruikt.</value>
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>Deze worden door de server gelezen uit de sectie [LDAP] van hMailServer.INI, en binnen twee seconden na het opslaan opnieuw gelezen, dus een herstart is niet nodig. De standaardwaarden passen bij Active Directory; een directory die niet van Windows is, heeft geen sAMAccountName en vereist andere attribuutnamen.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>Dit zijn de poorten waarop de server luistert. De submission-poort, 587, is de poort waarlangs uw eigen mensen versturen.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Deze horen bij elkaar: verlopen zonder geschiedenis leert mensen om tussen twee wachtwoorden te wisselen, wat erger is dan helemaal niet laten verlopen. Geschiedenis weigert alleen een WIJZIGING, op het moment dat iemand iets anders kan kiezen, dus niemand wordt erdoor buitengesloten. Verlopen weigert een AANMELDING - lees de beschrijving daarvan voordat u het inschakelt.</value>
   </data>
@@ -8106,6 +8157,12 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Tokens die met {0} zijn ondertekend, worden geweigerd: deze server implementeert alleen RS256, ES256 en HS256. Haal uit de lijst wat de server niet kan verifiëren, zodat een client die het aanbiedt wordt geweigerd om een reden die het logboek duidelijk maakt, in plaats van toegestaan te lijken.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Rondleiding</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Rondleidingen</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Eén bericht traceren</value>
@@ -8689,6 +8746,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>U bent hier via het zoekpalet terechtgekomen</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Uw domeinen staan in deze lijst. Als u er een opent, krijgt u de accounts, aliassen en distributielijsten ervan.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Accountadres</value>
   </data>
@@ -9063,6 +9123,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Server</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>Rondleiding _starten</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Doel-SMTP-host</value>
@@ -9955,6 +10018,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>{0} wijziging(en) doorgevoerd, geen enkele mislukt.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>“{0}” gesloten. De rondleiding gaat verder waar u gebleven was.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} geconfigureerd, maar bijlageblokkering staat uit, dus geen ervan wordt toegepast.</value>
   </data>
@@ -10128,6 +10194,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} instelling(en) konden niet worden geschreven.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>“{0}” stopt hier: het volgende waarnaar de rondleiding wijst, staat niet op dit scherm.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} de mailserver-engine</value>

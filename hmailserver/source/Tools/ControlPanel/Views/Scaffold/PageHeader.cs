@@ -5,6 +5,7 @@
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
+using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views.Scaffold
 {
@@ -41,6 +42,18 @@ namespace hMailServer.ControlPanel.Views.Scaffold
       public static readonly DependencyProperty StatusProperty = DependencyProperty.Register(
          nameof(Status), typeof(object), typeof(PageHeader), new PropertyMetadata(null));
 
+      public static readonly DependencyProperty TourIdProperty = DependencyProperty.Register(
+         nameof(TourId), typeof(string), typeof(PageHeader), new PropertyMetadata(null, OnTourIdChanged, NullWhenEmpty));
+
+      /// <summary>
+      /// Raised by the help button. It bubbles to the shell, which is the only
+      /// thing that knows how to run a tour; a scaffold component that reached
+      /// into the main window for it would be the design system depending on
+      /// the application instead of the other way round.
+      /// </summary>
+      public static readonly RoutedEvent ShowTourEvent = EventManager.RegisterRoutedEvent(
+         "ShowTour", RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(PageHeader));
+
       public PageHeader()
       {
          AutomationProperties.SetHeadingLevel(this, AutomationHeadingLevel.Level1);
@@ -74,7 +87,55 @@ namespace hMailServer.ControlPanel.Views.Scaffold
          set => SetValue(StatusProperty, value);
       }
 
+      /// <summary>
+      /// The id of the tour this page's help button starts, or null for no
+      /// button. The shell sets it as it opens a page, from the tour catalogue,
+      /// so a page gains a help button by being on a tour and not by being
+      /// edited.
+      /// </summary>
+      public string TourId
+      {
+         get => (string)GetValue(TourIdProperty);
+         set => SetValue(TourIdProperty, value);
+      }
+
+      /// <summary>Raised when the reader presses the help button.</summary>
+      public event RoutedEventHandler ShowTour
+      {
+         add => AddHandler(ShowTourEvent, value);
+         remove => RemoveHandler(ShowTourEvent, value);
+      }
+
       protected override AutomationControlType ControlType => AutomationControlType.Text;
+
+      public override void OnApplyTemplate()
+      {
+         base.OnApplyTemplate();
+
+         var help = Part<Wpf.Ui.Controls.Button>("PART_Help");
+         if (help == null)
+            return;
+
+         // The words, not just a glyph: a question mark alone reaches a screen
+         // reader as nothing, and a page with two icon buttons in its header
+         // has to be able to say which is which.
+         string caption = L("Show me around this page");
+         help.ToolTip = caption;
+         AutomationProperties.SetName(help, caption);
+         AutomationProperties.SetAutomationId(help, "page-help");
+         help.Click += (s, e) => RaiseEvent(new RoutedEventArgs(ShowTourEvent, this));
+         ApplyTourVisibility_();
+      }
+
+      private static void OnTourIdChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+         => ((PageHeader)d).ApplyTourVisibility_();
+
+      private void ApplyTourVisibility_()
+      {
+         var help = Part<Wpf.Ui.Controls.Button>("PART_Help");
+         if (help != null)
+            help.Visibility = string.IsNullOrEmpty(TourId) ? Visibility.Collapsed : Visibility.Visible;
+      }
 
       private static void OnTitleChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
          => AutomationProperties.SetName(d, (string)e.NewValue ?? "");

@@ -434,6 +434,9 @@ Save this weak password anyway?</value>
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone.</value>
   </data>
@@ -445,6 +448,9 @@ Save this weak password anyway?</value>
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>A label is required. It is how this key is told apart from the others months from now.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept.</value>
@@ -1089,6 +1095,9 @@ The full details were written to:
 
 Restart the Control Panel now? Choose No to try to keep working.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>And this is the server's own verdict on what you have built. It is the page to come back to.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Announcements only</value>
   </data>
@@ -1292,6 +1301,9 @@ Restart the Control Panel now? Choose No to try to keep working.</value>
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>B_rowse…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Back</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Back up _domains (accounts, aliases, lists)</value>
@@ -1579,6 +1591,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Certificates (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Certificates a listener can present are kept here, and ACME can renew them for you.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that.</value>
@@ -3202,6 +3217,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>Finding the user's directory entry</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Finish</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>First: which half is stuck?</value>
   </data>
@@ -4470,6 +4488,12 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="New rule name" xml:space="preserve">
     <value>New rule name</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Next</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Next try</value>
   </data>
@@ -4850,6 +4874,9 @@ The verified installer is handed to the update helper: the service stops, the ne
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Notify sender</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Now a mailbox. An account is an address somebody signs in to and receives mail at.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Number of delivery retries</value>
@@ -6827,6 +6854,9 @@ Restart it now?</value>
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Shared IMAP folders, and which accounts or groups may read and write each one.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>Sho_w me around</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Shortest search string the index answers for (3-64; shorter strings fall back to the scan)</value>
   </data>
@@ -6838,6 +6868,12 @@ Restart it now?</value>
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Show every {0} sample as a table of numbers</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Show me around</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Show me around this page</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Show table</value>
@@ -6907,6 +6943,9 @@ Restart it now?</value>
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Size limit and scanners…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Skip the tour</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Skipped, by reason</value>
@@ -6992,6 +7031,9 @@ Restart it now?</value>
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Start with a domain: the part after the @ that this server accepts mail for. Add yours here.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting.</value>
   </data>
@@ -7012,6 +7054,9 @@ Restart it now?</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>Status</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Step {0} of {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Stop rule processing</value>
@@ -7288,6 +7333,9 @@ Restart it now?</value>
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>That is the end of {0}. You can start it again whenever you like.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}.</value>
@@ -7940,6 +7988,9 @@ It will keep trying as you use the application.</value>
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>These are the ports the server listens on. The submission port, 587, is the one your own people send through.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on.</value>
   </data>
@@ -8106,6 +8157,12 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Tour</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Tours</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Trace one message</value>
@@ -8689,6 +8746,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>You arrived here from the search palette</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Account address</value>
   </data>
@@ -9063,6 +9123,9 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Server</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>_Start the walk</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Target SMTP host</value>
@@ -9955,6 +10018,9 @@ No message is deleted and no account is removed. Continue?</value>
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>{0} change(s) carried out, none failed.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>{0} closed. It picks up where you left off.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} configured but attachment blocking is switched off, so none of them is applied.</value>
   </data>
@@ -10128,6 +10194,9 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} setting(s) could not be written.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>{0} stops here: the next thing it points at is not on this screen.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} the mail server engine</value>

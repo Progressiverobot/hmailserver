@@ -335,11 +335,16 @@ namespace hMailServer.ControlPanel.Tests.Services
          Assert.Contains("LogDeleteDays", row.Detail);
       }
 
-      /// <summary>Every page row names the group it is in, and every task row names its destination.</summary>
+      /// <summary>
+      /// Every page row names the group it is in, and every task row names its
+      /// destination. A tour row is the one kind that names no page: it walks
+      /// several, and it opens the first one itself.
+      /// </summary>
       [Fact]
       public void EveryRow_SaysWhereItGoes()
       {
-         foreach (PaletteRow row in PaletteSearch.Query("tls", null, null).Where(r => r.IsSelectable))
+         foreach (PaletteRow row in PaletteSearch.Query("tls", null, null)
+                     .Where(r => r.IsSelectable && r.Kind != PaletteRowKind.Tour))
          {
             Assert.False(string.IsNullOrWhiteSpace(row.Page));
             Assert.NotNull(NavigationMap.Find(row.Page));
@@ -404,7 +409,12 @@ namespace hMailServer.ControlPanel.Tests.Services
          IReadOnlyList<PaletteRow> rows = PaletteSearch.Query("", usage, null);
          var sections = rows.Where(r => r.Kind == PaletteRowKind.Header).Select(r => r.Section).ToList();
 
-         Assert.Equal(new[] { PaletteSearch.RecentSection, PaletteSearch.MostUsedSection, PaletteSearch.PageSection },
+         // Tours before the full page list: the palette's own list of
+         // forty-seven pages is exactly the thing a tour exists to make
+         // navigable, and a tour underneath it would be found by nobody who
+         // needed it.
+         Assert.Equal(new[] { PaletteSearch.RecentSection, PaletteSearch.MostUsedSection,
+                              PaletteSearch.TourSection, PaletteSearch.PageSection },
             sections);
 
          List<string> mostUsed = rows.Where(r => r.Section == PaletteSearch.MostUsedSection && r.IsSelectable)
@@ -454,7 +464,15 @@ namespace hMailServer.ControlPanel.Tests.Services
          IReadOnlyList<PaletteRow> rows = PaletteSearch.Query("", usage, null);
 
          Assert.DoesNotContain("aPageWeDeleted", rows.Select(r => r.Page ?? ""));
-         Assert.All(rows.Where(r => r.IsSelectable), r => Assert.NotNull(NavigationMap.Find(r.Page)));
+         Assert.All(rows.Where(r => r.IsSelectable && r.Kind != PaletteRowKind.Tour),
+            r => Assert.NotNull(NavigationMap.Find(r.Page)));
+
+         // A tour row carries a tour rather than a page, and never both.
+         Assert.All(rows.Where(r => r.Kind == PaletteRowKind.Tour), r =>
+         {
+            Assert.Null(r.Page);
+            Assert.NotNull(TourCatalog.Find(r.Tour));
+         });
       }
 
       /// <summary>

@@ -150,6 +150,24 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
 .login input{width:100%;margin-bottom:12px}
 .login .btn{width:100%;text-align:center;padding:11px;margin-top:6px;box-sizing:border-box}
 .login .err{color:var(--bad);font-size:12.5px;min-height:18px;margin-top:10px}
+/* ---------- The tour ----------
+   A ring round the thing being talked about and a card beside it. Neither is
+   a dialog: the ring takes no pointer events at all and the card is the only
+   thing on this layer that does, so every control under it - including the
+   one being pointed at - stays usable while a tour runs. The ring is a solid
+   outline in the accent AND a dashed inset, because a highlight that is only
+   a colour is no highlight in greyscale, in high contrast, or to a reader who
+   does not see this blue. */
+.tourring{position:fixed;z-index:70;pointer-events:none;border-radius:8px;
+  outline:2px solid var(--accent);outline-offset:2px;box-shadow:0 0 0 1px var(--bg) inset,var(--glow)}
+.tourring::after{content:"";position:absolute;inset:3px;border:1px dashed var(--text);border-radius:6px;opacity:.75}
+.tourcard{position:fixed;z-index:71;width:330px;max-width:calc(100vw - 32px);background:var(--surface2);
+  border:1px solid var(--accent);border-radius:14px;padding:16px 18px;backdrop-filter:blur(16px);
+  box-shadow:0 18px 60px rgba(0,0,0,.5)}
+.tourcard .head{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font-size:11.5px;
+  letter-spacing:.4px;text-transform:uppercase}
+.tourcard p{font-size:13.5px;line-height:1.6;margin:10px 0 14px}
+.tourcard .row{gap:8px}
 .view{animation:fadein .25s ease}
 @keyframes fadein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 [hidden]{display:none!important}
@@ -209,10 +227,26 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <h1 id="viewTitle">Dashboard</h1>
       <div class="sp"></div>
       <select data-lang id="langSel" aria-label="Language" title="Language"></select>
+      <button class="iconbtn" id="tourBtn" title="Show me around" aria-label="Show me around">?</button>
       <button class="iconbtn" id="themeBtn" title="Toggle theme">◐</button>
       <button class="iconbtn" id="logoutBtn" title="Sign out">⏻</button>
     </div>
     <div class="content" id="content"></div>
+  </div>
+</div>
+
+<!-- The tour. Outside the app shell so that the ring can sit over any part of
+     it, hidden until a tour runs, and polite rather than assertive: a step
+     that interrupted whatever a screen reader was saying would be exactly the
+     interruption a tour promises not to be. -->
+<div class="tourring" id="tourRing" hidden></div>
+<div class="tourcard" id="tourCard" hidden role="group" aria-live="polite" aria-label="Tour">
+  <div class="head"><span id="tourName"></span><span id="tourStep"></span></div>
+  <p id="tourText"></p>
+  <div class="row">
+    <button class="btn ghost sm" id="tourBack">Back</button>
+    <button class="btn sm" id="tourNext">Next</button>
+    <button class="btn ghost sm" id="tourSkip">Skip the tour</button>
   </div>
 </div>
 
@@ -494,6 +528,228 @@ async function render(silent){
     if(!silent)$("#content").innerHTML='<div class="empty">'+tf("Could not reach the server: {0}",escHtml(err.message))+'</div>';
   }
 }
+
+/* ---------- Tours ----------
+   Teaching a view while somebody uses it. One mechanism, the same shape as the
+   desktop Control Panel's and the webmail's: a step is an element (by id or by
+   a stable selector), one sentence, an optional condition that ends the step
+   when the thing has happened, and what to do when the element is not there -
+   skip it, or end the tour saying so. A tour is an ordered list of those with a
+   name and a version.
+
+   Four properties of it are the feature rather than decoration, and each is
+   checked by build/deck-script-test.js:
+
+     * it is never modal - the ring takes no pointer events and the card is the
+       only thing on its layer that does, so every control underneath, the one
+       being pointed at included, stays usable;
+     * it never takes the keyboard - nothing is focused when a step opens, and
+       the card's three buttons are ordinary tab stops;
+     * a step whose element is not on the view is skipped rather than waited on,
+       because a view draws what the server has and a server without a domain
+       has no domain row to point at;
+     * where it got to is remembered, so leaving a tour is not losing it.
+
+   Every sentence goes through the catalogues like every other text on this
+   page: K() marks it here and t() looks it up when it is drawn. */
+const TOURS=[{
+  id:"firstrun",
+  name:K("Show me around"),
+  version:1,
+  steps:[
+    {view:"domains",sel:"#newDomain",until:"domain-exists",
+     text:K("Start with a domain: the part after the @ that this server accepts mail for. Add yours here.")},
+    {view:"domains",sel:"#content .tablewrap",
+     text:K("Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists.")},
+    {view:"domains",sel:'#content button[data-act="accounts"]',
+     text:K("Now a mailbox. An account is an address somebody signs in to and receives mail at.")},
+    {view:"ports",sel:"#content .tablewrap",missing:"end",
+     text:K("These are the ports the server listens on. The submission port, 587, is the one your own people send through.")},
+    {view:"ports",sel:'#content button[data-act="portnew"]',until:"tls-listener",
+     text:K("A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear.")},
+    {view:"certs",sel:"#content .tablewrap",
+     text:K("Certificates a listener can present are kept here, and ACME can renew them for you.")},
+    {view:"dash",sel:"#kpiState",
+     text:K("And this is the server's own verdict on what you have built. It is the page to come back to.")}
+  ]}];
+/* What a step can wait for. Answered from what the view has just read rather
+   than from the words on the screen: a table cell says "Starttls optional" in
+   English only, and a condition that stopped working in German would be a
+   defect nobody here would ever see. */
+const TOUR_CONDITIONS={
+  "domain-exists":()=>cache.domains.length>0,
+  "tls-listener":()=>cache.ports.some(p=>String(p.connection_security||"none")!=="none")
+};
+function tourFind(id){return TOURS.filter(x=>x.id===id)[0]||null;}
+/* Which tours this browser has finished, and where it stopped in one it left.
+   One line, finished then resume points - "firstrun=1|firstrun@3v1" - which is
+   the form the Control Panel keeps in the registry, so the two surfaces can be
+   read with one explanation. Every kind of damage is survivable and silent:
+   the worst it can cost is being offered a tour twice. */
+function tourProgress(){
+  const out={finished:{},stopped:{}};
+  let raw="";
+  try{raw=localStorage.getItem("hmsTours")||"";}catch(_){raw="";}
+  const halves=String(raw).split("|");
+  halves[0].split(",").forEach(pair=>{
+    const at=pair.indexOf("=");if(at<=0)return;
+    const version=parseInt(pair.slice(at+1),10);
+    if(version>0)out.finished[pair.slice(0,at).trim()]=version;
+  });
+  (halves[1]||"").split(",").forEach(pair=>{
+    const at=pair.indexOf("@");if(at<=0)return;
+    const rest=pair.slice(at+1),mark=rest.indexOf("v");if(mark<=0)return;
+    const step=parseInt(rest.slice(0,mark),10),version=parseInt(rest.slice(mark+1),10);
+    if(step>0&&version>0)out.stopped[pair.slice(0,at).trim()]={step:step,version:version};
+  });
+  return out;
+}
+function tourSaveProgress(p){
+  const finished=Object.keys(p.finished).sort().map(id=>id+"="+p.finished[id]).join(",");
+  const stopped=Object.keys(p.stopped).sort().map(id=>id+"@"+p.stopped[id].step+"v"+p.stopped[id].version).join(",");
+  try{localStorage.setItem("hmsTours",finished+"|"+stopped);}catch(_){}
+}
+function tourFinished(t0){const p=tourProgress();return !!t0&&(p.finished[t0.id]||0)>=t0.version;}
+function tourResumeAt(t0){
+  const stop=tourProgress().stopped[t0.id];
+  return stop&&stop.version===t0.version&&stop.step<t0.steps.length?stop.step:0;
+}
+/* The tour running now: the tour, the step it is on, and what its condition
+   said when the step opened. That last one is why a step does not vanish in
+   front of somebody who already has a domain - it is the CHANGE that ends a
+   step, not the state. */
+let tourNow=null;
+let tourTimer=null;
+function tourCondition(step){
+  const test=step&&step.until?TOUR_CONDITIONS[step.until]:null;
+  try{return !!test&&!!test();}catch(_){return false;}
+}
+/* The element a step points at, with the view it is on opened first: a control
+   on a view nobody has drawn is in no document to be found in. */
+async function tourElement(step){
+  if(step.view&&step.view!==view){
+    view=step.view;editing=null;
+    document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.view===view));
+    await render();
+  }
+  return $(step.sel);
+}
+/* From this step onwards, the first one that can be shown. A step whose element
+   is missing is skipped; a step marked missing:"end" stops the tour instead,
+   which is for the one whose absence makes the rest meaningless. */
+async function tourSettle(from){
+  for(let at=from;at<tourNow.tour.steps.length;at++){
+    const step=tourNow.tour.steps[at];
+    if(await tourElement(step)){tourNow.at=at;tourNow.entry=tourCondition(step);return true;}
+    if(step.missing==="end"){tourNow.at=at;tourEnd("missing");return false;}
+  }
+  tourEnd("finished");
+  return false;
+}
+async function tourStart(id,at){
+  const t0=tourFind(id);
+  if(!t0||$("#app").style.display==="none")return;
+  tourNow={tour:t0,at:0,entry:false};
+  const from=typeof at==="number"&&at>=0?Math.min(at,t0.steps.length-1):tourResumeAt(t0);
+  if(!await tourSettle(from))return;
+  tourDraw();
+  if(!tourTimer)tourTimer=setInterval(tourTick,400);
+}
+function tourDraw(){
+  const step=tourNow.tour.steps[tourNow.at];
+  $("#tourName").textContent=t(tourNow.tour.name);
+  $("#tourStep").textContent=tf("Step {0} of {1}",tourNow.at+1,tourNow.tour.steps.length);
+  $("#tourText").textContent=t(step.text);
+  $("#tourBack").hidden=tourNow.at===0;
+  $("#tourNext").textContent=tourNow.at===tourNow.tour.steps.length-1?t("Finish"):t("Next");
+  $("#tourCard").hidden=false;
+  tourPlace();
+}
+/* The ring put back where the element is. The view under a tour goes on living
+   - it scrolls, it redraws itself every three seconds on the dashboard - and a
+   ring left where the element used to be is worse than no ring. An element that
+   has gone takes the ring with it and leaves the card, because the sentence is
+   still the sentence. */
+function tourPlace(){
+  if(!tourNow)return;
+  const step=tourNow.tour.steps[tourNow.at];
+  const el=$(step.sel);
+  const ring=$("#tourRing"),card=$("#tourCard");
+  if(!el||!el.getBoundingClientRect){ring.hidden=true;return;}
+  const at=el.getBoundingClientRect();
+  if(!at.width&&!at.height){ring.hidden=true;return;}
+  ring.hidden=false;
+  ring.style.left=at.left+"px";ring.style.top=at.top+"px";
+  ring.style.width=at.width+"px";ring.style.height=at.height+"px";
+  const height=card.offsetHeight||190;
+  const room=typeof innerHeight==="number"?innerHeight:900;
+  const wide=typeof innerWidth==="number"?innerWidth:1280;
+  let top=at.bottom+12;
+  if(top+height>room)top=Math.max(8,at.top-12-height);
+  card.style.top=Math.max(8,Math.min(top,Math.max(8,room-height-8)))+"px";
+  card.style.left=Math.max(8,Math.min(at.left,Math.max(8,wide-346)))+"px";
+}
+function tourTick(){
+  if(!tourNow){if(tourTimer){clearInterval(tourTimer);tourTimer=null;}return;}
+  tourPlace();
+  const step=tourNow.tour.steps[tourNow.at];
+  if(step.until&&!tourNow.entry&&tourCondition(step))tourNext();
+}
+async function tourNext(){
+  if(!tourNow)return;
+  if(tourNow.at+1>=tourNow.tour.steps.length){tourEnd("finished");return;}
+  if(await tourSettle(tourNow.at+1))tourDraw();
+}
+async function tourBack(){
+  if(!tourNow)return;
+  for(let at=tourNow.at-1;at>=0;at--){
+    if(await tourElement(tourNow.tour.steps[at])){
+      tourNow.at=at;tourNow.entry=tourCondition(tourNow.tour.steps[at]);tourDraw();return;
+    }
+  }
+  // Nowhere to go back to is standing still, never closing the tour: Back is
+  // how somebody re-reads a sentence, and a Back that ended it would be a trap.
+  tourDraw();
+}
+/* Every ending says something. Silence after a tour that stopped on its own is
+   how somebody decides the feature is broken. */
+function tourEnd(why){
+  if(!tourNow)return;
+  const walk=tourNow.tour,at=tourNow.at;
+  const progress=tourProgress();
+  if(why==="finished"){progress.finished[walk.id]=Math.max(progress.finished[walk.id]||0,walk.version);delete progress.stopped[walk.id];}
+  else if(why==="left"&&at>0)progress.stopped[walk.id]={step:at,version:walk.version};
+  else delete progress.stopped[walk.id];
+  tourSaveProgress(progress);
+  tourNow=null;
+  if(tourTimer){clearInterval(tourTimer);tourTimer=null;}
+  $("#tourCard").hidden=true;$("#tourRing").hidden=true;
+  if(why==="finished")toast(tf("That is the end of {0}. You can start it again whenever you like.",t(walk.name)));
+  else if(why==="missing")toast(tf("{0} stops here: the next thing it points at is not on this screen.",t(walk.name)));
+  else toast(tf("{0} closed. It picks up where you left off.",t(walk.name)));
+}
+/* The header's entry point. It starts the tour that visits the view showing, at
+   its first stop there, so the button teaches THIS view; on a view no tour
+   visits it starts at the beginning. */
+$("#tourBtn").onclick=()=>{
+  if(tourNow){tourEnd("left");return;}
+  for(const walk of TOURS){
+    for(let at=0;at<walk.steps.length;at++)
+      if(walk.steps[at].view===view)return tourStart(walk.id,at);
+  }
+  if(TOURS.length)tourStart(TOURS[0].id,-1);
+};
+$("#tourNext").onclick=()=>tourNext();
+$("#tourBack").onclick=()=>tourBack();
+$("#tourSkip").onclick=()=>tourEnd("left");
+/* Escape leaves the tour only when the keyboard is already inside its card.
+   Everywhere else Escape still belongs to the page, and a tour that ate it
+   would be exactly the "in the way of the keyboard" this promises not to be. */
+document.addEventListener("keydown",e=>{
+  if(!tourNow||e.key!=="Escape")return;
+  const active=document.activeElement;
+  if(active&&active.closest&&active.closest("#tourCard"))tourEnd("left");
+});
 
 /* Buttons inside a rendered view carry their arguments as data attributes and are
    handled here, so no server-provided value is ever placed inside inline JavaScript,

@@ -434,6 +434,9 @@ Přesto toto slabé heslo uložit?</value>
   <data name="A domain name here needs the SERVER's own computer to be joined to that domain, because Windows validates it with LogonUser. From a computer that is not joined, every attempt fails as though the password were wrong - including when the domain name is simply misspelt - so a mailbox configured this way on an unjoined server can never log in and never says why. If the server is not domain-joined, use LDAP directory authentication on the Directory authentication page instead: it binds to the directory over the network and needs no domain join." xml:space="preserve">
     <value>Název domény zde vyžaduje, aby počítač SERVERU byl připojen do této domény, protože Windows jej ověřují funkcí LogonUser. Z počítače, který připojen není, selže každý pokus, jako by bylo heslo špatné – včetně případu, kdy je název domény jen napsán s překlepem – takže poštovní schránka nastavená tímto způsobem na nepřipojeném serveru se nikdy nepřihlásí a nikdy neřekne proč. Pokud server není připojen k doméně, použijte místo toho ověřování proti adresáři LDAP na stránce Ověřování proti adresáři: to se k adresáři připojuje po síti a žádné připojení k doméně nevyžaduje.</value>
   </data>
+  <data name="A domain, a mailbox, a listener that offers TLS, and what the dashboard makes of it. Four minutes; leave whenever you like." xml:space="preserve">
+    <value>Doména, poštovní schránka, listener, který nabízí TLS, a co z toho vyčte Přehled. Čtyři minuty; kdykoli můžete skončit.</value>
+  </data>
   <data name="A group exists so that several accounts can be given the same rights at once - grant the group access to a public folder under Public folders, and every account listed here gets that access. An empty group grants nothing to anyone." xml:space="preserve">
     <value>Skupina existuje proto, aby bylo možné udělit stejná práva několika účtům najednou – udělte skupině přístup k veřejné složce v části Veřejné složky a každý účet uvedený zde tento přístup získá. Prázdná skupina neuděluje nikomu nic.</value>
   </data>
@@ -445,6 +448,9 @@ Přesto toto slabé heslo uložit?</value>
   </data>
   <data name="A label is required. It is how this key is told apart from the others months from now." xml:space="preserve">
     <value>Popisek je povinný. Podle něj se tento klíč po měsících odliší od ostatních.</value>
+  </data>
+  <data name="A listener wants a certificate and STARTTLS, so that no password crosses the network in the clear." xml:space="preserve">
+    <value>Listener potřebuje certifikát a STARTTLS, aby žádné heslo neputovalo sítí v nešifrované podobě.</value>
   </data>
   <data name="A low rate on a busy server usually means the TTL is shorter than the interval between lookups of the same object; a rate of 0% with no memory in use means nothing has been looked up yet, which is not the same thing. Memory in use is measured against the size caps above, and a cache at its cap is evicting entries it would otherwise have kept." xml:space="preserve">
     <value>Nízká úspěšnost na vytíženém serveru obvykle znamená, že je TTL kratší než interval mezi vyhledáními téhož objektu; úspěšnost 0 % bez využité paměti znamená, že se zatím nic nevyhledávalo, což není totéž. Využitá paměť se poměřuje s limity velikosti výše a cache na svém limitu vyřazuje položky, které by jinak zachovala.</value>
@@ -1089,6 +1095,9 @@ Control Panel může číst soubory zpráv pouze tehdy, když běží na stejné
 
 Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</value>
   </data>
+  <data name="And this is the server's own verdict on what you have built. It is the page to come back to." xml:space="preserve">
+    <value>A toto je vlastní verdikt serveru nad tím, co jste vytvořili. Na tuto stránku se budete vracet.</value>
+  </data>
   <data name="Announcements only" xml:space="preserve">
     <value>Pouze oznámení</value>
   </data>
@@ -1292,6 +1301,9 @@ Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</v
   </data>
   <data name="B_rowse…" xml:space="preserve">
     <value>P_rocházet…</value>
+  </data>
+  <data name="Back" xml:space="preserve">
+    <value>Zpět</value>
   </data>
   <data name="Back up _domains (accounts, aliases, lists)" xml:space="preserve">
     <value>Zálohovat _domény (účty, aliasy, seznamy)</value>
@@ -1579,6 +1591,9 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
   </data>
   <data name="Certificates (ACME)" xml:space="preserve">
     <value>Certifikáty (ACME)</value>
+  </data>
+  <data name="Certificates a listener can present are kept here, and ACME can renew them for you." xml:space="preserve">
+    <value>Certifikáty, které může listener předkládat, jsou uložené zde, a ACME je za vás umí obnovovat.</value>
   </data>
   <data name="Certificates are not verified on the connections this server makes when delivering. That is the normal setting for mail between servers - most of the internet's SMTP certificates would fail verification and the mail would stop - but it does mean outbound TLS protects against a passive listener only, not against something in the path. DANE and MTA-STS are how a specific destination gets more than that." xml:space="preserve">
     <value>Na připojeních, která tento server navazuje při doručování, se certifikáty neověřují. To je u pošty mezi servery běžné nastavení – většina SMTP certifikátů na internetu by ověřením neprošla a pošta by se zastavila – ale znamená to, že odchozí TLS chrání jen proti pasivnímu odposlechu, ne proti něčemu, co je přímo v cestě. DANE a MTA-STS jsou způsob, jak konkrétní cíl získá víc.</value>
@@ -3202,6 +3217,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Finding the user's directory entry" xml:space="preserve">
     <value>Hledání položky uživatele v adresáři</value>
   </data>
+  <data name="Finish" xml:space="preserve">
+    <value>Dokončit</value>
+  </data>
   <data name="First: which half is stuck?" xml:space="preserve">
     <value>Nejdřív: která polovina uvázla?</value>
   </data>
@@ -4470,6 +4488,12 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="New rule name" xml:space="preserve">
     <value>Název nového pravidla</value>
   </data>
+  <data name="New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard." xml:space="preserve">
+    <value>Nováček v hMailServeru? Krátká prohlídka založí doménu, poštovní schránku a listener nabízející TLS a skončí na Přehledu.</value>
+  </data>
+  <data name="Next" xml:space="preserve">
+    <value>Další</value>
+  </data>
   <data name="Next try" xml:space="preserve">
     <value>Další pokus</value>
   </data>
@@ -4850,6 +4874,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Notify sender" xml:space="preserve">
     <value>Upozornit odesílatele</value>
+  </data>
+  <data name="Now a mailbox. An account is an address somebody signs in to and receives mail at." xml:space="preserve">
+    <value>Teď poštovní schránka. Účet je adresa, ke které se někdo přihlašuje a na kterou dostává poštu.</value>
   </data>
   <data name="Number of delivery retries" xml:space="preserve">
     <value>Počet opakovaných pokusů o doručení</value>
@@ -6827,6 +6854,9 @@ Restartovat ji nyní?</value>
   <data name="Shared IMAP folders, and which accounts or groups may read and write each one." xml:space="preserve">
     <value>Sdílené složky IMAP a to, které účty nebo skupiny je smějí číst a zapisovat do nich.</value>
   </data>
+  <data name="Sho_w me around" xml:space="preserve">
+    <value>Pro_vést mě serverem</value>
+  </data>
   <data name="Shortest search string the index answers for (3-64; shorter strings fall back to the scan)" xml:space="preserve">
     <value>Nejkratší hledaný řetězec, na který index odpovídá (3–64; kratší řetězce se hledají procházením)</value>
   </data>
@@ -6838,6 +6868,12 @@ Restartovat ji nyní?</value>
   </data>
   <data name="Show every {0} sample as a table of numbers" xml:space="preserve">
     <value>Zobrazit všechny vzorky {0} jako tabulku čísel</value>
+  </data>
+  <data name="Show me around" xml:space="preserve">
+    <value>Provést mě serverem</value>
+  </data>
+  <data name="Show me around this page" xml:space="preserve">
+    <value>Provést mě touto stránkou</value>
   </data>
   <data name="Show table" xml:space="preserve">
     <value>Zobrazit tabulku</value>
@@ -6907,6 +6943,9 @@ Restartovat ji nyní?</value>
   </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Limit velikosti a skenery…</value>
+  </data>
+  <data name="Skip the tour" xml:space="preserve">
+    <value>Přeskočit prohlídku</value>
   </data>
   <data name="Skipped, by reason" xml:space="preserve">
     <value>Přeskočeno, podle důvodu</value>
@@ -6992,6 +7031,9 @@ Restartovat ji nyní?</value>
   <data name="Start here: jump straight to a common task, or press Ctrl+K and describe what you want to do." xml:space="preserve">
     <value>Začněte zde: přejděte rovnou k běžné úloze, nebo stiskněte Ctrl+K a popište, co chcete udělat.</value>
   </data>
+  <data name="Start with a domain: the part after the @ that this server accepts mail for. Add yours here." xml:space="preserve">
+    <value>Začněte doménou: částí za @, pro kterou tento server přijímá poštu. Tu svou přidejte zde.</value>
+  </data>
   <data name="Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting." xml:space="preserve">
     <value>Začněte tím, co chcete udělat, procházejte oblasti níže, nebo stiskněte Ctrl+K a prohledejte všechny stránky a nastavení.</value>
   </data>
@@ -7012,6 +7054,9 @@ Restartovat ji nyní?</value>
   </data>
   <data name="Status" xml:space="preserve">
     <value>Stav</value>
+  </data>
+  <data name="Step {0} of {1}" xml:space="preserve">
+    <value>Krok {0} z {1}</value>
   </data>
   <data name="Stop rule processing" xml:space="preserve">
     <value>Zastavit zpracování pravidel</value>
@@ -7288,6 +7333,9 @@ Restartovat ji nyní?</value>
   </data>
   <data name="That is the delivery half: a wedged scanner, a slow remote server, a hung external tool or the database." xml:space="preserve">
     <value>To je doručovací polovina: zaseknutý skener, pomalý vzdálený server, zatuhlý externí nástroj nebo databáze.</value>
+  </data>
+  <data name="That is the end of {0}. You can start it again whenever you like." xml:space="preserve">
+    <value>Zde končí „{0}“. Prohlídku můžete kdykoli spustit znovu.</value>
   </data>
   <data name="That key's id is not in the form this store uses, so its section cannot be identified. Remove it by hand from {0}." xml:space="preserve">
     <value>Id tohoto klíče nemá tvar, který toto úložiště používá, takže nelze určit jeho sekci. Odstraňte jej ručně z {0}.</value>
@@ -7940,6 +7988,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed." xml:space="preserve">
     <value>Server je čte ze sekce [LDAP] v hMailServer.INI a do dvou sekund od uložení je načte znovu, takže restart není potřeba. Výchozí hodnoty vyhovují Active Directory; adresář, který není z Windows, nemá sAMAccountName a potřebuje změnit názvy atributů.</value>
   </data>
+  <data name="These are the ports the server listens on. The submission port, 587, is the one your own people send through." xml:space="preserve">
+    <value>Toto jsou porty, na kterých server naslouchá. Odesílací port 587 je ten, přes který posílají vaši vlastní lidé.</value>
+  </data>
   <data name="These belong together: expiry without history teaches people to alternate between two passwords, which is worse than not expiring at all. History only ever refuses a CHANGE, at the moment somebody is able to pick something else, so nobody is locked out by it. Expiry refuses a LOGON - read its description before turning it on." xml:space="preserve">
     <value>Tyto dvě patří k sobě: vypršení bez historie učí lidi střídat dvě hesla, což je horší než nevypršet vůbec. Historie jen odmítne ZMĚNU, ve chvíli, kdy si dotyčný může vybrat něco jiného, takže nikoho nezamkne. Vypršení odmítne PŘIHLÁŠENÍ - než ho zapnete, přečtěte si jeho popis.</value>
   </data>
@@ -8106,6 +8157,12 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="Tokens signed with {0} are refused: this server implements RS256, ES256 and HS256 only. Remove what the server cannot verify from the list, so a client offering it is refused for a reason the log makes plain rather than appearing to be allowed." xml:space="preserve">
     <value>Tokeny podepsané {0} se odmítají: tento server implementuje jen RS256, ES256 a HS256. Odstraňte ze seznamu, co server nedokáže ověřit, aby klient, který to nabízí, byl odmítnut z důvodu, který log jasně uvede, místo aby se to zdálo povolené.</value>
+  </data>
+  <data name="Tour" xml:space="preserve">
+    <value>Prohlídka</value>
+  </data>
+  <data name="Tours" xml:space="preserve">
+    <value>Prohlídky</value>
   </data>
   <data name="Trace one message" xml:space="preserve">
     <value>Sledovat jednu zprávu</value>
@@ -8689,6 +8746,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="You arrived here from the search palette" xml:space="preserve">
     <value>Přišli jste sem z palety hledání</value>
   </data>
+  <data name="Your domains live in this list. Opening one gives you its accounts, aliases and distribution lists." xml:space="preserve">
+    <value>Vaše domény najdete v tomto seznamu. Otevřením domény získáte její účty, aliasy a distribuční seznamy.</value>
+  </data>
   <data name="_Account address" xml:space="preserve">
     <value>_Adresa účtu</value>
   </data>
@@ -9063,6 +9123,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Server</value>
+  </data>
+  <data name="_Start the walk" xml:space="preserve">
+    <value>_Spustit prohlídku</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Cílový SMTP hostitel</value>
@@ -9955,6 +10018,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="{0} change(s) carried out, none failed." xml:space="preserve">
     <value>Provedeno {0} změn, žádná neselhala.</value>
   </data>
+  <data name="{0} closed. It picks up where you left off." xml:space="preserve">
+    <value>„{0}“ zavřeno. Prohlídka bude pokračovat tam, kde jste skončili.</value>
+  </data>
   <data name="{0} configured but attachment blocking is switched off, so none of them is applied." xml:space="preserve">
     <value>{0} v konfiguraci, ale blokování příloh je vypnuté, takže se žádný z nich neuplatní.</value>
   </data>
@@ -10128,6 +10194,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="{0} setting(s) could not be written." xml:space="preserve">
     <value>{0} nastavení nešlo zapsat.</value>
+  </data>
+  <data name="{0} stops here: the next thing it points at is not on this screen." xml:space="preserve">
+    <value>„{0}“ zde končí: to další, na co ukazuje, není na této obrazovce.</value>
   </data>
   <data name="{0} the mail server engine" xml:space="preserve">
     <value>{0} engine poštovního serveru</value>

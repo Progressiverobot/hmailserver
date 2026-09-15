@@ -16,12 +16,47 @@ namespace hMailServer.ControlPanel.Views
    {
       private readonly PageHeader header_ = new() { Title = L("Welcome") };
 
+      // The offer to be walked through the server. It is a notice rather than a
+      // tour that starts itself: a first-run walk that seizes the screen of
+      // somebody who already knows the product is the reason first-run walks
+      // have a bad name. It is taken off the page once the walk is finished.
+      private readonly InlineNotice tourOffer_ = new()
+      {
+         Level = StatusLevel.Information,
+         Visibility = Visibility.Collapsed,
+         Margin = new Thickness(0, 0, 0, 16)
+      };
+
       public WelcomeView()
       {
          var panel = new StackPanel { MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
 
+         // "Show me around" in the header's actions as well as in the notice
+         // below, because the notice goes away for good once the walk is done
+         // and the entry point must not go with it.
+         var showMe = new Wpf.Ui.Controls.Button
+         {
+            Content = L("Sho_w me around"),
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
+            Icon = new Wpf.Ui.Controls.SymbolIcon(Wpf.Ui.Controls.SymbolRegular.QuestionCircle24)
+         };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(showMe, "welcome-show-me");
+         showMe.Click += (s, e) => StartWalk_();
+         header_.Actions = showMe;
+
          // The subtitle says which server this is, once connected (OnEnter).
          panel.Children.Add(header_);
+
+         tourOffer_.Text = L("New to hMailServer? A short walk sets up a domain, a mailbox and a listener that offers TLS, and ends on the dashboard.");
+         var start = new Wpf.Ui.Controls.Button
+         {
+            Content = L("_Start the walk"),
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary
+         };
+         System.Windows.Automation.AutomationProperties.SetAutomationId(start, "welcome-start-walk");
+         start.Click += (s, e) => StartWalk_();
+         tourOffer_.Content = start;
+         panel.Children.Add(tourOffer_);
 
          panel.Children.Add(Text(L("Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting."),
             "TextSecondary", new Thickness(0, 0, 0, 16)));
@@ -144,7 +179,13 @@ namespace hMailServer.ControlPanel.Views
          {
             header_.Subtitle = "";
          }
+
+         var shell = Application.Current.MainWindow as MainWindow;
+         tourOffer_.Visibility = shell != null && !shell.HasFinishedFirstRun ? Visibility.Visible : Visibility.Collapsed;
       }
+
+      private static void StartWalk_()
+         => (Application.Current.MainWindow as MainWindow)?.StartTour(TourCatalog.FirstRun);
 
       public void OnLeave()
       {

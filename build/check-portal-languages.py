@@ -8,7 +8,9 @@
 English is the key. The page (hmailserver/source/Server/Common/Util/
 Portal.html, and Portal.js) holds the keys in two forms: the texts of its markup - text
 nodes, placeholders, aria-labels, titles, alts - which the script walks at
-run time, and the literals the script hands to t() and tf(). Each language
+run time, and the literals the script hands to t(), tf() and K() - the last being how a
+table of texts the script draws later, such as a tour's steps, marks them.
+Each language
 lives in hmailserver/source/Server/Common/Util/PortalLanguages/<code>.json as
 one object, English to translation, and build/generate-portal-languages.py
 embeds every catalogue in PortalLanguagesData.cpp.
@@ -60,7 +62,7 @@ def page_keys():
             s = m.group(1).strip()
             if re.search(r"[A-Za-z]{2,}", s):
                 keys.add(s)
-    for m in re.finditer(r"\btf?\('((?:[^'\\]|\\.)*)'", script):
+    for m in re.finditer(r"\b(?:t|tf|K)\('((?:[^'\\]|\\.)*)'", script):
         keys.add(m.group(1).replace("\\'", "'").replace("\\\\", "\\"))
     return keys
 

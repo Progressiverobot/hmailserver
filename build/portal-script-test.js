@@ -129,7 +129,23 @@ class Element {
       return !event.defaultPrevented;
    }
    focus() { this.focused += 1; document.activeElement = this; }
+   // The page presses its own buttons in a few places - Save before Close in
+   // the compose window, the file picker behind Attach - and a DOM without
+   // this reports it as "click is not a function" from inside a handler,
+   // which names neither the button nor the reason.
+   click() { this.dispatchEvent(makeEvent('click')); }
    scrollIntoView() { this.scrolledIntoView += 1; }
+   /* There is no layout in this DOM, so an element has the rectangle a test
+      gives it (el.rect = {left, top, width, height}) and otherwise none at all.
+      That is enough for the tour, which asks only where the thing it points at
+      is; an element with no rectangle is one it draws no ring around, which is
+      what a browser reports for something that is not on the screen. */
+   getBoundingClientRect() {
+      const r = this.rect || { left: 0, top: 0, width: 0, height: 0 };
+      return { left: r.left, top: r.top, width: r.width, height: r.height, x: r.left, y: r.top,
+               right: r.left + r.width, bottom: r.top + r.height };
+   }
+   get offsetHeight() { return (this.rect || { height: 0 }).height; }
    querySelector() { throw new Error('the portal script must not need querySelector'); }
 }
 
@@ -271,12 +287,18 @@ const history = {
 };
 
 const timers = [];
+const intervals = [];
 let timerId = 1;
 function fireTimers() {
    const due = timers.splice(0, timers.length);
    due.forEach((t) => t.fn());
    return due.length;
 }
+// A repeating timer is a queue this file fires by hand rather than node's own:
+// a real one would keep the process alive after the last check and would fire
+// whenever the runner happened to be slow, which is how a test starts failing
+// on a busy machine and nowhere else.
+function fireIntervals() { intervals.slice().forEach((t) => t.fn()); return intervals.length; }
 
 const store = new Map();
 const localStorage = {
@@ -571,7 +593,9 @@ const world = {
    DOMParser: DOMParserStub,
    FileReader: FileReaderStub,
    setTimeout: (fn, ms) => { const id = timerId++; timers.push({ id, fn, ms }); return id; },
-   clearTimeout: (id) => { const at = timers.findIndex((t) => t.id === id); if (at >= 0) { timers.splice(at, 1); } }
+   clearTimeout: (id) => { const at = timers.findIndex((t) => t.id === id); if (at >= 0) { timers.splice(at, 1); } },
+   setInterval: (fn, ms) => { const id = timerId++; intervals.push({ id, fn, ms }); return id; },
+   clearInterval: (id) => { const at = intervals.findIndex((t) => t.id === id); if (at >= 0) { intervals.splice(at, 1); } }
 };
 Object.keys(world).forEach((name) => {
    Object.defineProperty(globalThis, name, { value: world[name], writable: true, configurable: true });
@@ -1726,6 +1750,175 @@ async function main() {
       String(document.documentElement.getAttribute('dir')) + ' ' + String(document.documentElement.getAttribute('lang')));
    check('and the caption is the German', document.getElementById('keys-title').textContent === german['Keyboard shortcuts'],
       document.getElementById('keys-title').textContent);
+
+   // ---- the tour: teaching the page while somebody uses it
+   // Every check here is a way a tour can be wrong that nobody would notice
+   // until they walked it: a step that hangs on something this page has hidden,
+   // a tour that moves on before the reader has read it, a Back that closes it,
+   // a finished record written for a walk somebody left, a tour that only works
+   // in English. The record is kept with the ACCOUNT rather than with this
+   // browser, so a reader who starts on a laptop finishes on a phone - which is
+   // why what is checked below is a PUT and not a localStorage key.
+   document.getElementById('pref-language').value = 'en';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const tourCard = document.getElementById('tour-card');
+   const tourRing = document.getElementById('tour-ring');
+   const tourStepOf = () => document.getElementById('tour-step').textContent;
+   const lastPrefs = (from) => {
+      const puts = since(from).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences');
+      return puts.length ? JSON.parse(puts[puts.length - 1].body) : null;
+   };
+
+   // The compose window is left open by earlier sections of this file; the step
+   // about it waits for it to be OPENED, and a condition already true when the
+   // step arrives is deliberately not one that moves the tour on.
+   if (document.getElementById('compose-section').hidden === false) {
+      document.getElementById('compose-to').value = '';
+      document.getElementById('compose-subject').value = '';
+      document.getElementById('compose-text').value = '';
+      document.getElementById('compose-close').dispatchEvent(makeEvent('click'));
+      await flush();
+   }
+   check('the compose window is closed before the walk begins', document.getElementById('compose-section').hidden === true);
+
+   document.getElementById('account-btn').dispatchEvent(makeEvent('click'));
+   check('the header menu carries the way in', document.getElementById('account-menu').hidden === false &&
+      document.getElementById('menu-tour').textContent.indexOf('Show me around') >= 0,
+      document.getElementById('menu-tour').textContent);
+   let beforeTour = requests.length;
+   document.getElementById('menu-tour').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('starting the tour opens the mail view and closes the menu',
+      tourCard.hidden === false && document.getElementById('mail-section').hidden === false &&
+      document.getElementById('account-menu').hidden === true, 'card=' + tourCard.hidden);
+   check('the card names the tour and says where the reader is',
+      document.getElementById('tour-name').textContent === 'Show me around' && tourStepOf() === 'Step 1 of 4',
+      document.getElementById('tour-name').textContent + ' | ' + tourStepOf());
+   check('and carries the step\'s own sentence',
+      document.getElementById('tour-text').textContent.indexOf('Choose a message in the list') === 0,
+      document.getElementById('tour-text').textContent);
+   check('there is nowhere to go back to on the first stop', document.getElementById('tour-back').hidden === true);
+   check('starting it asks the server for nothing of its own', !called(beforeTour, 'GET', /tour/),
+      JSON.stringify(since(beforeTour).map((r) => r.path)));
+
+   // The ring goes where the element is, the card under it.
+   document.getElementById('pane-empty').rect = { left: 400, top: 120, width: 360, height: 40 };
+   document.getElementById('tour-back').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('Back on the first stop stands still rather than closing the tour',
+      tourCard.hidden === false && tourStepOf() === 'Step 1 of 4', tourStepOf());
+   check('the ring is drawn over the element the step points at',
+      tourRing.hidden === false && tourRing.style.left === '400px' && tourRing.style.top === '120px' &&
+      tourRing.style.width === '360px' && tourRing.style.height === '40px', JSON.stringify(tourRing.style));
+   check('and the card is put under it rather than over it', tourCard.style.top === '172px', tourCard.style.top);
+
+   // The reading-pane step waits for a message to be opened. Opening one hides
+   // the very element the ring is on, which must take the ring away and move
+   // the tour on rather than leave it pointing at nothing.
+   // Opened through its own address, which is where a click on the row lands.
+   location.hash = '#/m/102';
+   await flush();
+   check('opening a message hides what the step pointed at',
+      document.getElementById('message-view').hidden === false && document.getElementById('pane-empty').hidden === true,
+      'view=' + document.getElementById('message-view').hidden + ' empty=' + document.getElementById('pane-empty').hidden);
+   fireIntervals();
+   await flush();
+   check('and the condition the step was waiting for moves the tour on by itself',
+      tourStepOf() === 'Step 2 of 4' && document.getElementById('tour-text').textContent.indexOf('Compose opens') === 0,
+      tourStepOf() + ' | ' + document.getElementById('tour-text').textContent);
+   fireIntervals();
+   await flush();
+   check('a step whose condition has not happened yet is not moved on by anything but the reader',
+      tourStepOf() === 'Step 2 of 4', tourStepOf());
+   document.getElementById('nav-compose').dispatchEvent(makeEvent('click'));
+   await flush();
+   fireIntervals();
+   await flush();
+   check('opening the compose window ends the step about it', tourStepOf() === 'Step 3 of 4', tourStepOf());
+   check('and Back is offered from the second stop on', document.getElementById('tour-back').hidden === false);
+
+   // A stop whose element this page happens to be hiding is skipped rather
+   // than waited on: half of this page is hidden at any moment, and a tour
+   // that stopped at the first thing it could not see would stop at once.
+   document.getElementById('tour-back').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('Back returns to the stop before', tourStepOf() === 'Step 2 of 4', tourStepOf());
+   document.getElementById('label-nav').hidden = true;
+   document.getElementById('tour-next').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('a stop whose element the page is hiding is skipped, and the tour carries on past it',
+      document.getElementById('tour-card').hidden === false && tourStepOf() === 'Step 4 of 4', tourStepOf());
+   document.getElementById('label-nav').hidden = false;
+   document.getElementById('tour-back').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('and Back finds it again once the page is showing it', tourStepOf() === 'Step 3 of 4', tourStepOf());
+   document.getElementById('compose-to').value = '';
+   document.getElementById('compose-subject').value = '';
+   document.getElementById('compose-text').value = '';
+   document.getElementById('compose-close').dispatchEvent(makeEvent('click'));
+   await flush();
+
+   // Leaving records where the reader got to, with the account.
+   beforeTour = requests.length;
+   document.getElementById('tour-skip').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('leaving takes the ring and the card off the screen', tourCard.hidden === true && tourRing.hidden === true);
+   check('and says so rather than vanishing in silence',
+      document.getElementById('toasts').textContent.indexOf('picks up where you left off') > 0,
+      document.getElementById('toasts').textContent);
+   check('where it was left is kept with the account, in the form the other two surfaces keep it in',
+      lastPrefs(beforeTour) && lastPrefs(beforeTour).tours === '|firstrun@2v1', JSON.stringify(lastPrefs(beforeTour)));
+   document.getElementById('menu-tour').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('and the next start picks it up there', tourStepOf() === 'Step 3 of 4', tourStepOf());
+
+   // Escape belongs to the page unless the keyboard is already inside the card.
+   document.getElementById('mail-search').focus();
+   document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.getElementById('mail-search') }));
+   await flush();
+   check('Escape with the keyboard outside the card leaves the tour alone', tourCard.hidden === false);
+   document.getElementById('tour-next').focus();
+   document.dispatchEvent(makeEvent('keydown', { key: 'Escape', target: document.getElementById('tour-next') }));
+   await flush();
+   check('Escape inside the card leaves the tour', tourCard.hidden === true);
+
+   // Walked to its end.
+   document.getElementById('menu-tour').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('the last stop offers Finish rather than promising another',
+      tourStepOf() === 'Step 3 of 4' && document.getElementById('tour-next').textContent === 'Next', document.getElementById('tour-next').textContent);
+   document.getElementById('tour-next').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('the last stop is the search box, where a reader who learns nothing else should still end up',
+      tourStepOf() === 'Step 4 of 4' && document.getElementById('tour-next').textContent === 'Finish',
+      tourStepOf() + ' | ' + document.getElementById('tour-next').textContent);
+   beforeTour = requests.length;
+   document.getElementById('tour-next').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('finishing says so', tourCard.hidden === true && document.getElementById('toasts').textContent.indexOf('That is the end of') >= 0,
+      document.getElementById('toasts').textContent);
+   check('and is recorded as finished, with no resume point left behind',
+      lastPrefs(beforeTour) && lastPrefs(beforeTour).tours === 'firstrun=1|', JSON.stringify(lastPrefs(beforeTour)));
+
+   // In the reader's own language, from the catalogues the page already speaks.
+   document.getElementById('pref-language').value = 'de';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   document.getElementById('menu-tour').dispatchEvent(makeEvent('click'));
+   await flush();
+   check('the tour is drawn in the reader\'s language: its name',
+      document.getElementById('tour-name').textContent === german['Show me around'], document.getElementById('tour-name').textContent);
+   check('its sentence',
+      document.getElementById('tour-text').textContent === german['Choose a message in the list and it opens here beside it. The More menu moves this pane, or turns it off.'],
+      document.getElementById('tour-text').textContent);
+   check('where the reader is, with its numbers',
+      tourStepOf() === german['Step {0} of {1}'].replace('{0}', '1').replace('{1}', '4'), tourStepOf());
+   check('and the card\'s own buttons, which the markup walk translates',
+      document.getElementById('tour-next').textContent === german['Next'] && document.getElementById('tour-skip').textContent === german['Skip the tour'],
+      document.getElementById('tour-next').textContent + ' | ' + document.getElementById('tour-skip').textContent);
+   document.getElementById('tour-skip').dispatchEvent(makeEvent('click'));
+   await flush();
 
    // ---- signing out ends the session and stops the probe
    const beforeOut = requests.length;
