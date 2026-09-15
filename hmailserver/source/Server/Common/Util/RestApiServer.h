@@ -298,6 +298,7 @@ namespace HM
          RouteServerMessageList,
          RouteServerMessagePut,
          RouteSieveEvaluate,
+         RouteCalendarExpand,
          RouteIpRangeUpdate,
          RouteDomainAliasList,
          RouteDomainAliasCreate,
@@ -867,6 +868,7 @@ namespace HM
       HttpResponse HandleServerMessageList_();
       HttpResponse HandleServerMessagePut_(const AnsiString &name, const AnsiString &requestBody);
       HttpResponse HandleSieveEvaluate_(const AnsiString &requestBody);
+      HttpResponse HandleCalendarExpand_(const AnsiString &requestBody);
       HttpResponse HandleCreateRule_(const AnsiString &requestBody);
       HttpResponse HandleUpdateRule_(__int64 ruleId, const AnsiString &requestBody);
       HttpResponse HandleDeleteRule_(__int64 ruleId);

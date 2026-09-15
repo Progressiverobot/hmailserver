@@ -135,14 +135,14 @@ namespace HM
 
       // RFC 6764 well-known redirect. calendar selects caldav over carddav.
       // built_in_target is where the path points when no other server is
-      // configured: this server's own CardDAV for carddav, nothing for caldav.
+      // configured: this server's own /dav/, which serves both.
       static HttpResponse HandleWellKnownDavRedirect_(bool calendar, const AnsiString &built_in_target);
 
-      // The absolute URL of this server's CardDAV context path, on the host
-      // the client used and over HTTPS: the HTTPS listener's port when the
-      // request came over plain HTTP and one is configured. Relative when the
-      // request named no host.
-      static AnsiString BuiltInCardDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer);
+      // The absolute URL of this server's DAV context path (CardDAV and
+      // CalDAV), on the host the client used and over HTTPS: the HTTPS
+      // listener's port when the request came over plain HTTP and one is
+      // configured. Relative when the request named no host.
+      static AnsiString BuiltInDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer);
 
       // The Host header as sent, port included, lower-cased; empty when
       // absent or not printable US-ASCII without spaces. GetRequestHost_

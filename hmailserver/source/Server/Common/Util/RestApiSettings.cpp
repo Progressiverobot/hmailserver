@@ -55,6 +55,7 @@
 #include "../Persistence/PersistentServerMessage.h"
 #include "../Scripting/ScriptServer.h"
 #include "../Sieve/SieveScript.h"
+#include "ICalendar.h"
 #include "FileUtilities.h"
 #include "../Persistence/PersistentIMAPFolder.h"
 #include "../Persistence/PersistentRuleAction.h"
@@ -1635,6 +1636,90 @@ namespace
       return bridge.respond(200, "{\"result\":\"" + bridge.escape(Utf8(result)) + "\"}", "");
    }
 
+   // ---------------------------------------------------------------------
+   // POST /api/v1/calendar/expand: the recurrence expansion of one iCalendar
+   // object over a window, exactly as the CalDAV calendar-query performs it,
+   // so a rule can be checked against what the server will answer for it.
+   // Nothing is stored. The body: calendar (the object's text), start and
+   // end (UTC, YYYYMMDDTHHMMSSZ; the window, unbounded when absent) and
+   // limit (instances, 1..10000, 1000 by default).
+   // ---------------------------------------------------------------------
+
+   HttpResponse CalendarExpand(const AnsiString &requestBody, const Bridge &bridge)
+   {
+      JsonValue document;
+      std::string parseError;
+      if (!JsonValue::Parse(std::string(requestBody.c_str(), requestBody.GetLength()), document, parseError) || !document.IsObject())
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      const JsonValue *calendar = document.Get("calendar");
+      if (!calendar || !calendar->IsString())
+         return Refusal(bridge, 400, "calendar must be a string holding one iCalendar object");
+
+      __int64 windowStart = 0;
+      __int64 windowEnd = ICalendar::Forever;
+      if (const JsonValue *start = document.Get("start"))
+      {
+         if (!start->IsString() || !ICalendar::ParseUtc(AnsiString(start->AsString().c_str()), windowStart))
+            return Refusal(bridge, 400, "start must be a UTC date-time, YYYYMMDDTHHMMSSZ");
+      }
+      if (const JsonValue *end = document.Get("end"))
+      {
+         if (!end->IsString() || !ICalendar::ParseUtc(AnsiString(end->AsString().c_str()), windowEnd))
+            return Refusal(bridge, 400, "end must be a UTC date-time, YYYYMMDDTHHMMSSZ");
+      }
+      if (windowEnd <= windowStart)
+         return Refusal(bridge, 400, "end must be after start");
+
+      size_t maxInstances = 1000;
+      if (const JsonValue *limit = document.Get("limit"))
+      {
+         if (!limit->IsNumber() || limit->AsNumber() < 1 || limit->AsNumber() > 10000)
+            return Refusal(bridge, 400, "limit must be a number from 1 to 10000");
+         maxInstances = static_cast<size_t>(limit->AsNumber());
+      }
+
+      ICalComponent tree;
+      AnsiString problem;
+      AnsiString text(calendar->AsString().c_str());
+      if (!ICalendar::Parse(text, tree, problem))
+         return Refusal(bridge, 400, "the calendar is not one iCalendar object: " + problem);
+
+      ICalendar::Summary summary;
+      if (!ICalendar::Summarize(tree, summary, problem))
+         return Refusal(bridge, 400, "the object cannot be expanded: " + problem);
+
+      std::vector<ICalInstance> instances;
+      bool truncated = false;
+      if (!ICalendar::Expand(tree, windowStart, windowEnd, maxInstances, instances, truncated, problem))
+         return Refusal(bridge, 400, "the object cannot be expanded: " + problem);
+
+      AnsiString count;
+      count.Format("%d", static_cast<int>(instances.size()));
+
+      AnsiString json = "{\"uid\":\"" + bridge.escape(summary.uid) + "\",\"component\":\"" + bridge.escape(summary.component) +
+         "\",\"recurring\":" + AnsiString(summary.recurring ? "true" : "false") +
+         ",\"first\":\"" + ICalendar::FormatUtc(summary.first) +
+         "\",\"last\":\"" + (summary.last >= ICalendar::Forever ? AnsiString("") : ICalendar::FormatUtc(summary.last)) +
+         "\",\"count\":" + count + ",\"truncated\":" + AnsiString(truncated ? "true" : "false") + ",\"instances\":[";
+
+      for (size_t i = 0; i < instances.size(); i++)
+      {
+         const ICalInstance &instance = instances[i];
+         AnsiString summaryText = instance.component < tree.children.size() ? tree.children[instance.component].Value("SUMMARY") : AnsiString("");
+         if (i > 0)
+            json += ",";
+         json += "{\"start\":\"" + ICalendar::FormatUtc(instance.start) + "\",\"end\":\"" + ICalendar::FormatUtc(instance.end) +
+            "\",\"all_day\":" + AnsiString(instance.allDay ? "true" : "false") +
+            ",\"recurrence_id\":\"" + ICalendar::FormatUtc(instance.recurrenceId) +
+            "\",\"overridden\":" + AnsiString(instance.overridden ? "true" : "false") +
+            ",\"summary\":\"" + bridge.escape(summaryText) + "\"}";
+      }
+
+      json += "]}";
+      return bridge.respond(200, json, "");
+   }
+
    // The hand-written paths beside the generated groups: the INI routes and
    // the logon-failure clear, each beginning with a comma as OpenApiPath's do.
    const char *ScriptingMessagesAndSievePaths =
@@ -1642,7 +1727,8 @@ namespace
       "\"/api/v1/settings/scripting/check\":{\"post\":{\"summary\":\"Check the event-handler script's syntax\",\"description\":\"What Scripting.CheckSyntax does over COM: result is empty when the script parses, and the parser's message otherwise. Nothing is changed. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"{result: the parser's message, or empty}\"}}}},"
       "\"/api/v1/settings/messages\":{\"get\":{\"summary\":\"The server's message texts\",\"description\":\"The texts the server puts in the mail it writes itself - Settings.ServerMessages over COM. Each entry: id, name, text. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Array of {id, name, text}\"}}}},"
       "\"/api/v1/settings/messages/{name}\":{\"put\":{\"summary\":\"Change one server message text\",\"description\":\"Body: text. The name is the table's own, as the listing shows it. In use at once. Server-wide; refused for domain-restricted and read-only keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"text\"],\"properties\":{\"text\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{id, name, text} as saved\"},\"400\":{\"description\":\"text missing or not a string\"},\"404\":{\"description\":\"No message of that name\"}}}},"
-      "\"/api/v1/sieve/evaluate\":{\"post\":{\"summary\":\"Try a Sieve script against a message, without delivering anything\",\"description\":\"Body: script (RFC 5228 Sieve) and message (the raw message, headers and body). result is the action list the script decided on - keep, fileinto:Folder, discard, redirect:address, and so on - or error: followed by the parser's message. What Utilities.EvaluateSieveScript does over COM: nothing is filed, sent or recorded. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\",\"message\"],\"properties\":{\"script\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{result}\"},\"400\":{\"description\":\"script or message missing\"}}}}";
+      "\"/api/v1/sieve/evaluate\":{\"post\":{\"summary\":\"Try a Sieve script against a message, without delivering anything\",\"description\":\"Body: script (RFC 5228 Sieve) and message (the raw message, headers and body). result is the action list the script decided on - keep, fileinto:Folder, discard, redirect:address, and so on - or error: followed by the parser's message. What Utilities.EvaluateSieveScript does over COM: nothing is filed, sent or recorded. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"script\",\"message\"],\"properties\":{\"script\":{\"type\":\"string\"},\"message\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{result}\"},\"400\":{\"description\":\"script or message missing\"}}}},"
+      "\"/api/v1/calendar/expand\":{\"post\":{\"summary\":\"Expand an iCalendar object's recurrence over a window, without storing anything\",\"description\":\"Body: calendar (one iCalendar object, VEVENT or VTODO, with any VTIMEZONE it needs), start and end (UTC, YYYYMMDDTHHMMSSZ; the window, unbounded when absent) and limit (instances, 1 to 10000, 1000 by default). Answers what the CalDAV calendar-query computes for the object: uid, component, recurring, first and last (the span; last empty for a recurrence with no end), count, truncated, and instances - each with start, end, all_day, recurrence_id, overridden and summary. An object the server would refuse on PUT - a rule it does not expand, a zone it cannot place - is a 400 with the reason. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"calendar\"],\"properties\":{\"calendar\":{\"type\":\"string\"},\"start\":{\"type\":\"string\"},\"end\":{\"type\":\"string\"},\"limit\":{\"type\":\"integer\"}}}}}},\"responses\":{\"200\":{\"description\":\"{uid, component, recurring, first, last, count, truncated, instances: [{start, end, all_day, recurrence_id, overridden, summary}]}\"},\"400\":{\"description\":\"calendar missing, not one iCalendar object, or one this server cannot expand (the reason is in error)\"}}}}";
 
    const char *CacheAndIndexingPaths =
       ",\"/api/v1/settings/cache/clear\":{\"post\":{\"summary\":\"Empty the caches\",\"description\":\"What Settings.Cache.Clear does over COM: the domain, account, alias and distribution-list caches are emptied, and the open-message container with them, so the next lookup of each reads the database. Server-wide; refused for domain-restricted and read-only keys.\",\"responses\":{\"200\":{\"description\":\"{cleared: true}\"}}}},"
@@ -1905,6 +1991,13 @@ namespace HM
    {
       Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
       return SieveEvaluate(requestBody, bridge);
+   }
+
+   HttpResponse
+   RestApiServer::HandleCalendarExpand_(const AnsiString &requestBody)
+   {
+      Bridge bridge = { &RestApiServer::JsonEscape_, &RestApiServer::BuildResponse_ };
+      return CalendarExpand(requestBody, bridge);
    }
 
    HttpResponse

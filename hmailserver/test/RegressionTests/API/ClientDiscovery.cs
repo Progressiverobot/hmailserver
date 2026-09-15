@@ -36,24 +36,21 @@ namespace RegressionTests.API
    ///    request would leave a user who reinstalls the profile with a stack of
    ///    duplicate mail accounts instead of one replaced account.
    ///
-   ///    (b) /.well-known/caldav and /.well-known/carddav (RFC 6764). This
-   ///    server does not implement CalDAV; the caldav redirect exists so an
-   ///    administrator can pair a separate calendar server and have clients
-   ///    find it, and with no target configured the path must answer 404 and
-   ///    must not redirect anywhere. A client that follows a redirect to
-   ///    something which does not speak CalDAV reports a broken calendar
-   ///    account and keeps retrying it, and the administrator then debugs the
-   ///    wrong server. CardDAV is different since September 2026: this server
-   ///    serves it itself, under /dav/, so with no CardDavRedirectUrl the
-   ///    carddav path points at the built-in address book, and a configured
-   ///    target still wins (the CardDav fixture covers the address book).
+   ///    (b) /.well-known/caldav and /.well-known/carddav (RFC 6764). Both
+   ///    protocols are served by this server under /dav/ (CardDAV since
+   ///    September 2026, CalDAV since the calendar wave that followed), so
+   ///    with no CalDavRedirectUrl or CardDavRedirectUrl each path points at
+   ///    the built-in /dav/ on the host the client used, and a configured
+   ///    target still wins - the redirect settings exist so an administrator
+   ///    can pair a separate calendar or contacts server and have clients
+   ///    find it. Before CalDAV was written here the unconfigured caldav path
+   ///    answered 404 on purpose, because a redirect to a server that does
+   ///    not speak the protocol leaves a client retrying a broken account
+   ///    forever; it speaks it now (the CalDav fixture covers the calendar,
+   ///    the CardDav fixture the address book).
    ///
    ///    Against a build without these handlers every test here fails with 404
-   ///    "not found", because neither path is routed - except
-   ///    CalDavWellKnownIsNotFoundWithoutAConfiguredTarget, which passes both
-   ///    before and after the change and is labelled as the negative control it
-   ///    is: it exists to fail if anyone later "improves" the unconfigured
-   ///    caldav case into a redirect to this server, which speaks no CalDAV.
+   ///    "not found", because neither path is routed.
    /// </summary>
    [TestFixture]
    public class ClientDiscovery : TestFixtureBase
@@ -362,29 +359,40 @@ namespace RegressionTests.API
          Assert.AreEqual(301, carddav.status, "Headers: " + carddav.headers);
          Assert.AreEqual(CardDavTarget, HeaderValue(carddav.headers, "Location"), "Headers: " + carddav.headers);
 
-         // The two settings are separate: configuring contacts must not make
-         // the server claim a calendar service it was never pointed at.
+         // The two settings are separate: configuring contacts must not send
+         // calendar clients to the contacts server. The caldav path keeps
+         // pointing at the built-in calendar.
          (int status, string headers, string body) caldav = HttpGet("/.well-known/caldav", "example.test");
 
-         Assert.AreEqual(404, caldav.status,
+         Assert.AreEqual(301, caldav.status, "Headers: " + caldav.headers);
+         Assert.AreNotEqual(CardDavTarget, HeaderValue(caldav.headers, "Location"),
             "CardDavRedirectUrl must not answer for CalDAV. Headers: " + caldav.headers);
+         StringAssert.EndsWith("/dav/", HeaderValue(caldav.headers, "Location"), "Headers: " + caldav.headers);
       }
 
       [Test]
-      [Description("NEGATIVE CONTROL - passes before and after the change: with no target configured /.well-known/caldav is 404 and does not redirect")]
-      public void CalDavWellKnownIsNotFoundWithoutAConfiguredTarget()
+      [Description("With no CalDavRedirectUrl, /.well-known/caldav points at this server's own calendar under /dav/, on the host the client used (RFC 6764 section 6)")]
+      public void CalDavWellKnownPointsAtTheBuiltInCalendarWithoutAConfiguredTarget()
       {
-         // This one does not fail against the current code, because an unrouted
-         // path answers 404 too. It is here as a guard: the tempting "fix" for
-         // an unconfigured target is to redirect somewhere plausible, and that
-         // is the one outcome that must never ship for a protocol this server
-         // does not speak. A client that follows a redirect to a server which
-         // does not speak CalDAV reports a broken account and retries forever,
-         // where a 404 makes it conclude there is no calendar service and stop.
-         (int status, string headers, string body) caldav = HttpGet("/.well-known/caldav", "example.test");
+         // Until the calendar was written here this path answered 404 when
+         // unconfigured, and a test guarded that: a redirect to a server that
+         // does not speak CalDAV leaves a client retrying a broken account
+         // forever. The server speaks it now, so a client that arrives by
+         // discovery is sent to it, exactly as the carddav path sends it to
+         // the address book - absolute, on the host and port the client
+         // named, https when the request came over TLS or a proxy says it did.
+         (int status, string headers, string body) caldav =
+            HttpGet("/.well-known/caldav", "mail.example.test:" + WebServicesPort, "X-Forwarded-Proto: https\r\n");
 
-         Assert.AreEqual(404, caldav.status, "Headers: " + caldav.headers);
-         Assert.IsNull(HeaderValue(caldav.headers, "Location"), "Headers: " + caldav.headers);
+         Assert.AreEqual(301, caldav.status, "Headers: " + caldav.headers);
+         Assert.AreEqual("https://mail.example.test:" + WebServicesPort + "/dav/", HeaderValue(caldav.headers, "Location"),
+            "Headers: " + caldav.headers);
+
+         (int status, string headers, string body) plain = HttpGet("/.well-known/caldav", "mail.example.test:" + WebServicesPort);
+
+         Assert.AreEqual(301, plain.status, "Headers: " + plain.headers);
+         Assert.AreEqual("http://mail.example.test:" + WebServicesPort + "/dav/", HeaderValue(plain.headers, "Location"),
+            "Headers: " + plain.headers);
       }
 
       [Test]

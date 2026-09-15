@@ -90,6 +90,7 @@
   <!-- The fixtures. -->
   <ItemGroup>
     <Compile Include="..\RegressionTests\API\Basics.cs" Link="API\Basics.cs" />
+    <Compile Include="..\RegressionTests\API\CalDav.cs" Link="API\CalDav.cs" />
     <Compile Include="..\RegressionTests\API\CardDav.cs" Link="API\CardDav.cs" />
     <Compile Include="..\RegressionTests\API\ClientDiscovery.cs" Link="API\ClientDiscovery.cs" />
     <Compile Include="..\RegressionTests\API\Message.cs" Link="API\Message.cs" />

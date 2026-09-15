@@ -1663,6 +1663,8 @@ namespace HM
             return HandleServerMessagePut_(route.name, GetRequestBody_(request));
          case RouteSieveEvaluate:
             return HandleSieveEvaluate_(GetRequestBody_(request));
+         case RouteCalendarExpand:
+            return HandleCalendarExpand_(GetRequestBody_(request));
          case RouteIpRangeUpdate:
             return HandleUpdateIpRange_(route.range_id, GetRequestBody_(request));
          case RouteDomainAliasList:
@@ -3269,6 +3271,12 @@ namespace HM
          return;
       }
 
+      if (method == "POST" && path == "/api/v1/calendar/expand")
+      {
+         route.kind = RouteCalendarExpand;
+         return;
+      }
+
       if (method == "POST" && path == "/api/v1/server/reinitialize")
       {
          route.kind = RouteServerReinitialize;
@@ -3681,6 +3689,7 @@ namespace HM
       case RouteServerMessagePut:
       case RouteSieveEvaluate:
       case RouteRuleMatch:
+      case RouteCalendarExpand:
       case RouteIpRangeUpdate:
       case RouteRuleCreate:
       case RouteRuleUpdate:

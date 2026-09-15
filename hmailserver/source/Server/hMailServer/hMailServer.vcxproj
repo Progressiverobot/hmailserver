@@ -580,8 +580,10 @@ EXIT 0
     <ClCompile Include="..\Common\Util\ContactStore.cpp" />
     <ClCompile Include="..\Common\Util\VCard.cpp" />
     <ClCompile Include="..\Common\Util\CardDavServer.cpp" />
+    <ClCompile Include="..\Common\Util\DavSupport.cpp" />
     <ClCompile Include="..\Common\Util\ICalendar.cpp" />
     <ClCompile Include="..\Common\Util\CalendarStore.cpp" />
+    <ClCompile Include="..\Common\Util\CalDavServer.cpp" />
     <ClCompile Include="..\Common\Util\RestApiBranding.cpp" />
     <ClCompile Include="..\Common\Util\RestApiFiles.cpp" />
     <ClCompile Include="..\Common\Util\RestApiLanguages.cpp" />
@@ -1303,8 +1305,10 @@ EXIT 0
     <ClInclude Include="..\Common\Util\ContactStore.h" />
     <ClInclude Include="..\Common\Util\VCard.h" />
     <ClInclude Include="..\Common\Util\CardDavServer.h" />
+    <ClInclude Include="..\Common\Util\DavSupport.h" />
     <ClInclude Include="..\Common\Util\ICalendar.h" />
     <ClInclude Include="..\Common\Util\CalendarStore.h" />
+    <ClInclude Include="..\Common\Util\CalDavServer.h" />
     <ClInclude Include="..\Common\AntiSpam\QuarantineStore.h" />
     <ClInclude Include="..\Common\Util\Totp.h" />
     <ClInclude Include="..\Common\Util\MessageTrace.h" />

@@ -661,6 +661,7 @@
     <Compile Include="Sieve\ManageSieveAutoBan.cs" />
     <Compile Include="API\ClientDiscovery.cs" />
     <Compile Include="API\CardDav.cs" />
+    <Compile Include="API\CalDav.cs" />
     <Compile Include="API\RestApiApiKeys.cs" />
     <Compile Include="API\UpdateCheck.cs" />
     <Compile Include="API\UpdateVerify.cs" />

@@ -15,6 +15,7 @@
 #include "OtelTracer.h"
 #include "OtelTraceContext.h"
 #include "CardDavServer.h"
+#include "CalDavServer.h"
 
 #include "../BO/Domains.h"
 #include "../BO/Domain.h"
@@ -358,9 +359,10 @@ namespace HM
             if (davRedirectConfigured)
                features += ", CalDAV/CardDAV service discovery (/.well-known/caldav and /.well-known/carddav)";
 
-            // CardDAV has no enable setting either: it is served for every
-            // account once a listener exists, so it is always in the list.
-            features += ", CardDAV (/dav/, the accounts' contacts for phones and desktop clients, over HTTPS)";
+            // CardDAV and CalDAV have no enable setting either: they are served
+            // for every account once a listener exists, so they are always in
+            // the list.
+            features += ", CardDAV and CalDAV (/dav/, the accounts' contacts and calendars for phones and desktop clients, over HTTPS)";
 
             featureMessage = _T("WebServices: these features are enabled but unreachable, because no web services listener is configured: ") + String(features) +
                _T(". Nothing answers those URLs until WebServicesHttpPort and/or WebServicesHttpsPort is set to a non-zero port in hMailServer.ini - both default to 0.");
@@ -379,11 +381,11 @@ namespace HM
             if (mtaStsHosting)
                featureMessage = _T("WebServices: MTA-STS policy hosting is enabled (MtaStsHostingEnabled) but WebServicesHttpsPort is 0, so only the plain-HTTP listener is running. RFC 8461 section 3.3 requires the policy to be fetched over HTTPS, so the policy cannot be served and sending servers will treat the domain as having no policy. Set WebServicesHttpsPort in hMailServer.ini. The other web services are unaffected and are being served over HTTP. ");
 
-            // CardDAV authenticates with the account's password, so it holds
-            // itself to the same rule; said here, at startup, as well as in
+            // CardDAV and CalDAV authenticate with the account's password, so
+            // they hold themselves to the same rule; said here, at startup, as well as in
             // the 403 a client gets, because the client's log is not where
             // an administrator looks first.
-            featureMessage += _T("WebServices: CardDAV (/dav/) is served over HTTPS only, because HTTP Basic would put an account's password on the wire in clear, and WebServicesHttpsPort is 0: a client reaching /dav/ on the plain-HTTP listener is refused with that reason. Set WebServicesHttpsPort in hMailServer.ini, or put a TLS-terminating proxy in front of the plain listener that sets X-Forwarded-Proto: https.");
+            featureMessage += _T("WebServices: CardDAV and CalDAV (/dav/) are served over HTTPS only, because HTTP Basic would put an account's password on the wire in clear, and WebServicesHttpsPort is 0: a client reaching /dav/ on the plain-HTTP listener is refused with that reason. Set WebServicesHttpsPort in hMailServer.ini, or put a TLS-terminating proxy in front of the plain listener that sets X-Forwarded-Proto: https.");
          }
 
          if (acmeMessage.IsEmpty() && featureMessage.IsEmpty())
@@ -650,9 +652,12 @@ namespace HM
 
       try
       {
-         // CardDAV (RFC 6352): everything under /dav/, authenticated as the
-         // account, over HTTPS. CardDavServer answers the plain-HTTP case
-         // itself, with the reason, rather than this dispatch hiding it.
+         // CalDAV (RFC 4791) under /dav/calendars/ and CardDAV (RFC 6352)
+         // under the rest of /dav/, each authenticated as the account, over
+         // HTTPS. Both answer the plain-HTTP case themselves, with the
+         // reason, rather than this dispatch hiding it.
+         if (CalDavServer::IsCalendarTarget(path))
+            return CalDavServer::Handle(httpRequest, RequestArrivedOverHttps_(request, over_tls, httpRequest.peer));
          if (CardDavServer::IsDavTarget(path))
             return CardDavServer::Handle(httpRequest, RequestArrivedOverHttps_(request, over_tls, httpRequest.peer));
 
@@ -675,14 +680,13 @@ namespace HM
          // CalDAV / CardDAV service discovery (RFC 6764). Deliberately not
          // restricted to GET: section 6 has clients issuing PROPFIND straight
          // at the well-known URI, and a client that gets 404 for its PROPFIND
-         // stops looking. Not gated on AutoconfigEnabled either. CalDAV points
-         // at a different server entirely and is off unless a target is set;
-         // CardDAV points at this server's own /dav/ unless CardDavRedirectUrl
-         // names another.
+         // stops looking. Not gated on AutoconfigEnabled either. Each points
+         // at this server's own /dav/, which serves both protocols, unless
+         // CalDavRedirectUrl or CardDavRedirectUrl names another server.
          if (path == "/.well-known/caldav" || path == "/.well-known/carddav")
          {
             bool calendar = path == "/.well-known/caldav";
-            return HandleWellKnownDavRedirect_(calendar, calendar ? AnsiString("") : BuiltInCardDavUrl_(request, over_tls, httpRequest.peer));
+            return HandleWellKnownDavRedirect_(calendar, BuiltInDavUrl_(request, over_tls, httpRequest.peer));
          }
 
          if (IniFileSettings::Instance()->GetAutoconfigEnabled())
@@ -1206,19 +1210,15 @@ namespace HM
 
       if (!GetDavRedirectTarget_(calendar, target))
       {
-         // CardDAV is served by this server, so with no other server named
-         // the well-known URI points at the built-in address book.
+         // Both protocols are served by this server, so with no other
+         // server named the well-known URI points at the built-in /dav/.
+         // Before CalDAV was written here (September 2026) the caldav path
+         // answered 404 when unconfigured, on purpose: a redirect to a
+         // server that does not speak the protocol leaves a client retrying
+         // a broken account forever. It speaks it now.
          if (!built_in_target.IsEmpty())
             return BuildRedirectResponse_(built_in_target);
 
-         // CalDAV: 404, deliberately, and not a redirect to this server or to
-         // a guessed host name. A client that follows a redirect to something
-         // which does not speak CalDAV reports a broken calendar account and
-         // retries it forever; a client that gets 404 concludes there is no
-         // calendar service and stops. The second is the truth, and it is
-         // also the outcome that does not send an administrator debugging the
-         // wrong server.
-         LOG_DEBUG(_T("WebServices: No CalDAV redirect served - CalDavRedirectUrl is not set in hMailServer.ini. This server does not implement CalDAV; the setting points at the server that does."));
          return BuildResponse_(404, "text/plain", "not found");
       }
 
@@ -1259,7 +1259,7 @@ namespace HM
    }
 
    AnsiString
-   WebServicesServer::BuiltInCardDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer)
+   WebServicesServer::BuiltInDavUrl_(const AnsiString &request, bool over_tls, const IPAddress &peer)
    {
       AnsiString hostWithPort = GetRequestHostHeader_(request);
       if (hostWithPort.IsEmpty())
