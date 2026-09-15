@@ -3,6 +3,7 @@ if exists (select * from sysobjects where id = object_id('hm_audit') and objectp
 if exists (select * from sysobjects where id = object_id('hm_alertrules') and objectproperty(id, 'isusertable') = 1) drop table hm_alertrules
 
 if exists (select * from sysobjects where id = object_id('hm_alertevents') and objectproperty(id, 'isusertable') = 1) drop table hm_alertevents
+if exists (select * from sysobjects where id = object_id('hm_remotedomainpolicies') and objectproperty(id, 'isusertable') = 1) drop table hm_remotedomainpolicies
 
 if exists (select * from sysobjects where id = object_id('hm_calendarobjects') and objectproperty(id, 'isusertable') = 1) drop table hm_calendarobjects
 if exists (select * from sysobjects where id = object_id('hm_calendars') and objectproperty(id, 'isusertable') = 1) drop table hm_calendars
@@ -687,6 +688,31 @@ ALTER TABLE hm_calendarobjects ADD CONSTRAINT hm_calendarobjects_pk PRIMARY KEY 
 CREATE UNIQUE CLUSTERED INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi)
 
 CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken)
+
+create table hm_remotedomainpolicies
+(
+	policyid int identity(1,1) not null,
+	policydomainname nvarchar(255) not null,
+	policydescription nvarchar(255) not null,
+	policyactive tinyint not null,
+	policyoutboundtls int not null,
+	policyinboundtls tinyint not null,
+	policymaxmessagesizekb int not null,
+	policymaxconnections int not null,
+	policymaxperminute int not null,
+	policyallowreplies tinyint not null,
+	policyallowforwarding tinyint not null,
+	policycalloutenabled tinyint not null,
+	policycallouthost nvarchar(255) not null,
+	policycalloutport int not null,
+	policycallouttimeout int not null,
+	policycalloutcacheminutes int not null,
+	policycalloutperminute int not null
+)
+
+ALTER TABLE hm_remotedomainpolicies ADD CONSTRAINT hm_remotedomainpolicies_pk PRIMARY KEY NONCLUSTERED (policyid)
+
+CREATE INDEX idx_hm_remotedomainpolicies_domain ON hm_remotedomainpolicies (policydomainname)
 
 create table hm_rules
 (
@@ -1481,4 +1507,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6044)
+insert into hm_dbversion values (6047)

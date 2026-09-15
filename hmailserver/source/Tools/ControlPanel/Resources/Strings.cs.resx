@@ -1314,6 +1314,9 @@ Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</v
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
     <value>Automatické uzamčení adresy, které se opakovaně nedaří přihlásit. Samotný ban je IP rozsah s vypršením platnosti, takže je uveden na stránce Rozsahy IP.</value>
   </data>
+  <data name="Automatic replies may go to this domain" xml:space="preserve">
+    <value>Automatické odpovědi smí jít do této domény</value>
+  </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV je zapnuto, ale není nastaven žádný tajný klíč, takže odchozí odesílatelé nejsou označováni a vracející se nedoručenky se neověřují – přepínač hlásí, že je zapnuto, přitom nedělá nic. Vygenerujte nebo zadejte tajný klíč.</value>
   </data>
@@ -2350,6 +2353,9 @@ Připravený selektor „{0}“ se odebere z konfigurace serveru; podepisování
   <data name="DANE &amp; DNSSEC" xml:space="preserve">
     <value>DANE a DNSSEC</value>
   </data>
+  <data name="DANE - and the certificate must match a DNSSEC-validated TLSA record" xml:space="preserve">
+    <value>DANE - a certifikát musí odpovídat záznamu TLSA ověřenému přes DNSSEC</value>
+  </data>
   <data name="DANE for inbound mail - publish TLSA records for your MX hosts" xml:space="preserve">
     <value>DANE pro příchozí poštu – publikujte TLSA záznamy pro své MX hostitele</value>
   </data>
@@ -2797,6 +2803,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)" xml:space="preserve">
     <value>Doména pro adresu odesílatele mailer-daemon (prázdné = název hostitele, jinak místní doména zprávy, jinak název počítače)</value>
   </data>
+  <data name="Domain or pattern" xml:space="preserve">
+    <value>Doména nebo vzor</value>
+  </data>
   <data name="Domain whose DNS records are shown" xml:space="preserve">
     <value>Doména, jejíž záznamy DNS se zobrazují</value>
   </data>
@@ -2958,6 +2967,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   </data>
   <data name="Encrypted" xml:space="preserve">
     <value>Šifrováno</value>
+  </data>
+  <data name="Encrypted - STARTTLS must succeed; the certificate is not judged" xml:space="preserve">
+    <value>Šifrované - STARTTLS musí uspět; certifikát se neposuzuje</value>
   </data>
   <data name="Encrypted key" xml:space="preserve">
     <value>Šifrovaný klíč</value>
@@ -3580,6 +3592,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a memory dump, stops working once it expires." xml:space="preserve">
     <value>Jak dlouho zůstává relace obnovitelná, u kešovaných relací i lístků. Omezuje to, jak dlouho zůstává uniklé tajemství obnovení užitečné: lístek zaznamenaný z drátu nebo relace přečtená z výpisu paměti přestanou fungovat, jakmile vyprší.</value>
   </data>
+  <data name="How long an answer is remembered, in minutes" xml:space="preserve">
+    <value>Jak dlouho se odpověď pamatuje, v minutách</value>
+  </data>
   <data name="How long every worker may be busy before the saturation report. 0 = reporting off." xml:space="preserve">
     <value>Jak dlouho smí být každý worker zaneprázdněn, než přijde hlášení o saturaci. 0 = hlášení vypnuto.</value>
   </data>
@@ -3588,6 +3603,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   </data>
   <data name="How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely." xml:space="preserve">
     <value>Jak dlouho bude server pokračovat ve finalizaci přijaté zprávy, než odpoví 451 a požádá odesílatele o opakování, místo aby držel spojení otevřené donekonečna.</value>
+  </data>
+  <data name="How long to wait, in seconds" xml:space="preserve">
+    <value>Jak dlouho čekat, v sekundách</value>
   </data>
   <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
     <value>Jak se pošta dostane dovnitř, kam jde dál a co se s ní cestou děje.</value>
@@ -3612,6 +3630,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   </data>
   <data name="How often a client may check for mail" xml:space="preserve">
     <value>Jak často smí klient kontrolovat poštu</value>
+  </data>
+  <data name="How often one domain is asked, per minute" xml:space="preserve">
+    <value>Jak často se jedné domény ptát, za minutu</value>
   </data>
   <data name="How the caches are performing" xml:space="preserve">
     <value>Jak si vedou cache</value>
@@ -3888,6 +3909,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Language (VBScript or JScript)" xml:space="preserve">
     <value>Jazyk (VBScript nebo JScript)</value>
   </data>
+  <data name="Largest message in KB (0 is no limit)" xml:space="preserve">
+    <value>Největší zpráva v KB (0 je bez omezení)</value>
+  </data>
   <data name="Last backup: {0} ({1})." xml:space="preserve">
     <value>Poslední záloha: {0} ({1}).</value>
   </data>
@@ -4161,6 +4185,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Mail is stuck or slow" xml:space="preserve">
     <value>Pošta uvázla nebo je pomalá</value>
   </data>
+  <data name="Mail may be forwarded to this domain" xml:space="preserve">
+    <value>Poštu lze přeposílat do této domény</value>
+  </data>
   <data name="Mail servers for {0}, in the order this server would try them:" xml:space="preserve">
     <value>Poštovní servery pro {0}, v pořadí, v jakém by je tento server zkoušel:</value>
   </data>
@@ -4373,6 +4400,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Message-store consistency" xml:space="preserve">
     <value>Konzistence úložiště zpráv</value>
+  </data>
+  <data name="Messages a minute (0 is unlimited)" xml:space="preserve">
+    <value>Zpráv za minutu (0 je bez omezení)</value>
   </data>
   <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
     <value>Zprávy pozdržené k posouzení místo odmítnutí a dvě věci, které lze s každou udělat: uvolnit ji příjemci, nebo ji smazat.</value>
@@ -5235,6 +5265,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   <data name="Out of office" xml:space="preserve">
     <value>Mimo kancelář</value>
   </data>
+  <data name="Outbound TLS" xml:space="preserve">
+    <value>Odchozí TLS</value>
+  </data>
   <data name="Outbound delivery behavior, retries and smart-host relaying." xml:space="preserve">
     <value>Chování odchozího doručování, opakované pokusy a relay přes smart host.</value>
   </data>
@@ -5386,6 +5419,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
     <value>Pozastavit poštovní server?
 
 Do obnovení nebudou přijímána žádná nová připojení a nebude doručována žádná pošta. Služba Windows běží dál, takže tento Control Panel zůstane připojený.</value>
+  </data>
+  <data name="Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up." xml:space="preserve">
+    <value>Pro každou vzdálenou doménu: TLS, které tento server vyžaduje v obou směrech, velikost a počet spojení, o která se pokusí, a ověřování příjemců u domény, pro kterou je záložním MX.</value>
   </data>
   <data name="Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run." xml:space="preserve">
     <value>Výjimky pro jednotlivý účet ze zpracování spamu platného pro celý server, uplatněné na kopii TOHOTO účtu při doručení. Nemohou zasáhnout zpět do SMTP konverzace: zpráva, kterou globální nastavení odmítne, dá do karantény nebo greylistuje, je zastavena pro všechny příjemce dřív, než může jakékoli nastavení účtu proběhnout.</value>
@@ -5908,6 +5944,9 @@ Spusťte to, pokud klienti hlásí zprávy pod špatným UID, nebo po obnovení 
   <data name="Remote domain" xml:space="preserve">
     <value>Vzdálená doména</value>
   </data>
+  <data name="Remote domains" xml:space="preserve">
+    <value>Vzdálené domény</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Odstranit _vypršelé</value>
   </data>
@@ -6016,6 +6055,9 @@ SMTP 25 a 587, POP3 110, IMAP 143 – bez zabezpečení připojení. TLS porty a
   </data>
   <data name="Require TLS for token authentication" xml:space="preserve">
     <value>Vyžadovat TLS pro ověřování tokenem</value>
+  </data>
+  <data name="Require TLS on mail from this domain" xml:space="preserve">
+    <value>Vyžadovat TLS u pošty z této domény</value>
   </data>
   <data name="Require _TLS for auth" xml:space="preserve">
     <value>Vyžadovat _TLS pro ověření</value>
@@ -7019,6 +7061,9 @@ Restartovat ji nyní?</value>
   <data name="Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined." xml:space="preserve">
     <value>Výchozí je Jednoduchý. Negotiate provádí výměnu přes SSPI (Kerberos s návratem k NTLM), která heslo nikdy nepřenáší a podepisuje spojení – je to jediná metoda, kterou moderní řadič domény ve výchozí konfiguraci bez nainstalovaného certifikátu přijme, nepotřebuje žádné hledání, žádnou SearchBase ani účet služby a funguje i z hostitele, který není připojen k doméně.</value>
   </data>
+  <data name="Simultaneous connections (0 is unlimited)" xml:space="preserve">
+    <value>Souběžná spojení (0 je bez omezení)</value>
+  </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Limit velikosti a skenery…</value>
   </data>
@@ -7827,6 +7872,9 @@ nešlo načíst. Zpráva byla pravděpodobně doručena a už není ve frontě.<
   <data name="The port is outside the range 1-65535." xml:space="preserve">
     <value>Port je mimo rozsah 1-65535.</value>
   </data>
+  <data name="The port to ask on" xml:space="preserve">
+    <value>Port, na kterém se ptát</value>
+  </data>
   <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
     <value>Porty, na kterých každý protokol naslouchá, jejich adresa bind a zabezpečení spojení. Po změnách je nutné službu restartovat. Sloupec Naslouchá se čte z otevřených portů tohoto počítače, ne z konfigurace, takže ukazuje, co se skutečně děje, ne co bylo požadováno.</value>
   </data>
@@ -7961,6 +8009,9 @@ Odpovídá vlastní resolver serveru - tentýž, který používá doručování
   </data>
   <data name="The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured." xml:space="preserve">
     <value>Server tuto hodnotu ukládá a nikdy ji nečte - nic z ní nenastavuje prioritu vláken, takže její změna nemá žádný účinek. Zobrazuje se místo odstranění proto, aby správce, který ji před lety nastavil, viděl, že tam pořád je a proč se nic nestalo, a není editovatelná, protože pole, které přijme hodnotu, na niž nic nereaguje, je horší než žádné pole. Počty vláken výše se respektují.</value>
+  </data>
+  <data name="The server to ask (empty asks the domain's MX hosts)" xml:space="preserve">
+    <value>Server, kterého se zeptat (prázdné se ptá MX hostitelů domény)</value>
   </data>
   <data name="The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no &quot;a:&quot; mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it." xml:space="preserve">
     <value>Název hostitele serveru (Doručování pošty) je PRÁZDNÝ, takže v HELO/EHLO oznamuje název svého počítače Windows - ne veřejný název DNS - a žádný mechanismus „a:“ nelze poctivě nabídnout. Návrh autorizuje jen hostitele MX domény. Nejdřív nastavte název hostitele; potřebuje ho několik záznamů na této stránce.</value>
@@ -8506,8 +8557,14 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Ověřovací kód z vaší ověřovací aplikace</value>
   </data>
+  <data name="Verified - and the certificate must chain and name the host" xml:space="preserve">
+    <value>Ověřené - a certifikát musí mít platný řetěz a odpovídat jménu hostitele</value>
+  </data>
   <data name="Verify DKIM signatures" xml:space="preserve">
     <value>Ověřovat podpisy DKIM</value>
+  </data>
+  <data name="Verify a recipient with the domain's own server" xml:space="preserve">
+    <value>Ověřit příjemce u vlastního serveru domény</value>
   </data>
   <data name="Verify remote certificates when delivering" xml:space="preserve">
     <value>Ověřovat vzdálené certifikáty při doručování</value>
@@ -8647,11 +8704,17 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>K čemu tento klíč je, např. „Grafana probe“</value>
   </data>
+  <data name="What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else." xml:space="preserve">
+    <value>Co tento server dělá, když komunikuje s pojmenovanou vzdálenou doménou: jaké TLS vyžaduje na spojení v každém směru, jak velkou zprávu a kolik spojení se pokusí použít, zda tam smí jít automatická odpověď nebo přeposlání a zda se příjemce ověří u vlastního serveru té domény dříve, než je pošta pro něj přijata. Název může obsahovat zástupný znak - o doručení rozhoduje nejpřesnější aktivní záznam. Požadavek na TLS zde se přidává k tomu, co doména zveřejňuje sama o sobě: záznam na této stránce nikdy neoslabí politiku MTA-STS ani DANE. Ověřování příjemců je určeno pro doménu, pro kterou je tento server záložním MX, a pro nic jiného.</value>
+  </data>
   <data name="What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing." xml:space="preserve">
     <value>Co tento server potřebuje mít hotovo mimo sebe - záznamy DNS, soubory klíčů a CA, důvěryhodné seznamy. Každá položka ukazuje stav; kde odpověď odsud nelze přečíst, položka říká, co zkontrolovat, místo aby hádala.</value>
   </data>
   <data name="What to do: " xml:space="preserve">
     <value>Co dělat:</value>
+  </data>
+  <data name="Whatever the server would do anyway - including MTA-STS and DANE" xml:space="preserve">
+    <value>Cokoli by server udělal i tak - včetně MTA-STS a DANE</value>
   </data>
   <data name="Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting." xml:space="preserve">
     <value>Cokoli váš adresář přijme pro jednoduchý bind: UPN (svc-mail@example.local), DOMAIN\name nebo úplné DN. Ponecháno prázdné, server hledá anonymně - což proti Active Directory obvykle selže, s nahlášeným důvodem, který toto nastavení pojmenuje.</value>
@@ -9762,6 +9825,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="rejected" xml:space="preserve">
     <value>odmítnuto</value>
+  </data>
+  <data name="remote domain policy" xml:space="preserve">
+    <value>pravidlo pro vzdálenou doménu</value>
   </data>
   <data name="remove a domain" xml:space="preserve">
     <value>odebrat doménu</value>

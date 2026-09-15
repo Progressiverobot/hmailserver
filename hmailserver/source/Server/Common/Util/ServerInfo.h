@@ -42,6 +42,18 @@ namespace HM
 
       void SetDaneRecords(const std::vector<TlsaRecord> &records) { dane_records_ = records; }
       const std::vector<TlsaRecord>& GetDaneRecords() const { return dane_records_; }
+
+      // Which rule demanded the TLS, in words an administrator can read.
+      //
+      // Empty for a delivery that is merely trying TLS; set when a remote domain
+      // policy required it. It travels to SMTPClientConnection so that "the
+      // remote does not offer STARTTLS" comes back as a DEFERRAL naming the
+      // policy rather than as the permanent 5.7.0 that an unattributed
+      // required-STARTTLS failure produces. A policy that silently downgraded
+      // would be worse than no policy; one that bounced the mail without saying
+      // which rule refused it is not much better.
+      void SetTlsPolicyReason(const String &reason) { tls_policy_reason_ = reason; }
+      String GetTlsPolicyReason() const { return tls_policy_reason_; }
          
       bool operator== (const ServerInfo &other) const;
 
@@ -57,6 +69,7 @@ namespace HM
       bool require_tls_ = false;
       bool require_peer_verification_ = false;
       std::vector<TlsaRecord> dane_records_;
+      String tls_policy_reason_;
 
    };
 }

@@ -1314,6 +1314,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
     <value>Automatisch buitensluiten van een adres dat zich telkens tevergeefs probeert aan te melden. Het verbannen zelf is een verlopend IP-bereik, dus het staat op de pagina IP-bereiken.</value>
   </data>
+  <data name="Automatic replies may go to this domain" xml:space="preserve">
+    <value>Automatische antwoorden mogen naar dit domein</value>
+  </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV staat aan maar er is geen geheim ingesteld, dus uitgaande afzenders worden niet getagd en terugkomende bounces worden niet gevalideerd - de schakelaar meldt ingeschakeld terwijl hij niets doet. Genereer of voer een geheim in.</value>
   </data>
@@ -2350,6 +2353,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   <data name="DANE &amp; DNSSEC" xml:space="preserve">
     <value>DANE en DNSSEC</value>
   </data>
+  <data name="DANE - and the certificate must match a DNSSEC-validated TLSA record" xml:space="preserve">
+    <value>DANE - en het certificaat moet overeenkomen met een DNSSEC-gevalideerde TLSA-record</value>
+  </data>
   <data name="DANE for inbound mail - publish TLSA records for your MX hosts" xml:space="preserve">
     <value>DANE voor inkomende mail - publiceer TLSA-records voor uw MX-hosts</value>
   </data>
@@ -2797,6 +2803,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)" xml:space="preserve">
     <value>Domein voor het afzenderadres van de mailer-daemon (leeg = hostnaam, anders het lokale domein van het bericht, anders de computernaam)</value>
   </data>
+  <data name="Domain or pattern" xml:space="preserve">
+    <value>Domein of patroon</value>
+  </data>
   <data name="Domain whose DNS records are shown" xml:space="preserve">
     <value>Domein waarvan de DNS-records worden getoond</value>
   </data>
@@ -2958,6 +2967,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="Encrypted" xml:space="preserve">
     <value>Versleuteld</value>
+  </data>
+  <data name="Encrypted - STARTTLS must succeed; the certificate is not judged" xml:space="preserve">
+    <value>Versleuteld - STARTTLS moet slagen; het certificaat wordt niet beoordeeld</value>
   </data>
   <data name="Encrypted key" xml:space="preserve">
     <value>Versleutelde sleutel</value>
@@ -3580,6 +3592,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a memory dump, stops working once it expires." xml:space="preserve">
     <value>Hoe lang een sessie hervatbaar blijft, voor sessies in de cache en tickets gelijk. Het begrenst hoe lang een uitgelekt hervattingsgeheim bruikbaar blijft: een ticket dat van de lijn is opgenomen, of een sessie die uit een geheugendump is gelezen, werkt niet meer zodra het verloopt.</value>
   </data>
+  <data name="How long an answer is remembered, in minutes" xml:space="preserve">
+    <value>Hoe lang een antwoord wordt onthouden, in minuten</value>
+  </data>
   <data name="How long every worker may be busy before the saturation report. 0 = reporting off." xml:space="preserve">
     <value>Hoe lang elke worker bezig mag zijn voordat de verzadigingsmelding volgt. 0 = melden uit.</value>
   </data>
@@ -3588,6 +3603,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely." xml:space="preserve">
     <value>Hoe lang de server doorgaat met het afronden van een geaccepteerd bericht voordat hij 451 antwoordt en de afzender vraagt het opnieuw te proberen, in plaats van de verbinding onbeperkt open te houden.</value>
+  </data>
+  <data name="How long to wait, in seconds" xml:space="preserve">
+    <value>Hoe lang er wordt gewacht, in seconden</value>
   </data>
   <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
     <value>Hoe mail binnenkomt, waar die vervolgens heen gaat, en wat er onderweg mee gebeurt.</value>
@@ -3612,6 +3630,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="How often a client may check for mail" xml:space="preserve">
     <value>Hoe vaak een client op mail mag controleren</value>
+  </data>
+  <data name="How often one domain is asked, per minute" xml:space="preserve">
+    <value>Hoe vaak één domein wordt gevraagd, per minuut</value>
   </data>
   <data name="How the caches are performing" xml:space="preserve">
     <value>Hoe de caches presteren</value>
@@ -3888,6 +3909,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Language (VBScript or JScript)" xml:space="preserve">
     <value>Taal (VBScript of JScript)</value>
   </data>
+  <data name="Largest message in KB (0 is no limit)" xml:space="preserve">
+    <value>Grootste bericht in KB (0 is geen limiet)</value>
+  </data>
   <data name="Last backup: {0} ({1})." xml:space="preserve">
     <value>Laatste back-up: {0} ({1}).</value>
   </data>
@@ -4161,6 +4185,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Mail is stuck or slow" xml:space="preserve">
     <value>Mail zit vast of is traag</value>
   </data>
+  <data name="Mail may be forwarded to this domain" xml:space="preserve">
+    <value>Post mag naar dit domein worden doorgestuurd</value>
+  </data>
   <data name="Mail servers for {0}, in the order this server would try them:" xml:space="preserve">
     <value>Mailservers voor {0}, in de volgorde waarin deze server ze zou proberen:</value>
   </data>
@@ -4373,6 +4400,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Message-store consistency" xml:space="preserve">
     <value>Consistentie van de berichtopslag</value>
+  </data>
+  <data name="Messages a minute (0 is unlimited)" xml:space="preserve">
+    <value>Berichten per minuut (0 is onbeperkt)</value>
   </data>
   <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
     <value>Berichten die voor beoordeling worden vastgehouden in plaats van geweigerd, en de twee dingen die u met elk kunt doen: het vrijgeven aan de ontvanger, of het verwijderen.</value>
@@ -5235,6 +5265,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="Out of office" xml:space="preserve">
     <value>Afwezigheid</value>
   </data>
+  <data name="Outbound TLS" xml:space="preserve">
+    <value>Uitgaande TLS</value>
+  </data>
   <data name="Outbound delivery behavior, retries and smart-host relaying." xml:space="preserve">
     <value>Gedrag bij uitgaande bezorging, nieuwe pogingen en relayen via een smart host.</value>
   </data>
@@ -5386,6 +5419,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
     <value>De mailserver pauzeren?
 
 Er worden geen nieuwe verbindingen geaccepteerd en er wordt geen mail bezorgd totdat hij wordt hervat. De Windows-service blijft draaien, dus dit Control Panel blijft verbonden.</value>
+  </data>
+  <data name="Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up." xml:space="preserve">
+    <value>Per extern domein: de TLS die deze server in elke richting eist, de omvang en de verbindingen die hij zal proberen, en ontvangerverificatie voor een domein waarvoor hij back-up-MX is.</value>
   </data>
   <data name="Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run." xml:space="preserve">
     <value>Uitzonderingen per account op de serverbrede spamafhandeling, toegepast op de kopie van DIT account bij de bezorging. Ze kunnen niet terugreiken in de SMTP-conversatie: een bericht dat de globale instellingen weigeren, in quarantaine plaatsen of greylisten wordt voor elke ontvanger tegengehouden voordat welke instelling per account dan ook kan draaien.</value>
@@ -5908,6 +5944,9 @@ Voer dit uit als clients melden dat berichten onder de verkeerde UID verschijnen
   <data name="Remote domain" xml:space="preserve">
     <value>Extern domein</value>
   </data>
+  <data name="Remote domains" xml:space="preserve">
+    <value>Externe domeinen</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Verlopen _items verwijderen</value>
   </data>
@@ -6016,6 +6055,9 @@ SMTP 25 en 587, POP3 110, IMAP 143 - zonder verbindingsbeveiliging. TLS-poorten 
   </data>
   <data name="Require TLS for token authentication" xml:space="preserve">
     <value>TLS vereisen voor tokenauthenticatie</value>
+  </data>
+  <data name="Require TLS on mail from this domain" xml:space="preserve">
+    <value>TLS eisen voor post uit dit domein</value>
   </data>
   <data name="Require _TLS for auth" xml:space="preserve">
     <value>_TLS vereisen voor auth</value>
@@ -7019,6 +7061,9 @@ Nu herstarten?</value>
   <data name="Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined." xml:space="preserve">
     <value>Simple is de standaard. Negotiate voert een SSPI-uitwisseling uit (Kerberos, met terugval op NTLM) die het wachtwoord nooit verstuurt en de verbinding ondertekent - het is de enige methode die een moderne, standaard geconfigureerde domeincontroller accepteert wanneer er geen certificaat op is geïnstalleerd, het heeft geen zoekopdracht, geen SearchBase en geen serviceaccount nodig, en het werkt vanaf een host die geen lid is van het domein.</value>
   </data>
+  <data name="Simultaneous connections (0 is unlimited)" xml:space="preserve">
+    <value>Gelijktijdige verbindingen (0 is onbeperkt)</value>
+  </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Groottelimiet en scanners…</value>
   </data>
@@ -7827,6 +7872,9 @@ kon niet worden geladen. Het bericht is waarschijnlijk bezorgd en staat niet mee
   <data name="The port is outside the range 1-65535." xml:space="preserve">
     <value>De poort valt buiten het bereik 1-65535.</value>
   </data>
+  <data name="The port to ask on" xml:space="preserve">
+    <value>De poort waarop wordt gevraagd</value>
+  </data>
   <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
     <value>De poorten waarop elk protocol luistert, hun bindadres en verbindingsbeveiliging. Na wijzigingen moet de service opnieuw worden gestart. De kolom Luistert wordt gelezen uit de open poorten van deze machine en niet uit de configuratie, dus die toont wat er werkelijk gebeurt in plaats van wat er is gevraagd.</value>
   </data>
@@ -7961,6 +8009,9 @@ Dit is de eigen resolver van de server die antwoordt - dezelfde die de SMTP-bezo
   </data>
   <data name="The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured." xml:space="preserve">
     <value>De server slaat deze waarde op en leest hem nooit - er wordt geen threadprioriteit uit afgeleid, dus hem wijzigen heeft geen effect. Hij wordt getoond in plaats van verwijderd, zodat een beheerder die hem jaren geleden heeft ingesteld kan zien dat hij er nog staat en waarom er niets is gebeurd, en hij is niet bewerkbaar omdat een vak dat een waarde accepteert waar niets mee wordt gedaan erger is dan helemaal geen vak. De threadaantallen hierboven worden wél gehonoreerd.</value>
+  </data>
+  <data name="The server to ask (empty asks the domain's MX hosts)" xml:space="preserve">
+    <value>De server die wordt gevraagd (leeg vraagt de MX-hosts van het domein)</value>
   </data>
   <data name="The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no &quot;a:&quot; mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it." xml:space="preserve">
     <value>De Hostnaam van de server (E-mailbezorging) is LEEG, dus hij kondigt zijn Windows-computernaam aan in HELO/EHLO - geen publieke DNS-naam - en er kan niet eerlijk een "a:"-mechanisme worden aangeboden. Het voorstel autoriseert alleen de MX-hosts van het domein. Stel eerst de hostnaam in; meerdere records op deze pagina hebben die nodig.</value>
@@ -8506,8 +8557,14 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Verificatiecode uit uw authenticator-app</value>
   </data>
+  <data name="Verified - and the certificate must chain and name the host" xml:space="preserve">
+    <value>Geverifieerd - en het certificaat moet ketenen en de host noemen</value>
+  </data>
   <data name="Verify DKIM signatures" xml:space="preserve">
     <value>DKIM-handtekeningen verifiëren</value>
+  </data>
+  <data name="Verify a recipient with the domain's own server" xml:space="preserve">
+    <value>Een ontvanger bij de eigen server van het domein verifiëren</value>
   </data>
   <data name="Verify remote certificates when delivering" xml:space="preserve">
     <value>Certificaten van de andere server verifiëren bij het bezorgen</value>
@@ -8647,11 +8704,17 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>Waar deze sleutel voor is, bijv. "Grafana probe"</value>
   </data>
+  <data name="What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else." xml:space="preserve">
+    <value>Wat deze server doet als hij met een benoemd extern domein praat: welke TLS hij van de verbinding in elke richting eist, hoe groot een bericht en hoeveel verbindingen hij zal proberen, of een automatisch antwoord of een doorstuur daarheen mag gaan, en of een ontvanger bij de eigen server van het domein wordt geverifieerd voordat post voor hem wordt aangenomen. Een naam mag een jokerteken bevatten - de meest specifieke actieve regel bepaalt een aflevering. Een TLS-eis hier komt boven op wat het domein zelf publiceert: een regel op deze pagina verzwakt een MTA-STS- of DANE-beleid nooit. Ontvangerverificatie is bedoeld voor een domein waarvoor deze server back-up-MX is, en nergens anders voor.</value>
+  </data>
   <data name="What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing." xml:space="preserve">
     <value>Wat er buiten deze server moet gebeuren - DNS-records, sleutel- en CA-bestanden, lijsten met vertrouwde partijen. Elk item toont een status; waar het antwoord hiervandaan niet te lezen is, zegt het item wat u moet controleren in plaats van te gokken.</value>
   </data>
   <data name="What to do: " xml:space="preserve">
     <value>Wat te doen:</value>
+  </data>
+  <data name="Whatever the server would do anyway - including MTA-STS and DANE" xml:space="preserve">
+    <value>Wat de server toch al zou doen - inclusief MTA-STS en DANE</value>
   </data>
   <data name="Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting." xml:space="preserve">
     <value>Wat uw directory ook accepteert voor een simple bind: een UPN (svc-mail@example.local), DOMAIN\name of een volledige DN. Leeg gelaten zoekt de server anoniem - wat tegen Active Directory meestal mislukt, met een gemelde reden die deze instelling noemt.</value>
@@ -9762,6 +9825,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="rejected" xml:space="preserve">
     <value>geweigerd</value>
+  </data>
+  <data name="remote domain policy" xml:space="preserve">
+    <value>regel voor een extern domein</value>
   </data>
   <data name="remove a domain" xml:space="preserve">
     <value>een domein verwijderen</value>

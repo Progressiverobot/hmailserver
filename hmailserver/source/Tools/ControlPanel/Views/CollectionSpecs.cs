@@ -149,6 +149,64 @@ namespace hMailServer.ControlPanel.Views
          }
       });
 
+      /// <summary>
+      /// hMailServer's eRemoteTlsRequirement, in the order the enum declares it.
+      ///
+      /// The wording says what the server will do rather than what the value is
+      /// called, because the difference between "encrypted" and "verified" is the
+      /// difference between a partner whose self-signed certificate is fine and a
+      /// bank whose is not, and nobody should have to read the roadmap to know
+      /// which one they are choosing.
+      /// </summary>
+      private static readonly (int Value, string Label)[] RemoteTlsOptions =
+      {
+         (0, L("Whatever the server would do anyway - including MTA-STS and DANE")),
+         (1, L("Encrypted - STARTTLS must succeed; the certificate is not judged")),
+         (2, L("Verified - and the certificate must chain and name the host")),
+         (3, L("DANE - and the certificate must match a DNSSEC-validated TLSA record"))
+      };
+
+      /// <summary>
+      /// What this server will do when it talks to a named remote domain.
+      ///
+      /// Three questions an administrator asks about a partner, a customer or a
+      /// provider, in one record because they are one subject: how much transport
+      /// security is demanded of it in each direction, what this server will
+      /// attempt to push at it, and whether a recipient is checked with the
+      /// domain's own server before mail for it is accepted.
+      ///
+      /// Deliberately not the Routes page. A route says WHERE mail for a domain
+      /// goes and replaces the MX lookup; this says what this server will and
+      /// will not do when it gets there, whatever found the server, and a domain
+      /// may have both.
+      /// </summary>
+      public static CollectionEditorView RemoteDomains() => new(new CollectionSpec
+      {
+         Title = L("Remote domains"),
+         Subtitle = L("What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else."),
+         ItemNoun = L("remote domain policy"),
+         GetCollection = () => Settings.RemoteDomainPolicies,
+         Fields =
+         {
+            new FieldSpec { Prop = "Active", Label = L("Active"), Kind = FieldKind.Bool, GridWidth = 70, Default = true },
+            new FieldSpec { Prop = "DomainName", Label = L("Domain or pattern"), GridWidth = 200, Default = "" },
+            new FieldSpec { Prop = "OutboundTls", Label = L("Outbound TLS"), Kind = FieldKind.Combo, Options = RemoteTlsOptions, GridWidth = 160, Default = 0 },
+            new FieldSpec { Prop = "RequireInboundTls", Label = L("Require TLS on mail from this domain"), Kind = FieldKind.Bool, GridWidth = 90, Default = false },
+            new FieldSpec { Prop = "MaxMessageSizeKB", Label = L("Largest message in KB (0 is no limit)"), Kind = FieldKind.Number, GridWidth = 110, Default = 0 },
+            new FieldSpec { Prop = "MaxConnections", Label = L("Simultaneous connections (0 is unlimited)"), Kind = FieldKind.Number, GridWidth = 110, Default = 0 },
+            new FieldSpec { Prop = "MaxMessagesPerMinute", Label = L("Messages a minute (0 is unlimited)"), Kind = FieldKind.Number, ShowInGrid = false, Default = 0 },
+            new FieldSpec { Prop = "AllowAutomaticReplies", Label = L("Automatic replies may go to this domain"), Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            new FieldSpec { Prop = "AllowForwarding", Label = L("Mail may be forwarded to this domain"), Kind = FieldKind.Bool, ShowInGrid = false, Default = true },
+            new FieldSpec { Prop = "CalloutEnabled", Label = L("Verify a recipient with the domain's own server"), Kind = FieldKind.Bool, GridWidth = 90, Default = false },
+            new FieldSpec { Prop = "CalloutHost", Label = L("The server to ask (empty asks the domain's MX hosts)"), ShowInGrid = false, Default = "" },
+            new FieldSpec { Prop = "CalloutPort", Label = L("The port to ask on"), Kind = FieldKind.Number, ShowInGrid = false, Default = 25 },
+            new FieldSpec { Prop = "CalloutTimeoutSeconds", Label = L("How long to wait, in seconds"), Kind = FieldKind.Number, ShowInGrid = false, Default = 10 },
+            new FieldSpec { Prop = "CalloutCacheMinutes", Label = L("How long an answer is remembered, in minutes"), Kind = FieldKind.Number, ShowInGrid = false, Default = 60 },
+            new FieldSpec { Prop = "CalloutMaxPerMinute", Label = L("How often one domain is asked, per minute"), Kind = FieldKind.Number, ShowInGrid = false, Default = 10 },
+            new FieldSpec { Prop = "Description", Label = L("Description"), Default = "" }
+         }
+      });
+
       public static CollectionEditorView ServerMessages() => new(new CollectionSpec
       {
          Title = L("Server messages"),

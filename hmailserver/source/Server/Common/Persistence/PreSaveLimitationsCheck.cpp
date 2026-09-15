@@ -16,6 +16,8 @@
 #include "../BO/Groups.h"
 #include "../BO/Route.h"
 #include "../BO/Routes.h"
+#include "../BO/RemoteDomainPolicy.h"
+#include "../BO/RemoteDomainPolicies.h"
 #include "../BO/SecurityRanges.h"
 
 #include "../Cache/CacheContainer.h"
@@ -533,6 +535,38 @@ namespace HM
         return false;  
       }
  
+      return true;
+   }
+
+   bool
+   PreSaveLimitationsCheck::CheckLimitations(PersistenceMode mode, std::shared_ptr<RemoteDomainPolicy> policy, String &resultDescription)
+   {
+      if (mode == PersistenceModeRestore || mode == PersistenceModeRename)
+         return true;
+
+      if (policy->GetDomainName().IsEmpty())
+      {
+         resultDescription = "A remote domain policy must name a domain or a pattern.";
+         return false;
+      }
+
+      // One record per pattern. Two rows with the same pattern would both match
+      // every domain it covers and be equally specific, so which one governed a
+      // delivery would come down to the id - a policy decided by insertion order,
+      // which is the thing GetPolicyForDomain exists to avoid.
+      std::shared_ptr<RemoteDomainPolicies> policies =
+         Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
+
+      if (policies)
+      {
+         std::shared_ptr<RemoteDomainPolicy> existing = policies->GetItemByName(policy->GetName());
+         if (existing && existing->GetID() != policy->GetID())
+         {
+            resultDescription = "Another remote domain policy for this domain already exists.";
+            return false;
+         }
+      }
+
       return true;
    }
 

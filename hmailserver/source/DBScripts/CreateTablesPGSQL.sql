@@ -20,6 +20,7 @@ select hm_drop_table('hm_audit');
 select hm_drop_table('hm_alertrules');
 
 select hm_drop_table('hm_alertevents');
+select hm_drop_table('hm_remotedomainpolicies');
 
 select hm_drop_table('hm_calendarobjects');
 
@@ -543,6 +544,29 @@ create table hm_calendarobjects
 
 CREATE UNIQUE INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi);
 CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken);
+
+create table hm_remotedomainpolicies
+(
+	policyid bigserial not null primary key,
+	policydomainname varchar(255) not null,
+	policydescription varchar(255) not null,
+	policyactive smallint not null,
+	policyoutboundtls int not null,
+	policyinboundtls smallint not null,
+	policymaxmessagesizekb int not null,
+	policymaxconnections int not null,
+	policymaxperminute int not null,
+	policyallowreplies smallint not null,
+	policyallowforwarding smallint not null,
+	policycalloutenabled smallint not null,
+	policycallouthost varchar(255) not null,
+	policycalloutport int not null,
+	policycallouttimeout int not null,
+	policycalloutcacheminutes int not null,
+	policycalloutperminute int not null
+);
+
+CREATE INDEX idx_hm_remotedomainpolicies_domain ON hm_remotedomainpolicies (policydomainname);
 
 create table hm_rules
 (
@@ -1279,4 +1303,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditRetentionDays', '', 0);
 
-insert into hm_dbversion values (6044);
+insert into hm_dbversion values (6047);

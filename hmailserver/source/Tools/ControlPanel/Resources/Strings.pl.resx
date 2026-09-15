@@ -1314,6 +1314,9 @@ Uruchomić teraz ponownie aplikację Control Panel? Wybierz Nie, aby spróbować
   <data name="Automatic lockout of an address that keeps failing to log on. The ban itself is an expiring IP range, so it is listed on the IP ranges page." xml:space="preserve">
     <value>Automatyczne odcięcie adresu, któremu logowanie wciąż się nie udaje. Sama blokada jest wygasającym zakresem adresów IP, więc widnieje na stronie Zakresy adresów IP.</value>
   </data>
+  <data name="Automatic replies may go to this domain" xml:space="preserve">
+    <value>Odpowiedzi automatyczne mogą trafiać do tej domeny</value>
+  </data>
   <data name="BATV is switched on but no secret is set, so outbound senders are not tagged and returning bounces are not validated - the switch reads enabled while it does nothing. Generate or enter a secret." xml:space="preserve">
     <value>BATV jest włączone, ale nie ustawiono sekretu, więc nadawcy poczty wychodzącej nie są znakowani, a wracające wiadomości zwrotne nie są weryfikowane - przełącznik pokazuje stan włączony i nie robi nic. Należy wygenerować albo wpisać sekret.</value>
   </data>
@@ -2350,6 +2353,9 @@ Przygotowany selektor „{0}” zostaje usunięty z konfiguracji serwera; podpis
   <data name="DANE &amp; DNSSEC" xml:space="preserve">
     <value>DANE i DNSSEC</value>
   </data>
+  <data name="DANE - and the certificate must match a DNSSEC-validated TLSA record" xml:space="preserve">
+    <value>DANE - a certyfikat musi pasować do rekordu TLSA zweryfikowanego przez DNSSEC</value>
+  </data>
   <data name="DANE for inbound mail - publish TLSA records for your MX hosts" xml:space="preserve">
     <value>DANE dla poczty przychodzącej - opublikuj rekordy TLSA dla swoich hostów MX</value>
   </data>
@@ -2797,6 +2803,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="Domain for the mailer-daemon sender address (empty = host name, else the message's local domain, else the machine name)" xml:space="preserve">
     <value>Domena adresu nadawcy mailer-daemon (puste = nazwa hosta, w innym razie lokalna domena wiadomości, w innym razie nazwa komputera)</value>
   </data>
+  <data name="Domain or pattern" xml:space="preserve">
+    <value>Domena lub wzorzec</value>
+  </data>
   <data name="Domain whose DNS records are shown" xml:space="preserve">
     <value>Domena, której rekordy DNS są pokazywane</value>
   </data>
@@ -2958,6 +2967,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   </data>
   <data name="Encrypted" xml:space="preserve">
     <value>Zaszyfrowany</value>
+  </data>
+  <data name="Encrypted - STARTTLS must succeed; the certificate is not judged" xml:space="preserve">
+    <value>Szyfrowane - STARTTLS musi się powieść; certyfikat nie jest oceniany</value>
   </data>
   <data name="Encrypted key" xml:space="preserve">
     <value>Zaszyfrowany klucz</value>
@@ -3580,6 +3592,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="How long a session stays resumable, for cached sessions and tickets alike. It bounds how long a leaked resumption secret stays useful: a ticket recorded off the wire, or a session read out of a memory dump, stops working once it expires." xml:space="preserve">
     <value>Jak długo sesję można wznowić - tak samo dla sesji w pamięci podręcznej, jak i dla biletów. Ogranicza to, jak długo wyciekły sekret wznawiania pozostaje użyteczny: bilet przechwycony z sieci albo sesja odczytana ze zrzutu pamięci przestają działać po jego wygaśnięciu.</value>
   </data>
+  <data name="How long an answer is remembered, in minutes" xml:space="preserve">
+    <value>Jak długo odpowiedź jest pamiętana, w minutach</value>
+  </data>
   <data name="How long every worker may be busy before the saturation report. 0 = reporting off." xml:space="preserve">
     <value>Jak długo wszystkie wątki robocze mogą być zajęte, zanim powstanie raport o nasyceniu. 0 = raportowanie wyłączone.</value>
   </data>
@@ -3588,6 +3603,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   </data>
   <data name="How long the server will go on finalizing an accepted message before answering 451 and asking the sender to retry, rather than holding the connection open indefinitely." xml:space="preserve">
     <value>Jak długo serwer będzie finalizował przyjętą wiadomość, zanim odpowie 451 i poprosi nadawcę o ponowną próbę, zamiast trzymać połączenie otwarte w nieskończoność.</value>
+  </data>
+  <data name="How long to wait, in seconds" xml:space="preserve">
+    <value>Jak długo czekać, w sekundach</value>
   </data>
   <data name="How mail gets in, where it goes next, and what happens to it on the way." xml:space="preserve">
     <value>Jak poczta trafia do serwera, dokąd idzie dalej i co się z nią dzieje po drodze.</value>
@@ -3612,6 +3630,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   </data>
   <data name="How often a client may check for mail" xml:space="preserve">
     <value>Jak często klient może sprawdzać pocztę</value>
+  </data>
+  <data name="How often one domain is asked, per minute" xml:space="preserve">
+    <value>Jak często pytać jedną domenę, na minutę</value>
   </data>
   <data name="How the caches are performing" xml:space="preserve">
     <value>Jak radzą sobie pamięci podręczne</value>
@@ -3888,6 +3909,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   <data name="Language (VBScript or JScript)" xml:space="preserve">
     <value>Język (VBScript lub JScript)</value>
   </data>
+  <data name="Largest message in KB (0 is no limit)" xml:space="preserve">
+    <value>Największa wiadomość w KB (0 to bez ograniczeń)</value>
+  </data>
   <data name="Last backup: {0} ({1})." xml:space="preserve">
     <value>Ostatnia kopia zapasowa: {0} ({1}).</value>
   </data>
@@ -4161,6 +4185,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   <data name="Mail is stuck or slow" xml:space="preserve">
     <value>Poczta utknęła albo idzie wolno</value>
   </data>
+  <data name="Mail may be forwarded to this domain" xml:space="preserve">
+    <value>Pocztę można przekazywać do tej domeny</value>
+  </data>
   <data name="Mail servers for {0}, in the order this server would try them:" xml:space="preserve">
     <value>Serwery pocztowe domeny {0}, w kolejności, w jakiej ten serwer by je wypróbował:</value>
   </data>
@@ -4373,6 +4400,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   </data>
   <data name="Message-store consistency" xml:space="preserve">
     <value>Spójność magazynu wiadomości</value>
+  </data>
+  <data name="Messages a minute (0 is unlimited)" xml:space="preserve">
+    <value>Wiadomości na minutę (0 to bez ograniczeń)</value>
   </data>
   <data name="Messages held for review instead of being refused, and the two things you can do with each: release it to the recipient, or delete it." xml:space="preserve">
     <value>Wiadomości wstrzymane do przejrzenia zamiast odrzucenia oraz dwie rzeczy, które można z każdą zrobić: zwolnić ją do odbiorcy albo usunąć.</value>
@@ -5235,6 +5265,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   <data name="Out of office" xml:space="preserve">
     <value>Nieobecność w biurze</value>
   </data>
+  <data name="Outbound TLS" xml:space="preserve">
+    <value>TLS wychodzący</value>
+  </data>
   <data name="Outbound delivery behavior, retries and smart-host relaying." xml:space="preserve">
     <value>Zachowanie dostarczania wychodzącego, ponowne próby i przekazywanie przez przekaźnik (smart host).</value>
   </data>
@@ -5386,6 +5419,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
     <value>Wstrzymać serwer pocztowy?
 
 Do czasu wznowienia nie będą przyjmowane nowe połączenia ani dostarczana poczta. Usługa systemu Windows nadal działa, więc ta aplikacja Control Panel pozostaje połączona.</value>
+  </data>
+  <data name="Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up." xml:space="preserve">
+    <value>Dla każdej domeny zdalnej: wymagane TLS w obu kierunkach, rozmiar i liczba połączeń, które serwer podejmie, oraz weryfikacja odbiorcy dla domeny, dla której jest zapasowym MX.</value>
   </data>
   <data name="Per-account overrides of the server-wide spam handling, applied to THIS account's copy at delivery. They cannot reach back into the SMTP conversation: a message the global settings refuse, quarantine or greylist is stopped for every recipient before any per-account setting can run." xml:space="preserve">
     <value>Nadpisania obsługi spamu obowiązującej na całym serwerze, stosowane do kopii TEGO konta przy dostarczaniu. Nie sięgają wstecz do konwersacji SMTP: wiadomość, którą ustawienia globalne odrzucają, kierują do kwarantanny lub obejmują greylistingiem, zostaje zatrzymana dla każdego odbiorcy, zanim jakiekolwiek ustawienie na poziomie konta zdąży zadziałać.</value>
@@ -5908,6 +5944,9 @@ Warto to uruchomić, gdy klienty zgłaszają wiadomości pojawiające się pod n
   <data name="Remote domain" xml:space="preserve">
     <value>Domena zdalna</value>
   </data>
+  <data name="Remote domains" xml:space="preserve">
+    <value>Domeny zdalne</value>
+  </data>
   <data name="Remove _expired" xml:space="preserve">
     <value>Usuń _wygasłe</value>
   </data>
@@ -6016,6 +6055,9 @@ SMTP 25 i 587, POP3 110, IMAP 143 - bez zabezpieczenia połączenia. Porty TLS i
   </data>
   <data name="Require TLS for token authentication" xml:space="preserve">
     <value>Wymagaj TLS do uwierzytelniania tokenem</value>
+  </data>
+  <data name="Require TLS on mail from this domain" xml:space="preserve">
+    <value>Wymagaj TLS dla poczty z tej domeny</value>
   </data>
   <data name="Require _TLS for auth" xml:space="preserve">
     <value>Wymagaj _TLS do uwierzytelniania</value>
@@ -7019,6 +7061,9 @@ Uruchomić ją teraz ponownie?</value>
   <data name="Simple is the default. Negotiate runs an SSPI exchange (Kerberos, falling back to NTLM) that never transmits the password and signs the connection - it is the only method a default-configured modern domain controller accepts when it has no certificate installed, it needs no search, no SearchBase and no service account, and it works from a host that is not domain-joined." xml:space="preserve">
     <value>Prosty jest wartością domyślną. Negotiate przeprowadza wymianę SSPI (Kerberos, z powrotem do NTLM), która nigdy nie przesyła hasła i podpisuje połączenie - to jedyna metoda, jaką przyjmuje nowoczesny kontroler domeny w konfiguracji domyślnej, gdy nie ma zainstalowanego certyfikatu, nie wymaga żadnego wyszukiwania, żadnego SearchBase ani konta usługi i działa z hosta nieprzyłączonego do domeny.</value>
   </data>
+  <data name="Simultaneous connections (0 is unlimited)" xml:space="preserve">
+    <value>Jednoczesne połączenia (0 to bez ograniczeń)</value>
+  </data>
   <data name="Size limit and scanners…" xml:space="preserve">
     <value>Limit rozmiaru i skanery…</value>
   </data>
@@ -7827,6 +7872,9 @@ Wiadomość została prawdopodobnie dostarczona i nie ma jej już w kolejce.</va
   <data name="The port is outside the range 1-65535." xml:space="preserve">
     <value>Port jest poza zakresem 1-65535.</value>
   </data>
+  <data name="The port to ask on" xml:space="preserve">
+    <value>Port, na którym pytać</value>
+  </data>
   <data name="The ports each protocol listens on, their bind address and connection security. The service must be restarted after changes. The Listening column is read from this machine's open ports, not from the configuration, so it shows what is actually happening rather than what was asked for." xml:space="preserve">
     <value>Porty, na których nasłuchuje każdy protokół, ich adres powiązania i zabezpieczenie połączenia. Po zmianach należy ponownie uruchomić usługę. Kolumna Nasłuchiwanie jest odczytywana z otwartych portów tego komputera, a nie z konfiguracji, więc pokazuje to, co dzieje się naprawdę, a nie to, o co poproszono.</value>
   </data>
@@ -7961,6 +8009,9 @@ Odpowiada tu własny resolwer serwera - ten sam, którego używa dostarczanie SM
   </data>
   <data name="The server stores this value and never reads it - nothing sets a thread priority from it, so changing it has no effect. It is shown rather than removed so that an administrator who set it years ago can see it is still there and why nothing happened, and it is not editable because a box that accepts a value nothing acts on is worse than no box at all. The thread counts above are honoured." xml:space="preserve">
     <value>Serwer przechowuje tę wartość i nigdy jej nie odczytuje - nic nie ustawia na jej podstawie priorytetu wątku, więc jej zmiana nie przynosi żadnego skutku. Jest pokazywana, a nie usunięta, aby administrator, który ustawił ją przed laty, widział, że wciąż tam jest, i dlaczego nic się nie wydarzyło; nie da się jej edytować, ponieważ pole przyjmujące wartość, na którą nic nie reaguje, jest gorsze niż brak pola. Liczby wątków powyżej są respektowane.</value>
+  </data>
+  <data name="The server to ask (empty asks the domain's MX hosts)" xml:space="preserve">
+    <value>Serwer, którego pytać (puste pyta hosty MX domeny)</value>
   </data>
   <data name="The server's Host name (Delivery of e-mail) is EMPTY, so it announces its Windows computer name in HELO/EHLO - not a public DNS name - and no &quot;a:&quot; mechanism can honestly be offered. The suggestion authorises only the domain's MX hosts. Set the host name first; several records on this page need it." xml:space="preserve">
     <value>Nazwa hosta serwera (Dostarczanie poczty) jest PUSTA, więc w HELO/EHLO ogłasza on nazwę swojego komputera w systemie Windows - a nie publiczną nazwę DNS - i żadnego mechanizmu „a:” nie da się uczciwie zaoferować. Sugestia autoryzuje wyłącznie hosty MX domeny. Najpierw należy ustawić nazwę hosta; potrzebuje jej kilka rekordów na tej stronie.</value>
@@ -8506,8 +8557,14 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="Verification code from your authenticator app" xml:space="preserve">
     <value>Kod weryfikacyjny z aplikacji uwierzytelniającej</value>
   </data>
+  <data name="Verified - and the certificate must chain and name the host" xml:space="preserve">
+    <value>Zweryfikowane - a certyfikat musi tworzyć łańcuch i wskazywać host</value>
+  </data>
   <data name="Verify DKIM signatures" xml:space="preserve">
     <value>Weryfikuj podpisy DKIM</value>
+  </data>
+  <data name="Verify a recipient with the domain's own server" xml:space="preserve">
+    <value>Zweryfikuj odbiorcę na własnym serwerze domeny</value>
   </data>
   <data name="Verify remote certificates when delivering" xml:space="preserve">
     <value>Weryfikuj certyfikaty zdalnych serwerów podczas dostarczania</value>
@@ -8647,11 +8704,17 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="What this key is for, e.g. &quot;Grafana probe&quot;" xml:space="preserve">
     <value>Do czego służy ten klucz, np. „Grafana probe”</value>
   </data>
+  <data name="What this server does when it talks to a named remote domain: the TLS it demands of the connection in each direction, the largest message and the number of connections it will attempt, whether an automatic reply or a forward may go there, and whether a recipient is verified with the domain's own server before mail for it is accepted. A name may carry a wildcard - the most specific active entry governs a delivery. A TLS requirement here is added to whatever the domain publishes for itself: an MTA-STS or DANE policy is never weakened by an entry on this page. Recipient verification is for a domain this server is a backup MX for, and for nothing else." xml:space="preserve">
+    <value>Co robi ten serwer, gdy rozmawia z nazwaną domeną zdalną: jakiego TLS wymaga od połączenia w każdym kierunku, jak dużą wiadomość i ile połączeń podejmie, czy może tam trafić odpowiedź automatyczna lub przekierowanie oraz czy odbiorca jest weryfikowany na własnym serwerze tej domeny, zanim poczta dla niego zostanie przyjęta. Nazwa może zawierać symbol wieloznaczny - o doręczeniu decyduje najbardziej szczegółowy aktywny wpis. Wymóg TLS z tej strony dodaje się do tego, co domena publikuje sama: wpis tutaj nigdy nie osłabia zasady MTA-STS ani DANE. Weryfikacja odbiorcy służy domenie, dla której ten serwer jest zapasowym MX, i niczemu innemu.</value>
+  </data>
   <data name="What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing." xml:space="preserve">
     <value>Co ten serwer potrzebuje mieć zrobione poza sobą - rekordy DNS, pliki kluczy i urzędów certyfikacji, zaufane listy. Każda pozycja pokazuje stan; tam, gdzie odpowiedzi nie da się stąd odczytać, pozycja mówi, co sprawdzić, zamiast zgadywać.</value>
   </data>
   <data name="What to do: " xml:space="preserve">
     <value>Co zrobić:</value>
+  </data>
+  <data name="Whatever the server would do anyway - including MTA-STS and DANE" xml:space="preserve">
+    <value>To, co serwer zrobiłby i tak - łącznie z MTA-STS i DANE</value>
   </data>
   <data name="Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting." xml:space="preserve">
     <value>Cokolwiek Twój katalog przyjmuje przy prostym wiązaniu: UPN (svc-mail@example.local), DOMAIN\name albo pełne DN. Pozostawione puste sprawia, że serwer wyszukuje anonimowo - co zwykle zawodzi wobec Active Directory, ze zgłoszonym powodem wskazującym to ustawienie.</value>
@@ -9762,6 +9825,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   </data>
   <data name="rejected" xml:space="preserve">
     <value>odrzucana</value>
+  </data>
+  <data name="remote domain policy" xml:space="preserve">
+    <value>zasada dla domeny zdalnej</value>
   </data>
   <data name="remove a domain" xml:space="preserve">
     <value>usuń domenę</value>

@@ -161,6 +161,7 @@ namespace hMailServer.ControlPanel
          pageFactories_["protocols"] = () => new ServerSettingsView(ServerSettingsView.Section.Protocols);
          pageFactories_["delivery"] = () => new ServerSettingsView(ServerSettingsView.Section.Delivery);
          pageFactories_["routes"] = () => new RoutesView();
+         pageFactories_["remotedomains"] = () => CollectionSpecs.RemoteDomains();
          pageFactories_["publicfolders"] = () => new PublicFoldersView();
          pageFactories_["spamoverview"] = () => new SpamOverviewView();
          pageFactories_["quarantine"] = () => new QuarantineView();

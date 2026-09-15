@@ -385,6 +385,7 @@
     <Compile Include="Sieve\SieveNotifyDelivery.cs" />
     <Compile Include="SMTP\OutboundXOAuth2.cs" />
     <Compile Include="SMTP\OutboundSize.cs" />
+    <Compile Include="SMTP\RemoteDomainPolicyEnforcement.cs" />
     <Compile Include="SMTP\OverQuotaRecipientRefusal.cs" />
     <Compile Include="SMTP\PerDomainRelay.cs" />
     <Compile Include="SMTP\QuotaWarning.cs" />
@@ -679,6 +680,7 @@
     <Compile Include="API\RestApiRules.cs" />
     <Compile Include="API\RestApiCertificatesAndPorts.cs" />
     <Compile Include="API\RestApiRoutesAndAliases.cs" />
+    <Compile Include="API\RestApiRemoteDomains.cs" />
     <Compile Include="API\RestApiSelfService.cs" />
     <Compile Include="API\RestApiArchive.cs" />
     <Compile Include="API\RestApiParityGaps.cs" />

@@ -11,6 +11,8 @@
 #include "../Common/BO/Message.h"
 #include "../Common/BO/MessageRecipient.h"
 #include "../Common/BO/Routes.h"
+#include "../Common/BO/RemoteDomainPolicies.h"
+#include "../Common/BO/RemoteDomainPolicy.h"
 
 #include "../Common/Scripting/Events.h"
 
@@ -28,6 +30,7 @@
 #include "../Common/Application/IniFileSettings.h"
 #include "../Common/Util/TlsRptStore.h"
 #include "../Common/Util/RateLimiter.h"
+#include "../Common/Util/RemoteDomainThrottle.h"
 
 #include "ServerTargetResolver.h"
 #include "SMTPConfiguration.h"
@@ -175,6 +178,123 @@ namespace HM
       // point; it is replaced by individual MX host names further down.
       String recipientDomain = serverInfo->GetHostName();
 
+      // The recipient domains this batch actually carries, which is NOT the same
+      // question. For an MX delivery the server info's host name is the
+      // recipient domain; for a route or a relay it is the target host - a name
+      // belonging to whoever runs the smart host - and ServerTargetResolver
+      // merges the recipients of several domains onto one such target. The
+      // addresses are right in every one of those cases.
+      std::vector<String> recipientDomains;
+      for (std::shared_ptr<MessageRecipient> recipient : vecRecipients)
+      {
+         String domain = StringParser::ExtractDomain(recipient->GetAddress()).ToLower();
+
+         if (domain.IsEmpty())
+            continue;
+
+         bool seen = false;
+         for (const String &existing : recipientDomains)
+         {
+            if (existing == domain)
+            {
+               seen = true;
+               break;
+            }
+         }
+
+         if (!seen)
+            recipientDomains.push_back(domain);
+      }
+
+      // What the administrator has said about these domains. Deliberately
+      // applied to a routed delivery as well as to an MX one: the policy is a
+      // statement about the DOMAIN, not about how its server was found, and a
+      // route that quietly exempted a domain from the TLS its administrator
+      // required would be the silent downgrade this whole record exists to
+      // prevent. MTA-STS and DANE are the other way round - they are properties
+      // the domain itself publishes about its MX hosts, and a route replaces MX
+      // discovery, so they stay skipped for a fixed target.
+      std::shared_ptr<RemoteDomainPolicies> policies =
+         Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
+      std::shared_ptr<RemoteDomainPolicy> policy =
+         policies ? policies->GetStrictestPolicy(recipientDomains) : std::shared_ptr<RemoteDomainPolicy>();
+
+      RemoteTlsRequirement policyTls = policy ? policy->GetOutboundTlsRequirement() : RemoteTlsDefault;
+      String policyName = policy ? policy->GetDomainName() : String();
+
+      // The largest message this server will offer to the remote.
+      //
+      // PERMANENT, unlike everything else this record can refuse: the message
+      // will not be smaller on the next attempt, so retrying it for two days
+      // before bouncing would delay the news without changing it. 5.3.4 is RFC
+      // 3463's "message too big for system", which is what the remote would have
+      // said itself had the administrator not already known it would.
+      if (policy && policy->GetMaxMessageSizeKB() > 0)
+      {
+         __int64 messageSize = original_message_->GetSize();
+         __int64 sizeLimit = (__int64) policy->GetMaxMessageSizeKB() * 1024;
+
+         if (messageSize > sizeLimit)
+         {
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Not attempted. The remote domain policy for " + policyName + " allows at most " + StringParser::IntToString((int) policy->GetMaxMessageSizeKB()) + " KB and this message is " + StringParser::IntToString((int) (messageSize / 1024)) + " KB.");
+
+            String errorMessage;
+            errorMessage.Format(_T("   Error Type: SMTP\r\n   Error Description: The message was not sent. The remote domain policy for %s allows at most %d KB to this destination and this message is %d KB.\r\n\r\n"),
+               policyName.c_str(), (int) policy->GetMaxMessageSizeKB(), (int) (messageSize / 1024));
+
+            HandleExternalDeliveryFailure_(vecRecipients, true, errorMessage, _T("5.3.4"));
+            return;
+         }
+      }
+
+      // How many messages a minute this server will push at the remote. Its own
+      // bucket, keyed by the policy rather than by the domain, so that one
+      // pattern covering several domains is one ceiling - which is what an
+      // administrator who wrote the pattern meant.
+      if (policy && policy->GetMaxMessagesPerMinute() > 0)
+      {
+         String rateKey = _T("remote-policy:") + policyName;
+         rateKey.ToLower();
+
+         if (!RateLimiter::Instance()->TryConsume(rateKey, (int) policy->GetMaxMessagesPerMinute()))
+         {
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery deferred. The remote domain policy for " + policyName + " allows " + StringParser::IntToString((int) policy->GetMaxMessagesPerMinute()) + " message(s) a minute.");
+
+            String errorMessage;
+            errorMessage.Format(_T("   Error Type: SMTP\r\n   Error Description: Delivery deferred by the remote domain policy for %s, which allows %d message(s) a minute to this destination.\r\n\r\n"),
+               policyName.c_str(), (int) policy->GetMaxMessagesPerMinute());
+
+            // RFC 3463 X.4.5 "Mail system congestion", as the per-destination
+            // rate limit above uses: the congestion is this server's own
+            // deliberate shaping, and "too much mail for this route right now,
+            // try later" is exactly what X.4.5 carries.
+            HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.4.5"));
+            return;
+         }
+      }
+
+      // How many sessions this server will hold open to the remote at once. The
+      // slot lives to the end of this function, which is the end of the last
+      // connection attempt for this batch; every return below releases it.
+      RemoteDomainThrottle::Slot connectionSlot;
+
+      if (policy && policy->GetMaxConnections() > 0)
+      {
+         RemoteDomainThrottle::Instance()->Acquire(connectionSlot, policyName, (int) policy->GetMaxConnections());
+
+         if (!connectionSlot.Acquired())
+         {
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery deferred. The remote domain policy for " + policyName + " allows " + StringParser::IntToString((int) policy->GetMaxConnections()) + " simultaneous connection(s), and they are all in use.");
+
+            String errorMessage;
+            errorMessage.Format(_T("   Error Type: SMTP\r\n   Error Description: Delivery deferred by the remote domain policy for %s, which allows %d simultaneous connection(s) to this destination.\r\n\r\n"),
+               policyName.c_str(), (int) policy->GetMaxConnections());
+
+            HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.4.5"));
+            return;
+         }
+      }
+
       // Per-destination outbound rate shaping. A configured [Settings]
       // MaxOutboundPerDestinationPerMinute caps how many messages this server
       // sends to a single destination per minute; when exceeded the delivery is
@@ -244,7 +364,16 @@ namespace HM
          }
       }
 
-      bool daneEnabled = !serverInfo->GetFixed() && IniFileSettings::Instance()->GetDaneEnabled();
+      // A policy that asks for DANE asks for the TLSA lookup whatever the global
+      // switch says and whatever kind of target this is: the administrator has
+      // named the proof they want, and answering "DANE is off in the ini" by
+      // delivering in the clear is the silent downgrade. The lookup itself is
+      // unchanged, and so is every outcome of it - Insecure and NoRecords still
+      // mean "deliver without DANE" for every OTHER delivery; it is only the
+      // policy's own requirement below that turns "no usable record" into a
+      // refusal, and only for the domains the policy names.
+      bool daneEnabled = (!serverInfo->GetFixed() && IniFileSettings::Instance()->GetDaneEnabled()) ||
+                         policyTls == RemoteTlsDane;
 
       // RFC 7672 section 2.2: DANE applies only to a host learned from a
       // DNSSEC-validated MX RRset. Validating the TLSA record alone proves nothing
@@ -279,6 +408,12 @@ namespace HM
 
       unsigned int attemptedHosts = 0;
 
+      // Why every host was skipped, when every host was. Written by whichever
+      // rule did the skipping so that the deferral names it: a refusal that does
+      // not say which rule refused is a refusal an administrator cannot act on.
+      String skippedReason = _T("the DANE TLSA records of all MX hosts failed DNSSEC validation");
+      String skippedDescription = _T("Delivery blocked: the DANE TLSA records of all MX hosts failed DNSSEC validation.");
+
       for (unsigned int i = 0; i < mail_servers.size(); i++)
       {
          HostNameAndIpAddress hostAndIp = mail_servers[i];
@@ -299,8 +434,15 @@ namespace HM
          serverInfo->SetIpAddress(hostAndIp.GetIpAddress());
 
          // Apply per-host TLS requirements: MTA-STS enforcement applies to
-         // all hosts; DANE pins are looked up per MX host (RFC 7672).
-         serverInfo->SetRequirePeerVerification(stsEnforced);
+         // all hosts; DANE pins are looked up per MX host (RFC 7672); a remote
+         // domain policy applies to every host of the domains it names.
+         //
+         // OR, never assignment. The three sources of a TLS requirement compose
+         // as the strongest of them, and this is the line where that is true or
+         // not: a domain that publishes an MTA-STS enforce policy AND is named
+         // here at "encrypted" still gets certificate verification, because
+         // MTA-STS asked for it and nothing in this record can take it away.
+         serverInfo->SetRequirePeerVerification(stsEnforced || policyTls >= RemoteTlsVerified);
 
          std::vector<TlsaRecord> daneRecords;
          bool daneValidated = false;
@@ -348,10 +490,65 @@ namespace HM
             }
          }
 
+         // A policy that asked for DANE and got a host with no usable
+         // DNSSEC-validated TLSA record. There is nothing to verify the
+         // certificate against, so there is no way to deliver to this host that
+         // satisfies what was asked for - which is the point of asking for it.
+         // The host is skipped like a bogus one; if none is left the delivery is
+         // deferred below, naming the rule.
+         if (policyTls == RemoteTlsDane &&
+             (daneRecords.empty() || !daneValidated))
+         {
+            LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Skipping " + hostAndIp.GetHostName() + " - the remote domain policy for " + policyName + " requires DANE and this host publishes no DNSSEC-validated TLSA record.");
+
+            skippedReason = _T("the remote domain policy for ") + policyName + _T(" requires DANE");
+            skippedDescription = _T("Delivery blocked by the remote domain policy for ") + policyName +
+               _T(", which requires DANE. No mail host for this domain publishes a DNSSEC-validated TLSA record.");
+
+            TlsRptStore::Instance()->RecordFailure(recipientDomain, "tlsa", "dane required by local policy", "validation-failure", hostAndIp.GetHostName());
+            continue;
+         }
+
          attemptedHosts++;
 
          serverInfo->SetDaneRecords(daneRecords);
-         serverInfo->SetRequireTls(stsEnforced || !daneRecords.empty());
+         serverInfo->SetRequireTls(stsEnforced || !daneRecords.empty() || policyTls >= RemoteTlsEncrypted);
+
+         // The sentence a deferral carries when the encryption could not be had.
+         // Empty unless a policy is what required it: an MTA-STS or DANE failure
+         // keeps the wording and the (permanent, for the missing STARTTLS)
+         // classification it has had since those were written, because changing
+         // either would be changing a shipped behaviour that is not this row's.
+         if (policyTls >= RemoteTlsEncrypted)
+         {
+            String requirement;
+
+            switch (policyTls)
+            {
+            case RemoteTlsDane:
+               requirement = _T("TLS proven by a DNSSEC-validated TLSA record");
+               break;
+            case RemoteTlsVerified:
+               requirement = _T("TLS with a certificate that verifies");
+               break;
+            default:
+               requirement = _T("TLS");
+               break;
+            }
+
+            // One plain sentence, as every other reason SMTPClientConnection
+            // records is: it wraps the sentence in its own "Error Type" lines,
+            // and a pre-wrapped block would appear inside them a second time.
+            String reason;
+            reason.Format(_T("Delivery deferred: the remote domain policy for %s requires %s to this destination, and it could not be established. The message has NOT been sent in the clear."),
+               policyName.c_str(), requirement.c_str());
+
+            serverInfo->SetTlsPolicyReason(reason);
+         }
+         else
+         {
+            serverInfo->SetTlsPolicyReason(_T(""));
+         }
 
          // Classification for TLS reporting (RFC 8460).
          AnsiString rptPolicyType = !daneRecords.empty() ? "tlsa" : (stsEnforced ? "sts" : "no-policy-found");
@@ -404,11 +601,12 @@ namespace HM
 
       if (attemptedHosts == 0 && !mail_servers.empty())
       {
-         // Every MX host was skipped because its TLSA records failed
-         // DNSSEC validation. Defer delivery rather than deliver insecurely.
-         LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred. TLSA records of all MX hosts failed DNSSEC validation.");
+         // Every host was skipped - because its TLSA records failed DNSSEC
+         // validation, or because a policy required DANE and none publishes a
+         // usable record. Defer rather than deliver insecurely, and say which.
+         LOG_APPLICATION("SMTPDeliverer - Message " + StringParser::IntToString(original_message_->GetID()) + ": Delivery to " + recipientDomain + " deferred: " + skippedReason + ". No host was attempted.");
 
-         String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: Delivery blocked: the DANE TLSA records of all MX hosts failed DNSSEC validation.\r\n\r\n");
+         String errorMessage = _T("   Error Type: SMTP\r\n   Error Description: ") + skippedDescription + _T("\r\n\r\n");
          // As above: refused on security grounds, RFC 3463 X.7.0.
          HandleExternalDeliveryFailure_(vecRecipients, false, errorMessage, _T("4.7.0"));
       }
@@ -640,9 +838,16 @@ namespace HM
       std::shared_ptr<SMTPClientConnection> pClientConnection 
          = std::shared_ptr<SMTPClientConnection> (new SMTPClientConnection(serverInfo->GetEffectiveConnectionSecurity(), pIOService->GetIOContext(), pIOService->GetClientContext(), disconnectEvent, serverInfo->GetHostName()));
 
-      // Apply TLS policy requirements (MTA-STS / DANE) for this connection.
+      // Apply TLS policy requirements (MTA-STS / DANE / a remote domain policy)
+      // for this connection.
       if (serverInfo->GetRequirePeerVerification())
          pClientConnection->SetRequirePeerVerification();
+
+      // Which rule required the TLS, if one did. Decides whether a failure to
+      // get it is a deferral naming the rule or the permanent refusal that
+      // required STARTTLS has always produced. See SMTPClientConnection.
+      if (!serverInfo->GetTlsPolicyReason().IsEmpty())
+         pClientConnection->SetTlsPolicyReason(serverInfo->GetTlsPolicyReason());
 
       if (!serverInfo->GetDaneRecords().empty())
          pClientConnection->SetDaneRecords(serverInfo->GetDaneRecords());

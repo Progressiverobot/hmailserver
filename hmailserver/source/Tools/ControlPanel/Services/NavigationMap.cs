@@ -472,6 +472,16 @@ namespace hMailServer.ControlPanel.Services
                   aliases: "Static route|Transport map|Send domain to server|Internal relay|Hybrid|Split delivery",
                   seeAlso: "delivery|mxquery"),
 
+               // Beside the routes because that is where somebody who has just
+               // set one up will look next, and because the two are the pair an
+               // administrator confuses: a route decides WHERE mail for a domain
+               // goes, a remote domain policy decides what this server will do
+               // when it gets there.
+               Page("remotedomains", N("Remote domains"),
+                  N("Per remote domain: the TLS this server demands in each direction, the size and connections it will attempt, and recipient verification for a domain it backs up."),
+                  aliases: "Mandatory TLS|TLS policy|Require TLS|TLS policy map|Connector|Partner domain|Recipient callout|Recipient verification|Backup MX|Secondary MX|Rate limit|Per-domain limits",
+                  seeAlso: "routes|tlsoverview|delivery"),
+
                Page("relays", N("Incoming relays"),
                   N("Upstream gateways whose IP address must not be treated as the connecting client in spam checks."),
                   aliases: "Trusted relay|Upstream gateway|Front-end filter|Load balancer|Proxy|Received header",

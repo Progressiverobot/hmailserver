@@ -317,6 +317,18 @@ namespace HM
          RouteRouteCreate,
          RouteRouteUpdate,
          RouteRouteDelete,
+         // What this server will do for a named remote domain: the TLS it
+         // demands, the size and concurrency it will attempt, the backup-MX
+         // recipient callout. Server-wide, like the routes: a policy decides
+         // whether this server refuses to deliver a domain's mail in the clear
+         // and whether it opens verification sessions to a third party, and
+         // neither is one hosted domain administrator's to decide.
+         RouteRemoteDomainList,
+         RouteRemoteDomainCreate,
+         RouteRemoteDomainUpdate,
+         RouteRemoteDomainDelete,
+         RouteRemoteDomainEffective,
+         RouteRemoteDomainClearCache,
          RouteAliasCreate,
          RouteAliasDelete,
          RouteAccountUpdate,
@@ -913,6 +925,16 @@ namespace HM
       HttpResponse HandleCreateRoute_(const AnsiString &requestBody);
       HttpResponse HandleUpdateRoute_(__int64 routeId, const AnsiString &requestBody);
       HttpResponse HandleDeleteRoute_(__int64 routeId);
+      // The remote domain policies (RestApiRemoteDomains.cpp): what this server
+      // will do when it talks to a named remote domain.
+      HttpResponse HandleListRemoteDomains_();
+      HttpResponse HandleCreateRemoteDomain_(const AnsiString &requestBody);
+      HttpResponse HandleUpdateRemoteDomain_(__int64 policyId, const AnsiString &requestBody);
+      HttpResponse HandleDeleteRemoteDomain_(__int64 policyId);
+      // Which record GOVERNS a domain, which is not the record named by it.
+      HttpResponse HandleEffectiveRemoteDomain_(const String &domainName);
+      HttpResponse HandleClearRemoteDomainVerificationCache_();
+      static AnsiString OpenApiRemoteDomainsPaths_();
       HttpResponse HandleCreateAlias_(const String &domainName, const AnsiString &requestBody);
       HttpResponse HandleDeleteAlias_(const String &address);
       HttpResponse HandleUpdateAccount_(const Caller &caller, const String &address, const AnsiString &requestBody);

@@ -9,6 +9,7 @@
 #include "../Common/BO/Alias.h"
 #include "../Common/BO/Message.h"
 #include "../Common/BO/MessageData.h"
+#include "../Common/BO/RemoteDomainPolicies.h"
 #include "../Common/Cache/CacheContainer.h"
 #include "../Common/Mime/Mime.h"
 #include "../Common/Util/Time.h"
@@ -50,6 +51,18 @@ namespace HM
       // recipient" check; it is a loop guard, so it is stated as one.
       if (sToAddress.IsEmpty())
          return;
+
+      // The remote domain policy's first Exchange switch: whether this server
+      // may send an automatic reply to this domain at all. An absence notice is
+      // the message a regulated desk and a discussion list both least want from
+      // us, and an administrator who has said no to a domain has said no to
+      // every account's out-of-office as well as to the domain-wide one - both
+      // arrive here.
+      if (!RemoteDomainPolicies::AutomaticRepliesPermitted(sToAddress))
+      {
+         LOG_DEBUG(_T("No out-of-office message was sent: the remote domain policy for ") + StringParser::ExtractDomain(sToAddress) + _T(" does not permit automatic replies."));
+         return;
+      }
 
       // Load the original message's header once. It answers three questions below:
       // whether an automatic reply may answer this message at all, what the original
