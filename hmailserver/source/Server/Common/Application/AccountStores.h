@@ -16,11 +16,11 @@ namespace HM
    // An account is not only its row in hm_accounts, its folders and its mail. Since
    // 6.3 it is also an address book, the webmail's remembered choices, the messages
    // it has put off sending, the large files it has sent as links, its S/MIME
-   // certificates and keys, its calendar, and the history that stops it reusing a
-   // password. Each of those arrived as a table of its own beside the subsystem that
-   // wanted it, and none of them arrived in the backup - because the backup writes
-   // what the business objects' XMLStore methods know how to write, and these have
-   // no business object.
+   // certificates and keys, its calendar, the history that stops it reusing a
+   // password and the memory of who has written to it before. Each of those arrived
+   // as a table of its own beside the subsystem that wanted it, and none of them
+   // arrived in the backup - because the backup writes what the business objects'
+   // XMLStore methods know how to write, and these have no business object.
    //
    // That is not a gap, it is data loss. Every one of these tables carries a foreign
    // key to hm_accounts with ON DELETE CASCADE, and a restore calls
