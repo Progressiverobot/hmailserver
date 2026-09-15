@@ -926,6 +926,9 @@
   <data name="Address or domain" xml:space="preserve">
     <value>地址或域</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>要添加的地址(_D)</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>地址</value>
   </data>
@@ -1151,6 +1154,9 @@
   </data>
   <data name="Application events" xml:space="preserve">
     <value>应用程序事件</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>已应用</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>在“选择”密码时应用 - 在此处、在账户编辑器中、由脚本或由 API 选择时 - 而在登录校验密码时从不应用。这个区分正是整个设计的核心：密码早于该策略的账户可以继续使用，因为把人们锁在他们今天还能打开的邮箱之外，比它所要纠正的弱密码是更糟的结果。因此，收紧这些设置影响的是每个人下一次设置的密码，而不是他们现在用的这个。所有项在您打开之前都是关闭的，因此升级绝不会自行开始拒绝密码。</value>
@@ -2830,6 +2836,9 @@
   <data name="Edit {0}" xml:space="preserve">
     <value>编辑 {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>编辑中</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>正在编辑 {0}</value>
   </data>
@@ -2932,6 +2941,9 @@
   <data name="Enter a valid port number." xml:space="preserve">
     <value>请输入有效的端口号。</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>请输入整数。</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>输入地址并搜索。在“日志记录”页面开启邮件跟踪之前，跟踪不会记录任何内容 - 它默认关闭，因为它会存储谁与谁通信。</value>
   </data>
@@ -2946,6 +2958,9 @@
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>输入当前的 6 位代码以关闭第二重验证。</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>请以 YYYY-MM-DD HH:MM:SS 格式输入到期时间。</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>输入服务器上备份 XML 文件的路径。</value>
@@ -3815,6 +3830,9 @@
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>留空则使用内置的根锚点</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>留空以保留当前密码。</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>留空则只测试基础设施</value>
@@ -4754,6 +4772,9 @@
   </data>
   <data name="Not published" xml:space="preserve">
     <value>未发布</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>未重启</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>未提供</value>
@@ -5951,6 +5972,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>正在重启 hMailServer 服务...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>正在重启…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>还原</value>
   </data>
@@ -6726,9 +6750,6 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>服务已重启 - 设置已生效。</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>服务已重启，但控制面板无法重新连接。</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain 为 {0}，在此显示而不供编辑，因为服务器读取该键后从不使用它: 服务凭据仅用 ServiceUsername 和 ServicePassword 绑定。请改为把域放进用户名 (DOMAIN\name 或 UPN)。</value>
   </data>
@@ -6965,8 +6986,8 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>专业选项 — 除非有明确原因，否则请保留默认值。</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>要路由的特定地址 (在“投递到所有地址”关闭时使用)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>要路由的特定地址(_T)</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>拆分为名和姓，并且只写入两者都没有的账户。管理员在此输入的名称永远不会被目录覆盖。</value>
@@ -7821,9 +7842,6 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>无法读取服务账户: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>无法重启服务。</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>服务正以 {0} 身份运行，且未请求其他账户。这是默认值，也能工作；它出现在此列表中，是因为改用专用账户是降低邮件服务器被攻陷所值代价的最大单项措施，而这无法在 hMailServer 内部完成。</value>
   </data>
@@ -8227,6 +8245,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>无人值守窗口（留空 = 绝不自行安装；例如 03:00、Sun 03:00、Sat,Sun 02:00-05:00）</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>不可用</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>未知</value>
   </data>
@@ -8295,6 +8316,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>在未设置每日时间时使用。间隔以目标位置中最新的存档为基准计算，因此能跨越服务重启；如果目标位置根本没有备份，第一次备份会在服务启动大约一分钟后进行。</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>在“投递到所有地址”关闭时使用。</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>用户 DN 模板 (User_DnTemplate)</value>

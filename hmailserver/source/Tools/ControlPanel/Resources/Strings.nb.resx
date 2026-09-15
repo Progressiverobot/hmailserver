@@ -926,6 +926,9 @@ Control Panel kan bare lese meldingsfiler når det kjører på den samme maskine
   <data name="Address or domain" xml:space="preserve">
     <value>Adresse eller domene</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>A_dresse som skal legges til</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Adresser</value>
   </data>
@@ -1151,6 +1154,9 @@ Vil du starte Control Panel på nytt nå? Velg Nei for å prøve å fortsette å
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Programhendelser</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Tatt i bruk</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Brukes når et passord VELGES - her, i kontoredigeringen, av et skript eller av API-et - og aldri når et passord kontrolleres ved innlogging. Det skillet er hele designet: en konto med et passord fra før regelverket ble innført fortsetter å virke, fordi å stenge folk ute fra postbokser de kan åpne i dag er et verre utfall enn det svake passordet man dermed ville rettet opp. Å stramme inn disse innstillingene påvirker derfor det neste passordet hver person setter, ikke det de har. Alt er avslått til du slår det på, så en oppgradering begynner aldri å avvise passord av seg selv.</value>
@@ -2830,6 +2836,9 @@ Ingen post røres - indeksen er utledet fra den - men til gjenoppbyggingen har t
   <data name="Edit {0}" xml:space="preserve">
     <value>Rediger {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Redigerer</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Redigerer {0}</value>
   </data>
@@ -2932,6 +2941,9 @@ Ingen post røres - indeksen er utledet fra den - men til gjenoppbyggingen har t
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Skriv inn et gyldig portnummer.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Skriv inn et heltall.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Skriv inn en adresse og søk. Sporingen registrerer ingenting før meldingssporing slås på på siden Logging – den er av som standard fordi den lagrer hvem som korresponderer med hvem.</value>
   </data>
@@ -2946,6 +2958,9 @@ Ingen post røres - indeksen er utledet fra den - men til gjenoppbyggingen har t
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Skriv inn den gjeldende 6-sifrede koden for å slå av den andre faktoren.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Skriv inn utløpet som ÅÅÅÅ-MM-DD TT:MM:SS.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Skriv inn stien til sikkerhetskopi-XML-filen på serveren.</value>
@@ -3815,6 +3830,9 @@ Det verifiserte installasjonsprogrammet overleveres til oppdateringshjelperen: t
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>La stå tom for de innebygde rotankrene</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>La feltet stå tomt for å beholde det nåværende passordet.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>La stå tom for å teste bare infrastrukturen</value>
@@ -4754,6 +4772,9 @@ Det verifiserte installasjonsprogrammet overleveres til oppdateringshjelperen: t
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Ikke publisert</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Ikke startet på nytt</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Ikke servert</value>
@@ -5951,6 +5972,9 @@ SMTP 25 og 587, POP3 110, IMAP 143 - uten tilkoblingssikkerhet. TLS-porter og eg
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Starter hMailServer-tjenesten på nytt...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Starter på nytt…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Gjenopprett</value>
   </data>
@@ -6726,9 +6750,6 @@ Fortsette?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Tjenesten startet på nytt - innstillingene er aktive.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Tjenesten startet på nytt, men Control Panel kunne ikke koble til igjen.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, og vises her i stedet for å tilbys for redigering, fordi serveren leser nøkkelen og deretter aldri bruker den: tjenestelegitimasjonen binder med ServiceUsername og ServicePassword alene. Legg domenet i brukernavnet i stedet (DOMAIN\name eller et UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Starte den på nytt nå?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Spesialistknapper — la dem stå på standardene med mindre du har en konkret grunn.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Spesifikke adresser som skal rutes (brukes når "Lever til alle adresser" er av)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>_Bestemte adresser som skal rutes</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Deles i for- og etternavn, og skrives bare til en konto som ikke har noen av delene. Et navn en administrator har skrevet her, overskrives aldri av katalogen.</value>
@@ -7821,9 +7842,6 @@ Dette er serverens egen resolver som svarer - den samme som SMTP-levering bruker
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Tjenestekontoen kan ikke leses: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Tjenesten kunne ikke startes på nytt.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Tjenesten kjører som {0}, og ingen annen konto er forespurt. Dette er standarden, og det fungerer; det står på denne listen fordi å flytte til en dedikert konto er den største enkeltreduksjonen av hva en kompromittering av postserveren er verdt, og det kan ikke gjøres fra innsiden av hMailServer.</value>
   </data>
@@ -8227,6 +8245,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Uovervåket vindu (tomt = installer aldri på egen hånd; f.eks. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Utilgjengelig</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Ukjent</value>
   </data>
@@ -8295,6 +8316,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Brukes når ingen daglig tid er satt. Intervallet måles mot det nyeste arkivet i målet, så det overlever omstarter av tjenesten; hvis målet ikke inneholder noen sikkerhetskopi i det hele tatt, tas den første omtrent et minutt etter at tjenesten starter.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Brukes når «Lever til alle adresser» er slått av.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Bruker-_DN-mal (UserDnTemplate)</value>

@@ -926,6 +926,9 @@ Control Panel может читать файлы сообщений только
   <data name="Address or domain" xml:space="preserve">
     <value>Адрес или домен</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>_Адрес для добавления</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Адреса</value>
   </data>
@@ -1151,6 +1154,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Application events" xml:space="preserve">
     <value>События приложения</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Применено</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Применяется в момент ВЫБОРА пароля — здесь, в редакторе учётной записи, сценарием или через API — и никогда при проверке пароля во время входа. В этом различии и состоит весь замысел: учётная запись, чей пароль появился раньше политики, продолжает работать, потому что отрезать людей от почтовых ящиков, которые они открывают сегодня, — исход худший, чем тот слабый пароль, который это исправило бы. Поэтому ужесточение этих параметров затрагивает следующий пароль, который задаст каждый человек, а не тот, что у него есть сейчас. Всё выключено, пока вы это не включите, так что обновление никогда не начинает отклонять пароли само по себе.</value>
@@ -2830,6 +2836,9 @@ Control Panel может читать файлы сообщений только
   <data name="Edit {0}" xml:space="preserve">
     <value>Изменить {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Редактирование</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Изменение {0}</value>
   </data>
@@ -2932,6 +2941,9 @@ Control Panel может читать файлы сообщений только
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Введите корректный номер порта.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Введите целое число.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Введите адрес и выполните поиск. Трассировка ничего не записывает, пока трассировка сообщений не будет включена на странице «Журналирование», – по умолчанию она выключена, потому что сохраняет, кто с кем переписывается.</value>
   </data>
@@ -2946,6 +2958,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Введите текущий 6-значный код, чтобы отключить второй фактор.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Введите срок истечения в формате ГГГГ-ММ-ДД ЧЧ:ММ:СС.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Укажите путь к XML-файлу резервной копии на сервере.</value>
@@ -3815,6 +3830,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Оставьте пустым, чтобы использовать встроенные корневые якоря</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Оставьте пустым, чтобы сохранить текущий пароль.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Оставьте пустым, чтобы проверить только инфраструктуру</value>
@@ -4754,6 +4772,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Не опубликовано</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Не перезапущено</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Не отдаётся</value>
@@ -5951,6 +5972,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Перезапуск службы hMailServer...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Перезапуск…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Восстановление</value>
   </data>
@@ -6726,9 +6750,6 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Служба перезапущена — параметры действуют.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Служба перезапущена, но восстановить подключение Control Panel не удалось.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, и он показан здесь, а не предложен для правки, потому что сервер читает этот ключ и затем никогда его не использует: учётные данные службы выполняют привязку только через ServiceUsername и ServicePassword. Указывайте домен в составе имени пользователя (DOMAIN\name или UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Специальные регуляторы — оставьте значения по умолчанию, если у вас нет конкретной причины их менять.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Конкретные адреса для маршрутизации (используются, когда «Доставлять на все адреса» выключено)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>Конкретные адреса для _маршрутизации</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Разделяется на имя и фамилию и записывается только в ту учётную запись, где нет ни того ни другого. Имя, введённое здесь администратором, каталог не перезаписывает никогда.</value>
@@ -7821,9 +7842,6 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Не удалось прочитать учётную запись службы: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Службу не удалось перезапустить.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Служба работает как {0}, и другая учётная запись не запрошена. Это значение по умолчанию, и оно работает; в этом списке оно потому, что переход на выделенную учётную запись - самое большое из возможных снижение того, чего стоит компрометация почтового сервера, и сделать это изнутри hMailServer нельзя.</value>
   </data>
@@ -8227,6 +8245,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Окно автоматической установки (пусто — никогда не устанавливать самостоятельно; например, 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Недоступно</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Неизвестно</value>
   </data>
@@ -8295,6 +8316,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Используется, когда не задано ежедневное время. Интервал отмеряется от новейшего архива в назначении, поэтому переживает перезапуски службы; если в назначении нет ни одной резервной копии, первая снимается примерно через минуту после запуска службы.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Используется, когда «Доставлять на все адреса» выключено.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Шаблон _DN пользователя (UserDnTemplate)</value>

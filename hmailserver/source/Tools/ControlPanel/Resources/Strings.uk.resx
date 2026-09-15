@@ -926,6 +926,9 @@
   <data name="Address or domain" xml:space="preserve">
     <value>Адреса або домен</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>_Адреса для додавання</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Адреси</value>
   </data>
@@ -1151,6 +1154,9 @@
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Події програми</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Застосовано</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Застосовується тоді, коли пароль ОБИРАЮТЬ — тут, у редакторі облікових записів, сценарієм або через API, — і ніколи під час перевірки пароля при вході. Ця відмінність і є всім задумом: обліковий запис, пароль якого старіший за політику, працює далі, бо позбавити людей доступу до поштових скриньок, які вони можуть відкрити сьогодні, — гірший результат, ніж слабкий пароль, який це виправляло б. Тому посилення цих параметрів впливає на наступний пароль, який встановить кожна людина, а не на той, що вона має. Усе вимкнено, доки ви це не ввімкнете, тож оновлення ніколи не починає відхиляти паролі саме собою.</value>
@@ -2830,6 +2836,9 @@
   <data name="Edit {0}" xml:space="preserve">
     <value>Редагувати {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Редагування</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Редагування {0}</value>
   </data>
@@ -2932,6 +2941,9 @@
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Введіть дійсний номер порту.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Введіть ціле число.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Введіть адресу та виконайте пошук. Трасування нічого не записує, доки трасування повідомлень не буде ввімкнено на сторінці «Журналювання», – типово воно вимкнене, бо зберігає, хто з ким листується.</value>
   </data>
@@ -2946,6 +2958,9 @@
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Введіть поточний 6-значний код, щоб вимкнути другий фактор.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Введіть час закінчення у форматі РРРР-ММ-ДД ГГ:ХХ:СС.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Введіть шлях до XML-файлу резервної копії на сервері.</value>
@@ -3815,6 +3830,9 @@
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Залиште порожнім для вбудованих кореневих якорів</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Залиште порожнім, щоб зберегти поточний пароль.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Залиште порожнім, щоб перевірити лише інфраструктуру</value>
@@ -4754,6 +4772,9 @@
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Не опубліковано</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Не перезапущено</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Не надається</value>
@@ -5951,6 +5972,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Перезапуск служби hMailServer...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Перезапуск…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Відновлення</value>
   </data>
@@ -6726,9 +6750,6 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Службу перезапущено - параметри діють.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Службу перезапущено, але Панель керування не змогла повторно під'єднатися.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, і показується тут, а не пропонується до редагування, бо сервер читає ключ, а потім ніколи його не використовує: облікові дані служби прив'язуються лише за ServiceUsername і ServicePassword. Натомість вкажіть домен в імені користувача (DOMAIN\name або UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Спеціалізовані регулятори — залиште типові значення, якщо немає конкретної причини.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Конкретні адреси для маршрутизації (використовується, коли «Доставляти на всі адреси» вимкнено)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>Конкретні адреси для _маршрутизації</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Розділяється на ім'я та прізвище і записується лише в обліковий запис, у якого немає ні того, ні іншого. Ім'я, введене тут адміністратором, ніколи не перезаписується з каталогу.</value>
@@ -7821,9 +7842,6 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Не вдалося прочитати обліковий запис служби: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Службу не вдалося перезапустити.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Служба працює як {0}, і інший обліковий запис не запитано. Це типове значення, і воно працює; у цьому списку воно тому, що перехід на виділений обліковий запис - найбільше з можливих зниження того, чого варта компрометація поштового сервера, і зробити це зсередини hMailServer неможливо.</value>
   </data>
@@ -8227,6 +8245,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Вікно застосування без нагляду (порожньо = ніколи не застосовувати самостійно; наприклад, 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Недоступно</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Невідомо</value>
   </data>
@@ -8295,6 +8316,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Використовується, коли не задано щоденний час. Інтервал відмірюється від найновішого архіву в призначенні, тому переживає перезапуски служби; якщо в призначенні немає жодної резервної копії, першу роблять приблизно через хвилину після запуску служби.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Використовується, коли «Доставляти на всі адреси» вимкнено.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Шаблон _DN користувача (UserDnTemplate)</value>
@@ -8942,7 +8966,7 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
     <value>_Сторонні відправники завжди отримують текст домену, навіть коли обліковий запис має власний</value>
   </data>
   <data name="_Password" xml:space="preserve">
-    <value>П_ароль</value>
+    <value>Па_роль</value>
   </data>
   <data name="_Pause" xml:space="preserve">
     <value>П_ризупинити</value>

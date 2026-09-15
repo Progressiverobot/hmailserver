@@ -926,6 +926,9 @@ Het Control Panel kan berichtbestanden alleen lezen wanneer het op dezelfde mach
   <data name="Address or domain" xml:space="preserve">
     <value>Adres of domein</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>Toe te voegen a_dres</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Adressen</value>
   </data>
@@ -1151,6 +1154,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Toepassingsgebeurtenissen</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Toegepast</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Toegepast wanneer een wachtwoord wordt GEKOZEN - hier, in de accounteditor, door een script of via de API - en nooit wanneer er een wordt gecontroleerd bij aanmelden. Dat onderscheid is het hele ontwerp: een account waarvan het wachtwoord ouder is dan het beleid blijft werken, omdat mensen buitensluiten uit postvakken die ze vandaag kunnen openen een slechtere uitkomst is dan het zwakke wachtwoord dat ermee zou worden gecorrigeerd. Deze instellingen aanscherpen raakt dus het volgende wachtwoord dat iemand instelt, niet het wachtwoord dat hij heeft. Alles staat uit totdat u het aanzet, dus een upgrade begint nooit uit zichzelf wachtwoorden te weigeren.</value>
@@ -2830,6 +2836,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Edit {0}" xml:space="preserve">
     <value>{0} bewerken</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Bewerken</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>{0} wordt bewerkt</value>
   </data>
@@ -2932,6 +2941,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Voer een geldig poortnummer in.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Voer een geheel getal in.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Voer een adres in en zoek. De tracering legt niets vast totdat berichttracering wordt ingeschakeld op de pagina Logboekregistratie – standaard staat deze uit omdat ze opslaat wie met wie correspondeert.</value>
   </data>
@@ -2946,6 +2958,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Voer de huidige 6-cijferige code in om de tweede factor uit te schakelen.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Voer de vervaldatum in als YYYY-MM-DD HH:MM:SS.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Voer het pad in van het XML-back-upbestand op de server.</value>
@@ -3815,6 +3830,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Laat leeg voor de ingebouwde rootankers</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Laat leeg om het huidige wachtwoord te behouden.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Laat leeg om alleen de infrastructuur te testen</value>
@@ -4754,6 +4772,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Niet gepubliceerd</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Niet herstart</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Wordt niet geserveerd</value>
@@ -5951,6 +5972,9 @@ SMTP 25 en 587, POP3 110, IMAP 143 - zonder verbindingsbeveiliging. TLS-poorten 
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>De hMailServer-service wordt opnieuw gestart...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Bezig met herstarten…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Herstellen</value>
   </data>
@@ -6726,9 +6750,6 @@ Doorgaan?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Service herstart - de instellingen zijn actief.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Service herstart, maar het Control Panel kon niet opnieuw verbinden.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, en wordt hier getoond in plaats van aangeboden om te bewerken, omdat de server de sleutel wel leest maar vervolgens nooit gebruikt: de servicereferentie bindt alleen met ServiceUsername en ServicePassword. Zet het domein in plaats daarvan in de gebruikersnaam (DOMAIN\name of een UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Nu herstarten?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Instellingen voor specialisten — laat ze op de standaardwaarden staan, tenzij u een specifieke reden hebt.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Specifieke adressen om te routeren (gebruikt wanneer “Aan alle adressen bezorgen” uit staat)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>Specifieke adressen om te rou_ten</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Gesplitst in voor- en achternaam, en alleen ooit geschreven naar een account dat geen van beide heeft. Een naam die hier door een beheerder is getypt, wordt nooit door de directory overschreven.</value>
@@ -7821,9 +7842,6 @@ Dit is de eigen resolver van de server die antwoordt - dezelfde die de SMTP-bezo
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Het serviceaccount kan niet worden gelezen: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>De service kon niet opnieuw worden gestart.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>De service draait als {0}, en er wordt geen ander account gevraagd. Dit is de standaard en het werkt; het staat op deze lijst omdat overstappen naar een toegewijd account de allergrootste vermindering is van wat een compromittering van de mailserver waard is, en omdat het niet vanuit hMailServer zelf kan worden gedaan.</value>
   </data>
@@ -8227,6 +8245,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Onbeheerd venster (leeg = nooit uit zichzelf installeren; bijv. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Niet beschikbaar</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Onbekend</value>
   </data>
@@ -8295,6 +8316,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Wordt gebruikt wanneer er geen dagelijkse tijd is ingesteld. Het interval wordt gemeten vanaf het nieuwste archief in de bestemming, dus het overleeft herstarts van de service; bevat de bestemming helemaal geen back-up, dan wordt de eerste ongeveer een minuut na het starten van de service gemaakt.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Wordt gebruikt wanneer ‘Aan alle adressen bezorgen’ uit staat.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Sjabloon voor gebruikers-_DN (UserDnTemplate)</value>

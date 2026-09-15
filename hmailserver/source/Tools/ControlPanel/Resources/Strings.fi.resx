@@ -926,6 +926,9 @@ Control Panel voi lukea viestitiedostoja vain, kun se on käynnissä samalla kon
   <data name="Address or domain" xml:space="preserve">
     <value>Osoite tai verkkotunnus</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>Lisättävä _osoite</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Osoitteet</value>
   </data>
@@ -1151,6 +1154,9 @@ Käynnistetäänkö Control Panel nyt uudelleen? Valitse Ei, jos haluat yrittä�
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Sovellustapahtumat</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Otettu käyttöön</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Sovelletaan silloin kun salasana VALITAAN – täällä, tilieditorissa, komentosarjalla tai API:n kautta – eikä koskaan silloin kun salasana tarkistetaan kirjautumisessa. Tuo ero on koko suunnittelun ydin: tili jonka salasana on käytäntöä vanhempi toimii edelleen, koska ihmisten sulkeminen pois postilaatikoista jotka he tänään saavat auki on huonompi lopputulos kuin se heikko salasana jota se korjaisi. Näiden asetusten kiristäminen vaikuttaa siis kunkin henkilön seuraavaan salasanaan, ei siihen joka hänellä on. Kaikki on pois käytöstä kunnes otat sen käyttöön, joten päivitys ei koskaan ala itsestään hylätä salasanoja.</value>
@@ -2830,6 +2836,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Edit {0}" xml:space="preserve">
     <value>Muokkaa: {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Muokkaus</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Muokataan: {0}</value>
   </data>
@@ -2932,6 +2941,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Anna kelvollinen portin numero.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Anna kokonaisluku.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Anna osoite ja hae. Jäljitys ei tallenna mitään ennen kuin viestien jäljitys otetaan käyttöön Lokitus-sivulla – se on oletuksena pois käytöstä, koska se tallentaa, kuka kirjoittaa kenelle.</value>
   </data>
@@ -2946,6 +2958,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Anna nykyinen 6-numeroinen koodi poistaaksesi toisen tunnistustekijän käytöstä.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Anna vanheneminen muodossa VVVV-KK-PP TT:MM:SS.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Anna varmuuskopion XML-tiedoston polku palvelimella.</value>
@@ -3815,6 +3830,9 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Jätä tyhjäksi sisäänrakennettuja juuriankkureita varten</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Jätä tyhjäksi, jos haluat säilyttää nykyisen salasanan.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Jätä tyhjäksi testataksesi vain infrastruktuurin</value>
@@ -4754,6 +4772,9 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Ei julkaistu</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Ei käynnistetty uudelleen</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Ei tarjolla</value>
@@ -5951,6 +5972,9 @@ SMTP 25 ja 587, POP3 110, IMAP 143 - ilman yhteyden suojausta. TLS-portit ja muk
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Käynnistetään hMailServer-palvelu uudelleen...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Käynnistetään uudelleen…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Palauta</value>
   </data>
@@ -6726,9 +6750,6 @@ Jatketaanko?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Palvelu käynnistetty uudelleen - asetukset ovat voimassa.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Palvelu käynnistetty uudelleen, mutta Control Panel ei saanut yhteyttä uudelleen.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, ja se näytetään täällä muokattavaksi tarjoamisen sijaan, koska palvelin lukee avaimen eikä koskaan käytä sitä: palvelun tunnistetiedot sidotaan pelkästään arvoilla ServiceUsername ja ServicePassword. Laita toimialue sen sijaan käyttäjänimeen (DOMAIN\name tai UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Käynnistetäänkö se uudelleen nyt?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Erikoissäätimet — jätä oletuksiin, ellei sinulla ole erityistä syytä.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Tietyt reititettävät osoitteet (käytetään, kun "Toimita kaikkiin osoitteisiin" on pois päältä)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>_Reititettävät osoitteet</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Jaetaan etu- ja sukunimeen ja kirjoitetaan vain tilille, jolla ei ole kumpaakaan. Järjestelmänvalvojan tähän kirjoittamaa nimeä hakemisto ei koskaan korvaa.</value>
@@ -7821,9 +7842,6 @@ Tähän vastaa palvelimen oma nimiselvitin - sama, jota SMTP-toimitus käyttää
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Palvelutiliä ei voi lukea: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Palvelua ei voitu käynnistää uudelleen.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Palvelu toimii tilillä {0}, eikä muuta tiliä ole pyydetty. Tämä on oletus, ja se toimii; se on tällä listalla, koska siirtyminen erilliseen tiliin on suurin yksittäinen vähennys siihen, minkä arvoinen postipalvelimen murtaminen on, eikä sitä voi tehdä hMailServerin sisältä.</value>
   </data>
@@ -8227,6 +8245,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Valvomaton aikaikkuna (tyhjä = älä koskaan asenna omin päin; esim. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Ei käytettävissä</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Ei tiedossa</value>
   </data>
@@ -8295,6 +8316,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Käytetään, kun päivittäistä aikaa ei ole asetettu. Väli mitataan kohteen uusimmasta arkistosta, joten se selviää palvelun uudelleenkäynnistyksistä; jos kohteessa ei ole lainkaan varmuuskopiota, ensimmäinen otetaan noin minuutti palvelun käynnistymisen jälkeen.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Käytetään, kun ”Toimita kaikkiin osoitteisiin” on pois käytöstä.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Käyttäjän _DN-malli (UserDnTemplate)</value>

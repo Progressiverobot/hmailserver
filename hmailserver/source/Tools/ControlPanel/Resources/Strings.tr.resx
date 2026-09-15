@@ -926,6 +926,9 @@ Denetim Masası, ileti dosyalarını yalnızca sunucuyla aynı makinede ve yeter
   <data name="Address or domain" xml:space="preserve">
     <value>Adres veya etki alanı</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>Eklenecek a_dres</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Adresler</value>
   </data>
@@ -1151,6 +1154,9 @@ Denetim Masası şimdi yeniden başlatılsın mı? Çalışmayı sürdürmeyi de
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Uygulama olayları</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Uygulandı</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Bir parola SEÇİLDİĞİNDE uygulanır - burada, hesap düzenleyicisinde, bir betikle veya API ile - oturum açarken parola denetlenirken asla uygulanmaz. Tasarımın tamamı bu ayrıma dayanır: parolası ilkeden eski olan bir hesap çalışmayı sürdürür, çünkü insanları bugün açabildikleri posta kutularının dışında bırakmak, düzeltilecek olan zayıf paroladan daha kötü bir sonuçtur. Dolayısıyla bu ayarların sıkılaştırılması, herkesin elindeki parolayı değil, bir sonraki belirleyeceği parolayı etkiler. Siz açana kadar her şey kapalıdır; bu yüzden bir yükseltme kendiliğinden parola reddetmeye başlamaz.</value>
@@ -2830,6 +2836,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="Edit {0}" xml:space="preserve">
     <value>{0} düzenle</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Düzenleme</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>{0} düzenleniyor</value>
   </data>
@@ -2932,6 +2941,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Geçerli bir port numarası girin.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Bir tam sayı girin.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Bir adres girin ve arayın. İzleme, Günlükleme sayfasında ileti izleme açılana kadar hiçbir şey kaydetmez – kimin kiminle yazıştığını sakladığı için varsayılan olarak kapalıdır.</value>
   </data>
@@ -2946,6 +2958,9 @@ Postaya dokunulmaz - indeks ondan türetilir - ama yeniden oluşturma yetişene 
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>İkinci etkeni kapatmak için geçerli 6 haneli kodu girin.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Süre sonunu YYYY-MM-DD HH:MM:SS olarak girin.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Sunucudaki yedek XML dosyasının yolunu girin.</value>
@@ -3815,6 +3830,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Yerleşik kök çapalar için boş bırakın</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Geçerli parolayı korumak için boş bırakın.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Yalnızca altyapıyı sınamak için boş bırakın</value>
@@ -4754,6 +4772,9 @@ Doğrulanan yükleyici güncelleştirme yardımcısına verilir: hizmet durur, y
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Yayımlanmamış</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Yeniden başlatılmadı</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Sunulmuyor</value>
@@ -5951,6 +5972,9 @@ SMTP 25 ve 587, POP3 110, IMAP 143 - bağlantı güvenliği olmadan. TLS portlar
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>hMailServer hizmeti yeniden başlatılıyor...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Yeniden başlatılıyor…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Geri yükle</value>
   </data>
@@ -6726,9 +6750,6 @@ Devam edilsin mi?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Hizmet yeniden başlatıldı - ayarlar etkin.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Hizmet yeniden başlatıldı, ancak Denetim Masası yeniden bağlanamadı.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}; burada düzenlenmek üzere sunulmak yerine gösteriliyor, çünkü sunucu anahtarı okur ve sonra hiç kullanmaz: hizmet kimlik bilgisi yalnızca ServiceUsername ve ServicePassword ile bağlanır. Etki alanını bunun yerine kullanıcı adına koyun (DOMAIN\name veya bir UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Devam edilsin mi?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Uzman düğmeleri — belirli bir nedeniniz yoksa varsayılanlarda bırakın.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Yönlendirilecek belirli adresler ("Tüm adreslere teslim et" kapalıyken kullanılır)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>Yönlendirilecek _belirli adresler</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Ad ve soyada bölünür ve yalnızca ikisi de olmayan bir hesaba yazılır. Bir yöneticinin buraya yazdığı ad dizin tarafından hiçbir zaman üzerine yazılmaz.</value>
@@ -7821,9 +7842,6 @@ Yanıt veren sunucunun kendi çözümleyicisi - SMTP teslimatının kullandığ�
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Hizmet hesabı okunamıyor: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Hizmet yeniden başlatılamadı.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Hizmet {0} olarak çalışıyor ve başka bir hesap istenmiyor. Bu varsayılandır ve çalışır; bu listede olmasının nedeni, ayrılmış bir hesaba geçmenin posta sunucusunun ele geçirilmesinin değerini en çok düşüren tek adım olması ve hMailServer'ın içinden yapılamamasıdır.</value>
   </data>
@@ -8227,6 +8245,9 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Gözetimsiz pencere (boş = kendi başına hiçbir zaman uygulama yapma; örneğin 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Kullanılamıyor</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Bilinmiyor</value>
   </data>
@@ -8295,6 +8316,9 @@ Hiçbir ileti silinmez ve hiçbir hesap kaldırılmaz. Devam edilsin mi?</value>
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Günlük bir saat ayarlanmamışken kullanılır. Aralık hedefteki en yeni arşive göre ölçülür; bu yüzden hizmet yeniden başlatmalarından etkilenmez; hedefte hiç yedek yoksa ilki hizmet başladıktan yaklaşık bir dakika sonra alınır.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>“Tüm adreslere teslim et” kapalıyken kullanılır.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Kullanıcı _DN şablonu (UserDnTemplate)</value>

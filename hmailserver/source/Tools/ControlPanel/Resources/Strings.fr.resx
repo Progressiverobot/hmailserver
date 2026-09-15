@@ -926,6 +926,9 @@ Le Control Panel ne peut lire les fichiers de messages que lorsqu'il s'exécute 
   <data name="Address or domain" xml:space="preserve">
     <value>Adresse ou domaine</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>A_dresse à ajouter</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Adresses</value>
   </data>
@@ -1151,6 +1154,9 @@ Redémarrer le Control Panel maintenant ? Choisissez Non pour essayer de continu
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Événements de l'application</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Appliqué</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Appliqué quand un mot de passe est CHOISI - ici, dans l'éditeur de compte, par un script ou par l'API - et jamais quand un mot de passe est vérifié à la connexion. Cette distinction est toute la conception : un compte dont le mot de passe précède la politique continue de fonctionner, parce que priver des gens de boîtes qu'ils peuvent ouvrir aujourd'hui est un pire résultat que le mot de passe faible qui serait corrigé. Durcir ces réglages affecte donc le prochain mot de passe que chaque personne définit, pas celui qu'elle a. Tout est désactivé tant que vous ne l'activez pas, une mise à niveau ne se met donc jamais à refuser des mots de passe d'elle-même.</value>
@@ -2830,6 +2836,9 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
   <data name="Edit {0}" xml:space="preserve">
     <value>Modifier {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Édition</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Modification de {0}</value>
   </data>
@@ -2932,6 +2941,9 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Saisissez un numéro de port valide.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Saisissez un nombre entier.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Saisissez une adresse et lancez la recherche. La trace n'enregistre rien tant que le traçage des messages n'est pas activé sur la page Journalisation – il est désactivé par défaut car il conserve qui correspond avec qui.</value>
   </data>
@@ -2946,6 +2958,9 @@ Aucun courrier n'est touché - l'index en est dérivé - mais jusqu'à ce que la
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Saisissez le code à 6 chiffres actuel pour désactiver le second facteur.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Saisissez l'expiration au format AAAA-MM-JJ HH:MM:SS.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Saisissez le chemin du fichier XML de sauvegarde sur le serveur.</value>
@@ -3815,6 +3830,9 @@ L'installateur vérifié est remis à l'assistant de mise à jour : le service s
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Laissez vide pour les ancres racine intégrées</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Laissez vide pour conserver le mot de passe actuel.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Laissez vide pour ne tester que l'infrastructure</value>
@@ -4754,6 +4772,9 @@ L'installateur vérifié est remis à l'assistant de mise à jour : le service s
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Non publié</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Non redémarré</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Non servi</value>
@@ -5951,6 +5972,9 @@ SMTP 25 et 587, POP3 110, IMAP 143 - sans sécurité de connexion. Les ports TLS
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Redémarrage du service hMailServer...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Redémarrage…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Restaurer</value>
   </data>
@@ -6726,9 +6750,6 @@ Continuer ?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Service redémarré - les réglages sont actifs.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Service redémarré, mais le Control Panel n'a pas pu se reconnecter.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0}, et est affiché ici plutôt que proposé à la modification parce que le serveur lit la clé puis ne s'en sert jamais : l'identifiant de service se lie avec ServiceUsername et ServicePassword seuls. Mettez plutôt le domaine dans le nom d'utilisateur (DOMAIN\name ou un UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Le redémarrer maintenant ?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Réglages spécialisés — laissez les valeurs par défaut sauf raison précise.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Adresses précises à router (utilisé quand « Livrer à toutes les adresses » est désactivé)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>Adresses spécifiques à rou_ter</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Découpé en prénom et nom, et écrit uniquement dans un compte qui n'a ni l'un ni l'autre. Un nom saisi ici par un administrateur n'est jamais écrasé par l'annuaire.</value>
@@ -7821,9 +7842,6 @@ C'est le propre résolveur du serveur qui répond - le même que celui qu'utilis
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Le compte de service ne peut pas être lu : {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Le service n'a pas pu être redémarré.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Le service s'exécute en tant que {0}, et aucun autre compte n'est demandé. C'est la valeur par défaut et cela fonctionne ; c'est sur cette liste parce que passer à un compte dédié est ce qui réduit le plus ce que vaut une compromission du serveur de messagerie, et cela ne peut pas être fait depuis hMailServer.</value>
   </data>
@@ -8227,6 +8245,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Fenêtre sans surveillance (vide = ne jamais installer de lui-même ; p. ex. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Indisponible</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Inconnu</value>
   </data>
@@ -8295,6 +8316,9 @@ Aucun message n'est supprimé et aucun compte n'est retiré. Continuer ?</value>
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Utilisé quand aucune heure quotidienne n'est définie. L'intervalle est mesuré par rapport à l'archive la plus récente dans la destination : il survit donc aux redémarrages du service ; si la destination ne contient aucune sauvegarde, la première est prise environ une minute après le démarrage du service.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Utilisé lorsque « Livrer à toutes les adresses » est désactivé.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Modèle de _DN utilisateur (UserDnTemplate)</value>

@@ -926,6 +926,9 @@ Control Panel může číst soubory zpráv pouze tehdy, když běží na stejné
   <data name="Address or domain" xml:space="preserve">
     <value>Adresa nebo doména</value>
   </data>
+  <data name="Address to a_dd" xml:space="preserve">
+    <value>_Adresa k přidání</value>
+  </data>
   <data name="Addresses" xml:space="preserve">
     <value>Adresy</value>
   </data>
@@ -1151,6 +1154,9 @@ Restartovat nyní Control Panel? Volbou Ne se pokusíte pokračovat v práci.</v
   </data>
   <data name="Application events" xml:space="preserve">
     <value>Události aplikace</value>
+  </data>
+  <data name="Applied" xml:space="preserve">
+    <value>Použito</value>
   </data>
   <data name="Applied when a password is CHOSEN - here, in the account editor, by a script or by the API - and never when one is checked at logon. That distinction is the whole design: an account whose password predates the policy keeps working, because locking people out of mailboxes they can open today is a worse outcome than the weak password it would be correcting. Tightening these settings therefore affects the next password each person sets, not the one they have. Everything is off until you turn it on, so an upgrade never starts refusing passwords on its own." xml:space="preserve">
     <value>Uplatní se, když se heslo VOLÍ – zde, v editoru účtu, skriptem nebo přes API – a nikdy když se heslo ověřuje při přihlášení. V tomto rozlišení spočívá celý návrh: účet, jehož heslo je starší než tato politika, funguje dál, protože zamknout lidem přístup k poštovním schránkám, které dnes otevřou, je horší výsledek než slabé heslo, které by se tím napravovalo. Zpřísnění těchto nastavení se tedy projeví na příštím hesle, které si každý nastaví, ne na tom, které má. Vše je vypnuto, dokud to nezapnete, takže aktualizace nikdy nezačne hesla odmítat sama od sebe.</value>
@@ -2830,6 +2836,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Edit {0}" xml:space="preserve">
     <value>Upravit {0}</value>
   </data>
+  <data name="Editing" xml:space="preserve">
+    <value>Úpravy</value>
+  </data>
   <data name="Editing {0}" xml:space="preserve">
     <value>Úprava {0}</value>
   </data>
@@ -2932,6 +2941,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="Enter a valid port number." xml:space="preserve">
     <value>Zadejte platné číslo portu.</value>
   </data>
+  <data name="Enter a whole number." xml:space="preserve">
+    <value>Zadejte celé číslo.</value>
+  </data>
   <data name="Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom." xml:space="preserve">
     <value>Zadejte adresu a vyhledejte. Trasování nezaznamenává vůbec nic, dokud není trasování zpráv zapnuto na stránce Logování – ve výchozím nastavení je vypnuto, protože ukládá, kdo si s kým dopisuje.</value>
   </data>
@@ -2946,6 +2958,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   </data>
   <data name="Enter the current 6-digit code to turn the second factor off." xml:space="preserve">
     <value>Zadejte aktuální 6místný kód pro vypnutí druhého faktoru.</value>
+  </data>
+  <data name="Enter the expiry as YYYY-MM-DD HH:MM:SS." xml:space="preserve">
+    <value>Zadejte vypršení ve tvaru RRRR-MM-DD HH:MM:SS.</value>
   </data>
   <data name="Enter the path of the backup XML file on the server." xml:space="preserve">
     <value>Zadejte cestu k záložnímu souboru XML na serveru.</value>
@@ -3815,6 +3830,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Leave empty for the built-in root anchors" xml:space="preserve">
     <value>Pro vestavěné kořenové kotvy nechte prázdné</value>
+  </data>
+  <data name="Leave empty to keep the current password." xml:space="preserve">
+    <value>Ponechte prázdné pro zachování stávajícího hesla.</value>
   </data>
   <data name="Leave empty to test only the infrastructure" xml:space="preserve">
     <value>Chcete-li otestovat pouze infrastrukturu, nechte prázdné</value>
@@ -4754,6 +4772,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Not published" xml:space="preserve">
     <value>Nepublikováno</value>
+  </data>
+  <data name="Not restarted" xml:space="preserve">
+    <value>Nerestartováno</value>
   </data>
   <data name="Not served" xml:space="preserve">
     <value>Neposkytováno</value>
@@ -5951,6 +5972,9 @@ SMTP 25 a 587, POP3 110, IMAP 143 – bez zabezpečení připojení. TLS porty a
   <data name="Restarting the hMailServer service..." xml:space="preserve">
     <value>Restartuje se služba hMailServer...</value>
   </data>
+  <data name="Restarting…" xml:space="preserve">
+    <value>Restartuje se…</value>
+  </data>
   <data name="Restore" xml:space="preserve">
     <value>Obnovit</value>
   </data>
@@ -6726,9 +6750,6 @@ Pokračovat?</value>
   <data name="Service restarted - settings are live." xml:space="preserve">
     <value>Služba restartována – nastavení je aktivní.</value>
   </data>
-  <data name="Service restarted, but the Control Panel could not reconnect." xml:space="preserve">
-    <value>Služba restartována, ale Control Panel se nemohl znovu připojit.</value>
-  </data>
   <data name="ServiceDomain {0}, and is shown here rather than offered for editing because the server reads the key and then never uses it: the service credential binds with ServiceUsername and ServicePassword alone. Put the domain in the user name instead (DOMAIN\name or a UPN)." xml:space="preserve">
     <value>ServiceDomain {0} a zobrazuje se zde místo toho, aby byl nabídnut k úpravám, protože server tento klíč přečte a pak jej nikdy nepoužije: přihlašovací údaje služby se vážou pouze pomocí ServiceUsername a ServicePassword. Doménu uveďte místo toho v uživatelském jménu (DOMAIN\name nebo UPN).</value>
   </data>
@@ -6965,8 +6986,8 @@ Restartovat ji nyní?</value>
   <data name="Specialist knobs — leave at the defaults unless you have a specific reason." xml:space="preserve">
     <value>Specializovaná nastavení — pokud nemáte konkrétní důvod, ponechte výchozí hodnoty.</value>
   </data>
-  <data name="Specific addresses to route (used when “Deliver to all addresses” is off)" xml:space="preserve">
-    <value>Konkrétní adresy k směrování (použije se, když je „Doručovat na všechny adresy“ vypnuto)</value>
+  <data name="Specific addresses to rou_te" xml:space="preserve">
+    <value>_Konkrétní adresy pro směrování</value>
   </data>
   <data name="Split into first and last name, and only ever written to an account that has neither. A name typed here by an administrator is never overwritten by the directory." xml:space="preserve">
     <value>Rozdělí se na jméno a příjmení a zapíše se jen do účtu, který nemá ani jedno. Jméno, které sem zadal správce, adresář nikdy nepřepíše.</value>
@@ -7821,9 +7842,6 @@ Odpovídá vlastní resolver serveru - tentýž, který používá doručování
   <data name="The service account cannot be read: {0}" xml:space="preserve">
     <value>Servisní účet nelze přečíst: {0}</value>
   </data>
-  <data name="The service could not be restarted." xml:space="preserve">
-    <value>Službu nešlo restartovat.</value>
-  </data>
   <data name="The service is running as {0}, and no other account is requested. This is the default and it works; it is on this list because moving to a dedicated account is the single largest reduction in what a compromise of the mail server is worth, and it cannot be done from inside hMailServer." xml:space="preserve">
     <value>Služba běží jako {0} a žádný jiný účet není požadován. To je výchozí stav a funguje; na tomto seznamu je proto, že přechod na vyhrazený účet je největší jednotlivé snížení toho, co má kompromitace poštovního serveru cenu, a zevnitř hMailServeru ho nelze provést.</value>
   </data>
@@ -8227,6 +8245,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="Unattended window (empty = never apply on its own; e.g. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)" xml:space="preserve">
     <value>Bezobslužné okno (prázdné = nikdy neinstalovat sám od sebe; např. 03:00, Sun 03:00, Sat,Sun 02:00-05:00)</value>
   </data>
+  <data name="Unavailable" xml:space="preserve">
+    <value>Nedostupné</value>
+  </data>
   <data name="Unknown" xml:space="preserve">
     <value>Neznámo</value>
   </data>
@@ -8295,6 +8316,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="Used when no daily time is set. The interval is measured against the newest archive in the destination, so it survives service restarts; if the destination holds no backup at all, the first one is taken about a minute after the service starts." xml:space="preserve">
     <value>Používá se, když není nastaven denní čas. Interval se měří od nejnovějšího archivu v cíli, takže přežije restarty služby; pokud cíl neobsahuje žádnou zálohu, první se pořídí asi minutu po startu služby.</value>
+  </data>
+  <data name="Used when “Deliver to all addresses” is off." xml:space="preserve">
+    <value>Použije se, když je „Doručovat na všechny adresy“ vypnuto.</value>
   </data>
   <data name="User _DN template (UserDnTemplate)" xml:space="preserve">
     <value>Šablona _DN uživatele (UserDnTemplate)</value>
