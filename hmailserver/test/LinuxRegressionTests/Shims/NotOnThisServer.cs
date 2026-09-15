@@ -149,6 +149,9 @@ namespace RegressionTests.Shared
       public const string NoGroups =
          "needs Settings.Groups, and this server's REST API has no /api/v1/groups (it arrived after 6.3.3)";
 
+      public const string NoFolderUidNext =
+         "reads IMAPFolder.CurrentUID, and this server's GET /api/v1/me/folders does not report a folder's uidnext (it arrived after 6.3.3)";
+
       public const string NoFolderSubscriptionWrite =
          "sets IMAPFolder.Subscribed, and the folder routes report a folder's subscription and never change it - a client subscribes over IMAP";
 

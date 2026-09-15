@@ -1009,9 +1009,15 @@ namespace hMailServer
          return From(All()[index]);
       }
 
+      /// <summary>
+      ///    A name no route has is the error InterfaceRoutes::get_ItemByName
+      ///    returns, DISP_E_BADINDEX ("Invalid index."), and not null - which is
+      ///    what API/Basics.cs TestRetrieveNonexistantRoute (issue 368) asserts.
+      /// </summary>
       public Route get_ItemByName(string domainName)
       {
-         return All().Where(element => string.Equals(ServerApi.StringOf(element, "domain_name"), domainName, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault();
+         return All().Where(element => string.Equals(ServerApi.StringOf(element, "domain_name"), domainName, StringComparison.OrdinalIgnoreCase)).Select(element => From(element)).FirstOrDefault()
+            ?? throw new System.Runtime.InteropServices.COMException("Invalid index.", unchecked((int) 0x8002000B));
       }
 
       public Route ItemByName(string domainName)
@@ -1548,7 +1554,6 @@ namespace hMailServer
             ID = ServerApi.LongOf(element, "id"),
             Name = ServerApi.StringOf(element, "name"),
             SavedName = ServerApi.StringOf(element, "name"),
-            CurrentUID = ServerApi.LongOf(element, "uidvalidity"),
             ParentID = ServerApi.LongOf(element, "parent_id"),
             Account = _account
          };
@@ -1631,6 +1636,29 @@ namespace hMailServer
          return PathIn(ServerApi.Array(answer, "folders"), id);
       }
 
+      /// <summary>
+      ///    The uidnext the listing reports for one folder of this account, read
+      ///    now rather than when the folder object was made: COM's CurrentUID is
+      ///    the live folder's, and delivery moves it on. A server whose listing
+      ///    does not carry uidnext skips the test naming that.
+      /// </summary>
+      internal static long UidNextOf(Account account, long id)
+      {
+         account.RequireOwnCredentials("reads a folder's current UID");
+
+         var answer = ServerApi.AsAccount(account.Address, account.Password, HttpMethod.Get,
+            "/api/v1/me/folders").Expect(200, "GET /api/v1/me/folders as " + account.Address);
+
+         var folder = Find(ServerApi.Array(answer, "folders"), id);
+         if (!folder.HasValue)
+            throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
+
+         if (!folder.Value.TryGetProperty("uidnext", out _))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoFolderUidNext);
+
+         return ServerApi.LongOf(folder.Value, "uidnext");
+      }
+
       private static string PathIn(List<JsonElement> folders, long id)
       {
          foreach (var folder in folders)
@@ -1660,7 +1688,14 @@ namespace hMailServer
 
       public long ID { get; set; }
       public string Name { get; set; }
-      public long CurrentUID { get; set; }
+
+      /// <summary>
+      ///    The UID the folder's newest message was given: the listing's uidnext
+      ///    less one, which is how IMAP STATUS derives UIDNEXT from the same
+      ///    value. Not uidvalidity - that is the folder's creation time, and a
+      ///    Unix time is what this answered when it read that.
+      /// </summary>
+      public long CurrentUID => IMAPFolders.UidNextOf(Account, ID) - 1;
 
       /// <summary>
       ///    The id of the folder this one hangs under, or -1 at the top level -
