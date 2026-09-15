@@ -552,6 +552,16 @@
         renderMessageLabels();
         renderLabelMenu();
         lastListing = null;
+        if (remove.length && !add.length) {
+          // Undo puts the label back on the same message, whatever is open by then.
+          var was = current;
+          toast(t('Label removed.'), function () {
+            call('PUT', '/api/v1/me/messages/' + was.id + '/flags', { keywords_add: remove, keywords_remove: [] }).then(function (back) {
+              if (back.status === 200 && back.data && back.data.flags && current && current.id === was.id) { current.flags = back.data.flags; renderMessageLabels(); renderLabelMenu(); }
+              lastListing = null;
+            });
+          });
+        }
         return true;
       }
       say('mail-status', describe(result, t('Could not change the labels')), false);
@@ -2047,7 +2057,14 @@
       var remove = document.createElement('button'); remove.type = 'button'; remove.className = 'btn ghost'; remove.textContent = t('Remove');
       remove.addEventListener('click', function () {
         call('DELETE', '/api/v1/me/contacts/' + c.id).then(function (result) {
-          if (result.status === 200) { contactsCache = null; loadContacts(); } else { say('contact-status', describe(result, t('Could not remove the contact')), false); }
+          if (result.status !== 200) { say('contact-status', describe(result, t('Could not remove the contact')), false); return; }
+          contactsCache = null; loadContacts();
+          toast(t('Contact removed.'), function () {
+            call('POST', '/api/v1/me/contacts', { name: c.name || '', address: c.address }).then(function (back) {
+              if (back.status !== 201) { say('contact-status', describe(back, t('Could not add the contact')), false); }
+              contactsCache = null; loadContacts();
+            });
+          });
         });
       });
       actions.appendChild(write); actions.appendChild(remove);
@@ -2870,8 +2887,20 @@
   };
   var saveRules = function (rules) {
     var script = scriptOf(rules);
+    var before = el('filter-script').value;
     return call('PUT', '/api/v1/me/filters', { script: script }).then(function (result) {
-      if (result.status === 200) { el('filter-script').value = script; renderRules(script); say('rule-status', t('Saved.'), true); return true; }
+      if (result.status === 200) {
+        el('filter-script').value = script; renderRules(script); say('rule-status', t('Saved.'), true);
+        if (before !== script) {
+          toast(t('Rules saved.'), function () {
+            call('PUT', '/api/v1/me/filters', { script: before }).then(function (back) {
+              if (back.status === 200) { el('filter-script').value = before; renderRules(before); say('rule-status', t('Saved.'), true); }
+              else { say('rule-status', describe(back, t('Could not save the rules')), false); }
+            });
+          });
+        }
+        return true;
+      }
       say('rule-status', describe(result, t('Could not save the rules')), false);
       return false;
     });

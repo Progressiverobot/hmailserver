@@ -403,6 +403,7 @@ function answer(method, path, body) {
    if (path === '/api/v1/me/settings' && method === 'GET') {
       return json(200, { name: { first: 'A', last: 'B' }, forwarding: { enabled: false, address: '', keep_original: true }, signature: { enabled: false, text: '' } });
    }
+   if (/^\/api\/v1\/me\/contacts\/\d+$/.test(path) && method === 'DELETE') { return json(200, { deleted: true }); }
    if (path === '/api/v1/me/contacts' && method === 'POST') {
       const added = JSON.parse(body || '{}');
       return json(201, { id: 100 + requests.length, name: added.name || '', address: added.address || '', source: 'manual' });
@@ -1398,6 +1399,39 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- undo more: a contact removed and a rule saved come back from the toast
+   location.hash = '#/contacts';
+   await flush();
+   const contactRows = document.getElementById('contact-rows');
+   const removeButtons = Array.from(contactRows.children).map((tr) => Array.from(tr.children[3].children).find((b) => b.textContent === 'Remove'));
+   const beforeContactRemove = requests.length;
+   removeButtons[0].dispatchEvent(makeEvent('click'));
+   await flush();
+   check('removing a contact offers Undo', called(beforeContactRemove, 'DELETE', '/api/v1/me/contacts/1') && document.getElementById('toasts').textContent.indexOf('Contact removed.') >= 0 && document.getElementById('toasts').textContent.indexOf('Undo') >= 0,
+      document.getElementById('toasts').textContent);
+   const contactUndo = Array.from(document.getElementById('toasts').children[0].children).find((b) => b.textContent === 'Undo');
+   const beforeContactUndo = requests.length;
+   contactUndo.dispatchEvent(makeEvent('click'));
+   await flush();
+   const contactBack = since(beforeContactUndo).filter((r) => r.method === 'POST' && r.path === '/api/v1/me/contacts').map((r) => JSON.parse(r.body))[0];
+   check('and Undo adds the contact back as it was', !!contactBack && contactBack.address === 'alice@example.net' && contactBack.name === 'Alice Example', JSON.stringify(contactBack));
+   location.hash = '#/filters';
+   await flush();
+   const scriptBefore = document.getElementById('filter-script').value;
+   document.getElementById('rule-field').value = 'from';
+   document.getElementById('rule-text').value = 'news@example.org';
+   document.getElementById('rule-action').value = 'delete';
+   document.getElementById('rule-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('saving a rule offers Undo', document.getElementById('toasts').textContent.indexOf('Rules saved.') >= 0 && document.getElementById('filter-script').value !== scriptBefore,
+      document.getElementById('toasts').textContent);
+   const ruleUndo = Array.from(document.getElementById('toasts').children[0].children).find((b) => b.textContent === 'Undo');
+   const beforeRuleUndo = requests.length;
+   ruleUndo.dispatchEvent(makeEvent('click'));
+   await flush();
+   const scriptBack = since(beforeRuleUndo).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/filters').map((r) => JSON.parse(r.body).script)[0];
+   check('and Undo writes the rules back as they were', scriptBack === scriptBefore && document.getElementById('filter-script').value === scriptBefore, JSON.stringify(scriptBack).slice(0, 80));
+
    // ---- the reader's own time zone: every date the page shows, rendered in it
    location.hash = '#/m/102';
    await flush();

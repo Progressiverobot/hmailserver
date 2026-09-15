@@ -182,7 +182,7 @@ Gmail and Google Workspace, Outlook.com and Microsoft 365 with Exchange behind i
 | ⬜ | **Import from the old provider** (Proton's Easy Switch, Fastmail's import) | The reader's side of the migration: sign in to Gmail or Outlook.com over IMAP (OAuth for the two), pick folders, and watch them arrive - the server's IMAP mirror, driven from the page for one account. |
 | ⬜ | **Right-to-left languages** | Twenty catalogues, none right-to-left. Arabic, Hebrew and Persian, with the layout mirrored, which is a stylesheet's `dir` and a day of checking every view. |
 | ✅ | **The reader's own time zone** | **Done 15 September 2026.** Settings has a *Time zone* choice - the zones the browser knows, *Where this browser is* as the default - kept with the account; the list's times, the open message's date and the conversation cards render in it, and today and this year are decided in it. Three harness checks. |
-| ⬜ | **Undo more** | Undo covers filing and sending. Undo for a label removed, a rule saved, a contact deleted, a sender blocked. |
+| ✅ | **Undo more** | **Done 15 September 2026.** The toast with Undo that filing and sending have, for the three that lacked it: a label taken off a message (Undo puts it back on that message), the rules saved by an addition or a removal (Undo writes the script back as it was), and a contact removed (Undo adds it back). Four harness checks. |
 
 ### Normal users: the phone
 
