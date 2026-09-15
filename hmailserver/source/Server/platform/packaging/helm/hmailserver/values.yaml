@@ -11,7 +11,8 @@
 
 image:
   repository: ghcr.io/progressiverobot/hmailserver
-  # The tag's own image; pin what you deployed. Empty means the chart's appVersion.
+  # The tag's own image; pin what you deployed. Empty means the chart's
+  # appVersion, which is "latest" - the current stable release, never an alpha.
   tag: ""
   pullPolicy: IfNotPresent
 imagePullSecrets: []

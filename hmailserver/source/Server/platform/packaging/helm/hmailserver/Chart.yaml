@@ -9,7 +9,12 @@ description: >-
   data in. The database is not in the chart: point database.host at one.
 type: application
 version: 0.1.0
-appVersion: "6.3.3"
+# The application this chart installs, by tag rather than by number: a version
+# spelled out here would be one more place to stamp at a release and one more
+# to forget, which is what build/check-linux-version-stamp.sh refuses. It is
+# the default image tag (values.yaml, image.tag), so the chart installs the
+# current stable release unless a version is asked for.
+appVersion: "latest"
 home: https://github.com/Progressiverobot/hmailserver
 sources:
   - https://github.com/Progressiverobot/hmailserver

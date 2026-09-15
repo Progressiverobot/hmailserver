@@ -101,6 +101,20 @@ function Get-XamlLabels($xamlText) {
       $contentMatch = [regex]::Match($attrs, '\bContent="([^"]*)"')
       $textMatch = [regex]::Match($attrs, '\bText="([^"]*)"')
 
+      # Since the page waves of 15 September 2026 a field is a scaffold FieldRow:
+      # the caption is its Label and the editor is its content, so the caption to
+      # remember is the row's rather than the last TextBlock's. Both shapes are in
+      # the tree - the settings views build their rows in C# - so both are read.
+      if ($tag -like '*FieldRow') {
+         $labelMatch = [regex]::Match($attrs, '\bLabel="([^"]*)"')
+         if ($labelMatch.Success) {
+            $caption = Remove-Mnemonic (Remove-LocWrapper ([System.Net.WebUtility]::HtmlDecode($labelMatch.Groups[1].Value).Trim()))
+            if ($caption.Length -gt 0 -and $caption.Length -le 60 -and -not $caption.StartsWith('{')) {
+               $pending = $caption
+            }
+         }
+      }
+
       # A text box is labelled by the TextBlock above it rather than by an
       # attribute of its own, so remember the last short caption seen. Long
       # blocks are explanatory notes and bindings are not captions.

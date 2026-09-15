@@ -313,6 +313,7 @@ namespace hMailServer.ControlPanel.Services
          new SettingEntry("Shortest search string the index answers for (3-64; shorter strings fall back to the scan)", "IndexerFullTextMinTokenLength", "performance"),
          new SettingEntry("TCP/IP threads", "TCPIPThreads", "performance"),
          new SettingEntry("Worker thread priority (stored, but the server does not use it)", "WorkerThreadPriority", "performance"),
+         new SettingEntry("Bind address (0.0.0.0)", "Address", "ports"),
          new SettingEntry("ACL (shared folder permissions)", "IMAPACLEnabled", "protocols"),
          new SettingEntry("Allow incorrect line endings", "AllowIncorrectLineEndings", "protocols"),
          new SettingEntry("Allow plain-text authentication (AUTH PLAIN/LOGIN)", "AllowSMTPAuthPlain", "protocols"),

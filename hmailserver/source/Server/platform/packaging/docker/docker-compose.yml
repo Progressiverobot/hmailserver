@@ -41,7 +41,11 @@ services:
       retries: 12
 
   hmailserver:
-    image: ghcr.io/progressiverobot/hmailserver:6.3.3
+    # :latest is a stable release and never an alpha. Pin the version you
+    # deploy in your own copy of this file - this one carries no version,
+    # because a literal here goes stale the release after it is written and
+    # the packaging check refuses one for that reason.
+    image: ghcr.io/progressiverobot/hmailserver:latest
     restart: unless-stopped
     depends_on:
       db:
