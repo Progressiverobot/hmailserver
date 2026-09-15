@@ -97,6 +97,15 @@ jobs:
       - name: Every statement in a MySQL script ends with a blank line
         run: python3 build/check-sql-separators.py
 
+      # A table that holds one account's data and is in neither the backup nor
+      # the list of what is carried elsewhere is data a RESTORE destroys: every
+      # one of them cascades from hm_accounts and a restore deletes every domain
+      # first. Seven such tables were added between 6.3.0 and 6.3.3 and not one
+      # reached the archive. This reads the CREATE TABLE scripts against
+      # AccountStores.cpp and fails by name, with what to do.
+      - name: Every per-account table is in the backup, or says why not
+        run: python3 build/check-account-stores.py
+
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.
       - name: Every folder-access decision is ACLManager's

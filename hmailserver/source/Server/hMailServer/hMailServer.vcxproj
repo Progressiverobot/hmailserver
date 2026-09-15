@@ -244,6 +244,7 @@ EXIT 0
     <ClCompile Include="..\Common\AntiVirus\VirusScannerTester.cpp" />
     <ClCompile Include="..\Common\AntiVirus\VirusScanningResult.cpp" />
     <ClCompile Include="..\Common\Application\ACLManager.cpp" />
+    <ClCompile Include="..\Common\Application\AccountStores.cpp" />
     <ClCompile Include="..\Common\Application\Application.cpp" />
     <ClCompile Include="..\Common\Application\Backup.cpp" />
     <ClCompile Include="..\Common\Application\BackupExecuter.cpp" />
@@ -964,6 +965,7 @@ EXIT 0
     <ClInclude Include="..\Common\AntiVirus\VirusScannerTester.h" />
     <ClInclude Include="..\Common\AntiVirus\VirusScanningResult.h" />
     <ClInclude Include="..\Common\Application\ACLManager.h" />
+    <ClInclude Include="..\Common\Application\AccountStores.h" />
     <ClInclude Include="..\Common\Application\Application.h" />
     <ClInclude Include="..\Common\Application\Backup.h" />
     <ClInclude Include="..\Common\Application\BackupExecuter.h" />

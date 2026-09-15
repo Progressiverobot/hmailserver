@@ -13,6 +13,8 @@
 #include "FetchAccounts.h"
 #include "AppPasswords.h"
 
+#include "../Application/AccountStores.h"
+
 #include "../../SMTP/SMTPVacationMessageCreator.h"
 #include "../Persistence/PersistentAccount.h"
 #include "../Cache/AccountSizeCache.h"
@@ -362,6 +364,15 @@ namespace HM
       if (!GetRules()->XMLStore(pNode,iBackupOptions))
          return false;
 
+      // The stores that have no business object: the address book, the webmail's
+      // settings, the scheduled messages, the files sent as links, the S/MIME keys,
+      // the password history and the calendar. Each of those tables cascades from
+      // hm_accounts and a restore deletes every domain first, so leaving them out of
+      // the archive - which is what happened until 15 September 2026 - made a
+      // restore delete them. See AccountStores.h.
+      if (!AccountStores::XMLStore(*this, pNode))
+         return false;
+
       if (iBackupOptions & Backup::BOMessages)
       {
          if (!GetFolders()->XMLStore(pNode,iBackupOptions))
@@ -468,6 +479,14 @@ namespace HM
          if (!PersistentAccount::CreateInbox(*this))
             return false;
       }
+
+      // LAST, and after the folders on purpose. A scheduled send names a message and
+      // a folder, and the archive carries those as a folder path and a UID because
+      // the ids themselves are reassigned by the restore - so they can only be
+      // resolved once this account's folders and messages are back. A reference that
+      // still does not resolve drops its row and says so; see AccountStores.h.
+      if (!AccountStores::XMLLoad(*this, pAccountNode))
+         return false;
 
       return true;
    }
