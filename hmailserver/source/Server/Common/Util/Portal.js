@@ -301,6 +301,11 @@
       entry(f, icons[s[1]], '/f/' + f.id, s[1] === 'inbox' ? t('Inbox') : (f.name || f.path), s[1] === 'drafts' ? f.count : f.unseen, '');
       if (s[2] === 0) { entry(null, 'star', '/starred', t('Starred'), 0, ''); }
     });
+    var saved = savedSearches();
+    if (saved.length) {
+      nav.appendChild(node('div', t('Saved searches'), 'navhead'));
+      saved.forEach(function (s, i) { entry(null, 'search', savedSearchRoute(s, i), s.name, 0, ''); });
+    }
     if (rest.length) {
       var head = node('div', t('Folders'), 'navhead');
       head.appendChild(node('span', undefined, 'grow'));
@@ -1534,8 +1539,9 @@
     el('mail-search').value = state.query;
     el('mail-search-everywhere').checked = true;
     dropMessage();
-    showPanel('mail-section', 'Search - \'' + state.query + '\'');
-    markNav('');
+    var saved = params.saved !== undefined ? savedSearches()[Number(params.saved)] : null;
+    showPanel('mail-section', saved && saved.q === state.query ? saved.name : 'Search - \'' + state.query + '\'');
+    markNav(saved && saved.q === state.query ? savedSearchRoute(saved, Number(params.saved)) : '');
     showList();
     renderListTools();
     loadMessages();
@@ -4600,7 +4606,7 @@
       closeMenus();
       menu.hidden = !open;
       el(pair[0]).setAttribute('aria-expanded', open ? 'true' : 'false');
-      if (open && pair[1] === 'search-advanced') { el('adv-from').focus(); }
+      if (open && pair[1] === 'search-advanced') { renderSavedSearches(); el('adv-from').focus(); }
     });
     el(pair[1]).addEventListener('click', function (event) { event.stopPropagation(); });
   });
@@ -4669,6 +4675,44 @@
     if (el('adv-flagged').checked) { parts.push('is:flagged'); }
     return parts.join(' ');
   };
+  // ---- Saved searches -------------------------------------------------------
+  // A search kept under a name, in the account's preferences so it follows
+  // the reader between browsers, and listed among the folders: opening one
+  // runs the search again, so it is always current, which is what Outlook's
+  // search folders are. Twenty at most, as many as a navigation can carry.
+  var savedSearches = function () {
+    try {
+      var list = JSON.parse(pref('saved_searches') || '[]');
+      return Array.isArray(list) ? list.filter(function (s) { return s && s.name && s.q; }) : [];
+    } catch (why) { return []; }
+  };
+  var savedSearchRoute = function (s, i) { return '/search?q=' + encodeURIComponent(s.q) + '&saved=' + i; };
+  var writeSavedSearches = function (list) {
+    return savePrefs({ saved_searches: JSON.stringify(list.slice(0, 20)) }).then(function (ok) { if (ok) { return loadFolders(); } });
+  };
+  var renderSavedSearches = function () {
+    var box = el('adv-saved');
+    clear(box);
+    var list = savedSearches();
+    box.hidden = !list.length;
+    list.forEach(function (s, i) {
+      var open = node('button', s.name, 'btn ghost sm'); open.type = 'button';
+      open.addEventListener('click', function () { closeMenus(); go(savedSearchRoute(s, i)); });
+      var remove = iconButton('close', t('Remove') + ': ' + s.name);
+      remove.addEventListener('click', function () { writeSavedSearches(list.filter(function (x, j) { return j !== i; })).then(renderSavedSearches); });
+      var row = node('span', undefined, 'saved-search'); row.appendChild(open); row.appendChild(remove);
+      box.appendChild(row);
+    });
+  };
+  el('adv-save').addEventListener('click', function () {
+    var q = advancedQuery() || el('mail-search').value.trim();
+    var name = el('adv-save-name').value.trim();
+    if (!q || !name) { el('adv-save-name').focus(); return; }
+    var list = savedSearches().filter(function (s) { return s.name !== name; });
+    list.push({ name: name, q: q });
+    el('adv-save-name').value = '';
+    writeSavedSearches(list).then(renderSavedSearches);
+  });
   el('adv-search').addEventListener('click', function () {
     var q = advancedQuery();
     el('mail-search').value = q;

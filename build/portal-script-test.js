@@ -1398,6 +1398,30 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- saved searches: named, kept with the account, listed as folders, run afresh
+   location.hash = '#/f/1';
+   await flush();
+   document.getElementById('search-tune').dispatchEvent(makeEvent('click'));
+   await flush();
+   document.getElementById('adv-from').value = 'boss@example.net';
+   document.getElementById('adv-unread').checked = true;
+   document.getElementById('adv-save-name').value = 'Unread from the boss';
+   const beforeSave = requests.length;
+   document.getElementById('adv-save').dispatchEvent(makeEvent('click'));
+   await flush();
+   const savedPut = since(beforeSave).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   const savedList = savedPut ? JSON.parse(JSON.parse(savedPut.body).saved_searches) : [];
+   check('a search saved with a name is kept with the account', savedList.length === 1 && savedList[0].name === 'Unread from the boss' && /from:boss@example\.net/.test(savedList[0].q) && /is:unread/.test(savedList[0].q),
+      JSON.stringify(savedList));
+   const savedEntry = Array.from(document.getElementById('folder-nav').children).find((b) => (b.getAttribute('data-route') || '').indexOf('saved=0') >= 0);
+   check('and listed among the folders', !!savedEntry && savedEntry.textContent.indexOf('Unread from the boss') >= 0,
+      savedEntry ? savedEntry.getAttribute('data-route') : 'no entry');
+   const beforeSavedOpen = requests.length;
+   savedEntry.dispatchEvent(makeEvent('click'));
+   await flush();
+   check('opening it runs the search again', called(beforeSavedOpen, 'GET', /\/api\/v1\/me\/search\?/) && document.getElementById('view-title').textContent === 'Unread from the boss' && savedEntry.classList.contains('on'),
+      document.getElementById('view-title').textContent + ' | ' + JSON.stringify(since(beforeSavedOpen).map((r) => r.path).slice(0, 3)));
+
    // ---- contacts in and out: vCard and CSV out, either back in
    location.hash = '#/contacts';
    await flush();
