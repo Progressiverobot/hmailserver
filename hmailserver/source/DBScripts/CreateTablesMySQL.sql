@@ -9,6 +9,7 @@ drop table if exists hm_audit;
 drop table if exists hm_alertrules;
 
 drop table if exists hm_alertevents;
+
 drop table if exists hm_remotedomainpolicies;
 
 drop table if exists hm_calendarobjects;
@@ -1365,4 +1366,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditRetentionDays', '', 0);
 
-insert into hm_dbversion values (6047);
+insert into hm_dbversion values (6045);

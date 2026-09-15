@@ -14,7 +14,7 @@ kinds of decision, in one record because they are one subject:
   domain's own server before this server accepts mail for it. This is for a domain
   this server is a backup MX for, and for nothing else.
 
-Policies live in the database (`hm_remotedomainpolicies`, schema 6047), take effect
+Policies live in the database (`hm_remotedomainpolicies`, schema 6045), take effect
 for the next message without a restart, and are part of the configuration backup.
 Nothing about them is in `hMailServer.ini`.
 

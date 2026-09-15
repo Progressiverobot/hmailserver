@@ -10,16 +10,16 @@ The page itself is the webmail's design: one `:root` block declares the palette 
 
 | Measure | Count |
 |---|---|
-| COM properties the desktop program writes | 349 |
-| of them writable over REST | 349 |
-| of them reachable from a Deck view | 343 |
+| COM properties the desktop program writes | 365 |
+| of them writable over REST | 365 |
+| of them reachable from a Deck view | 359 |
 | missing over REST | 0 |
 | over REST but not reached by any Deck view | 6 |
 | assignments left out of the count | 5 |
-| COM interfaces in the IDL | 94 |
+| COM interfaces in the IDL | 96 |
 | desktop pages read | 58 |
-| REST routes (path and method) | 236, 107 of them writes |
-| Deck views | 18 |
+| REST routes (path and method) | 242, 110 of them writes |
+| Deck views | 19 |
 
 ## Missing over REST, by interface
 
@@ -342,6 +342,27 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `RejectMessage` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
 | `Score` | CollectionSpecs | `POST /api/v1/dns-blacklists` (setter)<br>`PUT /api/v1/dns-blacklists/{id}` (setter) | lists, settings |
 
+### RemoteDomainPolicy
+
+| Property | Desktop page | REST route | Deck view |
+|---|---|---|---|
+| `Active` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `AllowAutomaticReplies` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `AllowForwarding` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutCacheMinutes` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`POST /api/v1/remote-domains/verification-cache/clear` (name, scope unknown)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutEnabled` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutHost` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutMaxPerMinute` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutPort` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `CalloutTimeoutSeconds` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `Description` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `DomainName` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `MaxConnections` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `MaxMessageSizeKB` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `MaxMessagesPerMinute` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `OutboundTls` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+| `RequireInboundTls` | CollectionSpecs | `POST /api/v1/remote-domains` (setter)<br>`PUT /api/v1/remote-domains/{id}` (setter) | remotedomains |
+
 ### RouteAddress
 
 | Property | Desktop page | REST route | Deck view |
@@ -598,7 +619,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | Status | `DownloadUpdate` | StatusView | `POST /api/v1/update/download` |
 | Status | `InstallUpdate` | StatusView | `POST /api/v1/update/install` |
 | Settings | `ApplyDirectorySync` | DirectorySyncView | - |
-| Settings | `ClearLogonFailureList` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
+| Settings | `ClearLogonFailureList` | ServerSettingsView | `POST /api/v1/remote-domains/verification-cache/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | Settings | `DisableAdministratorTOTP` | AdministratorTwoFactorDialog | - |
 | Settings | `EnrolAdministratorTOTP` | AdministratorTwoFactorDialog | - |
 | Settings | `PreviewDirectorySync` | DirectorySyncView | - |
@@ -653,7 +674,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | DeliveryQueue | `ResetDeliveryTime` | QueueView | - |
 | DeliveryQueue | `StartDelivery` | QueueView | - |
 | IMAPFolders | `Add` | AccountDialog, PublicFoldersView | - |
-| AntiSpam | `ClearGreyListingTriplets` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
+| AntiSpam | `ClearGreyListingTriplets` | ServerSettingsView | `POST /api/v1/remote-domains/verification-cache/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | AntiSpam | `TestSpamAssassinConnection` | ServerSettingsView | `POST /api/v1/alerts/test` |
 | TCPIPPorts | `Add` | TcpIpPortsView | - |
 | TCPIPPorts | `SetDefault` | TcpIpPortsView | - |
@@ -663,7 +684,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | IMAPFolderPermissions | `Add` | FolderPermissionsDialog | - |
 | IMAPFolderPermissions | `DeleteByDBID` | FolderPermissionsDialog | - |
 | IncomingRelays | `Add` | UtilityViews | - |
-| MessageIndexing | `Clear` | ServerSettingsView | `POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
+| MessageIndexing | `Clear` | ServerSettingsView | `POST /api/v1/remote-domains/verification-cache/clear`<br>`POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | MessageIndexing | `Index` | ServerSettingsView | `POST /api/v1/settings/indexing/index` |
 | Diagnostics | `PerformTests` | UtilityViews | `POST /api/v1/alerts/test` |
 
@@ -748,6 +769,9 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/ports/{id}` | TCPIPPort | `address`, `certificate_id`, `client_certificate_ca_file`, `client_certificate_policy`, `connection_security`, `port`, `protocol` | yes |
 | `POST /api/v1/quarantine/{id}/release` | - | - | - |
 | `POST /api/v1/queue/{id}/retry` | - | - | yes |
+| `POST /api/v1/remote-domains` | RemoteDomainPolicy, RemoteDomainPolicies | `active`, `allow_automatic_replies`, `allow_forwarding`, `answered`, `callout_cache_minutes`, `callout_enabled`, `callout_host`, `callout_max_per_minute`, `callout_port`, `callout_timeout_seconds`, `certificate`, `description`, `domain_name`, `limit`, `lower`, `match`, `max_connections`, `max_message_size_kb`, `max_messages_per_minute`, `message`, `outbound_tls`, `require_inbound_tls`, `wildcard` | yes |
+| `POST /api/v1/remote-domains/verification-cache/clear` | ? | `callout_cache_minutes` | yes |
+| `PUT /api/v1/remote-domains/{id}` | RemoteDomainPolicy, RemoteDomainPolicies | `active`, `allow_automatic_replies`, `allow_forwarding`, `answered`, `callout_cache_minutes`, `callout_enabled`, `callout_host`, `callout_max_per_minute`, `callout_port`, `callout_timeout_seconds`, `certificate`, `description`, `domain_name`, `limit`, `lower`, `match`, `max_connections`, `max_message_size_kb`, `max_messages_per_minute`, `message`, `outbound_tls`, `require_inbound_tls`, `wildcard` | yes |
 | `POST /api/v1/routes` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
 | `PUT /api/v1/routes/{id}` | Route, RouteAddress | `addresses`, `all_addresses`, `connection_security`, `description`, `domain_name`, `message`, `minutes_between_try`, `number_of_tries`, `relayer_auth_password`, `relayer_auth_username`, `relayer_requires_authentication`, `target_smtp_host`, `target_smtp_port`, `to`, `treat_recipient_as_local_domain`, `treat_security_as_local_domain`, `treat_sender_as_local_domain` | yes |
 | `POST /api/v1/rules` | Rule, RuleCriteria, RuleAction | `abort_spam_flagged`, `action`, `actions`, `active`, `all_criteria`, `bind_to_address`, `body`, `cc`, `criteria`, `delivery_attempts`, `field`, `folder`, `from`, `from_address`, `from_name`, `greater_than`, `header`, `key`, `less_than`, `match`, `message`, `message_size`, `move_to_folder`, `name`, `not_contains`, `not_equals`, `recipient_list`, `route_id`, `script_function`, `send_using_route`, `set_header`, `subject`, `to`, `type`, `value`, `wildcard` | yes |
@@ -798,6 +822,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `messages` | `GET /api/v1/openapi.json`, `GET /api/v1/settings/messages`, `PUT /api/v1/settings/messages/{}` |
 | `rules` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `GET /api/v1/rules`, `POST /api/v1/rules`, `DELETE /api/v1/rules/{}`, `PUT /api/v1/rules/{}` |
 | `routes` | `GET /api/v1/openapi.json`, `GET /api/v1/routes`, `POST /api/v1/routes`, `DELETE /api/v1/routes/{}`, `PUT /api/v1/routes/{}` |
+| `remotedomains` | `GET /api/v1/openapi.json`, `GET /api/v1/remote-domains`, `POST /api/v1/remote-domains`, `POST /api/v1/remote-domains/verification-cache/clear`, `DELETE /api/v1/remote-domains/{}`, `PUT /api/v1/remote-domains/{}` |
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |
 | `ports` | `GET /api/v1/certificates`, `GET /api/v1/openapi.json`, `GET /api/v1/ports`, `POST /api/v1/ports`, `DELETE /api/v1/ports/{}`, `PUT /api/v1/ports/{}`, `POST /api/v1/server/reinitialize` |
 | `logs` | `GET /api/v1/logs`, `GET /api/v1/logs/{}?lines={}`, `GET /api/v1/status` |

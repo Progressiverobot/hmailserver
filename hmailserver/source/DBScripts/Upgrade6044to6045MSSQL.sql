@@ -19,8 +19,8 @@ create table hm_remotedomainpolicies
 	policycalloutperminute int not null
 )
 
-ALTER TABLE hm_remotedomainpolicies ADD CONSTRAINT hm_remotedomainpolicies_pk PRIMARY KEY (policyid)
+ALTER TABLE hm_remotedomainpolicies ADD CONSTRAINT hm_remotedomainpolicies_pk PRIMARY KEY NONCLUSTERED (policyid)
 
 CREATE INDEX idx_hm_remotedomainpolicies_domain ON hm_remotedomainpolicies (policydomainname)
 
-update hm_dbversion set value = 6047
+update hm_dbversion set value = 6045

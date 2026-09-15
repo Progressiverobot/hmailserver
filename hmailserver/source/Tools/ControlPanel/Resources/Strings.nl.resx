@@ -18,6 +18,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
+    <value>
+
+Dit zwakke wachtwoord toch opslaan?</value>
+  </data>
   <data name="  Configured database type: {0}." xml:space="preserve">
     <value>  Geconfigureerd databasetype: {0}.</value>
   </data>
@@ -173,11 +178,6 @@
   </data>
   <data name=" — applied immediately." xml:space="preserve">
     <value> — direct toegepast.</value>
-  </data>
-  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
-    <value>
-
-Dit zwakke wachtwoord toch opslaan?</value>
   </data>
   <data name="&quot;Anyone in the domain&quot; means the sender's address is at a domain this server hosts, which an outsider can claim unless the list also requires authentication. Tick that below if the list must be restricted to people who have logged in." xml:space="preserve">
     <value>"Iedereen in het domein" betekent dat het adres van de afzender bij een domein hoort dat deze server host, wat een buitenstaander kan beweren tenzij de lijst ook authenticatie vereist. Vink dat hieronder aan als de lijst beperkt moet zijn tot mensen die zijn aangemeld.</value>
@@ -7705,13 +7705,13 @@ Selecteer de sleutel hierboven en kopieer die met de hand - hij wordt niet opnie
   <data name="The fetch itself failed: {0} This says nothing about the policy." xml:space="preserve">
     <value>Het ophalen zelf is mislukt: {0} Dit zegt niets over het beleid.</value>
   </data>
-  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
-    <value>Het bestand kon niet als PEM-certificaat worden ingelezen. De server laadt certificaten alleen in PEM-formaat, dus dit bestand laadt niet en elke TLS-poort die het gebruikt, start niet (serverfout 5113).</value>
-  </data>
   <data name="The file&#13;&#10;   {0}&#13;&#10;could not be loaded. The message has probably been delivered and is no longer in the queue." xml:space="preserve">
     <value>Het bestand
    {0}
 kon niet worden geladen. Het bericht is waarschijnlijk bezorgd en staat niet meer in de wachtrij.</value>
+  </data>
+  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
+    <value>Het bestand kon niet als PEM-certificaat worden ingelezen. De server laadt certificaten alleen in PEM-formaat, dus dit bestand laadt niet en elke TLS-poort die het gebruikt, start niet (serverfout 5113).</value>
   </data>
   <data name="The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in front of a fast one is paid for on every clean message." xml:space="preserve">
     <value>De eerste scanner die iets vindt, beëindigt de scan, dus de volgorde bepaalt ook de kosten: een trage scanner vóór een snelle betaalt u bij elk schoon bericht.</value>

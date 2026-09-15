@@ -1303,4 +1303,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditRetentionDays', '', 0);
 
-insert into hm_dbversion values (6047);
+insert into hm_dbversion values (6045);

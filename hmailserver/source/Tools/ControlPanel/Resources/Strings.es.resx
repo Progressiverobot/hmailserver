@@ -18,6 +18,11 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
+    <value>
+
+¿Guardar esta contraseña débil de todos modos?</value>
+  </data>
   <data name="  Configured database type: {0}." xml:space="preserve">
     <value>  Tipo de base de datos configurado: {0}.</value>
   </data>
@@ -173,11 +178,6 @@
   </data>
   <data name=" — applied immediately." xml:space="preserve">
     <value> — aplicado de inmediato.</value>
-  </data>
-  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
-    <value>
-
-¿Guardar esta contraseña débil de todos modos?</value>
   </data>
   <data name="&quot;Anyone in the domain&quot; means the sender's address is at a domain this server hosts, which an outsider can claim unless the list also requires authentication. Tick that below if the list must be restricted to people who have logged in." xml:space="preserve">
     <value>"Cualquiera del dominio" significa que la dirección del remitente está en un dominio que aloja este servidor, cosa que un extraño puede afirmar salvo que la lista también exija autenticación. Márquelo abajo si la lista debe limitarse a personas que han iniciado sesión.</value>
@@ -7705,13 +7705,13 @@ Seleccione la clave de arriba y cópiela a mano - no volverá a mostrarse.</valu
   <data name="The fetch itself failed: {0} This says nothing about the policy." xml:space="preserve">
     <value>La obtención en sí falló: {0} Esto no dice nada sobre la política.</value>
   </data>
-  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
-    <value>El archivo no pudo interpretarse como un certificado PEM. El servidor solo carga certificados en formato PEM, así que este archivo no se cargará y todos los puertos TLS que lo usen fallarán al arrancar (error del servidor 5113).</value>
-  </data>
   <data name="The file&#13;&#10;   {0}&#13;&#10;could not be loaded. The message has probably been delivered and is no longer in the queue." xml:space="preserve">
     <value>El archivo
    {0}
 no se pudo cargar. Probablemente el mensaje ya se ha entregado y ya no está en la cola.</value>
+  </data>
+  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
+    <value>El archivo no pudo interpretarse como un certificado PEM. El servidor solo carga certificados en formato PEM, así que este archivo no se cargará y todos los puertos TLS que lo usen fallarán al arrancar (error del servidor 5113).</value>
   </data>
   <data name="The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in front of a fast one is paid for on every clean message." xml:space="preserve">
     <value>El primer analizador que encuentra algo termina el análisis, así que el orden es también el coste: un analizador lento por delante de uno rápido se paga en cada mensaje limpio.</value>
