@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Threading;
 using hMailServer;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
 
@@ -33,14 +34,14 @@ namespace RegressionTests.SMTP
    ///    every test.
    /// </summary>
    [TestFixture]
-   public class RemoteDomainPolicies : TestFixtureBase
+   public class RemoteDomainPolicyEnforcement : TestFixtureBase
    {
       private const string RemoteDomain = "dummy-example.com";
 
       private Account _account;
 
       [SetUp]
-      public new void SetUp()
+      public void AddSenderAndClearPolicies()
       {
          ClearPolicies_();
 
@@ -48,7 +49,7 @@ namespace RegressionTests.SMTP
       }
 
       [TearDown]
-      public new void TearDown()
+      public void ClearPoliciesAfterTest()
       {
          ClearPolicies_();
       }

@@ -783,7 +783,16 @@ namespace HM
       // own people submitting mail, judged by the port's own connection
       // security and by the IP range's RequireTLSForAuth, and a policy about a
       // remote domain has nothing to say about it.
-      if (!isAuthenticated_ && !IsSSLConnection())
+      //
+      // Nor to a configured incoming relay. The hop from a front-end filter or a
+      // gateway is this organisation's own network, and the hop the policy is
+      // about - the partner's server to the internet-facing machine - happened
+      // before it, where this server cannot see it. Refusing here would stop the
+      // partner's mail at the last internal hop without having secured the first;
+      // that gateway is where inbound TLS has to be required, and the
+      // documentation says so.
+      if (!isAuthenticated_ && !IsSSLConnection() &&
+          !Configuration::Instance()->GetSMTPConfiguration()->GetIncomingRelays()->IsIncomingRelay(GetRemoteEndpointAddress()))
       {
          std::shared_ptr<RemoteDomainPolicies> policies =
             Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
@@ -1399,58 +1408,6 @@ namespace HM
          return;
       }
 
-      // The backup-MX recipient callout, if a policy for this recipient's domain
-      // asks for one.
-      //
-      // HERE, and not earlier, for two reasons. The relay decision above has
-      // already been made, so this server never opens a session to a stranger's
-      // server on behalf of a client it was going to refuse anyway - which is
-      // what would make this a reflector. And CheckDeliveryPossibility has
-      // already run, so an address this server knows the answer to - a local
-      // account, an alias, a list, a route's own address list - never reaches a
-      // callout at all.
-      //
-      // Never for an authenticated session: that is one of our own people
-      // sending, and asking a third party to vet their recipients would leak the
-      // correspondence and slow every submission down.
-      //
-      // RecipientCallout answers Unknown for everything that is not a clear
-      // permanent refusal from the primary, and Unknown accepts - so a primary
-      // that is unreachable, slow, or answering 4xx leaves this server exactly
-      // where it was before the policy existed. It also refuses to call out for
-      // a domain this server is authoritative for.
-      if (!isAuthenticated_)
-      {
-         std::shared_ptr<RemoteDomainPolicies> policies =
-            Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
-
-         std::shared_ptr<RemoteDomainPolicy> recipientPolicy = policies
-            ? policies->GetPolicyForDomain(StringParser::ExtractDomain(sRecipientAddress).ToLower())
-            : std::shared_ptr<RemoteDomainPolicy>();
-
-         if (recipientPolicy && recipientPolicy->GetCalloutEnabled())
-         {
-            String calloutReason;
-
-            if (RecipientCallout::Instance()->Verify(sRecipientAddress, recipientPolicy, calloutReason) ==
-                RecipientCallout::CalloutRejected)
-            {
-               LOG_SMTP(GetSessionID(), GetIPAddressString(), "RCPT TO refused by recipient verification: " + calloutReason);
-
-               AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
-
-               // The remote's own words are deliberately NOT repeated back. This
-               // server is relaying somebody else's answer to a third party, and
-               // a verbatim reply would make it a readable oracle over the other
-               // domain's directory; the exact reply is in this server's log,
-               // where its own administrator can read it.
-               SendResponse_(550, _T("5.1.1"),
-                  _T("Recipient address rejected: the mail server for this domain does not accept it."));
-               return;
-            }
-         }
-      }
-
       // This server is the submission server (RFC 6409) for the message if the client
       // has authenticated, or if it sends as one of our own domains from a range that
       // does not require authentication to do so - by default, only the server itself.
@@ -1532,6 +1489,60 @@ namespace HM
                // The sender is greylisted. We don't log to awstats here,
                // since we tell the client to try again later.
                SendErrorResponse_(451, "Please try again later.");
+               return;
+            }
+         }
+      }
+
+      // The backup-MX recipient callout, if a policy for this recipient's domain
+      // asks for one.
+      //
+      // HERE, last of the refusals, for three reasons. The relay and
+      // authentication decisions have been made, so this server never opens a
+      // session to a stranger's server on behalf of a client it was going to
+      // refuse anyway - which is what would make it a reflector. The DNS
+      // blacklists and greylisting have had their say, so a listed sender, or
+      // a first attempt that greylisting is about to answer 451, costs the
+      // primary nothing. And CheckDeliveryPossibility has run, so an address
+      // this server knows the answer to - a local account, an alias, a list -
+      // never reaches a callout at all.
+      //
+      // Never for an authenticated session: that is one of our own people
+      // sending, and asking a third party to vet their recipients would leak the
+      // correspondence and slow every submission down.
+      //
+      // RecipientCallout answers Unknown for everything that is not a clear
+      // permanent refusal from the primary, and Unknown accepts - so a primary
+      // that is unreachable, slow, or answering 4xx leaves this server exactly
+      // where it was before the policy existed. It also refuses to call out for
+      // a domain this server is authoritative for.
+      if (!isAuthenticated_)
+      {
+         std::shared_ptr<RemoteDomainPolicies> policies =
+            Configuration::Instance()->GetSMTPConfiguration()->GetRemoteDomainPolicies();
+
+         std::shared_ptr<RemoteDomainPolicy> recipientPolicy = policies
+            ? policies->GetPolicyForDomain(StringParser::ExtractDomain(sRecipientAddress).ToLower())
+            : std::shared_ptr<RemoteDomainPolicy>();
+
+         if (recipientPolicy && recipientPolicy->GetCalloutEnabled())
+         {
+            String calloutReason;
+
+            if (RecipientCallout::Instance()->Verify(sRecipientAddress, recipientPolicy, calloutReason) ==
+                RecipientCallout::CalloutRejected)
+            {
+               LOG_SMTP(GetSessionID(), GetIPAddressString(), "RCPT TO refused by recipient verification: " + calloutReason);
+
+               AWStats::LogDeliveryFailure(GetIPAddressString(), current_message_->GetFromAddress(), sRecipientAddress, 550, current_message_->GetID());
+
+               // The remote's own words are deliberately NOT repeated back. This
+               // server is relaying somebody else's answer to a third party, and
+               // a verbatim reply would make it a readable oracle over the other
+               // domain's directory; the exact reply is in this server's log,
+               // where its own administrator can read it.
+               SendResponse_(550, _T("5.1.1"),
+                  _T("Recipient address rejected: the mail server for this domain does not accept it."));
                return;
             }
          }

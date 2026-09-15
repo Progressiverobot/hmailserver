@@ -32,10 +32,12 @@ namespace HM
       //
       // So: an exact name beats any pattern; between two patterns the longer one
       // (more literal characters) wins; between two equally specific ones the
-      // lower id wins, so the answer is stable rather than incidental. Inactive
-      // rows take part in nothing - an inactive policy is one the administrator
-      // has switched off, not one that falls through to a broader row, because
-      // falling through would silently apply somebody else's limits.
+      // lower id wins, so the answer is stable rather than incidental. An
+      // inactive row takes part in nothing, so the next most specific active row
+      // governs in its place. That is the safe direction: an administrator who
+      // switches off the entry for one domain beneath a "*" that requires TLS
+      // has removed an exception, and must not have exempted that domain from
+      // the rule every other domain still obeys.
       std::shared_ptr<RemoteDomainPolicy> GetPolicyForDomain(const String &domainName) const;
 
       // The strictest policy over several recipient domains.

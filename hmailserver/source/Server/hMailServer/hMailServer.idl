@@ -1821,8 +1821,8 @@ interface IInterfaceRemoteDomainPolicy : IDispatch{
    [propget, id(3), helpstring("Description.")] HRESULT Description([out, retval] BSTR *pVal);
    [propput, id(3), helpstring("Description.")] HRESULT Description([in] BSTR newVal);
 
-   [propget, id(4), helpstring("Whether this policy is applied at all. An inactive policy governs nothing; it does not fall through to a broader one.")] HRESULT Active([out, retval] VARIANT_BOOL *pVal);
-   [propput, id(4), helpstring("Whether this policy is applied at all. An inactive policy governs nothing; it does not fall through to a broader one.")] HRESULT Active([in] VARIANT_BOOL newVal);
+   [propget, id(4), helpstring("Whether this policy is applied at all. An inactive policy is skipped, and the next most specific active policy governs instead.")] HRESULT Active([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(4), helpstring("Whether this policy is applied at all. An inactive policy is skipped, and the next most specific active policy governs instead.")] HRESULT Active([in] VARIANT_BOOL newVal);
 
    [propget, id(5), helpstring("The transport security demanded of outbound mail.")] HRESULT OutboundTls([out, retval] eRemoteTlsRequirement *pVal);
    [propput, id(5), helpstring("The transport security demanded of outbound mail.")] HRESULT OutboundTls([in] eRemoteTlsRequirement newVal);

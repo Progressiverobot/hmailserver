@@ -536,8 +536,11 @@ namespace HM
                break;
             }
 
+            // One plain sentence, as every other reason SMTPClientConnection
+            // records is: it wraps the sentence in its own "Error Type" lines,
+            // and a pre-wrapped block would appear inside them a second time.
             String reason;
-            reason.Format(_T("   Error Type: SMTP\r\n   Error Description: Delivery deferred. The remote domain policy for %s requires %s to this destination, and it could not be established. The message has NOT been sent in the clear.\r\n\r\n"),
+            reason.Format(_T("Delivery deferred: the remote domain policy for %s requires %s to this destination, and it could not be established. The message has NOT been sent in the clear."),
                policyName.c_str(), requirement.c_str());
 
             serverInfo->SetTlsPolicyReason(reason);
