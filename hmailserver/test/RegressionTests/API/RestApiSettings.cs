@@ -4,7 +4,6 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -253,27 +252,6 @@ namespace RegressionTests.API
          if (backup.BackupMessages != s.BackupMessages) backup.BackupMessages = s.BackupMessages;
          if (backup.BackupSettings != s.BackupSettings) backup.BackupSettings = s.BackupSettings;
          if (backup.CompressDestinationFiles != s.BackupCompress) backup.CompressDestinationFiles = s.BackupCompress;
-      }
-
-      private void WriteSetting(string key, string value)
-      {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
       }
 
       [SetUp]
@@ -732,8 +710,9 @@ namespace RegressionTests.API
          StringAssert.Contains("\"database\":\"" + JsonText(directories.DatabaseDirectory) + "\"", body);
          StringAssert.Contains("\"db_scripts\":\"" + JsonText(directories.DBScriptDirectory) + "\"", body);
 
-         // The ini is the one beside the binary, and it exists: the file this
-         // fixture's SetUp wrote the listener's port into.
+         // The ini is the one beside the binary, and it exists: the file whose
+         // [Settings] section the server keeps as the copy of the settings store,
+         // including the listener port this fixture's SetUp stored.
          string bin = Regex.Unescape(Extract(body, "bin"));
          string iniFile = Regex.Unescape(Extract(body, "ini_file"));
          Assert.IsTrue(File.Exists(iniFile), "ini_file names a file that exists: " + iniFile);
@@ -762,7 +741,7 @@ namespace RegressionTests.API
 
          Assert.AreEqual("one two", _settings.GetIniSetting(IniProbeKey), "COM reads what the API wrote.");
          StringAssert.Contains(IniProbeKey, _settings.IniSettingNames);
-         Assert.AreEqual("one two", IniFileSetting.Read(IniProbeKey), "The value reached the file itself, not only the database mirror.");
+         Assert.AreEqual("one two", IniFileSetting.Read(IniProbeKey), "The value reached the file's copy as well as the database store.");
 
          (int listStatus, string listBody) = Http("GET", "/api/v1/settings/ini");
          Assert.AreEqual(200, listStatus, listBody);

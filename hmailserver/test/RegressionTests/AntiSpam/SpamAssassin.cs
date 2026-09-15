@@ -398,12 +398,14 @@ namespace RegressionTests.AntiSpam
          if (!System.IO.File.Exists(iniPath))
             Assert.Ignore("hMailServer.ini is not next to the running executable in this layout.");
 
+         // The original is read from the file, which the server keeps in step with the
+         // settings store; it is changed and put back through the store, because from
+         // schema 6042 a value written into the file is undone at the next start.
          string original = NativeMethods.GetIniValue("Settings", "SAMoveVsCopy", "0", iniPath);
 
          try
          {
-            Assert.IsTrue(NativeMethods.SetIniValue("Settings", "SAMoveVsCopy", "1", iniPath),
-               "Failed to enable SAMoveVsCopy.");
+            IniFileSetting.Write("SAMoveVsCopy", "1");
             _application.Reinitialize();
 
             new SmtpClientSimulator().Send(account.Address, account.Address,
@@ -421,17 +423,13 @@ namespace RegressionTests.AntiSpam
          }
          finally
          {
-            NativeMethods.SetIniValue("Settings", "SAMoveVsCopy", original, iniPath);
+            IniFileSetting.Write("SAMoveVsCopy", original);
             _application.Reinitialize();
          }
       }
 
       private static class NativeMethods
       {
-
-         public static bool SetIniValue(string section, string key, string value, string filePath)
-            => IniFile.WritePrivateProfileString(section, key, value, filePath);
-
          public static string GetIniValue(string section, string key, string defaultValue, string filePath)
          {
             var buffer = new System.Text.StringBuilder(256);

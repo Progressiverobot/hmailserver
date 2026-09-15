@@ -178,8 +178,10 @@ namespace RegressionTests.AntiSpam
          {
             // Cleared AFTER the restart, not before it: the value is read while the
             // service starts, so a clear followed by a start with the bad value
-            // still in the file would leave the error behind to fail whichever
-            // fixture ran next.
+            // still stored would leave the error behind to fail whichever fixture
+            // ran next. The clear goes through the settings store, which drops the
+            // row and the file's line together; deleting only the line, as this did
+            // before schema 6042, has the row write it straight back at the start.
             ServerIniFile.SetSetting("DmarcRptSchemaVersion", null);
             RestartServerAndReacquireCom();
             LogHandler.DeleteErrorLog();
@@ -190,9 +192,9 @@ namespace RegressionTests.AntiSpam
       ///    Seeds one unsigned and one signed message from the policy domain, asks
       ///    for the reports now, and returns the delivered report mail.
       ///
-      ///    schemaVersion and treeWalkEnabled are written to the ini as given, or
-      ///    left absent when null - "absent" being the case that matters most,
-      ///    since it is what a stock server has.
+      ///    schemaVersion and treeWalkEnabled are stored in the settings store as
+      ///    given, or removed from it when null - "absent" being the case that
+      ///    matters most, since it is what a stock server has.
       /// </summary>
       private string RunOneReportingCycle_(string schemaVersion, string treeWalkEnabled)
       {
@@ -254,7 +256,10 @@ namespace RegressionTests.AntiSpam
             ServerIniFile.SetSetting("DmarcTreeWalkEnabled", null);
 
             // Restart before any COM restore - proxies taken before the mid-test
-            // restart point at the old process.
+            // restart point at the old process. The four removals above are COM
+            // calls as well, and are safe before it: they go through TestSetup's
+            // Application, which the mid-test restart replaced, not through a proxy
+            // this test took.
             RestartServerAndReacquireCom();
          }
       }

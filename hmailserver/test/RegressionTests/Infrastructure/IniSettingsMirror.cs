@@ -283,5 +283,115 @@ namespace RegressionTests.Infrastructure
                "have been written back into it: " + ProbeKey,
                LogHandler.ReadCurrentDefaultLog()));
       }
+
+      /// <summary>
+      ///    Whether hm_inisettings has a row for a name. The table has no COM accessor,
+      ///    and the fixture's rule is not to invent one; its unique index on the name
+      ///    answers the question instead - an insert of the name succeeds only when
+      ///    there is no row, and is taken straight back out.
+      /// </summary>
+      private bool HasStoredRow(string name)
+      {
+         try
+         {
+            _application.Database.ExecuteSQL(
+               "insert into hm_inisettings (inisettingname, inisettingvalue, inisettingfilevalue) values ('" + name +
+               "', 'row-probe', 'row-probe')");
+         }
+         catch (System.Runtime.InteropServices.COMException)
+         {
+            return true;
+         }
+
+         _application.Database.ExecuteSQL("delete from hm_inisettings where inisettingname = '" + name + "'");
+         return false;
+      }
+
+      private const string PepperKey = "PasswordPepper";
+
+      [Test]
+      [Description("PasswordPepper is kept in hMailServer.INI and never in the database: set over COM it reaches the file " +
+                   "and not hm_inisettings, and a row an earlier build adopted is taken out at the next start with the " +
+                   "file keeping the value - because a pepper protects the password hashes only while it is somewhere " +
+                   "a copy of the database is not.")]
+      public void ThePasswordPepperIsKeptInTheFileAndNotInTheDatabase()
+      {
+         const string pepper = "zz-ini-mirror-pepper";
+
+         try
+         {
+            // The probe can say yes: a key that IS stored has a row. Without this the
+            // assertions below could pass because the probe never finds anything.
+            _settings.SetIniSetting(ProbeKey, "stored");
+            Assert.IsTrue(HasStoredRow(ProbeKey), "The row probe did not find the row of a setting just stored, so it proves nothing.");
+
+            _settings.SetIniSetting(PepperKey, pepper);
+
+            Assert.AreEqual(pepper, IniFileSetting.Read(PepperKey), "The pepper set over COM did not reach hMailServer.INI.");
+            Assert.IsFalse(HasStoredRow(PepperKey), "The pepper set over COM was stored in hm_inisettings, beside the hashes it protects.");
+
+            Reload();
+
+            Assert.AreEqual(pepper, _settings.GetIniSetting(PepperKey), "The server did not read the pepper from the file after a restart.");
+            Assert.IsFalse(HasStoredRow(PepperKey), "A restart put the pepper into hm_inisettings.");
+            StringAssert.DoesNotContain(PepperKey, ErrorLog(), "A pepper in the file was reported as an edit the store discarded.");
+
+            // What a server that ran an earlier build of 6042 has: the pepper adopted into
+            // a row. The next start must take the row out and leave the file holding it.
+            _application.Database.ExecuteSQL(
+               "insert into hm_inisettings (inisettingname, inisettingvalue, inisettingfilevalue) values ('" + PepperKey +
+               "', '" + pepper + "', '" + pepper + "')");
+            Assert.IsTrue(HasStoredRow(PepperKey));
+
+            Reload();
+
+            Assert.IsFalse(HasStoredRow(PepperKey), "The row an earlier build adopted was not taken out at the next start.");
+            Assert.AreEqual(pepper, IniFileSetting.Read(PepperKey), "Taking the row out lost the pepper from the file.");
+            RetryHelper.TryAction(TimeSpan.FromSeconds(10), () =>
+               RetryableAssert.StringContains("kept in hMailServer.INI only and have been taken out of the database", LogHandler.ReadCurrentDefaultLog()));
+         }
+         finally
+         {
+            // Removes the line (and any row) through the store, which is how a pepper is
+            // returned to none; Reinitialize so no later fixture hashes with it.
+            try
+            {
+               _settings.DeleteIniSetting(PepperKey);
+               _application.Reinitialize();
+            }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+            {
+               // The real failure, if there is one, is the one to report.
+            }
+         }
+      }
+
+      [Test]
+      [Description("A value with spaces at either end is stored as hMailServer.INI will read it back, trimmed, so that it " +
+                   "is not reported as an edit to the file at every start; and a row a build before this one stored " +
+                   "with the spaces stops being reported and is trimmed once.")]
+      public void AValueWithSpacesAtEitherEndIsStoredAsTheFileReadsIt()
+      {
+         _settings.SetIniSetting(ProbeKey, "  padded value  ");
+
+         Assert.AreEqual("padded value", EffectiveValue());
+
+         Reload();
+         Reload();
+
+         Assert.AreEqual("padded value", EffectiveValue());
+         StringAssert.DoesNotContain(ProbeKey, ErrorLog(),
+            "A value stored with spaces at either end was reported as an edit to hMailServer.INI.");
+
+         // The row as an earlier build left it: the spaces in the stored value.
+         SetStoredValue("  padded value  ");
+
+         Reload();
+         Reload();
+
+         Assert.AreEqual("padded value", EffectiveValue());
+         StringAssert.DoesNotContain(ProbeKey, ErrorLog(),
+            "A stored value with spaces at either end is still reported as an edit at every start.");
+      }
    }
 }

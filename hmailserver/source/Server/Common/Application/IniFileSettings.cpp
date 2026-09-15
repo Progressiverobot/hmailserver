@@ -978,8 +978,13 @@ namespace HM
    }
 
    bool
-   IniFileSettings::WriteSettingsValue(const String &key, const String &value)
+   IniFileSettings::WriteSettingsValue(const String &key, const String &requestedValue)
    {
+      // Trimmed here as well as in the store, so the overlay below holds what the
+      // store and the file hold rather than what was typed.
+      String value = requestedValue;
+      value.Trim();
+
       if (!IniSettingStore::WriteSetting(key, value))
          return false;
 
@@ -998,7 +1003,9 @@ namespace HM
 
          shadowed = file_overrides_.find(key) != file_overrides_.end();
 
-         if (database_settings_loaded_ && !shadowed)
+         // A key kept in the file only is never in the overlay: it is read from the
+         // file, which is where the store just put it.
+         if (database_settings_loaded_ && !shadowed && !IniSettingStore::IsFileOnlyName(key))
             database_settings_[key] = value;
       }
 

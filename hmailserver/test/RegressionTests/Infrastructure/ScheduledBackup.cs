@@ -15,9 +15,9 @@ namespace RegressionTests.Infrastructure
 {
    /// <summary>
    ///    Exercises scheduled (automatic) backups and backup retention
-   ///    (hMailServer.ini [Settings] ScheduledBackupTime,
-   ///    ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount and
-   ///    ScheduledBackupMaxAgeDays).
+   ///    (ScheduledBackupTime, ScheduledBackupIntervalMinutes,
+   ///    ScheduledBackupKeepCount and ScheduledBackupMaxAgeDays, in the settings
+   ///    store).
    ///
    ///    Until this feature existed the only way to get a backup was for something
    ///    outside the server to call BackupManager.StartBackup() over COM, which in
@@ -124,30 +124,14 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         // The server reads hMailServer.ini from its bin directory: a registered
-         // install resolves to {InstallLocation}\Bin, while a developer build that is
-         // not registered reads the ini next to the running executable. Write to
-         // every candidate that already exists, so the file the service actually
-         // reads is updated whichever layout this is, and no stray ini files are
-         // created. A null value removes the key, which is what "not configured"
-         // means here - and what the default-off test needs.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Through the settings store, which is where the server reads these from:
+         // an edit to the ini file's copy would be undone at the next start. A null
+         // value removes the setting, which is what "not configured" means here -
+         // and what the default-off test needs.
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
       private string CreateArchive(DateTime timestamp)

@@ -249,7 +249,10 @@ namespace RegressionTests.AntiSpam
 
             // Restart before any COM restore - proxies taken before the
             // mid-test restart point at the old process (the TLS-RPT
-            // fixture's first run proved what happens otherwise). Nothing
+            // fixture's first run proved what happens otherwise). The two
+            // removals above are COM calls as well, and are safe before it:
+            // they go through TestSetup's Application, which the mid-test
+            // restart replaced, not through a proxy this test took. Nothing
             // else needs restoring: no ports, certificates or IP ranges
             // were touched, and PerformBasicSetup resets the anti-spam
             // settings for the next fixture.

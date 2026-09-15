@@ -2,8 +2,6 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
-using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -32,29 +30,16 @@ namespace RegressionTests.Security
       private const int CryptArgon2id = 5;
       private const string Password = "SeC-r3t Pass!";
 
-      private void WriteSetting(string key, string value)
+      private static void WriteSetting(string key, string value)
       {
-         // The same two candidates PasswordPepper writes: a registered install reads
-         // {InstallLocation}\Bin\hMailServer.ini, a developer build the one beside the
-         // executable. Every existing candidate is updated so the file the service
-         // reads is the one that changed, without creating stray ini files.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Through the settings store - Settings.SetIniSetting and DeleteIniSetting, the
+         // door the Control Panel and the REST API use - because from schema 6042 a value
+         // edited into hMailServer.ini is put back at the next start and reported as
+         // HM5804. A null value removes the key, returning it to its default.
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
       private void Apply()

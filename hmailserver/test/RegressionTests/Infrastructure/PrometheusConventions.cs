@@ -17,7 +17,7 @@ namespace RegressionTests.Infrastructure
 {
    /// <summary>
    ///    Pins the Prometheus exposition conventions of the /metrics endpoint
-   ///    (hMailServer.ini [Settings] MetricsServerPort).
+   ///    (MetricsServerPort, in the settings store).
    ///
    ///    The exporter used to get five things wrong, and each of them cost the
    ///    operator something concrete rather than merely being unidiomatic:
@@ -51,23 +51,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private static (int status, string body) HttpGet(string path)

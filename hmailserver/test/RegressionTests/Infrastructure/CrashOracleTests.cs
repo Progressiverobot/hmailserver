@@ -34,7 +34,7 @@ namespace RegressionTests.Infrastructure
    ///    before every fixture.
    ///
    ///    These tests provoke the fault the only way the suite can from outside: the
-   ///    existing crash-simulation hook (hMailServer.ini CrashSimulationMode, read in
+   ///    existing crash-simulation hook (Settings.CrashSimulationMode over COM, read in
    ///    SMTPConnection::ProtocolHELP_), where mode 3 dereferences a null pointer and
    ///    mode 2 throws an ordinary C++ exception. That gives both a positive and a
    ///    negative control for the observer's filter.

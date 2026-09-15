@@ -11,7 +11,7 @@ namespace RegressionTests.AntiSpam
 {
    /// <summary>
    ///    RFC 8601 Authentication-Results and RFC 7208 section 9.1 Received-SPF on
-   ///    inbound mail, driven by three hMailServer.ini [Settings] values:
+   ///    inbound mail, driven by three [Settings] values in the settings store:
    ///    AuthenticationResultsEnabled, ReceivedSpfHeaderEnabled and
    ///    AuthenticationResultsIdentity.
    ///
@@ -56,9 +56,9 @@ namespace RegressionTests.AntiSpam
       }
 
       /// <summary>
-      ///    Puts every ini setting this fixture can have touched back to its shipped
-      ///    default and makes the server re-read the file. Called from the finally
-      ///    block of every test that writes the ini.
+      ///    Puts every setting this fixture can have touched back to its shipped
+      ///    default in the settings store and makes the server re-read it. Called from
+      ///    the finally block of every test that changes one.
       /// </summary>
       private void RestoreIniDefaults()
       {

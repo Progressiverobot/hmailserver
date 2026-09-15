@@ -2,8 +2,6 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -33,28 +31,6 @@ namespace RegressionTests.SMTP
    [TestFixture]
    public class TlsRptInertReporting : TestFixtureBase
    {
-
-      private void WriteSetting(string key, string value)
-      {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
-      }
-
       [Test]
       [Description("A server with no TlsRptFromAddress says so once at startup, in the application log and not as a reported error")]
       public void InertTlsReportingIsAnnouncedAtStartup()
@@ -63,7 +39,7 @@ namespace RegressionTests.SMTP
          {
             // The shipped default, made explicit: an earlier fixture could have
             // left a sender address behind.
-            WriteSetting("TlsRptFromAddress", "");
+            IniFileSetting.Write("TlsRptFromAddress", "");
 
             LogHandler.DeleteCurrentDefaultLog();
             LogHandler.DeleteErrorLog();

@@ -15,7 +15,7 @@ namespace RegressionTests.Infrastructure
 {
    /// <summary>
    ///    Exercises the opt-in message-store consistency check
-   ///    (hMailServer.ini [Settings] MessageStoreConsistencyCheck): a scheduled,
+   ///    (MessageStoreConsistencyCheck, in the settings store): a scheduled,
    ///    read-only task cross-checks every message row against its backing file on
    ///    disk and publishes the number of missing files as the
    ///    hmailserver_messagestore_missing_files metric. The check never deletes or
@@ -29,23 +29,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // Parses a Prometheus gauge value from a /metrics body. Returns -1 if absent.

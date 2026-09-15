@@ -3,16 +3,14 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Diagnostics;
-using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Infrastructure
 {
    /// <summary>
-   ///    Exercises the graceful-shutdown drain (hMailServer.ini [Settings]
-   ///    ShutdownDrainSeconds): when stopping, the server gives in-flight client
+   ///    Exercises the graceful-shutdown drain (ShutdownDrainSeconds, in the
+   ///    settings store): when stopping, the server gives in-flight client
    ///    sessions a bounded window to finish before tearing the listeners down.
    /// </summary>
    [TestFixture]
@@ -21,23 +19,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       [Test]

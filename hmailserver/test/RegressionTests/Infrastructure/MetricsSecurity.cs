@@ -19,8 +19,8 @@ using RegressionTests.SSL;
 namespace RegressionTests.Infrastructure
 {
    /// <summary>
-   ///    Access control on the metrics listener (hMailServer.ini [Settings]
-   ///    MetricsServerPort).
+   ///    Access control on the metrics listener (MetricsServerPort, in the settings
+   ///    store).
    ///
    ///    Until this work the listener performed no authentication of any kind and
    ///    served plain HTTP only, so the whole of its protection was the bind address
@@ -49,11 +49,11 @@ namespace RegressionTests.Infrastructure
    ///
    ///    Every test restores the shipped configuration in a finally block, and the
    ///    fixture does it again in a OneTimeTearDown. That matters more here than
-   ///    usual: these settings live in hMailServer.ini rather than the database, the
-   ///    whole suite runs against one live service, and a leftover
-   ///    MetricsServerAuthToken would turn HealthProbes, PrometheusConventions,
-   ///    DatabaseMetrics and DeliveryMetrics into 401s that have nothing to do with
-   ///    what they test.
+   ///    usual: these settings are held in the settings store, which nothing
+   ///    between tests puts back, the whole suite runs against one live service,
+   ///    and a leftover MetricsServerAuthToken would turn HealthProbes,
+   ///    PrometheusConventions, DatabaseMetrics and DeliveryMetrics into 401s that
+   ///    have nothing to do with what they test.
    /// </summary>
    [TestFixture]
    public class MetricsSecurity : TestFixtureBase
@@ -76,30 +76,15 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // Writes the complete access-control configuration in one call, so that every
       // test states all seven settings it depends on instead of inheriting whatever
-      // the previous test left behind. These live in an ini file rather than the
-      // database and the whole suite shares one live service, so "the last test
-      // cleaned up after itself" is not something a test should have to trust.
+      // the previous test left behind. These are stored server-wide, nothing between
+      // tests puts them back, and the whole suite shares one live service, so "the
+      // last test cleaned up after itself" is not something a test should have to
+      // trust.
       private void ConfigureListener(int port, string bindAddress, string token,
          string basicUser, string basicPassword, string certificateFile, string privateKeyFile)
       {
@@ -125,8 +110,8 @@ namespace RegressionTests.Infrastructure
       }
 
       // A belt-and-braces reset. If a test fails part way through its own finally
-      // block - or is aborted - the ini file would otherwise stay configured, and a
-      // leftover credential would fail HealthProbes, PrometheusConventions,
+      // block - or is aborted - the stored settings would otherwise stay configured,
+      // and a leftover credential would fail HealthProbes, PrometheusConventions,
       // DatabaseMetrics and DeliveryMetrics with a 401 that has nothing to do with
       // what they test.
       [OneTimeTearDown]

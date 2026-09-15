@@ -31,6 +31,19 @@ namespace RegressionTests.Shared
    ///    does nothing until the service restarts. TestFixtureBase.RestartServerAndReacquireCom
    ///    is the primitive for that; Application.Stop()/Start() over COM is NOT, because
    ///    the process keeps running.
+   ///
+   ///    THE FILE IS NO LONGER WHERE A [Settings] VALUE IS CHANGED. From schema 6042 the
+   ///    database is the settings store and this section of the file is its copy: a value
+   ///    edited into the file is put back at the next start and reported as HM5804, and a
+   ///    line removed from the file is written back from the stored row. Until 15 September
+   ///    2026 SetSetting still edited the file, so every one of its callers set a value that
+   ///    was undone at the restart that was meant to apply it, and a fixture that removed a
+   ///    bad value in its teardown left the bad value stored for every test after it - which
+   ///    is how DmarcRptSchemaVersion=7 failed three hundred tests of one gate. SetSetting
+   ///    now stores the value through Settings.SetIniSetting and DeleteIniSetting, the door
+   ///    the Control Panel, the REST API and hmctl use, which writes the row and the file
+   ///    together; GetSetting still reads the file, which the server keeps in step. A test
+   ///    that is ABOUT an edit to the file losing uses IniFileSetting.WriteFileOnly.
    /// </summary>
    public static class ServerIniFile
    {
@@ -72,19 +85,10 @@ namespace RegressionTests.Shared
       /// </summary>
       public static void SetSetting(string key, string value)
       {
-         var path = Path();
-         var lines = new List<string>(File.ReadAllLines(path));
-
-         lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
-
-         var section = lines.FindIndex(line => line.Trim() == SettingsSection);
-
-         Assert.Greater(section, -1, "hMailServer.ini has no [Settings] section: " + path);
-
-         if (value != null)
-            lines.Insert(section + 1, key + "=" + value);
-
-         File.WriteAllLines(path, lines);
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
       /// <summary>

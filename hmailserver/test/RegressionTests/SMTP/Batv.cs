@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Shared;
@@ -13,7 +11,7 @@ namespace RegressionTests.SMTP
 {
    /// <summary>
    /// B4 BATV (Bounce Address Tag Validation), "prvs" scheme. When BATV is enabled
-   /// (hMailServer.ini [Settings] BATVEnabled/BATVSecret), the envelope MAIL FROM of
+   /// (the settings store's BATVEnabled/BATVSecret), the envelope MAIL FROM of
    /// locally-originated outbound mail is signed into a prvs-tagged address at the
    /// sender's own domain so that a bounce returned to it can be validated; a bounce
    /// (null sender) addressed to a prvs return-path whose signature does not validate
@@ -25,26 +23,7 @@ namespace RegressionTests.SMTP
 
       private void WriteSetting(string key, string value)
       {
-         // The server reads hMailServer.ini from its bin directory; write to every
-         // existing candidate so the file the service actually reads is updated
-         // regardless of the install/dev layout.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private static string ExtractEnvelopeAddress(string mailFromCommand)

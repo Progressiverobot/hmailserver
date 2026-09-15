@@ -247,6 +247,7 @@ namespace RegressionTests.Infrastructure
          // ReadCompleteTextFile expects to detect.
          string xml = "<Backup><BackupInformation Mode=\"11\" Version=\"" + version + "\"/></Backup>";
 
+         // settings-store-exempt: writes the forged archive's backup index, not hMailServer.ini.
          File.WriteAllText(Paths.Combine(stagingDirectory, "hMailServerBackup.xml"), xml, Encoding.Unicode);
 
          string archive = Paths.Combine(_backupDirectory, "forged.7z");

@@ -34,27 +34,6 @@ namespace RegressionTests.API
       private static int RestPort = 9098;
       private const string AdminPassword = "testar";
 
-      private void WriteSetting(string key, string value)
-      {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
-      }
-
       [Test]
       [Description("The Control Deck is served from the program directory with a view for each of the administrative routes it reads and writes")]
       public void TheControlDeckIsServedWithItsViews()

@@ -70,6 +70,7 @@ namespace RegressionTests.API
          _application.Reinitialize();
 
          var scripting = _settings.Scripting;
+         // settings-store-exempt: this is the event script file, not hMailServer.ini.
          File.WriteAllText(scripting.CurrentScriptFile, "");
          scripting.Enabled = false;
          scripting.Reload();
@@ -91,6 +92,7 @@ namespace RegressionTests.API
 
          var scripting = _settings.Scripting;
          scripting.Language = language;
+         // settings-store-exempt: this is the event script file, not hMailServer.ini.
          File.WriteAllText(scripting.CurrentScriptFile, script);
          scripting.Enabled = true;
          scripting.Reload();

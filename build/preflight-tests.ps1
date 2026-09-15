@@ -263,7 +263,15 @@ if (Test-Path $serverIni) {
                     #                            that is not there, which is slow rather than wrong
                     'SMTPProxyProtocolEnabled', 'SMTPProxyProtocolTrustedIPs',
                     'SMTPXClientEnabled', 'SMTPXClientTrustedIPs',
-                    'OtelEndpoint', 'OtelMetricsEndpoint', 'OtelLogsEndpoint'
+                    'OtelEndpoint', 'OtelMetricsEndpoint', 'OtelLogsEndpoint',
+                    #   DmarcRptSchemaVersion  - a fixture stores 7 on purpose to see it refused; left
+                    #                            behind, every start logs HM6210 and fails the next SetUp
+                    #   SmtpAuthenticatedSenderCheck - refuses every test that sends as another address
+                    #   BackupVerifyRestore, MetricsHistoryDays, OutboundChunking, OutboundPipelining
+                    #                          - switched OFF by fixtures ("=0" is not empty), and ten
+                    #                            unrelated tests failed on 15 September 2026 with them left
+                    'DmarcRptSchemaVersion', 'SmtpAuthenticatedSenderCheck',
+                    'BackupVerifyRestore', 'MetricsHistoryDays', 'OutboundChunking', 'OutboundPipelining'
 
     $iniLines = @(Get-Content -LiteralPath $serverIni)
 
@@ -277,9 +285,37 @@ if (Test-Path $serverIni) {
     $leftovers = $iniLines | Where-Object { $_ -match $pattern }
 
     if ($leftovers -and $Clean) {
-        Set-Content -LiteralPath $serverIni -Value ($iniLines | Where-Object { $_ -notmatch $pattern })
-        Write-Host ('  CLEAN Removed leftover test settings from hMailServer.ini - restart the service: {0}' -f ($leftovers -join '; ')) -ForegroundColor Yellow
-        $leftovers = $null
+        # From schema 6042 the database is the settings store and this section of the
+        # file is its copy: a line deleted here is written straight back from the stored
+        # row at the next start. So a leftover is removed through the store - the row and
+        # the line together - whenever the server can be asked, and the file is edited
+        # only when it cannot, which is then said rather than reported as clean.
+        $removedThroughStore = $false
+        if ($null -ne $app -and $null -ne $auth) {
+            try {
+                foreach ($line in $leftovers) {
+                    $key = ($line -split '=', 2)[0].Trim()
+                    $app.Settings.DeleteIniSetting($key)
+                }
+                $removedThroughStore = $true
+            } catch {
+                Write-Host ('  The settings store refused the removal ({0}); editing the file instead.' -f $_.Exception.Message) -ForegroundColor Yellow
+            }
+        }
+
+        if ($removedThroughStore) {
+            Write-Host ('  CLEAN Removed leftover test settings from the settings store - restart the service: {0}' -f ($leftovers -join '; ')) -ForegroundColor Yellow
+            $leftovers = $null
+        } else {
+            Set-Content -LiteralPath $serverIni -Value ($iniLines | Where-Object { $_ -notmatch $pattern })
+            $storeInUse = [bool]($iniLines | Where-Object { $_ -match '^\s*Store\s*=\s*database\s*$' })
+            if ($storeInUse) {
+                Write-Host ('  NOT CLEAN Removed {0} from hMailServer.ini only, and the database is the settings store, so the next start writes them back. Start the service and re-run with -Clean.' -f ($leftovers -join '; ')) -ForegroundColor Red
+            } else {
+                Write-Host ('  CLEAN Removed leftover test settings from hMailServer.ini - restart the service: {0}' -f ($leftovers -join '; ')) -ForegroundColor Yellow
+                $leftovers = $null
+            }
+        }
     }
 
     Report (-not $leftovers) 'No leftover test-only ini settings' `

@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
-using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -33,32 +32,14 @@ namespace RegressionTests.Infrastructure
       private const int ProbeTimeoutMilliseconds = 5000;
 
       /// <summary>
-      ///    Writes [Settings] BlockedIPHoldSeconds and reloads it. The server reads
-      ///    hMailServer.ini from its bin directory (Utilities::GetBinDirectory): a
-      ///    registered install resolves to {InstallLocation}\Bin, a developer build
-      ///    that is not registered reads the ini next to the running executable.
-      ///    Write to every existing candidate so the file the service actually reads
-      ///    is updated whichever layout this is.
+      ///    Stores BlockedIPHoldSeconds and reloads it. The value goes into the
+      ///    settings store (hm_inisettings) through IniFileSetting rather than into
+      ///    hMailServer.ini, whose [Settings] section is only the store's copy from
+      ///    schema 6042.
       /// </summary>
       private void SetBlockedIpHoldSeconds(int seconds)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         var wroteAny = false;
-         foreach (var iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", "BlockedIPHoldSeconds", seconds.ToString(), iniPath),
-               "Failed to write BlockedIPHoldSeconds to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write("BlockedIPHoldSeconds", seconds.ToString());
 
          // IniFileSettings caches everything at startup; Reinitialize reloads it.
          _application.Reinitialize();
