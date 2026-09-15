@@ -95,6 +95,17 @@ ANSWERS = {
     ("GET", "/api/v1/accounts/ann@example.com/app-passwords"): {"app_passwords": [
         {"id": 2, "name": "phone", "created": "2026-09-01T10:00:00Z", "last_used": None}]},
     ("POST", "/api/v1/accounts/ann@example.com/app-passwords"): {"id": 3, "name": "tablet", "password": "abcd-efgh-ijkl"},
+    ("GET", "/api/v1/rules"): {"rules": [{"name": "Tag support", "active": True, "sort_order": 1}]},
+    ("GET", "/api/v1/routes"): {"routes": [{"domain_name": "partner.test", "target_smtp_host": "mx.partner.test",
+                                            "target_smtp_port": 25}]},
+    ("GET", "/api/v1/ports"): {"ports": [{"protocol": "SMTP", "address": "0.0.0.0", "port": 25,
+                                          "connection_security": 0}]},
+    ("GET", "/api/v1/domains/example.com/lists"): {"lists": [{"address": "all@example.com", "active": True,
+                                                              "mode": 0}]},
+    ("GET", "/api/v1/domains/example.net/accounts"): {"accounts": []},
+    ("GET", "/api/v1/domains/example.net/aliases"): {"aliases": []},
+    ("GET", "/api/v1/domains/example.net/lists"): {"lists": []},
+    ("PUT", "/api/v1/domains/example.net"): {"name": "example.net", "active": True},
     ("GET", "/api/v1/ipranges"): {"ipranges": [
         {"id": 1, "name": "My computer", "lower_ip": "127.0.0.1", "upper_ip": "127.0.0.1", "priority": 15}]},
 }
@@ -342,6 +353,88 @@ POWERSHELL_CASES = [
 ]
 
 
+def run_powershell_config_cases(url, tmp, verbose):
+    """The module's configuration verbs, held to the same document and the same
+    refusals as hmctl's. The point of the pair is that they ask for the same
+    thing; a document one writes is a document the other reads."""
+    pwsh = shutil.which("pwsh") or shutil.which("powershell")
+    if not pwsh or not os.path.exists(MODULE):
+        return
+
+    document = os.path.join(tmp, "ps-config.json")
+    prologue = ("$ErrorActionPreference='Stop'; Import-Module '%s' -Force; "
+                "Connect-HmServer -Url '%s' -Password (ConvertTo-SecureString '%s' -AsPlainText -Force) | Out-Null; "
+                % (MODULE.replace("'", "''"), url, PASSWORD))
+
+    def run(script):
+        return subprocess.run([pwsh, "-NoProfile", "-NonInteractive", "-Command", prologue + script],
+                              capture_output=True, text=True, timeout=180)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Export-HmConfiguration -Path '%s'" % document.replace("'", "''"))
+    with Recorder.lock:
+        exporting = list(Recorder.requests)
+    check(completed.returncode == 0,
+          "Export-HmConfiguration: exit %d - %s" % (completed.returncode, completed.stderr.strip()[:400]))
+    check(all(r["method"] == "GET" for r in exporting),
+          "Export-HmConfiguration made a request that was not a GET: %s" % sorted({r["method"] for r in exporting}))
+
+    if not os.path.exists(document):
+        problem("Export-HmConfiguration wrote no file")
+        return
+
+    with open(document, encoding="utf-8-sig") as handle:
+        written = json.load(handle)
+
+    check(written.get("version") == 1, "the module's document carries no version")
+    names = [row.get("name") for row in written.get("sections", {}).get("domains", [])]
+    check("example.com" in names, "the module's document holds no domains: %s" % names)
+    addresses = [row.get("address") for row in written.get("sections", {}).get("accounts", [])]
+    check("ann@example.com" in addresses, "the module's document holds no accounts: %s" % addresses)
+
+    # The same document, read by the other client: one vocabulary, one file.
+    completed = subprocess.run(
+        [sys.executable, HMCTL, "--url", url, "--password", PASSWORD, "config", "diff", document],
+        capture_output=True, text=True, timeout=120)
+    check(completed.returncode == 0,
+          "hmctl does not agree that the module's document matches the server (exit %d):\n%s"
+          % (completed.returncode, completed.stdout))
+
+    completed = run("Compare-HmConfiguration -Path '%s' | Measure-Object | Select-Object -ExpandProperty Count"
+                    % document.replace("'", "''"))
+    check(completed.returncode == 0 and completed.stdout.strip() in ("0", ""),
+          "Compare-HmConfiguration of a matching document should be empty, said %r %s"
+          % (completed.stdout.strip(), completed.stderr.strip()[:200]))
+
+    # A change, planned but not applied.
+    with open(document, encoding="utf-8-sig") as handle:
+        changed = json.load(handle)
+    changed["sections"]["settings"]["settings"]["max_message_size_kb"] = 51200
+    changed_path = os.path.join(tmp, "ps-changed.json")
+    with open(changed_path, "w", encoding="utf-8") as handle:
+        json.dump(changed, handle, indent=2, sort_keys=True)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Import-HmConfiguration -Path '%s' | Out-Null" % changed_path.replace("'", "''"))
+    with Recorder.lock:
+        planning = list(Recorder.requests)
+    check(completed.returncode == 0,
+          "Import-HmConfiguration without -Force: exit %d - %s" % (completed.returncode, completed.stderr.strip()[:300]))
+    check(all(r["method"] == "GET" for r in planning),
+          "Import-HmConfiguration without -Force wrote something: %s" % [r["method"] for r in planning])
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run("Import-HmConfiguration -Path '%s' -Force -Confirm:$false | Out-Null" % changed_path.replace("'", "''"))
+    with Recorder.lock:
+        applying = list(Recorder.requests)
+    writes = [(r["method"], r["path"], r["body"]) for r in applying if r["method"] != "GET"]
+    check(("PUT", "/api/v1/settings", {"max_message_size_kb": 51200}) in writes,
+          "Import-HmConfiguration -Force did not write the setting: %s" % writes)
+
+
 def run_powershell_cases(url, verbose):
     pwsh = shutil.which("pwsh") or shutil.which("powershell")
     if not pwsh:
@@ -384,6 +477,116 @@ def run_powershell_cases(url, verbose):
             check(text in completed.stdout, "%s: %r is not in the output:\n%s" % (name, text, completed.stdout))
 
     return True
+
+
+def run_config_cases(url, tmp):
+    """The whole configuration as one document: exported, compared, applied.
+
+    Three properties are checked rather than described, because they are what
+    makes a document usable in a repository: an export of an unchanged server is
+    the same bytes twice, a document that matches produces an empty plan and
+    exit 0, and `apply` without --force writes nothing at all.
+    """
+    def run(arguments):
+        return subprocess.run(
+            [sys.executable, HMCTL, "--url", url, "--password", PASSWORD] + arguments,
+            capture_output=True, text=True, timeout=120)
+
+    document = os.path.join(tmp, "config.json")
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run(["config", "export", document])
+    check(completed.returncode == 0, "config export: exit %d - %s" % (completed.returncode, completed.stderr))
+    with Recorder.lock:
+        exporting = list(Recorder.requests)
+    check(all(r["method"] == "GET" for r in exporting),
+          "config export made a request that was not a GET: %s" % sorted({r["method"] for r in exporting}))
+
+    if not os.path.exists(document):
+        problem("config export wrote no file")
+        return
+
+    with open(document, encoding="utf-8") as handle:
+        first = handle.read()
+
+    check('"version": 1' in first, "the document carries no version")
+    check("example.com" in first and "ann@example.com" in first,
+          "the document holds neither the domain nor its accounts")
+    check("all@example.com" in first, "the document holds no distribution list")
+    check("mx.partner.test" in first, "the document holds no route")
+
+    second_path = os.path.join(tmp, "config-again.json")
+    run(["config", "export", second_path])
+    if os.path.exists(second_path):
+        with open(second_path, encoding="utf-8") as handle:
+            second = handle.read()
+        check(first == second, "two exports of an unchanged server are not the same bytes")
+
+    completed = run(["config", "diff", document])
+    check(completed.returncode == 0,
+          "a document that matches must exit 0, exited %d:\n%s" % (completed.returncode, completed.stdout))
+    check("already matches" in completed.stdout, "a matching document should say so:\n%s" % completed.stdout)
+
+    changed = json.loads(first)
+    changed["sections"]["settings"]["settings"]["max_message_size_kb"] = 51200
+    for row in changed["sections"]["domains"]:
+        if row.get("name") == "example.net":
+            row["active"] = True
+    changed_path = os.path.join(tmp, "changed.json")
+    with open(changed_path, "w", encoding="utf-8") as handle:
+        json.dump(changed, handle, indent=2, sort_keys=True)
+
+    completed = run(["config", "diff", changed_path])
+    check(completed.returncode == 1, "a document that differs must exit 1, exited %d" % completed.returncode)
+    check("max_message_size_kb" in completed.stdout,
+          "the plan does not name the changed setting:\n%s" % completed.stdout)
+    check("example.net" in completed.stdout, "the plan does not name the changed domain:\n%s" % completed.stdout)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run(["config", "apply", changed_path])
+    with Recorder.lock:
+        planning = list(Recorder.requests)
+    check(completed.returncode == 0, "apply without --force should exit 0, exited %d" % completed.returncode)
+    check(all(r["method"] == "GET" for r in planning),
+          "apply without --force wrote something: %s" % [r["method"] for r in planning])
+    check("Nothing was changed" in completed.stdout, "apply without --force must say so:\n%s" % completed.stdout)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    run(["config", "apply", changed_path, "--force"])
+    with Recorder.lock:
+        applying = list(Recorder.requests)
+    writes = [(r["method"], r["path"], r["body"]) for r in applying if r["method"] != "GET"]
+    check(("PUT", "/api/v1/settings", {"max_message_size_kb": 51200}) in writes,
+          "the setting was not written: %s" % writes)
+    check(any(method == "PUT" and path == "/api/v1/domains/example.net" for method, path, _ in writes),
+          "the domain was not written: %s" % writes)
+
+    fewer = json.loads(first)
+    fewer["sections"]["domains"] = [r for r in fewer["sections"]["domains"] if r.get("name") != "example.net"]
+    fewer_path = os.path.join(tmp, "fewer.json")
+    with open(fewer_path, "w", encoding="utf-8") as handle:
+        json.dump(fewer, handle, indent=2, sort_keys=True)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    completed = run(["config", "apply", fewer_path, "--force"])
+    with Recorder.lock:
+        applying = list(Recorder.requests)
+    deleted = [r["path"] for r in applying if r["method"] == "DELETE"]
+    check(not deleted, "apply --force deleted without --allow-delete: %s" % deleted)
+    check("left alone" in completed.stdout, "apply must say what it left alone:\n%s" % completed.stdout)
+
+    with Recorder.lock:
+        Recorder.requests = []
+    run(["config", "apply", fewer_path, "--force", "--allow-delete"])
+    with Recorder.lock:
+        applying = list(Recorder.requests)
+    check(any(r["method"] == "DELETE" and r["path"] == "/api/v1/domains/example.net" for r in applying),
+          "apply --allow-delete did not delete the domain the document dropped: %s"
+          % [(r["method"], r["path"]) for r in applying])
 
 
 def run_import_cases(url, tmp):
@@ -472,9 +675,12 @@ def main():
             run_python_cases(url, arguments.verbose)
             run_python_refusals(url)
             run_import_cases(url, tmp)
+            run_config_cases(url, tmp)
         if not arguments.python:
             print("the PowerShell module against the same server")
             powershell_ran = run_powershell_cases(url, arguments.verbose)
+            if powershell_ran:
+                run_powershell_config_cases(url, tmp, arguments.verbose)
     finally:
         server.shutdown()
         shutil.rmtree(tmp, ignore_errors=True)

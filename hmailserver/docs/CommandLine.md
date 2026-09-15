@@ -136,6 +136,58 @@ The export writes no password column, because the server does not have the
 passwords to give. A file exported and re-imported makes no accounts; it is for
 an inventory, not a round trip.
 
+The configuration as one file
+-----------------------------
+
+```bash
+hmctl config export server.json          # the whole configuration, as a document
+hmctl config diff server.json            # what would change; exit 1 if anything would
+hmctl config apply server.json           # the plan, and nothing else
+hmctl config apply server.json --force   # the plan, applied
+```
+
+The document holds the settings groups, the `hMailServer.ini` keys the server
+exposes, the domains and their accounts, aliases and distribution lists, the
+groups, the rules, the routes, the listeners and the IP ranges. It is sorted
+throughout and carries nothing the server allocated - no identifier, no count,
+no time - so **two exports of an unchanged server are the same bytes**. That is
+what makes it usable in a repository: a diff means a change, and nothing churns.
+
+`apply` is a plan unless you add `--force`, and a **deletion needs `--allow-delete`
+on top of that**. Without it, an entry the server has and the document does not
+is left alone and counted, because the common case is a document written from
+one server and applied to another that has things of its own.
+
+What it does not carry, and why:
+
+* **Passwords.** The server does not give them out, so they are not in the
+  document. An account in the document that does not exist on the server is
+  refused with that reason rather than created with a password nobody chose;
+  add a `password` field for the accounts you mean to create.
+* **Certificates and the directories.** A certificate is files on the server's
+  own disk, and the directories are that machine's paths; copying either between
+  machines would describe a server that does not exist.
+* **What lives under an account** - application passwords, fetch accounts,
+  folder permissions - which are the account holder's rather than the
+  configuration's.
+
+### A repository that is the configuration
+
+There is no daemon; the loop is two commands and whatever runs them.
+
+```yaml
+# On a pull request: does the repository still match the server?
+- run: hmctl config diff server.json        # exit 1 fails the job
+
+# On merge: make the server match the repository.
+- run: hmctl config apply server.json --force
+```
+
+Give the job an API key rather than the administrator password, keep the key in
+the runner's secret store, and let the diff run on a schedule as well: a server
+that has drifted from its repository is worth knowing about before somebody
+needs the repository to be true.
+
 The PowerShell module
 ---------------------
 
