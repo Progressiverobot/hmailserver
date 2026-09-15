@@ -8,13 +8,13 @@ alter table hm_domains add column domainfirstcontacttip int not null default 0;
 
 alter table hm_domains add column domaindisclaimerenabled int not null default 0;
 
-alter table hm_domains add column domaindisclaimerplaintext text not null default '';
+alter table hm_domains add column domaindisclaimerplaintext text;
 
-alter table hm_domains add column domaindisclaimerhtml text not null default '';
+alter table hm_domains add column domaindisclaimerhtml text;
 
 create table hm_knownsenders
 (
-	ksid bigserial not null primary key,
+	ksid bigint auto_increment not null, primary key(`ksid`), unique(`ksid`),
 	ksaccountid int not null,
 	ksaddress varchar(255) not null,
 	kscount int not null,
@@ -24,6 +24,8 @@ create table hm_knownsenders
 
 CREATE UNIQUE INDEX idx_hm_knownsenders_account ON hm_knownsenders (ksaccountid, ksaddress);
 
+ALTER TABLE hm_knownsenders ENGINE=InnoDB;
+
 ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
-update hm_dbversion set value = 6045;
+update hm_dbversion set value = 6044;

@@ -28,4 +28,4 @@ CREATE UNIQUE CLUSTERED INDEX idx_hm_knownsenders_account ON hm_knownsenders (ks
 
 ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
-update hm_dbversion set value = 6045
+update hm_dbversion set value = 6044

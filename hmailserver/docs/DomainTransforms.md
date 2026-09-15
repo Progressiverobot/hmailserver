@@ -17,7 +17,7 @@ They are configured in three places, which are the same three settings:
 
 Over COM they are `Domain.ExternalTagSubject`, `.ExternalTagHeader`,
 `.ExternalTagText`, `.FirstContactTip`, `.DisclaimerEnabled`,
-`.DisclaimerPlainText` and `.DisclaimerHTML`. Schema 6045 added the seven
+`.DisclaimerPlainText` and `.DisclaimerHTML`. Schema 6044 added the seven
 columns and the table behind the first-contact note.
 
 Who counts as outside

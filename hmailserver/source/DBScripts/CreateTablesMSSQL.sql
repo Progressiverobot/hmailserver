@@ -1481,4 +1481,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6045)
+insert into hm_dbversion values (6044)

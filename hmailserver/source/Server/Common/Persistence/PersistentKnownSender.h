@@ -8,7 +8,7 @@ namespace HM
 {
    // The memory behind the first-contact note: who has written to an account
    // before. One row per account and sender address in hm_knownsenders (schema
-   // 6045), which is the smallest thing that can answer the question.
+   // 6044), which is the smallest thing that can answer the question.
    //
    // Why not the message index. hm_messages knows what arrived, but it does not
    // know who from: the sender is in the file, not in a column, so answering
