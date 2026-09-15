@@ -254,11 +254,27 @@ namespace HM
 
    bool
    PersistentMessageIndex::InsertTerm_(__int64 messageID, __int64 accountID, const String &term)
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // One term row, written only while the message it hangs off still exists,
+   // in the one statement. A message expunged between the indexer's listing
+   // and this save used to draw the foreign key's refusal - on PostgreSQL and
+   // on SQL Server Compact alike - which the DAL had logged as HM5032 before
+   // the caller could see that the message was gone; the hosted Linux run of
+   // 14 September 2026 failed a test that had just expunged the message it
+   // reported. Selecting the ids from hm_messages leaves the key check only
+   // the instant between that select and the insert, and a message that is
+   // gone inserts nothing and succeeds, which is the truth of it. The term is
+   // a literal: SQL Server Compact allows no parameter in a select list. The
+   // account is the message's own, which is what the caller passed.
+   //---------------------------------------------------------------------------()
    {
-      SQLCommand command("insert into hm_messageindexterms (mitmessageid, mitaccountid, mitterm) values (@MESSAGEID, @ACCOUNTID, @TERM)");
+      (void) accountID;
+
+      SQLCommand command("insert into hm_messageindexterms (mitmessageid, mitaccountid, mitterm) "
+                         "select messageid, messageaccountid, '" + SQLStatement::Escape(term) + "' "
+                         "from hm_messages where messageid = @MESSAGEID");
       command.AddParameter("@MESSAGEID", messageID);
-      command.AddParameter("@ACCOUNTID", (int) accountID);
-      command.AddParameter("@TERM", term);
 
       return Application::Instance()->GetDBManager()->Execute(command);
    }

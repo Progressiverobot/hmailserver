@@ -287,10 +287,11 @@ namespace HM
          {
             // A message deleted between the listing and this save is not a
             // failure of the index: its row is gone, the terms have no row to
-            // hang off, and there is nothing left to index. On PostgreSQL the
-            // foreign key refuses the save where SQL Server Compact accepted
-            // it, which is how the Linux run of 14 September 2026 saw an error
-            // reported for a message a test had just expunged.
+            // hang off, and there is nothing left to index. The insert selects
+            // from hm_messages itself since 15 September 2026, so a message
+            // that is gone inserts nothing rather than drawing the foreign
+            // key's refusal; what is left is the instant between that select
+            // and the insert, and this is the answer to it.
             std::shared_ptr<Message> stillThere = std::shared_ptr<Message>(new Message);
             if (!PersistentMessage::ReadObject(stillThere, messageToIndex.MessageID) || stillThere->GetID() == 0)
             {
