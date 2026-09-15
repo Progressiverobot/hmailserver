@@ -215,6 +215,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
       <button data-view="certs"><span class="ico">⚿</span>Certificates</button>
       <button data-view="ports"><span class="ico">⊞</span>Ports</button>
       <button data-view="logs"><span class="ico">≡</span>Logs</button>
+      <button data-view="audit"><span class="ico">⚷</span>Audit trail</button>
     </nav>
     <div class="foot">
       <div class="pill"><span class="dot"></span><span id="connState">Connected</span></div>
@@ -501,7 +502,7 @@ $("#nav").addEventListener("click",e=>{
   view=b.dataset.view;editing=null;render();
 });
 const titles={dash:K("Dashboard"),domains:K("Domains"),ipranges:K("IP ranges"),fetch:K("Fetch accounts"),lists:K("Lists"),queue:K("Delivery queue"),tlsa:K("DANE / TLSA"),
-  settings:K("Settings"),backup:K("Backup"),messages:K("Server messages"),rules:K("Rules"),routes:K("Routes"),certs:K("Certificates"),ports:K("Ports"),logs:K("Logs")};
+  settings:K("Settings"),backup:K("Backup"),messages:K("Server messages"),rules:K("Rules"),routes:K("Routes"),certs:K("Certificates"),ports:K("Ports"),logs:K("Logs"),audit:K("Audit trail")};
 
 async function render(silent){
   $("#viewTitle").textContent=t(titles[view]);
@@ -521,6 +522,7 @@ async function render(silent){
     else if(view==="certs")await renderCerts();
     else if(view==="ports")await renderPorts();
     else if(view==="logs")await renderLogs();
+    else if(view==="audit")await renderAudit();
     $("#connState").textContent=t("Connected");
   }catch(err){
     if(err.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}
@@ -819,6 +821,8 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="routeedit")openRoute(Number(d.id));
   else if(d.act==="routedel")deleteRoute(Number(d.id),d.name);
   else if(d.act==="routesave")saveRoute();
+  else if(d.act==="auditpage"){auditOffset=Math.max(0,auditOffset+Number(d.by));render();}
+  else if(d.act==="auditverify")verifyAuditChain();
   else if(d.act==="cancel"){editing=null;render();}
 });
 /* A criterion's field or an action's type decides which further controls the
@@ -2546,6 +2550,55 @@ async function renderLogs(){
     <pre id="logPre" style="margin-top:14px;max-height:60vh;overflow:auto;white-space:pre-wrap" hidden></pre></div>`;
 }
 function fmtBytes(n){n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(1)+" MB";if(n>=1024)return (n/1024).toFixed(1)+" KB";return n+" B";}
+/* ---------- Audit trail ----------
+   Who changed what, when, from where, and over which interface. The rows are
+   written below the interfaces (see AuditTrail.h in the server), so a change
+   made over COM by the Control Panel and the same change made here appear side
+   by side with only the interface column telling them apart.
+
+   The page reads and never writes: the record is append-only, and a page that
+   could edit it would be the first thing to use. */
+let auditOffset=0;
+const AUDIT_PAGE=50;
+function auditWhen(seconds){
+  const value=Number(seconds)||0;
+  if(!value)return "—";
+  return new Date(value*1000).toISOString().replace("T"," ").replace(/\.\d+Z$/,"Z");
+}
+async function renderAudit(){
+  const filter=(auditFilter||"").trim();
+  const query="?limit="+AUDIT_PAGE+"&offset="+auditOffset+(filter?"&actor="+encodeURIComponent(filter):"");
+  const answer=await api("/api/v1/audit"+query);
+  const entries=answer.entries||[];
+  const total=Number(answer.total)||0;
+  const rows=entries.map(e=>`
+    <tr><td>${escHtml(auditWhen(e.time))}</td><td>${escHtml(e.actor||"—")}</td><td>${escHtml(e.interface||"—")}</td>
+        <td>${escHtml(e.address||"—")}</td><td>${escHtml(e.object_type||"—")}</td><td>${escHtml(e.object||"—")}</td>
+        <td>${escHtml(e.action||"—")}</td><td>${escHtml(e.detail||"")}</td></tr>`).join("");
+  $("#content").innerHTML=`<div class="card view">
+    <div class="row" style="gap:10px;align-items:center;margin-bottom:12px">
+      <input id="auditFilter" placeholder="${t("Filter by administrator or API key")}" value="${escHtml(filter)}" style="flex:1">
+      <button class="btn ghost sm" data-act="auditverify">${t("Verify the chain")}</button>
+      <button class="btn ghost sm" data-act="auditpage" data-by="-${AUDIT_PAGE}">${t("Newer")}</button>
+      <button class="btn ghost sm" data-act="auditpage" data-by="${AUDIT_PAGE}">${t("Older")}</button>
+    </div>
+    <div class="err" id="err_audit"></div>
+    <div class="tablewrap"><table><thead><tr><th>${t("When")}</th><th>${t("Who")}</th><th>${t("Interface")}</th><th>${t("From")}</th>
+      <th>${t("Object")}</th><th>${t("Name")}</th><th>${t("Action")}</th><th>${t("Detail")}</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="8" class="empty">'+t("Nothing has been recorded yet. Every administrative change appears here.")+'</td></tr>'}</tbody></table></div>
+    <p class="note" style="margin-top:12px">${tf("{0} to {1} of {2}",total?auditOffset+1:0,auditOffset+entries.length,total)}</p></div>`;
+  const box=$("#auditFilter");
+  if(box)box.onchange=e=>{auditFilter=e.target.value;auditOffset=0;render();};
+}
+let auditFilter="";
+async function verifyAuditChain(){
+  setErr("err_audit","");
+  try{
+    const answer=await api("/api/v1/audit/verify");
+    if(answer.intact)toast(tf("The chain is intact. {0} row(s) checked.",Number(answer.rows_checked)||0));
+    else setErr("err_audit",tf("The chain is broken at row {0}. {1}",Number(answer.first_broken_id)||0,answer.reason||""));
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_audit",e.message);}
+}
 async function showLog(name,lines){
   setErr("err_log","");
   try{

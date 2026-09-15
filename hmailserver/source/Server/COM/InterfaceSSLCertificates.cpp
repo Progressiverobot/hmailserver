@@ -12,6 +12,7 @@
 #include "InterfaceSSLCertificate.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceSSLCertificates::InterfaceSupportsErrorInfo(REFIID riid)
 {
@@ -58,6 +59,8 @@ InterfaceSSLCertificates::Clear()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ssl_certificates_)
          return GetAccessDenied();
    
@@ -124,6 +127,8 @@ InterfaceSSLCertificates::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ssl_certificates_)
          return GetAccessDenied();
 

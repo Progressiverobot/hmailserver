@@ -5,6 +5,7 @@
 #include "stdafx.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceMessage.h"
 #include "InterfaceAttachments.h"
 #include "InterfaceRecipients.h"
@@ -392,6 +393,8 @@ InterfaceMessage::SaveNewMessageToIMAPFolder_()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

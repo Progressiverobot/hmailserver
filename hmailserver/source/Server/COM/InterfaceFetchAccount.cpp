@@ -11,6 +11,7 @@
 #include "../Common/Persistence/PersistentFetchAccount.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 InterfaceFetchAccount::InterfaceFetchAccount()
 {
@@ -344,6 +345,8 @@ STDMETHODIMP InterfaceFetchAccount::Save(void)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceTCPIPPorts.h"
 
 
@@ -110,6 +111,8 @@ InterfaceTCPIPPorts::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!tcpip_ports_)
          return GetAccessDenied();
 

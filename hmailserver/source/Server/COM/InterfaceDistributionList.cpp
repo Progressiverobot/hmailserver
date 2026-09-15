@@ -13,6 +13,7 @@
 #include "../Common/BO/DistributionListRecipients.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 
 #ifdef _DEBUG
@@ -232,6 +233,8 @@ STDMETHODIMP InterfaceDistributionList::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -254,6 +257,8 @@ STDMETHODIMP InterfaceDistributionList::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

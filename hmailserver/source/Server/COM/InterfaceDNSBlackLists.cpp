@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceDNSBlackLists.h"
 #include "InterfaceDNSBlackList.h"
 
@@ -94,6 +95,8 @@ InterfaceDNSBlackLists::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!black_lists_)
          return GetAccessDenied();
 

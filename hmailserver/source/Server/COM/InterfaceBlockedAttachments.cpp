@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "../COM/InterfaceBlockedAttachments.h"
 
 #include "../Common/BO/BlockedAttachment.h"
@@ -102,6 +103,8 @@ InterfaceBlockedAttachments::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!blocked_attachments_)
          return GetAccessDenied();
 

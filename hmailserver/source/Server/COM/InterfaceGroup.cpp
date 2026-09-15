@@ -13,6 +13,7 @@
 #include "../Common/BO/Groups.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceGroup::InterfaceSupportsErrorInfo(REFIID riid)
 {
@@ -41,6 +42,8 @@ InterfaceGroup::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

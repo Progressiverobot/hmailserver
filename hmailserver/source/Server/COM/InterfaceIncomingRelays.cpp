@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceIncomingRelays.h"
 
 #include "../Common/Persistence/PersistentIncomingRelay.h"
@@ -37,6 +38,8 @@ InterfaceIncomingRelays::Delete(long Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!incoming_relays_)
          return GetAccessDenied();
 
@@ -54,6 +57,8 @@ InterfaceIncomingRelays::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!incoming_relays_)
          return GetAccessDenied();
 

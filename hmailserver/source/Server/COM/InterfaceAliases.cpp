@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "InterfaceAliases.h"
 #include "InterfaceAlias.h"
@@ -34,6 +35,8 @@ STDMETHODIMP InterfaceAliases::Delete(long Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!aliases_)
          return GetAccessDenied();
 
@@ -158,6 +161,8 @@ STDMETHODIMP InterfaceAliases::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!aliases_)
          return GetAccessDenied();
 

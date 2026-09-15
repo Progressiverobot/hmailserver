@@ -11,6 +11,7 @@
 #include "../Common/Util/Totp.h"
 #include "../Common/Util/Crypt.h"
 #include "../Common/Application/IniFileSettings.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "COMError.h"
 
@@ -199,6 +200,8 @@ namespace HM
    bool 
    COMAuthentication::GetIsDomainAdmin() const
    {
+      AuditTrail::SetActor(GetAuditActor());
+
       if (GetIsServerAdmin())
          return true;
 
@@ -206,9 +209,44 @@ namespace HM
              account_->GetAdminLevel() == Account::DomainAdmin;
    }
 
+   /*
+      Who this COM call is being made by, for the audit trail. Empty (present ==
+      false) for an unauthenticated caller, which cannot write anything anyway.
+
+      The address is deliberately blank: a COM call arrives through DCOM with no
+      peer address this process can see, and inventing one would be worse than
+      saying nothing. What the row does say is the interface - COM - which is the
+      Control Panel, hmconfig.ps1, DBSetup, a script, or anything else holding the
+      administrator password.
+   */
+   AuditTrail::Actor
+   COMAuthentication::GetAuditActor() const
+   {
+      AuditTrail::Actor actor;
+
+      if (!account_)
+         return actor;
+
+      actor.present = true;
+      actor.name = account_->GetAddress();
+      actor.interface_name = _T("COM");
+
+      if (account_->GetAdminLevel() == Account::ServerAdmin || account_->GetAdminLevel() == Account::DomainAdmin)
+         actor.kind = _T("administrator");
+      else
+         actor.kind = _T("account");
+
+      return actor;
+   }
+
    bool 
    COMAuthentication::GetIsServerAdmin() const
    {
+      // See GetAuditActor: this is one of the two places COM installs the audit
+      // trail's actor, and it is here rather than at authentication because the
+      // thread that asks the question is the thread that then writes.
+      AuditTrail::SetActor(GetAuditActor());
+
       return (account_ && account_->GetAdminLevel() == Account::ServerAdmin);
    }
 

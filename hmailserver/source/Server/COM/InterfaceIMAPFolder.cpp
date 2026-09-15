@@ -20,6 +20,7 @@
 
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 
 STDMETHODIMP 
@@ -49,6 +50,8 @@ STDMETHODIMP InterfaceIMAPFolder::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -254,6 +257,8 @@ STDMETHODIMP InterfaceIMAPFolder::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

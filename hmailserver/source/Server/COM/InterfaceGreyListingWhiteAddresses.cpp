@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceGreyListingWhiteAddresses.h"
 
 #include "../Common/BO/GreyListingWhiteAddress.h"
@@ -87,6 +88,8 @@ InterfaceGreyListingWhiteAddresses::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!gl_white_addresses_)
          return GetAccessDenied();
 

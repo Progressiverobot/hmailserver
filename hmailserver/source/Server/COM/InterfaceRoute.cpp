@@ -10,6 +10,7 @@
 #include "../Common/BO/Routes.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceRoute::InterfaceSupportsErrorInfo(REFIID riid)
 {
@@ -245,6 +246,8 @@ STDMETHODIMP InterfaceRoute::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

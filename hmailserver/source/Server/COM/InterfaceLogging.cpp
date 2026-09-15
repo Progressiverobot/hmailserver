@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "InterfaceLogging.h"
 
@@ -49,6 +50,8 @@ InterfaceLogging::put_Enabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -88,6 +91,8 @@ InterfaceLogging::put_LogSMTP(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -127,6 +132,8 @@ InterfaceLogging::put_LogPOP3(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -168,6 +175,8 @@ InterfaceLogging::put_LogIMAP(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -204,6 +213,8 @@ InterfaceLogging::put_AWStatsEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -243,6 +254,8 @@ InterfaceLogging::put_LogTCPIP(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -284,6 +297,8 @@ InterfaceLogging::put_LogApplication(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -336,6 +351,8 @@ STDMETHODIMP InterfaceLogging::put_Device(eLogDevice newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
    
@@ -410,6 +427,8 @@ STDMETHODIMP InterfaceLogging::put_LogFormat(eLogOutputFormat newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -482,6 +501,8 @@ STDMETHODIMP InterfaceLogging::put_LogDebug(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -574,6 +595,8 @@ STDMETHODIMP InterfaceLogging::put_MaskPasswordsInLog(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -606,6 +629,8 @@ STDMETHODIMP InterfaceLogging::put_KeepFilesOpen(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 

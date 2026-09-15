@@ -10,6 +10,7 @@
 #include "../Common/BO/DistributionListRecipients.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceDistributionListRecipient::InterfaceSupportsErrorInfo(REFIID riid)
 {
@@ -115,6 +116,8 @@ STDMETHODIMP InterfaceDistributionListRecipient::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -135,6 +138,8 @@ STDMETHODIMP InterfaceDistributionListRecipient::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

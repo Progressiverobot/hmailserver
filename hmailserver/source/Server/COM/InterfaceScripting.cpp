@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceScripting.h"
 
 #include "../Common/Scripting/ScriptServer.h"
@@ -48,6 +49,8 @@ STDMETHODIMP InterfaceScripting::put_Enabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -81,6 +84,8 @@ STDMETHODIMP InterfaceScripting::put_Language(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 

@@ -5,6 +5,7 @@
 #include "stdafx.h"
 #include "InterfaceQuarantine.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 
 #include "../Common/AntiSpam/SpamAssassin/SpamAssassinTestConnect.h"
@@ -84,6 +85,8 @@ STDMETHODIMP InterfaceAntiSpam::put_CheckHostInHelo(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -118,6 +121,8 @@ STDMETHODIMP InterfaceAntiSpam::put_CheckHostInHeloScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -152,6 +157,8 @@ STDMETHODIMP InterfaceAntiSpam::put_CheckPTR(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -186,6 +193,8 @@ STDMETHODIMP InterfaceAntiSpam::put_CheckPTRScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -220,6 +229,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamMarkThreshold(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -275,6 +286,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamDeleteThreshold(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -308,6 +321,8 @@ STDMETHODIMP InterfaceAntiSpam::put_GreyListingEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -340,6 +355,8 @@ STDMETHODIMP InterfaceAntiSpam::put_GreyListingInitialDelay(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -372,6 +389,8 @@ STDMETHODIMP InterfaceAntiSpam::put_GreyListingInitialDelete(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -404,6 +423,8 @@ STDMETHODIMP InterfaceAntiSpam::put_GreyListingFinalDelete(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -436,6 +457,8 @@ STDMETHODIMP InterfaceAntiSpam::put_AddHeaderSpam(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -468,6 +491,8 @@ STDMETHODIMP InterfaceAntiSpam::put_AddHeaderReason(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -500,6 +525,8 @@ STDMETHODIMP InterfaceAntiSpam::put_PrependSubject(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -532,6 +559,8 @@ STDMETHODIMP InterfaceAntiSpam::put_PrependSubjectText(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -637,6 +666,8 @@ STDMETHODIMP InterfaceAntiSpam::put_UseSPF(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -671,6 +702,8 @@ STDMETHODIMP InterfaceAntiSpam::put_UseSPFScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -705,6 +738,8 @@ STDMETHODIMP InterfaceAntiSpam::put_UseMXChecks(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -739,6 +774,8 @@ STDMETHODIMP InterfaceAntiSpam::put_UseMXChecksScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -799,6 +836,8 @@ STDMETHODIMP InterfaceAntiSpam::put_TarpitDelay(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -836,6 +875,8 @@ STDMETHODIMP InterfaceAntiSpam::put_TarpitCount(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -874,6 +915,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamAssassinEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -908,6 +951,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamAssassinScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -942,6 +987,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamAssassinMergeScore(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -976,6 +1023,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamAssassinHost(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1010,6 +1059,8 @@ STDMETHODIMP InterfaceAntiSpam::put_SpamAssassinPort(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1044,6 +1095,8 @@ STDMETHODIMP InterfaceAntiSpam::put_MaximumMessageSize(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1133,6 +1186,8 @@ STDMETHODIMP InterfaceAntiSpam::put_DKIMVerificationEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1167,6 +1222,8 @@ STDMETHODIMP InterfaceAntiSpam::put_DKIMVerificationFailureScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1201,6 +1258,8 @@ STDMETHODIMP InterfaceAntiSpam::put_DMARCEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1235,6 +1294,8 @@ STDMETHODIMP InterfaceAntiSpam::put_ArcFilteringEnabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1269,6 +1330,8 @@ STDMETHODIMP InterfaceAntiSpam::put_ArcTrustedSealers(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1303,6 +1366,8 @@ STDMETHODIMP InterfaceAntiSpam::put_DMARCFailureScore(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1337,6 +1402,8 @@ STDMETHODIMP InterfaceAntiSpam::put_BypassGreylistingOnSPFSuccess(VARIANT_BOOL n
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -1371,6 +1438,8 @@ STDMETHODIMP InterfaceAntiSpam::put_BypassGreylistingOnMailFromMX(VARIANT_BOOL n
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 

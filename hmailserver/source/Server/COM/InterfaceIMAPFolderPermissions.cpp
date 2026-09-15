@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceIMAPFolderPermissions.h"
 #include "InterfaceIMAPFolderPermission.h"
 
@@ -42,6 +43,8 @@ STDMETHODIMP InterfaceIMAPFolderPermissions::Delete(long Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!acl_permission_)
          return GetAccessDenied();
 
@@ -168,6 +171,8 @@ STDMETHODIMP InterfaceIMAPFolderPermissions::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!acl_permission_)
          return GetAccessDenied();
 

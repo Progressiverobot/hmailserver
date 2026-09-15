@@ -16,8 +16,8 @@ This measures how far the browser administration page (the Control Deck at `/Web
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 58 |
-| REST routes (path and method) | 227, 104 of them writes |
-| Deck views | 15 |
+| REST routes (path and method) | 234, 107 of them writes |
+| Deck views | 16 |
 
 ## Missing over REST, by interface
 
@@ -600,8 +600,8 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | DistributionListRecipients | `Add` | RecipientsDialog | - |
 | SecurityRanges | `Add` | IPRangesView | - |
 | SecurityRanges | `SetDefault` | IPRangesView | - |
-| AntiVirus | `TestClamAVScanner` | ServerSettingsView | - |
-| AntiVirus | `TestClamWinScanner` | ServerSettingsView | - |
+| AntiVirus | `TestClamAVScanner` | ServerSettingsView | `POST /api/v1/alerts/test` |
+| AntiVirus | `TestClamWinScanner` | ServerSettingsView | `POST /api/v1/alerts/test` |
 | Route | `SetRelayerAuthPassword` | RouteDialog | - |
 | Domains | `Add` | DomainsView | - |
 | Domains | `DeleteByDBID` | DomainsView | - |
@@ -635,7 +635,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | DeliveryQueue | `StartDelivery` | QueueView | - |
 | IMAPFolders | `Add` | AccountDialog, PublicFoldersView | - |
 | AntiSpam | `ClearGreyListingTriplets` | ServerSettingsView | `POST /api/v1/settings/logon-failures/clear` |
-| AntiSpam | `TestSpamAssassinConnection` | ServerSettingsView | - |
+| AntiSpam | `TestSpamAssassinConnection` | ServerSettingsView | `POST /api/v1/alerts/test` |
 | TCPIPPorts | `Add` | TcpIpPortsView | - |
 | TCPIPPorts | `SetDefault` | TcpIpPortsView | - |
 | SSLCertificates | `Add` | SslCertificatesView | - |
@@ -646,7 +646,7 @@ Secondary and looser still: a COM method counts as covered when a non-GET route'
 | IncomingRelays | `Add` | UtilityViews | - |
 | MessageIndexing | `Clear` | ServerSettingsView | `POST /api/v1/settings/indexing/clear`<br>`POST /api/v1/settings/logon-failures/clear` |
 | MessageIndexing | `Index` | ServerSettingsView | `POST /api/v1/settings/indexing/index` |
-| Diagnostics | `PerformTests` | UtilityViews | - |
+| Diagnostics | `PerformTests` | UtilityViews | `POST /api/v1/alerts/test` |
 
 ## Write routes
 
@@ -666,6 +666,9 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `PUT /api/v1/accounts/{address}/messages/{id}` | ServerMessage | `answered`, `deleted`, `draft`, `flagged`, `folder`, `seen`, `value` | - |
 | `POST /api/v1/accounts/{address}/messages/{id}/copy` | ServerMessage | `account`, `destination`, `folder`, `folder_id`, `to` | - |
 | `POST /api/v1/accounts/{address}/support-session` | - | - | - |
+| `PUT /api/v1/alerts/rules/{condition}` | Rule, RuleCriteria, RuleAction | `webhook_secret` | - |
+| `POST /api/v1/alerts/run` | ? | - | - |
+| `POST /api/v1/alerts/test` | ? | - | - |
 | `POST /api/v1/apikeys` | - | - | - |
 | `POST /api/v1/archive/{id}/hold` | - | - | - |
 | `POST /api/v1/backup` | BackupSettings, Backup | - | yes |
@@ -734,7 +737,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/scheduled/run` | - | - | - |
 | `POST /api/v1/server/reinitialize` | - | - | yes |
 | `POST /api/v1/session` | - | - | - |
-| `PUT /api/v1/settings` | Settings, MessageIndexing, Directories, BackupSettings, Cache, AntiVirus | `add_delivered_to_header`, `allow_incorrect_line_endings`, `allow_smtp_auth_plain`, `auto_ban_on_logon_failure`, `create_default_special_use_folders`, `default_domain`, `deny_mail_from_null`, `disconnect_invalid_clients`, `host_name`, `imap_acl_enabled`, `imap_hierarchy_delimiter`, `imap_idle_enabled`, `imap_master_user`, `imap_public_folder_name`, `imap_quota_enabled`, `imap_sasl_initial_response_enabled`, `imap_sasl_plain_enabled`, `imap_sort_enabled`, `ipv6_preferred`, `log_imap_conversations`, `log_pop3_conversations`, `log_smtp_conversations`, `max_asynchronous_threads`, `max_delivery_threads`, `max_imap_connections`, `max_invalid_logon_attempts`, `max_message_size_kb`, `max_number_of_invalid_commands`, `max_number_of_mx_hosts`, `max_pop3_connections`, `max_smtp_connections`, `max_smtp_recipients_in_batch`, `minutes_before_reset`, `minutes_to_ban`, `mirror_email_address`, `rewrite_envelope_from_when_forwarding`, `rule_loop_limit`, `service_imap`, `service_pop3`, `service_smtp`, `smtp_connection_security`, `smtp_delivery_bind_to_ip`, `smtp_minutes_between_try`, `smtp_no_of_tries`, `smtp_relayer`, `smtp_relayer_connection_security`, `smtp_relayer_password`, `smtp_relayer_port`, `smtp_relayer_requires_authentication`, `smtp_relayer_username`, `ssl_cipher_list`, `tcpip_threads`, `tls_prefer_server_ciphers`, `tls_prioritize_chacha`, `tls_version_10_enabled`, `tls_version_11_enabled`, `tls_version_12_enabled`, `tls_version_13_enabled`, `user_interface_language`, `verify_remote_ssl_certificate`, `welcome_imap`, `welcome_pop3`, `welcome_smtp`, `worker_thread_priority` | yes |
+| `PUT /api/v1/settings` | Settings, MessageIndexing, Directories, BackupSettings, Cache, AntiVirus | `add_delivered_to_header`, `alert_digest_enabled`, `alert_digest_hour`, `alert_max_per_hour`, `alert_recipient`, `alert_sender_address`, `alert_webhook_max_attempts`, `alerts_enabled`, `allow_incorrect_line_endings`, `allow_smtp_auth_plain`, `audit_retention_days`, `audit_trail_enabled`, `auto_ban_on_logon_failure`, `create_default_special_use_folders`, `default_domain`, `deny_mail_from_null`, `disconnect_invalid_clients`, `host_name`, `imap_acl_enabled`, `imap_hierarchy_delimiter`, `imap_idle_enabled`, `imap_master_user`, `imap_public_folder_name`, `imap_quota_enabled`, `imap_sasl_initial_response_enabled`, `imap_sasl_plain_enabled`, `imap_sort_enabled`, `ipv6_preferred`, `log_imap_conversations`, `log_pop3_conversations`, `log_smtp_conversations`, `max_asynchronous_threads`, `max_delivery_threads`, `max_imap_connections`, `max_invalid_logon_attempts`, `max_message_size_kb`, `max_number_of_invalid_commands`, `max_number_of_mx_hosts`, `max_pop3_connections`, `max_smtp_connections`, `max_smtp_recipients_in_batch`, `minutes_before_reset`, `minutes_to_ban`, `mirror_email_address`, `rewrite_envelope_from_when_forwarding`, `rule_loop_limit`, `service_imap`, `service_pop3`, `service_smtp`, `smtp_connection_security`, `smtp_delivery_bind_to_ip`, `smtp_minutes_between_try`, `smtp_no_of_tries`, `smtp_relayer`, `smtp_relayer_connection_security`, `smtp_relayer_password`, `smtp_relayer_port`, `smtp_relayer_requires_authentication`, `smtp_relayer_username`, `ssl_cipher_list`, `tcpip_threads`, `tls_prefer_server_ciphers`, `tls_prioritize_chacha`, `tls_version_10_enabled`, `tls_version_11_enabled`, `tls_version_12_enabled`, `tls_version_13_enabled`, `user_interface_language`, `verify_remote_ssl_certificate`, `welcome_imap`, `welcome_pop3`, `welcome_smtp`, `worker_thread_priority` | yes |
 | `PUT /api/v1/settings/antispam` | AntiSpam | `add_header_reason`, `add_header_spam`, `arc_filtering_enabled`, `arc_trusted_sealers`, `bypass_greylisting_on_mail_from_mx`, `bypass_greylisting_on_spf_success`, `check_host_in_helo`, `check_host_in_helo_score`, `check_mx_records`, `check_mx_records_score`, `check_ptr`, `check_ptr_score`, `dkim_verification_enabled`, `dkim_verification_failure_score`, `dmarc_enabled`, `dmarc_failure_score`, `greylisting_enabled`, `greylisting_final_delete`, `greylisting_initial_delay`, `greylisting_initial_delete`, `maximum_message_size_kb`, `prepend_subject`, `prepend_subject_text`, `spam_delete_threshold`, `spam_mark_threshold`, `spamassassin_enabled`, `spamassassin_host`, `spamassassin_merge_score`, `spamassassin_port`, `spamassassin_score`, `tarpit_count`, `tarpit_delay`, `use_spf`, `use_spf_score` | yes |
 | `PUT /api/v1/settings/antivirus` | AntiVirus | `action`, `attachment_blocking_enabled`, `clamav_enabled`, `clamav_host`, `clamav_port`, `clamwin_db_folder`, `clamwin_enabled`, `clamwin_executable`, `custom_scanner_enabled`, `custom_scanner_executable`, `custom_scanner_return_value`, `maximum_message_size_kb`, `notify_receiver`, `notify_sender` | yes |
 | `PUT /api/v1/settings/backup` | BackupSettings, Backup | `backup_domains`, `backup_messages`, `backup_settings`, `compress`, `destination` | yes |
@@ -778,4 +781,5 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |
 | `ports` | `GET /api/v1/certificates`, `GET /api/v1/openapi.json`, `GET /api/v1/ports`, `POST /api/v1/ports`, `DELETE /api/v1/ports/{}`, `PUT /api/v1/ports/{}`, `POST /api/v1/server/reinitialize` |
 | `logs` | `GET /api/v1/logs`, `GET /api/v1/logs/{}?lines={}`, `GET /api/v1/status` |
+| `audit` | `GET /api/v1/audit/verify`, `GET /api/v1/audit{}` |
 

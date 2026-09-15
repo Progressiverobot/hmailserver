@@ -10,6 +10,7 @@
 #include "../Common/BO/RouteAddress.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP 
 InterfaceRouteAddress::get_ID(long *pVal)
@@ -106,6 +107,8 @@ InterfaceRouteAddress::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

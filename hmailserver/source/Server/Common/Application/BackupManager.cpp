@@ -6,6 +6,8 @@
 
 #include "BackupManager.h"
 
+#include "../Util/AlertManager.h"
+
 #include "Backup.h"
 #include "BackupRestorer.h"
 
@@ -374,6 +376,13 @@ namespace HM
       last_backup_succeeded_ = false;
 
       ErrorManager::Instance()->ReportError(ErrorManager::Critical, 5014, "BackupManager::OnBackupFailed", sErrorMsg);
+
+      // One of the two alert rules that ship switched on. A backup that fails is
+      // not noticed at all until the day it is needed, which is the worst
+      // possible day to find out, so this one is worth a message even on a
+      // server whose administrator has configured nothing else.
+      AlertManager::Instance()->RaiseOccurrence(AlertManager::ConditionBackupFailed, ErrorManager::Critical,
+         _T("A backup failed."), sReason);
 
       if (Configuration::Instance()->GetUseScriptServer())
       {

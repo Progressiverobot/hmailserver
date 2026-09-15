@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceSecurityRanges.h"
 
 #include "../Common/Persistence/PersistentSecurityRange.h"
@@ -45,6 +46,8 @@ InterfaceSecurityRanges::Delete(long Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!security_ranges_)
          return GetAccessDenied();
 
@@ -62,6 +65,8 @@ InterfaceSecurityRanges::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!security_ranges_)
          return GetAccessDenied();
 

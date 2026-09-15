@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceBackupSettings.h"
 
 #include "../Common/Application/IniFileSettings.h"
@@ -48,6 +49,8 @@ STDMETHODIMP InterfaceBackupSettings::put_Destination(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -106,6 +109,8 @@ InterfaceBackupSettings::put_BackupSettings(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -140,6 +145,8 @@ InterfaceBackupSettings::put_BackupDomains(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -174,6 +181,8 @@ InterfaceBackupSettings::put_BackupMessages(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 
@@ -208,6 +217,8 @@ InterfaceBackupSettings::put_CompressDestinationFiles(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!config_)
          return GetAccessDenied();
 

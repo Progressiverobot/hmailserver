@@ -536,6 +536,38 @@ namespace
       { "user_interface_language", KindString, ReadWrite, EffectStored, nullptr,
         "The language name third-party administration tools read over COM (Settings.UserInterfaceLanguage, UseLanguage in hMailServer.ini); the server translates nothing with it.",
         ROW_TEXT(Ini()->GetUserInterfaceLanguage()), ROW_SET(Ini()->SetUserInterfaceLanguage(v.text)), ROW_NO_CHECK },
+
+      // The audit trail and the alerts. In hm_settings, reached through
+      // Configuration like every other row here - none of them is an
+      // hMailServer.ini key, and the rules themselves are rows in
+      // hm_alertrules reached at /api/v1/alerts/rules rather than settings.
+      { "audit_trail_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether every administrative change is recorded in the hash-chained audit trail, readable at /api/v1/audit.",
+        ROW_FLAG(Config()->GetAuditTrailEnabled()), ROW_SET(Config()->SetAuditTrailEnabled(v.flag)), ROW_NO_CHECK },
+      { "audit_retention_days", KindInteger, ReadWrite, EffectNow, nullptr,
+        "Days of audit trail to keep; 0 keeps everything, which is the default. Deleting the oldest rows re-anchors the chain at the oldest that remains.",
+        ROW_NUMBER(Config()->GetAuditRetentionDays()), ROW_SET(Config()->SetAuditRetentionDays((int) v.number)), ROW_NO_CHECK },
+      { "alerts_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "The master switch for alerting. With it on, the rules at /api/v1/alerts/rules decide which conditions are watched.",
+        ROW_FLAG(Config()->GetAlertsEnabled()), ROW_SET(Config()->SetAlertsEnabled(v.flag)), ROW_NO_CHECK },
+      { "alert_recipient", KindString, ReadWrite, EffectNow, nullptr,
+        "The address alerts and the daily digest are sent to. Empty means nothing is mailed, which is the default.",
+        ROW_TEXT(Config()->GetAlertRecipient()), ROW_SET(Config()->SetAlertRecipient(v.text)), ROW_NO_CHECK },
+      { "alert_sender_address", KindString, ReadWrite, EffectNow, nullptr,
+        "The address alerts are sent FROM. Empty means nothing is mailed, which is the default.",
+        ROW_TEXT(Config()->GetAlertSenderAddress()), ROW_SET(Config()->SetAlertSenderAddress(v.text)), ROW_NO_CHECK },
+      { "alert_digest_enabled", KindBoolean, ReadWrite, EffectNow, nullptr,
+        "Whether conditions marked for the digest wait for one daily message rather than sending one message each.",
+        ROW_FLAG(Config()->GetAlertDigestEnabled()), ROW_SET(Config()->SetAlertDigestEnabled(v.flag)), ROW_NO_CHECK },
+      { "alert_digest_hour", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The hour of the day, UTC, at which the digest is sent. 0 to 23.",
+        ROW_NUMBER(Config()->GetAlertDigestHour()), ROW_SET(Config()->SetAlertDigestHour((int) v.number)), ROW_NO_CHECK },
+      { "alert_max_per_hour", KindInteger, ReadWrite, EffectNow, nullptr,
+        "The most alerts that will be sent one at a time in an hour. Past it everything goes into the digest instead.",
+        ROW_NUMBER(Config()->GetAlertMaxPerHour()), ROW_SET(Config()->SetAlertMaxPerHour((int) v.number)), ROW_NO_CHECK },
+      { "alert_webhook_max_attempts", KindInteger, ReadWrite, EffectNow, nullptr,
+        "How many times a webhook is attempted before the event is dead-lettered. 1 to 20.",
+        ROW_NUMBER(Config()->GetAlertWebhookMaxAttempts()), ROW_SET(Config()->SetAlertWebhookMaxAttempts((int) v.number)), ROW_NO_CHECK },
    };
 
    const Row AntiSpamRows[] =
