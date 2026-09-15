@@ -2,8 +2,6 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.POP3;
 using RegressionTests.Shared;
@@ -11,7 +9,8 @@ using RegressionTests.Shared;
 namespace RegressionTests.Security
 {
    /// <summary>
-   ///    Exercises the MinimumAcceptedHashAlgorithm policy (hMailServer.ini [Settings]).
+   ///    Exercises the MinimumAcceptedHashAlgorithm policy (a [Settings] value, held in the
+   ///    settings store since schema 6042 and mirrored into hMailServer.ini).
    ///    An administrator can refuse authentication for accounts whose stored password
    ///    hash is weaker than a configured Crypt::EncryptionType threshold, forcing those
    ///    passwords to be reset to a strong scheme rather than continuing to be accepted
@@ -28,28 +27,10 @@ namespace RegressionTests.Security
 
       private void SetMinimumAcceptedHashAlgorithm(int value)
       {
-         // The server reads hMailServer.ini from its bin directory (Utilities::GetBinDirectory):
-         // a registered install resolves to {InstallLocation}\Bin, while a developer build that
-         // is not registered reads the ini next to the running executable (the ProgramFolder).
-         // Write the setting to every existing candidate so the file the service actually reads
-         // is updated regardless of layout, without creating stray ini files.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", "MinimumAcceptedHashAlgorithm", value.ToString(), iniPath),
-               "Failed to write MinimumAcceptedHashAlgorithm to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Stored through the settings store rather than written into hMailServer.ini: from
+         // schema 6042 an edit to the file is undone at the next start, and the store writes
+         // the file's copy itself.
+         IniFileSetting.Write("MinimumAcceptedHashAlgorithm", value.ToString());
 
          // The setting is cached in IniFileSettings at startup; Reinitialize reloads it.
          _application.Reinitialize();

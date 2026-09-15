@@ -116,6 +116,7 @@ namespace RegressionTests.API
          // file's bytes rather than going through the profile API, so without
          // this the server can still read the old value and the test that ages a
          // key past its expiry would assert against stale data.
+         // settings-store-exempt: a flush of hMailServerApiKeys.ini, the API key store; it writes no key and never touches hMailServer.ini.
          IniFile.WritePrivateProfileString(null, null, null, store);
       }
 

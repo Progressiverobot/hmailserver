@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using hMailServer;
@@ -242,25 +240,16 @@ namespace RegressionTests.SMTP
          }
       }
 
-      // Writes a key into the FIRST [Settings] section of the ini the server
-      // binary reads. Same mechanics as CustomDnsServer, for the same reasons:
-      // GetPrivateProfileString reads the first section of a given name, and the
-      // server's ini is the one beside the binary, not the data directory's.
+      // Stores a setting in the settings store, or removes it when value is null.
+      // This used to rewrite the server's hMailServer.ini, which from schema 6042 is
+      // only the store's copy: the restart meant to apply the value would have put
+      // the stored one back and reported the edit as HM5804.
       private static void SetIniSetting(string key, string value)
       {
-         var path = ServerIniFile.Path();
-         var lines = new List<string>(File.ReadAllLines(path));
-
-         lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
-
-         var section = lines.FindIndex(line => line.Trim() == "[Settings]");
-
-         Assert.Greater(section, -1, "hMailServer.ini has no [Settings] section: " + path);
-
-         if (value != null)
-            lines.Insert(section + 1, key + "=" + value);
-
-         File.WriteAllLines(path, lines);
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
    }

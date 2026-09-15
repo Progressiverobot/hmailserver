@@ -14,7 +14,7 @@ namespace RegressionTests.Infrastructure
 {
    /// <summary>
    ///    Exercises the oper/observability health probes served on the metrics
-   ///    listener (hMailServer.ini [Settings] MetricsServerPort): the Kubernetes-style
+   ///    listener (MetricsServerPort, in the settings store): the Kubernetes-style
    ///    /livez (liveness), /readyz (readiness) and /healthz (JSON health) endpoints,
    ///    alongside the existing /metrics endpoint.
    /// </summary>
@@ -25,23 +25,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // Parses a Prometheus counter/gauge value from a /metrics body. Returns -1 if absent.

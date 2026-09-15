@@ -8,7 +8,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -47,27 +46,6 @@ namespace RegressionTests.API
       // It is set explicitly because an empty administrator password disables
       // the API outright.
       private const string AdminPassword = "testar";
-
-      private void WriteSetting(string key, string value)
-      {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
-      }
 
       // Issues a minimal authenticated HTTP/1.0 request against the REST
       // listener and returns the parsed status code and body. The connect is

@@ -11,12 +11,14 @@ namespace RegressionTests.Shared
    ///    that is right for the bench the suite is on.
    ///
    ///    On the Windows bench the listener is off until a fixture wants it: the
-   ///    fixture writes RestApiBindAddress and RestApiPort into hMailServer.ini,
-   ///    reinitialises, and writes RestApiPort back to 0 in its teardown, on a
-   ///    port of its own so that two fixtures never contend for one. Against the
-   ///    Linux server the listener is already on - it is the one the whole fixture
-   ///    layer talks to, on the port HMTEST_REST_PORT names - and a fixture that
-   ///    moved it or turned it off would take every test after it down with it.
+   ///    fixture stores RestApiBindAddress and RestApiPort through IniFileSetting
+   ///    (the settings store: from schema 6042 an edit to hMailServer.ini is put
+   ///    back at the next start), reinitialises, and stores RestApiPort as 0 in
+   ///    its teardown, on a port of its own so that two fixtures never contend
+   ///    for one. Against the Linux server the listener is already on - it is the
+   ///    one the whole fixture layer talks to, on the port HMTEST_REST_PORT names -
+   ///    and a fixture that moved it or turned it off would take every test after
+   ///    it down with it.
    ///    So: with HMTEST_REST_PORT in the environment, Start answers that port and
    ///    writes nothing, and Stop does nothing; without it, they do what the
    ///    fixtures always did. The fixture's Reinitialize call stays where it was,

@@ -6,7 +6,6 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
@@ -32,26 +31,10 @@ namespace RegressionTests.Security
 
       private void WriteSetting(string key, string value)
       {
-         // The server reads hMailServer.ini from its bin directory; write to every
-         // existing candidate so the file the service actually reads is updated
-         // regardless of layout, without creating stray ini files.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Stored through the settings store, not written into hMailServer.ini: from
+         // schema 6042 an edit to the file is undone at the next start. The store writes
+         // the file's copy itself, and the Reinitialize after the writes still applies them.
+         IniFileSetting.Write(key, value);
       }
 
       private void EnableOAuth2(string allowedAlgorithms)

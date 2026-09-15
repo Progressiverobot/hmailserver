@@ -213,11 +213,14 @@ namespace RegressionTests.Infrastructure
          // and _settings, not the domain.
          string domainName = _domain.Name;
 
-         ServerIniFile.SetSetting("BackupVerifyRestore", "0");
-         RestartServerAndReacquireCom();
-
+         // Stored inside the try, so that a restart that never happens - Assert.Ignore
+         // on a console server - still has the finally remove the stored 0, rather
+         // than leaving it for every later start of the server to read.
          try
          {
+            ServerIniFile.SetSetting("BackupVerifyRestore", "0");
+            RestartServerAndReacquireCom();
+
             Domain domain = _application.Domains.get_ItemByName(domainName);
             DeliverTwoMessages(domain);
 

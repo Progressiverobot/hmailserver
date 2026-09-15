@@ -2,9 +2,7 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
 using System.Text;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -41,34 +39,14 @@ namespace RegressionTests.IMAP
       private const string Needle = "SearchLimitsNeedleToken";
 
       /// <summary>
-      ///    Sets both ceilings and reloads them. The server reads hMailServer.ini from its
-      ///    bin directory (Utilities::GetBinDirectory): a registered install resolves to
-      ///    {InstallLocation}\Bin, while a developer build that is not registered reads the
-      ///    ini next to the running executable. Write to every existing candidate so the
-      ///    file the service actually reads is updated regardless of layout.
+      ///    Sets both ceilings and reloads them. They are stored in the settings store
+      ///    (hm_inisettings) through IniFileSetting, not written into hMailServer.ini,
+      ///    whose [Settings] section is only the store's copy from schema 6042.
       /// </summary>
       private void SetSearchLimits(int timeoutSeconds, int maxMegabytes)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", "IMAPSearchTimeout", timeoutSeconds.ToString(), iniPath),
-               "Failed to write IMAPSearchTimeout to " + iniPath + ".");
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", "IMAPSearchMaxMegabytes", maxMegabytes.ToString(), iniPath),
-               "Failed to write IMAPSearchMaxMegabytes to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write("IMAPSearchTimeout", timeoutSeconds.ToString());
+         IniFileSetting.Write("IMAPSearchMaxMegabytes", maxMegabytes.ToString());
 
          // Both settings are cached in IniFileSettings at startup; Reinitialize reloads them.
          _application.Reinitialize();

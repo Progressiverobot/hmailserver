@@ -2,8 +2,6 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
-using System.Linq;
 using hMailServer;
 using NUnit.Framework;
 using RegressionTests.Shared;
@@ -29,30 +27,11 @@ namespace RegressionTests.Security
    public class SecretProtection : TestFixtureBase
    {
 
-      private void WriteSetting(string key, string value)
-      {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
-      }
-
       private void SetSecretProtection(bool dpapiEnabled)
       {
-         WriteSetting("ProtectStoredSecretsWithDPAPI", dpapiEnabled ? "1" : "0");
+         // Through the settings store, not hMailServer.ini: from schema 6042 a value
+         // edited into the file is put back at the next start and reported as HM5804.
+         IniFileSetting.Write("ProtectStoredSecretsWithDPAPI", dpapiEnabled ? "1" : "0");
          _application.Reinitialize();
       }
 

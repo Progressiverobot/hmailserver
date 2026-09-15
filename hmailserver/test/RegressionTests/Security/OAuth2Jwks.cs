@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.IO;
-using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using hMailServer;
@@ -185,25 +183,12 @@ namespace RegressionTests.Security
          _application.Reinitialize();
       }
 
+      // Stored through the settings store, not written into hMailServer.ini: from schema
+      // 6042 an edit to the file is undone at the next start. The store writes the file's
+      // copy itself, and the Reinitialize after the writes still applies them.
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       internal static string Base64Url(byte[] data)

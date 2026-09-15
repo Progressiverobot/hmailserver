@@ -245,7 +245,7 @@ namespace RegressionTests.Security
 
          Assert.AreEqual(5, _settings.AntiSpam.TarpitCount);
          Assert.AreEqual(7, _settings.AntiSpam.TarpitDelay);
-         Assert.AreEqual("5", ReadSetting("SmtpTarpitCount"), "Stored in the ini, so it survives a restart.");
+         Assert.AreEqual("5", ReadSetting("SmtpTarpitCount"), "Stored as a setting, so it survives a restart.");
          Assert.AreEqual("7", ReadSetting("SmtpTarpitDelaySeconds"));
 
          Assert.Throws<COMException>(() => _settings.AntiSpam.TarpitDelay = 31, "A pause longer than 30 seconds is refused.");
@@ -301,18 +301,15 @@ namespace RegressionTests.Security
          return Convert.ToBase64String(Encoding.ASCII.GetBytes(text));
       }
 
-      private void WriteSetting(string key, string value)
+      private static void WriteSetting(string key, string value)
       {
-         bool wroteAny = false;
-         foreach (string iniPath in IniCandidates().Where(File.Exists))
-         {
-            Assert.IsTrue(IniFile.WritePrivateProfileString("Settings", key, value, iniPath), "Failed to write " + key + " to " + iniPath);
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Through the settings store, the door the Control Panel and the REST API use:
+         // from schema 6042 a value edited into hMailServer.ini is put back at the next
+         // start and reported as HM5804.
+         IniFileSetting.Write(key, value);
       }
 
+      // Reads the file's [Settings] copy, which the server keeps in step with the store.
       private string ReadSetting(string key)
       {
          string iniPath = IniCandidates().FirstOrDefault(File.Exists);

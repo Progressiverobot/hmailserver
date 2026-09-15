@@ -71,35 +71,17 @@ namespace RegressionTests.Infrastructure
       // beside the point.
       private const string UnreachableButValidServer = "192.0.2.1";
 
-      private const string SettingsSection = "[Settings]";
-
-      // The server reads its ini from the directory holding the BINARY, not from the data
-      // directory - a distinction worth stating because editing the wrong hMailServer.ini
-      // appears to do nothing at all, and there is one in the data directory too.
-      //
-      // Found by searching upwards for it rather than by counting "..\" segments, so that
-      // moving the test assembly's output path cannot turn this into a silent skip.
-
-      // Writes a key into the FIRST [Settings] section, which is the only one that counts.
-      // GetPrivateProfileString reads the first section with a given name and ignores any
-      // later duplicate - so appending "[Settings]\nKey=Value" to the end of the file, the
-      // obvious thing to do, silently has no effect. That mistake produced an entire
-      // afternoon of invalid measurements before it was spotted.
+      // Stores a setting, or removes it when value is null. This used to rewrite the
+      // [Settings] section of hMailServer.ini; from schema 6042 that section is only the
+      // settings store's copy, and an edit there is undone at the very restart that was
+      // meant to apply it, so the value goes into the store over COM instead. Every call
+      // is made while the service is running, before the restart that applies it.
       private static void SetIniSetting(string key, string value)
       {
-         var path = ServerIniFile.Path();
-         var lines = new System.Collections.Generic.List<string>(File.ReadAllLines(path));
-
-         lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
-
-         var section = lines.FindIndex(line => line.Trim() == SettingsSection);
-
-         Assert.Greater(section, -1, "hMailServer.ini has no [Settings] section: " + path);
-
-         if (value != null)
-            lines.Insert(section + 1, key + "=" + value);
-
-         File.WriteAllLines(path, lines);
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
       /// <summary>
@@ -541,7 +523,7 @@ namespace RegressionTests.Infrastructure
 
             Assert.IsTrue(usedConfiguredServer,
                "The lookup completed without using the configured DNS server, so this test proved nothing. " +
-               "Check that DNSServer landed in the FIRST [Settings] section of the ini the server reads. " +
+               "Check that DNSServer was stored and that no [SettingsOverride] entry in hMailServer.ini shadows it. " +
                "Log:\r\n" + log);
          }
          finally

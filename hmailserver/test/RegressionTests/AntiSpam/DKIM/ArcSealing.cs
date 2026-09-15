@@ -6,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Linq;
 using System.Text;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
@@ -39,26 +38,10 @@ namespace RegressionTests.AntiSpam.DKIM
 
       private void WriteSetting(string key, string value)
       {
-         // The server reads hMailServer.ini from its bin directory; write to every
-         // existing candidate so the file the service actually reads is updated
-         // regardless of the install/dev layout.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         // Stored in the settings store over COM rather than written into
+         // hMailServer.ini, whose [Settings] section is only the store's copy from
+         // schema 6042 and would have the edit put back at the next start.
+         IniFileSetting.Write(key, value);
       }
 
       private static string GetPrivateKeyFile()

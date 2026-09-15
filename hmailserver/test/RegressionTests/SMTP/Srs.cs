@@ -2,7 +2,6 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-using System.IO;
 using System.Linq;
 using hMailServer;
 using NUnit.Framework;
@@ -12,7 +11,7 @@ namespace RegressionTests.SMTP
 {
    /// <summary>
    /// B4 SRS (Sender Rewriting Scheme) for forwarded mail. When SRS is enabled
-   /// (hMailServer.ini [Settings] SRSEnabled/SRSSecret), the envelope MAIL FROM of
+   /// (the settings store's SRSEnabled/SRSSecret), the envelope MAIL FROM of
    /// a forwarded message from an external sender is rewritten to a signed,
    /// reversible SRS0 address at the local forwarding domain so SPF stays aligned;
    /// a bounce sent back to that address is decoded and relayed to the original
@@ -24,26 +23,7 @@ namespace RegressionTests.SMTP
 
       private void WriteSetting(string key, string value)
       {
-         // The server reads hMailServer.ini from its bin directory; write to every
-         // existing candidate so the file the service actually reads is updated
-         // regardless of the install/dev layout.
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private static string ExtractReturnPath(string messageText)

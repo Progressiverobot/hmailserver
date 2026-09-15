@@ -4,15 +4,14 @@
 
 using System;
 using System.IO;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Infrastructure
 {
    /// <summary>
-   ///    Verifies the operability log-retention task (hMailServer.ini [Settings]
-   ///    LogDeleteDays): on startup the server prunes its own date-stamped log
+   ///    Verifies the operability log-retention task (LogDeleteDays, in the
+   ///    settings store): on startup the server prunes its own date-stamped log
    ///    files older than the configured window while keeping recent ones.
    /// </summary>
    [TestFixture]
@@ -21,23 +20,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       [Test]

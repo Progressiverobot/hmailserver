@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Threading;
-using System.Linq;
 using NUnit.Framework;
 using RegressionTests.Infrastructure;
 using RegressionTests.Shared;
@@ -20,7 +19,7 @@ namespace RegressionTests.SSL
    /// default group list (which contains X25519MLKEM768) with a hard-coded
    /// "secp384r1:x25519:secp256r1", so the hybrid post-quantum KEMs were compiled
    /// in, linked, and never offered. The list is now configurable
-   /// (hMailServer.ini [Settings] TlsKeyExchangeGroups) and defaults to the hybrid
+   /// (the settings store's TlsKeyExchangeGroups) and defaults to the hybrid
    /// groups first.
    ///
    /// SslStream does not expose which group was negotiated, and Windows SChannel
@@ -71,35 +70,23 @@ namespace RegressionTests.SSL
       };
 
       /// <summary>
-      /// Writes (or, with a null value, removes) a setting in every hMailServer.ini
-      /// we can find, the same way the other ini-driven regression tests do.
+      /// Stores (or, with a null value, removes) a setting in the settings store.
+      /// Written into hMailServer.ini directly it would be undone at the next start,
+      /// because from schema 6042 the file is only the store's copy.
       /// </summary>
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini")
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
       /// <summary>
-      /// Puts the given group list in the ini (null removes the setting, so that the
-      /// built-in default applies) and restarts the server so the listeners rebuild
-      /// their SSL contexts. Reinitialize, not just Stop/Start: the list is read from
-      /// the ini during application initialization.
+      /// Stores the given group list (null removes the setting, so that the built-in
+      /// default applies) and restarts the server so the listeners rebuild their SSL
+      /// contexts. Reinitialize, not just Stop/Start: the list is read from the
+      /// settings store during application initialization.
       /// </summary>
       private void ApplyGroupList(string groups)
       {
@@ -327,7 +314,7 @@ namespace RegressionTests.SSL
       [Description("With the default configuration every TLS listener prefers the hybrid post-quantum group X25519MLKEM768 over the classical curves")]
       public void DefaultConfiguration_PrefersHybridPostQuantumGroupOnEveryListener()
       {
-         // No setting in the ini, so the built-in default applies.
+         // No stored setting, so the built-in default applies.
          ApplyGroupList(null);
 
          // The client offers exactly one hybrid group and one classical group. A

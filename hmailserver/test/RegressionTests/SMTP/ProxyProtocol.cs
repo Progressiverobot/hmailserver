@@ -22,7 +22,7 @@ namespace RegressionTests.SMTP
    /// instead of the proxy's.
    ///
    /// Both mechanisms are OFF by default and only take effect for peers on an
-   /// explicitly configured trusted list (hMailServer.ini [Settings]
+   /// explicitly configured trusted list (the settings store's
    /// SMTPProxyProtocolEnabled/SMTPProxyProtocolTrustedIPs and
    /// SMTPXClientEnabled/SMTPXClientTrustedIPs), because a peer that can rewrite its
    /// own source address has defeated every IP-based control on the server.

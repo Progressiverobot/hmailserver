@@ -4,9 +4,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Infrastructure;
@@ -29,24 +27,13 @@ namespace RegressionTests.ExternalAccounts
    public class FetchXOAuth2 : TestFixtureBase
    {
 
+      /// <summary>
+      ///    Stores a [Settings] key in the settings store over COM, which is how one is
+      ///    changed from schema 6042 - hMailServer.ini holds only the store's copy.
+      /// </summary>
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private FetchAccount AddFetchAccount(Account account, int port)

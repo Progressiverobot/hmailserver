@@ -105,6 +105,12 @@ jobs:
       # AccountStores.cpp and fails by name, with what to do.
       - name: Every per-account table is in the backup, or says why not
         run: python3 build/check-account-stores.py
+      # A test changes a [Settings] value through the settings store. From schema
+      # 6042 an edit to hMailServer.ini's [Settings] is undone at the next start and
+      # logged, and on 15 September 2026 one such teardown failed 320 of the first
+      # 404 tests of a gate.
+      - name: No test edits hMailServer.ini [Settings] behind the settings store
+        run: python3 build/check-test-settings-writes.py
 
       # "May account A do X to folder F" is answered by ACLManager and nowhere else;
       # a second decision-maker is how mail servers serve other people's mail.

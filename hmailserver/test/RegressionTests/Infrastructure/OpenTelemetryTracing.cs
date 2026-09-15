@@ -17,7 +17,7 @@ namespace RegressionTests.Infrastructure
 {
    /// <summary>
    ///    Exercises the dependency-free OpenTelemetry trace exporter
-   ///    (hMailServer.ini [Settings] OtelEndpoint). A throwaway in-process HTTP
+   ///    (OtelEndpoint, in the settings store). A throwaway in-process HTTP
    ///    collector captures the OTLP/HTTP (protobuf-over-JSON) export, and the test
    ///    asserts that real protocol + database activity produces command and DB
    ///    spans whose SQL is redacted.
@@ -32,23 +32,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // A minimal HTTP/1.1 collector that accepts OTLP POSTs and records each body.

@@ -57,11 +57,11 @@ namespace RegressionTests.Infrastructure
    ///    Both tests fail against the build before this work, and each says how.
    ///
    ///    Every test restores the shipped configuration in a finally block and the
-   ///    fixture does it again in a OneTimeTearDown, because these settings live in
-   ///    hMailServer.ini rather than the database and the whole suite runs against
-   ///    one live service - a leftover MetricsServerBindAddress of 0.0.0.0 would turn
-   ///    HealthProbes, PrometheusConventions, DatabaseMetrics and DeliveryMetrics into
-   ///    503s that have nothing to do with what they test.
+   ///    fixture does it again in a OneTimeTearDown, because these settings are held
+   ///    in the settings store, which nothing between tests puts back, and the whole
+   ///    suite runs against one live service - a leftover MetricsServerBindAddress of
+   ///    0.0.0.0 would turn HealthProbes, PrometheusConventions, DatabaseMetrics and
+   ///    DeliveryMetrics into 503s that have nothing to do with what they test.
    /// </summary>
    [TestFixture]
    public class MetricsReadiness : TestFixtureBase
@@ -74,23 +74,7 @@ namespace RegressionTests.Infrastructure
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       // Writes every setting these tests depend on, so each of them states its whole

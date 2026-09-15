@@ -289,6 +289,7 @@ namespace HM
       std::vector<String> writtenToFile;
       std::vector<String> restoredToFile;
       std::vector<String> unwritable;
+      std::vector<String> keptInFileOnly;
 
       // 1. Everything the file has.
       //
@@ -312,6 +313,31 @@ namespace HM
 
          auto row = rows.find(name);
 
+         if (IsFileOnlyName(name))
+         {
+            // Read from the file by IniFileSettings, because it is not put in
+            // resolvedValues. A row an earlier start adopted is taken out - once the
+            // file holds the value the server has been running on since then, which
+            // is the stored one: every hash made since was made with it.
+            if (row != rows.end())
+            {
+               const String &storedValue = (*row).second.first;
+
+               if (fileNow.Compare(storedValue) == 0 || WriteIniValue_(_T("Settings"), name, storedValue))
+               {
+                  if (DeleteRow_(name))
+                     keptInFileOnly.push_back(name);
+               }
+               else
+               {
+                  unwritable.push_back(name);
+                  resolvedValues[name] = storedValue;
+               }
+            }
+
+            continue;
+         }
+
          if (row == rows.end())
          {
             // No row yet. This is THE MIGRATION: on the first start at schema 6042
@@ -333,8 +359,16 @@ namespace HM
          // decides only what has to be SAID about it, and what has to be written back.
          resolvedValues[name] = storedValue;
 
-         bool fileEdited = fileNow.Compare(storedFileValue) != 0;
-         bool fileAgrees = fileNow.Compare(storedValue) == 0;
+         // Compared as the file reads them back - trimmed - so that a value stored
+         // with whitespace at either end before WriteSetting trimmed is not taken
+         // for an edit at every start. It is written back trimmed once, below.
+         String storedTrimmed = storedValue;
+         storedTrimmed.Trim();
+         String storedFileTrimmed = storedFileValue;
+         storedFileTrimmed.Trim();
+
+         bool fileEdited = fileNow.Compare(storedFileTrimmed) != 0;
+         bool fileAgrees = fileNow.Compare(storedTrimmed) == 0;
 
          if (fileEdited && !fileAgrees)
          {
@@ -347,9 +381,13 @@ namespace HM
          if (fileAgrees)
          {
             // The file already holds the stored value; only the bookkeeping can be
-            // behind, which is what a hand edit that happened to match leaves.
-            if (fileEdited)
-               UpdateRow_(name, storedValue, storedValue);
+            // behind, which is what a hand edit that happened to match leaves - or a
+            // row that still carries the whitespace the file has always dropped.
+            if (fileEdited || storedTrimmed.Compare(storedValue) != 0 || storedFileTrimmed.Compare(storedFileValue) != 0)
+            {
+               UpdateRow_(name, storedTrimmed, storedTrimmed);
+               resolvedValues[name] = storedTrimmed;
+            }
 
             continue;
          }
@@ -386,6 +424,21 @@ namespace HM
 
          const String &storedValue = (*iter).second.first;
 
+         if (IsFileOnlyName(name))
+         {
+            if (WriteIniValue_(_T("Settings"), name, storedValue) && DeleteRow_(name))
+            {
+               keptInFileOnly.push_back(name);
+            }
+            else
+            {
+               unwritable.push_back(name);
+               resolvedValues[name] = storedValue;
+            }
+
+            continue;
+         }
+
          if (WriteIniValue_(_T("Settings"), name, storedValue))
          {
             UpdateRow_(name, storedValue, storedValue);
@@ -413,6 +466,12 @@ namespace HM
          ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5803, "IniSettingStore::Synchronize",
             Formatter::Format("These settings could not be written into hMailServer.INI: {0}. The server is using the stored values, so the settings themselves are right, but hMailServer.exe /Register and anything else that reads the file directly will see the old ones until the account the service runs as has write access to it.",
                StringParser::JoinVector(unwritable, _T(", "))));
+      }
+
+      if (!keptInFileOnly.empty())
+      {
+         LOG_APPLICATION(Formatter::Format("IniSettingStore: these settings are kept in hMailServer.INI only and have been taken out of the database, where an earlier start had stored them: {0}. A password pepper protects the password hashes only while it is somewhere the database is not - so it is not stored with them and not written into a backup. Keep a copy of the file, or of this one value, with the backups: a restore onto another machine needs it to sign anybody in.",
+            StringParser::JoinVector(keptInFileOnly, _T(", "))));
       }
 
       if (!adopted.empty())
@@ -489,6 +548,12 @@ namespace HM
    }
 
    bool
+   IniSettingStore::IsFileOnlyName(const String &name)
+   {
+      return name.CompareNoCase(_T("PasswordPepper")) == 0;
+   }
+
+   bool
    IniSettingStore::IsStorableValue(const String &value)
    {
       if (value.GetLength() > 4000)
@@ -500,10 +565,30 @@ namespace HM
    }
 
    bool
-   IniSettingStore::WriteSetting(const String &name, const String &value)
+   IniSettingStore::WriteSetting(const String &name, const String &requestedValue)
    {
+      // Stored as the file will read it back. GetPrivateProfileString and the POSIX
+      // implementation both trim a value, so " a " stored as it came would be read
+      // back as "a" at every start, taken for an edit to the file, named in the error
+      // log as HM5804 and written back as " a " - for ever. The trimmed value is the
+      // one the setting has always really had.
+      String value = requestedValue;
+      value.Trim();
+
       if (!IsStorableName(name) || !IsStorableValue(value))
          return false;
+
+      if (IsFileOnlyName(name))
+      {
+         // The file, and a row taken out if an earlier start put one there. The
+         // order is the file first: if the row cannot be dropped the value is still
+         // right where the server reads it, and the next start drops the row.
+         if (!WriteIniValue_(_T("Settings"), name, value))
+            return false;
+
+         DeleteRow_(name);
+         return true;
+      }
 
       // The store first. See the header for why the order is not an implementation
       // detail, and why it is the opposite of what it was.
@@ -615,6 +700,9 @@ namespace HM
          // attribute values and writes element names raw, and these names come from
          // a file an administrator edits - so a name that is not a valid XML element
          // name would produce an archive that cannot be parsed back.
+         if (IsFileOnlyName((*iter).first))
+            continue;
+
          XNode *pSetting = pNode->AppendChild(_T("Setting"));
          pSetting->AppendAttr(_T("Name"), (*iter).first);
          pSetting->AppendAttr(_T("Value"), (*iter).second.first);
@@ -655,6 +743,23 @@ namespace HM
 
          if (name.IsEmpty())
             continue;
+
+         if (IsFileOnlyName(name))
+         {
+            const DWORD bufferSize = 4096;
+            TCHAR current[bufferSize];
+            GetPrivateProfileString(_T("Settings"), name.c_str(), _T(""), current, bufferSize, IniFileSettings::GetInitializationFile().c_str());
+
+            if (String(current).IsEmpty() && !value.IsEmpty())
+            {
+               if (WriteIniValue_(_T("Settings"), name, value))
+                  LOG_APPLICATION(Formatter::Format("IniSettingStore: the archive carried {0}, which this server keeps in hMailServer.INI only; the file had none, so the archived value has been written into the file and not into the database.", name));
+               else
+                  writeFailures.push_back(name);
+            }
+
+            continue;
+         }
 
          // Restore is authoritative: the point of restoring settings is to get the
          // backed-up settings. Both the row and the file are written, and the two

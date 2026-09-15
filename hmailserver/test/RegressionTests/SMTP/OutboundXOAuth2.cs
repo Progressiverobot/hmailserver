@@ -4,9 +4,7 @@
 
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Text;
-using System.Linq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -35,22 +33,7 @@ namespace RegressionTests.SMTP
 
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private Route AddAuthedRoute(int port)

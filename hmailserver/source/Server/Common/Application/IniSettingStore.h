@@ -171,6 +171,22 @@ namespace HM
       static bool IsStorableValue(const String &value);
 
       /// <summary>
+      /// The [Settings] keys the database must never hold, which stay in the file
+      /// and nowhere else: today only PasswordPepper.
+      ///
+      /// The pepper is the one setting whose whole purpose is to be somewhere the
+      /// password hashes are not. Crypt::ApplyPepper_ mixes it into every Argon2id
+      /// and scrypt hash so that a copy of the database is not enough to attack them;
+      /// stored in hm_inisettings it sits in the same database as hm_accounts, and
+      /// XMLStore puts it in the same backup archive, which is exactly the copy it
+      /// is meant to be missing from. So a file-only key is never adopted, never
+      /// served from the store, written only to the file when an administrator sets
+      /// it over COM or REST, and any row an earlier start adopted is taken out -
+      /// after making sure the file holds the value the server was running on.
+      /// </summary>
+      static bool IsFileOnlyName(const String &name);
+
+      /// <summary>
       /// Every setting name the server holds: the union of the table and the
       /// [Settings] section, which after a start are the same list.
       ///

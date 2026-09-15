@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using hMailServer;
 using NUnit.Framework;
@@ -168,29 +167,13 @@ namespace RegressionTests.AntiSpam
       }
 
       /// <summary>
-      ///    Writes a [Settings] key to every hMailServer.ini the running service could be
-      ///    reading, the way the password-cost fixture does; Apply() then has the server
-      ///    re-read it.
+      ///    Stores a [Settings] key in the settings store over COM - which is how one is
+      ///    changed from schema 6042, hMailServer.ini holding only the store's copy - and
+      ///    Apply() then has the server re-read it. An empty value is stored as empty.
       /// </summary>
       private void WriteSetting(string key, string value)
       {
-         string programDirectory = _application.Settings.Directories.ProgramDirectory;
-         string[] candidates =
-         {
-            Paths.Combine(programDirectory, "hMailServer.ini"),
-            Paths.Combine(programDirectory, "Bin", "hMailServer.ini"),
-         };
-
-         bool wroteAny = false;
-         foreach (string iniPath in candidates.Where(File.Exists))
-         {
-            Assert.IsTrue(
-               IniFile.WritePrivateProfileString("Settings", key, value, iniPath),
-               "Failed to write " + key + " to " + iniPath + ".");
-            wroteAny = true;
-         }
-
-         Assert.IsTrue(wroteAny, "Could not locate an existing hMailServer.ini to update.");
+         IniFileSetting.Write(key, value);
       }
 
       private void Apply()

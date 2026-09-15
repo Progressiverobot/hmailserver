@@ -84,7 +84,13 @@ namespace RegressionTests.Infrastructure
          SingletonProvider<TestSetup>.Instance.AddAccount(outside, "someone@outside.test", "test");
 
          ServerIniFile.SetSetting("ArchiveDir", archiveRoot_);
-         ServerIniFile.SetSetting("ArchiveDomains", " " + listed.ToUpperInvariant() + " , nobody.example ");
+
+         // Spacing around the comma but none at either end. The value is stored, and
+         // the file copy of a value with whitespace at its ends reads back trimmed,
+         // which the next start takes for a hand edit and reports as HM5804. The ends
+         // never reached the server when this was a file edit either, because
+         // GetPrivateProfileString trims them.
+         ServerIniFile.SetSetting("ArchiveDomains", listed.ToUpperInvariant() + " , nobody.example");
          RestartServerAndReacquireCom();
 
          SmtpClientSimulator.StaticSend("remote@elsewhere.test", "inside@" + listed, "In scope", "For a listed domain.");

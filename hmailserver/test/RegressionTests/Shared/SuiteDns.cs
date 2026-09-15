@@ -58,20 +58,30 @@ namespace RegressionTests
          if (TestSetup.ConsoleServer)
          {
             // A console server (hMailServer.exe /Debug under a coverage tool) read
-            // the ini at its start and no service command can restart it, so the
-            // run that launched it wrote the resolver first; that is checked here
+            // its settings at its start and no service command can restart it, so
+            // the run that launched it stored the resolver first; that is checked here
             // rather than restarted into. Ignoring instead, as the restart helper
             // does for a fixture, would ignore every test of the run from this
             // one setup - which is what the coverage run of 15 September 2026 did.
+            // The file is read because the server brings its [Settings] copy into
+            // line with the store at start, so it shows the value in effect.
             Assert.AreEqual(Resolver, ServerIniFile.GetSetting("DNSServer"),
-               "A console server must be started with DNSServer=" + Resolver + " already in hMailServer.ini: " +
+               "A console server must be started with DNSServer=" + Resolver + " already stored " +
+               "(Settings.SetIniSetting - a value edited into hMailServer.ini loses to a stored one): " +
                "the suite cannot restart it into its zone.");
             return;
          }
 
+         // Storing the resolver is a COM call, and nothing has authenticated yet:
+         // this runs before the first fixture's OneTimeSetUp, when GetApp() is still
+         // null. Creating the Application also starts the service if it is stopped
+         // (the AppID names it as the LocalService), which the store needs and which
+         // the file edit this replaced did not.
+         SingletonProvider<TestSetup>.Instance.Authenticate();
+
          ServerIniFile.SetSetting("DNSServer", Resolver);
 
-         // The ini is read once, at process start.
+         // The setting is read once, at process start.
          SingletonProvider<TestSetup>.Instance.RestartServiceAndReacquire();
       }
 
@@ -80,7 +90,7 @@ namespace RegressionTests
       {
          if (TestSetup.ConsoleServer)
          {
-            // The launcher that wrote the resolver takes it out again once the
+            // The launcher that stored the resolver removes it again once the
             // console server has been ended; the zone just goes.
             Zone.Dispose();
             Zone = null;
@@ -91,6 +101,12 @@ namespace RegressionTests
          // the restart never runs against a dead one.
          using (Zone)
          {
+            // Authenticated afresh rather than through the last fixture's object: the
+            // removal is a COM call now, and a fixture that ended with the service
+            // stopped or dead left that object talking to a process that has gone,
+            // where creating a new one starts the service again.
+            SingletonProvider<TestSetup>.Instance.Authenticate();
+
             ServerIniFile.SetSetting("DNSServer", null);
             SingletonProvider<TestSetup>.Instance.RestartServiceAndReacquire();
          }

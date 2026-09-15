@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 using System;
-using System.Collections.Generic;
-using System.IO;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
@@ -313,16 +311,17 @@ namespace RegressionTests.Security
             "With AccountLockoutThreshold unset the mechanism must be inert.");
       }
 
+      // Stores the setting, or returns it to its default when value is null. From
+      // schema 6042 the settings store in the database is where a [Settings] value
+      // lives - an edit to hMailServer.ini is undone at the next start and a removed
+      // line is written back - so this goes through the store, and the Reinitialize
+      // after each call is still what applies it.
       private static void SetIniSetting(string key, string value)
       {
-         var path = ServerIniFile.Path();
-         var lines = new List<string>(File.ReadAllLines(path));
-         lines.RemoveAll(line => line.StartsWith(key + "=", StringComparison.OrdinalIgnoreCase));
-         var section = lines.FindIndex(line => line.Trim() == "[Settings]");
-         Assert.Greater(section, -1, "hMailServer.ini has no [Settings] section: " + path);
-         if (value != null)
-            lines.Insert(section + 1, key + "=" + value);
-         File.WriteAllLines(path, lines);
+         if (value == null)
+            IniFileSetting.Delete(key);
+         else
+            IniFileSetting.Write(key, value);
       }
 
    }
