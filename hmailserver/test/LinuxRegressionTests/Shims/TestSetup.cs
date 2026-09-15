@@ -668,18 +668,31 @@ namespace RegressionTests.Shared
             answer.Expect(201, "POST " + route + " (putting back a row the run started with)");
       }
 
-      // ---- The server's ini, put back the way the rows are ----
+      // ---- The server's [Settings], put back the way the run found them ----
       //
-      // A fixture that writes hMailServer.ini (ServerIniFile) then restarts the
-      // server to have it read: the restart is not something this project can do,
-      // so that test stops there - but the file it wrote stays written, and the
-      // next start of the server would read it. The file as the run found it is
-      // kept and written back before every test. The running server does not
-      // re-read the ini, so putting it back is invisible to it and cannot change
-      // what any test sees.
+      // From schema 6042 the database is the settings store and the [Settings]
+      // section of hMailServer.ini is the server's own copy of it: every store
+      // write puts the line in the file, and a line edited or removed by anybody
+      // else is undone at the next start and reported as HM5804. This used to
+      // rewrite the whole file back to its start-of-run content before every
+      // test, which under the store is the worst thing it could do: a fixture that
+      // stores a value the run did not start with (SecretProtection leaves
+      // ProtectStoredSecretsWithDPAPI=1 behind on a server that started with 0)
+      // then had its line overwritten with the old value before the next test,
+      // every later restart reported the edit and put the line back, and the run
+      // of 15 September 2026 failed 66 tests that had passed, all in TearDown on
+      // that one error.
+      //
+      // The file is still what is READ, because it is the cheapest complete
+      // picture of the store there is - one file, no request - and the server keeps
+      // it current. What differs from the start of the run is put back THROUGH THE
+      // STORE: a changed or missing key is stored again with its original value, a
+      // key the run did not start with is deleted, and the file follows. Only the
+      // [Settings] section: nothing else in the file is stored, and no linked
+      // fixture writes another section on this platform.
 
       private static string _iniPath;
-      private static string _iniAtStart;
+      private static Dictionary<string, string> _settingsAtStart;
 
       private static void RestoreServerIni()
       {
@@ -688,18 +701,70 @@ namespace RegressionTests.Shared
          if (string.IsNullOrWhiteSpace(path) || !File.Exists(path.Trim()))
             return;
 
+         if (!ServerApi.HasRoute(SettingsApi.Ini, "get"))
+            return;
+
          _iniPath = path.Trim();
 
-         if (_iniAtStart == null)
+         if (_settingsAtStart == null)
          {
-            _iniAtStart = File.ReadAllText(_iniPath);
+            _settingsAtStart = SettingsSectionOf(File.ReadAllText(_iniPath));
             return;
          }
 
-         if (File.ReadAllText(_iniPath) != _iniAtStart)
-            File.WriteAllText(_iniPath, _iniAtStart);
+         var now = SettingsSectionOf(File.ReadAllText(_iniPath));
+
+         foreach (var original in _settingsAtStart)
+         {
+            string current;
+            if (now.TryGetValue(original.Key, out current) && current == original.Value)
+               continue;
+
+            ServerApi.Put(SettingsApi.Ini + "/" + original.Key, "{\"value\":" + ServerApi.Quote(original.Value) + "}")
+               .Expect(200, "PUT " + SettingsApi.Ini + "/" + original.Key + " (putting back the value the run started with)");
+         }
+
+         foreach (var added in now.Keys.Where(key => !_settingsAtStart.ContainsKey(key)))
+            ServerApi.Delete(SettingsApi.Ini + "/" + added)
+               .Expect(200, "DELETE " + SettingsApi.Ini + "/" + added + " (a setting the run did not start with)");
       }
 
+      // The [Settings] section of an ini text as name -> value, read the way the
+      // profile API reads it: the first section of that name, keys matched without
+      // regard to case, white space around the name and the value dropped, and a
+      // line that is a comment or has no '=' ignored.
+      private static Dictionary<string, string> SettingsSectionOf(string ini)
+      {
+         var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+         var inSettings = false;
+
+         foreach (var raw in ini.Split('\n'))
+         {
+            var line = raw.Trim();
+
+            if (line.StartsWith("[", StringComparison.Ordinal))
+            {
+               if (inSettings)
+                  break;
+
+               inSettings = string.Equals(line, "[Settings]", StringComparison.OrdinalIgnoreCase);
+               continue;
+            }
+
+            if (!inSettings || line.Length == 0 || line.StartsWith(";", StringComparison.Ordinal) || line.StartsWith("#", StringComparison.Ordinal))
+               continue;
+
+            var equals = line.IndexOf('=');
+            if (equals <= 0)
+               continue;
+
+            var name = line.Substring(0, equals).Trim();
+            if (name.Length > 0 && !values.ContainsKey(name))
+               values[name] = line.Substring(equals + 1).Trim();
+         }
+
+         return values;
+      }
       public void RestoreServerRows()
       {
          RestoreServerIni();
