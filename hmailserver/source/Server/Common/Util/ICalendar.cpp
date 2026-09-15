@@ -90,11 +90,13 @@ namespace HM
          return value;
       }
 
-      // A signed integer, or false. Bounded to what a rule part can mean.
+      // A signed integer that fits an int, or false. Ten digits at most: a
+      // COUNT of a hundred million is a rule a client may well write, and
+      // every part is range-checked by its reader afterwards.
       bool SmallInt(const AnsiString &text, int &value)
       {
          AnsiString t = Trimmed(text);
-         if (t.IsEmpty() || t.GetLength() > 7)
+         if (t.IsEmpty() || t.GetLength() > 11)
             return false;
          int i = 0;
          bool negative = false;
@@ -103,16 +105,18 @@ namespace HM
             negative = t[0] == '-';
             i = 1;
          }
-         if (i >= t.GetLength())
+         if (i >= t.GetLength() || t.GetLength() - i > 10)
             return false;
-         int v = 0;
+         __int64 v = 0;
          for (; i < t.GetLength(); i++)
          {
             if (t[i] < '0' || t[i] > '9')
                return false;
             v = v * 10 + (t[i] - '0');
          }
-         value = negative ? -v : v;
+         if (v > 2147483647LL)
+            return false;
+         value = static_cast<int>(negative ? -v : v);
          return true;
       }
 
