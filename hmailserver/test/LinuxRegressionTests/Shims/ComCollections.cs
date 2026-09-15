@@ -1044,6 +1044,11 @@ namespace hMailServer
 
    // ---- The global rules: /api/v1/rules ----
 
+   // Virtual throughout, because an account's own rules (AccountRules, in
+   // ComExtras.cs) are the same COM type and a fixture hands them to a helper
+   // typed as Rules; a member bound here statically would then add a GLOBAL
+   // rule where the fixture asked for the account's, and the test would pass
+   // for the wrong reason.
    public class Rules
    {
       private static List<JsonElement> All()
@@ -1051,22 +1056,22 @@ namespace hMailServer
          return ServerApi.Array(ServerApi.Get("/api/v1/rules").Expect(200, "GET /api/v1/rules"));
       }
 
-      public int Count => All().Count;
+      public virtual int Count => All().Count;
 
       [System.Runtime.CompilerServices.IndexerName("At")]
-      public Rule this[int index] => Rule.From(All()[index]);
+      public virtual Rule this[int index] => Rule.From(All()[index]);
 
-      public Rule get_Item(int index)
+      public virtual Rule get_Item(int index)
       {
          return Rule.From(All()[index]);
       }
 
-      public Rule get_ItemByName(string name)
+      public virtual Rule get_ItemByName(string name)
       {
          return All().Where(element => string.Equals(ServerApi.StringOf(element, "name"), name, StringComparison.Ordinal)).Select(element => Rule.From(element)).FirstOrDefault();
       }
 
-      public Rule Add()
+      public virtual Rule Add()
       {
          if (!ServerApi.HasRoute("/api/v1/rules", "post"))
             throw NotOnThisServer.Skipped(NotOnThisServer.NoRuleCreate);
@@ -1074,28 +1079,28 @@ namespace hMailServer
          return new Rule();
       }
 
-      public Rule get_ItemByDBID(long id)
+      public virtual Rule get_ItemByDBID(long id)
       {
          return All().Where(element => ServerApi.LongOf(element, "id") == id).Select(element => Rule.From(element)).FirstOrDefault();
       }
 
-      public void DeleteByDBID(long id)
+      public virtual void DeleteByDBID(long id)
       {
          ServerApi.Delete("/api/v1/rules/" + id).Expect(200, "DELETE /api/v1/rules/" + id);
       }
 
-      public void Delete(int index)
+      public virtual void Delete(int index)
       {
          DeleteByDBID(get_Item(index).ID);
       }
 
-      public void Clear()
+      public virtual void Clear()
       {
          foreach (var id in All().Select(element => ServerApi.LongOf(element, "id")))
             ServerApi.Delete("/api/v1/rules/" + id).Expect(200, "DELETE /api/v1/rules/" + id);
       }
 
-      public void Refresh()
+      public virtual void Refresh()
       {
       }
    }
@@ -1335,7 +1340,7 @@ namespace hMailServer
          }
       }
 
-      private static string MatchName(eRuleMatchType match)
+      internal static string MatchName(eRuleMatchType match)
       {
          switch (match)
          {
@@ -1538,7 +1543,7 @@ namespace hMailServer
 
       private IMAPFolder From(JsonElement element)
       {
-         return new IMAPFolder
+         var folder = new IMAPFolder
          {
             ID = ServerApi.LongOf(element, "id"),
             Name = ServerApi.StringOf(element, "name"),
@@ -1547,6 +1552,8 @@ namespace hMailServer
             ParentID = ServerApi.LongOf(element, "parent_id"),
             Account = _account
          };
+         folder.SeedSubscribed(ServerApi.FlagOf(element, "subscribed"));
+         return folder;
       }
 
       /// <summary>
@@ -1670,6 +1677,28 @@ namespace hMailServer
       public Messages Messages => new Messages(Account, ID);
 
       /// <summary>
+      ///    Whether the folder is subscribed, as the listing reports it - the
+      ///    column IMAP SUBSCRIBE writes. The routes report it and none changes
+      ///    it, so a value a test sets is remembered and Save stops the test
+      ///    naming that, rather than dropping the change.
+      /// </summary>
+      public bool Subscribed
+      {
+         get { return _subscribed; }
+         set { _subscribed = value; _subscribedChanged = value != _savedSubscribed; }
+      }
+      private bool _subscribed;
+      private bool _savedSubscribed;
+      private bool _subscribedChanged;
+
+      internal void SeedSubscribed(bool subscribed)
+      {
+         _subscribed = subscribed;
+         _savedSubscribed = subscribed;
+         _subscribedChanged = false;
+      }
+
+      /// <summary>
       ///    PUT /api/v1/me/folders/{id}, which is a rename. Its body is a WHOLE
       ///    mailbox name, exactly as IMAP RENAME's second argument is - so
       ///    sending this folder's leaf name on its own would move it to the top
@@ -1678,6 +1707,9 @@ namespace hMailServer
       /// </summary>
       public void Save()
       {
+         if (_subscribedChanged)
+            NotOnThisServer.Ignore(NotOnThisServer.NoFolderSubscriptionWrite, _subscribed);
+
          // Nothing to rename: the COM fixtures call Save on a folder they have
          // just added, or changed a property of that the route does not carry.
          if (string.Equals(Name, SavedName, StringComparison.Ordinal))

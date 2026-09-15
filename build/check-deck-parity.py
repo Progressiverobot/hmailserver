@@ -82,7 +82,10 @@ PATH_SCOPE = {
     'accounts': ['Account'],
     'aliases': ['Alias'],
     'lists': ['DistributionList'],
-    'members': ['DistributionListRecipient'],
+    # Two resources end in /members: a distribution list's recipients and a
+    # group's accounts (/api/v1/groups/{id}/members); the property names keep
+    # them apart.
+    'members': ['DistributionListRecipient', 'GroupMember'],
     'recipients': ['DistributionListRecipient'],
     'rules': ['Rule', 'RuleCriteria', 'RuleAction'],
     'routes': ['Route', 'RouteAddress'],
@@ -134,7 +137,8 @@ PATH_SCOPE = {
 
 # Trailing path segments that are verbs on the resource before them.
 VERB_SEGMENTS = {'reload', 'check', 'clear', 'retry', 'release', 'hold', 'download',
-                 'run', 'install', 'reinitialize', 'evaluate', 'history', 'start', 'index'}
+                 'run', 'install', 'reinitialize', 'evaluate', 'history', 'start', 'index',
+                 'copy', 'match'}
 
 UNIT_SUFFIXES = ('seconds', 'minutes', 'hours', 'days', 'secs', 'mins', 'kb', 'mb', 'ms', 'sec', 'min')
 STOP_WORDS = {'of', 'number', 'no', 'the', 'a', 'an', 'is', 'in', 'to', 'use',

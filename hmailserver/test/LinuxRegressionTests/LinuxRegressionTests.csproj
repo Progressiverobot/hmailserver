@@ -89,6 +89,7 @@
 
   <!-- The fixtures. -->
   <ItemGroup>
+    <Compile Include="..\RegressionTests\API\Basics.cs" Link="API\Basics.cs" />
     <Compile Include="..\RegressionTests\API\CardDav.cs" Link="API\CardDav.cs" />
     <Compile Include="..\RegressionTests\API\ClientDiscovery.cs" Link="API\ClientDiscovery.cs" />
     <Compile Include="..\RegressionTests\API\Message.cs" Link="API\Message.cs" />
@@ -126,6 +127,7 @@
     <Compile Include="..\RegressionTests\ExternalAccounts\FetchXOAuth2.cs" Link="ExternalAccounts\FetchXOAuth2.cs" />
     <Compile Include="..\RegressionTests\ExternalAccounts\HostileRemoteServer.cs" Link="ExternalAccounts\HostileRemoteServer.cs" />
     <Compile Include="..\RegressionTests\ExternalAccounts\ImapFetch.cs" Link="ExternalAccounts\ImapFetch.cs" />
+    <Compile Include="..\RegressionTests\IMAP\ACL.cs" Link="IMAP\ACL.cs" />
     <Compile Include="..\RegressionTests\IMAP\Append.cs" Link="IMAP\Append.cs" />
     <Compile Include="..\RegressionTests\IMAP\AppendInternalDate.cs" Link="IMAP\AppendInternalDate.cs" />
     <Compile Include="..\RegressionTests\IMAP\AppendLimit.cs" Link="IMAP\AppendLimit.cs" />
@@ -144,6 +146,7 @@
     <Compile Include="..\RegressionTests\IMAP\HierarchyDelimiter.cs" Link="IMAP\HierarchyDelimiter.cs" />
     <Compile Include="..\RegressionTests\IMAP\ListStatus.cs" Link="IMAP\ListStatus.cs" />
     <Compile Include="..\RegressionTests\IMAP\MasterUserImpersonation.cs" Link="IMAP\MasterUserImpersonation.cs" />
+    <Compile Include="..\RegressionTests\IMAP\MessageUids.cs" Link="IMAP\MessageUids.cs" />
     <Compile Include="..\RegressionTests\IMAP\Metadata.cs" Link="IMAP\Metadata.cs" />
     <Compile Include="..\RegressionTests\IMAP\MultiAppend.cs" Link="IMAP\MultiAppend.cs" />
     <Compile Include="..\RegressionTests\IMAP\NonSynchronizingLiterals.cs" Link="IMAP\NonSynchronizingLiterals.cs" />

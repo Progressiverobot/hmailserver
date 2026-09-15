@@ -386,12 +386,32 @@ namespace HM
          RouteAccountMessageDelete,
          RouteAccountMessageSource,
          RouteAccountAppPasswordUpdate,
+         // The account groups (RestApiGroups.cpp): Settings.Groups, Group and
+         // Group.Members over COM. A group holds accounts of any domain and is
+         // an ACL principal, so the resource is server-wide and refused for
+         // domain-restricted keys in Authorize_.
+         RouteGroupList,
+         RouteGroupCreate,
+         RouteGroupGet,
+         RouteGroupUpdate,
+         RouteGroupDelete,
+         RouteGroupMemberList,
+         RouteGroupMemberCreate,
+         RouteGroupMemberDelete,
+         // A message copied into another folder of its account
+         // (RestApiAccountResources.cpp): Message.Copy over COM. Scoped to the
+         // address's domain as the other message routes are.
+         RouteAccountMessageCopy,
+         // A rule criterion tried against a value (RestApiRules.cpp):
+         // Utilities.CriteriaMatch over COM. Nothing is read or written;
+         // server-wide as the Sieve evaluation is.
+         RouteRuleMatch,
          RouteOpenApi
       };
 
       struct Route
       {
-         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0), attachment_index(0), record_id(0) { }
+         Route() : kind(RouteUnknown), message_id(0), range_id(0), archive_id(0), folder_id(0), attachment_index(0), record_id(0), member_account_id(0) { }
 
          RouteKind kind;
          AnsiString identifier;   // domain name, account address or api key id
@@ -400,7 +420,8 @@ namespace HM
          __int64 archive_id;      // an archive index row id, for the routes that name one
          __int64 folder_id;       // an IMAP folder id, for the account's own mailbox routes
          int attachment_index;    // which attachment of a message, for the download route
-         __int64 record_id;       // a rule, certificate, port or route id, for the write routes that name one
+         __int64 record_id;       // a rule, certificate, port, route or group id, for the write routes that name one
+         __int64 member_account_id; // the account id under a group's members, for the route that removes one
          AnsiString query;        // the part after "?", for the routes that take one
          AnsiString name;         // a second path segment naming a member of the resource (a domain alias under its domain, a server message)
       };
@@ -916,6 +937,14 @@ namespace HM
       static bool ParseAccountResourceRoute_(const AnsiString &method, const AnsiString &tail, Route &route);
       HttpResponse HandleAccountResources_(const Route &route, const AnsiString &requestBody);
       static AnsiString OpenApiAccountResourcesPaths_();
+      // The account groups as a resource (RestApiGroups.cpp): one entry point
+      // for the eight routes, the route saying which verb, its record_id the
+      // group and its member_account_id the member.
+      HttpResponse HandleGroups_(const Route &route, const AnsiString &requestBody);
+      static AnsiString OpenApiGroupsPaths_();
+      // A rule criterion tried against a value (RestApiRules.cpp): what
+      // Utilities.CriteriaMatch answers over COM.
+      HttpResponse HandleRuleMatch_(const AnsiString &requestBody);
       static AnsiString OpenApiRoutesPaths_();
       HttpResponse HandleArchiveSearch_(const std::vector<String> &domains, const AnsiString &query);
       HttpResponse HandleArchiveGet_(const std::vector<String> &domains, __int64 archiveId);

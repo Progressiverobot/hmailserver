@@ -179,8 +179,8 @@ On Linux
 `RegressionTests.csproj` is `net481` with a `COMReference` to the service and runs
 nowhere but a Windows bench. `hmailserver/test/LinuxRegressionTests` is the part
 of the suite that can test the Linux server: a `net10.0` project that compiles
-260 of the suite's files **in place** from `RegressionTests`, 226 of them
-fixtures holding some 1,400 tests, together with the socket simulators, and
+270 of the suite's files **in place** from `RegressionTests`, 235 of them
+fixtures holding some 1,500 tests, together with the socket simulators, and
 stands a REST-backed fixture layer under them (`LinuxRegressionTests/Shims`).
 The fixtures are not copied and not edited; a test that passes here is the same
 test that passes on Windows. It began at 52 files - the ones that drive the

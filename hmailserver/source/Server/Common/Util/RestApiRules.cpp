@@ -51,6 +51,7 @@
 #include "../Persistence/PersistentRuleAction.h"
 #include "../Persistence/PersistenceMode.h"
 #include "../Application/ObjectCache.h"
+#include "../../SMTP/RuleApplier.h"
 
 // The same construction RuleGuard::RegexCriteriaMatches makes - boost::wregex
 // from the String, default (Perl) flags - so that "compiles here" means
@@ -881,7 +882,8 @@ namespace HM
          "\"put\":{\"summary\":\"Replace a global rule\",\"description\":\"The same body as POST. The rule's name, flags, criteria and actions are all replaced - the old criteria and actions are deleted and the new ones created, which is what saving an edited rule in the Control Panel comes to - and its place in the order is kept. A rule that belongs to an account is not reachable here.\","
          "\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"all_criteria\":{\"type\":\"boolean\"},\"criteria\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"field\",\"match\",\"value\"],\"properties\":{\"field\":{\"type\":\"string\",\"enum\":[\"from\",\"to\",\"cc\",\"subject\",\"body\",\"message_size\",\"recipient_list\",\"delivery_attempts\",\"header\"]},\"header\":{\"type\":\"string\"},\"match\":{\"type\":\"string\",\"enum\":[\"equals\",\"contains\",\"less_than\",\"greater_than\",\"regex\",\"not_contains\",\"not_equals\",\"wildcard\"]},\"value\":{\"type\":\"string\"}}}},\"actions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"required\":[\"type\"],\"properties\":{\"type\":{\"type\":\"string\",\"enum\":[\"delete\",\"forward\",\"reply\",\"move_to_folder\",\"script_function\",\"stop\",\"set_header\",\"send_using_route\",\"copy\",\"bind_to_address\"]},\"value\":{\"type\":\"string\"},\"to\":{\"type\":\"string\"},\"from_name\":{\"type\":\"string\"},\"from_address\":{\"type\":\"string\"},\"subject\":{\"type\":\"string\"},\"body\":{\"type\":\"string\"},\"folder\":{\"type\":\"string\"},\"header\":{\"type\":\"string\"},\"route_id\":{\"type\":\"integer\"},\"script_function\":{\"type\":\"string\"},\"abort_spam_flagged\":{\"type\":\"boolean\"}}}}}}}}},"
          "\"responses\":{\"200\":{\"description\":\"The rule as saved\"},\"400\":{\"description\":\"As for POST; the rule is unchanged\"},\"404\":{\"description\":\"No global rule with that id\"}}},"
-         "\"delete\":{\"summary\":\"Delete a global rule\",\"description\":\"With its criteria and actions, as the Control Panel deletes one. A rule that belongs to an account is not reachable here.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"No global rule with that id\"}}}}";
+         "\"delete\":{\"summary\":\"Delete a global rule\",\"description\":\"With its criteria and actions, as the Control Panel deletes one. A rule that belongs to an account is not reachable here.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"No global rule with that id\"}}}},"
+         "\"/api/v1/rules/match\":{\"post\":{\"summary\":\"Try a rule criterion against a value, without a rule\",\"description\":\"Body: match_value (the criterion's value, as a rule stores it), match_type (equals, contains, less_than, greater_than, regex, not_contains, not_equals or wildcard - the words the rule listing uses) and test_value (what the criterion is tried against). match is what the delivery path would decide for a criterion of that value and type meeting that text. What Utilities.CriteriaMatch answers over COM: nothing is read or written. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"match_value\",\"match_type\",\"test_value\"],\"properties\":{\"match_value\":{\"type\":\"string\"},\"match_type\":{\"type\":\"string\"},\"test_value\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"{match}\"},\"400\":{\"description\":\"A field missing or of the wrong type, a match_type not among the eight words, or an unknown field (error names it)\"}}}}";
 
       return AnsiString(paths);
    }
@@ -1016,5 +1018,49 @@ namespace HM
       LOG_APPLICATION(String(_T("RestApi: Rule '")) + name + _T("' deleted."));
 
       return BuildResponse_(200, "{\"deleted\":true}");
+   }
+
+   HttpResponse
+   RestApiServer::HandleRuleMatch_(const AnsiString &requestBody)
+   {
+      // Utilities.CriteriaMatch over COM, to the call: RuleApplier::TestMatch,
+      // which is what the delivery path asks of every criterion. The three
+      // fields are all required - a criterion with no value, no type or
+      // nothing to try it against is not a question - and the type is one of
+      // the eight words the rule listing emits, so what a client reads from
+      // GET /api/v1/rules is what it may send here.
+      JsonValue body;
+      std::string error;
+      if (!JsonValue::Parse(std::string(requestBody), body, error) || !body.IsObject())
+         return BuildResponse_(400, RefusalBody("the body must be a JSON object", &RestApiServer::JsonEscape_));
+
+      for (const std::pair<std::string, JsonValue> &member : body.Members())
+      {
+         if (member.first != "match_value" && member.first != "match_type" && member.first != "test_value")
+            return BuildResponse_(400, RefusalBody("unknown field: " + member.first.substr(0, 48), &RestApiServer::JsonEscape_));
+      }
+
+      String matchValue, matchType, testValue;
+      bool present = false;
+      if (!ReadString(body, "match_value", "", present, matchValue, error))
+         return BuildResponse_(400, RefusalBody(error, &RestApiServer::JsonEscape_));
+      if (!present)
+         return BuildResponse_(400, RefusalBody("match_value is required", &RestApiServer::JsonEscape_));
+      if (!ReadString(body, "match_type", "", present, matchType, error))
+         return BuildResponse_(400, RefusalBody(error, &RestApiServer::JsonEscape_));
+      if (!present)
+         return BuildResponse_(400, RefusalBody("match_type is required", &RestApiServer::JsonEscape_));
+      if (!ReadString(body, "test_value", "", present, testValue, error))
+         return BuildResponse_(400, RefusalBody(error, &RestApiServer::JsonEscape_));
+      if (!present)
+         return BuildResponse_(400, RefusalBody("test_value is required", &RestApiServer::JsonEscape_));
+
+      RuleCriteria::MatchType match = RuleCriteria::None;
+      if (!RuleMatchFromWord(std::string(AnsiString(matchType)), match))
+         return BuildResponse_(400, RefusalBody("match_type must be equals, contains, less_than, greater_than, regex, not_contains, not_equals or wildcard", &RestApiServer::JsonEscape_));
+
+      const bool matched = RuleApplier::TestMatch(matchValue, match, testValue);
+
+      return BuildResponse_(200, matched ? "{\"match\":true}" : "{\"match\":false}");
    }
 }

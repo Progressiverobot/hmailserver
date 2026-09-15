@@ -76,6 +76,7 @@ namespace RegressionTests.Shared
       {
          DeleteMessagesInQueue();
          RemoveAllRoutes();
+         RemoveAllGroups();
          RestoreServerRows();
          ResetSettings();
 
@@ -261,6 +262,24 @@ namespace RegressionTests.Shared
             throw new COMException("Failed to save object. The alias address is already in use.");
          answer.Expect(201, "POST /api/v1/domains/" + domain.Name + "/aliases " + name);
          return new Alias { Name = name, Value = value, Active = true };
+      }
+
+      /// <summary>What the Windows one does: Groups.Add, the name, Save.</summary>
+      public Group AddGroup(string name)
+      {
+         var group = GetApp().Settings.Groups.Add();
+         group.Name = name;
+         group.Save();
+         return group;
+      }
+
+      /// <summary>What the Windows one does: Members.Add, the account's id, Save.</summary>
+      public GroupMember AddGroupMember(Group group, Account account)
+      {
+         var member = group.Members.Add();
+         member.AccountID = account.ID;
+         member.Save();
+         return member;
       }
 
       public Domain AddDomain(string name)
@@ -705,6 +724,19 @@ namespace RegressionTests.Shared
             return;
          foreach (var id in ServerApi.Array(ServerApi.Get("/api/v1/routes").Expect(200, "GET /api/v1/routes")).Select(route => ServerApi.LongOf(route, "id")))
             ServerApi.Delete("/api/v1/routes/" + id).Expect(200, "DELETE /api/v1/routes/" + id);
+      }
+
+      /// <summary>
+      ///    What the Windows PerformBasicSetup does with Settings.Groups: every
+      ///    group gone before a test, with its members and the permissions that
+      ///    named it. A server without the groups routes has nothing to remove.
+      /// </summary>
+      public void RemoveAllGroups()
+      {
+         if (!ServerApi.HasRoute("/api/v1/groups", "post"))
+            return;
+         foreach (var id in ServerApi.Array(ServerApi.Get("/api/v1/groups").Expect(200, "GET /api/v1/groups")).Select(group => ServerApi.LongOf(group, "id")))
+            ServerApi.Delete("/api/v1/groups/" + id).Expect(200, "DELETE /api/v1/groups/" + id);
       }
 
       // ---- The delivery queue, through /api/v1/queue ----

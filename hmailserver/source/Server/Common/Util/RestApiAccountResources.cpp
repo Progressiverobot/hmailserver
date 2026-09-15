@@ -31,6 +31,7 @@
 //    PUT    /api/v1/accounts/{address}/messages/{id}              its flags
 //    DELETE /api/v1/accounts/{address}/messages/{id}              Messages.DeleteByDBID
 //    GET    /api/v1/accounts/{address}/messages/{id}/source       the file, message/rfc822
+//    POST   /api/v1/accounts/{address}/messages/{id}/copy         Message.Copy: the message into another folder of the account
 //
 // Each handler does what the COM member does with the same persistence call
 // and the same checks. A create is InterfaceAppPasswords::Add, then
@@ -83,7 +84,11 @@
 // folder's next mod-sequence, so CONDSTORE clients see the change. The
 // account's whole is Account.Messages - every folder, in the collection's
 // order - and its DELETE is Account.DeleteMessages: PersistentAccount's, with
-// the same caches dropped.
+// the same caches dropped. A copy is Message.Copy to the call -
+// MessageUtilities::CopyToIMAPFolder: the file copied, the row written with
+// the destination folder's next UID, the folder's sessions told - into a
+// folder of the same account's tree, which is the only destination COM's
+// Copy reaches either.
 
 #include "StdAfx.h"
 #include "RestApiServer.h"
@@ -91,6 +96,7 @@
 #include "Unicode.h"
 #include "PasswordPolicy.h"
 #include "FileUtilities.h"
+#include "MessageUtilities.h"
 #include "../Application/Logger.h"
 #include "../Application/Application.h"
 #include "../Application/Configuration.h"
@@ -1340,6 +1346,50 @@ namespace
       return bridge.respond(200, "{\"deleted\":true}", "");
    }
 
+   HttpResponse CopyMessage(const Bridge &bridge, std::shared_ptr<Account> account, __int64 messageId, const AnsiString &requestBody)
+   {
+      std::shared_ptr<IMAPFolder> folder;
+      std::shared_ptr<Message> row = OwnMessageRow(account, messageId, folder);
+      if (!row)
+         return Refusal(bridge, 404, "message not found");
+
+      JsonValue body;
+      if (!ParseObjectBody(requestBody, body))
+         return Refusal(bridge, 400, "the body must be a JSON object");
+
+      static const char *const keys[] = { "folder_id" };
+      AnsiString error;
+      if (UnknownKey(body, keys, sizeof(keys) / sizeof(keys[0]), error))
+         return Refusal(bridge, 400, String(error));
+
+      const JsonValue *folderMember = body.Get("folder_id");
+      if (!folderMember || folderMember->IsNull())
+         return Refusal(bridge, 400, "folder_id is required");
+      if (!folderMember->IsNumber() || std::floor(folderMember->AsNumber()) != folderMember->AsNumber() || folderMember->AsNumber() < 1.0)
+         return Refusal(bridge, 400, "folder_id has to be a folder id");
+
+      // The destination is judged here, so that its absence is a 404 naming
+      // it rather than the one false CopyToIMAPFolder answers for every
+      // failure; the same tree the call itself looks the folder up in.
+      const __int64 folderId = folderMember->AsInt64();
+      std::shared_ptr<IMAPFolder> destination = OwnFolder(account, folderId);
+      if (!destination)
+         return Refusal(bridge, 404, "folder not found");
+
+      // Message.Copy over COM, to the call: the file copied, the row saved
+      // with the destination's next UID, its sessions told.
+      __int64 copyId = 0;
+      if (!MessageUtilities::CopyToIMAPFolder(row, (int) folderId, copyId))
+         return Refusal(bridge, 500, "the message could not be copied; see the error log");
+
+      std::shared_ptr<IMAPFolder> copyFolder;
+      std::shared_ptr<Message> copy = OwnMessageRow(account, copyId, copyFolder);
+      if (!copy)
+         return Refusal(bridge, 500, "the copy was written but could not be read back; see the error log");
+
+      return bridge.respond(201, "{" + RowFields(bridge, copy) + "}", "");
+   }
+
    HttpResponse DeleteAccountMessages(const Bridge &bridge, std::shared_ptr<Account> account)
    {
       // Account.DeleteMessages over COM, to the call.
@@ -1379,7 +1429,8 @@ namespace
       "\"get\":{\"summary\":\"One message: its row, its header fields and every header (administrator)\",\"description\":\"The row as the listing shows it, then file - the path on the server's own disk, the COM Filename - and file_exists, then subject, from, to, cc and date decoded from the header block, and headers: every field as written, name and value in order, which is what Message.Headers and Message.HeaderValue answer over COM. The header block is read to 64 KB. A message of another account, or in a folder outside the account's tree, is not found.\",\"responses\":{\"200\":{\"description\":\"The message\"},\"404\":{\"description\":\"No such account or message\"}}},"
       "\"put\":{\"summary\":\"Change a message's flags (administrator)\",\"description\":\"Body: any of seen, deleted, flagged, answered and draft, true or false; a flag not named keeps its value. Written on the path STORE takes, with the folder's next mod-sequence, and every session told. Answers the row as changed.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"properties\":{\"seen\":{\"type\":\"boolean\"},\"deleted\":{\"type\":\"boolean\"},\"flagged\":{\"type\":\"boolean\"},\"answered\":{\"type\":\"boolean\"},\"draft\":{\"type\":\"boolean\"}}}}}},\"responses\":{\"200\":{\"description\":\"The row\"},\"400\":{\"description\":\"No flag named, an unknown field, or a value that is not true or false\"},\"404\":{\"description\":\"No such account or message\"}}},"
       "\"delete\":{\"summary\":\"Delete a message (administrator)\",\"description\":\"What Messages.DeleteByDBID does over COM and EXPUNGE does for one message: the row and the file go, through the folder's live collection, and every session is told.\",\"responses\":{\"200\":{\"description\":\"deleted true\"},\"404\":{\"description\":\"No such account or message\"}}}},"
-      "\"/api/v1/accounts/{address}/messages/{id}/source\":{\"get\":{\"summary\":\"A message's file (administrator)\",\"description\":\"The bytes as stored, message/rfc822, as a download; up to 16 MB.\",\"responses\":{\"200\":{\"description\":\"The message file\"},\"404\":{\"description\":\"No such account or message, or the file is missing\"},\"413\":{\"description\":\"Over 16 MB\"}}}}";
+      "\"/api/v1/accounts/{address}/messages/{id}/source\":{\"get\":{\"summary\":\"A message's file (administrator)\",\"description\":\"The bytes as stored, message/rfc822, as a download; up to 16 MB.\",\"responses\":{\"200\":{\"description\":\"The message file\"},\"404\":{\"description\":\"No such account or message, or the file is missing\"},\"413\":{\"description\":\"Over 16 MB\"}}}},"
+      "\"/api/v1/accounts/{address}/messages/{id}/copy\":{\"post\":{\"summary\":\"Copy a message into another folder of the account (administrator)\",\"description\":\"Body: folder_id (required), a folder of this account's own tree. What Message.Copy does over COM, to the call: the file is copied, the row written with the destination folder's next UID, and every session on that folder told. The source is left as it is, flags included. Answers the copy's row as the listing shows it.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"folder_id\"],\"properties\":{\"folder_id\":{\"type\":\"integer\"}}}}}},\"responses\":{\"201\":{\"description\":\"The copy: id, uid, folder_id, account_id, size, state, received, from_address, flags\"},\"400\":{\"description\":\"folder_id missing or not a folder id, an unknown field, or the body is not a JSON object\"},\"404\":{\"description\":\"No such account or message, or folder_id is not a folder of the account\"}}}}";
 }
 
 namespace HM
@@ -1521,6 +1572,8 @@ namespace HM
          }
          else if (sub == "/source" && method == "GET")
             route.kind = RouteAccountMessageSource;
+         else if (sub == "/copy" && method == "POST")
+            route.kind = RouteAccountMessageCopy;
 
          if (route.kind != RouteUnknown)
             route.message_id = messageId;
@@ -1585,6 +1638,8 @@ namespace HM
          return DeleteMessage(bridge, account, route.message_id);
       case RouteAccountMessageSource:
          return MessageSource(bridge, account, route.message_id);
+      case RouteAccountMessageCopy:
+         return CopyMessage(bridge, account, route.message_id, requestBody);
       default:
          break;
       }

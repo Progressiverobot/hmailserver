@@ -52,15 +52,20 @@ namespace hMailServer
       }
    }
 
-   /// <summary>An account's own rules, which /api/v1/rules does not carry.</summary>
-   public class AccountRules
+   /// <summary>
+   ///    An account's own rules, which /api/v1/rules does not carry. The same
+   ///    COM type as the global collection - a fixture hands Account.Rules to a
+   ///    helper typed as Rules - so it is one here too, with every member
+   ///    overridden to stop the test, and none reaching the global rules.
+   /// </summary>
+   public class AccountRules : Rules
    {
-      public Rule Add()
+      public override Rule Add()
       {
          throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
-      public int Count
+      public override int Count
       {
          get
          {
@@ -68,34 +73,61 @@ namespace hMailServer
          }
       }
 
-      public Rule get_ItemByName(string name)
+      public override Rule get_ItemByName(string name)
       {
          throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
-      [System.Runtime.CompilerServices.IndexerName("At")]
-      public Rule this[int index]
+      public override Rule this[int index]
       {
          get { throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules); }
       }
 
-      public Rule get_Item(int index)
+      public override Rule get_Item(int index)
       {
          throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
       }
 
-      public void DeleteByDBID(long id)
+      public override Rule get_ItemByDBID(long id)
+      {
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoAccountRules);
+      }
+
+      public override void DeleteByDBID(long id)
       {
          NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
       }
 
-      public void Clear()
+      public override void Delete(int index)
       {
          NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
       }
 
-      public void Refresh()
+      public override void Clear()
       {
+         NotOnThisServer.Ignore(NotOnThisServer.NoAccountRules);
+      }
+
+      public override void Refresh()
+      {
+      }
+   }
+
+   /// <summary>
+   ///    Application.Links, which reaches an object by its database id; the
+   ///    REST API addresses a domain by its name and an account by its address,
+   ///    so every member here stops the test naming that.
+   /// </summary>
+   public class Links
+   {
+      public Domain get_Domain(long id)
+      {
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoLinks);
+      }
+
+      public Account get_Account(long id)
+      {
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoLinks);
       }
    }
 
@@ -528,14 +560,201 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    One group. New, it is the POST of its name; stored, its Save is the PUT
+   ///    of the name when it changed. A refusal - an empty or duplicate name -
+   ///    is the COMException it is over COM, with nothing stored.
+   /// </summary>
    public class Group
    {
       public long ID { get; set; }
       public string Name { get; set; }
 
+      // The name as the server knows it, so that a Save of an unchanged group
+      // - the COM habit - asks the server nothing.
+      private string _savedName;
+
+      internal static Group From(JsonElement entry)
+      {
+         var group = new Group
+         {
+            ID = ServerApi.LongOf(entry, "id"),
+            Name = ServerApi.StringOf(entry, "name")
+         };
+         group._savedName = group.Name;
+         return group;
+      }
+
+      /// <summary>The group's members, under /api/v1/groups/{id}/members.</summary>
+      public GroupMembers Members
+      {
+         get
+         {
+            if (ID == 0)
+               throw new System.Runtime.InteropServices.COMException("The group has to be saved before it has members.");
+            return new GroupMembers(this);
+         }
+      }
+
       public void Save()
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
+         Groups.RouteOrSkip();
+
+         if (ID != 0 && string.Equals(Name, _savedName, StringComparison.Ordinal))
+            return;
+
+         var body = "{\"name\":" + ServerApi.Quote(Name ?? string.Empty) + "}";
+         var answer = ID == 0
+            ? ServerApi.Post(Groups.Base, body)
+            : ServerApi.Put(Groups.Base + "/" + ID, body);
+
+         if (answer.Status == 400 || answer.Status == 409)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(ID == 0 ? 201 : 200, (ID == 0 ? "POST " : "PUT ") + Groups.Base);
+         ID = ServerApi.LongOf(answer.Json.Value, "id");
+         Name = ServerApi.StringOf(answer.Json.Value, "name");
+         _savedName = Name;
+      }
+
+      public void Delete()
+      {
+         if (ID != 0)
+            new Groups().DeleteByDBID(ID);
+      }
+   }
+
+   /// <summary>
+   ///    Group.Members over GET and POST /api/v1/groups/{id}/members and DELETE
+   ///    .../members/{account_id}: the group's membership rows, read from the
+   ///    server on every use as Group::GetMembers reads them. A member is
+   ///    removed by its row id, as the COM collection removes it, which the
+   ///    listing maps to the account the route names.
+   /// </summary>
+   public class GroupMembers
+   {
+      private readonly Group _group;
+
+      internal GroupMembers(Group group)
+      {
+         _group = group;
+      }
+
+      internal long GroupID => _group.ID;
+
+      internal string Base => Groups.Base + "/" + _group.ID + "/members";
+
+      private List<GroupMember> Load()
+      {
+         Groups.RouteOrSkip();
+         var answer = ServerApi.Get(Base).Expect(200, "GET " + Base);
+         return ServerApi.Array(answer).Select(entry => GroupMember.From(this, entry)).ToList();
+      }
+
+      public int Count => Load().Count;
+
+      [System.Runtime.CompilerServices.IndexerName("At")]
+      public GroupMember this[int index] => Load()[index];
+
+      public GroupMember get_Item(int index)
+      {
+         return Load()[index];
+      }
+
+      public GroupMember get_ItemByDBID(long id)
+      {
+         return Load().FirstOrDefault(member => member.ID == id)
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
+      }
+
+      public GroupMember Add()
+      {
+         Groups.RouteOrSkip();
+         return new GroupMember(this);
+      }
+
+      public void DeleteByDBID(long id)
+      {
+         var member = Load().FirstOrDefault(candidate => candidate.ID == id);
+         if (member == null)
+            throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
+
+         var path = Base + "/" + member.AccountID;
+         ServerApi.Delete(path).Expect(200, "DELETE " + path);
+      }
+
+      public void Delete(int index)
+      {
+         DeleteByDBID(Load()[index].ID);
+      }
+
+      public void Refresh()
+      {
+      }
+   }
+
+   /// <summary>
+   ///    One membership row: the group, the account. Save is the POST of the
+   ///    account's id; a refusal - an account that is not there, one already in
+   ///    the group - is the COMException it is over COM.
+   /// </summary>
+   public class GroupMember
+   {
+      private readonly GroupMembers _owner;
+      private string _address;
+
+      internal GroupMember(GroupMembers owner)
+      {
+         _owner = owner;
+         GroupID = owner.GroupID;
+      }
+
+      internal static GroupMember From(GroupMembers owner, JsonElement entry)
+      {
+         var member = new GroupMember(owner);
+         member.ID = ServerApi.LongOf(entry, "id");
+         member.GroupID = ServerApi.LongOf(entry, "group_id");
+         member.AccountID = ServerApi.LongOf(entry, "account_id");
+         member._address = ServerApi.StringOf(entry, "account");
+         return member;
+      }
+
+      public long ID { get; private set; }
+      public long GroupID { get; set; }
+      public long AccountID { get; set; }
+
+      /// <summary>The account, by the address the listing carries beside the id.</summary>
+      public Account Account
+      {
+         get
+         {
+            if (string.IsNullOrEmpty(_address))
+               throw new System.Runtime.InteropServices.COMException("The member's account no longer exists.");
+            return Account.ByAddress(_address);
+         }
+      }
+
+      public void Save()
+      {
+         Groups.RouteOrSkip();
+
+         if (ID != 0)
+            return;
+
+         var answer = ServerApi.Post(_owner.Base, "{\"account_id\":" + AccountID + "}");
+
+         if (answer.Status == 400 || answer.Status == 409)
+            throw new System.Runtime.InteropServices.COMException("Failed to save object. " + answer.Error);
+
+         answer.Expect(201, "POST " + _owner.Base);
+         ID = ServerApi.LongOf(answer.Json.Value, "id");
+         _address = ServerApi.StringOf(answer.Json.Value, "account");
+      }
+
+      public void Delete()
+      {
+         if (ID != 0)
+            _owner.DeleteByDBID(ID);
       }
    }
 
@@ -658,12 +877,19 @@ namespace hMailServer
          return permission;
       }
 
+      // The address and the group name the entry carries beside the ids, for
+      // the COM Account and Group properties.
+      private string _accountAddress;
+      private string _groupName;
+
       private void Read(JsonElement entry)
       {
          ID = ServerApi.LongOf(entry, "id");
          PermissionType = TypeOf(ServerApi.StringOf(entry, "type"));
          PermissionAccountID = ServerApi.LongOf(entry, "account_id");
          PermissionGroupID = ServerApi.LongOf(entry, "group_id");
+         _accountAddress = ServerApi.StringOf(entry, "account");
+         _groupName = ServerApi.StringOf(entry, "group");
 
          long value = 0;
          JsonElement rights;
@@ -704,6 +930,28 @@ namespace hMailServer
       public long PermissionAccountID { get; set; }
       public long PermissionGroupID { get; set; }
       public long Value { get; set; }
+
+      /// <summary>The account a user permission names, by the address the entry carries.</summary>
+      public Account Account
+      {
+         get
+         {
+            if (string.IsNullOrEmpty(_accountAddress))
+               throw new System.Runtime.InteropServices.COMException("The permission names no account.");
+            return Account.ByAddress(_accountAddress);
+         }
+      }
+
+      /// <summary>The group a group permission names, read from /api/v1/groups/{id}.</summary>
+      public Group Group
+      {
+         get
+         {
+            if (PermissionGroupID == 0)
+               throw new System.Runtime.InteropServices.COMException("The permission names no group.");
+            return new Groups().get_ItemByDBID(PermissionGroupID);
+         }
+      }
 
       public bool get_Permission(eACLPermission permission)
       {

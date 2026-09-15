@@ -147,7 +147,19 @@ namespace RegressionTests.Shared
          "needs Settings.AntiVirus, and no REST route carries the anti-virus settings or the blocked-attachment list";
 
       public const string NoGroups =
-         "needs Settings.Groups, and no REST route carries the account groups";
+         "needs Settings.Groups, and this server's REST API has no /api/v1/groups (it arrived after 6.3.3)";
+
+      public const string NoFolderSubscriptionWrite =
+         "sets IMAPFolder.Subscribed, and the folder routes report a folder's subscription and never change it - a client subscribes over IMAP";
+
+      public const string NoMessageCopy =
+         "needs Message.Copy, and this server's REST API has no POST /api/v1/accounts/{address}/messages/{id}/copy (it arrived after 6.3.3)";
+
+      public const string NoLinks =
+         "needs Application.Links, which reaches an object by its database id, and the REST API addresses a domain by its name and an account by its address";
+
+      public const string NoCriteriaMatch =
+         "needs Utilities.CriteriaMatch, and this server's REST API has no POST /api/v1/rules/match (it arrived after 6.3.3)";
 
       public const string NoServerMessages =
          "needs Settings.ServerMessages, and this server's REST API has no /api/v1/settings/messages (it arrived after 6.3.2)";

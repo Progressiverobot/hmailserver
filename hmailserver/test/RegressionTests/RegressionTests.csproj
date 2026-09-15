@@ -718,6 +718,7 @@
     <Compile Include="API\RestApiAccountAppPasswords.cs" />
     <Compile Include="API\RestApiFolderPermissions.cs" />
     <Compile Include="API\RestApiAccountMessages.cs" />
+    <Compile Include="API\RestApiGroups.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Messages\MultipartMessageWithNoMainBodyText.txt" />

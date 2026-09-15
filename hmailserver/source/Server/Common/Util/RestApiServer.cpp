@@ -1578,6 +1578,17 @@ namespace HM
          case RouteBlockedAttachmentUpdate:
          case RouteBlockedAttachmentDelete:
             return HandleBlockedAttachments_(route.kind, route.record_id, GetRequestBody_(request));
+         case RouteGroupList:
+         case RouteGroupCreate:
+         case RouteGroupGet:
+         case RouteGroupUpdate:
+         case RouteGroupDelete:
+         case RouteGroupMemberList:
+         case RouteGroupMemberCreate:
+         case RouteGroupMemberDelete:
+            return HandleGroups_(route, GetRequestBody_(request));
+         case RouteRuleMatch:
+            return HandleRuleMatch_(GetRequestBody_(request));
          case RouteCertificateList:
             return HandleListCertificates_();
          case RouteDkimGet:
@@ -1936,6 +1947,7 @@ namespace HM
          case RouteAccountMessageDelete:
          case RouteAccountMessageSource:
          case RouteAccountAppPasswordUpdate:
+         case RouteAccountMessageCopy:
             return HandleAccountResources_(route, GetRequestBody_(request));
 
          case RouteOpenApi:
@@ -2884,6 +2896,61 @@ namespace HM
             }
          }
       }
+
+      // The account groups (RestApiGroups.cpp): the collection, a group by
+      // id, its members, and a member by the account's id.
+      const AnsiString groupsPath = "/api/v1/groups";
+      if (path == groupsPath)
+      {
+         if (method == "GET")
+            route.kind = RouteGroupList;
+         else if (method == "POST")
+            route.kind = RouteGroupCreate;
+         return;
+      }
+      if (path.StartsWith(groupsPath + "/"))
+      {
+         AnsiString rest = path.Mid(groupsPath.GetLength() + 1);
+         int slash = rest.Find("/");
+         AnsiString idPart = slash < 0 ? rest : rest.Mid(0, slash);
+         AnsiString sub = slash < 0 ? AnsiString() : rest.Mid(slash);
+
+         __int64 groupId = 0;
+         if (!ParseQueueId(idPart, groupId))
+            return;
+
+         const AnsiString members = "/members";
+         if (sub.IsEmpty())
+         {
+            if (method == "GET")
+               route.kind = RouteGroupGet;
+            else if (method == "PUT")
+               route.kind = RouteGroupUpdate;
+            else if (method == "DELETE")
+               route.kind = RouteGroupDelete;
+         }
+         else if (sub == members)
+         {
+            if (method == "GET")
+               route.kind = RouteGroupMemberList;
+            else if (method == "POST")
+               route.kind = RouteGroupMemberCreate;
+         }
+         else if (method == "DELETE" && sub.StartsWith(members + "/"))
+         {
+            AnsiString accountPart = sub.Mid(members.GetLength() + 1);
+            __int64 accountId = 0;
+            if (accountPart.Find("/") < 0 && ParseQueueId(accountPart, accountId))
+            {
+               route.kind = RouteGroupMemberDelete;
+               route.member_account_id = accountId;
+            }
+         }
+
+         if (route.kind != RouteUnknown)
+            route.record_id = groupId;
+         return;
+      }
       if (path.StartsWith(domainsPrefix) && path.EndsWith("/lists"))
       {
          AnsiString domainName = path.Mid(domainsPrefix.GetLength(),
@@ -3002,6 +3069,14 @@ namespace HM
       if (method == "POST" && path == "/api/v1/rules")
       {
          route.kind = RouteRuleCreate;
+         return;
+      }
+
+      // A criterion tried against a value, beside the rules it is written
+      // for; "match" is no rule id, so the id routes below never claim it.
+      if (method == "POST" && path == "/api/v1/rules/match")
+      {
+         route.kind = RouteRuleMatch;
          return;
       }
 
@@ -3335,6 +3410,12 @@ namespace HM
       case RouteGreyListingWhiteAddressCreate:
       case RouteGreyListingWhiteAddressUpdate:
       case RouteGreyListingWhiteAddressDelete:
+      case RouteGroupCreate:
+      case RouteGroupUpdate:
+      case RouteGroupDelete:
+      case RouteGroupMemberCreate:
+      case RouteGroupMemberDelete:
+      case RouteAccountMessageCopy:
       case RouteBackupStart:
       case RouteSettingsPut:
       case RouteSettingsAntiSpamPut:
@@ -3599,6 +3680,7 @@ namespace HM
       case RouteServerMessageList:
       case RouteServerMessagePut:
       case RouteSieveEvaluate:
+      case RouteRuleMatch:
       case RouteIpRangeUpdate:
       case RouteRuleCreate:
       case RouteRuleUpdate:
@@ -3618,6 +3700,17 @@ namespace HM
       case RouteUpdateCheck:
       case RouteUpdateDownload:
       case RouteUpdateInstall:
+      // A group holds accounts of any domain and is an ACL principal on any
+      // folder: a key issued for one domain could add its own account to a
+      // group another domain's folders trust, so the groups are the server's.
+      case RouteGroupList:
+      case RouteGroupCreate:
+      case RouteGroupGet:
+      case RouteGroupUpdate:
+      case RouteGroupDelete:
+      case RouteGroupMemberList:
+      case RouteGroupMemberCreate:
+      case RouteGroupMemberDelete:
          // IP ranges, certificates, global rules, the logs, the backup, the
          // server settings and the update check are all server-wide: none of
          // them belongs to a domain, and the logs in particular carry every
@@ -3673,6 +3766,7 @@ namespace HM
       case RouteAccountMessageDelete:
       case RouteAccountMessageSource:
       case RouteAccountAppPasswordUpdate:
+      case RouteAccountMessageCopy:
          targetDomain = StringParser::ExtractDomain(String(route.identifier));
          break;
 
@@ -10541,6 +10635,7 @@ namespace HM
       openApiJson += OpenApiBlockedAttachmentsPaths_();
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += OpenApiAccountResourcesPaths_();
+      openApiJson += OpenApiGroupsPaths_();
       openApiJson += openApiTail;
 
       return BuildResponse_(200, openApiJson);

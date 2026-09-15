@@ -31,6 +31,7 @@ namespace hMailServer
       public Status Status { get; } = new Status();
       public Domains Domains { get; } = new Domains();
       public Rules Rules { get; } = new Rules();
+      public Links Links { get; } = new Links();
 
       /// <summary>
       ///    POST /api/v1/server/reinitialize: every service stopped, the configuration
@@ -1391,37 +1392,65 @@ namespace hMailServer
       }
    }
 
+   /// <summary>
+   ///    Settings.Groups over GET and POST /api/v1/groups and GET, PUT and
+   ///    DELETE /api/v1/groups/{id}: the account groups a folder permission
+   ///    names as one principal. Read from the server on every use, as the COM
+   ///    collection is refreshed on every get_Groups; a group is a Group bound
+   ///    to the route, written by its Save.
+   /// </summary>
    public class Groups
    {
-      public int Count
+      internal const string Base = "/api/v1/groups";
+
+      internal static void RouteOrSkip()
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
-         }
+         if (!ServerApi.HasRoute(Base, "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
       }
 
-      public int Length
+      private static List<Group> Load()
       {
-         get
-         {
-            throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
-         }
+         RouteOrSkip();
+         return ServerApi.Array(ServerApi.Get(Base).Expect(200, "GET " + Base)).Select(Group.From).ToList();
       }
 
-      public Group Add()
+      public int Count => Load().Count;
+
+      [System.Runtime.CompilerServices.IndexerName("At")]
+      public Group this[int index] => Load()[index];
+
+      public Group get_Item(int index)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
+         return Load()[index];
+      }
+
+      public Group get_ItemByDBID(long id)
+      {
+         return Load().FirstOrDefault(group => group.ID == id)
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + id);
       }
 
       public Group get_ItemByName(string name)
       {
-         throw NotOnThisServer.Skipped(NotOnThisServer.NoGroups);
+         return Load().FirstOrDefault(group => string.Equals(group.Name, name, StringComparison.OrdinalIgnoreCase))
+            ?? throw new System.Runtime.InteropServices.COMException("Item not found. " + name);
+      }
+
+      public Group Add()
+      {
+         RouteOrSkip();
+         return new Group();
       }
 
       public void DeleteByDBID(long id)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoGroups);
+         RouteOrSkip();
+         ServerApi.Delete(Base + "/" + id).Expect(200, "DELETE " + Base + "/" + id);
+      }
+
+      public void Refresh()
+      {
       }
    }
 
@@ -2113,6 +2142,29 @@ namespace hMailServer
          throw NotOnThisServer.Skipped(NotOnThisServer.NoMailServerLookup);
       }
 
+      /// <summary>
+      ///    POST /api/v1/rules/match: the delivery path's decision for a criterion
+      ///    of that value and type meeting the text, which is what CriteriaMatch
+      ///    answers over COM. The type travels as the word the rule listing uses.
+      /// </summary>
+      public bool CriteriaMatch(string matchValue, eRuleMatchType matchType, string testValue)
+      {
+         const string path = "/api/v1/rules/match";
+         if (!ServerApi.HasRoute(path, "post"))
+            throw NotOnThisServer.Skipped(NotOnThisServer.NoCriteriaMatch);
+
+         var answer = ServerApi.Post(path,
+            "{\"match_value\":" + ServerApi.Quote(matchValue ?? string.Empty) +
+            ",\"match_type\":" + ServerApi.Quote(RuleCriteria.MatchName(matchType)) +
+            ",\"test_value\":" + ServerApi.Quote(testValue ?? string.Empty) + "}");
+
+         if (answer.Status == 400)
+            throw new System.Runtime.InteropServices.COMException(answer.Error);
+
+         answer.Expect(200, "POST " + path);
+         return ServerApi.FlagOf(answer.Json.Value, "match");
+      }
+
       public string MD5(string text)
       {
          throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
@@ -2128,14 +2180,19 @@ namespace hMailServer
          throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
-      public void ImportMessageFromFile(string file, long accountId)
+      public bool ImportMessageFromFile(string file, long accountId)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
-      public void ImportMessageFromFileWithFolderName(string file, long accountId, string folder)
+      public bool ImportMessageFromFileWithFolderName(string file, long accountId, string folder)
       {
-         NotOnThisServer.Ignore(NotOnThisServer.NoUtilityCall);
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
+      }
+
+      public long RetrieveMessageID(string file)
+      {
+         throw NotOnThisServer.Skipped(NotOnThisServer.NoUtilityCall);
       }
 
       public string RunTestSuite(string name = null)
@@ -2916,6 +2973,23 @@ namespace hMailServer
          return this;
       }
 
+      /// <summary>
+      ///    An account named by its address alone - a group member, the account
+      ///    a folder permission is for - as GET /api/v1/accounts/{address} reports
+      ///    it: nothing is claimed that was not read, so a field the route does
+      ///    not report is answered by its skip. The password is the one this run
+      ///    made the account with, or none.
+      /// </summary>
+      internal static Account ByAddress(string address)
+      {
+         var at = address.IndexOf('@');
+         var account = new Account().Seed(address, RegressionTests.Shared.TestSetup.PasswordFor(address), false,
+            at < 0 ? string.Empty : address.Substring(at + 1));
+         account._known.Remove("active");
+         account.LoadWhole();
+         return account;
+      }
+
       public string Address { get; set; }
       public string Password
       {
@@ -3684,6 +3758,27 @@ namespace hMailServer
       {
          RequireStored();
          new Messages(Account).DeleteByDBID(ID);
+      }
+
+      /// <summary>
+      ///    POST .../messages/{id}/copy: the message into another folder of the
+      ///    account, what Message.Copy does over COM. A folder that is not the
+      ///    account's is the COMException Copy raises.
+      /// </summary>
+      public void Copy(long destinationFolderId)
+      {
+         RequireStored();
+
+         var path = Messages.Base(Account) + "/" + ID + "/copy";
+         if (!ServerApi.HasRoute("/api/v1/accounts/{address}/messages/{id}/copy", "post"))
+            NotOnThisServer.Ignore(NotOnThisServer.NoMessageCopy);
+
+         var answer = ServerApi.Post(path, "{\"folder_id\":" + destinationFolderId + "}");
+
+         if (answer.Status == 400 || answer.Status == 404 || answer.Status == 500)
+            throw new System.Runtime.InteropServices.COMException("Unable to copy message. " + answer.Error);
+
+         answer.Expect(201, "POST " + path);
       }
 
       public string Charset
