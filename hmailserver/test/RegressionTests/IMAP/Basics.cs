@@ -75,6 +75,36 @@ namespace RegressionTests.IMAP
       }
 
       [Test]
+      [Description("A LOGIN whose username is a 9,000-character literal is refused and the server goes on answering. " +
+                   "The account lookup compares the name with an nvarchar column, and a long string bound for it " +
+                   "crashed the SQL Server Compact provider inside the service - before anybody had signed in.")]
+      public void AnOverLongLiteralUsernameIsRefusedAndTheServerSurvives()
+      {
+         var account = SingletonProvider<TestSetup>.Instance.AddAccount(_domain, "longliteral@example.test", "test");
+         string longName = new string('u', 9000) + "@example.test";
+
+         for (int attempt = 0; attempt < 2; attempt++)
+         {
+            var simulator = new ImapClientSimulator();
+            simulator.Connect();
+
+            string ready = simulator.Send("A01 LOGIN {" + longName.Length + "}");
+            if (ready.StartsWith("+"))
+            {
+               string answer = simulator.Send(longName + " test");
+               Assert.IsFalse(answer.Contains("A01 OK"), "A name that is no account must not sign in. Got: " + answer);
+            }
+
+            simulator.Disconnect();
+         }
+
+         var check = new ImapClientSimulator();
+         Assert.IsTrue(check.ConnectAndLogon(account.Address, "test"),
+            "After two over-long usernames the server no longer signs anybody in.");
+         check.Disconnect();
+      }
+
+      [Test]
       [Description("Security: with the per-IP auto-ban disabled, a single IMAP connection must still be disconnected after the per-connection authentication-failure cap (defense-in-depth brute-force protection).")]
       public void TestPerConnectionLoginFailureCapDisconnects()
       {

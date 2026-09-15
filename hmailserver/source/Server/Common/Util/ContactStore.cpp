@@ -169,7 +169,8 @@ namespace HM
    bool
    ContactStore::FindByUri(__int64 accountId, const String &uri, ContactRecord &contact)
    {
-      if (uri.IsEmpty())
+      // contacturi is nvarchar(255): a longer name from a request path cannot exist.
+      if (uri.IsEmpty() || uri.GetLength() > 255)
          return false;
 
       SQLCommand command("select contactid, contactname, contactaddress, contactsource, contactcreated, contacturi, contactuid, contactvcard from hm_contacts where contactaccountid = @ACCOUNTID and contacturi = @URI");

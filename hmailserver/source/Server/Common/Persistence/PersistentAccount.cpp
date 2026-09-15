@@ -188,6 +188,14 @@ namespace HM
    bool
    PersistentAccount::ReadObject(std::shared_ptr<Account> pAccount, const String & sAddress)
    {
+      // No account address is longer than its column, and this lookup is reached by
+      // a sign-in attempt before anybody is authenticated - an IMAP LOGIN, a SASL
+      // exchange, a DAV request's Basic credentials - so a name that cannot exist is
+      // answered here rather than handed to the database to refuse, or on SQL Server
+      // Compact to fail on, once per attempt.
+      if (sAddress.GetLength() > 255)
+         return false;
+
       SQLStatement statement;
       statement.SetStatementType(SQLStatement::STSelect);
       statement.SetTable("hm_accounts");
