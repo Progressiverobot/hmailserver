@@ -356,6 +356,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 keer vasthouden van 15 minuten is ongeveer vier uur. 0 betekent ongescande mail nooit in de wachtrij zetten - de afzender meteen inlichten. Een vastgehouden bericht wordt bezorgd zodra een scanner antwoordt; de telling wordt in het geheugen bewaard, dus een herstart van de service geeft een vastgehouden bericht een nieuw budget.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 is mail, waar de regels van een mailserver thuishoren en waar de mail.*-regel van een collector al op aanslaat. 16 tot en met 23 zijn local0 tot en met local7, voor een omgeving die daar haar eigen toepassingen onderbrengt. 0 is kernel en hoort niet gebruikt te worden.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Of voer de hieronder getoonde instelsleutel handmatig in.</value>
   </data>
@@ -382,6 +385,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Promoveer de klaargezette sleutel tot ondertekeningssleutel:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 is de geregistreerde poort voor UDP en voor gewone TCP; 6514 is de geregistreerde poort voor syslog over TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 dagen</value>
@@ -421,6 +427,9 @@ Dit zwakke wachtwoord toch opslaan?</value>
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>Een code van een authenticator-app, vereist naast het wachtwoord van dit account. Het geldt waar een code daadwerkelijk kan worden ingevoerd - het Control Panel en de API. E-mailclients kunnen er geen tonen, dus zodra dit aanstaat moeten zij een app-wachtwoord gebruiken.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>Een kopie van elke logregel, als RFC 5424, naar een syslog-collector - rsyslog, syslog-ng, een SIEM - naast de logbestanden en niet in plaats daarvan. Op Linux zonder genoemde collector schrijft een server onder systemd naar de journal, waar journalctl hem kan lezen.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>Er is een referentie ingesteld maar de listener heeft geen TLS, dus de referentie gaat bij elke scrape in klare tekst over het netwerk en kan door iedereen onderweg opnieuw worden gebruikt. Stel de certificaat- en sleutelbestanden in, of bind aan 127.0.0.1. De server start toch - hij logt dezelfde waarschuwing.</value>
@@ -1155,6 +1164,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   <data name="Application events" xml:space="preserve">
     <value>Toepassingsgebeurtenissen</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Toepassingsgebeurtenissen naar syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Toegepast</value>
   </data>
@@ -1163,6 +1175,9 @@ Het Control Panel nu herstarten? Kies Nee om te proberen door te werken.</value>
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Geldt _voor</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Wordt van kracht bij de volgende herstart van de service of bij herinitialiseren. De logbestanden veranderen niet: dit verstuurt een kopie, het verplaatst niets. Zonder collectorhost hieronder schrijft een server onder systemd op Linux naar de journal - op Linux is deze ene schakelaar dus de hele configuratie.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Directorysynchronisatie toepassen</value>
@@ -1783,6 +1798,12 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Navigatie samenvouwen</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Hostnaam of adres van de collector</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Collectorpoort</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Opdrachtregel (gebruik %FILE% voor het gescande bestand)</value>
@@ -2443,6 +2464,9 @@ De klaargezette selector "{0}" wordt uit de serverconfiguratie verwijderd; het o
   <data name="Debug messages" xml:space="preserve">
     <value>Debugberichten</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Debugberichten naar syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Standaard 10, toegestaan bereik 1 tot 90. De server leest waarden onder 1 als 10 en begrenst waarden boven 90, want "eeuwig wachten" op een onbereikbare directory is precies hoe verbindingsthreads opraken.</value>
   </data>
@@ -2854,6 +2878,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Leeg betekent niemand. XCLIENT wordt niet eens in EHLO aangekondigd aan een upstream die hier niet is vermeld, zodat een aanvaller door ernaar te vragen niets over de opstelling te weten komt.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Leeg betekent op Linux de systemd-journal en op Windows dat er niets wordt verstuurd. Een collector die niet meer antwoordt vertraagt de post nooit: regels komen in een wachtrij, de oudste vervallen zodra er 4096 wachten, en het toepassingslog meldt dat eenmaal bij het begin en eenmaal als de collector terug is.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>_In-/uitschakelen</value>
   </data>
@@ -2977,6 +3004,18 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Envelopafzenders die meteen worden geweigerd, of een score krijgen. Een vermelding met een @ is één exact adres; zonder @ is het een heel domein inclusief zijn subdomeinen. De standaardscore van 100 overschrijdt de verwijderdrempel en weigert het bericht tijdens het SMTP-gesprek. Dit vergelijkt met het adres dat de afzender BEWEERT, dus het houdt een correspondent tegen die één adres blijft gebruiken - het is geen middel tegen spoofing, en het houdt niets tegen dat van adres wisselt.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Foutregels dragen de ernst die de server zelf heeft vastgelegd: critical, error, warning of notice. Al het overige is informational, behalve TCP/IP en debug, die debug zijn.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Fouten en waarschuwingen (ernst 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Fouten worden altijd verstuurd, welke van deze schakelaars ook uit staan - het foutenlog wordt zelfs geschreven als loggen uit staat, en dit volgt dat.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Alleen fouten (ernst 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>DMARC-beleid evalueren</value>
   </data>
@@ -3046,11 +3085,17 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Alles wat ErrorManager meldt</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Alles behalve debug (ernst 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Alles wat bepaalt of een bericht gewenst is.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Alles wat buiten deze server moet gebeuren - DNS-records, sleutel- en CA-bestanden, vertrouwde lijsten - en de toestand van elk daarvan.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Alles, inclusief debug (ernst 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Uitvoerbaar bestand gevonden: {0}</value>
@@ -3138,6 +3183,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Extra bezorgpogingen per extra MX-host (0 = standaard)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0 tot en met 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Mislukte aanmeldingen vanaf een vermeld adres worden helemaal niet geteld, dus het kan nooit geband worden. Zet hier de adressen van waaruit u beheert voordat u de firewall-optie inschakelt: een ban die de firewall bereikt sluit dat adres uit van elke mailpoort op deze machine. Voorbeeld: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Een vermelding die geen adres is wordt bij naam in het foutenlogboek gemeld en genegeerd.</value>
@@ -3493,6 +3541,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Hoe accounts bewijzen wie ze zijn: wachtwoordhashing, OAuth2 / XOAUTH2, en vereiste mechanismen.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Hoe de regels bij de collector komen</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Hoe lang een verbinding inactief mag zijn voordat die wordt gesloten, per protocol, in seconden. "Server" is hMailServer die een verbinding accepteert van een e-mailclient of een andere mailserver; "client" is hMailServer die naar buiten verbinding maakt om mail te bezorgen of om die op te halen bij een extern POP3-account. De effectieve time-out beweegt met de serverbelasting tussen het minimum en het maximum, dus een drukke server verbreekt inactieve verbindingen eerder. Geldt na een herstart van de service.</value>
   </data>
@@ -3567,6 +3618,9 @@ Er wordt geen mail aangeraakt - de index is ervan afgeleid - maar totdat het opn
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP-gesprekken</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP-conversaties naar syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>Zoeklimieten voor IMAP</value>
@@ -5202,6 +5256,9 @@ Het geverifieerde installatieprogramma wordt aan de updatehelper doorgegeven: de
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3-conversaties</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3-conversaties naar syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3 biedt de server geen manier om een client te vertellen dat er mail is aangekomen, dus clients die responsief willen lijken pollen - en sommige doen dat om de paar seconden. Elke poll is een nieuwe verbinding, een TLS-handshake en een wachtwoordcontrole, wat met Argon2id bewust duur is, zodat een handvol gretige clients meer kan kosten dan de mail zelf. Een vertraging instellen vertelt clients het interval in de capabilitylijst van de server en weigert aanmeldingen die te vroeg komen met een code die de client begrijpt als "rustiger aan" in plaats van als een verkeerd wachtwoord. Geldt na een herstart van de service.</value>
   </data>
@@ -6147,6 +6204,9 @@ Doorgaan?</value>
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP-conversaties</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP-conversaties naar syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP-relayserver (smart host)</value>
   </data>
@@ -6564,11 +6624,17 @@ Doorgaan?</value>
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Stuur een bericht naar elk account op de server (of naar de accounts die aan een jokerteken voldoen) - voor onderhoudsaankondigingen.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Regels versturen die minstens zo ernstig zijn</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Alles via mijn provider verzenden</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Stuur hem als bearertoken:  Authorization: Bearer hmapi_...  naar de REST-listener die is geconfigureerd op de pagina API en monitoring. Het beheerderswachtwoord werkt ook en is onbeperkt, en dat is precies de reden om een sleutel te verkiezen: een sleutel kan alleen-lezen zijn, beperkt tot genoemde domeinen, beperkt tot één bronadres, van een vervaldatum worden voorzien, en worden ingetrokken zonder dat er verder iets verandert.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Logregels naar syslog sturen</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Dit bericht naar alle accounts sturen die aan '{0}' voldoen?</value>
@@ -7097,8 +7163,17 @@ Nu herstarten?</value>
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Syntaxiscontrole mislukt: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - in volgorde afgeleverd, niets afgekapt</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP over TLS (RFC 5425), certificaat geverifieerd</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP-activiteit</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP-activiteit naar syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP-poort</value>
@@ -8220,6 +8295,12 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Type:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - geen afleveringsgarantie, afgekapt op 1024 bytes</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP kapt een regel af op 1024 bytes, wat de richtlijn van RFC 5426 is en onder elke relevante pad-MTU blijft; de twee streamtransporten omkaderen elke regel met zijn eigen lengte (RFC 5425) en kappen niets af. TLS verifieert de certificaatketen van de collector en de naam ervan tegen het basiscertificaatarchief van deze machine, en weigert de verbinding als een van beide faalt - een collector met een zelfondertekend certificaat heeft dat certificaat dus als vertrouwd nodig op deze machine.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Kan de server niet bereiken (RPC niet beschikbaar).</value>
@@ -9684,6 +9765,9 @@ Er wordt geen bericht verwijderd en er wordt geen account verwijderd. Doorgaan?<
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>spam stoppen</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>iedereen over onderhoud informeren</value>

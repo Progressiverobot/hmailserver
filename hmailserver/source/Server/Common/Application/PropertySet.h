@@ -26,6 +26,21 @@ namespace HM
       void SetBool(const String &sPropertyName, bool lValue);
       void SetString(const String &sPropertyName, const String &lValue);
 
+      // Creates the property, with the given value, when the database has no row
+      // for it; does nothing at all when it has one.
+      //
+      // This is how a setting added after a database was created gets a row
+      // without a schema step of its own. It matters because of what GetProperty_
+      // does when a property is missing: it reports HM5015 on EVERY read, so a
+      // feature whose settings have no rows fills the error log of an installation
+      // that has never used it. Called from Configuration::Load, on the one thread
+      // that is running at that point, before any other thread can read the set -
+      // which is why this may write to items_ and the getters may not.
+      void EnsureLong(const String &sPropertyName, long lValue);
+      void EnsureString(const String &sPropertyName, const String &sValue);
+
+      bool Contains(const String &sPropertyName) const;
+
       bool XMLStore(XNode *pBackupNode);
       bool XMLLoad(XNode *pBackupNode);
 

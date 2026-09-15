@@ -153,6 +153,25 @@
 
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
+// The syslog sink (RFC 5424), beside the log files rather than instead of them.
+// In hm_settings rather than in hMailServer.ini because of the rule in
+// .github/CONTRIBUTING.md from 15 September 2026: a setting belongs in the
+// database. The rows are created with these defaults by
+// PropertySet::EnsureLong/EnsureString at start-up when they are absent, which is
+// every installation that predates the feature - so no reader ever sees a missing
+// property, and none of them reports HM5015 on a server that has never touched
+// the page.
+//
+// SyslogHost empty is not "off": on Linux under systemd it is what selects the
+// journal, which is where a Linux administrator expects the lines to be.
+#define PROPERTY_SYSLOG_ENABLED                 _T("SyslogEnabled")
+#define PROPERTY_SYSLOG_HOST                    _T("SyslogHost")
+#define PROPERTY_SYSLOG_PORT                    _T("SyslogPort")
+#define PROPERTY_SYSLOG_TRANSPORT               _T("SyslogTransport")
+#define PROPERTY_SYSLOG_FACILITY                _T("SyslogFacility")
+#define PROPERTY_SYSLOG_SEVERITY                _T("SyslogMinimumSeverity")
+#define PROPERTY_SYSLOG_LOGTYPES                _T("SyslogLogTypes")
+
 // 6006 adds hm_imapfolders.folderspecialuse (RFC 6154 SPECIAL-USE).
 // 6007 adds hm_domains.domaindkimsecondaryselector and
 //      hm_domains.domaindkimsecondaryprivatekeyfile, the staged half of a DKIM key

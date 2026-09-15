@@ -85,6 +85,37 @@ namespace HM
       long GetLogDevice() const;
       void SetLogDevice(long newVal);
 
+      // The syslog sink. Seven settings, stored in hm_settings, read by
+      // SyslogSink::Start - so a change takes effect at the next service start or
+      // Reinitialize, which is what the Control Panel editor says on the page.
+      bool GetSyslogEnabled() const;
+      void SetSyslogEnabled(bool newVal);
+
+      String GetSyslogHost() const;
+      void SetSyslogHost(const String &newVal);
+
+      long GetSyslogPort() const;
+      void SetSyslogPort(long newVal);
+
+      long GetSyslogTransport() const;
+      void SetSyslogTransport(long newVal);
+
+      long GetSyslogFacility() const;
+      void SetSyslogFacility(long newVal);
+
+      long GetSyslogMinimumSeverity() const;
+      void SetSyslogMinimumSeverity(long newVal);
+
+      long GetSyslogLogTypes() const;
+      void SetSyslogLogTypes(long newVal);
+
+      // One category of the SyslogLogTypes mask, by its Logger::LogSource bit.
+      // The same shape as the six GetLog*Conversations above, which read bits of
+      // PROPERTY_LOGGING: one stored integer, one switch per category, and no
+      // second place for the two to disagree.
+      bool GetSyslogLogType(int mask) const;
+      void SetSyslogLogType(int mask, bool enabled);
+
       void SetUseScriptServer(bool newVal);
       bool GetUseScriptServer() const;
 
@@ -181,6 +212,12 @@ namespace HM
       std::shared_ptr<PropertySet> GetPropertySet() {return property_set_;}
 
    private:
+
+      // Creates the hm_settings rows that a database made before a feature
+      // existed has none of, each with the default that is today's behaviour.
+      // Runs once per Load, on the start-up thread, before anything else can read
+      // the property set. See PropertySet::EnsureLong for why it is needed at all.
+      void EnsureSettingDefaults_();
 
       std::shared_ptr<POP3Configuration> pop3_configuration_;
       std::shared_ptr<SMTPConfiguration> smtp_configuration_;

@@ -1349,6 +1349,34 @@ interface IInterfaceLogging : IDispatch
    [propput, id(22), helpstring("Keep log file open between writes.")] HRESULT KeepFilesOpen([in] VARIANT_BOOL newVal);
 
    [propget, id(23), helpstring("Returns true if live logging is enabled. False otherwise.")] HRESULT LiveLoggingEnabled([out, retval] VARIANT_BOOL *pVal);
+
+   // The syslog sink (RFC 5424). Stored in hm_settings, read when the sink starts,
+   // so a change applies at the next service start or Reinitialize. SyslogHost empty
+   // is not "off": on Linux under systemd it selects the journal.
+   [propget, id(24), helpstring("Send log entries to a syslog collector, or to the systemd journal.")] HRESULT SyslogEnabled([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(24), helpstring("Send log entries to a syslog collector, or to the systemd journal.")] HRESULT SyslogEnabled([in] VARIANT_BOOL newVal);
+   [propget, id(25), helpstring("The syslog collector host name or address. Empty selects the systemd journal on Linux.")] HRESULT SyslogHost([out, retval] BSTR *pVal);
+   [propput, id(25), helpstring("The syslog collector host name or address.")] HRESULT SyslogHost([in] BSTR newVal);
+   [propget, id(26), helpstring("The syslog collector port. 514 for UDP and TCP, 6514 for TLS.")] HRESULT SyslogPort([out, retval] long *pVal);
+   [propput, id(26), helpstring("The syslog collector port.")] HRESULT SyslogPort([in] long newVal);
+   [propget, id(27), helpstring("How entries reach the collector: 0 UDP, 1 TCP, 2 TCP over TLS.")] HRESULT SyslogTransport([out, retval] long *pVal);
+   [propput, id(27), helpstring("How entries reach the collector: 0 UDP, 1 TCP, 2 TCP over TLS.")] HRESULT SyslogTransport([in] long newVal);
+   [propget, id(28), helpstring("The RFC 5424 facility, 0 to 23. 2 is mail.")] HRESULT SyslogFacility([out, retval] long *pVal);
+   [propput, id(28), helpstring("The RFC 5424 facility, 0 to 23. 2 is mail.")] HRESULT SyslogFacility([in] long newVal);
+   [propget, id(29), helpstring("The least severe entry that is sent, 0 emergency to 7 debug.")] HRESULT SyslogMinimumSeverity([out, retval] long *pVal);
+   [propput, id(29), helpstring("The least severe entry that is sent, 0 emergency to 7 debug.")] HRESULT SyslogMinimumSeverity([in] long newVal);
+   [propget, id(30), helpstring("Send SMTP conversations to syslog.")] HRESULT SyslogLogSMTP([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(30), helpstring("Send SMTP conversations to syslog.")] HRESULT SyslogLogSMTP([in] VARIANT_BOOL newVal);
+   [propget, id(31), helpstring("Send POP3 conversations to syslog.")] HRESULT SyslogLogPOP3([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(31), helpstring("Send POP3 conversations to syslog.")] HRESULT SyslogLogPOP3([in] VARIANT_BOOL newVal);
+   [propget, id(32), helpstring("Send IMAP conversations to syslog.")] HRESULT SyslogLogIMAP([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(32), helpstring("Send IMAP conversations to syslog.")] HRESULT SyslogLogIMAP([in] VARIANT_BOOL newVal);
+   [propget, id(33), helpstring("Send application events to syslog.")] HRESULT SyslogLogApplication([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(33), helpstring("Send application events to syslog.")] HRESULT SyslogLogApplication([in] VARIANT_BOOL newVal);
+   [propget, id(34), helpstring("Send TCP/IP activity to syslog.")] HRESULT SyslogLogTCPIP([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(34), helpstring("Send TCP/IP activity to syslog.")] HRESULT SyslogLogTCPIP([in] VARIANT_BOOL newVal);
+   [propget, id(35), helpstring("Send debug messages to syslog.")] HRESULT SyslogLogDebug([out, retval] VARIANT_BOOL *pVal);
+   [propput, id(35), helpstring("Send debug messages to syslog.")] HRESULT SyslogLogDebug([in] VARIANT_BOOL newVal);
 };
 
 [

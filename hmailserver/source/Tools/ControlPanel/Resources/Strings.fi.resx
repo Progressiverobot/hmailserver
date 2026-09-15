@@ -356,6 +356,9 @@ Tallennetaanko tämä heikko salasana silti?</value>
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 pidätystä 15 minuutin välein on noin neljä tuntia. 0 tarkoittaa, ettei tarkistamatonta postia jonoteta koskaan – lähettäjälle kerrotaan heti. Pidätetty viesti toimitetaan heti kun jokin tarkistin vastaa; laskuria pidetään muistissa, joten palvelun uudelleenkäynnistys antaa pidätetylle viestille uuden kiintiön.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 on mail, johon postipalvelimen rivit kuuluvat ja johon keräimen mail.*-sääntö jo osuu. 16-23 ovat local0-local7, sellaiselle asennukselle, joka arkistoi omat sovelluksensa sinne. 0 on kernel eikä sitä pidä käyttää.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Tai syötä alla näkyvä asetusavain käsin.</value>
   </data>
@@ -382,6 +385,9 @@ Tallennetaanko tämä heikko salasana silti?</value>
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Ota valmisteltu avain käyttöön allekirjoitusavaimena:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 on rekisteröity portti UDP:lle ja tavalliselle TCP:lle; 6514 on rekisteröity portti syslogille TLS:n yli.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 päivää</value>
@@ -421,6 +427,9 @@ Tallennetaanko tämä heikko salasana silti?</value>
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>Todennussovelluksen antama koodi, joka vaaditaan tämän tilin salasanan lisäksi. Se koskee niitä paikkoja, joissa koodin voi todella syöttää – Control Panelia ja API:a. Sähköpostiohjelmat eivät osaa esittää koodia, joten kun tämä on käytössä, niiden on käytettävä sovellussalasanaa.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>Kopio jokaisesta lokimerkinnästä RFC 5424 -muodossa syslog-keräimelle - rsyslog, syslog-ng, SIEM - lokitiedostojen rinnalle eikä niiden tilalle. Linuxissa ilman nimettyä keräintä systemd:n alla toimiva palvelin kirjoittaa journaliin, josta journalctl lukee sen.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>Tunnistetiedot on asetettu, mutta kuuntelijalla ei ole TLS:ää, joten tunnistetiedot kulkevat verkossa selväkielisinä jokaisella keruukerralla ja kuka tahansa reitillä oleva voi toistaa ne. Aseta varmenne- ja avaintiedostot tai sido kuuntelija osoitteeseen 127.0.0.1. Palvelin käynnistyy silti – se kirjaa lokiin tämän saman varoituksen.</value>
@@ -1155,6 +1164,9 @@ Käynnistetäänkö Control Panel nyt uudelleen? Valitse Ei, jos haluat yrittä�
   <data name="Application events" xml:space="preserve">
     <value>Sovellustapahtumat</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Sovellustapahtumat syslogiin</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Otettu käyttöön</value>
   </data>
@@ -1163,6 +1175,9 @@ Käynnistetäänkö Control Panel nyt uudelleen? Valitse Ei, jos haluat yrittä�
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Koskee _kohdetta</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Tulee voimaan palvelun seuraavassa käynnistyksessä tai alustettaessa uudelleen. Lokitiedostoihin tämä ei vaikuta: tämä lähettää kopion eikä siirrä mitään. Jos alla ei ole keräimen osoitetta, systemd:n alla toimiva palvelin Linuxissa kirjoittaa sen sijaan journaliin - Linuxissa tämä yksi kytkin on siis koko asetus.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Suorita hakemistosynkronointi</value>
@@ -1783,6 +1798,12 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Pienennä navigointi</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Keräimen isäntänimi tai osoite</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Keräimen portti</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Komentorivi (käytä %FILE%-merkintää tarkistettavalle tiedostolle)</value>
@@ -2443,6 +2464,9 @@ Valmisteltu valitsin "{0}" poistetaan palvelimen määrityksestä; allekirjoitus
   <data name="Debug messages" xml:space="preserve">
     <value>Vianjäljitysviestit</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Virheenjäljitysviestit syslogiin</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Oletus 10, sallittu alue 1-90. Palvelin lukee alle 1:n arvot arvona 10 ja rajaa yli 90:n arvot, koska "odota ikuisesti" tavoittamatonta hakemistoa on tapa, jolla yhteyssäikeet loppuvat.</value>
   </data>
@@ -2854,6 +2878,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Tyhjä tarkoittaa ei ketään. XCLIENTiä ei edes mainosteta EHLO:ssa ylävirran palvelimelle, jota ei ole lueteltu tässä, joten hyökkääjä ei opi kysymällä mitään käyttöönotosta.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Tyhjä tarkoittaa Linuxissa systemd:n journalia ja Windowsissa sitä, ettei mitään lähetetä. Keräin, joka lakkaa vastaamasta, ei koskaan viivytä postia: merkinnät jonottavat, vanhimmat hylätään kun jonossa on 4096, ja sovelluslokiin tulee siitä yksi rivi alussa ja yksi, kun keräin palaa.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>_Ota käyttöön / poista käytöstä</value>
   </data>
@@ -2977,6 +3004,18 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Kuoren lähettäjät, jotka hylätään suoraan tai pisteytetään. Merkintä, jossa on @, on yksi tarkka osoite; ilman sitä se on kokonainen verkkotunnus aliverkkotunnuksineen. Oletuspistemäärä 100 ylittää poistokynnyksen ja hylkää viestin SMTP-keskustelun aikana. Tämä vertaa osoitetta, jonka lähettäjä VÄITTÄÄ, joten se pysäyttää kirjeenvaihtajan, joka käyttää yhtä osoitetta yhä uudelleen - se ei ole väärennösten vastainen työkalu eikä pysäytä mitään, mikä vaihtaa osoitteita.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Virhemerkinnät kantavat sen vakavuuden, jonka palvelin itse kirjasi: critical, error, warning tai notice. Kaikki muu on informational, paitsi TCP/IP ja virheenjäljitys, jotka ovat debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Virheet ja varoitukset (vakavuus 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Virheet lähetetään aina, olivatpa nämä pois päältä tai eivät - virheloki kirjoitetaan silloinkin, kun lokitus on pois käytöstä, ja tämä noudattaa sitä.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Vain virheet (vakavuus 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Arvioi DMARC-käytännöt</value>
   </data>
@@ -3046,11 +3085,17 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Kaikki, mistä ErrorManager raportoi</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Kaikki paitsi virheenjäljitys (vakavuus 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Kaikki, mikä päättää, onko viesti haluttu.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Kaikki, mitä tämän palvelimen ulkopuolella on tehtävä - DNS-tietueet, avain- ja CA-tiedostot, luotettujen luettelot - ja kunkin tila.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Kaikki, virheenjäljitys mukaan lukien (vakavuus 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Suoritettava tiedosto löytyi: {0}</value>
@@ -3138,6 +3183,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Lisätoimitusyritykset kutakin lisä-MX-konetta kohden (0 = oletus)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0-23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Listatusta osoitteesta tulleita epäonnistuneita kirjautumisia ei lasketa lainkaan, joten sitä ei voi koskaan estää. Kirjaa tähän osoitteet, joista hallinnoit, ennen kuin otat palomuurivalinnan käyttöön: palomuuriin asti ulottuva esto sulkee tuon osoitteen tämän koneen kaikista sähköpostiporteista. Esimerkki: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Merkintä, joka ei ole osoite, raportoidaan nimeltä virhelokiin ja ohitetaan.</value>
@@ -3493,6 +3541,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Miten tilit todistavat, keitä ne ovat: salasanojen tiivistys, OAuth2 / XOAUTH2 ja vaaditut mekanismit.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Miten merkinnät päätyvät keräimelle</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Kuinka kauan yhteys saa olla joutilaana ennen sulkemista, protokollaa kohden, sekunteina. "Palvelin" on hMailServer, joka hyväksyy yhteyden postiasiakkaalta tai toiselta postipalvelimelta; "asiakas" on hMailServer, joka yhdistää ulospäin toimittaakseen postia tai noutaakseen sitä ulkoiselta POP3-tililtä. Todellinen aikakatkaisu liikkuu minimin ja maksimin välillä palvelimen kuorman mukaan, joten kiireinen palvelin pudottaa joutilaat yhteydet aiemmin. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
   </data>
@@ -3567,6 +3618,9 @@ Postiin ei kosketa - indeksi johdetaan siitä - mutta kunnes uudelleenrakennus s
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP-keskustelut</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP-keskustelut syslogiin</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>IMAP-haun rajat</value>
@@ -5202,6 +5256,9 @@ Tarkistettu asennusohjelma luovutetaan päivitysapurille: palvelu pysähtyy, uus
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3-keskustelut</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3-keskustelut syslogiin</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3:ssa palvelimella ei ole keinoa kertoa asiakkaalle, että postia on saapunut, joten reagoivilta näyttää haluavat asiakkaat kyselevät - ja jotkut kyselevät muutaman sekunnin välein. Jokainen kysely on uusi yhteys, TLS-kättely ja salasanan tarkistus, joka on Argon2id:llä tarkoituksella kallis, joten kourallinen innokkaita asiakkaita voi maksaa enemmän kuin itse posti. Viiveen asettaminen kertoo asiakkaille aikavälin palvelimen ominaisuusluettelossa ja hylkää liian aikaisin saapuvat kirjautumiset koodilla, jonka asiakas ymmärtää "hidasta"-pyynnöksi eikä vääräksi salasanaksi. Tulee voimaan palvelun uudelleenkäynnistyksen jälkeen.</value>
   </data>
@@ -6147,6 +6204,9 @@ Jatketaanko?</value>
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP-keskustelut</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP-keskustelut syslogiin</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP-välittäjä (smart host)</value>
   </data>
@@ -6564,11 +6624,17 @@ Jatketaanko?</value>
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Lähetä viesti palvelimen jokaiselle tilille (tai jokerimerkkiin täsmääville) - huoltoilmoituksia varten.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Lähetä vähintään näin vakavat merkinnät</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Lähetä kaikki palveluntarjoajani kautta</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Lähetä se bearer-tokenina:  Authorization: Bearer hmapi_...  API ja valvonta -sivulla määritetylle REST-kuuntelijalle. Myös järjestelmänvalvojan salasana toimii, ja se on rajoittamaton, mikä on syy suosia avainta: avain voi olla vain luku -tilassa, rajattu nimettyihin verkkotunnuksiin, rajattu yhteen lähdeosoitteeseen, sille voi antaa vanhenemisajan, ja sen voi kumota muuttamatta mitään muuta.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Lähetä lokimerkinnät syslogiin</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Lähetetäänkö tämä viesti kaikille tileille, jotka täsmäävät kohteeseen '{0}'?</value>
@@ -7097,8 +7163,17 @@ Käynnistetäänkö se uudelleen nyt?</value>
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Syntaksitarkistus epäonnistui: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - toimitetaan järjestyksessä, mitään ei katkaista</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP TLS:n yli (RFC 5425), varmenne tarkistetaan</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP-toiminta</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP-toiminta syslogiin</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP-portti</value>
@@ -8220,6 +8295,12 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Tyyppi:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - ei toimitustakuuta, katkaistaan 1024 tavuun</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP katkaisee merkinnän 1024 tavuun, mikä on RFC 5426:n ohje ja mahtuu jokaisen merkityksellisen polun MTU:n alle; kaksi virtasiirtoa kehystävät jokaisen merkinnän sen omalla pituudella (RFC 5425) eivätkä katkaise mitään. TLS tarkistaa keräimen varmenneketjun ja nimen koneen juurivarastoa vasten ja kieltäytyy yhteydestä, jos kumpi tahansa epäonnistuu - itse allekirjoitetulla varmenteella varustettu keräin vaatii siis, että varmenne on luotettu tällä koneella.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Palvelinta ei tavoiteta (RPC ei ole käytettävissä).</value>
@@ -9684,6 +9765,9 @@ Yhtään viestiä ei poisteta eikä yhtään tiliä poisteta. Jatketaanko?</valu
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>pysäytä roskaposti</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>kerro kaikille huollosta</value>

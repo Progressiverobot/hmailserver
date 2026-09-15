@@ -356,6 +356,9 @@
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>15 分間隔で 16 回保留すると約 4 時間になります。0 は、スキャンされていないメールをキューにまったく入れず、送信者に直ちに通知することを意味します。保留されたメッセージは、いずれかのスキャナーが応答した時点で配信されます。回数はメモリ上に保持されるため、サービスを再起動すると、保留中のメッセージには新たな回数の枠が与えられます。</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 は mail で、メールサーバーの行が属する場所であり、コレクターの mail.* ルールがすでに一致する値です。16 から 23 は local0 から local7 で、自前のアプリケーションをそこに分類しているサイト向けです。0 は kernel なので使用しないでください。</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  または、下に表示されているセットアップ キーを手で入力します。</value>
   </data>
@@ -382,6 +385,9 @@
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. 準備中の鍵を昇格させて署名鍵にします:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 は UDP と平文 TCP の登録済みポート、6514 は TLS 上の syslog の登録済みポートです。</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 日</value>
@@ -421,6 +427,9 @@
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>認証アプリが生成するコードで、このアカウントのパスワードと併せて必要になります。適用されるのは、実際にコードを入力できる場所、つまりコントロールパネルと API です。メール クライアントはコードを提示できないため、これを有効にした後は、代わりにアプリ パスワードを使用する必要があります。</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>各ログ項目のコピーを RFC 5424 形式で syslog コレクター (rsyslog、syslog-ng、SIEM) に送ります。ログファイルの代わりではなく、それと並行して送ります。Linux でコレクターを指定しない場合、systemd 配下で動作するサーバーは journal に書き込み、journalctl で読めます。</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>資格情報は設定されていますが、リスナーに TLS がありません。そのため資格情報はスクレイプのたびに平文でネットワークを流れ、経路上の誰でも再生できます。証明書ファイルと鍵ファイルを設定するか、127.0.0.1 にバインドしてください。サーバーはそれでも起動し、これと同じ警告をログに記録します。</value>
@@ -1155,6 +1164,9 @@
   <data name="Application events" xml:space="preserve">
     <value>アプリケーション イベント</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>アプリケーションのイベントを syslog へ</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>適用済み</value>
   </data>
@@ -1163,6 +1175,9 @@
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>適用対象(_T)</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>次回のサービス再起動または再初期化で有効になります。ログファイルには影響しません。コピーを送るだけで、何も移動しません。下にコレクターのホストを指定しない場合、Linux 上で systemd 配下のサーバーは代わりに journal に書き込みます。つまり Linux ではこのスイッチだけで設定は完了です。</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>ディレクトリの同期を適用する</value>
@@ -1783,6 +1798,12 @@
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>ナビゲーションを折りたたむ</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>コレクターのホスト名またはアドレス</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>コレクターのポート</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>コマンド ライン (スキャン対象ファイルには %FILE% を使用)</value>
@@ -2443,6 +2464,9 @@
   <data name="Debug messages" xml:space="preserve">
     <value>デバッグ メッセージ</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>デバッグメッセージを syslog へ</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>既定は 10 で、指定できる範囲は 1 から 90 です。サーバーは 1 未満の値を 10 として読み、90 を超える値は 90 に丸めます。到達できないディレクトリを「永遠に待つ」ことが、接続スレッドが枯渇する原因だからです。</value>
   </data>
@@ -2854,6 +2878,9 @@
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>空は「誰も許可しない」を意味します。ここに列挙されていない上流には XCLIENT は EHLO で告知すらされないため、攻撃者が問い合わせても、この構成について何も知ることはできません。</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>空欄は Linux では systemd の journal を意味し、Windows では何も送らないことを意味します。応答しなくなったコレクターがメールを遅らせることはありません。項目はキューに入り、4096 件待機すると古いものから破棄され、アプリケーションログには開始時に一度、コレクターが復帰したときに一度その旨が記録されます。</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>有効/無効(_B)</value>
   </data>
@@ -2977,6 +3004,18 @@
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>エンベロープ送信者を無条件に拒否するか、スコアを付けます。@ を含むエントリは 1 つの正確なアドレスで、含まないエントリはサブドメインを含むドメイン全体です。既定のスコア 100 は削除しきい値を超え、SMTP のやり取り中にメッセージを拒否します。これは送信者が「名乗る」アドレスと照合するため、1 つのアドレスを使い続ける相手を止めることはできますが、なりすまし対策のツールではなく、アドレスを次々に変えるものは何も止められません。</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>エラー項目にはサーバー自身が記録した重大度 (critical、error、warning、notice) が付きます。それ以外はすべて informational で、TCP/IP とデバッグだけが debug です。</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>エラーと警告 (重大度 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>これらのどれをオフにしてもエラーは常に送信されます。エラーログはログ記録を無効にしていても書き込まれ、この機能はそれに従います。</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>エラーのみ (重大度 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>DMARC ポリシーを評価する</value>
   </data>
@@ -3046,11 +3085,17 @@
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>ErrorManager が報告するすべて</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>デバッグ以外のすべて (重大度 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>メッセージが望まれているかどうかを決めるすべて。</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>このサーバーの外側で必要なすべて (DNS レコード、鍵と CA のファイル、信頼リスト) と、それぞれの状態。</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>デバッグを含むすべて (重大度 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>実行ファイルが見つかりました: {0}</value>
@@ -3138,6 +3183,9 @@
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>追加の MX ホストごとの追加配信試行回数 (0 = 既定)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0 ～ 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>登録されたアドレスからのログオン失敗はまったく数えられないため、そのアドレスが BAN されることはありません。ファイアウォールのオプションを有効にする前に、管理に使うアドレスをここに登録してください。ファイアウォールまで届く BAN は、そのアドレスをこのマシンのすべてのメールポートから締め出します。例: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32。アドレスでない項目はエラーログに名前付きで報告され、無視されます。</value>
@@ -3493,6 +3541,9 @@
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>アカウントが自分を証明する方法: パスワード ハッシュ、OAuth2 / XOAUTH2、必須のメカニズム。</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>コレクターへの送信方法</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>接続がアイドルのまま閉じられるまでの時間。プロトコルごとに秒単位です。「サーバー」は hMailServer がメール クライアントや別のメール サーバーからの接続を受け付ける側、「クライアント」は hMailServer がメールを配信するため、または外部の POP3 アカウントからメールを取り込むために外へ接続する側です。実効タイムアウトはサーバーの負荷に応じて最小値と最大値の間で変動するため、忙しいサーバーはアイドル接続をより早く切断します。サービスの再起動後に適用されます。</value>
   </data>
@@ -3567,6 +3618,9 @@
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP のやり取り</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP の通信を syslog へ</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>IMAP 検索の制限</value>
@@ -5202,6 +5256,9 @@
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3 の通信内容</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3 の通信を syslog へ</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3 には、メールが届いたことをサーバーからクライアントに伝える手段がありません。そのため、反応がよく見えるようにしたいクライアントはポーリングを行い、数秒ごとにポーリングするものもあります。1 回のポーリングごとに新しい接続、TLS ハンドシェイク、パスワードの検証が発生し、Argon2id では検証は意図的に重いため、熱心なクライアントが数台あるだけで、メールそのものより多くのコストがかかることがあります。遅延を設定すると、サーバーは機能一覧でクライアントにその間隔を伝え、早すぎるログインは、誤ったパスワードではなく「速度を落とせ」という意味だとクライアントが解釈できるコードで拒否します。サービスの再起動後に有効になります。</value>
   </data>
@@ -6147,6 +6204,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP の通信内容</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP の通信を syslog へ</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP リレー (スマート ホスト)</value>
   </data>
@@ -6564,11 +6624,17 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>サーバー上のすべてのアカウント (またはワイルドカードに一致するアカウント) にメッセージを送信します。メンテナンスの告知用です。</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>この重大度以上の項目を送信</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>すべてをプロバイダー経由で送信</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>ベアラー トークンとして送信します:  Authorization: Bearer hmapi_...  API と監視ページで設定した REST リスナー宛てです。管理者パスワードも使えますが制限がなく、それがキーを使うべき理由です。キーは読み取り専用にでき、指定ドメインに限定でき、1 つの送信元アドレスに限定でき、有効期限を設定でき、他に何も変更せずに失効させられます。</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>ログ項目を syslog に送信する</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>'{0}' に一致するすべてのアカウントにこのメッセージを送信しますか?</value>
@@ -7097,8 +7163,17 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>構文チェックに失敗しました: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - 順序どおりに配送、切り詰めなし</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TLS 上の TCP (RFC 5425)、証明書を検証</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP アクティビティ</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP の動作を syslog へ</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP ポート</value>
@@ -8220,6 +8295,12 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>種類:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - 配送保証なし、1024 バイトで切り詰め</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP は項目を 1024 バイトに切り詰めます。これは RFC 5426 の指針であり、問題になるあらゆる経路 MTU を下回ります。2 つのストリーム方式は各項目をその長さで枠付けし (RFC 5425)、切り詰めは行いません。TLS はコレクターの証明書チェーンと名前をこのコンピューターのルートストアに照らして検証し、いずれかが失敗すると接続を拒否します。したがって自己署名証明書のコレクターでは、その証明書をこのコンピューターで信頼させる必要があります。</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>サーバーに到達できません (RPC が利用できません)。</value>
@@ -9684,6 +9765,9 @@ SMTP 25 と 587、POP3 110、IMAP 143 で、接続のセキュリティはあり
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>スパムを止める</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>メンテナンスを全員に知らせる</value>

@@ -356,6 +356,9 @@
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 утримань по 15 хвилин — це приблизно чотири години. 0 означає взагалі ніколи не ставити неперевірену пошту в чергу, а одразу повідомляти відправника. Утримане повідомлення доставляється, щойно відповість будь-який сканер; лічильник зберігається в пам’яті, тому після перезапуску служби утримане повідомлення отримує новий ліміт.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 - це mail, куди й належать рядки поштового сервера і що правило mail.* збирача вже охоплює. Від 16 до 23 - це local0 - local7, для майданчика, який записує туди власні застосунки. 0 - це kernel, і його використовувати не варто.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Або введіть ключ налаштування, показаний нижче, вручну.</value>
   </data>
@@ -382,6 +385,9 @@
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Зробіть підготовлений ключ ключем підписування:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 - зареєстрований порт для UDP і для звичайного TCP; 6514 - зареєстрований порт для syslog поверх TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 днів</value>
@@ -421,6 +427,9 @@
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>Код із програми автентифікації, потрібний разом із паролем цього облікового запису. Він діє там, де код справді можна ввести, — у Панелі керування та в API. Поштові клієнти не вміють його надавати, тому після ввімкнення вони мають натомість використовувати пароль програми.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>Копія кожного запису журналу у форматі RFC 5424 до збирача syslog - rsyslog, syslog-ng, SIEM - поруч із файлами журналу, а не замість них. У Linux, якщо збирача не вказано, сервер під systemd пише до journal, де його читає journalctl.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>Облікові дані задано, але слухач не має TLS, тому під час кожного збирання метрик вони передаються мережею відкритим текстом, і будь-хто на шляху може їх відтворити. Задайте файли сертифіката та ключа або прив’яжіться до 127.0.0.1. Сервер усе одно запуститься — він записує в журнал це саме попередження.</value>
@@ -1155,6 +1164,9 @@
   <data name="Application events" xml:space="preserve">
     <value>Події програми</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Події застосунку до syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Застосовано</value>
   </data>
@@ -1163,6 +1175,9 @@
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Застосовується _до</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Набуває чинності під час наступного запуску служби або повторної ініціалізації. Файли журналу не змінюються: надсилається копія, нічого не переміщується. Якщо вузол збирача нижче не вказано, сервер під systemd у Linux пише до journal - тобто в Linux цей один перемикач і є всім налаштуванням.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Застосувати синхронізацію з каталогом</value>
@@ -1783,6 +1798,12 @@
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Згорнути навігацію</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Ім'я вузла або адреса збирача</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Порт збирача</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Командний рядок (використовуйте %FILE% для файлу, що сканується)</value>
@@ -2443,6 +2464,9 @@
   <data name="Debug messages" xml:space="preserve">
     <value>Повідомлення налагодження</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Налагоджувальні повідомлення до syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Типове значення — 10, дозволений діапазон — від 1 до 90. Значення, менші за 1, сервер читає як 10, а більші за 90 обмежує, бо «чекати вічно» на недосяжний каталог — це саме той шлях, яким вичерпуються потоки підключень.</value>
   </data>
@@ -2854,6 +2878,9 @@
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Порожньо означає нікого. XCLIENT навіть не оголошується в EHLO вищому вузлу, якого тут немає, тому зловмисник нічого не дізнається про розгортання, запитуючи.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Порожнє значення означає journal systemd у Linux, а у Windows - що нічого не надсилається. Збирач, який перестав відповідати, ніколи не затримує пошту: записи стають у чергу, найстаріші відкидаються, коли чекає 4096, а журнал застосунку повідомляє про це один раз на початку і один раз, коли збирач повертається.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>_Увімкнути / вимкнути</value>
   </data>
@@ -2977,6 +3004,18 @@
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Відправники конверта, яких відхиляють одразу або оцінюють. Запис із @ - це одна точна адреса; без нього - цілий домен разом із піддоменами. Типова оцінка 100 перетинає поріг видалення і відхиляє повідомлення під час діалогу SMTP. Це зіставляє адресу, яку відправник ЗАЯВЛЯЄ, тому зупиняє кореспондента, який і далі використовує одну адресу - це не засіб проти підробки, і воно не зупиняє нічого, що змінює адреси.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Записи про помилки несуть ту важливість, яку зафіксував сам сервер: critical, error, warning або notice. Усе інше - informational, окрім TCP/IP та налагодження, які є debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Помилки та попередження (важливість 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Помилки надсилаються завжди, які б із цих перемикачів не були вимкнені: журнал помилок пишеться навіть із вимкненим веденням журналу, і це поводиться так само.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Лише помилки (важливість 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Оцінювати політики DMARC</value>
   </data>
@@ -3046,11 +3085,17 @@
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Усе, про що повідомляє ErrorManager</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Усе, крім налагодження (важливість 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Усе, що вирішує, чи є повідомлення бажаним.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Усе, що цьому серверу потрібно зробити поза ним - записи DNS, файли ключів і ЦС, довірені списки - і стан кожного.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Усе, включно з налагодженням (важливість 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Виконуваний файл знайдено: {0}</value>
@@ -3138,6 +3183,9 @@
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Додаткові спроби доставки на кожен додатковий вузол MX (0 = типово)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (від 0 до 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Невдалі входи з адреси зі списку не рахуються взагалі, тож її неможливо забанити ніколи. Внесіть сюди адреси, з яких ви адмініструєте, перш ніж вмикати параметр брандмауера: бан, що дістався брандмауера, закриває цій адресі всі поштові порти цієї машини. Приклад: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Запис, що не є адресою, повідомляється за назвою в журналі помилок і пропускається.</value>
@@ -3493,6 +3541,9 @@
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Як облікові записи доводять, хто вони: хешування паролів, OAuth2 / XOAUTH2 і обов'язкові механізми.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Як записи потрапляють до збирача</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Як довго з'єднання може простоювати, перш ніж його закриють, для кожного протоколу, у секундах. «Сервер» - це hMailServer, що приймає з'єднання від поштового клієнта або іншого поштового сервера; «клієнт» - це hMailServer, що підключається назовні для доставки пошти або забирання її із зовнішнього облікового запису POP3. Чинний час очікування переміщується між мінімумом і максимумом залежно від навантаження, тому навантажений сервер розриває бездіяльні з'єднання раніше. Застосовується після перезапуску служби.</value>
   </data>
@@ -3567,6 +3618,9 @@
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>Діалоги IMAP</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>Діалоги IMAP до syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>Обмеження пошуку IMAP</value>
@@ -5202,6 +5256,9 @@
   <data name="POP3 conversations" xml:space="preserve">
     <value>Сеанси обміну POP3</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>Діалоги POP3 до syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>У POP3 сервер не має способу повідомити клієнта про надходження пошти, тому клієнти, які хочуть виглядати чуйними, опитують сервер — а деякі опитують кожні кілька секунд. Кожне опитування — це нове підключення, рукостискання TLS і перевірка пароля, яка з Argon2id навмисно дорога, тож жменька надто завзятих клієнтів може коштувати більше, ніж сама пошта. Задана затримка повідомляє клієнтам інтервал у списку можливостей сервера й відхиляє надто ранні входи кодом, який клієнт розуміє як «повільніше», а не як неправильний пароль. Застосовується після перезапуску служби.</value>
   </data>
@@ -6147,6 +6204,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="SMTP conversations" xml:space="preserve">
     <value>Сеанси обміну SMTP</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>Діалоги SMTP до syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>Ретранслятор SMTP (смарт-хост)</value>
   </data>
@@ -6564,11 +6624,17 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Надіслати повідомлення кожному обліковому запису на сервері (або тим, що відповідають шаблону) - для оголошень про обслуговування.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Надсилати записи не нижче цієї важливості</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Надсилати все через мого провайдера</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Надсилайте його як bearer-токен:  Authorization: Bearer hmapi_...  на слухач REST, налаштований на сторінці «API та моніторинг». Пароль адміністратора також працює і нічим не обмежений - саме тому варто віддати перевагу ключу: ключ може бути лише для читання, обмежений названими доменами, обмежений однією адресою джерела, мати термін дії та бути відкликаним без зміни чогось іншого.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Надсилати записи журналу до syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Надіслати це повідомлення всім обліковим записам, що відповідають '{0}'?</value>
@@ -7097,8 +7163,17 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Перевірка синтаксису не вдалася: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - доставка по порядку, нічого не обрізається</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP поверх TLS (RFC 5425), сертифікат перевіряється</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>Активність TCP/IP</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>Активність TCP/IP до syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>Порт TCP/IP</value>
@@ -8220,6 +8295,12 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Тип:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - без гарантії доставки, обрізається до 1024 байтів</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP обрізає запис до 1024 байтів, що відповідає настанові RFC 5426 і вкладається в будь-який значущий MTU шляху; два потокових транспорти обрамлюють кожен запис його власною довжиною (RFC 5425) і нічого не обрізають. TLS перевіряє ланцюжок сертифікатів збирача та його ім'я за кореневим сховищем цього комп'ютера й відхиляє з'єднання, якщо будь-що з цього не проходить, - тож збирачеві із самопідписаним сертифікатом потрібно, щоб цей сертифікат був довіреним на цьому комп'ютері.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Не вдалося дістатися до сервера (RPC недоступний).</value>
@@ -9684,6 +9765,9 @@ SMTP 25 і 587, POP3 110, IMAP 143 — без захисту підключен�
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>зупинити спам</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>повідомити всіх про технічне обслуговування</value>

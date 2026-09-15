@@ -356,6 +356,9 @@ Salvar esta senha fraca mesmo assim?</value>
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 retenções de 15 minutos são cerca de quatro horas. 0 significa nunca enfileirar e-mails não verificados - avisar o remetente imediatamente. Uma mensagem retida é entregue assim que qualquer verificador responde; a contagem é mantida em memória, então um reinício do serviço dá a uma mensagem retida um orçamento novo.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 é mail, que é onde as linhas de um servidor de e-mail pertencem e o que a regra mail.* de um coletor já captura. De 16 a 23 são local0 a local7, para um site que arquiva ali seus próprios aplicativos. 0 é kernel e não deve ser usado.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Ou digite manualmente a chave de configuração mostrada abaixo.</value>
   </data>
@@ -382,6 +385,9 @@ Salvar esta senha fraca mesmo assim?</value>
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Promover a chave preparada para se tornar a chave de assinatura:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 é a porta registrada para UDP e para TCP simples; 6514 é a porta registrada para syslog sobre TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 dias</value>
@@ -421,6 +427,9 @@ Salvar esta senha fraca mesmo assim?</value>
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>Um código de um aplicativo autenticador, exigido junto com a senha desta conta. Vale onde um código pode de fato ser digitado - o Control Panel e a API. Clientes de e-mail não podem apresentar um, então uma vez ativado eles precisam usar uma senha de aplicativo.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>Uma cópia de cada entrada de log, no formato RFC 5424, para um coletor syslog - rsyslog, syslog-ng, um SIEM - ao lado dos arquivos de log e não no lugar deles. No Linux, sem coletor indicado, um servidor sob systemd grava no journal, onde o journalctl pode lê-lo.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>Uma credencial está definida mas o ouvinte não tem TLS, então a credencial atravessa a rede em texto claro a cada coleta e pode ser reutilizada por qualquer um no caminho. Defina os arquivos de certificado e chave, ou vincule a 127.0.0.1. O servidor inicia mesmo assim - ele registra este mesmo aviso.</value>
@@ -1155,6 +1164,9 @@ Reiniciar o Control Panel agora? Escolha Não para tentar continuar trabalhando.
   <data name="Application events" xml:space="preserve">
     <value>Eventos do aplicativo</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Eventos do aplicativo para o syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Aplicado</value>
   </data>
@@ -1163,6 +1175,9 @@ Reiniciar o Control Panel agora? Escolha Não para tentar continuar trabalhando.
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Aplica-se _a</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Passa a valer na próxima reinicialização do serviço ou ao reinicializar. Os arquivos de log não mudam: isto envia uma cópia, não move nada. Sem um host coletor abaixo, um servidor sob systemd no Linux grava no journal - no Linux, portanto, esta única chave é toda a configuração.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Aplicar sincronização de diretório</value>
@@ -1783,6 +1798,12 @@ O seletor preparado "{0}" é removido da configuração do servidor; a assinatur
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Recolher a navegação</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Nome de host ou endereço do coletor</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Porta do coletor</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Linha de comando (use %FILE% para o arquivo verificado)</value>
@@ -2443,6 +2464,9 @@ O seletor preparado "{0}" é removido da configuração do servidor; a assinatur
   <data name="Debug messages" xml:space="preserve">
     <value>Mensagens de depuração</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Mensagens de depuração para o syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Padrão 10, faixa permitida de 1 a 90. O servidor lê valores abaixo de 1 como 10 e limita valores acima de 90, porque "esperar para sempre" por um diretório inalcançável é como as threads de conexão se esgotam.</value>
   </data>
@@ -2854,6 +2878,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Vazio significa ninguém. O XCLIENT nem sequer é anunciado no EHLO a um upstream que não esteja listado aqui, então um atacante não aprende nada sobre a instalação perguntando.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Vazio significa o journal do systemd no Linux e, no Windows, que nada é enviado. Um coletor que deixa de responder nunca atrasa o correio: as entradas ficam em fila, as mais antigas são descartadas quando 4096 estão à espera, e o log do aplicativo informa isso uma vez no início e outra quando o coletor volta.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>A_tivar / desativar</value>
   </data>
@@ -2977,6 +3004,18 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Remetentes de envelope recusados de imediato, ou pontuados. Uma entrada com @ é um endereço exato; sem @ é um domínio inteiro, incluindo seus subdomínios. A pontuação padrão de 100 ultrapassa o limiar de exclusão e recusa a mensagem durante a conversa SMTP. Isto é comparado com o endereço que o remetente ALEGA, então detém um correspondente que insiste em usar um endereço - não é uma ferramenta anti-spoofing, e não detém nada que troque de endereço.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>As entradas de erro carregam a gravidade que o próprio servidor registrou: critical, error, warning ou notice. Todo o resto é informational, exceto TCP/IP e depuração, que são debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Erros e avisos (gravidade 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Os erros são sempre enviados, estejam desligadas quais destas chaves estiverem - o log de erros é gravado mesmo com o registro desativado, e isto o acompanha.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Somente erros (gravidade 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Avaliar as políticas DMARC</value>
   </data>
@@ -3046,11 +3085,17 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Tudo o que o ErrorManager informa</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Tudo exceto depuração (gravidade 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Tudo o que decide se uma mensagem é desejada.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Tudo o que este servidor precisa que seja feito fora dele - registros DNS, arquivos de chave e de CA, listas de confiança - e o estado de cada um.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Tudo, inclusive depuração (gravidade 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Executável encontrado: {0}</value>
@@ -3138,6 +3183,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Tentativas de entrega extras por host MX adicional (0 = padrão)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0 a 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Logons malsucedidos de um endereço listado não são contados de forma alguma, então ele nunca pode ser banido. Coloque aqui os endereços de onde você administra antes de ativar a opção de firewall: um banimento que chega ao firewall bloqueia esse endereço em todas as portas de e-mail desta máquina. Exemplo: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Uma entrada que não é um endereço é relatada pelo nome no log de erros e ignorada.</value>
@@ -3493,6 +3541,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Como as contas provam quem são: hash de senhas, OAuth2 / XOAUTH2, e mecanismos exigidos.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Como as entradas chegam ao coletor</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Por quanto tempo uma conexão pode ficar ociosa antes de ser fechada, por protocolo, em segundos. "Servidor" é o hMailServer aceitando uma conexão de um cliente de e-mail ou de outro servidor de e-mail; "cliente" é o hMailServer conectando para fora para entregar e-mails ou para coletá-los de uma conta POP3 externa. O tempo limite efetivo se move entre o mínimo e o máximo conforme a carga do servidor, então um servidor ocupado derruba conexões ociosas mais cedo. Vale após reiniciar o serviço.</value>
   </data>
@@ -3567,6 +3618,9 @@ Nenhum e-mail é tocado - o índice é derivado deles - mas até a reconstruçã
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>Conversas IMAP</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>Conversas IMAP para o syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>Limites de busca IMAP</value>
@@ -5202,6 +5256,9 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="POP3 conversations" xml:space="preserve">
     <value>Conversas POP3</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>Conversas POP3 para o syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>O POP3 não dá ao servidor nenhuma forma de avisar um cliente de que chegou e-mail, então os clientes que querem parecer ágeis ficam consultando - e alguns consultam a cada poucos segundos. Cada consulta é uma nova conexão, um handshake TLS e uma verificação de senha, que com Argon2id é deliberadamente cara, de modo que um punhado de clientes ansiosos pode custar mais do que o próprio e-mail. Definir um atraso informa aos clientes o intervalo na lista de capacidades do servidor e recusa os logins que chegam cedo demais com um código que o cliente entende como "vá mais devagar", e não como senha errada. Vale após reiniciar o serviço.</value>
   </data>
@@ -6147,6 +6204,9 @@ Continuar?</value>
   <data name="SMTP conversations" xml:space="preserve">
     <value>Conversas SMTP</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>Conversas SMTP para o syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>Servidor de relay SMTP (smart host)</value>
   </data>
@@ -6564,11 +6624,17 @@ Continuar?</value>
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Envie uma mensagem para todas as contas do servidor (ou as que correspondem a um curinga) - para avisos de manutenção.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Enviar entradas com pelo menos esta gravidade</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Enviar tudo através do meu provedor</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Envie-a como um token portador:  Authorization: Bearer hmapi_...  para o ouvinte REST configurado na página API e monitoramento. A senha de administrador também funciona e não tem restrição alguma, e é justamente por isso que se prefere uma chave: uma chave pode ser somente leitura, limitada a domínios nomeados, limitada a um endereço de origem, receber uma validade e ser revogada sem alterar mais nada.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Enviar entradas de log para o syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Enviar esta mensagem para todas as contas que correspondem a '{0}'?</value>
@@ -7097,8 +7163,17 @@ Reiniciá-lo agora?</value>
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>A verificação de sintaxe falhou: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - entregue em ordem, nada truncado</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP sobre TLS (RFC 5425), certificado verificado</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>Atividade TCP/IP</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>Atividade TCP/IP para o syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>Porta TCP/IP</value>
@@ -8220,6 +8295,12 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Tipo:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - sem garantia de entrega, truncado em 1024 bytes</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>O UDP trunca uma entrada em 1024 bytes, que é a orientação da RFC 5426 e fica abaixo de qualquer MTU de caminho relevante; os dois transportes de fluxo enquadram cada entrada com o próprio comprimento (RFC 5425) e não truncam nada. O TLS verifica a cadeia de certificados do coletor e o nome dele contra o repositório raiz da máquina, e recusa a conexão se qualquer um falhar - portanto um coletor com certificado autoassinado exige que esse certificado seja confiável nesta máquina.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Não foi possível alcançar o servidor (RPC indisponível).</value>
@@ -9684,6 +9765,9 @@ Nenhuma mensagem é excluída e nenhuma conta é removida. Continuar?</value>
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>parar o spam</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>avisar a todos sobre uma manutenção</value>

@@ -356,6 +356,9 @@
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>按每次 15 分钟计算，暂挂 16 次约为四小时。0 表示完全不把未扫描的邮件排队 - 立即告知发件人。只要有任何扫描器给出答复，被暂挂的邮件就会立即投递；计数保存在内存中，因此重启服务后，被暂挂的邮件会重新获得完整的额度。</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 是 mail，邮件服务器的日志行属于这里，收集器的 mail.* 规则也已经匹配它。16 到 23 是 local0 到 local7，供把自有应用归入其中的站点使用。0 是 kernel，不应使用。</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  或者手动输入下面显示的设置密钥。</value>
   </data>
@@ -382,6 +385,9 @@
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. 把暂存的密钥提升为签名密钥：</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 是 UDP 和明文 TCP 的注册端口；6514 是 syslog over TLS 的注册端口。</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 天</value>
@@ -421,6 +427,9 @@
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>来自身份验证器应用的验证码，需与此账户的密码一并使用。它适用于确实能够输入验证码的场合 - 控制面板和 API。邮件客户端无法出示验证码，因此一旦启用此项，它们就必须改用应用密码。</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>将每条日志条目按 RFC 5424 复制一份发送到 syslog 收集器（rsyslog、syslog-ng 或 SIEM），与日志文件并存而不是取代它们。在 Linux 上若未指定收集器，运行于 systemd 下的服务器会写入 journal，可用 journalctl 读取。</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>已设置凭据，但监听器没有 TLS，因此凭据会在每次抓取时以明文穿越网络，路径上的任何人都可以重放它。请设置证书和密钥文件，或者绑定到 127.0.0.1。服务器仍会启动 - 它会记录这条同样的警告。</value>
@@ -1155,6 +1164,9 @@
   <data name="Application events" xml:space="preserve">
     <value>应用程序事件</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>应用程序事件发送到 syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>已应用</value>
   </data>
@@ -1163,6 +1175,9 @@
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>应用于(_T)</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>在下次服务重启或重新初始化时生效。日志文件不受影响：这里发送的是副本，不会移动任何内容。若下方未填写收集器主机，Linux 上运行于 systemd 的服务器会改为写入 journal，因此在 Linux 上这一个开关就是全部配置。</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>应用目录同步</value>
@@ -1783,6 +1798,12 @@
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>折叠导航</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>收集器主机名或地址</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>收集器端口</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>命令行（用 %FILE% 表示被扫描的文件）</value>
@@ -2443,6 +2464,9 @@
   <data name="Debug messages" xml:space="preserve">
     <value>调试消息</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>调试消息发送到 syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>默认 10，允许范围 1 至 90。服务器把小于 1 的值当作 10，并把大于 90 的值限制到 90，因为对无法访问的目录“永远等待”正是连接线程被耗尽的原因。</value>
   </data>
@@ -2854,6 +2878,9 @@
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>留空表示无人。对于未列在此处的上游，甚至不会在 EHLO 中通告 XCLIENT，因此攻击者无法通过询问来了解部署情况。</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>留空在 Linux 上表示 systemd journal，在 Windows 上表示不发送任何内容。停止应答的收集器绝不会延误邮件：条目进入队列，待发条目达到 4096 条后丢弃最旧的，应用程序日志会在开始时记录一次、在收集器恢复时再记录一次。</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>启用 / 禁用(_B)</value>
   </data>
@@ -2977,6 +3004,18 @@
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>被直接拒绝或计分的信封发件人。带 @ 的条目是一个精确地址；不带 @ 的条目是整个域，包括其子域。默认分数 100 会越过删除阈值，并在 SMTP 会话期间拒绝该邮件。它匹配的是发件人所声称的地址，因此能挡住一直使用同一个地址的通信方 - 它不是反伪造工具，挡不住任何轮换地址的人。</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>错误条目带有服务器自身记录的严重级别：critical、error、warning 或 notice。其余一律为 informational，只有 TCP/IP 和调试属于 debug。</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>错误和警告（严重级别 4）</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>无论以上哪几项处于关闭状态，错误始终会被发送——即使停用日志记录，错误日志仍会写入，本功能与之一致。</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>仅错误（严重级别 3）</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>评估 DMARC 策略</value>
   </data>
@@ -3046,11 +3085,17 @@
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>ErrorManager 报告的所有内容</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>除调试外的全部（严重级别 6）</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>决定一封邮件是否是想要的邮件的一切。</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>本服务器需要在其外部完成的一切 - DNS 记录、密钥和 CA 文件、信任列表 - 以及每一项的状态。</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>全部，含调试（严重级别 7）</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>已找到可执行文件：{0}</value>
@@ -3138,6 +3183,9 @@
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>每增加一个 MX 主机的额外投递尝试次数（0 = 默认）</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility（0 到 23）</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>来自列表中地址的登录失败根本不计数，因此它永远不会被封禁。在启用防火墙选项之前，请先在此填入您用于管理的地址：到达防火墙的封禁会把该地址挡在本机所有邮件端口之外。示例：192.0.2.10, 203.0.113.0/24, 2001:db8::/32。不是地址的条目会在错误日志中按名称报告并被忽略。</value>
@@ -3493,6 +3541,9 @@
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>账户如何证明自己的身份：密码哈希、OAuth2 / XOAUTH2 以及必需的机制。</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>条目如何送达收集器</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>连接在被关闭之前可以空闲多久，按协议划分，以秒计。“服务器”指 hMailServer 接受来自邮件客户端或另一台邮件服务器的连接；“客户端”指 hMailServer 向外连接以投递邮件或从外部 POP3 账户收取邮件。实际超时会随服务器负载在最小值和最大值之间变动，因此繁忙的服务器会更早断开空闲连接。在重启服务后生效。</value>
   </data>
@@ -3567,6 +3618,9 @@
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP 会话</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP 会话发送到 syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>IMAP 搜索限制</value>
@@ -5202,6 +5256,9 @@
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3 会话</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3 会话发送到 syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3 没有办法让服务器告诉客户端邮件已到达，因此想要显得灵敏的客户端会轮询 - 有些每隔几秒就轮询一次。每次轮询都是一个新连接、一次 TLS 握手和一次密码验证，而用 Argon2id 时密码验证是有意昂贵的，因此少数几个急切的客户端的开销可能比邮件本身还大。设置延迟会在服务器的能力列表中告知客户端间隔，并用客户端理解为“慢一点”而不是“密码错误”的代码拒绝过早到达的登录。在重启服务后生效。</value>
   </data>
@@ -6147,6 +6204,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP 会话</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP 会话发送到 syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP 中继服务器（智能主机）</value>
   </data>
@@ -6564,11 +6624,17 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>向服务器上的每个账户 (或匹配通配符的账户) 发送一封邮件 - 用于维护通告。</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>发送不低于此严重级别的条目</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>所有邮件都通过我的提供商发送</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>将其作为持有者令牌发送:  Authorization: Bearer hmapi_...  发给在“API 与监控”页配置的 REST 监听器。管理员密码也可以用，且不受限制，这正是优先使用密钥的原因: 密钥可以只读、可以限定于指定的域、可以限定于一个来源地址、可以设置到期时间，并且可以在不改动其他任何内容的情况下被吊销。</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>将日志条目发送到 syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>将此邮件发送给所有匹配 '{0}' 的账户?</value>
@@ -7097,8 +7163,17 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>语法检查失败: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - 按序送达，不作截断</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP over TLS（RFC 5425），验证证书</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP 活动</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP 活动发送到 syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP 端口</value>
@@ -8220,6 +8295,12 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>类型:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - 不保证送达，在 1024 字节处截断</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP 会把条目截断到 1024 字节，这是 RFC 5426 的建议，也低于所有需要考虑的路径 MTU；两种流式传输方式按各自长度为每条条目加帧（RFC 5425），不作任何截断。TLS 会对照本机根证书存储校验收集器的证书链及其名称，任一项失败即拒绝连接——因此使用自签名证书的收集器，需要在本机信任该证书。</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>无法访问服务器 (RPC 不可用)。</value>
@@ -9684,6 +9765,9 @@ SMTP 25 和 587、POP3 110、IMAP 143 - 均不带连接安全。TLS 端口和自
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>阻止垃圾邮件</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog（RFC 5424）</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>向所有人通告维护</value>
