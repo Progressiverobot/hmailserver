@@ -71,7 +71,7 @@ What it has, measured against the two on 14 September: a reading pane (right, be
 |---|---|---|
 | ⬜ | **Native coverage, measured** | The two silver-badge rows in Roadmap.md: the C++ server has never been measured. A coverage build on the bench, the number published. |
 | ⬜ | **The bench, doubled** | One Windows bench runs one gate at a time, about ninety minutes each, and the queue of 14 September was six deep. The Ubuntu VM as a second bench for the Linux suite, in parallel. |
-| ⬜ | **A fuzzing job that never stops** | The release step fuzzes once; a nightly job over the parsers (MIME, IMAP, SMTP, Sieve, iCalendar when it exists) with the corpus kept. |
+| 🔄 | **A fuzzing job that never stops** | **Written 15 September 2026, first run pending.** `.github/workflows/fuzz-nightly.yml`: every night at 02:10 UTC on a hosted Windows runner, the three MIME harnesses built with the runner's clang-cl, every kept input and committed reproducer replayed first, then each harness for forty minutes with two workers; the corpus kept in the Actions cache under a per-run key so it grows night by night; a finding fails the job and lands as an artifact. Underway until the first scheduled run has come back green; iCalendar and vCard harnesses (the parsers this server now has) are the next targets. |
 
 ## 7. What the deep dive of 14 September found missing
 

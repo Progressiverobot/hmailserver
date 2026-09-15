@@ -1,0 +1,122 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# A fuzzing job that never stops: every night the three MIME harnesses under
+# fuzz\ run for a while each, coverage-guided, on a corpus that grows from run to
+# run (kept in the Actions cache under a key of its own per run, so the newest
+# corpus is what the next run starts from), after replaying every input a
+# previous run found interesting and every committed reproducer. A crash, a hang
+# or a violated invariant fails the job and lands as an artifact with the
+# reproducer; hmailserver/docs/Fuzzing.md says what to do with one. The release
+# checklist's timed run (RELEASE.md step 8c) is the same harness on the release
+# tree; this is the harness on every night's master.
+name: Fuzz nightly
+
+on:
+  schedule:
+    # 02:10 UTC, after the day's pushes and before Europe's morning.
+    - cron: '10 2 * * *'
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'Minutes per harness (three harnesses run in turn).'
+        required: false
+        default: '40'
+      jobs:
+        description: 'libFuzzer workers per harness (the runner has four cores).'
+        required: false
+        default: '2'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-nightly
+  cancel-in-progress: false
+
+env:
+  # Where the native dependencies are restored to; the fuzz build reads Boost's
+  # headers from here (hMailServerLibs, as the main build does).
+  hMailServerLibs: C:\hMailLibs
+
+jobs:
+  fuzz:
+    name: MIME harnesses on last night's master
+    strategy:
+      matrix:
+        image: [windows-2025-vs2026]
+    runs-on: ${{ matrix.image }}
+    # Three harnesses of forty minutes, the build, and a cold library build the
+    # first time: well inside this, and a hang in a harness cannot run away.
+    timeout-minutes: 300
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Only Boost's headers are needed here (the harness is header-only Boost),
+      # but the action is the one way the runner gets them, cached under the
+      # pinned version like every other build.
+      - name: Restore or build the native dependencies
+        uses: ./.github/actions/native-dependencies
+        with:
+          libs-path: ${{ env.hMailServerLibs }}
+          runner-image: ${{ matrix.image }}
+
+      - name: Build the harnesses with clang-cl and libFuzzer
+        run: |
+          .\fuzz\build-fuzz.ps1
+          if ($LASTEXITCODE -ne 0) { throw "build-fuzz.ps1 failed with $LASTEXITCODE" }
+
+      # The corpus the previous nights grew. The key carries the run id so that
+      # every run saves a new entry and the newest one is what restores next
+      # time (restore-keys takes the most recent match of the prefix).
+      - name: Restore the corpus the previous runs grew
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz\corpus
+          key: fuzz-corpus-${{ matrix.image }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.image }}-
+
+      - name: Replay every kept input and every committed reproducer first
+        run: |
+          foreach ($target in @('mime_message_fuzzer', 'mime_header_fuzzer', 'mime_decode_fuzzer')) {
+            .\fuzz\run-fuzz.ps1 -Target $target -Replay
+            if ($LASTEXITCODE -ne 0) { throw "$target failed on replay with $LASTEXITCODE - a kept input or a reproducer no longer survives" }
+          }
+
+      - name: Fuzz, each harness in turn
+        env:
+          MINUTES: ${{ github.event.inputs.minutes || '40' }}
+          JOBS: ${{ github.event.inputs.jobs || '2' }}
+        run: |
+          $failed = @()
+          foreach ($target in @('mime_message_fuzzer', 'mime_header_fuzzer', 'mime_decode_fuzzer')) {
+            "== $target for $env:MINUTES minute(s), $env:JOBS worker(s)"
+            .\fuzz\run-fuzz.ps1 -Target $target -Minutes ([int]$env:MINUTES) -Jobs ([int]$env:JOBS)
+            if ($LASTEXITCODE -ne 0) { $failed += "$target ($LASTEXITCODE)" }
+          }
+          if ($failed.Count) { throw ("a harness found something: " + ($failed -join ', ') + " - the reproducer is in the artifacts") }
+
+      # Whatever happened, the corpus grown tonight is what tomorrow starts from.
+      - name: Save the corpus for the next run
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz\corpus
+          key: fuzz-corpus-${{ matrix.image }}-${{ github.run_id }}
+
+      - name: Keep the findings, if any
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-findings-${{ github.run_id }}
+          path: fuzz\artifacts
+          if-no-files-found: ignore
+          retention-days: 30
