@@ -7,6 +7,7 @@ using System.Windows.Automation;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -15,45 +16,60 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>
    /// Modal, tabbed editor for one domain: general, limits, signature and DKIM.
    /// Aliases and distribution lists are managed from the Domains page itself.
+   ///
+   /// On the standard frame: the domain name is the heading, the seven tabs all
+   /// take the height the dialog allows so the window never resizes on a click of
+   /// the strip, every field is a <see cref="FieldRow"/>, each of the eight
+   /// numbers that can be wrong is said on its own field rather than in one line
+   /// at the foot of the dialog, and the rotation walkthrough's running commentary
+   /// is an <see cref="InlineNotice"/> that carries its level in colour, shape and
+   /// word instead of in a held brush. The message boxes that remain are the real
+   /// questions - renaming a domain, promoting a key, cancelling a rotation - and
+   /// the file dialogs they lead to.
    /// </summary>
    public class DomainDialog : FluentDialogWindow
    {
+      /// <summary>The width this dialog asks the frame for.</summary>
+      private const double DialogWidth = 640;
+
       private readonly string domainName_;
 
+      private readonly InlineNotice notice_ = DialogFields.Notice();
+
       // General
-      private readonly CheckBox active_ = new() { Content = L("Domain _enabled"), FontSize = Typography.Body };
+      private readonly CheckBox active_ = new() { Content = L("Domain _enabled") };
       private readonly TextBox name_ = NewInput();
+      private FieldRow nameRow_;
       private readonly TextBox postmaster_ = NewInput();
       private readonly TextBox adDomain_ = NewInput();
 
-      private readonly TextBlock status_ = new()
-      {
-         Foreground = Services.ThemeTokens.Danger,
-         TextWrapping = TextWrapping.Wrap,
-         VerticalAlignment = VerticalAlignment.Center,
-         Margin = new Thickness(2, 0, 8, 0)
-      };
-
       // Limits
       private readonly TextBox maxSize_ = NewInput();
+      private FieldRow maxSizeRow_;
       private readonly TextBox maxMessageSize_ = NewInput();
+      private FieldRow maxMessageSizeRow_;
       private readonly TextBox maxAccountSize_ = NewInput();
+      private FieldRow maxAccountSizeRow_;
       private readonly TextBox retentionDays_ = NewInput();
-      private readonly CheckBox maxAccountsOn_ = new() { Content = L("_Limit number of accounts"), FontSize = Typography.Body };
+      private FieldRow retentionRow_;
+      private readonly CheckBox maxAccountsOn_ = new() { Content = L("_Limit number of accounts") };
       private readonly TextBox maxAccounts_ = NewInput();
-      private readonly CheckBox maxAliasesOn_ = new() { Content = L("Limit number of al_iases"), FontSize = Typography.Body };
+      private FieldRow maxAccountsRow_;
+      private readonly CheckBox maxAliasesOn_ = new() { Content = L("Limit number of al_iases") };
       private readonly TextBox maxAliases_ = NewInput();
-      private readonly CheckBox maxDistsOn_ = new() { Content = L("Limit _number of distribution lists"), FontSize = Typography.Body };
+      private FieldRow maxAliasesRow_;
+      private readonly CheckBox maxDistsOn_ = new() { Content = L("Limit _number of distribution lists") };
       private readonly TextBox maxDists_ = NewInput();
-      private readonly CheckBox plusAddressingOn_ = new() { Content = L("_Enable plus addressing"), FontSize = Typography.Body };
+      private FieldRow maxDistsRow_;
+      private readonly CheckBox plusAddressingOn_ = new() { Content = L("_Enable plus addressing") };
       private readonly TextBox plusChar_ = NewInput();
-      private readonly CheckBox greylisting_ = new() { Content = L("Enable _greylisting for this domain"), FontSize = Typography.Body };
+      private readonly CheckBox greylisting_ = new() { Content = L("Enable _greylisting for this domain") };
 
       // Signature
-      private readonly CheckBox signatureOn_ = new() { Content = L("_Add signature to outgoing messages"), FontSize = Typography.Body };
+      private readonly CheckBox signatureOn_ = new() { Content = L("_Add signature to outgoing messages") };
       private readonly ComboBox signatureMethod_ = new();
-      private readonly CheckBox signReplies_ = new() { Content = L("Add signature to _replies"), FontSize = Typography.Body };
-      private readonly CheckBox signLocal_ = new() { Content = L("Add signature to _local e-mail"), FontSize = Typography.Body };
+      private readonly CheckBox signReplies_ = new() { Content = L("Add signature to _replies") };
+      private readonly CheckBox signLocal_ = new() { Content = L("Add signature to _local e-mail") };
       private readonly TextBox signaturePlain_ = NewMemo();
       private readonly TextBox signatureHtml_ = NewMemo();
 
@@ -61,43 +77,33 @@ namespace hMailServer.ControlPanel.Views
       // Domain-wide out-of-office. The server sends this only for accounts that
       // have no vacation message of their own; the override below additionally
       // replaces an account's personal text for senders outside this server.
-      private readonly CheckBox oooOn_ = new() { Content = L("Send a _domain-wide out-of-office reply"), FontSize = Typography.Body };
+      private readonly CheckBox oooOn_ = new() { Content = L("Send a _domain-wide out-of-office reply") };
       private readonly TextBox oooSubject_ = NewInput();
       private readonly TextBox oooMessage_ = NewMemo();
       private readonly TextBox oooInternalSubject_ = NewInput();
       private readonly TextBox oooInternalMessage_ = NewMemo();
       private readonly CheckBox oooExternalOverride_ = new()
       {
-         Content = L("_Outside senders always get the domain's text, even when the account has its own"),
-         FontSize = Typography.Body
+         Content = L("_Outside senders always get the domain's text, even when the account has its own")
       };
 
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
-      private readonly CheckBox relayAuthOn_ = new() { Content = L("The relay requires _authentication"), FontSize = Typography.Body };
+      private FieldRow relayPortRow_;
+      private readonly CheckBox relayAuthOn_ = new() { Content = L("The relay requires _authentication") };
       private readonly TextBox relayUser_ = NewInput();
-      private readonly hMailServer.ControlPanel.Views.PasswordField relayPassword_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+      private readonly hMailServer.ControlPanel.Views.PasswordField relayPassword_ = new();
       private readonly ComboBox relaySecurity_ = new();
 
       // DKIM
-      private readonly CheckBox dkimOn_ = new() { Content = L("_Enable DKIM signing"), FontSize = Typography.Body };
-      private readonly CheckBox dkimAliases_ = new() { Content = L("Sign aliases _too"), FontSize = Typography.Body };
+      private readonly CheckBox dkimOn_ = new() { Content = L("_Enable DKIM signing") };
+      private readonly CheckBox dkimAliases_ = new() { Content = L("Sign aliases _too") };
       private readonly TextBox dkimSelector_ = NewInput();
       private readonly TextBox dkimKeyFile_ = NewInput();
       private readonly ComboBox dkimHeaderCanon_ = new();
       private readonly ComboBox dkimBodyCanon_ = new();
       private readonly ComboBox dkimAlgorithm_ = new();
-      private readonly TextBox dkimDns_ = new()
-      {
-         IsReadOnly = true,
-         AcceptsReturn = true,
-         TextWrapping = TextWrapping.Wrap,
-         FontSize = Typography.Caption,
-         MinHeight = 70,
-         Padding = new Thickness(6),
-         Margin = new Thickness(0, 0, 0, 4),
-         Background = System.Windows.Media.Brushes.Transparent
-      };
+      private readonly TextBox dkimDns_ = ReadOnlyBox(70);
       private StackPanel dkimDnsPanel_;
       private string dkimDnsValue_ = "";
 
@@ -111,7 +117,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox rotDnsValue_ = ReadOnlyBox(70);
       private TextBlock rotCurrent_;
       private TextBlock rotStagedInfo_;
-      private TextBlock rotStatus_;
+      private readonly InlineNotice rotStatus_ = DialogFields.Notice();
       private StackPanel rotStartPanel_;
       private StackPanel rotStagedPanel_;
       private Wpf.Ui.Controls.Button rotCheck_;
@@ -131,28 +137,6 @@ namespace hMailServer.ControlPanel.Views
 
          Owner = owner;
          Title = L("Domain - ") + domainName;
-         Width = 640;
-         Height = 680;
-         MinWidth = 560;
-         MinHeight = 520;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
-
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-         var header = new TextBlock
-         {
-            Text = domainName,
-            FontSize = Typography.DialogTitle,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(2, 0, 0, 12)
-         };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
          tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
@@ -162,47 +146,40 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = L("Relay"), Content = BuildRelay() });
          tabs.Items.Add(new TabItem { Header = L("Out of office"), Content = BuildOutOfOffice() });
          tabs.Items.Add(new TabItem { Header = L("DKIM"), Content = BuildDkim() });
-         Grid.SetRow(tabs, 1);
-         root.Children.Add(tabs);
+         DialogFields.FillTabs(tabs);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var body = new StackPanel();
+         body.Children.Add(notice_);
+         body.Children.Add(tabs);
+
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => Close();
-         buttons.Children.Add(save);
-         buttons.Children.Add(cancel);
 
-         var footer = new Grid { Margin = new Thickness(0, 12, 0, 0) };
-         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         footer.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         footer.Children.Add(status_);
-         Grid.SetColumn(buttons, 1);
-         footer.Children.Add(buttons);
-         Grid.SetRow(footer, 2);
-         root.Children.Add(footer);
-
-         Content = root;
+         UseFrame(domainName, body, save, cancel, width: DialogWidth);
          Loaded += (s, e) => { Load(); aliasEditor_?.OnEnter(); };
       }
 
       private ScrollViewer BuildGeneral()
       {
-         var panel = TabPanel();
-         panel.Children.Add(active_);
-         panel.Children.Add(Label(L("_Domain name (changing it renames the domain and moves every account, alias and list with it)"), name_));
-         panel.Children.Add(Input(name_));
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Check(active_));
+         nameRow_ = Label(L("_Domain name (changing it renames the domain and moves every account, alias and list with it)"), name_);
+         panel.Children.Add(nameRow_);
          panel.Children.Add(Label(L("_Postmaster address (mail to unknown recipients is redirected here)"), postmaster_));
-         panel.Children.Add(Input(postmaster_));
-         panel.Children.Add(Label(L("Active Directory domain (for AD-synchronised domains; optional)")));
-         var adRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
-         adDomain_.MinWidth = 320;
+
+         var adRow = new Grid();
+         adRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         adRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         Grid.SetColumn(adDomain_, 0);
          adRow.Children.Add(adDomain_);
-         var adBrowse = new Wpf.Ui.Controls.Button { Content = L("_Browse…"), Margin = new Thickness(8, 0, 0, 0) };
+         var adBrowse = new Wpf.Ui.Controls.Button { Content = L("_Browse…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
          adBrowse.Click += BrowseAdDomain;
+         Grid.SetColumn(adBrowse, 1);
          adRow.Children.Add(adBrowse);
-         panel.Children.Add(adRow);
-         return Scroll(panel);
+         panel.Children.Add(DialogFields.Field(L("Active Directory domain (for AD-synchronised domains; optional)"), adRow));
+         return DialogFields.Scroll(panel);
       }
 
       private void GenerateDkim()
@@ -249,22 +226,24 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not generate the DKIM key: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not generate the DKIM key: {0}", ex.Message));
          }
       }
 
       private void BrowseAdDomain(object sender, RoutedEventArgs e)
       {
+         notice_.Hide();
+
          if (!ActiveDirectoryService.IsAvailable(out string reason))
          {
-            MessageBox.Show(F("Active Directory is not available on this machine: {0}", reason), L("Control Panel"));
+            notice_.Show(StatusLevel.Warning, F("Active Directory is not available on this machine: {0}", reason));
             return;
          }
 
          System.Collections.Generic.List<string> domains = ActiveDirectoryService.ListDomains();
          if (domains == null || domains.Count == 0)
          {
-            MessageBox.Show(L("No Active Directory domains were found."), L("Control Panel"));
+            notice_.Show(StatusLevel.Warning, L("No Active Directory domains were found."));
             return;
          }
 
@@ -282,174 +261,154 @@ namespace hMailServer.ControlPanel.Views
       private FrameworkElement BuildNames()
       {
          aliasEditor_ = CollectionSpecs.DomainAliases(domainName_);
-         aliasEditor_.Margin = new Thickness(4, 8, 4, 4);
+         aliasEditor_.Margin = new Thickness(0, DesignTokens.Space.Md, 0, 0);
          return aliasEditor_;
       }
 
       private ScrollViewer BuildLimits()
       {
-         var panel = TabPanel();
-         panel.Children.Add(Label(L("Maximum _domain size (MB, 0 = unlimited)"), maxSize_));
-         panel.Children.Add(Input(maxSize_));
-         panel.Children.Add(Label(L("Maximum _message size (KB, 0 = unlimited)"), maxMessageSize_));
-         panel.Children.Add(Input(maxMessageSize_));
-         panel.Children.Add(Label(L("Maximum size for _accounts created in this domain (MB, 0 = unlimited)"), maxAccountSize_));
-         panel.Children.Add(Input(maxAccountSize_));
-         panel.Children.Add(Label(L("Delete messages in this domain's mailboxes _older than (days; 0 = no policy, an account's own value overrides it)"), retentionDays_));
-         panel.Children.Add(Input(retentionDays_));
-         panel.Children.Add(Separator());
-         panel.Children.Add(maxAccountsOn_);
-         panel.Children.Add(Input(maxAccounts_));
-         panel.Children.Add(maxAliasesOn_);
-         panel.Children.Add(Input(maxAliases_));
-         panel.Children.Add(maxDistsOn_);
-         panel.Children.Add(Input(maxDists_));
-         panel.Children.Add(Separator());
-         panel.Children.Add(plusAddressingOn_);
+         var panel = DialogFields.TabPanel();
+         maxSizeRow_ = Label(L("Maximum _domain size (MB, 0 = unlimited)"), maxSize_);
+         panel.Children.Add(maxSizeRow_);
+         maxMessageSizeRow_ = Label(L("Maximum _message size (KB, 0 = unlimited)"), maxMessageSize_);
+         panel.Children.Add(maxMessageSizeRow_);
+         maxAccountSizeRow_ = Label(L("Maximum size for _accounts created in this domain (MB, 0 = unlimited)"), maxAccountSize_);
+         panel.Children.Add(maxAccountSizeRow_);
+         retentionRow_ = Label(L("Delete messages in this domain's mailboxes _older than (days; 0 = no policy, an account's own value overrides it)"), retentionDays_);
+         panel.Children.Add(retentionRow_);
+         panel.Children.Add(DialogFields.Separator());
+
+         panel.Children.Add(DialogFields.Check(maxAccountsOn_));
+         maxAccountsRow_ = NumberUnder(maxAccountsOn_, maxAccounts_);
+         panel.Children.Add(maxAccountsRow_);
+         panel.Children.Add(DialogFields.Check(maxAliasesOn_));
+         maxAliasesRow_ = NumberUnder(maxAliasesOn_, maxAliases_);
+         panel.Children.Add(maxAliasesRow_);
+         panel.Children.Add(DialogFields.Check(maxDistsOn_));
+         maxDistsRow_ = NumberUnder(maxDistsOn_, maxDists_);
+         panel.Children.Add(maxDistsRow_);
+
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(plusAddressingOn_));
          panel.Children.Add(Label(L("_Plus addressing character"), plusChar_));
-         panel.Children.Add(Input(plusChar_));
-         panel.Children.Add(greylisting_);
-         return Scroll(panel);
+         panel.Children.Add(DialogFields.Check(greylisting_));
+         return DialogFields.Scroll(panel);
       }
 
       private ScrollViewer BuildSignature()
       {
-         signatureMethod_.Items.Add(Combo(L("Use only if account has no signature"), 1));
-         signatureMethod_.Items.Add(Combo(L("Overwrite account signature"), 2));
-         signatureMethod_.Items.Add(Combo(L("Append to account signature"), 3));
-         StyleCombo(signatureMethod_);
+         signatureMethod_.Items.Add(DialogFields.Combo(L("Use only if account has no signature"), 1));
+         signatureMethod_.Items.Add(DialogFields.Combo(L("Overwrite account signature"), 2));
+         signatureMethod_.Items.Add(DialogFields.Combo(L("Append to account signature"), 3));
 
-         var panel = TabPanel();
-         panel.Children.Add(signatureOn_);
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Check(signatureOn_));
          panel.Children.Add(Label(L("Signature _method"), signatureMethod_));
-         panel.Children.Add(signatureMethod_);
-         panel.Children.Add(signReplies_);
-         panel.Children.Add(signLocal_);
+         panel.Children.Add(DialogFields.Check(signReplies_));
+         panel.Children.Add(DialogFields.Check(signLocal_));
          panel.Children.Add(Label(L("_Plain-text signature"), signaturePlain_));
-         panel.Children.Add(signaturePlain_);
          panel.Children.Add(Label(L("_HTML signature"), signatureHtml_));
-         panel.Children.Add(signatureHtml_);
-         return Scroll(panel);
+         return DialogFields.Scroll(panel);
       }
 
       private ScrollViewer BuildRelay()
       {
-         relaySecurity_.Items.Add(Combo(L("None"), 0));
-         relaySecurity_.Items.Add(Combo(L("SSL/TLS"), 1));
-         relaySecurity_.Items.Add(Combo(L("STARTTLS (optional)"), 2));
-         relaySecurity_.Items.Add(Combo(L("STARTTLS (required)"), 3));
-         StyleCombo(relaySecurity_);
+         relaySecurity_.Items.Add(DialogFields.Combo(L("None"), 0));
+         relaySecurity_.Items.Add(DialogFields.Combo(L("SSL/TLS"), 1));
+         relaySecurity_.Items.Add(DialogFields.Combo(L("STARTTLS (optional)"), 2));
+         relaySecurity_.Items.Add(DialogFields.Combo(L("STARTTLS (required)"), 3));
 
-         var panel = TabPanel();
-         panel.Children.Add(Label(L("Where mail FROM this domain leaves through. This is a different question from a route, which decides where mail addressed TO a domain is sent - it is for a server hosting several independent domains where each has its own delivery provider.")));
-         panel.Children.Add(Label(L("Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination.")));
-         panel.Children.Add(Separator());
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Note(L("Where mail FROM this domain leaves through. This is a different question from a route, which decides where mail addressed TO a domain is sent - it is for a server hosting several independent domains where each has its own delivery provider.")));
+         panel.Children.Add(DialogFields.Note(L("Leave the host empty and the domain has no opinion: the server-wide SMTP relayer applies, exactly as it did before this setting existed. A route still wins over both, because a route is a statement about the destination.")));
+         panel.Children.Add(DialogFields.Separator());
          panel.Children.Add(Label(L("_Relay host (empty = use the server-wide relayer)"), relayHost_));
-         panel.Children.Add(Input(relayHost_));
-         panel.Children.Add(Label(L("_Port (0 = 25)"), relayPort_));
-         panel.Children.Add(Input(relayPort_));
+         relayPortRow_ = Label(L("_Port (0 = 25)"), relayPort_);
+         panel.Children.Add(relayPortRow_);
          panel.Children.Add(Label(L("_Connection security"), relaySecurity_));
-         panel.Children.Add(relaySecurity_);
-         panel.Children.Add(Separator());
-         panel.Children.Add(relayAuthOn_);
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(relayAuthOn_));
          panel.Children.Add(Label(L("_User name"), relayUser_));
-         panel.Children.Add(Input(relayUser_));
          panel.Children.Add(Label(L("Pass_word (leave blank to keep the stored one)"), relayPassword_));
-         panel.Children.Add(relayPassword_);
-         return Scroll(panel);
+         return DialogFields.Scroll(panel);
       }
 
       private ScrollViewer BuildOutOfOffice()
       {
-         var panel = TabPanel();
-         panel.Children.Add(Label(L("A reply for the whole domain - a closed office, a decommissioned department. It answers only for accounts that have NO vacation message of their own: an account's own message always wins, and at most one reply answers any message.")));
-         panel.Children.Add(Label(L("The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, mailing lists or other auto-replies, one reply per sender, and the reply itself is marked Auto-Submitted so two servers cannot loop.")));
-         panel.Children.Add(Separator());
-         panel.Children.Add(oooOn_);
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Note(L("A reply for the whole domain - a closed office, a decommissioned department. It answers only for accounts that have NO vacation message of their own: an account's own message always wins, and at most one reply answers any message.")));
+         panel.Children.Add(DialogFields.Note(L("The usual auto-reply protections apply and cannot be switched off here: no reply to bounces, mailing lists or other auto-replies, one reply per sender, and the reply itself is marked Auto-Submitted so two servers cannot loop.")));
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(oooOn_));
          panel.Children.Add(Label(L("Su_bject"), oooSubject_));
-         panel.Children.Add(Input(oooSubject_));
          panel.Children.Add(Label(L("_Message"), oooMessage_));
-         panel.Children.Add(oooMessage_);
-         panel.Children.Add(Separator());
-         panel.Children.Add(Label(L("Optional different text for local senders - colleagues can be told more than strangers. Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is forgeable: treat it as a courtesy, never as a place for anything confidential.")));
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Note(L("Optional different text for local senders - colleagues can be told more than strangers. Empty means everyone gets the text above. Note this identifies the sender's ADDRESS, which is forgeable: treat it as a courtesy, never as a place for anything confidential.")));
          panel.Children.Add(Label(L("Subject for _local senders (empty = same as above)"), oooInternalSubject_));
-         panel.Children.Add(Input(oooInternalSubject_));
          panel.Children.Add(Label(L("Message for local s_enders (empty = same as above)"), oooInternalMessage_));
-         panel.Children.Add(oooInternalMessage_);
-         panel.Children.Add(Separator());
-         panel.Children.Add(oooExternalOverride_);
-         panel.Children.Add(Label(L("With this on, an account's own vacation message still answers colleagues, but outside senders get the domain's generic text instead - so personal detail in a vacation message stays inside the organisation.")));
-         return Scroll(panel);
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(oooExternalOverride_));
+         panel.Children.Add(DialogFields.Note(L("With this on, an account's own vacation message still answers colleagues, but outside senders get the domain's generic text instead - so personal detail in a vacation message stays inside the organisation.")));
+         return DialogFields.Scroll(panel);
       }
 
       private ScrollViewer BuildDkim()
       {
-         dkimHeaderCanon_.Items.Add(Combo(L("Simple"), 1));
-         dkimHeaderCanon_.Items.Add(Combo(L("Relaxed"), 2));
-         StyleCombo(dkimHeaderCanon_);
-         dkimBodyCanon_.Items.Add(Combo(L("Simple"), 1));
-         dkimBodyCanon_.Items.Add(Combo(L("Relaxed"), 2));
-         StyleCombo(dkimBodyCanon_);
-         dkimAlgorithm_.Items.Add(Combo(L("SHA1"), 1));
-         dkimAlgorithm_.Items.Add(Combo(L("SHA256"), 2));
-         StyleCombo(dkimAlgorithm_);
+         dkimHeaderCanon_.Items.Add(DialogFields.Combo(L("Simple"), 1));
+         dkimHeaderCanon_.Items.Add(DialogFields.Combo(L("Relaxed"), 2));
+         dkimBodyCanon_.Items.Add(DialogFields.Combo(L("Simple"), 1));
+         dkimBodyCanon_.Items.Add(DialogFields.Combo(L("Relaxed"), 2));
+         dkimAlgorithm_.Items.Add(DialogFields.Combo(L("SHA1"), 1));
+         dkimAlgorithm_.Items.Add(DialogFields.Combo(L("SHA256"), 2));
 
-         var panel = TabPanel();
-         panel.Children.Add(dkimOn_);
-         panel.Children.Add(dkimAliases_);
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Check(dkimOn_));
+         panel.Children.Add(DialogFields.Check(dkimAliases_));
          panel.Children.Add(Label(L("Se_lector"), dkimSelector_));
-         panel.Children.Add(Input(dkimSelector_));
-         panel.Children.Add(Label(L("Private key file")));
-         var dkimKeyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-         Input(dkimKeyFile_);
-         dkimKeyFile_.MinWidth = 320;
-         dkimKeyFile_.Margin = new Thickness(0);
+
+         var dkimKeyRow = new Grid();
+         dkimKeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         dkimKeyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         Grid.SetColumn(dkimKeyFile_, 0);
          dkimKeyRow.Children.Add(dkimKeyFile_);
-         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(8, 0, 0, 0) };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimBrowse, "DkimKeyBrowse");
+         var dkimBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
+         AutomationProperties.SetAutomationId(dkimBrowse, "DkimKeyBrowse");
          dkimBrowse.Click += (s, e) =>
          {
             string file = PathPicker.PickFile(dkimKeyFile_.Text, "PEM/key files (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*");
             if (file != null)
                dkimKeyFile_.Text = file;
          };
+         Grid.SetColumn(dkimBrowse, 1);
          dkimKeyRow.Children.Add(dkimBrowse);
-         panel.Children.Add(dkimKeyRow);
+         panel.Children.Add(DialogFields.Field(L("Private key file"), dkimKeyRow));
 
          var dkimGen = new Wpf.Ui.Controls.Button
          {
-            Content = L("_Generate key pair\u2026"),
+            Content = L("_Generate key pair…"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            Margin = new Thickness(0, 0, 0, 8)
+            Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md)
          };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimGen, "DkimGenerate");
+         AutomationProperties.SetAutomationId(dkimGen, "DkimGenerate");
          dkimGen.Click += (s, e) => GenerateDkim();
          panel.Children.Add(dkimGen);
 
-         dkimDnsPanel_ = new StackPanel { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 8) };
-         dkimDnsPanel_.Children.Add(Label(L("Publish this DNS TXT record at your DNS provider, then enable DKIM:")));
-         dkimDns_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         dkimDnsPanel_.Children.Add(dkimDns_);
-         var dkimCopy = new Wpf.Ui.Controls.Button { Content = L("_Copy DNS value"), Margin = new Thickness(0, 0, 0, 0) };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
-         dkimCopy.Click += (s, e) =>
-         {
-            try { if (!string.IsNullOrEmpty(dkimDnsValue_)) Clipboard.SetText(dkimDnsValue_); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
-         };
+         dkimDnsPanel_ = new StackPanel { Visibility = Visibility.Collapsed };
+         dkimDnsPanel_.Children.Add(DialogFields.Field(L("Publish this DNS TXT record at your DNS provider, then enable DKIM:"), dkimDns_));
+         var dkimCopy = new Wpf.Ui.Controls.Button { Content = L("_Copy DNS value"), Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
+         AutomationProperties.SetAutomationId(dkimCopy, "DkimCopyDns");
+         dkimCopy.Click += (s, e) => CopyToClipboard(dkimDnsValue_);
          dkimDnsPanel_.Children.Add(dkimCopy);
          panel.Children.Add(dkimDnsPanel_);
 
          panel.Children.Add(Label(L("_Header canonicalization"), dkimHeaderCanon_));
-         panel.Children.Add(dkimHeaderCanon_);
          panel.Children.Add(Label(L("_Body canonicalization"), dkimBodyCanon_));
-         panel.Children.Add(dkimBodyCanon_);
          panel.Children.Add(Label(L("Signing _algorithm"), dkimAlgorithm_));
-         panel.Children.Add(dkimAlgorithm_);
 
-         panel.Children.Add(Separator());
+         panel.Children.Add(DialogFields.Separator());
          panel.Children.Add(BuildRotation());
 
-         return Scroll(panel);
+         return DialogFields.Scroll(panel);
       }
 
       /// <summary>
@@ -457,92 +416,73 @@ namespace hMailServer.ControlPanel.Views
       /// out-of-band wait in the middle (publishing a DNS record and letting it
       /// propagate), so the section reads as numbered steps and the Promote
       /// button is gated on an actual DNS check instead of trusting the
-      /// administrator to have waited long enough.
+      /// administrator to have waited long enough. It is a
+      /// <see cref="SettingsSection"/>, which makes its title a level-2 heading
+      /// under the dialog's own - a screen reader can jump to it, which a
+      /// semibold TextBlock never allowed.
       /// </summary>
-      private StackPanel BuildRotation()
+      private SettingsSection BuildRotation()
       {
          var section = new StackPanel();
-
-         var title = new TextBlock
-         {
-            Text = L("Key rotation"),
-            FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 2)
-         };
-         title.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         section.Children.Add(title);
-
-         var intro = Label(L("Replace the DKIM key without a gap in verification: stage a new key next to the current one, publish its DNS record, wait for the record to propagate, check it, and only then promote it."));
-         intro.TextWrapping = TextWrapping.Wrap;
-         section.Children.Add(intro);
-
-         rotCurrent_ = Label("");
-         rotCurrent_.TextWrapping = TextWrapping.Wrap;
-         section.Children.Add(rotCurrent_);
 
          // Step 1 quotes the primary fields above, so it must follow their edits
          // or it would describe a selector the user has already typed over.
          dkimSelector_.TextChanged += (s, e) => UpdateRotationUi();
          dkimKeyFile_.TextChanged += (s, e) => UpdateRotationUi();
 
+         rotCurrent_ = StepLine();
+         section.Children.Add(rotCurrent_);
+
          // Step 2 while nothing is staged: choose a selector name and stage a key.
          rotStartPanel_ = new StackPanel();
-         rotStartPanel_.Children.Add(Label(L("2. Stage a new key pair under a new selector name:")));
-         var startRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
-         Input(rotSelector_);
-         rotSelector_.MinWidth = 200;
-         rotSelector_.Margin = new Thickness(0);
-         System.Windows.Automation.AutomationProperties.SetAutomationId(rotSelector_, "DkimRotationSelector");
+         var startRow = new Grid();
+         startRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         startRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+         AutomationProperties.SetAutomationId(rotSelector_, "DkimRotationSelector");
+         Grid.SetColumn(rotSelector_, 0);
          startRow.Children.Add(rotSelector_);
-         var start = new Wpf.Ui.Controls.Button { Content = L("Generate and stage _key…"), Margin = new Thickness(8, 0, 0, 0) };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(start, "DkimRotationStart");
+         var start = new Wpf.Ui.Controls.Button { Content = L("Generate and stage _key…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
+         AutomationProperties.SetAutomationId(start, "DkimRotationStart");
          start.Click += (s, e) => StartRotation();
+         Grid.SetColumn(start, 1);
          startRow.Children.Add(start);
-         rotStartPanel_.Children.Add(startRow);
+         rotStartPanel_.Children.Add(DialogFields.Field(L("2. Stage a new key pair under a new selector name:"), startRow));
          section.Children.Add(rotStartPanel_);
 
          // Steps 2-5 once a rotation is staged.
          rotStagedPanel_ = new StackPanel { Visibility = Visibility.Collapsed };
 
-         rotStagedInfo_ = Label("");
-         rotStagedInfo_.TextWrapping = TextWrapping.Wrap;
+         rotStagedInfo_ = StepLine();
          rotStagedPanel_.Children.Add(rotStagedInfo_);
 
-         rotStagedPanel_.Children.Add(Label(L("3. Publish this DNS TXT record at your DNS provider. Host/Name:")));
-         rotDnsHost_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         rotStagedPanel_.Children.Add(rotDnsHost_);
-         rotStagedPanel_.Children.Add(Label(L("TXT value:")));
-         rotDnsValue_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         rotStagedPanel_.Children.Add(rotDnsValue_);
+         rotStagedPanel_.Children.Add(DialogFields.Field(L("3. Publish this DNS TXT record at your DNS provider. Host/Name:"), rotDnsHost_));
+         rotStagedPanel_.Children.Add(DialogFields.Field(L("TXT value:"), rotDnsValue_));
 
-         var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+         var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
          var copyHost = new Wpf.Ui.Controls.Button { Content = L("Copy h_ost") };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(copyHost, "DkimRotationCopyHost");
+         AutomationProperties.SetAutomationId(copyHost, "DkimRotationCopyHost");
          copyHost.Click += (s, e) => CopyToClipboard(rotDnsHost_.Text);
          copyRow.Children.Add(copyHost);
-         var copyValue = new Wpf.Ui.Controls.Button { Content = L("Copy _value"), Margin = new Thickness(8, 0, 0, 0) };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(copyValue, "DkimRotationCopyValue");
+         var copyValue = new Wpf.Ui.Controls.Button { Content = L("Copy _value"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
+         AutomationProperties.SetAutomationId(copyValue, "DkimRotationCopyValue");
          copyValue.Click += (s, e) => CopyToClipboard(rotExpectedTxt_);
          copyRow.Children.Add(copyValue);
          rotStagedPanel_.Children.Add(copyRow);
 
-         rotStagedPanel_.Children.Add(Label(L("4. Check that the record is visible in DNS:")));
-         rotCheck_ = new Wpf.Ui.Controls.Button { Content = L("Check D_NS") };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(rotCheck_, "DkimRotationCheck");
+         rotStagedPanel_.Children.Add(DialogFields.Caption(L("4. Check that the record is visible in DNS:")));
+         rotCheck_ = new Wpf.Ui.Controls.Button { Content = L("Check D_NS"), Margin = new Thickness(0, 0, 0, DesignTokens.Space.Sm) };
+         AutomationProperties.SetAutomationId(rotCheck_, "DkimRotationCheck");
          rotCheck_.Click += async (s, e) => await CheckRotationDns();
          rotStagedPanel_.Children.Add(rotCheck_);
 
-         rotStatus_ = new TextBlock
-         {
-            TextWrapping = TextWrapping.Wrap,
-            FontSize = Typography.Label,
-            Margin = new Thickness(0, 6, 0, 8)
-         };
+         // The running commentary of the check. A notice rather than a coloured
+         // line: the level reaches a reader who cannot tell the four colours
+         // apart, as a mark and a word, and it is a live region, so the outcome
+         // of a check that took a resolver timeout to come back is announced.
          rotStagedPanel_.Children.Add(rotStatus_);
 
-         rotStagedPanel_.Children.Add(Label(L("5. Promote the staged key to become the signing key:")));
-         var promoteRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
+         rotStagedPanel_.Children.Add(DialogFields.Caption(L("5. Promote the staged key to become the signing key:")));
+         var promoteRow = new StackPanel { Orientation = Orientation.Horizontal };
 
          // Promote stays locked until a "Check DNS" in this session has seen the
          // new record on the wire and confirmed it matches the staged key.
@@ -560,28 +500,35 @@ namespace hMailServer.ControlPanel.Views
             ToolTip = L("Enabled once \"Check DNS\" has confirmed the published record matches the staged key.")
          };
          ToolTipService.SetShowOnDisabled(rotPromote_, true);
-         System.Windows.Automation.AutomationProperties.SetAutomationId(rotPromote_, "DkimRotationPromote");
+         AutomationProperties.SetAutomationId(rotPromote_, "DkimRotationPromote");
          rotPromote_.Click += (s, e) => PromoteRotation();
          promoteRow.Children.Add(rotPromote_);
 
-         var cancelRotation = new Wpf.Ui.Controls.Button { Content = L("Cancel rotat_ion…"), Margin = new Thickness(8, 0, 0, 0) };
-         System.Windows.Automation.AutomationProperties.SetAutomationId(cancelRotation, "DkimRotationCancel");
+         var cancelRotation = new Wpf.Ui.Controls.Button { Content = L("Cancel rotat_ion…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
+         AutomationProperties.SetAutomationId(cancelRotation, "DkimRotationCancel");
          cancelRotation.Click += (s, e) => CancelRotation();
          promoteRow.Children.Add(cancelRotation);
 
          rotStagedPanel_.Children.Add(promoteRow);
          section.Children.Add(rotStagedPanel_);
-         return section;
+
+         return new SettingsSection
+         {
+            Heading = L("Key rotation"),
+            Description = L("Replace the DKIM key without a gap in verification: stage a new key next to the current one, publish its DNS record, wait for the record to propagate, check it, and only then promote it."),
+            Content = section
+         };
       }
 
       // ---- DKIM key rotation ----
 
       private void StartRotation()
       {
+         rotStatus_.Hide();
          string selector = rotSelector_.Text.Trim();
          if (selector.Length == 0)
          {
-            MessageBox.Show(L("Enter a selector name for the new key first."), L("Control Panel"));
+            SetRotationStatus(L("Enter a selector name for the new key first."), StatusLevel.Warning);
             return;
          }
 
@@ -592,7 +539,7 @@ namespace hMailServer.ControlPanel.Views
          // a staged rotation exists to prevent.
          if (string.Equals(selector, dkimSelector_.Text.Trim(), StringComparison.OrdinalIgnoreCase))
          {
-            MessageBox.Show(F("The new selector must be different from the current selector (\"{0}\"). A rotation runs both keys side by side under different DNS names.", selector), L("Control Panel"));
+            SetRotationStatus(F("The new selector must be different from the current selector (\"{0}\"). A rotation runs both keys side by side under different DNS names.", selector), StatusLevel.Critical);
             return;
          }
 
@@ -626,7 +573,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not generate the DKIM key: {0}", ex.Message), L("Control Panel"));
+            SetRotationStatus(F("Could not generate the DKIM key: {0}", ex.Message), StatusLevel.Critical);
             return;
          }
 
@@ -641,8 +588,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not stage the rotation on the server: {0}", ServerSession.DescribeComError(ex)),
-               L("Control Panel"));
+            SetRotationStatus(F("Could not stage the rotation on the server: {0}", ServerSession.DescribeComError(ex)), StatusLevel.Critical);
             return;
          }
          finally
@@ -656,7 +602,7 @@ namespace hMailServer.ControlPanel.Views
          rotCheckPassed_ = false;
          UpdateRotationUi();
          SetRotationStatus(L("Not checked yet. Publish the record, allow time for propagation, then press \"Check DNS\"."),
-            ThemeTokens.Info);
+            StatusLevel.Information);
       }
 
       private static string RotationNotFoundText =>
@@ -672,7 +618,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (rotStagedSelector_.Length == 0)
          {
-            SetRotationStatus(L("The staged pair has no selector, so there is no DNS name to check. Cancel the rotation and start again."), ThemeTokens.Danger);
+            SetRotationStatus(L("The staged pair has no selector, so there is no DNS name to check. Cancel the rotation and start again."), StatusLevel.Critical);
             return;
          }
 
@@ -681,7 +627,7 @@ namespace hMailServer.ControlPanel.Views
 
          rotChecking_ = true;
          rotCheck_.IsEnabled = false;
-         SetRotationStatus(F("Checking {0}…", host), ThemeTokens.Info);
+         SetRotationStatus(F("Checking {0}…", host), StatusLevel.Information);
 
          try
          {
@@ -706,19 +652,19 @@ namespace hMailServer.ControlPanel.Views
             {
                case DnsTxtLookup.MatchStatus.FoundAndMatches:
                   SetRotationStatus(L("The published record matches the staged key. It is safe to promote."),
-                     ThemeTokens.Success);
+                     StatusLevel.Good);
                   break;
 
                case DnsTxtLookup.MatchStatus.NoRecord:
-                  SetRotationStatus(RotationNotFoundText, ThemeTokens.Warning);
+                  SetRotationStatus(RotationNotFoundText, StatusLevel.Warning);
                   break;
 
                case DnsTxtLookup.MatchStatus.FoundButDifferent:
-                  SetRotationStatus(F("A TXT record exists at {0}, but it does not match the staged key. Waiting will not fix this: correct the published record so it matches the value above, then check again.", host) + DescribeFoundRecords(result.Records), ThemeTokens.Danger);
+                  SetRotationStatus(F("A TXT record exists at {0}, but it does not match the staged key. Waiting will not fix this: correct the published record so it matches the value above, then check again.", host) + DescribeFoundRecords(result.Records), StatusLevel.Critical);
                   break;
 
                default:
-                  SetRotationStatus(RotationLookupFailedText(result.Error), ThemeTokens.Danger);
+                  SetRotationStatus(RotationLookupFailedText(result.Error), StatusLevel.Critical);
                   break;
             }
          }
@@ -745,15 +691,15 @@ namespace hMailServer.ControlPanel.Views
          {
             case DnsTxtLookup.LookupStatus.Found:
                SetRotationStatus(F("A TXT record exists, but the staged private key file ({0}) could not be read from this machine, so the record cannot be compared against the key. Run this check on the server itself, or cancel the rotation and start it again from here.", rotStagedKeyFile_),
-                  ThemeTokens.Warning);
+                  StatusLevel.Warning);
                break;
 
             case DnsTxtLookup.LookupStatus.NoRecord:
-               SetRotationStatus(RotationNotFoundText, ThemeTokens.Warning);
+               SetRotationStatus(RotationNotFoundText, StatusLevel.Warning);
                break;
 
             default:
-               SetRotationStatus(RotationLookupFailedText(found.Error), ThemeTokens.Danger);
+               SetRotationStatus(RotationLookupFailedText(found.Error), StatusLevel.Critical);
                break;
          }
       }
@@ -796,11 +742,11 @@ namespace hMailServer.ControlPanel.Views
             rotCheckPassed_ = false;
             UpdateRotationUi();
 
-            MessageBox.Show(F("The rotation is complete: mail is now signed with selector \"{0}\".\n\nKeep the old DNS record ({1}) for a few more days while mail signed with the old key is still in transit, then remove it.", newSelector, oldHost), L("Control Panel"));
+            SetRotationStatus(F("The rotation is complete: mail is now signed with selector \"{0}\".\n\nKeep the old DNS record ({1}) for a few more days while mail signed with the old key is still in transit, then remove it.", newSelector, oldHost), StatusLevel.Good);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not promote the staged key: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
+            SetRotationStatus(F("Could not promote the staged key: {0}", ServerSession.DescribeComError(ex)), StatusLevel.Critical);
          }
          finally
          {
@@ -826,7 +772,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not cancel the rotation: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
+            SetRotationStatus(F("Could not cancel the rotation: {0}", ServerSession.DescribeComError(ex)), StatusLevel.Critical);
             return;
          }
          finally
@@ -838,6 +784,7 @@ namespace hMailServer.ControlPanel.Views
          rotStagedKeyFile_ = "";
          rotExpectedTxt_ = null;
          rotCheckPassed_ = false;
+         rotStatus_.Hide();
          UpdateRotationUi();
       }
 
@@ -868,9 +815,9 @@ namespace hMailServer.ControlPanel.Views
          UpdateRotationUi();
 
          if (selector.Length == 0 || keyFile.Length == 0)
-            SetRotationStatus(L("The staged rotation is incomplete (the selector or the key file is missing), so the server will refuse to promote it. Cancel the rotation and start again."), ThemeTokens.Danger);
+            SetRotationStatus(L("The staged rotation is incomplete (the selector or the key file is missing), so the server will refuse to promote it. Cancel the rotation and start again."), StatusLevel.Critical);
          else
-            SetRotationStatus(L("A rotation is already staged. If the DNS record is published, press \"Check DNS\"; promoting unlocks once the check passes in this session."), ThemeTokens.Info);
+            SetRotationStatus(L("A rotation is already staged. If the DNS record is published, press \"Check DNS\"; promoting unlocks once the check passes in this session."), StatusLevel.Information);
       }
 
       /// <summary>
@@ -933,11 +880,7 @@ namespace hMailServer.ControlPanel.Views
          rotPromote_.IsEnabled = rotCheckPassed_;
       }
 
-      private void SetRotationStatus(string text, System.Windows.Media.Brush brush)
-      {
-         rotStatus_.Text = text;
-         rotStatus_.Foreground = brush;
-      }
+      private void SetRotationStatus(string text, StatusLevel level) => rotStatus_.Show(level, text);
 
       private static string DescribeFoundRecords(System.Collections.Generic.List<string> records)
       {
@@ -981,7 +924,7 @@ namespace hMailServer.ControlPanel.Views
             greylisting_.IsChecked = (bool)d.AntiSpamEnableGreylisting;
 
             signatureOn_.IsChecked = (bool)d.SignatureEnabled;
-            SelectCombo(signatureMethod_, (int)d.SignatureMethod);
+            DialogFields.SelectCombo(signatureMethod_, (int)d.SignatureMethod);
             signReplies_.IsChecked = (bool)d.AddSignaturesToReplies;
             signLocal_.IsChecked = (bool)d.AddSignaturesToLocalMail;
             signaturePlain_.Text = (string)d.SignaturePlainText ?? "";
@@ -991,7 +934,7 @@ namespace hMailServer.ControlPanel.Views
             relayPort_.Text = ((long)d.RelayPort).ToString();
             relayAuthOn_.IsChecked = (bool)d.RelayRequiresAuthentication;
             relayUser_.Text = (string)d.RelayUsername ?? "";
-            SelectCombo(relaySecurity_, (int)d.RelayConnectionSecurity);
+            DialogFields.SelectCombo(relaySecurity_, (int)d.RelayConnectionSecurity);
 
             // The password box is deliberately left empty rather than filled with the
             // stored secret: a dialog that shows a password back is a dialog that hands
@@ -1010,9 +953,9 @@ namespace hMailServer.ControlPanel.Views
             dkimAliases_.IsChecked = (bool)d.DKIMSignAliasesEnabled;
             dkimSelector_.Text = (string)d.DKIMSelector ?? "";
             dkimKeyFile_.Text = (string)d.DKIMPrivateKeyFile ?? "";
-            SelectCombo(dkimHeaderCanon_, (int)d.DKIMHeaderCanonicalizationMethod);
-            SelectCombo(dkimBodyCanon_, (int)d.DKIMBodyCanonicalizationMethod);
-            SelectCombo(dkimAlgorithm_, (int)d.DKIMSigningAlgorithm);
+            DialogFields.SelectCombo(dkimHeaderCanon_, (int)d.DKIMHeaderCanonicalizationMethod);
+            DialogFields.SelectCombo(dkimBodyCanon_, (int)d.DKIMBodyCanonicalizationMethod);
+            DialogFields.SelectCombo(dkimAlgorithm_, (int)d.DKIMSigningAlgorithm);
 
             // The staged rotation pair, if an earlier session left one behind.
             // Read defensively: against an older server that predates the
@@ -1042,24 +985,42 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         if (!NumericField.TryValidate(maxSize_.Text, L("Maximum domain size (MB)"), 0, int.MaxValue, out int msV, out bool hasMs, out string error)
-          || !NumericField.TryValidate(maxMessageSize_.Text, L("Maximum message size (KB)"), 0, int.MaxValue, out int mmsV, out bool hasMms, out error)
-          || !NumericField.TryValidate(maxAccountSize_.Text, L("Maximum account size (MB)"), 0, int.MaxValue, out int masV, out bool hasMas, out error)
-          || !NumericField.TryValidate(retentionDays_.Text, L("Delete messages older than (days)"), 0, int.MaxValue, out int retentionV, out bool hasRetention, out error)
-          || !NumericField.TryValidate(maxAccounts_.Text, L("Maximum number of accounts"), 0, int.MaxValue, out int mnaV, out bool hasMna, out error)
-          || !NumericField.TryValidate(maxAliases_.Text, L("Maximum number of aliases"), 0, int.MaxValue, out int mnalV, out bool hasMnal, out error)
-          || !NumericField.TryValidate(maxDists_.Text, L("Maximum number of distribution lists"), 0, int.MaxValue, out int mndV, out bool hasMnd, out error)
-          || !NumericField.TryValidate(relayPort_.Text, L("Relay port"), 0, 65535, out int relayPortValue, out bool hasRelayPort, out error))
-         {
-            status_.Text = error;
-            return;
-         }
-         status_.Text = "";
+         notice_.Hide();
+         DialogFields.ClearErrors(nameRow_, maxSizeRow_, maxMessageSizeRow_, maxAccountSizeRow_, retentionRow_,
+                                  maxAccountsRow_, maxAliasesRow_, maxDistsRow_, relayPortRow_);
+
+         // Eight numbers, each said on its own field. They used to share one line
+         // at the foot of the dialog, which named the field in words and left the
+         // reader to find it again among seven tabs; ShowError brings the tab
+         // forward and puts the keyboard in the box itself.
+         if (!NumericField.TryValidate(maxSize_.Text, L("Maximum domain size (MB)"), 0, int.MaxValue, out int msV, out bool hasMs, out string error))
+         { DialogFields.ShowError(maxSizeRow_, error); return; }
+
+         if (!NumericField.TryValidate(maxMessageSize_.Text, L("Maximum message size (KB)"), 0, int.MaxValue, out int mmsV, out bool hasMms, out error))
+         { DialogFields.ShowError(maxMessageSizeRow_, error); return; }
+
+         if (!NumericField.TryValidate(maxAccountSize_.Text, L("Maximum account size (MB)"), 0, int.MaxValue, out int masV, out bool hasMas, out error))
+         { DialogFields.ShowError(maxAccountSizeRow_, error); return; }
+
+         if (!NumericField.TryValidate(retentionDays_.Text, L("Delete messages older than (days)"), 0, int.MaxValue, out int retentionV, out bool hasRetention, out error))
+         { DialogFields.ShowError(retentionRow_, error); return; }
+
+         if (!NumericField.TryValidate(maxAccounts_.Text, L("Maximum number of accounts"), 0, int.MaxValue, out int mnaV, out bool hasMna, out error))
+         { DialogFields.ShowError(maxAccountsRow_, error); return; }
+
+         if (!NumericField.TryValidate(maxAliases_.Text, L("Maximum number of aliases"), 0, int.MaxValue, out int mnalV, out bool hasMnal, out error))
+         { DialogFields.ShowError(maxAliasesRow_, error); return; }
+
+         if (!NumericField.TryValidate(maxDists_.Text, L("Maximum number of distribution lists"), 0, int.MaxValue, out int mndV, out bool hasMnd, out error))
+         { DialogFields.ShowError(maxDistsRow_, error); return; }
+
+         if (!NumericField.TryValidate(relayPort_.Text, L("Relay port"), 0, 65535, out int relayPortValue, out bool _, out error))
+         { DialogFields.ShowError(relayPortRow_, error); return; }
 
          string newName = name_.Text.Trim();
          if (newName.Length == 0 || !newName.Contains('.'))
          {
-            status_.Text = L("Enter a valid domain name.");
+            DialogFields.ShowError(nameRow_, L("Enter a valid domain name."));
             return;
          }
 
@@ -1100,7 +1061,7 @@ namespace hMailServer.ControlPanel.Views
             d.AntiSpamEnableGreylisting = greylisting_.IsChecked is true;
 
             d.SignatureEnabled = signatureOn_.IsChecked is true;
-            int sm = ComboValue(signatureMethod_);
+            int sm = DialogFields.ComboValue(signatureMethod_);
             if (sm > 0) d.SignatureMethod = sm;
             d.AddSignaturesToReplies = signReplies_.IsChecked is true;
             d.AddSignaturesToLocalMail = signLocal_.IsChecked is true;
@@ -1108,11 +1069,12 @@ namespace hMailServer.ControlPanel.Views
             d.SignatureHTML = signatureHtml_.Text;
 
             d.RelayHost = relayHost_.Text.Trim();
+            // Unconditional, as before: an empty box means port 0, which this
+            // dialog's own caption reads as "0 = 25".
             d.RelayPort = relayPortValue;
             d.RelayRequiresAuthentication = relayAuthOn_.IsChecked is true;
             d.RelayUsername = relayUser_.Text.Trim();
-            int rs = ComboValue(relaySecurity_);
-            if (rs >= 0) d.RelayConnectionSecurity = rs;
+            d.RelayConnectionSecurity = DialogFields.ComboValue(relaySecurity_);
 
             // Only written when something was typed, so re-saving the dialog for an
             // unrelated change does not silently blank the relay password.
@@ -1130,11 +1092,11 @@ namespace hMailServer.ControlPanel.Views
             d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked is true;
             d.DKIMSelector = dkimSelector_.Text.Trim();
             d.DKIMPrivateKeyFile = dkimKeyFile_.Text.Trim();
-            int hc = ComboValue(dkimHeaderCanon_);
+            int hc = DialogFields.ComboValue(dkimHeaderCanon_);
             if (hc > 0) d.DKIMHeaderCanonicalizationMethod = hc;
-            int bc = ComboValue(dkimBodyCanon_);
+            int bc = DialogFields.ComboValue(dkimBodyCanon_);
             if (bc > 0) d.DKIMBodyCanonicalizationMethod = bc;
-            int alg = ComboValue(dkimAlgorithm_);
+            int alg = DialogFields.ComboValue(dkimAlgorithm_);
             if (alg > 0) d.DKIMSigningAlgorithm = alg;
 
             d.Save();
@@ -1143,7 +1105,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the domain: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the domain: {0}", ex.Message));
          }
          finally
          {
@@ -1152,15 +1114,6 @@ namespace hMailServer.ControlPanel.Views
       }
 
       // ---- UI helpers ----
-
-      private static StackPanel TabPanel() => new() { Margin = new Thickness(4, 12, 4, 4) };
-
-      private static ScrollViewer Scroll(StackPanel panel) => new()
-      {
-         Content = panel,
-         VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-         HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
-      };
 
       private static TextBox NewInput() => new Wpf.Ui.Controls.TextBox();
 
@@ -1174,9 +1127,7 @@ namespace hMailServer.ControlPanel.Views
          TextWrapping = TextWrapping.Wrap,
          FontSize = Typography.Caption,
          MinHeight = minHeight,
-         Padding = new Thickness(6),
-         Margin = new Thickness(0, 0, 0, 4),
-         Background = System.Windows.Media.Brushes.Transparent
+         Padding = new Thickness(DesignTokens.Space.Sm)
       };
 
       private static TextBox NewMemo() => new()
@@ -1187,62 +1138,35 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto
       };
 
-      /// <summary>
-      /// A caption, and - when the editor it captions is passed in - that
-      /// editor's accessible name. A TextBlock above a control tells UI
-      /// Automation nothing, so without the second argument every field in
-      /// this dialog announces to a screen reader as an anonymous "edit".
-      /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
+      /// <summary>One line of the rotation walkthrough, written into as the state changes.</summary>
+      private static TextBlock StepLine()
       {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
+         var t = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
+         t.SetResourceReference(FrameworkElement.StyleProperty, "TextCaption");
          return t;
       }
 
-      private static TextBox Input(TextBox box)
+      /// <summary>
+      /// The number that belongs to the tick box above it. The three limit boxes
+      /// have no caption of their own and had no accessible name either, so each
+      /// announced as a bare "edit" under a tick box whose words it needs; the box
+      /// takes its name from that tick box, which is the only text there is, and
+      /// the row it sits in carries the validation message for it.
+      /// </summary>
+      private static FieldRow NumberUnder(CheckBox owner, TextBox box)
       {
-         box.FontSize = Typography.Body;
-         box.Padding = new Thickness(6);
-         box.Margin = new Thickness(0, 0, 0, 8);
-         box.Background = System.Windows.Media.Brushes.Transparent;
-         box.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         return box;
+         AutomationProperties.SetName(box, MnemonicText.Strip((string)owner.Content));
+         box.HorizontalAlignment = HorizontalAlignment.Left;
+         box.MinWidth = 160;
+         return DialogFields.Field(null, box);
       }
 
-      private static Border Separator()
-      {
-         // The theme's own hairline, not a fixed Gray: at 0.3 opacity the old
-         // one was near-invisible on the light theme, and theme-blind on all.
-         var divider = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) };
-         divider.SetResourceReference(Border.BackgroundProperty, "ControlElevationBorderBrush");
-         return divider;
-      }
-
-      private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
-
-      private static void StyleCombo(ComboBox combo)
-      {
-         combo.FontSize = Typography.Body;
-         combo.Margin = new Thickness(0, 0, 0, 8);
-      }
-
-      private static void SelectCombo(ComboBox combo, int value)
-      {
-         foreach (ComboBoxItem item in combo.Items)
-            if ((int)item.Tag == value)
-            {
-               combo.SelectedItem = item;
-               return;
-            }
-      }
-
-      private static int ComboValue(ComboBox combo) =>
-         combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
+      /// <summary>
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation. A TextBlock above a control tells UI Automation nothing, so
+      /// without this every field in this dialog announced to a screen reader as
+      /// an anonymous "edit".
+      /// </summary>
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }

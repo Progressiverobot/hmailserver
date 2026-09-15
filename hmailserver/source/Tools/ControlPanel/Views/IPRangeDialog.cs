@@ -4,9 +4,9 @@
 
 using System;
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -16,10 +16,17 @@ namespace hMailServer.ControlPanel.Views
    /// Full tabbed editor for one IP security range — the complete set of
    /// IInterfaceSecurityRange options (connections, relaying, per-direction SMTP
    /// authentication, anti-spam/anti-virus and expiry) that the inline panel does
-   /// not expose.
+   /// not expose. On the standard frame: five tabs sized to the tallest of them
+   /// so the window does not jump on every click of the strip, every field a
+   /// <see cref="FieldRow"/>, a priority or an expiry that will not parse said on
+   /// the field itself - which also brings its tab to the front - and a save the
+   /// server refuses said in a notice above the tabs.
    /// </summary>
    public class IPRangeDialog : FluentDialogWindow
    {
+      /// <summary>The width this dialog asks the frame for; the tabs are measured against the body inside it.</summary>
+      private const double DialogWidth = 560;
+
       private readonly int rangeId_;
 
       // General
@@ -27,50 +34,40 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox lower_ = new();
       private readonly TextBox upper_ = new();
       private readonly TextBox priority_ = new();
+      private FieldRow priorityRow_;
 
       // Connections
-      private readonly CheckBox smtp_ = new() { Content = L("Allow SM_TP connections"), FontSize = Typography.Body };
-      private readonly CheckBox imap_ = new() { Content = L("Allow _IMAP connections"), FontSize = Typography.Body };
-      private readonly CheckBox pop3_ = new() { Content = L("Allow _POP3 connections"), FontSize = Typography.Body };
+      private readonly CheckBox smtp_ = new() { Content = L("Allow SM_TP connections") };
+      private readonly CheckBox imap_ = new() { Content = L("Allow _IMAP connections") };
+      private readonly CheckBox pop3_ = new() { Content = L("Allow _POP3 connections") };
 
       // Relaying
-      private readonly CheckBox ll_ = new() { Content = L("_Local to local"), FontSize = Typography.Body };
-      private readonly CheckBox lr_ = new() { Content = L("Local to _external (relay out)"), FontSize = Typography.Body };
-      private readonly CheckBox rl_ = new() { Content = L("E_xternal to local"), FontSize = Typography.Body };
-      private readonly CheckBox rr_ = new() { Content = L("External to external (_open relay!)"), FontSize = Typography.Body };
+      private readonly CheckBox ll_ = new() { Content = L("_Local to local") };
+      private readonly CheckBox lr_ = new() { Content = L("Local to _external (relay out)") };
+      private readonly CheckBox rl_ = new() { Content = L("E_xternal to local") };
+      private readonly CheckBox rr_ = new() { Content = L("External to external (_open relay!)") };
 
       // SMTP authentication required
-      private readonly CheckBox authLL_ = new() { Content = L("Require auth: _local to local"), FontSize = Typography.Body };
-      private readonly CheckBox authLE_ = new() { Content = L("Require auth: local to _external"), FontSize = Typography.Body };
-      private readonly CheckBox authEL_ = new() { Content = L("Require auth: e_xternal to local"), FontSize = Typography.Body };
-      private readonly CheckBox authEE_ = new() { Content = L("Require auth: external to exte_rnal"), FontSize = Typography.Body };
-      private readonly CheckBox tlsAuth_ = new() { Content = L("Require SSL/_TLS when authenticating"), FontSize = Typography.Body };
+      private readonly CheckBox authLL_ = new() { Content = L("Require auth: _local to local") };
+      private readonly CheckBox authLE_ = new() { Content = L("Require auth: local to _external") };
+      private readonly CheckBox authEL_ = new() { Content = L("Require auth: e_xternal to local") };
+      private readonly CheckBox authEE_ = new() { Content = L("Require auth: external to exte_rnal") };
+      private readonly CheckBox tlsAuth_ = new() { Content = L("Require SSL/_TLS when authenticating") };
 
       // Protection + expiry
-      private readonly CheckBox spam_ = new() { Content = L("Enable _anti-spam for this range"), FontSize = Typography.Body };
-      private readonly CheckBox virus_ = new() { Content = L("Enable anti-_virus for this range"), FontSize = Typography.Body };
-      private readonly CheckBox expires_ = new() { Content = L("This range _expires"), FontSize = Typography.Body };
+      private readonly CheckBox spam_ = new() { Content = L("Enable _anti-spam for this range") };
+      private readonly CheckBox virus_ = new() { Content = L("Enable anti-_virus for this range") };
+      private readonly CheckBox expires_ = new() { Content = L("This range _expires") };
       private readonly TextBox expiresTime_ = new();
+      private FieldRow expiresRow_;
+
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public IPRangeDialog(Window owner, int rangeId)
       {
          rangeId_ = rangeId;
          Owner = owner;
          Title = L("IP range");
-         Width = 560;
-         Height = 560;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
-
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-         var header = new TextBlock { Text = L("IP range"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
 
          var tabs = new TabControl { Background = System.Windows.Media.Brushes.Transparent, BorderThickness = new Thickness(0) };
          tabs.Items.Add(new TabItem { Header = L("General"), Content = BuildGeneral() });
@@ -78,81 +75,80 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = L("Relaying"), Content = BuildRelaying() });
          tabs.Items.Add(new TabItem { Header = L("Require auth"), Content = BuildAuth() });
          tabs.Items.Add(new TabItem { Header = L("Protection"), Content = BuildProtection() });
-         Grid.SetRow(tabs, 1);
-         root.Children.Add(tabs);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         // One height for every tab, taken from the tallest: a window sized to
+         // its content would otherwise grow and shrink with each click on the
+         // strip, which is the tabbed dialog's version of a jumping layout.
+         DialogFields.FitTabs(tabs, DialogFields.BodyWidth(DialogWidth));
+
+         var body = new StackPanel();
+         body.Children.Add(notice_);
+         body.Children.Add(tabs);
+
+         // Enter saves, Escape cancels; the frame wires both.
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => Close();
-         buttons.Children.Add(save);
-         buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
 
-         Content = root;
+         UseFrame(L("IP range"), body, save, cancel, width: DialogWidth);
          Loaded += (s, e) => Load();
       }
 
       private ScrollViewer BuildGeneral()
       {
-         var p = Panel();
+         var p = DialogFields.TabPanel();
          p.Children.Add(Label(L("_Name"), name_));
-         p.Children.Add(Input(name_));
          p.Children.Add(Label(L("_Lower IP address"), lower_));
-         p.Children.Add(Input(lower_));
          p.Children.Add(Label(L("_Upper IP address"), upper_));
-         p.Children.Add(Input(upper_));
-         p.Children.Add(Label(L("_Priority (higher wins when ranges overlap)"), priority_));
-         p.Children.Add(Input(priority_));
-         return Scroll(p);
+         priorityRow_ = Label(L("_Priority (higher wins when ranges overlap)"), priority_);
+         p.Children.Add(priorityRow_);
+         return DialogFields.Scroll(p);
       }
 
       private ScrollViewer BuildConnections()
       {
-         var p = Panel();
-         p.Children.Add(smtp_);
-         p.Children.Add(imap_);
-         p.Children.Add(pop3_);
-         return Scroll(p);
+         var p = DialogFields.TabPanel();
+         p.Children.Add(DialogFields.Check(smtp_));
+         p.Children.Add(DialogFields.Check(imap_));
+         p.Children.Add(DialogFields.Check(pop3_));
+         return DialogFields.Scroll(p);
       }
 
       private ScrollViewer BuildRelaying()
       {
-         var p = Panel();
-         p.Children.Add(Label(L("Which deliveries are allowed from this range")));
-         p.Children.Add(ll_);
-         p.Children.Add(lr_);
-         p.Children.Add(rl_);
-         p.Children.Add(rr_);
-         return Scroll(p);
+         var p = DialogFields.TabPanel();
+         p.Children.Add(DialogFields.Caption(L("Which deliveries are allowed from this range")));
+         p.Children.Add(DialogFields.Check(ll_));
+         p.Children.Add(DialogFields.Check(lr_));
+         p.Children.Add(DialogFields.Check(rl_));
+         p.Children.Add(DialogFields.Check(rr_));
+         return DialogFields.Scroll(p);
       }
 
       private ScrollViewer BuildAuth()
       {
-         var p = Panel();
-         p.Children.Add(Label(L("Require SMTP authentication for each delivery direction")));
-         p.Children.Add(authLL_);
-         p.Children.Add(authLE_);
-         p.Children.Add(authEL_);
-         p.Children.Add(authEE_);
-         p.Children.Add(Separator());
-         p.Children.Add(tlsAuth_);
-         return Scroll(p);
+         var p = DialogFields.TabPanel();
+         p.Children.Add(DialogFields.Caption(L("Require SMTP authentication for each delivery direction")));
+         p.Children.Add(DialogFields.Check(authLL_));
+         p.Children.Add(DialogFields.Check(authLE_));
+         p.Children.Add(DialogFields.Check(authEL_));
+         p.Children.Add(DialogFields.Check(authEE_));
+         p.Children.Add(DialogFields.Separator());
+         p.Children.Add(DialogFields.Check(tlsAuth_));
+         return DialogFields.Scroll(p);
       }
 
       private ScrollViewer BuildProtection()
       {
-         var p = Panel();
-         p.Children.Add(spam_);
-         p.Children.Add(virus_);
-         p.Children.Add(Separator());
-         p.Children.Add(expires_);
-         p.Children.Add(Label(L("Expiry _time (YYYY-MM-DD HH:MM:SS)"), expiresTime_));
-         p.Children.Add(Input(expiresTime_));
-         return Scroll(p);
+         var p = DialogFields.TabPanel();
+         p.Children.Add(DialogFields.Check(spam_));
+         p.Children.Add(DialogFields.Check(virus_));
+         p.Children.Add(DialogFields.Separator());
+         p.Children.Add(DialogFields.Check(expires_));
+         expiresRow_ = Label(L("Expiry _time (YYYY-MM-DD HH:MM:SS)"), expiresTime_);
+         p.Children.Add(expiresRow_);
+         return DialogFields.Scroll(p);
       }
 
       private dynamic FindRange(dynamic ranges)
@@ -216,6 +212,25 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
+         notice_.Hide();
+         DialogFields.ClearErrors(priorityRow_, expiresRow_);
+
+         // A priority that will not parse used to be dropped on the floor: the
+         // dialog closed, the range kept its old priority and nothing said so.
+         // It is a field that is wrong, so the field says so.
+         int? priority = null;
+         string priorityText = priority_.Text.Trim();
+         if (priorityText.Length > 0)
+         {
+            if (!int.TryParse(priorityText, out int parsed))
+            {
+               DialogFields.ShowError(priorityRow_, L("Enter a whole number."));
+               return;
+            }
+
+            priority = parsed;
+         }
+
          dynamic ranges = ServerSession.Current.Application.Settings.SecurityRanges;
          try
          {
@@ -225,7 +240,7 @@ namespace hMailServer.ControlPanel.Views
             r.Name = name_.Text.Trim();
             if (lower_.Text.Trim().Length > 0) r.LowerIP = lower_.Text.Trim();
             if (upper_.Text.Trim().Length > 0) r.UpperIP = upper_.Text.Trim();
-            if (int.TryParse(priority_.Text.Trim(), out int prio)) r.Priority = prio;
+            if (priority.HasValue) r.Priority = priority.Value;
 
             r.AllowSMTPConnections = smtp_.IsChecked is true;
             r.AllowIMAPConnections = imap_.IsChecked is true;
@@ -247,7 +262,20 @@ namespace hMailServer.ControlPanel.Views
             r.Expires = expires_.IsChecked is true;
             if (expires_.IsChecked is true && expiresTime_.Text.Trim().Length > 0)
             {
-               try { r.ExpiresTime = expiresTime_.Text.Trim(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
+               // The server parses the date itself and refuses what it cannot
+               // read. That refusal used to be swallowed - the range saved with
+               // "expires" set and no expiry time, which never expires - so it
+               // now stops the save on the field that caused it.
+               try
+               {
+                  r.ExpiresTime = expiresTime_.Text.Trim();
+               }
+               catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+               {
+                  ServerSession.Release(r);
+                  DialogFields.ShowError(expiresRow_, L("Enter the expiry as YYYY-MM-DD HH:MM:SS."));
+                  return;
+               }
             }
 
             r.Save();
@@ -256,7 +284,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the range: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the range: {0}", ex.Message));
          }
          finally
          {
@@ -264,48 +292,14 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      // ---- UI helpers ----
-
-      private static StackPanel Panel() => new() { Margin = new Thickness(4, 12, 4, 4) };
-      private static ScrollViewer Scroll(StackPanel p) => new() { Content = p, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
-
       /// <summary>
-      /// A caption, and - when the editor it captions is passed in - that editor's
-      /// accessible name. A TextBlock above a control tells UI Automation nothing,
-      /// so the four boxes on the General tab announced themselves as "edit, edit,
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation. A TextBlock above a control tells UI Automation nothing, so
+      /// the four boxes on the General tab announced themselves as "edit, edit,
       /// edit, edit" on a dialog where two of them are the ends of an IP range.
-      /// The checkboxes are already named by their own Content, which is why the
-      /// group captions here are passed no editor.
+      /// The check boxes are named by their own Content, which is why the group
+      /// captions here are <see cref="DialogFields.Caption"/> and not rows.
       /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
-      {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
-         return t;
-      }
-
-      private static TextBox Input(TextBox box)
-      {
-         box.FontSize = Typography.Body;
-         box.Padding = new Thickness(6);
-         box.Margin = new Thickness(0, 0, 0, 8);
-         box.Background = System.Windows.Media.Brushes.Transparent;
-         box.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         return box;
-      }
-
-      private static Border Separator()
-      {
-         // The theme's own hairline, not a fixed Gray: at 0.3 opacity the old
-         // one was near-invisible on the light theme, and theme-blind on all.
-         var divider = new Border { Height = 1, Margin = new Thickness(0, 12, 0, 12) };
-         divider.SetResourceReference(Border.BackgroundProperty, "ControlElevationBorderBrush");
-         return divider;
-      }
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }

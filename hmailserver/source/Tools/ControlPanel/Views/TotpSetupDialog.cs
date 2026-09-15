@@ -9,7 +9,7 @@ using System.Windows.Controls;
 using System.Windows.Media.Imaging;
 using QRCoder;
 using hMailServer.ControlPanel.Services;
-using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -19,27 +19,29 @@ namespace hMailServer.ControlPanel.Views
    /// a new secret, renders a scannable QR code plus the manual key, and confirms
    /// with a verification code. Writing the secret requires the Control Panel to
    /// run elevated (the secret lives under HKLM).
+   ///
+   /// On the standard frame, keeping the QR-and-key layout it needs: the sentence
+   /// that says where the setting stands is body text at the top, the code is a
+   /// <see cref="FieldRow"/> so a wrong code is said on the box the reader must
+   /// retype rather than in a message box over the dialog, and everything else
+   /// the attempt has to say - enabled, disabled, not elevated - is an
+   /// <see cref="InlineNotice"/> in the flow, which a screen reader hears when it
+   /// appears. Nothing is confirmed with a modal on top of a modal any more.
    /// </summary>
    public class TotpSetupDialog : FluentDialogWindow
    {
       private static readonly System.Windows.Media.FontFamily Mono =
          new(Typography.MonoFontFamily);
 
-      private readonly TextBlock status_ = new()
-      {
-         FontSize = Typography.Body,
-         TextWrapping = TextWrapping.Wrap,
-         Margin = new Thickness(0, 0, 0, 16)
-      };
+      private readonly TextBlock status_ = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
 
       // Enrolment block (QR + manual key), shown only while enabling.
-      private readonly StackPanel enrolPanel_ = new() { Margin = new Thickness(0, 0, 0, 4) };
+      private readonly StackPanel enrolPanel_ = new();
       private readonly Image qrImage_ = new() { Width = 190, Height = 190 };
       private readonly Wpf.Ui.Controls.TextBox secret_ = new()
       {
          IsReadOnly = true,
          FontFamily = Mono,
-         FontSize = Typography.Body,
          VerticalContentAlignment = VerticalAlignment.Center
       };
 
@@ -56,8 +58,11 @@ namespace hMailServer.ControlPanel.Views
          HorizontalContentAlignment = HorizontalAlignment.Center
       };
 
+      private readonly FieldRow codeRow_;
+      private readonly InlineNotice notice_ = DialogFields.Notice();
+
       private readonly Wpf.Ui.Controls.Button action_ =
-         new() { Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
+         new() { Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
 
       private string pendingSecret_;
 
@@ -65,50 +70,23 @@ namespace hMailServer.ControlPanel.Views
       {
          Owner = owner;
          Title = L("Two-factor authentication setup");
-         Width = 560;
-         Height = 610;
-         MinWidth = 520;
-         MinHeight = 560;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var panel = new StackPanel { Margin = new Thickness(22) };
-
-         var header = new TextBlock
-         {
-            Text = L("Two-factor authentication"),
-            FontSize = Typography.DialogTitle,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 12)
-         };
-         header.SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
-         panel.Children.Add(header);
-
-         status_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         panel.Children.Add(status_);
+         status_.SetResourceReference(FrameworkElement.StyleProperty, "TextBody");
 
          BuildEnrolPanel();
-         panel.Children.Add(enrolPanel_);
+         codeRow_ = DialogFields.Field(L("Verification code from your authenticator app"), code_);
 
-         panel.Children.Add(Label(L("Verification code from your authenticator app")));
-         code_.Margin = new Thickness(0, 0, 0, 4);
-         panel.Children.Add(code_);
+         var body = new StackPanel();
+         body.Children.Add(status_);
+         body.Children.Add(notice_);
+         body.Children.Add(enrolPanel_);
+         body.Children.Add(codeRow_);
 
-         var buttons = new StackPanel
-         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 20, 0, 0)
-         };
          action_.Click += (s, e) => Apply();
-         action_.Margin = new Thickness(0, 0, 8, 0);
-         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 88 };
          close.Click += (s, e) => Close();
-         buttons.Children.Add(action_);
-         buttons.Children.Add(close);
-         panel.Children.Add(buttons);
 
-         Content = panel;
+         UseFrame(L("Two-factor authentication"), body, action_, close, width: 560);
          RefreshState();
          Loaded += (s, e) => code_.Focus();
       }
@@ -116,22 +94,24 @@ namespace hMailServer.ControlPanel.Views
       private void BuildEnrolPanel()
       {
          // Top row: QR code (white card) on the left, instructions on the right.
-         var grid = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+         var grid = new Grid { Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
+         // White whatever the theme, and deliberately not a token: a QR code is
+         // read by a camera, and a dark-on-dark or inverted code does not scan.
          var qrCard = new Border
          {
             Background = System.Windows.Media.Brushes.White,
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(10),
+            CornerRadius = new CornerRadius(DesignTokens.Radius.Card),
+            Padding = new Thickness(DesignTokens.Space.Sm),
             VerticalAlignment = VerticalAlignment.Top,
             Child = qrImage_
          };
          Grid.SetColumn(qrCard, 0);
          grid.Children.Add(qrCard);
 
-         var right = new StackPanel { Margin = new Thickness(18, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+         var right = new StackPanel { Margin = new Thickness(DesignTokens.Space.Lg, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
          right.Children.Add(StepText(L("1.  Scan this QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy, 1Password…).")));
          right.Children.Add(StepText(L("2.  Or enter the setup key shown below by hand.")));
          Grid.SetColumn(right, 1);
@@ -140,14 +120,13 @@ namespace hMailServer.ControlPanel.Views
          enrolPanel_.Children.Add(grid);
 
          // Full-width key row so the grouped base32 key is never clipped.
-         enrolPanel_.Children.Add(Label(L("Setup key (for manual entry)")));
          var keyRow = new Grid();
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          keyRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          secret_.HorizontalAlignment = HorizontalAlignment.Stretch;
          Grid.SetColumn(secret_, 0);
          keyRow.Children.Add(secret_);
-         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(8, 0, 0, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
          copy.Click += (s, e) =>
          {
             try { if (!string.IsNullOrEmpty(secret_.Text)) Clipboard.SetText(secret_.Text.Replace(" ", "")); }
@@ -155,7 +134,8 @@ namespace hMailServer.ControlPanel.Views
          };
          Grid.SetColumn(copy, 1);
          keyRow.Children.Add(copy);
-         enrolPanel_.Children.Add(keyRow);
+
+         enrolPanel_.Children.Add(DialogFields.Field(L("Setup key (for manual entry)"), keyRow));
       }
 
       private void RefreshState()
@@ -178,6 +158,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          code_.Text = "";
+         codeRow_.Error = null;
          code_.Focus();
       }
 
@@ -209,42 +190,47 @@ namespace hMailServer.ControlPanel.Views
 
       private void Apply()
       {
+         codeRow_.Error = null;
+         notice_.Hide();
+
          try
          {
             string entered = (code_.Text ?? "").Trim();
 
             if (TotpManager.IsConfigured())
             {
+               // A code that does not match is a field that is wrong, so it is
+               // said on the field and the keyboard goes back to it.
                if (!Totp.VerifyCode(TotpManager.ReadSecret(), entered))
                {
-                  MessageBox.Show(L("The verification code is incorrect."), Title);
+                  DialogFields.ShowError(codeRow_, L("The verification code is incorrect."));
                   return;
                }
 
                TotpManager.RemoveSecret();
-               MessageBox.Show(L("Two-factor authentication has been disabled."), Title);
+               RefreshState();
+               notice_.Show(StatusLevel.Good, L("Two-factor authentication has been disabled."));
             }
             else
             {
                if (!Totp.VerifyCode(pendingSecret_, entered))
                {
-                  MessageBox.Show(L("The verification code is incorrect. Make sure your authenticator app is set up with the new key."), Title);
+                  DialogFields.ShowError(codeRow_, L("The verification code is incorrect. Make sure your authenticator app is set up with the new key."));
                   return;
                }
 
                TotpManager.SaveSecret(pendingSecret_);
-               MessageBox.Show(L("Two-factor authentication has been enabled. The next connection will require a verification code."), Title);
+               RefreshState();
+               notice_.Show(StatusLevel.Good, L("Two-factor authentication has been enabled. The next connection will require a verification code."));
             }
-
-            RefreshState();
          }
          catch (UnauthorizedAccessException)
          {
-            MessageBox.Show(L("Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again."), Title);
+            notice_.Show(StatusLevel.Critical, L("Changing two-factor authentication settings requires administrator rights. Restart the Control Panel as an administrator and try again."));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(ex.Message, Title);
+            notice_.Show(StatusLevel.Critical, ex.Message);
          }
       }
 
@@ -263,23 +249,10 @@ namespace hMailServer.ControlPanel.Views
          return sb.ToString();
       }
 
-      private static TextBlock Label(string text)
-      {
-         var t = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 6) };
-         t.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         return t;
-      }
-
       private static TextBlock StepText(string text)
       {
-         var t = new TextBlock
-         {
-            Text = text,
-            FontSize = Typography.Label,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 10)
-         };
-         t.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
+         var t = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Sm) };
+         t.SetResourceReference(FrameworkElement.StyleProperty, "TextCaption");
          return t;
       }
    }
