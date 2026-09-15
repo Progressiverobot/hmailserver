@@ -694,8 +694,21 @@ namespace HM
          return -1;
       }
 
-      // Whether a placeholder is a value being WRITTEN - in an INSERT, or in an
-      // UPDATE's SET list - rather than a value a condition compares with.
+      // Whether a placeholder is a value being WRITTEN, recognised by the only two
+      // shapes a write has in the statements this server builds:
+      //
+      //    insert into t (a, b) values (@a, @b)       - inside the VALUES list
+      //    update t set a = @a, b = @b where c = @c   - "column = @name" in the SET
+      //                                                 list, followed by a comma,
+      //                                                 WHERE or the end
+      //
+      // Everything else is treated as compared, because that binding fails cleanly
+      // and the long one does not: a CASE in a SET list ("when c = @x then"), a
+      // JOIN's ON, a function's argument ("replace(col, @old, @new)"), an insert ...
+      // select, and anything after WHERE. Getting a write wrong costs a refused
+      // write of a value over 4,000 characters; getting a comparison wrong crashed
+      // the service, which on 15 September 2026 a native client reproduced for a
+      // CASE in a SET list and for a JOIN, neither of which the tree yet contains.
       bool IsWrittenValue(const String &queryString, const String &parameterName)
       {
          String text = queryString;
@@ -707,6 +720,11 @@ namespace HM
          if (position < 0)
             return false;
 
+         // A parameter used twice is written only if every use is a write, so the
+         // one that is found first must also be the only one.
+         if (FindWord(text, name, position + name.GetLength()) >= 0)
+            return false;
+
          String head = text;
          head.TrimLeft();
 
@@ -716,17 +734,62 @@ namespace HM
          if (!isInsert && !isUpdate)
             return false;
 
-         // Anything after the first WHERE is compared, in an insert ... select as
-         // much as in an update.
          int where = FindWord(text, _T("where"));
          if (where >= 0 && position > where)
             return false;
 
          if (isInsert)
-            return true;
+         {
+            // Inside the parentheses that follow VALUES, and no SELECT anywhere.
+            if (FindWord(text, _T("select")) >= 0)
+               return false;
+
+            int values = FindWord(text, _T("values"));
+            if (values < 0 || position < values)
+               return false;
+
+            int open = text.Find(_T("("), values);
+            int close = text.Find(_T(")"), position);
+            return open >= 0 && open < position && close > position;
+         }
 
          int set = FindWord(text, _T("set"));
-         return set >= 0 && position > set;
+         if (set < 0 || position < set)
+            return false;
+
+         if (FindWord(text, _T("case")) >= 0 || FindWord(text, _T("join")) >= 0)
+            return false;
+
+         // Immediately before the placeholder, ignoring spaces: "=", and before that
+         // a bare column name - no dot, no bracket, no function.
+         int cursor = position - 1;
+         while (cursor >= 0 && (text[cursor] == L' ' || text[cursor] == L'\t' || text[cursor] == L'\r' || text[cursor] == L'\n'))
+            cursor--;
+         if (cursor < 0 || text[cursor] != L'=')
+            return false;
+         cursor--;
+         if (cursor >= 0 && (text[cursor] == L'<' || text[cursor] == L'>' || text[cursor] == L'!'))
+            return false;
+         while (cursor >= 0 && (text[cursor] == L' ' || text[cursor] == L'\t' || text[cursor] == L'\r' || text[cursor] == L'\n'))
+            cursor--;
+         int identifierEnd = cursor;
+         while (cursor >= 0 && ((text[cursor] >= L'a' && text[cursor] <= L'z') || (text[cursor] >= L'0' && text[cursor] <= L'9') || text[cursor] == L'_'))
+            cursor--;
+         if (cursor == identifierEnd)
+            return false;
+         while (cursor >= 0 && (text[cursor] == L' ' || text[cursor] == L'\t' || text[cursor] == L'\r' || text[cursor] == L'\n'))
+            cursor--;
+         if (cursor < 0 || !(text[cursor] == L',' || cursor == set + 2))
+            return false;
+
+         // And after it: a comma, WHERE, or the end of the statement.
+         int after = position + name.GetLength();
+         while (after < text.GetLength() && (text[after] == L' ' || text[after] == L'\t' || text[after] == L'\r' || text[after] == L'\n'))
+            after++;
+         if (after >= text.GetLength() || text[after] == L',' || text[after] == L';')
+            return true;
+
+         return after == where;
       }
    }
 
