@@ -189,6 +189,25 @@ namespace HM
 
          if (result != DALSuccess)
          {
+            // A caller that passes DALErrorInSQL is saying that a row which already
+            // exists is not a failure - PersistentKnownSender::Insert, which loses a
+            // find-then-insert race on its unique index by design. The other three
+            // backends honour it through their error-type mapping; this one ignored
+            // the argument, so the race put HM5032 in the error log at High. It is
+            // narrowed to unique_violation, so the flag never hides a statement
+            // PostgreSQL refused for any other reason.
+            const char *sqlState = pResult != 0 ? PQresultErrorField(pResult, PG_DIAG_SQLSTATE) : nullptr;
+
+            bool ignoreByCaller = result == DALConnection::DALErrorInSQL &&
+                                  (iIgnoreErrors & DALConnection::DALErrorInSQL) != 0 &&
+                                  sqlState != nullptr && strcmp(sqlState, "23505") == 0;
+
+            if (ignoreByCaller)
+            {
+               PQclear(pResult);
+               return DALConnection::DALSuccess;
+            }
+
             bool ignoreByMarker = result != DALConnection::DALConnectionProblem &&
                                   HasIgnoreErrorsMarker(SQL);
 

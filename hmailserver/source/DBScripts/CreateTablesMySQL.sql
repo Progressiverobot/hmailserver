@@ -508,7 +508,7 @@ create table hm_calendars
 	calendardisplayname varchar(255) not null,
 	calendarsynctoken bigint not null,
 	calendarcreated bigint not null
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 
 CREATE UNIQUE INDEX idx_hm_calendars_account ON hm_calendars (calendaraccountid, calendarname);
 
@@ -529,7 +529,7 @@ create table hm_calendarobjects
 	objectlast bigint not null,
 	objectdeleted tinyint not null,
 	objectmodified bigint not null
-) DEFAULT CHARSET=utf8;
+) DEFAULT CHARSET=utf8mb4;
 
 CREATE UNIQUE INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi);
 
@@ -1244,7 +1244,7 @@ create table hm_knownsenders
 (
 	ksid bigint auto_increment not null, primary key(`ksid`), unique(`ksid`),
 	ksaccountid int not null,
-	ksaddress varchar(255) not null,
+	ksaddress varchar(255) character set utf8 collate utf8_bin not null,
 	kscount int not null,
 	ksfirstseen varchar(32) not null,
 	kslastseen varchar(32) not null

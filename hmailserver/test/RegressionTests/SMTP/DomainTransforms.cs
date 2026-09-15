@@ -113,6 +113,24 @@ namespace RegressionTests.SMTP
       }
 
       [Test]
+      [Description("A disclaimer longer than 4,000 characters is saved and read back whole. SQL Server Compact refused " +
+                   "any string parameter over 4,000 characters, even into ntext, so the whole domain save failed.")]
+      public void ADisclaimerLongerThanFourThousandCharactersIsSaved()
+      {
+         string plain = new string('p', 9000);
+         string html = "<p>" + new string('h', 9000) + "</p>";
+
+         _domain.DisclaimerPlainText = plain;
+         _domain.DisclaimerHTML = html;
+         _domain.Save();
+
+         var reread = SingletonProvider<TestSetup>.Instance.GetApp().Domains.get_ItemByName(_domain.Name);
+         ClassicAssert.AreEqual(plain.Length, reread.DisclaimerPlainText.Length);
+         ClassicAssert.AreEqual(plain, reread.DisclaimerPlainText);
+         ClassicAssert.AreEqual(html, reread.DisclaimerHTML);
+      }
+
+      [Test]
       [Description("Every switch is off on a new domain, and a message from outside is delivered exactly as it arrived.")]
       public void EverySwitchIsOffByDefault()
       {

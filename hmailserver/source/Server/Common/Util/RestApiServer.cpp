@@ -7802,7 +7802,7 @@ namespace HM
       String specialUse = designation != designations.end() ? IMAPSpecialUse::FormatDesignations(designation->second) : String();
 
       AnsiString entry;
-      entry.Format("{\"id\":%I64d,\"account_id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"subfolders\":[",
+      entry.Format("{\"id\":%I64d,\"account_id\":%I64d,\"name\":\"%hs\",\"path\":\"%hs\",\"parent_id\":%I64d,\"special_use\":\"%hs\",\"subscribed\":%hs,\"writable\":%hs,\"messages\":%ld,\"unseen\":%ld,\"uidvalidity\":%u,\"uidnext\":%I64d,\"subfolders\":[",
          folder->GetID(),
          folder->GetAccountID(),
          // Decoded, as InterfaceIMAPFolder::get_Name decodes it for COM. A
@@ -7820,7 +7820,13 @@ namespace HM
          writeAccess ? "true" : "false",
          messageCount,
          messageCount - seen,
-         folder->GetCreationTime().ToInt());
+         // UIDVALIDITY is the folder's creation time, as SELECT and STATUS
+         // report it; UIDNEXT is the UID the next message will be given, which
+         // STATUS reports as the folder's current UID plus one. The two are
+         // different numbers, and the current UID - COM's IMAPFolder.CurrentUID,
+         // which delivery moves on - is only readable from the second.
+         folder->GetCreationTime().ToInt(),
+         (__int64) folder->GetCurrentUID() + 1);
       json += entry;
 
       AppendFolderJson_(account, folder->GetSubFolders(), path, designations, delimiter, json, depth + 1);

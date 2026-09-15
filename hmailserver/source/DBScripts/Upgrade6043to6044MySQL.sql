@@ -16,7 +16,7 @@ create table hm_knownsenders
 (
 	ksid bigint auto_increment not null, primary key(`ksid`), unique(`ksid`),
 	ksaccountid int not null,
-	ksaddress varchar(255) not null,
+	ksaddress varchar(255) character set utf8 collate utf8_bin not null,
 	kscount int not null,
 	ksfirstseen varchar(32) not null,
 	kslastseen varchar(32) not null

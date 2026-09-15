@@ -704,17 +704,20 @@ namespace HM
             // the parameter bound to freed memory.
             _variant_t stringType(value.c_str());
 
-            // The length must be higher than 0. Also, we set a fixed length on most queries
-            // to prevent execution plan cache spamming. In the case where the data length is higher
-            // than 8000, we spam the execution plan cache.
-            int length = 0;
-
-            if (value.GetLength() < 8000)
-               length = 8000;
+            // SQL Server Compact types an adWChar parameter as nvarchar, whose ceiling
+            // is 4,000 characters, and refuses a longer value with "A literal value in
+            // the command overflowed the range of the type of the associated column" -
+            // even when the column is ntext. So a CalDAV object, a domain disclaimer or
+            // an alert's detail over 4,000 characters could not be saved at all. A
+            // longer value is bound as a long string sized to the value; a value too
+            // long for an nvarchar column is still refused, never truncated. Shorter
+            // values keep the fixed size, so the plan cache is not filled with one plan
+            // per length. Checked against Compact 4.0 on 15 September 2026 at 4,001,
+            // 9,000 and 1,048,576 characters, each read back intact.
+            if (value.GetLength() > 4000)
+               adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName), adLongVarWChar, adParamInput, value.GetLength(), stringType));
             else
-               length = value.GetLength();
-
-            adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName),adWChar,adParamInput, length, stringType));
+               adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName), adWChar, adParamInput, 8000, stringType));
          }
       }
    }

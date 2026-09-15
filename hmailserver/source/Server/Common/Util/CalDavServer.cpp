@@ -959,6 +959,13 @@ namespace HM
             CalendarObjectRecord existing;
             if (CalendarStore::FindByUri(accountId, calendarId, record.uri, existing))
                return Text(412, "precondition failed: an object was created at this URL a moment ago", "ETag: " + Utf8(existing.etag) + "\r\n");
+
+            // A name this database compares as equal to an existing one - a
+            // different case, or on MySQL different accents - cannot be created
+            // beside it. Said, rather than a 500 that says nothing.
+            CalendarObjectRecord twin;
+            if (CalendarStore::FindCollationTwin(accountId, calendarId, record.uri, twin))
+               return Text(409, "an object whose name differs from this one only in case or accents already exists in this calendar, and this server's database treats the two names as one: " + Utf8(twin.uri));
             return Text(500, "the object could not be saved");
          }
 
