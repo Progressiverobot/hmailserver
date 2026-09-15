@@ -643,6 +643,7 @@
     if (m.folder && state.everywhere) { what.appendChild(node('span', m.folder, 'badge')); }
     var nudge = nudgeFor(m, folderId);
     if (nudge) { entry.nudge = node('span', nudge, 'nudge'); what.appendChild(entry.nudge); }
+    if (mentionsReader(m)) { var at = node('span', '@', 'mention'); at.setAttribute('title', t('Mentions you')); what.appendChild(at); }
     what.appendChild(node('span', m.snippet || '', 'snip'));
     row.appendChild(what);
     var meta = node('div', undefined, 'meta');
@@ -2323,6 +2324,85 @@
     input.addEventListener('blur', function () { setTimeout(close, 150); });
   };
   complete('compose-to'); complete('compose-cc'); complete('compose-bcc');
+  // ---- @mentions in the text -------------------------------------------------
+  // An @ followed by letters, at the caret, asks the address book as the To
+  // field does; the person chosen is written as @Name where the @ was and
+  // added to To if not there. Outlook's shape, in the plain text editor.
+  var mentionComplete = function () {
+    var input = el('compose-text');
+    var list = document.createElement('ul'); list.className = 'complete'; list.hidden = true; list.setAttribute('role', 'listbox');
+    list.setAttribute('style', 'top:auto;bottom:100%');
+    input.parentNode.appendChild(list);
+    var items = []; var marked = -1; var timer = null;
+    var close = function () { list.hidden = true; list.textContent = ''; items = []; marked = -1; };
+    var mention = function () {
+      var caret = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+      var head = input.value.slice(0, caret);
+      var m = head.match(/(^|\s)@([^\s@]{1,40})$/);
+      return m ? { start: caret - m[2].length - 1, q: m[2], caret: caret } : null;
+    };
+    var take = function (c) {
+      var at = mention();
+      if (!at) { close(); return; }
+      var name = c.name || c.address.split('@')[0];
+      input.value = input.value.slice(0, at.start) + '@' + name + ' ' + input.value.slice(at.caret);
+      var to = el('compose-to').value;
+      if (to.toLowerCase().indexOf(c.address.toLowerCase()) < 0) {
+        el('compose-to').value = (to.trim() ? to.replace(/,?\s*$/, ', ') : '') + (c.name ? c.name + ' <' + c.address + '>' : c.address) + ', ';
+      }
+      close();
+      input.focus();
+    };
+    var mark = function (n) { marked = n; for (var i = 0; i < list.children.length; i++) { list.children[i].classList.toggle('on', i === marked); } };
+    var show = function (found) {
+      close();
+      if (!found.length) { return; }
+      items = found;
+      found.forEach(function (c) {
+        var li = document.createElement('li'); li.setAttribute('role', 'option');
+        var nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = '@' + (c.name || c.address);
+        var ad = document.createElement('span'); ad.className = 'ad'; ad.textContent = c.name ? c.address : '';
+        li.appendChild(nm); li.appendChild(ad);
+        li.addEventListener('mousedown', function (e) { e.preventDefault(); take(c); });
+        list.appendChild(li);
+      });
+      list.hidden = false; mark(0);
+    };
+    input.addEventListener('input', function () {
+      var at = mention();
+      if (timer) { clearTimeout(timer); }
+      if (!at) { close(); return; }
+      timer = setTimeout(function () {
+        call('GET', '/api/v1/me/contacts?limit=8&q=' + encodeURIComponent(at.q)).then(function (result) {
+          var now = mention();
+          if (result.status !== 200 || !result.data || !now || now.q !== at.q) { return; }
+          show(result.data.contacts || []);
+        });
+      }, 120);
+    });
+    input.addEventListener('keydown', function (e) {
+      if (list.hidden) { return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); mark((marked + 1) % items.length); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); mark((marked - 1 + items.length) % items.length); }
+      else if (e.key === 'Enter' || e.key === 'Tab') { if (marked >= 0) { e.preventDefault(); take(items[marked]); } }
+      else if (e.key === 'Escape') { close(); }
+    });
+    input.addEventListener('blur', function () { setTimeout(close, 150); });
+  };
+  mentionComplete();
+  // A message that mentions the reader by name, or by the mailbox's name,
+  // in what the listing shows of it, carries an @ mark in the list.
+  var readerNames = function () {
+    var names = [];
+    var first = el('name-first') ? String(el('name-first').value || '').trim() : '';
+    if (first) { names.push(first); }
+    if (me && me.indexOf('@') > 0) { names.push(me.split('@')[0]); }
+    return names;
+  };
+  var mentionsReader = function (m) {
+    var text = (String(m.subject || '') + ' ' + String(m.snippet || '')).toLowerCase();
+    return readerNames().some(function (n) { return n && text.indexOf('@' + n.toLowerCase()) >= 0; });
+  };
 
   // The request itself, once the undo delay has passed (or at once when
   // there is none). The form is emptied only when it still holds the

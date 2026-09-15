@@ -1399,6 +1399,24 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- @mentions: the text asks the address book, the person goes to To
+   location.hash = '#/compose';
+   await flush();
+   const mentionBox = document.getElementById('compose-text');
+   mentionBox.value = 'Hello @ali';
+   mentionBox.selectionStart = mentionBox.value.length;
+   const beforeMention = requests.length;
+   mentionBox.dispatchEvent(makeEvent('input'));
+   fireTimers();
+   await flush();
+   check('an @ in the text asks the address book for the name', called(beforeMention, 'GET', '/api/v1/me/contacts?limit=8&q=ali'), JSON.stringify(since(beforeMention).map((r) => r.path).slice(0, 3)));
+   mentionBox.dispatchEvent(makeEvent('keydown', { key: 'Enter' }));
+   await flush();
+   check('the person chosen is written as @Name and added to To', mentionBox.value === 'Hello @Alice Example ' && document.getElementById('compose-to').value.indexOf('alice@example.net') >= 0,
+      mentionBox.value + ' | ' + document.getElementById('compose-to').value);
+   document.getElementById('compose-discard').dispatchEvent(makeEvent('click'));
+   await flush();
+
    // ---- rows coloured by a rule
    location.hash = '#/filters';
    await flush();
