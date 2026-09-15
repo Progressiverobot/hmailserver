@@ -128,6 +128,13 @@ jobs:
       # is what the generator writes now.
       - name: The self-service portal's catalogues match the page
         run: python3 build/check-portal-languages.py
+
+      # The Control Deck's catalogues, likewise: every language has every text
+      # the page has and nothing else, keeps the tokens and the server's own
+      # words, carries nothing HTML would read (the page inserts a translation
+      # unescaped, where the English stood), and is in the catalogues' form.
+      - name: The Control Deck's catalogues match the page
+        run: python3 build/check-deck-languages.py
       - name: The webmail's S/MIME module, against OpenSSL both ways
         run: node build/check-portal-smime.js
       - name: The S/MIME module embedded in the server is current

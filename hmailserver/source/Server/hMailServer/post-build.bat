@@ -43,6 +43,11 @@ rem events off. This copy serves builds made from the IDE.
 if not exist "%OUT_DIR%WebAdmin\" mkdir "%OUT_DIR%WebAdmin"
 xcopy /F /Y "%SCRIPT_DIR%..\..\..\installation\WebAdmin\index.html" "%OUT_DIR%WebAdmin\"
 if errorlevel 1 exit /b 1
+rem And its catalogues, one per language, served from the languages directory
+rem beside the page.
+if not exist "%OUT_DIR%WebAdmin\languages\" mkdir "%OUT_DIR%WebAdmin\languages"
+xcopy /F /Y "%SCRIPT_DIR%..\..\..\installation\WebAdmin\languages\*.json" "%OUT_DIR%WebAdmin\languages\"
+if errorlevel 1 exit /b 1
 
 "%TARGET%" /Register
 if errorlevel 1 exit /b 1

@@ -149,6 +149,15 @@ namespace HM
       report.append(Formatter::Format(_T("  WebAdmin page: {0}   [{1}]\r\n"), webAdminPage,
          FileUtilities::Exists(webAdminPage) ? String(_T("exists")) : String(_T("not installed; GET / serves the built-in stub"))));
 
+      // The page's catalogues, which /deck-lang/<code>.json serves from beside
+      // it, reported for the same reason and likewise not counted: a Deck that
+      // stays in English when the browser asked for another language is
+      // explained by this directory being absent and by nothing else.
+      const String webAdminLanguages = FileUtilities::Combine(
+         FileUtilities::Combine(ini->GetProgramDirectory(), _T("WebAdmin")), _T("languages"));
+      report.append(Formatter::Format(_T("  WebAdmin languages: {0}   [{1}]\r\n"), webAdminLanguages,
+         FileUtilities::Exists(webAdminLanguages) ? String(_T("exists")) : String(_T("not installed; the Deck speaks English only"))));
+
       // Every [Settings] and [Database] value that names a file or a directory.
       // Each is optional, so an empty one is "not set" rather than a failure;
       // a set one that is not there is the failure this report exists to show.

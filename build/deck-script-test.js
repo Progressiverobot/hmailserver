@@ -27,9 +27,16 @@
 'use strict';
 
 const fs = require('fs');
+const nodePath = require('path');
 const vm = require('vm');
 
 const out = console;
+
+// The Deck's catalogues, which the recorded server answers at
+// /deck-lang/<code>.json as the real one does from the directory beside the
+// page: the files in the repository, so a check here runs against the
+// translations that ship.
+const CATALOGUES = nodePath.join(__dirname, '..', 'hmailserver', 'installation', 'WebAdmin', 'languages');
 
 const [pagePath, scriptPath] = process.argv.slice(2);
 if (!pagePath || !scriptPath) {
@@ -62,6 +69,8 @@ class TextNode {
    constructor(data) { this.data = data; this.parentNode = null; this.childNodes = []; this.nodeType = 3; }
    get textContent() { return this.data; }
    set textContent(v) { this.data = String(v); }
+   get nodeValue() { return this.data; }
+   set nodeValue(v) { this.data = String(v); }
 }
 
 /* Selectors: a list of chains, a chain a list of compounds from ancestor to
@@ -400,6 +409,10 @@ let otpRequired = false;
 let nextRefusal = null;
 let restartProbes = 0;
 let nextId = 100;
+// The language route's two failure shapes: a server without the catalogues
+// installed, and a catalogue that lacks a key the page has.
+let catalogueMissing = false;
+let droppedKey = null;
 
 const RULES_POST = 'Body: name (required, at most 100 characters), active (default true), all_criteria (default true: every criterion must match; false: any one), criteria and actions as arrays of objects in the order they run. A criterion: field (from, to, cc, subject, body, message_size, recipient_list, delivery_attempts, or header with the header\'s name in header), match (equals, not_equals, contains, not_contains, less_than, greater_than, regex, wildcard) and value (at most 2000 characters; a regex must compile). An action: type and the parameters that type takes - forward: to and abort_spam_flagged; reply: from_name, from_address (required), subject, body and abort_spam_flagged; move_to_folder: folder; script_function: script_function; set_header: header and value; send_using_route: route_id; bind_to_address: value; delete, stop and copy take none. value is also accepted as the parameter the listing shows under that name. An unknown key, word or type, a parameter the type does not take, or a missing one it needs, is refused naming it. Saved as the Control Panel saves a rule; it applies to the next message delivered. Server-wide; refused for domain-restricted keys.';
 
@@ -898,6 +911,15 @@ function answer(method, path, headers, raw) {
    }
    if (method === 'DELETE' && path === '/api/v1/session') { signedIn = false; return json(200, { ended: true }); }
    if (path === '/') { restartProbes += 1; return restartProbes < 3 ? { status: 503, body: '', headers: {} } : { status: 200, body: '<!doctype html>', headers: {} }; }
+   // A catalogue, unauthenticated as the page is: the file from the
+   // repository, or 404 when there is no such language or none is installed.
+   if (method === 'GET' && /^\/deck-lang\/[A-Za-z-]+\.json$/.test(path)) {
+      const file = nodePath.join(CATALOGUES, path.slice(11, -5) + '.json');
+      if (catalogueMissing || !fs.existsSync(file)) { return json(404, { error: 'no such language' }); }
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (droppedKey) { delete data[droppedKey]; }
+      return json(200, data);
+   }
    if (!signedIn) { return json(401, { error: 'Not signed in.' }, { 'WWW-Authenticate': 'Basic realm="hMailServer"' }); }
    if (method !== 'GET' && headers['X-Requested-With'] !== 'hMailServer') { return json(403, { error: 'A write from a browser session must carry X-Requested-With.' }); }
    if (method !== 'GET' && nextRefusal) { const sentence = nextRefusal; nextRefusal = null; return json(400, { error: sentence }); }
@@ -1291,7 +1313,12 @@ function fetchStub(path, options) {
       status: reply.status,
       ok: reply.status >= 200 && reply.status < 300,
       headers: { get: (name) => (name in reply.headers ? reply.headers[name] : null) },
-      text: () => Promise.resolve(reply.body)
+      text: () => Promise.resolve(reply.body),
+      // A browser's Response has both, and the page uses both: text() where it
+      // wants the empty body of a 204 as well, json() for a catalogue.
+      json: () => new Promise((resolve, reject) => {
+         try { resolve(JSON.parse(reply.body)); } catch (why) { reject(why); }
+      })
    });
 }
 
@@ -2511,6 +2538,84 @@ async function main() {
    check('and shows the card', $('#gate').style.display === 'grid' && $('#app').style.display === 'none' && sessionStorage.getItem('hmsSession') === null);
    check('and stops the poll', intervals.length === 0);
    check('no inline handler was needed anywhere: every button is data-act', $$('button[onclick]').length === 0);
+
+   // ---- the language: the catalogues, the switch, the walk and the fallback.
+   // This browser (the world above) names no language, so everything up to
+   // here ran in English and asked for no catalogue; what follows chooses one.
+   const catalogue = (code) => JSON.parse(fs.readFileSync(nodePath.join(CATALOGUES, code + '.json'), 'utf8'));
+   const choose = async (select, code) => { select.value = code; select.dispatchEvent(makeEvent('change')); await flush(); };
+   check('a browser that names no language gets English and no catalogue is asked for', called(0, 'GET', /^\/deck-lang\//).length === 0 && $('#nav button[data-view="domains"]').textContent.indexOf('Domains') >= 0);
+   const codes = $('#langSel').querySelectorAll('option').map((o) => o.attributes.value);
+   check('the header carries the switch: English first, then the twenty languages', codes.length === 21 && codes[0] === 'en' && codes.indexOf('de') > 0 && codes.indexOf('zh-Hans') > 0, JSON.stringify(codes));
+   check('and the sign-in card carries the same switch', $('#langSelGate').querySelectorAll('option').map((o) => o.attributes.value).join() === codes.join());
+   await signIn();
+   await goTo('domains');
+   const de = catalogue('de');
+   before = requests.length;
+   await choose($('#langSel'), 'de');
+   const fetched = called(before, 'GET', '/deck-lang/de.json');
+   check('choosing German fetches its catalogue once, same-origin', fetched.length === 1 && fetched[0].credentials === 'same-origin', paths(before));
+   check('the document says which language it is in', document.documentElement.getAttribute('lang') === 'de');
+   check('and the choice is remembered under a name that is not a secret', localStorage.getItem('hmsLang') === 'de');
+   check('the sidebar is walked: the Domains button reads the German', $('#nav button[data-view="domains"]').textContent.indexOf(de['Domains']) >= 0, $('#nav button[data-view="domains"]').textContent);
+   check('the top bar title as well', $('#viewTitle').textContent === de['Domains'], $('#viewTitle').textContent);
+   check('an attribute is walked: the sign-out button\'s title', $('#logoutBtn').getAttribute('title') === de['Sign out'], $('#logoutBtn').getAttribute('title'));
+   check('and a placeholder on the sign-in card', $('#pass').getAttribute('placeholder') === de['Password']);
+   check('both switches show the choice', $('#langSel').value === 'de' && $('#langSelGate').value === 'de');
+   check('the view is drawn again, in German: the table headings', called(before, 'GET', '/api/v1/domains').length === 1 && content().querySelector('th').textContent === de['Domain'], content().querySelector('th').textContent);
+   check('and a button in a row', act('domainedit', { name: 'renamed.example' }).textContent === de['Edit'], act('domainedit', { name: 'renamed.example' }).textContent);
+   before = requests.length;
+   setValue('newDomain', 'sprache.example');
+   click(act('domainnew'));
+   await flush();
+   check('a sentence the script builds carries its value: the toast', toastText() === de['Domain created: {0}'].replace('{0}', 'sprache.example'), toastText());
+   check('the editor\'s heading too', content().querySelector('h2').textContent === de['Domain {0}'].replace('{0}', 'sprache.example'), content().querySelector('h2').textContent);
+   check('a hint a table holds, marked with K, is looked up when drawn', document.getElementById('dom_active').closest('.fr').querySelector('.hint').textContent === de['Whether the domain receives mail and its accounts can sign in.'],
+      document.getElementById('dom_active').closest('.fr').querySelector('.hint').textContent);
+   check('and a group title', $$('h2').some((h) => h.textContent === de['General']));
+   confirmAnswer = false;
+   click(act('domaindel', { name: 'sprache.example' }));
+   await flush();
+   check('a question the script asks is German, with its value', confirmations[confirmations.length - 1] === de['Delete the domain {0} with every account, alias and list in it? Their messages go with them.'].replace('{0}', 'sprache.example'),
+      confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   click(act('cancel'));
+   await flush();
+   // Every catalogue that ships draws the view in its language.
+   for (const code of codes.slice(1)) {
+      const cat = catalogue(code);
+      await choose($('#langSel'), code);
+      check(code + ': the catalogue applied draws the Domains view in that language', document.documentElement.getAttribute('lang') === code && $('#viewTitle').textContent === cat['Domains'] && content().querySelector('th').textContent === cat['Domain'] && act('domainedit', { name: 'renamed.example' }).textContent === cat['Edit'],
+         $('#viewTitle').textContent + ' | ' + content().querySelector('th').textContent);
+   }
+   // A key the catalogue lacks is shown in English; the rest is not.
+   const fr = catalogue('fr');
+   droppedKey = 'Domains';
+   await choose($('#langSel'), 'fr');
+   check('a key the catalogue lacks falls back to English while the rest is French', $('#viewTitle').textContent === 'Domains' && $('#nav button[data-view="domains"]').textContent.indexOf('Domains') >= 0 &&
+      $('#nav button[data-view="rules"]').textContent.indexOf(fr['Rules']) >= 0 && content().querySelector('th').textContent === fr['Domain'],
+      $('#viewTitle').textContent + ' | ' + $('#nav button[data-view="rules"]').textContent);
+   droppedKey = null;
+   // A server without the catalogues: the page stays as it was and the switch says so.
+   catalogueMissing = true;
+   await choose($('#langSel'), 'sv');
+   check('a catalogue the server does not have leaves the page in its language, and the switch shows that language', document.documentElement.getAttribute('lang') === 'fr' && $('#langSel').value === 'fr' && $('#langSelGate').value === 'fr' &&
+      localStorage.getItem('hmsLang') === 'fr' && content().querySelector('th').textContent === fr['Domain'], $('#langSel').value);
+   catalogueMissing = false;
+   // Back to English, which is the page itself.
+   before = requests.length;
+   await choose($('#langSel'), 'en');
+   check('English asks the server for nothing and walks the markup back', called(before, 'GET', /^\/deck-lang\//).length === 0 && document.documentElement.getAttribute('lang') === 'en' &&
+      $('#nav button[data-view="rules"]').textContent.indexOf('Rules') >= 0 && $('#logoutBtn').getAttribute('title') === 'Sign out' && $('#pass').getAttribute('placeholder') === 'Password' &&
+      content().querySelector('th').textContent === 'Domain', $('#nav button[data-view="rules"]').textContent);
+   check('and forgets the choice', localStorage.getItem('hmsLang') === null);
+   // The sign-in card's switch drives the same mechanism.
+   const ja = catalogue('ja');
+   await choose($('#langSelGate'), 'ja');
+   check('the card\'s switch chooses for the whole page: Japanese on the card, in the sidebar and in the header switch', $('#gate p').textContent === ja['Sign in with the hMailServer administrator credential. The password is exchanged once for a session cookie and is never kept by this page.'] &&
+      $('#nav button[data-view="rules"]').textContent.indexOf(ja['Rules']) >= 0 && $('#langSel').value === 'ja', $('#gate p').textContent);
+   await choose($('#langSelGate'), 'en');
+   check('and back', $('#gate p').textContent.indexOf('Sign in with the hMailServer administrator credential') === 0 && $('#langSel').value === 'en');
 
    if (failures.length) {
       out.error('\ndeck script: ' + failures.length + ' of ' + checks + ' checks failed\n');

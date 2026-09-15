@@ -9,8 +9,11 @@ Source: "..\source\server\hMailServer\x64\Release\hMailServer.Updater.exe"; Dest
 ; the service on startup (e.g. constexpr std::mutex changes).
 Source: "Microsoft.VC145.CRT\*"; DestDir: "{app}\Bin"; Flags: ignoreversion; Components: server admintools;
 
-; Web administration SPA (served by the REST API listener at GET /)
+; Web administration SPA (served by the REST API listener at GET /), and its
+; catalogues - one JSON file per language, which the listener serves at
+; /deck-lang/<code>.json from this same directory.
 Source: "WebAdmin\index.html"; DestDir: "{app}\WebAdmin"; Flags: ignoreversion; Components: server;
+Source: "WebAdmin\languages\*.json"; DestDir: "{app}\WebAdmin\languages"; Flags: ignoreversion; Components: server;
 
 ; hMailServer Control Panel (modern .NET 10 WPF admin app)
 Source: "..\source\Tools\ControlPanel\publish\*"; DestDir: "{app}\ControlPanel"; Flags: ignoreversion recursesubdirs; Components: controlpanel;

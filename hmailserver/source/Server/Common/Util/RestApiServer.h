@@ -766,7 +766,11 @@ namespace HM
       // extraHeaders, when it is not empty, must be complete header lines each
       // ending in CRLF. Only the 429 uses it (Retry-After).
       static HttpResponse BuildResponse_(int statusCode, const AnsiString &body, const AnsiString &extraHeaders = "");
+      // The Control Deck: the page at /, and its catalogues at
+      // /deck-lang/<code>.json, both files of <ProgramFolder>/WebAdmin.
       static HttpResponse HandleWebAdminPage_();
+      static HttpResponse HandleWebAdminLanguage_(const AnsiString &code);
+      static bool ReadWebAdminFile_(const String &relativePath, AnsiString &body);
       static HttpResponse HandleStatus_();
 
       // allowedDomains empty means every domain; otherwise the listing is

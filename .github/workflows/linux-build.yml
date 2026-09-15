@@ -225,7 +225,11 @@ jobs:
           test -f build/linux/squashfs-root/usr/share/hmailserver/DBScripts/CreateTablesPGSQL.sql
           cmp build/linux/squashfs-root/usr/share/hmailserver/WebAdmin/index.html \
               hmailserver/installation/WebAdmin/index.html
-          echo "The AppImage carries the Control Deck, byte for byte."
+          # And every one of its catalogues, which the server serves from beside it.
+          for catalogue in hmailserver/installation/WebAdmin/languages/*.json; do
+            cmp "$catalogue" "build/linux/squashfs-root/usr/share/hmailserver/WebAdmin/languages/$(basename "$catalogue")"
+          done
+          echo "The AppImage carries the Control Deck and its $(ls hmailserver/installation/WebAdmin/languages/*.json | wc -l) catalogues, byte for byte."
           rm -rf build/linux/squashfs-root
 
       # A package that installs but leaves nothing runnable is worse than none, so the
@@ -251,6 +255,7 @@ jobs:
           #                     reports a critical 5603 and refuses the connection
           #   CreateTables*.sql the schema --create-database runs
           #   WebAdmin/index.html  the Control Deck the REST listener serves at GET /
+          #   WebAdmin/languages/  the Deck's catalogues, served at /deck-lang/<code>.json
           #   the unit, the configuration, the logrotate rule
           #
           # Tested as root throughout, because the package makes /etc/hmailserver
@@ -267,6 +272,8 @@ jobs:
             /usr/share/hmailserver/DBScripts/CreateTablesMySQL.sql \
             /usr/share/hmailserver/DBScripts/ScriptPrerequisitesPGSQL.sql \
             /usr/share/hmailserver/WebAdmin/index.html \
+            /usr/share/hmailserver/WebAdmin/languages/de.json \
+            /usr/share/hmailserver/WebAdmin/languages/zh-Hans.json \
             /usr/lib/systemd/system/hmailserver.service \
             /etc/hmailserver/hMailServer.ini \
             /etc/logrotate.d/hmailserver
@@ -526,6 +533,29 @@ jobs:
           sudo cmp /usr/share/hmailserver/WebAdmin/index.html hmailserver/installation/WebAdmin/index.html
           echo "GET / served the installed Control Deck, byte for byte."
 
+      # The Deck's catalogues, which the same listener serves from the languages
+      # directory beside the page: the German one byte for byte as the package
+      # installed it and as the repository holds it, and a 404 for a code that
+      # is not a language and for one that reaches for the directory above.
+      - name: GET /deck-lang/de.json returns the installed catalogue and nothing else is served
+        run: |
+          set -euo pipefail
+          curl -fsS -D lang-headers.txt -o deck-de.json "http://127.0.0.1:${REST_PORT}/deck-lang/de.json"
+          head -n 1 lang-headers.txt
+          grep -i '^content-type: application/json' lang-headers.txt
+          sudo cmp deck-de.json /usr/share/hmailserver/WebAdmin/languages/de.json
+          cmp deck-de.json hmailserver/installation/WebAdmin/languages/de.json
+          # --path-as-is, or curl resolves the ../ itself and asks for a
+          # different path than the one being tested.
+          for wrong in xx ../index ..%2Findex de.json; do
+            code=$(curl -s --path-as-is -o /dev/null -w '%{http_code}' "http://127.0.0.1:${REST_PORT}/deck-lang/${wrong}.json")
+            if [ "$code" != "404" ]; then
+              echo "::error::/deck-lang/${wrong}.json answered ${code}; a code that is not an installed language is 404."
+              exit 1
+            fi
+          done
+          echo "The server served the German catalogue, byte for byte, and refused what is not a language."
+
       - name: The server's own log, whatever happened above
         if: always()
         run: |
@@ -566,6 +596,8 @@ jobs:
                 /usr/share/hmailserver/DBScripts/CreateTablesMySQL.sql \
                 /usr/share/hmailserver/DBScripts/ScriptPrerequisitesPGSQL.sql \
                 /usr/share/hmailserver/WebAdmin/index.html \
+                /usr/share/hmailserver/WebAdmin/languages/de.json \
+                /usr/share/hmailserver/WebAdmin/languages/zh-Hans.json \
                 /usr/lib/systemd/system/hmailserver.service \
                 /etc/hmailserver/hMailServer.ini \
                 /etc/logrotate.d/hmailserver

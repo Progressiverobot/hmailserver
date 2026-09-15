@@ -151,6 +151,8 @@ From the CMakeLists install rules, with the prefix above:
 /usr/share/hmailserver/DBScripts/*.sql      schema creation and upgrade scripts
 /usr/share/hmailserver/WebAdmin/index.html  the Control Deck, served at GET / by the
                                             REST listener
+/usr/share/hmailserver/WebAdmin/languages/  the Deck's catalogues, one JSON file per
+                                            language, served at /deck-lang/<code>.json
 /usr/lib/systemd/system/hmailserver.service the unit
 /etc/hmailserver/hMailServer.ini            the configuration
 /etc/logrotate.d/hmailserver                the log rotation rule
@@ -298,7 +300,9 @@ setting is a Windows inheritance; on this platform it means syslog.
 administration program is an ATL application over an ATL API, and neither is in
 this build. What there is instead is the REST API and, on the same listener, the
 Control Deck - a single page the package installs at
-`/usr/share/hmailserver/WebAdmin/index.html` and the server serves at `GET /`.
+`/usr/share/hmailserver/WebAdmin/index.html` and the server serves at `GET /`,
+with its twenty language catalogues in `WebAdmin/languages` beside it, so the
+page comes up in the browser's language, or the one chosen in its header.
 Turn on the REST API in the configuration (`RestApiPort`, and
 `RestApiBindAddress=127.0.0.1` unless you also set a certificate and key), reload
 with `sudo systemctl reload hmailserver`, and open

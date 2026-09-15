@@ -1361,6 +1361,12 @@ namespace HM
       if (method == "GET" && (path == "/" || path == "/index.html"))
          return HandleWebAdminPage_();
 
+      // One language's catalogue of that page's texts, from the languages
+      // directory beside it; unauthenticated as the page is, since the sign-in
+      // card is in the reader's language before there is a session.
+      if (method == "GET" && path.StartsWith("/deck-lang/") && path.EndsWith(".json") && path.GetLength() > 16)
+         return HandleWebAdminLanguage_(path.Mid(11, path.GetLength() - 16));
+
       // The self-service page, likewise unauthenticated: it is a static sign-in
       // form whose script presents the account's credentials to /api/v1/me.
       if (method == "GET" && path == "/portal")
@@ -4521,34 +4527,40 @@ namespace HM
       return BuildResponse_(200, "{\"revoked\":true}");
    }
 
+   // A file of the Control Deck's directory, <ProgramFolder>/WebAdmin, read as
+   // the bytes on disk. The page and its catalogues are UTF-8 and carry
+   // characters outside the system code page (the navigation glyphs, every
+   // translated text); a round trip through String and back would have put
+   // them through the ANSI code page and served question marks. False when
+   // the file is not there.
+   bool
+   RestApiServer::ReadWebAdminFile_(const String &relativePath, AnsiString &body)
+   {
+      const String filePath = FileUtilities::Combine(
+         FileUtilities::Combine(IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin")), relativePath);
+      if (!FileUtilities::Exists(filePath))
+         return false;
+#ifdef HM_PLATFORM_POSIX
+      // MSVC's <fstream> has a constructor taking a wide path; libstdc++ has
+      // none, because a file name here is bytes. Narrowed the way the rest of
+      // the tree narrows a String for a C API.
+      const AnsiString narrowPath = filePath.c_str();
+      std::ifstream stream(narrowPath.c_str(), std::ios::binary);
+#else
+      std::ifstream stream(filePath.c_str(), std::ios::binary);
+#endif
+      std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
+      body = bytes.c_str();
+      if (body.GetLength() != bytes.size())
+         body = AnsiString(bytes);
+      return true;
+   }
+
    HttpResponse
    RestApiServer::HandleWebAdminPage_()
    {
-      String pagePath = FileUtilities::Combine(
-         FileUtilities::Combine(IniFileSettings::Instance()->GetProgramDirectory(), _T("WebAdmin")), _T("index.html"));
-
-      // Read as the bytes on disk. The page is UTF-8 and carries characters
-      // outside the system code page in its own markup (the navigation glyphs);
-      // a round trip through String and back would have put them through the
-      // ANSI code page and served question marks.
       AnsiString body;
-      if (FileUtilities::Exists(pagePath))
-      {
-#ifdef HM_PLATFORM_POSIX
-         // MSVC's <fstream> has a constructor taking a wide path; libstdc++ has
-         // none, because a file name here is bytes. Narrowed the way the rest of
-         // the tree narrows a String for a C API.
-         const AnsiString narrowPagePath = pagePath.c_str();
-         std::ifstream stream(narrowPagePath.c_str(), std::ios::binary);
-#else
-         std::ifstream stream(pagePath.c_str(), std::ios::binary);
-#endif
-         std::string bytes((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
-         body = bytes.c_str();
-         if (body.GetLength() != bytes.size())
-            body = AnsiString(bytes);
-      }
-      else
+      if (!ReadWebAdminFile_(_T("index.html"), body))
       {
          body = "<!doctype html><html><body style=\"font-family:sans-serif\">"
                 "<h1>hMailServer</h1><p>Web administration page not installed. "
@@ -4568,6 +4580,41 @@ namespace HM
          "Referrer-Policy: no-referrer\r\n"
          "Cache-Control: no-store\r\n";
 
+      return response;
+   }
+
+   // GET /deck-lang/<code>.json: the Deck's texts in one language, the file
+   // <ProgramFolder>/WebAdmin/languages/<code>.json the packages install
+   // beside the page. The page fetches it for the language the browser
+   // prefers or the administrator chose in its header, and shows English for
+   // anything the catalogue lacks. Not cached, as the page is not: an upgrade
+   // replaces both, and a page with a stale catalogue would show its new
+   // texts in English until the cache let go.
+   HttpResponse
+   RestApiServer::HandleWebAdminLanguage_(const AnsiString &code)
+   {
+      // The code names a file, so it is letters with a dash between them and
+      // nothing else - no separator, no dot, no way out of the directory - and
+      // a tag's length: two letters, or a language and a region or a script.
+      bool wellFormed = code.GetLength() >= 2 && code.GetLength() <= 12;
+      for (int i = 0; wellFormed && i < code.GetLength(); i++)
+      {
+         const char c = code[i];
+         const bool letter = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+         wellFormed = letter || (c == '-' && i > 0 && i + 1 < code.GetLength());
+      }
+
+      AnsiString body;
+      if (!wellFormed || !ReadWebAdminFile_(FileUtilities::Combine(_T("languages"), String(code) + _T(".json")), body))
+         return BuildResponse_(404, "{\"error\":\"no such language\"}");
+
+      HttpResponse response;
+      response.status = 200;
+      response.content_type = "application/json; charset=utf-8";
+      response.body = body;
+      response.extra_headers =
+         "X-Content-Type-Options: nosniff\r\n"
+         "Cache-Control: no-store\r\n";
       return response;
    }
 
@@ -10556,6 +10603,7 @@ namespace HM
          "\"/files/{token}\":{\"get\":{\"summary\":\"Fetch a file sent as a link (no credentials)\",\"description\":\"The bytes as a download (Content-Disposition attachment, nosniff, a sandbox policy, no-store), under the declared type unless a browser would render or run it. A file with a password answers a form instead, posted back here as password=; ten wrong answers pause the file for fifteen minutes. An expired link answers 410, an unknown or unfinished one 404.\",\"responses\":{\"200\":{\"description\":\"The bytes, or the password form\"},\"410\":{\"description\":\"Expired\"},\"404\":{\"description\":\"No such file\"}}}},"
          "\"/api/v1/portal/files\":{\"get\":{\"summary\":\"The policy for files sent as links (administrator)\",\"description\":\"link_above_kb, days, max_days, max_mb, quota_mb - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"The policy\"}}},\"put\":{\"summary\":\"Set the policy (administrator)\",\"description\":\"Body: link_above_kb (0 to 1048576), days (1 to 90), max_mb (1 to 500), quota_mb (1 to 102400) - each written when given a number, removed when given null, left alone when absent; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The policy as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
          "\"/portal-lang/{code}.json\":{\"get\":{\"summary\":\"The webmail's texts in one language\",\"description\":\"Unauthenticated. An object, English to translation, for one of the languages the page speaks (the page's Language preference lists them); cached a day. The page itself carries the catalogue for the request's Accept-Language.\",\"responses\":{\"200\":{\"description\":\"The catalogue\"},\"404\":{\"description\":\"No such language\"}}}},"
+         "\"/deck-lang/{code}.json\":{\"get\":{\"summary\":\"The Control Deck's texts in one language\",\"description\":\"Unauthenticated, as the page at / is. An object, English to translation, read from WebAdmin/languages/{code}.json beside the page - the file the packages install - for one of the languages the page's switch offers; the page fetches it for the language the browser prefers or the administrator chose, and shows English for a text the catalogue lacks. Not cached, as the page is not.\",\"responses\":{\"200\":{\"description\":\"The catalogue\"},\"404\":{\"description\":\"No such language, or the catalogues are not installed\"}}}},"
          "\"/api/v1/portal/branding\":{\"get\":{\"summary\":\"What the webmail says it is\",\"description\":\"Unauthenticated, so the sign-in page can ask: name, logo (an inline image), announcement - the domain's own when domain= names one that has some, else the server's.\",\"responses\":{\"200\":{\"description\":\"name, logo, announcement, domain\"}}},\"put\":{\"summary\":\"Set the branding (administrator)\",\"description\":\"Body: name (100), logo (an inline data:image/ under 3,900 characters), announcement (1,000), each written when given and removed when given empty; domain, when given, sets the domain's own instead of the server's.\",\"responses\":{\"200\":{\"description\":\"The branding as it now stands\"},\"400\":{\"description\":\"A value refused\"}}}},"
          "\"/api/v1/accounts/{address}/support-session\":{\"post\":{\"summary\":\"Open a mailbox as its user, for support (administrator)\",\"description\":\"Refused with 403 unless the user has turned on support access under Security. Answers a session cookie for the account; the moment and the administrator are recorded where the user sees them, every request of the session is written to the application log, and the user's session list shows it and can end it.\",\"responses\":{\"201\":{\"description\":\"support, account, idle_seconds, lifetime_seconds, with the cookie\"},\"403\":{\"description\":\"Not allowed by the user\"},\"404\":{\"description\":\"No such account\"}}}},"
          "\"/api/v1/me/drafts/{id}/schedule\":{\"post\":{\"summary\":\"Send a draft later\",\"description\":\"Body: send_at, YYYY-MM-DD HH:MM in the server's local time, within a year. At that minute the draft is sent as the account would have sent it - its To, Cc and Bcc under the checks a send makes, a copy in the Sent folder - and the draft goes. One schedule per draft; a new one replaces it.\",\"responses\":{\"201\":{\"description\":\"id, message_id, send_at\"},\"400\":{\"description\":\"Not a draft, not a time, in the past or too far\"}}},\"delete\":{\"summary\":\"Do not send it later after all\",\"responses\":{\"200\":{\"description\":\"cancelled\"},\"404\":{\"description\":\"Nothing scheduled for it\"}}}},"

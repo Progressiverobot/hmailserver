@@ -334,6 +334,13 @@ install(DIRECTORY ${SERVER_DIR}/../DBScripts/
 # the page and refuses the stub.
 install(FILES ${SERVER_DIR}/../../installation/WebAdmin/index.html
    DESTINATION ${CMAKE_INSTALL_DATADIR}/hmailserver/WebAdmin)
+# The page's catalogues, one JSON file per language, which
+# RestApiServer::HandleWebAdminLanguage_ reads from
+# <ProgramFolder>/WebAdmin/languages/<code>.json - the directory name is kept
+# because the source below has no trailing slash.
+install(DIRECTORY ${SERVER_DIR}/../../installation/WebAdmin/languages
+   DESTINATION ${CMAKE_INSTALL_DATADIR}/hmailserver/WebAdmin
+   FILES_MATCHING PATTERN "*.json")
 # Absolute for the same reason, and /usr/lib rather than /lib because that is
 # where a distribution's own units live and where systemd looks first.
 install(FILES ${SERVER_DIR}/platform/packaging/hmailserver.service

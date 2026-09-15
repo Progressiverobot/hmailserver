@@ -211,6 +211,11 @@ cp -r "${REPO_ROOT}/hmailserver/source/DBScripts" "${APPDIR}/usr/share/hmailserv
 # would see.
 install -Dm 0644 "${REPO_ROOT}/hmailserver/installation/WebAdmin/index.html" \
    "${APPDIR}/usr/share/hmailserver/WebAdmin/index.html"
+# Its catalogues, one per language, which the listener serves at
+# /deck-lang/<code>.json from the languages directory beside the page.
+install -d "${APPDIR}/usr/share/hmailserver/WebAdmin/languages"
+install -m 0644 "${REPO_ROOT}/hmailserver/installation/WebAdmin/languages/"*.json \
+   "${APPDIR}/usr/share/hmailserver/WebAdmin/languages/"
 
 # The configuration the AppRun below copies out on first run. It is the packaged
 # default with its absolute paths still in it; AppRun rewrites them, so this file

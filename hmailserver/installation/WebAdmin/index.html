@@ -61,6 +61,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hid
 .iconbtn{all:unset;cursor:pointer;width:36px;height:36px;display:grid;place-items:center;border-radius:10px;
   border:1px solid var(--border);background:var(--surface);transition:all .18s;font-size:15px}
 .iconbtn:hover{border-color:var(--accent);box-shadow:var(--glow)}
+.topbar select,.login select{padding:7px 10px;font-size:12.5px;border-radius:10px}
+.login .langrow{display:flex;justify-content:flex-end;margin-top:14px}
 .content{flex:1;overflow:auto;padding:26px 28px}
 
 /* ---------- Cards / grids ---------- */
@@ -168,6 +170,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
     <input id="otp" placeholder="One-time code" inputmode="numeric" autocomplete="one-time-code" hidden>
     <button class="btn" type="submit">Connect</button>
     <div class="err" id="loginErr"></div>
+    <div class="langrow"><select data-lang id="langSelGate" aria-label="Language" title="Language"></select></div>
   </form>
 </div>
 
@@ -205,6 +208,7 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
     <div class="topbar">
       <h1 id="viewTitle">Dashboard</h1>
       <div class="sp"></div>
+      <select data-lang id="langSel" aria-label="Language" title="Language"></select>
       <button class="iconbtn" id="themeBtn" title="Toggle theme">◐</button>
       <button class="iconbtn" id="logoutBtn" title="Sign out">⏻</button>
     </div>
@@ -218,6 +222,106 @@ pre{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padd
 "use strict";
 const $=s=>document.querySelector(s);
 let view="dash", pollTimer=null;
+
+/* ---------- Language ----------
+   English is the key. A catalogue - one object, English to translation, in
+   WebAdmin/languages/<code>.json beside this page on the server's disk and
+   served at /deck-lang/<code>.json - maps every text of the page to one
+   language. The sentences the script builds go through t() and tf(); the
+   tables of hints, titles and captions mark their texts with K() and the code
+   that draws them looks each one up; the static markup - the sign-in card, the
+   sidebar, the top bar - is walked once a catalogue is known, each text node
+   and attribute keeping its English so the walk can be undone. A view is drawn
+   afresh with the new texts, as a navigation draws it, so an edit in progress
+   is lost to a change of language as it is to a change of view. The language
+   is the choice this browser remembers, else the browser's own, else English;
+   a text the catalogue lacks is shown in English. A translation is inserted
+   where the English stood, in text and in markup alike, which is why
+   build/check-deck-languages.py refuses one carrying a character HTML would
+   read. */
+const LANGUAGES=[["en","English"],["cs","Čeština"],["da","Dansk"],["de","Deutsch"],["el","Ελληνικά"],["es","Español"],["fi","Suomi"],["fr","Français"],["it","Italiano"],["ja","日本語"],["ko","한국어"],["nb","Norsk bokmål"],["nl","Nederlands"],["pl","Polski"],["pt-BR","Português (Brasil)"],["pt-PT","Português (Portugal)"],["ru","Русский"],["sv","Svenska"],["tr","Türkçe"],["uk","Українська"],["zh-Hans","简体中文"]];
+let catalogue={}, language="en";
+/* Marks a text a table holds for a later t(); the identity. The checker reads
+   the page's keys out of t(), tf() and K(). */
+const K=s=>s;
+function catalogueHas(key){return Object.prototype.hasOwnProperty.call(catalogue,key)&&typeof catalogue[key]==="string"&&catalogue[key]!=="";}
+function t(key){return catalogueHas(key)?catalogue[key]:key;}
+function tf(key,...args){let s=t(key);args.forEach((a,i)=>{s=s.split("{"+i+"}").join(String(a));});return s;}
+const LOCALISED_ATTRIBUTES=["placeholder","aria-label","title","alt"];
+/* The static markup, translated in place and back again: a text node or an
+   attribute that is a key keeps its English on the node. The content area is
+   skipped - its views are drawn from t() and hold the server's own values,
+   and a domain that happened to be named like a key must not be translated. */
+function localiseTree(root){
+  Array.from(root.childNodes).forEach(n=>{
+    if(n.nodeType===3){
+      const original=n.__en!==undefined?n.__en:String(n.nodeValue||"");
+      const trimmed=original.trim();
+      if(trimmed&&(catalogueHas(trimmed)||n.__en!==undefined)){
+        if(n.__en===undefined)n.__en=original;
+        n.nodeValue=original.replace(trimmed,()=>t(trimmed));
+      }
+    }else if(n.nodeType===1){
+      if(n.tagName==="SCRIPT"||n.tagName==="STYLE"||n.id==="content")return;
+      LOCALISED_ATTRIBUTES.forEach(name=>{
+        if(!n.hasAttribute(name))return;
+        const key="__en_"+name;
+        const given=n[key]!==undefined?n[key]:n.getAttribute(name);
+        if(catalogueHas(given)||n[key]!==undefined){n[key]=given;n.setAttribute(name,t(given));}
+      });
+      localiseTree(n);
+    }
+  });
+}
+function knownLanguage(code){
+  const lower=String(code||"").toLowerCase();
+  const hit=LANGUAGES.filter(p=>p[0].toLowerCase()===lower)[0];
+  return hit?hit[0]:null;
+}
+/* The browser's languages in its order of preference: the first that is one
+   here, by its exact tag or by its primary subtag - Portuguese to pt-BR,
+   Chinese to zh-Hans, Norwegian of either kind to nb. */
+function browserLanguage(){
+  const nav=typeof navigator==="undefined"?{}:navigator;
+  const wanted=nav.languages&&nav.languages.length?nav.languages:[nav.language||"en"];
+  for(const w of wanted){
+    const tag=String(w||"");
+    const exact=knownLanguage(tag);if(exact)return exact;
+    const primary=tag.split("-")[0].toLowerCase();
+    if(primary==="pt")return "pt-BR";
+    if(primary==="zh")return "zh-Hans";
+    if(primary==="no"||primary==="nn")return "nb";
+    const byPrimary=knownLanguage(primary);if(byPrimary)return byPrimary;
+  }
+  return "en";
+}
+function languageSelects(){return Array.from(document.querySelectorAll("select[data-lang]"));}
+function applyCatalogue(code,data){
+  catalogue=data||{};language=code;
+  try{if(code==="en")localStorage.removeItem("hmsLang");else localStorage.setItem("hmsLang",code);}catch(_){}
+  document.documentElement.setAttribute("lang",code);
+  localiseTree(document.body);
+  languageSelects().forEach(s=>{s.value=code;});
+  if($("#app").style.display!=="none")render();
+}
+/* A catalogue the server does not have, or cannot be reached for, leaves the
+   page in the language it was in, and the switch says so. */
+async function loadLanguage(code){
+  if(code===language)return true;
+  if(code==="en"){applyCatalogue("en",{});return true;}
+  let data=null;
+  try{
+    const res=await fetch("/deck-lang/"+encodeURIComponent(code)+".json",{credentials:"same-origin",cache:"no-store"});
+    if(res.ok)data=await res.json();
+  }catch(_){data=null;}
+  if(!data||typeof data!=="object"){languageSelects().forEach(s=>{s.value=language;});return false;}
+  applyCatalogue(code,data);
+  return true;
+}
+languageSelects().forEach(sel=>{
+  LANGUAGES.forEach(p=>{const o=document.createElement("option");o.setAttribute("value",p[0]);o.textContent=p[1];sel.appendChild(o);});
+  sel.onchange=()=>loadLanguage(sel.value);
+});
 
 /* The server's own OpenAPI document, fetched once per sign-in. Every form on
    this page - which keys a settings group has, what type each one is, which
@@ -314,7 +418,7 @@ $("#loginForm").onsubmit=async e=>{
   $("#loginErr").textContent="";
   let res;
   try{res=await fetch("/api/v1/session",{method:"POST",headers:headers,credentials:"same-origin"});}
-  catch(_){$("#loginErr").textContent="Could not reach the server.";return;}
+  catch(_){$("#loginErr").textContent=t("Could not reach the server.");return;}
   let body={};
   try{body=JSON.parse(await res.text());}catch(_){}
   if(res.status===201){
@@ -326,19 +430,19 @@ $("#loginForm").onsubmit=async e=>{
     // what would put the browser's own password box on the screen.
     try{sessionStorage.setItem("hmsSession","1");}catch(_){}
     try{enter(await api("/api/v1/status"));}
-    catch(err){$("#loginErr").textContent="Signed in, but the server did not answer: "+err.message;}
+    catch(err){$("#loginErr").textContent=tf("Signed in, but the server did not answer: {0}",err.message);}
     return;
   }
   if(res.status===401&&(body.second_factor==="required"||res.headers.get("X-hMailServer-OTP")==="required")){
     $("#otp").hidden=false;$("#otp").focus();
-    $("#loginErr").textContent="A one-time code is needed. Enter the code from your authenticator app.";
+    $("#loginErr").textContent=t("A one-time code is needed. Enter the code from your authenticator app.");
     return;
   }
-  $("#loginErr").textContent=body.error?body.error:"Authentication failed. Check the password.";
+  $("#loginErr").textContent=body.error?body.error:t("Authentication failed. Check the password.");
 };
 $("#logoutBtn").onclick=async()=>{
   try{await api("/api/v1/session",{method:"DELETE"});}catch(_){}
-  signedOut("Signed out.");
+  signedOut(t("Signed out."));
 };
 function signedOut(message){
   if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
@@ -362,11 +466,11 @@ $("#nav").addEventListener("click",e=>{
   document.querySelectorAll("#nav button").forEach(x=>x.classList.toggle("on",x===b));
   view=b.dataset.view;editing=null;render();
 });
-const titles={dash:"Dashboard",domains:"Domains",ipranges:"IP ranges",fetch:"Fetch accounts",lists:"Lists",queue:"Delivery queue",tlsa:"DANE / TLSA",
-  settings:"Settings",backup:"Backup",messages:"Server messages",rules:"Rules",routes:"Routes",certs:"Certificates",ports:"Ports",logs:"Logs"};
+const titles={dash:K("Dashboard"),domains:K("Domains"),ipranges:K("IP ranges"),fetch:K("Fetch accounts"),lists:K("Lists"),queue:K("Delivery queue"),tlsa:K("DANE / TLSA"),
+  settings:K("Settings"),backup:K("Backup"),messages:K("Server messages"),rules:K("Rules"),routes:K("Routes"),certs:K("Certificates"),ports:K("Ports"),logs:K("Logs")};
 
 async function render(silent){
-  $("#viewTitle").textContent=titles[view];
+  $("#viewTitle").textContent=t(titles[view]);
   try{
     if(view==="dash")await renderDash(silent);
     else if(view==="domains")await renderDomains();
@@ -383,11 +487,11 @@ async function render(silent){
     else if(view==="certs")await renderCerts();
     else if(view==="ports")await renderPorts();
     else if(view==="logs")await renderLogs();
-    $("#connState").textContent="Connected";
+    $("#connState").textContent=t("Connected");
   }catch(err){
-    if(err.message==="auth"){signedOut("The session ended. Sign in again.");return;}
-    $("#connState").textContent="Connection problem";
-    if(!silent)$("#content").innerHTML='<div class="empty">Could not reach the server: '+escHtml(err.message)+'</div>';
+    if(err.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}
+    $("#connState").textContent=t("Connection problem");
+    if(!silent)$("#content").innerHTML='<div class="empty">'+tf("Could not reach the server: {0}",escHtml(err.message))+'</div>';
   }
 }
 
@@ -437,7 +541,7 @@ $("#content").addEventListener("click",e=>{
   else if(d.act==="retry")retryMsg(d.id);
   else if(d.act==="delmsg")delMsg(d.id);
   else if(d.act==="log")showLog(d.name,d.lines);
-  else if(d.act==="copy")navigator.clipboard.writeText($("#tlsaPre").textContent).then(()=>toast("Copied to clipboard"));
+  else if(d.act==="copy")navigator.clipboard.writeText($("#tlsaPre").textContent).then(()=>toast(t("Copied to clipboard")));
   else if(d.act==="setsave")saveSettings(d.group);
   else if(d.act==="setpost")settingsPost(d.group,d.path,d.label);
   else if(d.act==="rulenew")openRule(0);
@@ -569,11 +673,11 @@ function controlHtml(prefix,key,prop,value,opts){
   if(type==="integer")
     return '<input type="number" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
   if(type==="array")
-    return '<textarea id="'+id+'" rows="4" placeholder="One per line">'+escHtml((Array.isArray(value)?value:[]).join("\n"))+'</textarea>';
+    return '<textarea id="'+id+'" rows="4" placeholder="'+escHtml(t("One per line"))+'">'+escHtml((Array.isArray(value)?value:[]).join("\n"))+'</textarea>';
   if(prop.format==="multiline")
     return '<textarea id="'+id+'" rows="5">'+escHtml(value===undefined||value===null?"":value)+'</textarea>';
   if(isPassword(key,prop))
-    return '<input type="password" id="'+id+'" value="" autocomplete="new-password" placeholder="'+escHtml(opts.passwordHint||"left unchanged unless filled")+'">';
+    return '<input type="password" id="'+id+'" value="" autocomplete="new-password" placeholder="'+escHtml(opts.passwordHint||t("left unchanged unless filled"))+'">';
   return '<input type="text" id="'+id+'" value="'+escHtml(value===undefined||value===null?"":value)+'">';
 }
 function formHtml(prefix,props,values,opts){
@@ -584,12 +688,14 @@ function formHtml(prefix,props,values,opts){
     const prop=props[key];
     const value=values?values[key]:undefined;
     const caption=humanise(key);
-    const description=prop.description||"";
-    const restart=/takes effect when the server restarts/i.test(description);
-    const flags=(required.indexOf(key)>=0?'<span class="badge info">required</span> ':"")+
-                (prop.readOnly?'<span class="badge info">read-only</span> ':"")+
-                (isPassword(key,prop)?'<span class="badge info">write-only</span> ':"")+
-                (restart?'<span class="badge warn">restart</span>':"");
+    // A hint this page wrote is a key and comes back in the reader's language;
+    // a sentence from the server's document is not one and comes back as it is.
+    const description=prop.description?t(prop.description):"";
+    const restart=/takes effect when the server restarts/i.test(prop.description||"");
+    const flags=(required.indexOf(key)>=0?'<span class="badge info">'+t("required")+'</span> ':"")+
+                (prop.readOnly?'<span class="badge info">'+t("read-only")+'</span> ':"")+
+                (isPassword(key,prop)?'<span class="badge info">'+t("write-only")+'</span> ':"")+
+                (restart?'<span class="badge warn">'+t("restart")+'</span>':"");
     const search=(key+" "+caption+" "+description).toLowerCase();
     return '<div class="fr" data-k="'+escHtml(search)+'">'+
              '<div class="lab"><b>'+escHtml(caption)+'</b><code>'+escHtml(key)+'</code> '+flags+
@@ -617,7 +723,7 @@ function readForm(prefix,props,opts){
       const raw=String(el.value).trim();
       if(raw==="")return;
       const n=Number(raw);
-      if(!isFinite(n)||Math.floor(n)!==n)throw new Error(humanise(key)+" must be a whole number.");
+      if(!isFinite(n)||Math.floor(n)!==n)throw new Error(tf("{0} must be a whole number.",humanise(key)));
       out[key]=n;return;
     }
     if(type==="array"){out[key]=el.value.split("\n").map(s=>s.trim()).filter(Boolean);return;}
@@ -640,16 +746,16 @@ async function renderDash(update){
   if(!update||!$("#kpiProcessed")){
     $("#content").innerHTML=`
     <div class="grid g4 view">
-      <div class="card kpi"><div class="v" id="kpiProcessed" data-v="0">0</div><div class="l">Messages processed</div><div class="bar"></div></div>
-      <div class="card kpi"><div class="v" id="kpiSpam" data-v="0">0</div><div class="l">Spam blocked</div><div class="bar"></div></div>
-      <div class="card kpi"><div class="v" id="kpiVirus" data-v="0">0</div><div class="l">Viruses removed</div><div class="bar"></div></div>
-      <div class="card kpi"><div class="v" id="kpiState">—</div><div class="l">Server state</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiProcessed" data-v="0">0</div><div class="l">${t("Messages processed")}</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiSpam" data-v="0">0</div><div class="l">${t("Spam blocked")}</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiVirus" data-v="0">0</div><div class="l">${t("Viruses removed")}</div><div class="bar"></div></div>
+      <div class="card kpi"><div class="v" id="kpiState">—</div><div class="l">${t("Server state")}</div><div class="bar"></div></div>
     </div>
-    <div class="sect view"><h2>Live sessions</h2>
+    <div class="sect view"><h2>${t("Live sessions")}</h2>
       <div class="grid g4">
-        <div class="card kpi"><div class="v" id="sesSmtp" data-v="0">0</div><div class="l">SMTP sessions</div></div>
-        <div class="card kpi"><div class="v" id="sesImap" data-v="0">0</div><div class="l">IMAP sessions</div></div>
-        <div class="card kpi"><div class="v" id="sesPop3" data-v="0">0</div><div class="l">POP3 sessions</div></div>
+        <div class="card kpi"><div class="v" id="sesSmtp" data-v="0">0</div><div class="l">${t("SMTP sessions")}</div></div>
+        <div class="card kpi"><div class="v" id="sesImap" data-v="0">0</div><div class="l">${t("IMAP sessions")}</div></div>
+        <div class="card kpi"><div class="v" id="sesPop3" data-v="0">0</div><div class="l">${t("POP3 sessions")}</div></div>
       </div>
     </div>`;
   }
@@ -659,8 +765,8 @@ async function renderDash(update){
   animateNum($("#sesSmtp"),s.sessions.smtp);
   animateNum($("#sesImap"),s.sessions.imap);
   animateNum($("#sesPop3"),s.sessions.pop3);
-  const states={0:"Unknown",1:"Stopped",2:"Starting",3:"Running",4:"Stopping"};
-  $("#kpiState").innerHTML=s.state===3?'<span class="badge good">Running</span>':'<span class="badge warn">'+escHtml(states[s.state]||("State "+s.state))+'</span>';
+  const states={0:K("Unknown"),1:K("Stopped"),2:K("Starting"),3:K("Running"),4:K("Stopping")};
+  $("#kpiState").innerHTML=s.state===3?'<span class="badge good">'+t("Running")+'</span>':'<span class="badge warn">'+escHtml(states[s.state]?t(states[s.state]):tf("State {0}",s.state))+'</span>';
 }
 
 /* ---------- Domains and accounts ----------
@@ -674,47 +780,47 @@ async function renderDash(update){
    active, which the route requires, and the keys whose control differs from
    the record as it was read; a filled password goes as well. */
 const DOMAIN_GROUPS=[
-  {title:"General",props:{
-    active:{type:"boolean",description:"Whether the domain receives mail and its accounts can sign in."},
-    name:{type:"string",description:"The domain name. Changing it renames the domain and moves every account, alias and list with it."},
-    postmaster:{type:"string",description:"Mail to an unknown recipient in the domain is redirected to this address; empty means it is refused."}}},
-  {title:"Limits",props:{
-    max_size_mb:{type:"integer",description:"Maximum domain size in MB; 0 is unlimited."},
-    max_message_size_kb:{type:"integer",description:"Maximum message size in KB; 0 is unlimited."},
-    max_account_size_mb:{type:"integer",description:"Maximum size for accounts created in this domain, in MB; 0 is unlimited."},
-    message_retention_days:{type:"integer",description:"Delete messages in this domain's mailboxes older than this many days; 0 is no policy, and an account's own value overrides it."},
-    max_accounts_enabled:{type:"boolean",description:"Limit the number of accounts."},
-    max_accounts:{type:"integer",description:"The most accounts the domain may hold, when limited."},
-    max_aliases_enabled:{type:"boolean",description:"Limit the number of aliases."},
-    max_aliases:{type:"integer",description:"The most aliases the domain may hold, when limited."},
-    max_lists_enabled:{type:"boolean",description:"Limit the number of distribution lists."},
-    max_lists:{type:"integer",description:"The most distribution lists the domain may hold, when limited."},
-    plus_addressing_enabled:{type:"boolean",description:"Enable plus addressing: mail to user+anything@domain reaches user@domain."},
-    plus_addressing_character:{type:"string",description:"The one character that separates the address from its tag."},
-    use_greylisting:{type:"boolean",description:"Enable greylisting for this domain."}}},
-  {title:"Signature",props:{
-    signature_enabled:{type:"boolean",description:"Add a signature to outgoing messages."},
-    signature_method:{type:"string","enum":["set_if_not_specified","overwrite","append"],description:"Use the domain's signature only if the account has none, overwrite the account's signature, or append to it."},
-    signature_plain_text:{type:"string",format:"multiline",description:"The plain-text signature."},
-    signature_html:{type:"string",format:"multiline",description:"The HTML signature."},
-    signature_add_to_replies:{type:"boolean",description:"Add the signature to replies."},
-    signature_add_to_local_mail:{type:"boolean",description:"Add the signature to local e-mail."}}},
-  {title:"Relay",props:{
-    relay_host:{type:"string",description:"Where mail FROM this domain leaves through. Empty means the domain has no opinion and the server-wide SMTP relayer applies; a route still wins over both, because a route is a statement about the destination."},
-    relay_port:{type:"integer",description:"The relay's port; 0 is 25."},
-    relay_connection_security:{type:"string","enum":["none","starttls_optional","starttls_required","tls"],description:"How the connection to the relay is secured."},
-    relay_requires_auth:{type:"boolean",description:"The relay requires authentication."},
-    relay_username:{type:"string",description:"The user name for the relay."},
-    relay_password:{type:"string",writeOnly:true,description:"The password for the relay. Accepted here and never shown."}}},
-  {title:"Out of office",props:{
-    vacation_enabled:{type:"boolean",description:"Send a domain-wide out-of-office reply. It answers only for accounts that have no vacation message of their own, and at most one reply answers any message."},
-    vacation_subject:{type:"string",description:"The reply's subject."},
-    vacation_message:{type:"string",format:"multiline",description:"The reply's text."}}},
-  {title:"DKIM",props:{
-    dkim_enabled:{type:"boolean",description:"Sign outgoing mail from this domain."},
-    dkim_selector:{type:"string",description:"The selector, which names the DNS record the public key is published under."},
-    dkim_private_key_file:{type:"string",description:"The path of the private key file on the server."},
-    dkim_signing_algorithm:{type:"string","enum":["sha1","sha256"],description:"The signing algorithm."}}}
+  {title:K("General"),props:{
+    active:{type:"boolean",description:K("Whether the domain receives mail and its accounts can sign in.")},
+    name:{type:"string",description:K("The domain name. Changing it renames the domain and moves every account, alias and list with it.")},
+    postmaster:{type:"string",description:K("Mail to an unknown recipient in the domain is redirected to this address; empty means it is refused.")}}},
+  {title:K("Limits"),props:{
+    max_size_mb:{type:"integer",description:K("Maximum domain size in MB; 0 is unlimited.")},
+    max_message_size_kb:{type:"integer",description:K("Maximum message size in KB; 0 is unlimited.")},
+    max_account_size_mb:{type:"integer",description:K("Maximum size for accounts created in this domain, in MB; 0 is unlimited.")},
+    message_retention_days:{type:"integer",description:K("Delete messages in this domain's mailboxes older than this many days; 0 is no policy, and an account's own value overrides it.")},
+    max_accounts_enabled:{type:"boolean",description:K("Limit the number of accounts.")},
+    max_accounts:{type:"integer",description:K("The most accounts the domain may hold, when limited.")},
+    max_aliases_enabled:{type:"boolean",description:K("Limit the number of aliases.")},
+    max_aliases:{type:"integer",description:K("The most aliases the domain may hold, when limited.")},
+    max_lists_enabled:{type:"boolean",description:K("Limit the number of distribution lists.")},
+    max_lists:{type:"integer",description:K("The most distribution lists the domain may hold, when limited.")},
+    plus_addressing_enabled:{type:"boolean",description:K("Enable plus addressing: mail to user+anything@domain reaches user@domain.")},
+    plus_addressing_character:{type:"string",description:K("The one character that separates the address from its tag.")},
+    use_greylisting:{type:"boolean",description:K("Enable greylisting for this domain.")}}},
+  {title:K("Signature"),props:{
+    signature_enabled:{type:"boolean",description:K("Add a signature to outgoing messages.")},
+    signature_method:{type:"string","enum":["set_if_not_specified","overwrite","append"],description:K("Use the domain's signature only if the account has none, overwrite the account's signature, or append to it.")},
+    signature_plain_text:{type:"string",format:"multiline",description:K("The plain-text signature.")},
+    signature_html:{type:"string",format:"multiline",description:K("The HTML signature.")},
+    signature_add_to_replies:{type:"boolean",description:K("Add the signature to replies.")},
+    signature_add_to_local_mail:{type:"boolean",description:K("Add the signature to local e-mail.")}}},
+  {title:K("Relay"),props:{
+    relay_host:{type:"string",description:K("Where mail FROM this domain leaves through. Empty means the domain has no opinion and the server-wide SMTP relayer applies; a route still wins over both, because a route is a statement about the destination.")},
+    relay_port:{type:"integer",description:K("The relay's port; 0 is 25.")},
+    relay_connection_security:{type:"string","enum":["none","starttls_optional","starttls_required","tls"],description:K("How the connection to the relay is secured.")},
+    relay_requires_auth:{type:"boolean",description:K("The relay requires authentication.")},
+    relay_username:{type:"string",description:K("The user name for the relay.")},
+    relay_password:{type:"string",writeOnly:true,description:K("The password for the relay. Accepted here and never shown.")}}},
+  {title:K("Out of office"),props:{
+    vacation_enabled:{type:"boolean",description:K("Send a domain-wide out-of-office reply. It answers only for accounts that have no vacation message of their own, and at most one reply answers any message.")},
+    vacation_subject:{type:"string",description:K("The reply's subject.")},
+    vacation_message:{type:"string",format:"multiline",description:K("The reply's text.")}}},
+  {title:K("DKIM"),props:{
+    dkim_enabled:{type:"boolean",description:K("Sign outgoing mail from this domain.")},
+    dkim_selector:{type:"string",description:K("The selector, which names the DNS record the public key is published under.")},
+    dkim_private_key_file:{type:"string",description:K("The path of the private key file on the server.")},
+    dkim_signing_algorithm:{type:"string","enum":["sha1","sha256"],description:K("The signing algorithm.")}}}
 ];
 function domainProps(){const all={};DOMAIN_GROUPS.forEach(g=>Object.assign(all,g.props));return all;}
 
@@ -726,29 +832,29 @@ async function renderDomains(){
   if(editing&&editing.kind==="list"){await openList(editing.address,editing.domain);return;}
   const rows=cache.domains.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
-        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td>${x.active?'<span class="badge good">'+t("Active")+'</span>':'<span class="badge warn">'+t("Disabled")+'</span>'}</td>
         <td>${escHtml(x.postmaster||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">Accounts ›</button>
-          <button class="btn ghost sm" data-act="aliases" data-domain="${escHtml(x.name)}">Aliases ›</button>
-          <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(x.name)}">Lists ›</button>
-          <button class="btn ghost sm" data-act="domainedit" data-name="${escHtml(x.name)}">Edit</button>
-          <button class="btn danger sm" data-act="domaindel" data-name="${escHtml(x.name)}">Delete</button>
+          <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(x.name)}">${t("Accounts ›")}</button>
+          <button class="btn ghost sm" data-act="aliases" data-domain="${escHtml(x.name)}">${t("Aliases ›")}</button>
+          <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(x.name)}">${t("Lists ›")}</button>
+          <button class="btn ghost sm" data-act="domainedit" data-name="${escHtml(x.name)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="domaindel" data-name="${escHtml(x.name)}">${t("Delete")}</button>
           <div class="err" id="err_domain_${escHtml(x.name)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/domains","get").description||"")}</p>
-      <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Status</th><th>Postmaster</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="4" class="empty">No domains configured.</td></tr>'}</tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>${t("Domain")}</th><th>${t("Status")}</th><th>${t("Postmaster")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="empty">'+t("No domains configured.")+'</td></tr>'}</tbody></table></div>
     </div>
-    <div class="sect"><h2>New domain</h2>
+    <div class="sect"><h2>${t("New domain")}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation("/api/v1/domains","post").description||"")}</p>
         <div class="row" data-enter="domainnew">
-          <input id="newDomain" placeholder="example.com" aria-label="Domain name" style="flex:1;min-width:220px">
-          <input id="newPostmaster" placeholder="Postmaster address (optional)" aria-label="Postmaster address" style="flex:1;min-width:220px">
-          <label class="row" style="gap:7px"><input type="checkbox" id="newDomainActive" checked> Active</label>
-          <button class="btn" data-act="domainnew">Create domain</button>
+          <input id="newDomain" placeholder="example.com" aria-label="${t("Domain name")}" style="flex:1;min-width:220px">
+          <input id="newPostmaster" placeholder="${t("Postmaster address (optional)")}" aria-label="${t("Postmaster address")}" style="flex:1;min-width:220px">
+          <label class="row" style="gap:7px"><input type="checkbox" id="newDomainActive" checked> ${t("Active")}</label>
+          <button class="btn" data-act="domainnew">${t("Create domain")}</button>
           <div class="err" id="err_domainnew"></div>
         </div>
       </div></div></div>`;
@@ -756,22 +862,22 @@ async function renderDomains(){
 async function createDomain(){
   setErr("err_domainnew","");
   const name=$("#newDomain").value.trim(),postmaster=$("#newPostmaster").value.trim(),active=$("#newDomainActive").checked;
-  if(!name){setErr("err_domainnew","A domain name is required.");return;}
+  if(!name){setErr("err_domainnew",t("A domain name is required."));return;}
   try{
     await api("/api/v1/domains",{method:"POST",body:JSON.stringify({name:name,active:active,postmaster:postmaster})});
-    toast("Domain created: "+name);
+    toast(tf("Domain created: {0}",name));
     // Read back, and then straight into the editor of the domain as the
     // server holds it, where the rest of its settings are.
     cache.domains=asList(await api("/api/v1/domains"),"domains");
     if(cache.domains.some(d=>d.name===name))await openDomain(name);else await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_domainnew",e.message);}
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_domainnew",e.message);}
 }
 async function openDomain(name){
   const existing=cache.domains.filter(d=>d.name===name)[0];
   if(!existing)return;
   editing={kind:"domain",name:name,values:JSON.parse(JSON.stringify(existing)),aliases:[],aliasError:""};
   try{await reloadDomainAliases();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}editing.aliasError=e.message;}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}editing.aliasError=e.message;}
   renderDomainEditor();
 }
 async function reloadDomainAliases(){
@@ -780,33 +886,33 @@ async function reloadDomainAliases(){
 function domainNamesHtml(){
   const list=editing.aliases.map(a=>`
     <div class="row erow"><code style="flex:1">${escHtml(a.name)}</code>
-      <button class="btn ghost sm" data-act="daliasdel" data-name="${escHtml(a.name)}">Remove</button></div>`).join("")
-    ||'<div class="note">No other names: mail is accepted for the domain name only.</div>';
+      <button class="btn ghost sm" data-act="daliasdel" data-name="${escHtml(a.name)}">${t("Remove")}</button></div>`).join("")
+    ||'<div class="note">'+t("No other names: mail is accepted for the domain name only.")+'</div>';
   return `<p class="note">${escHtml(operation("/api/v1/domains/{domain}/domain-aliases","get").summary||"")}</p>
     ${list}
     <div class="row" style="margin-top:14px" data-enter="daliasadd">
-      <input id="newDomainAlias" placeholder="Another name for this domain" aria-label="Another name for this domain" style="flex:1;min-width:220px">
-      <button class="btn ghost sm" data-act="daliasadd">Add name</button>
+      <input id="newDomainAlias" placeholder="${t("Another name for this domain")}" aria-label="${t("Another name for this domain")}" style="flex:1;min-width:220px">
+      <button class="btn ghost sm" data-act="daliasadd">${t("Add name")}</button>
       <div class="err" id="err_dalias">${escHtml(editing.aliasError||"")}</div>
     </div>`;
 }
 function renderDomainEditor(){
   const cards=DOMAIN_GROUPS.map(g=>`
-    <div class="sect"><h2>${escHtml(g.title)}</h2>
+    <div class="sect"><h2>${escHtml(t(g.title))}</h2>
       <div class="card flat"><div class="form">${formHtml("dom",g.props,editing.values,{required:["active"]})}</div></div></div>`);
   // The names the domain answers to, between General and Limits as the
   // desktop dialog has them; drawn into their own box so that adding or
   // removing one redraws the box and not the edits in the other groups.
-  cards.splice(1,0,`<div class="sect"><h2>Names</h2><div class="card flat" id="domainNames">${domainNamesHtml()}</div></div>`);
+  cards.splice(1,0,`<div class="sect"><h2>${t("Names")}</h2><div class="card flat" id="domainNames">${domainNamesHtml()}</div></div>`);
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All domains</button>
-    <div class="sect"><h2>Domain ${escHtml(editing.name)}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All domains")}</button>
+    <div class="sect"><h2>${tf("Domain {0}",escHtml(editing.name))}</h2>
       <div class="card flat"><p class="note">${escHtml(operation("/api/v1/domains/{domain}","put").description||"")}</p></div></div>
     ${cards.join("")}
     <div class="sect"><div class="row">
-      <button class="btn" data-act="domainsave">Save domain</button>
-      <button class="btn ghost" data-act="cancel">Cancel</button>
-      <button class="btn danger" data-act="domaindel" data-name="${escHtml(editing.name)}">Delete domain</button>
+      <button class="btn" data-act="domainsave">${t("Save domain")}</button>
+      <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
+      <button class="btn danger" data-act="domaindel" data-name="${escHtml(editing.name)}">${t("Delete domain")}</button>
       <div class="err" id="err_domainedit"></div>
     </div></div>
   </div>`;
@@ -822,7 +928,7 @@ async function saveDomain(){
     if(isPassword(k,props[k])){body[k]=all[k];return;}
     if(all[k]!==editing.values[k])body[k]=all[k];
   });
-  if(Object.keys(body).length===1&&body.active===!!editing.values.active){toast("Nothing changed");return;}
+  if(Object.keys(body).length===1&&body.active===!!editing.values.active){toast(t("Nothing changed"));return;}
   const oldName=editing.name;
   try{
     await api("/api/v1/domains/"+encodeURIComponent(oldName),{method:"PUT",body:JSON.stringify(body)});
@@ -832,35 +938,35 @@ async function saveDomain(){
     cache.domains=asList(await api("/api/v1/domains"),"domains");
     const newName=body.name!==undefined?body.name:oldName;
     const fresh=cache.domains.filter(d=>d.name===newName)[0]||cache.domains.filter(d=>d.name===oldName)[0];
-    if(!fresh){editing=null;toast("Domain saved");await render();return;}
+    if(!fresh){editing=null;toast(t("Domain saved"));await render();return;}
     editing.name=fresh.name;editing.values=JSON.parse(JSON.stringify(fresh));
-    toast(fresh.name!==oldName?"Domain renamed to "+fresh.name:"Domain saved");
+    toast(fresh.name!==oldName?tf("Domain renamed to {0}",fresh.name):t("Domain saved"));
     renderDomainEditor();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_domainedit",e.message);}
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_domainedit",e.message);}
 }
 async function deleteDomain(name){
-  if(!confirm("Delete the domain "+name+" with every account, alias and list in it? Their messages go with them."))return;
+  if(!confirm(tf("Delete the domain {0} with every account, alias and list in it? Their messages go with them.",name)))return;
   const where=editing&&editing.kind==="domain"?"err_domainedit":"err_domain_"+name;
   setErr(where,"");
-  try{await api("/api/v1/domains/"+encodeURIComponent(name),{method:"DELETE"});editing=null;toast("Domain deleted: "+name);await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
+  try{await api("/api/v1/domains/"+encodeURIComponent(name),{method:"DELETE"});editing=null;toast(tf("Domain deleted: {0}",name));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr(where,e.message);}
 }
 async function addDomainAlias(){
   setErr("err_dalias","");
   const name=$("#newDomainAlias").value.trim();
-  if(!name){setErr("err_dalias","A name is required.");return;}
+  if(!name){setErr("err_dalias",t("A name is required."));return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(editing.name)+"/domain-aliases",{method:"POST",body:JSON.stringify({name:name})});
-    toast("Name added: "+name);editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_dalias",e.message);}
+    toast(tf("Name added: {0}",name));editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_dalias",e.message);}
 }
 async function deleteDomainAlias(name){
-  if(!confirm("Remove the name "+name+" from "+editing.name+"?"))return;
+  if(!confirm(tf("Remove the name {0} from {1}?",name,editing.name)))return;
   setErr("err_dalias","");
   try{
     await api("/api/v1/domains/"+encodeURIComponent(editing.name)+"/domain-aliases/"+encodeURIComponent(name),{method:"DELETE"});
-    toast("Name removed: "+name);editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_dalias",e.message);}
+    toast(tf("Name removed: {0}",name));editing.aliasError="";await reloadDomainAliases();$("#domainNames").innerHTML=domainNamesHtml();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_dalias",e.message);}
 }
 
 async function showAccounts(domain){
@@ -869,22 +975,22 @@ async function showAccounts(domain){
   const list=asList(a,"accounts");
   const rows=list.map(x=>`
     <tr><td><b>${escHtml(x.address)}</b></td>
-        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td>${x.active?'<span class="badge good">'+t("Active")+'</span>':'<span class="badge warn">'+t("Disabled")+'</span>'}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="accountedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Edit</button>
-          <button class="btn danger sm" data-act="del" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button></td></tr>`).join("");
+          <button class="btn ghost sm" data-act="accountedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="del" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">${t("Delete")}</button></td></tr>`).join("");
   $("#content").innerHTML=`
   <div class="view">
-    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
-    <div class="sect"><h2>${escHtml(domain)} — accounts</h2>
-      <div class="card"><div class="tablewrap"><table><thead><tr><th>Address</th><th>Status</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="3" class="empty">No accounts.</td></tr>'}</tbody></table></div></div>
+    <button class="btn ghost sm" data-act="domains">${t("‹ All domains")}</button>
+    <div class="sect"><h2>${tf("{0} — accounts",escHtml(domain))}</h2>
+      <div class="card"><div class="tablewrap"><table><thead><tr><th>${t("Address")}</th><th>${t("Status")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="3" class="empty">'+t("No accounts.")+'</td></tr>'}</tbody></table></div></div>
     </div>
-    <div class="sect"><h2>New account</h2>
+    <div class="sect"><h2>${t("New account")}</h2>
       <div class="card" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center" data-enter="add">
-        <input id="newAddr" placeholder="user@${escHtml(domain)}" aria-label="Address" style="flex:1;min-width:220px">
-        <input id="newPass" type="password" placeholder="Password" aria-label="Password" style="flex:1;min-width:160px">
-        <button class="btn" data-act="add" data-domain="${escHtml(domain)}">Create account</button>
+        <input id="newAddr" placeholder="user@${escHtml(domain)}" aria-label="${t("Address")}" style="flex:1;min-width:220px">
+        <input id="newPass" type="password" placeholder="${t("Password")}" aria-label="${t("Password")}" style="flex:1;min-width:160px">
+        <button class="btn" data-act="add" data-domain="${escHtml(domain)}">${t("Create account")}</button>
         <div class="err" id="err_account"></div>
       </div>
     </div>
@@ -894,21 +1000,21 @@ async function showAccounts(domain){
 async function addAccount(domain){
   const address=$("#newAddr").value.trim(),password=$("#newPass").value;
   setErr("err_account","");
-  if(!address||!password){setErr("err_account","An address and a password are required.");return;}
+  if(!address||!password){setErr("err_account",t("An address and a password are required."));return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(domain)+"/accounts",
       {method:"POST",body:JSON.stringify({address:address,password:password})});
-    toast("Account created: "+address);showAccounts(domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);}
+    toast(tf("Account created: {0}",address));showAccounts(domain);
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_account",e.message);}
 }
 
 async function delAccount(address,domain){
-  if(!confirm("Delete "+address+"?"))return;
+  if(!confirm(tf("Delete {0}?",address)))return;
   const where=editing&&editing.kind==="account"?"err_accountedit":"err_account";
   setErr(where,"");
   try{await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"DELETE"});
-    toast("Deleted "+address);showAccounts(domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
+    toast(tf("Deleted {0}",address));showAccounts(domain);
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr(where,e.message);}
 }
 
 /* ---------- The account editor ----------
@@ -925,30 +1031,30 @@ async function delAccount(address,domain){
    desktop dialog are not here: the external accounts have their own view,
    and the rest are not on the administrative API. */
 const ACCOUNT_GROUPS=[
-  {title:"General",keys:["active","first_name","last_name","password","max_size_mb","admin_level","message_retention_days"]},
-  {title:"Forwarding",keys:["forward_enabled","forward_address","forward_keep_original","forward_abort_spam_flagged"]},
-  {title:"Auto-reply",keys:["vacation_enabled","vacation_subject","vacation_message","vacation_expires","vacation_expires_date","vacation_begin_date","vacation_abort_spam_flagged"]},
-  {title:"Spam",keys:["antispam_enabled","spam_mark_threshold","spam_delete_threshold"]},
-  {title:"Signature",keys:["signature_enabled","signature_plain_text","signature_html"]},
-  {title:"Sieve",keys:["sieve_script"]},
-  {title:"Directory",keys:["ad_enabled","ad_domain","ad_username"]}
+  {title:K("General"),keys:["active","first_name","last_name","password","max_size_mb","admin_level","message_retention_days"]},
+  {title:K("Forwarding"),keys:["forward_enabled","forward_address","forward_keep_original","forward_abort_spam_flagged"]},
+  {title:K("Auto-reply"),keys:["vacation_enabled","vacation_subject","vacation_message","vacation_expires","vacation_expires_date","vacation_begin_date","vacation_abort_spam_flagged"]},
+  {title:K("Spam"),keys:["antispam_enabled","spam_mark_threshold","spam_delete_threshold"]},
+  {title:K("Signature"),keys:["signature_enabled","signature_plain_text","signature_html"]},
+  {title:K("Sieve"),keys:["sieve_script"]},
+  {title:K("Directory"),keys:["ad_enabled","ad_domain","ad_username"]}
 ];
 const ACCOUNT_HINTS={
-  active:"Account enabled: it receives mail and can sign in.",first_name:"The person's first name.",last_name:"The person's last name.",
-  password:"A new password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it.",
-  max_size_mb:"Maximum mailbox size in MB; 0 is unlimited.",
-  admin_level:"user, domain or server. Who is asking decides what it may become: a key restricted to named domains may set user or domain only.",
-  message_retention_days:"Delete messages older than this many days; -1 keeps forever, 0 follows the domain.",
-  forward_enabled:"Forward incoming mail.",forward_address:"The address the mail is forwarded to.",forward_keep_original:"Keep the original message in this mailbox.",
-  forward_abort_spam_flagged:"Do not forward messages flagged as spam.",
-  vacation_enabled:"Send an automatic reply (vacation message).",vacation_subject:"The reply's subject.",vacation_message:"The reply's text.",
-  vacation_expires:"Stop sending replies after a date.",vacation_expires_date:"YYYY-MM-DD; empty means today.",vacation_begin_date:"YYYY-MM-DD; empty means today.",
-  vacation_abort_spam_flagged:"Do not reply to messages flagged as spam.",
-  antispam_enabled:"Apply the server's spam filtering to this account.",spam_mark_threshold:"The score at which a message is marked as spam; -1 is the server's own value.",
-  spam_delete_threshold:"The score at which a message is deleted; -1 is the server's own value.",
-  signature_enabled:"Add a signature to outgoing messages.",signature_plain_text:"The plain-text signature.",signature_html:"The HTML signature.",
-  sieve_script:"The account's active Sieve filter, parsed before it is stored as the portal and ManageSieve parse one; empty removes it.",
-  ad_enabled:"Check this password against Windows (Active Directory, or a local Windows account).",ad_domain:"The Windows domain.",ad_username:"The Windows user name."
+  active:K("Account enabled: it receives mail and can sign in."),first_name:K("The person's first name."),last_name:K("The person's last name."),
+  password:K("A new password goes through the password policy, the reuse history and the configured hash exactly as when the Control Panel sets one, and the next logon uses it."),
+  max_size_mb:K("Maximum mailbox size in MB; 0 is unlimited."),
+  admin_level:K("user, domain or server. Who is asking decides what it may become: a key restricted to named domains may set user or domain only."),
+  message_retention_days:K("Delete messages older than this many days; -1 keeps forever, 0 follows the domain."),
+  forward_enabled:K("Forward incoming mail."),forward_address:K("The address the mail is forwarded to."),forward_keep_original:K("Keep the original message in this mailbox."),
+  forward_abort_spam_flagged:K("Do not forward messages flagged as spam."),
+  vacation_enabled:K("Send an automatic reply (vacation message)."),vacation_subject:K("The reply's subject."),vacation_message:K("The reply's text."),
+  vacation_expires:K("Stop sending replies after a date."),vacation_expires_date:K("YYYY-MM-DD; empty means today."),vacation_begin_date:K("YYYY-MM-DD; empty means today."),
+  vacation_abort_spam_flagged:K("Do not reply to messages flagged as spam."),
+  antispam_enabled:K("Apply the server's spam filtering to this account."),spam_mark_threshold:K("The score at which a message is marked as spam; -1 is the server's own value."),
+  spam_delete_threshold:K("The score at which a message is deleted; -1 is the server's own value."),
+  signature_enabled:K("Add a signature to outgoing messages."),signature_plain_text:K("The plain-text signature."),signature_html:K("The HTML signature."),
+  sieve_script:K("The account's active Sieve filter, parsed before it is stored as the portal and ManageSieve parse one; empty removes it."),
+  ad_enabled:K("Check this password against Windows (Active Directory, or a local Windows account)."),ad_domain:K("The Windows domain."),ad_username:K("The Windows user name.")
 };
 const ACCOUNT_LONG=["signature_plain_text","signature_html","vacation_message","sieve_script"];
 function accountProps(){
@@ -964,24 +1070,24 @@ async function openAccount(address,domain){
   setErr("err_account","");
   let record;
   try{record=await api("/api/v1/accounts/"+encodeURIComponent(address));}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_account",e.message);return;}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_account",e.message);return;}
   editing={kind:"account",address:address,domain:domain,values:record};
   renderAccountEditor();
 }
 function renderAccountEditor(){
   const props=accountProps();
   const cards=groupedKeys(ACCOUNT_GROUPS,props).map(g=>`
-    <div class="sect"><h2>${escHtml(g.title)}</h2>
-      <div class="card flat"><div class="form">${formHtml("acct",pick(props,g.keys),editing.values,{passwordHint:"left unchanged unless filled"})}</div></div></div>`).join("");
+    <div class="sect"><h2>${escHtml(t(g.title))}</h2>
+      <div class="card flat"><div class="form">${formHtml("acct",pick(props,g.keys),editing.values,{passwordHint:t("left unchanged unless filled")})}</div></div></div>`).join("");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(editing.domain)}">‹ Accounts of ${escHtml(editing.domain)}</button>
-    <div class="sect"><h2>Account ${escHtml(editing.address)}</h2>
+    <button class="btn ghost sm" data-act="accounts" data-domain="${escHtml(editing.domain)}">${tf("‹ Accounts of {0}",escHtml(editing.domain))}</button>
+    <div class="sect"><h2>${tf("Account {0}",escHtml(editing.address))}</h2>
       <div class="card flat"><p class="note">${escHtml(operation("/api/v1/accounts/{address}","put").description||"")}</p></div></div>
     ${cards}
     <div class="sect"><div class="row">
-      <button class="btn" data-act="accountsave">Save account</button>
-      <button class="btn ghost" data-act="accounts" data-domain="${escHtml(editing.domain)}">Cancel</button>
-      <button class="btn danger" data-act="del" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">Delete account</button>
+      <button class="btn" data-act="accountsave">${t("Save account")}</button>
+      <button class="btn ghost" data-act="accounts" data-domain="${escHtml(editing.domain)}">${t("Cancel")}</button>
+      <button class="btn danger" data-act="del" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">${t("Delete account")}</button>
       <div class="err" id="err_accountedit"></div>
     </div></div>
   </div>`;
@@ -997,16 +1103,16 @@ async function saveAccount(){
     if(isPassword(k,props[k])){body[k]=all[k];return;}
     if(all[k]!==editing.values[k])body[k]=all[k];
   });
-  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  if(!Object.keys(body).length){toast(t("Nothing changed"));return;}
   const address=editing.address;
   try{
     await api("/api/v1/accounts/"+encodeURIComponent(address),{method:"PUT",body:JSON.stringify(body)});
     // The account as the server holds it now, read back rather than taken
     // from the answer, and the editor redrawn from that.
     editing.values=await api("/api/v1/accounts/"+encodeURIComponent(address));
-    toast("Account saved");
+    toast(t("Account saved"));
     renderAccountEditor();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_accountedit",e.message);}
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_accountedit",e.message);}
 }
 
 /* ---------- Aliases ----------
@@ -1016,7 +1122,7 @@ async function saveAccount(){
    deletes and re-creates one as well - so the page lists, makes and removes.
    The form is built from the create's schema and starts at the default its
    description states, active. */
-const ALIAS_HINTS={name:"The alias address, in this domain.",value:"The e-mail address it delivers to.",active:"Whether mail to the alias is delivered."};
+const ALIAS_HINTS={name:K("The alias address, in this domain."),value:K("The e-mail address it delivers to."),active:K("Whether mail to the alias is delivered.")};
 function aliasProps(){
   const props=properties("/api/v1/domains/{domain}/aliases","post"), out={};
   Object.keys(props).forEach(k=>{out[k]=Object.assign({},props[k]);if(!out[k].description&&ALIAS_HINTS[k])out[k].description=ALIAS_HINTS[k];});
@@ -1029,25 +1135,25 @@ async function showAliases(domain){
   const rows=aliases.map(x=>`
     <tr><td><b>${escHtml(x.name)}</b></td>
         <td><code>${escHtml(x.value)}</code></td>
-        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td>${x.active?'<span class="badge good">'+t("Active")+'</span>':'<span class="badge warn">'+t("Disabled")+'</span>'}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn danger sm" data-act="aliasdel" data-name="${escHtml(x.name)}" data-domain="${escHtml(domain)}">Delete</button>
+          <button class="btn danger sm" data-act="aliasdel" data-name="${escHtml(x.name)}" data-domain="${escHtml(domain)}">${t("Delete")}</button>
           <div class="err" id="err_alias_${escHtml(x.name)}"></div></td></tr>`).join("");
   const props=aliasProps();
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
-    <div class="sect"><h2>${escHtml(domain)} — aliases</h2>
+    <button class="btn ghost sm" data-act="domains">${t("‹ All domains")}</button>
+    <div class="sect"><h2>${tf("{0} — aliases",escHtml(domain))}</h2>
       <div class="card flat">
-        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/aliases","get").summary||"")}. An alias has no update on the API: to change one, delete it and make it again.</p>
-        <div class="tablewrap"><table><thead><tr><th>Alias</th><th>Delivers to</th><th>Status</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="4" class="empty">No aliases in this domain.</td></tr>'}</tbody></table></div>
+        <p class="note">${escHtml(operation("/api/v1/domains/{domain}/aliases","get").summary||"")}. ${t("An alias has no update on the API: to change one, delete it and make it again.")}</p>
+        <div class="tablewrap"><table><thead><tr><th>${t("Alias")}</th><th>${t("Delivers to")}</th><th>${t("Status")}</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="4" class="empty">'+t("No aliases in this domain.")+'</td></tr>'}</tbody></table></div>
       </div></div>
-    <div class="sect"><h2>New alias</h2>
+    <div class="sect"><h2>${t("New alias")}</h2>
       <div class="card flat" data-enter="aliasnew">
         <p class="note">${escHtml(operation("/api/v1/domains/{domain}/aliases","post").description||"")}</p>
         <div class="form">${formHtml("aliasnew",props,documentedDefaults("/api/v1/domains/{domain}/aliases","post",props),{required:requiredOf("/api/v1/domains/{domain}/aliases","post")})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="aliasnew" data-domain="${escHtml(domain)}">Create alias</button>
+          <button class="btn" data-act="aliasnew" data-domain="${escHtml(domain)}">${t("Create alias")}</button>
           <div class="err" id="err_aliasnew"></div>
         </div>
       </div></div></div>`;
@@ -1056,17 +1162,17 @@ async function createAlias(domain){
   setErr("err_aliasnew","");
   let body;
   try{body=readForm("aliasnew",aliasProps(),{});}catch(e){setErr("err_aliasnew",e.message);return;}
-  if(!String(body.name||"").trim()||!String(body.value||"").trim()){setErr("err_aliasnew","An alias address and the address it delivers to are required.");return;}
+  if(!String(body.name||"").trim()||!String(body.value||"").trim()){setErr("err_aliasnew",t("An alias address and the address it delivers to are required."));return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(domain)+"/aliases",{method:"POST",body:JSON.stringify(body)});
-    toast("Alias created: "+body.name);await showAliases(domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_aliasnew",e.message);}
+    toast(tf("Alias created: {0}",body.name));await showAliases(domain);
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_aliasnew",e.message);}
 }
 async function deleteAlias(name,domain){
-  if(!confirm("Delete the alias "+name+"?"))return;
+  if(!confirm(tf("Delete the alias {0}?",name)))return;
   setErr("err_alias_"+name,"");
-  try{await api("/api/v1/aliases/"+encodeURIComponent(name),{method:"DELETE"});toast("Alias deleted: "+name);await showAliases(domain);}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_alias_"+name,e.message);}
+  try{await api("/api/v1/aliases/"+encodeURIComponent(name),{method:"DELETE"});toast(tf("Alias deleted: {0}",name));await showAliases(domain);}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_alias_"+name,e.message);}
 }
 
 /* ---------- Distribution lists ----------
@@ -1079,12 +1185,12 @@ async function deleteAlias(name,domain){
    update does not change them - the route says so, and the note repeats it.
    The captions are the desktop dialog's. */
 const LIST_HINTS={
-  address:"The list's address, in this domain.",
-  members:"The members, one address per line. Set when the list is made; the update does not change them.",
-  active:"List is active.",require_auth:"Require SMTP authentication to send to the list.",
-  mode:"Who may send to this list: public is anyone, membership the members, announcement the one sender named below, domain_members the accounts of the domain.",
-  require_sender_address:"Require sender address (empty = any).",moderator_address:"Moderator (empty = no moderation).",
-  bounce_address:"Bounce address (empty = bounces go to the poster)."
+  address:K("The list's address, in this domain."),
+  members:K("The members, one address per line. Set when the list is made; the update does not change them."),
+  active:K("List is active."),require_auth:K("Require SMTP authentication to send to the list."),
+  mode:K("Who may send to this list: public is anyone, membership the members, announcement the one sender named below, domain_members the accounts of the domain."),
+  require_sender_address:K("Require sender address (empty = any)."),moderator_address:K("Moderator (empty = no moderation)."),
+  bounce_address:K("Bounce address (empty = bounces go to the poster).")
 };
 function listProps(method){
   const props=properties(method==="post"?"/api/v1/domains/{domain}/lists":"/api/v1/lists/{address}",method), out={};
@@ -1098,28 +1204,28 @@ async function showLists(domain){
   cache.lists=lists;
   const rows=lists.map(x=>`
     <tr><td><b>${escHtml(x.address)}</b></td>
-        <td>${x.active?'<span class="badge good">Active</span>':'<span class="badge warn">Disabled</span>'}</td>
+        <td>${x.active?'<span class="badge good">'+t("Active")+'</span>':'<span class="badge warn">'+t("Disabled")+'</span>'}</td>
         <td>${escHtml(humanise(x.mode||""))}</td>
         <td>${escHtml((x.members||[]).length)}${(x.members||[]).length?'<div class="hint muted">'+escHtml((x.members||[]).slice(0,3).join(", ")+((x.members||[]).length>3?", …":""))+'</div>':""}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="listedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Edit</button>
-          <button class="btn danger sm" data-act="listdel" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">Delete</button>
+          <button class="btn ghost sm" data-act="listedit" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="listdel" data-address="${escHtml(x.address)}" data-domain="${escHtml(domain)}">${t("Delete")}</button>
           <div class="err" id="err_list_${escHtml(x.address)}"></div></td></tr>`).join("");
   const props=listProps("post");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="domains">‹ All domains</button>
-    <div class="sect"><h2>${escHtml(domain)} — distribution lists</h2>
+    <button class="btn ghost sm" data-act="domains">${t("‹ All domains")}</button>
+    <div class="sect"><h2>${tf("{0} — distribution lists",escHtml(domain))}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation("/api/v1/domains/{domain}/lists","get").description||"")}</p>
-        <div class="tablewrap"><table><thead><tr><th>Address</th><th>Status</th><th>Who may send</th><th>Members</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="5" class="empty">No distribution lists in this domain.</td></tr>'}</tbody></table></div>
+        <div class="tablewrap"><table><thead><tr><th>${t("Address")}</th><th>${t("Status")}</th><th>${t("Who may send")}</th><th>${t("Members")}</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="5" class="empty">'+t("No distribution lists in this domain.")+'</td></tr>'}</tbody></table></div>
       </div></div>
-    <div class="sect"><h2>New list</h2>
+    <div class="sect"><h2>${t("New list")}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation("/api/v1/domains/{domain}/lists","post").description||"")}</p>
         <div class="form">${formHtml("listnew",props,documentedDefaults("/api/v1/domains/{domain}/lists","post",props),{required:requiredOf("/api/v1/domains/{domain}/lists","post")})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="listnew" data-domain="${escHtml(domain)}">Create list</button>
+          <button class="btn" data-act="listnew" data-domain="${escHtml(domain)}">${t("Create list")}</button>
           <div class="err" id="err_listnew"></div>
         </div>
       </div></div></div>`;
@@ -1129,11 +1235,11 @@ async function createList(domain){
   const props=listProps("post");
   let body;
   try{body=readForm("listnew",props,{});}catch(e){setErr("err_listnew",e.message);return;}
-  if(!String(body.address||"").trim()){setErr("err_listnew","A list address is required.");return;}
+  if(!String(body.address||"").trim()){setErr("err_listnew",t("A list address is required."));return;}
   try{
     await api("/api/v1/domains/"+encodeURIComponent(domain)+"/lists",{method:"POST",body:JSON.stringify(body)});
-    toast("List created: "+body.address);await showLists(domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_listnew",e.message);}
+    toast(tf("List created: {0}",body.address));await showLists(domain);
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_listnew",e.message);}
 }
 async function openList(address,domain){
   await loadSpec();
@@ -1145,18 +1251,18 @@ async function openList(address,domain){
 }
 function renderListEditor(){
   const props=listProps("put");
-  const members=(editing.values.members||[]).map(m=>'<div class="row erow"><code>'+escHtml(m)+'</code></div>').join("")||'<div class="note">No members.</div>';
+  const members=(editing.values.members||[]).map(m=>'<div class="row erow"><code>'+escHtml(m)+'</code></div>').join("")||'<div class="note">'+t("No members.")+'</div>';
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(editing.domain)}">‹ Lists of ${escHtml(editing.domain)}</button>
-    <div class="sect"><h2>List ${escHtml(editing.address)}</h2>
+    <button class="btn ghost sm" data-act="lists" data-domain="${escHtml(editing.domain)}">${tf("‹ Lists of {0}",escHtml(editing.domain))}</button>
+    <div class="sect"><h2>${tf("List {0}",escHtml(editing.address))}</h2>
       <div class="card flat"><p class="note">${escHtml(operation("/api/v1/lists/{address}","put").description||"")}</p>
         <div class="form">${formHtml("list",props,editing.values,{})}</div></div></div>
-    <div class="sect"><h2>Members</h2>
-      <div class="card flat"><p class="note">${escHtml(LIST_HINTS.members)}</p>${members}</div></div>
+    <div class="sect"><h2>${t("Members")}</h2>
+      <div class="card flat"><p class="note">${escHtml(t(LIST_HINTS.members))}</p>${members}</div></div>
     <div class="sect"><div class="row">
-      <button class="btn" data-act="listsave">Save list</button>
-      <button class="btn ghost" data-act="lists" data-domain="${escHtml(editing.domain)}">Cancel</button>
-      <button class="btn danger" data-act="listdel" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">Delete list</button>
+      <button class="btn" data-act="listsave">${t("Save list")}</button>
+      <button class="btn ghost" data-act="lists" data-domain="${escHtml(editing.domain)}">${t("Cancel")}</button>
+      <button class="btn danger" data-act="listdel" data-address="${escHtml(editing.address)}" data-domain="${escHtml(editing.domain)}">${t("Delete list")}</button>
       <div class="err" id="err_listedit"></div>
     </div></div></div>`;
 }
@@ -1167,18 +1273,18 @@ async function saveList(){
   try{all=readForm("list",props,{});}catch(e){setErr("err_listedit",e.message);return;}
   const body={};
   Object.keys(all).forEach(k=>{if(all[k]!==undefined&&all[k]!==editing.values[k])body[k]=all[k];});
-  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  if(!Object.keys(body).length){toast(t("Nothing changed"));return;}
   try{
     await api("/api/v1/lists/"+encodeURIComponent(editing.address),{method:"PUT",body:JSON.stringify(body)});
-    toast("List saved");await openList(editing.address,editing.domain);
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_listedit",e.message);}
+    toast(t("List saved"));await openList(editing.address,editing.domain);
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_listedit",e.message);}
 }
 async function deleteList(address,domain){
-  if(!confirm("Delete the distribution list "+address+"?"))return;
+  if(!confirm(tf("Delete the distribution list {0}?",address)))return;
   const where=editing&&editing.kind==="list"?"err_listedit":"err_list_"+address;
   setErr(where,"");
-  try{await api("/api/v1/lists/"+encodeURIComponent(address),{method:"DELETE"});toast("List deleted: "+address);await showLists(domain);}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr(where,e.message);}
+  try{await api("/api/v1/lists/"+encodeURIComponent(address),{method:"DELETE"});toast(tf("List deleted: {0}",address));await showLists(domain);}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr(where,e.message);}
 }
 
 /* ---------- Delivery queue ---------- */
@@ -1187,32 +1293,32 @@ async function renderQueue(){
   const rows=(q.messages||[]).map(x=>`
     <tr><td>${escHtml(x.id)}</td><td>${escHtml(x.from||"—")}</td><td>${escHtml(x.recipients||"—")}</td><td>${escHtml(x.next_try||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="retry" data-id="${escHtml(x.id)}">Retry now</button>
-          <button class="btn danger sm" data-act="delmsg" data-id="${escHtml(x.id)}">Delete</button>
+          <button class="btn ghost sm" data-act="retry" data-id="${escHtml(x.id)}">${t("Retry now")}</button>
+          <button class="btn danger sm" data-act="delmsg" data-id="${escHtml(x.id)}">${t("Delete")}</button>
           <div class="err" id="err_queue_${escHtml(x.id)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
-    <div class="tablewrap"><table><thead><tr><th>ID</th><th>From</th><th>To</th><th>Next try</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="5" class="empty">The delivery queue is empty. ✦</td></tr>'}</tbody></table></div></div>`;
+    <div class="tablewrap"><table><thead><tr><th>${t("ID")}</th><th>${t("From")}</th><th>${t("To")}</th><th>${t("Next try")}</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="5" class="empty">'+t("The delivery queue is empty. ✦")+'</td></tr>'}</tbody></table></div></div>`;
 }
 async function retryMsg(id){
-  try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast("Delivery retriggered");renderQueue();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_queue_"+id,e.message);}
+  try{await api("/api/v1/queue/"+encodeURIComponent(id)+"/retry",{method:"POST"});toast(t("Delivery retriggered"));renderQueue();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_queue_"+id,e.message);}
 }
 async function delMsg(id){
-  if(!confirm("Remove message "+id+" from the queue?"))return;
-  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast("Message removed");renderQueue();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_queue_"+id,e.message);}
+  if(!confirm(tf("Remove message {0} from the queue?",id)))return;
+  try{await api("/api/v1/queue/"+encodeURIComponent(id),{method:"DELETE"});toast(t("Message removed"));renderQueue();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_queue_"+id,e.message);}
 }
 
 /* ---------- DANE / TLSA ---------- */
 async function renderTlsa(){
-  const t=await api("/api/v1/tlsa");
-  const recs=(t.records||[]).map(r=>r.record||JSON.stringify(r)).join("\n");
+  const answer=await api("/api/v1/tlsa");
+  const recs=(answer.records||[]).map(r=>r.record||JSON.stringify(r)).join("\n");
   $("#content").innerHTML=`<div class="view">
     <div class="card"><p class="note">
-      Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.</p>
-      <pre id="tlsaPre">${escHtml(recs||"No TLSA records available — assign an SSL certificate first.")}</pre>
-      <div style="margin-top:12px"><button class="btn ghost sm" data-act="copy">Copy all</button></div>
+      ${t("Publish-ready DANE TLSA records for your certificates. Add these to DNS (with DNSSEC) to enable DANE validation by sending servers.")}</p>
+      <pre id="tlsaPre">${escHtml(recs||t("No TLSA records available — assign an SSL certificate first."))}</pre>
+      <div style="margin-top:12px"><button class="btn ghost sm" data-act="copy">${t("Copy all")}</button></div>
     </div></div>`;
 }
 
@@ -1226,19 +1332,19 @@ async function renderTlsa(){
    the index run or emptied - draws a button per verb, worded from the route's
    own summary, and re-reads the group after one so its counters follow. */
 const SETTING_GROUPS=[
-  {id:"srv",  path:"/api/v1/settings",          title:"Server"},
-  {id:"spam", path:"/api/v1/settings/antispam", title:"Anti-spam"},
-  {id:"av",   path:"/api/v1/settings/antivirus", title:"Anti-virus"},
-  {id:"log",  path:"/api/v1/settings/logging",  title:"Logging"},
-  {id:"script",path:"/api/v1/settings/scripting",title:"Scripting",
-    verbs:[{path:"/api/v1/settings/scripting/reload",label:"Reload the script"},{path:"/api/v1/settings/scripting/check",label:"Check the syntax"}]},
-  {id:"cache",path:"/api/v1/settings/cache",    title:"Cache",
-    verbs:[{path:"/api/v1/settings/cache/clear",label:"Empty the caches"}]},
-  {id:"index",path:"/api/v1/settings/indexing", title:"Message indexing",
-    verbs:[{path:"/api/v1/settings/indexing/index",label:"Index now"},{path:"/api/v1/settings/indexing/clear",label:"Empty the index"}]}
+  {id:"srv",  path:"/api/v1/settings",          title:K("Server"),save:K("Save server settings")},
+  {id:"spam", path:"/api/v1/settings/antispam", title:K("Anti-spam"),save:K("Save anti-spam settings")},
+  {id:"av",   path:"/api/v1/settings/antivirus", title:K("Anti-virus"),save:K("Save anti-virus settings")},
+  {id:"log",  path:"/api/v1/settings/logging",  title:K("Logging"),save:K("Save logging settings")},
+  {id:"script",path:"/api/v1/settings/scripting",title:K("Scripting"),save:K("Save scripting settings"),
+    verbs:[{path:"/api/v1/settings/scripting/reload",label:K("Reload the script")},{path:"/api/v1/settings/scripting/check",label:K("Check the syntax")}]},
+  {id:"cache",path:"/api/v1/settings/cache",    title:K("Cache"),save:K("Save cache settings"),
+    verbs:[{path:"/api/v1/settings/cache/clear",label:K("Empty the caches")}]},
+  {id:"index",path:"/api/v1/settings/indexing", title:K("Message indexing"),save:K("Save message indexing settings"),
+    verbs:[{path:"/api/v1/settings/indexing/index",label:K("Index now")},{path:"/api/v1/settings/indexing/clear",label:K("Empty the index")}]}
 ];
 function verbButtonsHtml(g){
-  return (g.verbs||[]).map(v=>`<button class="btn ghost" data-act="setpost" data-group="${g.id}" data-path="${escHtml(v.path)}" data-label="${escHtml(v.label)}" title="${escHtml(operation(v.path,"post").summary||"")}">${escHtml(v.label)}</button>`).join("");
+  return (g.verbs||[]).map(v=>`<button class="btn ghost" data-act="setpost" data-group="${g.id}" data-path="${escHtml(v.path)}" data-label="${escHtml(t(v.label))}" title="${escHtml(operation(v.path,"post").summary||"")}">${escHtml(t(v.label))}</button>`).join("");
 }
 async function renderSettings(){
   await loadSpec();
@@ -1250,20 +1356,21 @@ async function renderSettings(){
     groups.push({g:g,props:props,values:values});
   }
   const cards=groups.map(({g,props,values})=>`
-    <div class="sect"><h2>${escHtml(g.title)} <code class="muted">PUT ${escHtml(g.path)}</code></h2>
+    <div class="sect"><h2>${escHtml(t(g.title))} <code class="muted">PUT ${escHtml(g.path)}</code></h2>
       <div class="card flat">
         <div class="form">${formHtml("set_"+g.id,props,values,{})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="setsave" data-group="${g.id}">Save ${escHtml(g.title.toLowerCase())} settings</button>
+          <button class="btn" data-act="setsave" data-group="${g.id}">${t(g.save)}</button>
           ${verbButtonsHtml(g)}
           <div class="err" id="err_set_${g.id}"></div>
         </div>
-        ${(g.verbs||[]).map(v=>'<p class="note" style="margin-top:12px">'+escHtml(operation(v.path,"post").summary||v.label)+'. '+escHtml(operation(v.path,"post").description||"")+'</p>').join("")}
+        ${(g.verbs||[]).map(v=>'<p class="note" style="margin-top:12px">'+escHtml(operation(v.path,"post").summary||t(v.label))+'. '+escHtml(operation(v.path,"post").description||"")+'</p>').join("")}
       </div></div>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
-      <p class="note">Every field below, its type and its words are read from the server's own OpenAPI document, so a setting added to the API appears here on its own. Only the fields you change are sent. A key marked <span class="badge info">write-only</span> is sent only when you fill it in; one marked <span class="badge warn">restart</span> is stored at once but reaches the running server when its services restart — the Ports view has the button that restarts them. A key marked <span class="badge info">read-only</span> is a counter or a fact about the server, shown and not sent.</p>
-      <input id="setFilter" placeholder="Filter settings by name or description" style="width:100%">
+      <p class="note">${tf("Every field below, its type and its words are read from the server's own OpenAPI document, so a setting added to the API appears here on its own. Only the fields you change are sent. A key marked {0} is sent only when you fill it in; one marked {1} is stored at once but reaches the running server when its services restart — the Ports view has the button that restarts them. A key marked {2} is a counter or a fact about the server, shown and not sent.",
+        '<span class="badge info">'+t("write-only")+'</span>','<span class="badge warn">'+t("restart")+'</span>','<span class="badge info">'+t("read-only")+'</span>')}</p>
+      <input id="setFilter" placeholder="${t("Filter settings by name or description")}" style="width:100%">
     </div>
     ${cards}</div>`;
   $("#setFilter").oninput=e=>{
@@ -1283,15 +1390,16 @@ async function saveSettings(groupId){
     if(isPassword(k,st.props[k])){body[k]=all[k];return;}
     if(all[k]!==st.values[k])body[k]=all[k];
   });
-  if(!Object.keys(body).length){toast("Nothing changed");return;}
+  if(!Object.keys(body).length){toast(t("Nothing changed"));return;}
   try{
     await api(st.path,{method:"PUT",body:JSON.stringify(body)});
-    toast(Object.keys(body).length+" setting"+(Object.keys(body).length===1?"":"s")+" saved");
+    const n=Object.keys(body).length;
+    toast(n===1?tf("{0} setting saved",n):tf("{0} settings saved",n));
     // The view that holds the group reads it back: Settings for its seven,
     // Backup for its own.
     await render();
   }catch(e){
-    if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
+    if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}
     setErr("err_set_"+groupId,e.message);
   }
 }
@@ -1304,12 +1412,12 @@ async function settingsPost(groupId,path,label){
     const answer=await api(path,{method:"POST"});
     if(answer&&answer.result!==undefined){
       if(answer.result){setErr("err_set_"+groupId,String(answer.result));return;}
-      toast("The script parses.");return;
+      toast(t("The script parses."));return;
     }
-    toast(label+": done");
+    toast(tf("{0}: done",label));
     await render();
   }catch(e){
-    if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
+    if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}
     setErr("err_set_"+groupId,e.message);
   }
 }
@@ -1365,7 +1473,7 @@ async function renderRules(){
   const words=ruleWords();
   const criteriaText=r=>(r.criteria||[]).map(c=>
       escHtml(humanise(c.field))+(c.header?" "+escHtml(c.header):"")+" "+escHtml(c.match)+" “"+escHtml(c.value)+"”"
-    ).join(r.all_criteria?" AND ":" OR ")||"—";
+    ).join(" "+(r.all_criteria?t("AND"):t("OR"))+" ")||"—";
   const actionsText=r=>(r.actions||[]).map(a=>{
       // A flag parameter reads as its caption when set and as nothing when not.
       const params=(words.actions[a.type]||[]).map(p=>typeof a[p]==="boolean"?(a[p]?humanise(p):""):a[p]).filter(v=>v!==undefined&&v!=="");
@@ -1373,19 +1481,19 @@ async function renderRules(){
       return escHtml(humanise(a.type))+(detail?" → "+escHtml(detail):"");
     }).join("; ")||"—";
   const rows=cache.rules.map(r=>`
-    <tr><td><b>${escHtml(r.name)}</b><div class="hint muted">id ${escHtml(r.id)}</div></td>
-        <td>${r.active?'<span class="badge good">On</span>':'<span class="badge warn">Off</span>'}</td>
+    <tr><td><b>${escHtml(r.name)}</b><div class="hint muted">${tf("id {0}",escHtml(r.id))}</div></td>
+        <td>${r.active?'<span class="badge good">'+t("On")+'</span>':'<span class="badge warn">'+t("Off")+'</span>'}</td>
         <td>${criteriaText(r)}</td><td>${actionsText(r)}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="ruleedit" data-id="${escHtml(r.id)}">Edit</button>
-          <button class="btn danger sm" data-act="ruledel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.name)}">Delete</button>
+          <button class="btn ghost sm" data-act="ruleedit" data-id="${escHtml(r.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="ruledel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.name)}">${t("Delete")}</button>
           <div class="err" id="err_rule_${escHtml(r.id)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/rules","get").description||"")}</p>
-      <div class="tablewrap"><table><thead><tr><th>Rule</th><th>Active</th><th>When</th><th>Then</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="5" class="empty">No global rules are defined.</td></tr>'}</tbody></table></div>
-      <div class="row" style="margin-top:16px"><button class="btn" data-act="rulenew">New rule</button></div>
+      <div class="tablewrap"><table><thead><tr><th>${t("Rule")}</th><th>${t("Active")}</th><th>${t("When")}</th><th>${t("Then")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="5" class="empty">'+t("No global rules are defined.")+'</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="rulenew">${t("New rule")}</button></div>
     </div></div>`;
 }
 function openRule(id){
@@ -1399,16 +1507,16 @@ function openRule(id){
 }
 function renderRuleEditor(){
   const words=ruleWords(), d=editing.rule;
-  const routeChoices=[{value:0,label:"(choose a route)"}].concat(
+  const routeChoices=[{value:0,label:t("(choose a route)")}].concat(
     cache.routes.map(r=>({value:r.id,label:r.domain_name+" → "+r.target_smtp_host+":"+r.target_smtp_port})));
   const criteria=d.criteria.map((c,i)=>`
     <div class="row erow">
       <select data-r="crit-field" data-i="${i}">${optionsHtml(words.fields,c.field)}</select>
-      <input data-r="crit-header" data-i="${i}" placeholder="Header name" value="${escHtml(c.header||"")}"${c.field==="header"?"":" hidden"}>
+      <input data-r="crit-header" data-i="${i}" placeholder="${t("Header name")}" value="${escHtml(c.header||"")}"${c.field==="header"?"":" hidden"}>
       <select data-r="crit-match" data-i="${i}">${optionsHtml(words.matches,c.match)}</select>
-      <input data-r="crit-value" data-i="${i}" placeholder="Value" value="${escHtml(c.value||"")}" style="flex:1;min-width:200px">
-      <button class="btn ghost sm" data-act="critdel" data-i="${i}">Remove</button>
-    </div>`).join("")||'<div class="note">No criteria: the rule matches every message.</div>';
+      <input data-r="crit-value" data-i="${i}" placeholder="${t("Value")}" value="${escHtml(c.value||"")}" style="flex:1;min-width:200px">
+      <button class="btn ghost sm" data-act="critdel" data-i="${i}">${t("Remove")}</button>
+    </div>`).join("")||'<div class="note">'+t("No criteria: the rule matches every message.")+'</div>';
   const actions=d.actions.map((a,i)=>{
     const params=words.actions[a.type]||[];
     const controls=params.map(p=>{
@@ -1417,35 +1525,35 @@ function renderRuleEditor(){
         return '<select data-r="act-'+p+'" data-i="'+i+'">'+optionsHtml(routeChoices,value)+'</select>';
       // The one flag among the parameters, with the desktop dialog's caption.
       if(p==="abort_spam_flagged")
-        return '<label class="row" style="gap:7px"><input type="checkbox" data-r="act-'+p+'" data-i="'+i+'"'+(value===true?" checked":"")+'> Abort on messages marked as spam</label>';
+        return '<label class="row" style="gap:7px"><input type="checkbox" data-r="act-'+p+'" data-i="'+i+'"'+(value===true?" checked":"")+'> '+t("Abort on messages marked as spam")+'</label>';
       if(p==="body")
-        return '<textarea data-r="act-'+p+'" data-i="'+i+'" rows="3" placeholder="Body" style="flex:1;min-width:240px">'+escHtml(value)+'</textarea>';
+        return '<textarea data-r="act-'+p+'" data-i="'+i+'" rows="3" placeholder="'+escHtml(t("Body"))+'" style="flex:1;min-width:240px">'+escHtml(value)+'</textarea>';
       return '<input data-r="act-'+p+'" data-i="'+i+'" placeholder="'+escHtml(humanise(p))+'" value="'+escHtml(value)+'" style="flex:1;min-width:170px">';
-    }).join("")||'<span class="muted" style="font-size:12.5px">This action takes no parameters.</span>';
+    }).join("")||'<span class="muted" style="font-size:12.5px">'+t("This action takes no parameters.")+'</span>';
     return `<div class="row erow">
       <select data-r="act-type" data-i="${i}">${optionsHtml(words.types,a.type)}</select>
       ${controls}
-      <button class="btn ghost sm" data-act="actdel" data-i="${i}">Remove</button>
+      <button class="btn ghost sm" data-act="actdel" data-i="${i}">${t("Remove")}</button>
     </div>`;
-  }).join("")||'<div class="note">No actions: the rule does nothing.</div>';
+  }).join("")||'<div class="note">'+t("No actions: the rule does nothing.")+'</div>';
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All rules</button>
-    <div class="sect"><h2>${editing.id?"Edit rule "+escHtml(editing.id):"New rule"}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All rules")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit rule {0}",escHtml(editing.id)):t("New rule")}</h2>
       <div class="card flat">
         <div class="row">
-          <input id="ruleName" placeholder="Rule name" value="${escHtml(d.name||"")}" style="flex:1;min-width:240px">
-          <label class="row" style="gap:7px"><input type="checkbox" id="ruleActive"${d.active?" checked":""}> Active</label>
-          <select id="ruleAll">${optionsHtml([{value:"all",label:"Every criterion must match"},{value:"any",label:"Any one criterion matches"}],d.all_criteria?"all":"any")}</select>
+          <input id="ruleName" placeholder="${t("Rule name")}" value="${escHtml(d.name||"")}" style="flex:1;min-width:240px">
+          <label class="row" style="gap:7px"><input type="checkbox" id="ruleActive"${d.active?" checked":""}> ${t("Active")}</label>
+          <select id="ruleAll">${optionsHtml([{value:"all",label:t("Every criterion must match")},{value:"any",label:t("Any one criterion matches")}],d.all_criteria?"all":"any")}</select>
         </div>
       </div>
     </div>
-    <div class="sect"><h2>When</h2><div class="card flat">${criteria}
-      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="critadd">Add criterion</button></div></div></div>
-    <div class="sect"><h2>Then</h2><div class="card flat">${actions}
-      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="actadd">Add action</button></div></div></div>
+    <div class="sect"><h2>${t("When")}</h2><div class="card flat">${criteria}
+      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="critadd">${t("Add criterion")}</button></div></div></div>
+    <div class="sect"><h2>${t("Then")}</h2><div class="card flat">${actions}
+      <div class="row" style="margin-top:14px"><button class="btn ghost sm" data-act="actadd">${t("Add action")}</button></div></div></div>
     <div class="sect"><div class="row">
-      <button class="btn" data-act="rulesave">Save rule</button>
-      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <button class="btn" data-act="rulesave">${t("Save rule")}</button>
+      <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
       <div class="err" id="err_ruleedit"></div>
     </div></div>
   </div>`;
@@ -1487,17 +1595,17 @@ async function saveRule(){
   try{
     if(editing.id)await api("/api/v1/rules/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/v1/rules",{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast("Rule saved");await render();
+    editing=null;toast(t("Rule saved"));await render();
   }catch(e){
-    if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}
+    if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}
     setErr("err_ruleedit",e.message);
   }
 }
 async function deleteRule(id,name){
-  if(!confirm("Delete the rule “"+name+"”?"))return;
+  if(!confirm(tf("Delete the rule “{0}”?",name)))return;
   setErr("err_rule_"+id,"");
-  try{await api("/api/v1/rules/"+id,{method:"DELETE"});toast("Rule deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_rule_"+id,e.message);}
+  try{await api("/api/v1/rules/"+id,{method:"DELETE"});toast(t("Rule deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_rule_"+id,e.message);}
 }
 
 /* ---------- Certificates ---------- */
@@ -1505,25 +1613,25 @@ async function renderCerts(){
   await loadSpec();
   cache.certificates=asList(await api("/api/v1/certificates"),"certificates");
   const rows=cache.certificates.map(c=>`
-    <tr><td><b>${escHtml(c.name)}</b><div class="hint muted">id ${escHtml(c.id)}</div></td>
+    <tr><td><b>${escHtml(c.name)}</b><div class="hint muted">${tf("id {0}",escHtml(c.id))}</div></td>
         <td><code>${escHtml(c.certificate_file||"—")}</code></td>
         <td><code>${escHtml(c.private_key_file||"—")}</code></td>
         <td style="text-align:right">
-          <button class="btn danger sm" data-act="certdel" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}">Delete</button>
+          <button class="btn danger sm" data-act="certdel" data-id="${escHtml(c.id)}" data-name="${escHtml(c.name)}">${t("Delete")}</button>
           <div class="err" id="err_cert_${escHtml(c.id)}"></div></td></tr>`).join("");
   const props=properties("/api/v1/certificates","post");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/certificates","get").description||"")}</p>
-      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Certificate file</th><th>Private key file</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="4" class="empty">No certificates are configured.</td></tr>'}</tbody></table></div>
+      <div class="tablewrap"><table><thead><tr><th>${t("Name")}</th><th>${t("Certificate file")}</th><th>${t("Private key file")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="4" class="empty">'+t("No certificates are configured.")+'</td></tr>'}</tbody></table></div>
     </div>
-    <div class="sect"><h2>Add a certificate</h2>
+    <div class="sect"><h2>${t("Add a certificate")}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation("/api/v1/certificates","post").description||"")}</p>
-        <div class="form">${formHtml("cert",props,{},{required:requiredOf("/api/v1/certificates","post"),passwordHint:"only if the key is encrypted"})}</div>
+        <div class="form">${formHtml("cert",props,{},{required:requiredOf("/api/v1/certificates","post"),passwordHint:t("only if the key is encrypted")})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="certadd">Add certificate</button>
+          <button class="btn" data-act="certadd">${t("Add certificate")}</button>
           <div class="err" id="err_certadd"></div>
         </div>
       </div></div>
@@ -1536,14 +1644,14 @@ async function addCertificate(){
   try{body=readForm("cert",props,{});}catch(e){setErr("err_certadd",e.message);return;}
   try{
     await api("/api/v1/certificates",{method:"POST",body:JSON.stringify(body)});
-    toast("Certificate added");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_certadd",e.message);}
+    toast(t("Certificate added"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_certadd",e.message);}
 }
 async function deleteCertificate(id,name){
-  if(!confirm("Delete the certificate “"+name+"”?"))return;
+  if(!confirm(tf("Delete the certificate “{0}”?",name)))return;
   setErr("err_cert_"+id,"");
-  try{await api("/api/v1/certificates/"+id,{method:"DELETE"});toast("Certificate deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_cert_"+id,e.message);}
+  try{await api("/api/v1/certificates/"+id,{method:"DELETE"});toast(t("Certificate deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_cert_"+id,e.message);}
 }
 
 /* ---------- Ports ----------
@@ -1558,17 +1666,17 @@ async function renderPorts(){
   if(editing&&editing.kind==="port"){renderPortEditor();return;}
   const certName=id=>{
     const c=cache.certificates.filter(x=>Number(x.id)===Number(id))[0];
-    return c?c.name:(Number(id)?"id "+id:"—");
+    return c?c.name:(Number(id)?tf("id {0}",id):"—");
   };
   const rows=cache.ports.map(p=>`
-    <tr><td><b>${escHtml(humanise(p.protocol))}</b><div class="hint muted">id ${escHtml(p.id)}</div></td>
+    <tr><td><b>${escHtml(humanise(p.protocol))}</b><div class="hint muted">${tf("id {0}",escHtml(p.id))}</div></td>
         <td><code>${escHtml(p.address)}:${escHtml(p.port)}</code></td>
         <td>${escHtml(humanise(p.connection_security))}</td>
         <td>${escHtml(certName(p.certificate_id))}</td>
         <td>${escHtml(humanise(p.client_certificate_policy))}${p.client_certificate_ca_file?'<div class="hint muted">'+escHtml(p.client_certificate_ca_file)+'</div>':""}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="portedit" data-id="${escHtml(p.id)}">Edit</button>
-          <button class="btn danger sm" data-act="portdel" data-id="${escHtml(p.id)}" data-label="${escHtml(p.protocol+" "+p.address+":"+p.port)}">Delete</button>
+          <button class="btn ghost sm" data-act="portedit" data-id="${escHtml(p.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="portdel" data-id="${escHtml(p.id)}" data-label="${escHtml(p.protocol+" "+p.address+":"+p.port)}">${t("Delete")}</button>
           <div class="err" id="err_port_${escHtml(p.id)}"></div></td></tr>`).join("");
   const restartWording=[
     sentencesWith(operation("/api/v1/ports","post").description,"restart"),
@@ -1578,12 +1686,12 @@ async function renderPorts(){
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/ports","get").description||"")}</p>
-      <p class="note"><span class="badge warn">restart</span> ${escHtml(restartWording)}</p>
-      <div class="tablewrap"><table><thead><tr><th>Protocol</th><th>Listens on</th><th>Security</th><th>Certificate</th><th>Client certificate</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" class="empty">No listeners are configured.</td></tr>'}</tbody></table></div>
+      <p class="note"><span class="badge warn">${t("restart")}</span> ${escHtml(restartWording)}</p>
+      <div class="tablewrap"><table><thead><tr><th>${t("Protocol")}</th><th>${t("Listens on")}</th><th>${t("Security")}</th><th>${t("Certificate")}</th><th>${t("Client certificate")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">'+t("No listeners are configured.")+'</td></tr>'}</tbody></table></div>
       <div class="row" style="margin-top:16px">
-        <button class="btn" data-act="portnew">Add a port</button>
-        <button class="btn ghost" data-act="portapply">Restart the services now</button>
+        <button class="btn" data-act="portnew">${t("Add a port")}</button>
+        <button class="btn ghost" data-act="portapply">${t("Restart the services now")}</button>
         <div class="err" id="err_portapply"></div>
       </div>
       <p class="note" style="margin-top:12px">${escHtml(operation("/api/v1/server/reinitialize","post").description||"")}</p>
@@ -1592,7 +1700,7 @@ async function renderPorts(){
 function portFormOptions(){
   return {
     required:requiredOf("/api/v1/ports","post"),
-    choices:{certificate_id:[{value:0,label:"(none)"}].concat(
+    choices:{certificate_id:[{value:0,label:t("(none)")}].concat(
       cache.certificates.map(c=>({value:c.id,label:c.name})))}
   };
 }
@@ -1607,14 +1715,14 @@ function openPort(id){
 function renderPortEditor(){
   const props=properties("/api/v1/ports","post");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All ports</button>
-    <div class="sect"><h2>${editing.id?"Edit port "+escHtml(editing.id):"New port"}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All ports")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit port {0}",escHtml(editing.id)):t("New port")}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation(editing.id?"/api/v1/ports/{id}":"/api/v1/ports",editing.id?"put":"post").description||"")}</p>
         <div class="form">${formHtml("port",props,editing.values,portFormOptions())}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="portsave">Save port</button>
-          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <button class="btn" data-act="portsave">${t("Save port")}</button>
+          <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
           <div class="err" id="err_portedit"></div>
         </div>
       </div></div></div>`;
@@ -1627,21 +1735,21 @@ async function savePort(){
   try{
     if(editing.id)await api("/api/v1/ports/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/v1/ports",{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast("Port saved — it reaches the wire when the services restart");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_portedit",e.message);}
+    editing=null;toast(t("Port saved — it reaches the wire when the services restart"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_portedit",e.message);}
 }
 async function deletePort(id,label){
-  if(!confirm("Delete the listener "+label+"?"))return;
+  if(!confirm(tf("Delete the listener {0}?",label)))return;
   setErr("err_port_"+id,"");
-  try{await api("/api/v1/ports/"+id,{method:"DELETE"});toast("Port deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_port_"+id,e.message);}
+  try{await api("/api/v1/ports/"+id,{method:"DELETE"});toast(t("Port deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_port_"+id,e.message);}
 }
 async function applyRestart(){
   setErr("err_portapply","");
-  if(!confirm("Restart the server's services now? Connections in progress are dropped, and this browser session ends with them."))return;
+  if(!confirm(t("Restart the server's services now? Connections in progress are dropped, and this browser session ends with them.")))return;
   try{await api("/api/v1/server/reinitialize",{method:"POST"});}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_portapply",e.message);return;}
-  toast("Restarting the services…");
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_portapply",e.message);return;}
+  toast(t("Restarting the services…"));
   if(pollTimer){clearInterval(pollTimer);pollTimer=null;}
   // The listener stops and starts with the rest of the services, and it drops
   // every browser session as it goes, so what is waited for is this page coming
@@ -1653,9 +1761,9 @@ async function applyRestart(){
     await new Promise(r=>setTimeout(r,1000));
     let res=null;
     try{res=await fetch("/",{credentials:"omit",cache:"no-store"});}catch(_){continue;}
-    if(res.status===200){signedOut("The services restarted, which ended this session. Sign in again.");return;}
+    if(res.status===200){signedOut(t("The services restarted, which ended this session. Sign in again."));return;}
   }
-  signedOut("The server did not answer after the restart. Sign in again when it is back.");
+  signedOut(t("The server did not answer after the restart. Sign in again when it is back."));
 }
 
 /* ---------- Routes ---------- */
@@ -1666,29 +1774,30 @@ function routeFormOptions(){
     // treat_recipient_as_local_domain and the document gives both for the same
     // flag; one control writes it, so only one is drawn.
     skip:["treat_security_as_local_domain"],
-    passwordHint:"left unchanged unless filled"
+    passwordHint:t("left unchanged unless filled")
   };
 }
 async function renderRoutes(){
   await loadSpec();
   cache.routes=asList(await api("/api/v1/routes"),"routes");
   if(editing&&editing.kind==="route"){renderRouteEditor();return;}
+  const addressCount=n=>n===1?tf("{0} address",n):tf("{0} addresses",n);
   const rows=cache.routes.map(r=>`
-    <tr><td><b>${escHtml(r.domain_name)}</b>${r.description?'<div class="hint muted">'+escHtml(r.description)+'</div>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
+    <tr><td><b>${escHtml(r.domain_name)}</b>${r.description?'<div class="hint muted">'+escHtml(r.description)+'</div>':""}<div class="hint muted">${tf("id {0}",escHtml(r.id))}</div></td>
         <td><code>${escHtml(r.target_smtp_host)}:${escHtml(r.target_smtp_port)}</code></td>
         <td>${escHtml(humanise(r.connection_security))}</td>
-        <td>${r.relayer_requires_authentication?escHtml(r.relayer_auth_username||"(no user name)"):'<span class="muted">none</span>'}</td>
-        <td>${r.all_addresses?'<span class="muted">every recipient</span>':escHtml((r.addresses||[]).length+" address"+((r.addresses||[]).length===1?"":"es"))}</td>
+        <td>${r.relayer_requires_authentication?escHtml(r.relayer_auth_username||t("(no user name)")):'<span class="muted">'+t("none")+'</span>'}</td>
+        <td>${r.all_addresses?'<span class="muted">'+t("every recipient")+'</span>':escHtml(addressCount((r.addresses||[]).length))}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="routeedit" data-id="${escHtml(r.id)}">Edit</button>
-          <button class="btn danger sm" data-act="routedel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.domain_name)}">Delete</button>
+          <button class="btn ghost sm" data-act="routeedit" data-id="${escHtml(r.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="routedel" data-id="${escHtml(r.id)}" data-name="${escHtml(r.domain_name)}">${t("Delete")}</button>
           <div class="err" id="err_route_${escHtml(r.id)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/routes","get").description||"")}</p>
-      <div class="tablewrap"><table><thead><tr><th>Domain</th><th>Target</th><th>Security</th><th>Authentication</th><th>Recipients</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="6" class="empty">No routes are configured; every domain is delivered to by its MX records.</td></tr>'}</tbody></table></div>
-      <div class="row" style="margin-top:16px"><button class="btn" data-act="routenew">Add a route</button></div>
+      <div class="tablewrap"><table><thead><tr><th>${t("Domain")}</th><th>${t("Target")}</th><th>${t("Security")}</th><th>${t("Authentication")}</th><th>${t("Recipients")}</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="6" class="empty">'+t("No routes are configured; every domain is delivered to by its MX records.")+'</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="routenew">${t("Add a route")}</button></div>
     </div></div>`;
 }
 function openRoute(id){
@@ -1702,14 +1811,14 @@ function openRoute(id){
 function renderRouteEditor(){
   const props=properties("/api/v1/routes","post");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All routes</button>
-    <div class="sect"><h2>${editing.id?"Edit route "+escHtml(editing.id):"New route"}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All routes")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit route {0}",escHtml(editing.id)):t("New route")}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation(editing.id?"/api/v1/routes/{id}":"/api/v1/routes",editing.id?"put":"post").description||"")}</p>
         <div class="form">${formHtml("route",props,editing.values,routeFormOptions())}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="routesave">Save route</button>
-          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <button class="btn" data-act="routesave">${t("Save route")}</button>
+          <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
           <div class="err" id="err_routeedit"></div>
         </div>
       </div></div></div>`;
@@ -1722,14 +1831,14 @@ async function saveRoute(){
   try{
     if(editing.id)await api("/api/v1/routes/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/v1/routes",{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast("Route saved");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_routeedit",e.message);}
+    editing=null;toast(t("Route saved"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_routeedit",e.message);}
 }
 async function deleteRoute(id,name){
-  if(!confirm("Delete the route for "+name+"?"))return;
+  if(!confirm(tf("Delete the route for {0}?",name)))return;
   setErr("err_route_"+id,"");
-  try{await api("/api/v1/routes/"+id,{method:"DELETE"});toast("Route deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_route_"+id,e.message);}
+  try{await api("/api/v1/routes/"+id,{method:"DELETE"});toast(t("Route deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_route_"+id,e.message);}
 }
 
 /* ---------- IP ranges ----------
@@ -1746,25 +1855,25 @@ async function deleteRoute(id,name){
    ranges and the desktop dialog offers: a range that expires is removed once
    its time passes, and the time goes only with the flag. */
 const RANGE_GROUPS=[
-  {title:"General",keys:["name","lower","upper","priority"]},
-  {title:"Connections",keys:["allow_smtp","allow_imap","allow_pop3"]},
-  {title:"Relaying",keys:["deliver_local_to_local","deliver_local_to_remote","deliver_remote_to_local","deliver_remote_to_remote"]},
-  {title:"Require auth",keys:["require_auth_local_to_local","require_auth_local_to_remote","require_auth_remote_to_local","require_auth_remote_to_remote","require_tls_for_auth"]},
-  {title:"Protection",keys:["spam_protection","virus_protection"]},
-  {title:"Expiry",keys:["expires","expires_time"]}
+  {title:K("General"),keys:["name","lower","upper","priority"]},
+  {title:K("Connections"),keys:["allow_smtp","allow_imap","allow_pop3"]},
+  {title:K("Relaying"),keys:["deliver_local_to_local","deliver_local_to_remote","deliver_remote_to_local","deliver_remote_to_remote"]},
+  {title:K("Require auth"),keys:["require_auth_local_to_local","require_auth_local_to_remote","require_auth_remote_to_local","require_auth_remote_to_remote","require_tls_for_auth"]},
+  {title:K("Protection"),keys:["spam_protection","virus_protection"]},
+  {title:K("Expiry"),keys:["expires","expires_time"]}
 ];
 const RANGE_HINTS={
-  name:"A name for the range.",lower:"The lowest address of the range, IPv4 or IPv6.",upper:"The highest address of the range.",
-  priority:"Higher wins when ranges overlap.",
-  allow_smtp:"Allow SMTP connections from the range.",allow_imap:"Allow IMAP connections.",allow_pop3:"Allow POP3 connections.",
-  deliver_local_to_local:"Local sender to local recipient.",deliver_local_to_remote:"Local sender to external recipient (relay out).",
-  deliver_remote_to_local:"External sender to local recipient (incoming mail).",deliver_remote_to_remote:"External sender to external recipient - an open relay unless authentication is required.",
-  require_auth_local_to_local:"Require SMTP authentication for local to local.",require_auth_local_to_remote:"Require SMTP authentication for local to external.",
-  require_auth_remote_to_local:"Require SMTP authentication for external to local.",require_auth_remote_to_remote:"Require SMTP authentication for external to external.",
-  require_tls_for_auth:"Require SSL/TLS when authenticating.",
-  spam_protection:"Run the anti-spam checks on mail from this range.",virus_protection:"Run the anti-virus scan on mail from this range.",
-  expires:"Remove the range once the time below passes, as one the auto-ban placed is removed.",
-  expires_time:"YYYY-MM-DD HH:MM:SS on the server's clock, or a date alone for midnight; required when the range expires, and taken only then."
+  name:K("A name for the range."),lower:K("The lowest address of the range, IPv4 or IPv6."),upper:K("The highest address of the range."),
+  priority:K("Higher wins when ranges overlap."),
+  allow_smtp:K("Allow SMTP connections from the range."),allow_imap:K("Allow IMAP connections."),allow_pop3:K("Allow POP3 connections."),
+  deliver_local_to_local:K("Local sender to local recipient."),deliver_local_to_remote:K("Local sender to external recipient (relay out)."),
+  deliver_remote_to_local:K("External sender to local recipient (incoming mail)."),deliver_remote_to_remote:K("External sender to external recipient - an open relay unless authentication is required."),
+  require_auth_local_to_local:K("Require SMTP authentication for local to local."),require_auth_local_to_remote:K("Require SMTP authentication for local to external."),
+  require_auth_remote_to_local:K("Require SMTP authentication for external to local."),require_auth_remote_to_remote:K("Require SMTP authentication for external to external."),
+  require_tls_for_auth:K("Require SSL/TLS when authenticating."),
+  spam_protection:K("Run the anti-spam checks on mail from this range."),virus_protection:K("Run the anti-virus scan on mail from this range."),
+  expires:K("Remove the range once the time below passes, as one the auto-ban placed is removed."),
+  expires_time:K("YYYY-MM-DD HH:MM:SS on the server's clock, or a date alone for midnight; required when the range expires, and taken only then.")
 };
 const RANGE_DEFAULTS={priority:15,expires:false,allow_smtp:true,allow_imap:true,allow_pop3:true,
   deliver_local_to_local:true,deliver_local_to_remote:false,deliver_remote_to_local:true,deliver_remote_to_remote:false,
@@ -1781,30 +1890,30 @@ function groupedKeys(groups,props){
   const named={};
   const out=groups.map(g=>({title:g.title,keys:g.keys.filter(k=>{named[k]=true;return k in props;})})).filter(g=>g.keys.length);
   const rest=Object.keys(props).filter(k=>!named[k]);
-  if(rest.length)out.push({title:"Other",keys:rest});
+  if(rest.length)out.push({title:K("Other"),keys:rest});
   return out;
 }
 function pick(props,keys){const out={};keys.forEach(k=>{out[k]=props[k];});return out;}
-const yesNo=v=>v?'<span class="badge good">yes</span>':'<span class="badge warn">no</span>';
+const yesNo=v=>v?'<span class="badge good">'+t("yes")+'</span>':'<span class="badge warn">'+t("no")+'</span>';
 async function renderIpRanges(){
   await loadSpec();
   cache.ranges=asList(await api("/api/v1/ipranges"),"ranges");
   if(editing&&editing.kind==="range"){renderRangeEditor();return;}
   const rows=cache.ranges.map(r=>`
-    <tr><td><b>${escHtml(r.name)}</b>${r.expires?' <span class="badge info">expires '+escHtml(r.expires_time||"")+'</span>':""}<div class="hint muted">id ${escHtml(r.id)}</div></td>
+    <tr><td><b>${escHtml(r.name)}</b>${r.expires?' <span class="badge info">'+tf("expires {0}",escHtml(r.expires_time||""))+'</span>':""}<div class="hint muted">${tf("id {0}",escHtml(r.id))}</div></td>
         <td><code>${escHtml(r.lower)}</code></td><td><code>${escHtml(r.upper)}</code></td>
         <td>${escHtml(r.priority)}</td>
         <td>${yesNo(r.allow_smtp)}</td><td>${yesNo(r.allow_imap)}</td><td>${yesNo(r.allow_pop3)}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="rangeedit" data-id="${escHtml(r.id)}">Edit</button>
-          <button class="btn danger sm" data-act="rangedel" data-id="${escHtml(r.id)}" data-label="${escHtml(r.name+" ("+r.lower+" – "+r.upper+")")}">Delete</button>
+          <button class="btn ghost sm" data-act="rangeedit" data-id="${escHtml(r.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="rangedel" data-id="${escHtml(r.id)}" data-label="${escHtml(r.name+" ("+r.lower+" – "+r.upper+")")}">${t("Delete")}</button>
           <div class="err" id="err_range_${escHtml(r.id)}"></div></td></tr>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
-      <p class="note">Access control: which addresses may connect and what they are allowed to do. Higher priority wins when ranges overlap. ${escHtml(operation("/api/v1/ipranges","get").description||"")}</p>
-      <div class="tablewrap"><table><thead><tr><th>Name</th><th>Lower IP</th><th>Upper IP</th><th>Priority</th><th>SMTP</th><th>IMAP</th><th>POP3</th><th></th></tr></thead>
-      <tbody>${rows||'<tr><td colspan="8" class="empty">No IP ranges: nothing may connect.</td></tr>'}</tbody></table></div>
-      <div class="row" style="margin-top:16px"><button class="btn" data-act="rangenew">Add a range</button></div>
+      <p class="note">${t("Access control: which addresses may connect and what they are allowed to do. Higher priority wins when ranges overlap.")} ${escHtml(operation("/api/v1/ipranges","get").description||"")}</p>
+      <div class="tablewrap"><table><thead><tr><th>${t("Name")}</th><th>${t("Lower IP")}</th><th>${t("Upper IP")}</th><th>${t("Priority")}</th><th>SMTP</th><th>IMAP</th><th>POP3</th><th></th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="8" class="empty">'+t("No IP ranges: nothing may connect.")+'</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:16px"><button class="btn" data-act="rangenew">${t("Add a range")}</button></div>
     </div></div>`;
 }
 function openRange(id){
@@ -1816,16 +1925,16 @@ function openRange(id){
 function renderRangeEditor(){
   const props=rangeProps(), required=requiredOf("/api/v1/ipranges","post");
   const cards=groupedKeys(RANGE_GROUPS,props).map(g=>`
-    <div class="sect"><h2>${escHtml(g.title)}</h2>
+    <div class="sect"><h2>${escHtml(t(g.title))}</h2>
       <div class="card flat"><div class="form">${formHtml("range",pick(props,g.keys),editing.values,{required:required})}</div></div></div>`).join("");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All IP ranges</button>
-    <div class="sect"><h2>${editing.id?"Edit IP range "+escHtml(editing.id):"New IP range"}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All IP ranges")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit IP range {0}",escHtml(editing.id)):t("New IP range")}</h2>
       <div class="card flat"><p class="note">${escHtml(operation(editing.id?"/api/v1/ipranges/{id}":"/api/v1/ipranges",editing.id?"put":"post").description||operation("/api/v1/ipranges","post").summary||"")}</p></div></div>
     ${cards}
     <div class="sect"><div class="row">
-      <button class="btn" data-act="rangesave">Save IP range</button>
-      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <button class="btn" data-act="rangesave">${t("Save IP range")}</button>
+      <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
       <div class="err" id="err_rangeedit"></div>
     </div></div></div>`;
 }
@@ -1836,14 +1945,14 @@ async function saveRange(){
   try{
     if(editing.id)await api("/api/v1/ipranges/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/v1/ipranges",{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast("IP range saved");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_rangeedit",e.message);}
+    editing=null;toast(t("IP range saved"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_rangeedit",e.message);}
 }
 async function deleteRange(id,label){
-  if(!confirm("Delete the IP range "+label+"?"))return;
+  if(!confirm(tf("Delete the IP range {0}?",label)))return;
   setErr("err_range_"+id,"");
-  try{await api("/api/v1/ipranges/"+id,{method:"DELETE"});toast("IP range deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_range_"+id,e.message);}
+  try{await api("/api/v1/ipranges/"+id,{method:"DELETE"});toast(t("IP range deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_range_"+id,e.message);}
 }
 
 /* ---------- Fetch accounts ----------
@@ -1857,24 +1966,24 @@ async function deleteRange(id,label){
    defaults the route's description states - enabled, every 30 minutes, keep 0
    days, pop3, no security - read out of that sentence. */
 const FETCH_GROUPS=[
-  {title:"External account",keys:["enabled","name","server_type","server_address","port","connection_security","username","password"]},
-  {title:"Schedule",keys:["minutes_between_fetch","days_to_keep_messages"]},
-  {title:"Downloaded mail",keys:["use_antispam","use_antivirus","mirror_folders","process_mime_recipients","process_mime_date","enable_route_recipients","mime_recipient_headers"]}
+  {title:K("External account"),keys:["enabled","name","server_type","server_address","port","connection_security","username","password"]},
+  {title:K("Schedule"),keys:["minutes_between_fetch","days_to_keep_messages"]},
+  {title:K("Downloaded mail"),keys:["use_antispam","use_antivirus","mirror_folders","process_mime_recipients","process_mime_date","enable_route_recipients","mime_recipient_headers"]}
 ];
 const FETCH_HINTS={
-  enabled:"Collect from this mailbox on the schedule.",name:"A name for the external account.",
-  server_type:"POP3 or IMAP.",server_address:"The remote server.",
-  port:"Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143.",
-  connection_security:"How the connection to the remote server is secured.",username:"The user name at the remote server.",
-  password:"The password at the remote server. Accepted here and never shown.",
-  minutes_between_fetch:"Minutes between downloads.",
-  days_to_keep_messages:"Days to keep a message on the remote server; 0 deletes it after the download, -1 keeps every message.",
-  use_antispam:"Run anti-spam on downloaded mail.",use_antivirus:"Run anti-virus on downloaded mail.",
-  mirror_folders:"Mirror every folder (IMAP only): a migration, verbatim, with flags and dates, nothing delivered.",
-  process_mime_recipients:"Read the recipients from the message's headers and deliver to the local ones found there; when none are, to this account.",
-  process_mime_date:"Use the message's own Date header as its date rather than the time of the download.",
-  enable_route_recipients:"Also deliver to a recipient found in the headers when a route covers its domain.",
-  mime_recipient_headers:"The headers the recipients are read from, comma-separated."
+  enabled:K("Collect from this mailbox on the schedule."),name:K("A name for the external account."),
+  server_type:K("POP3 or IMAP."),server_address:K("The remote server."),
+  port:K("Connection security and port go together: SSL/TLS on 995 (POP3) or 993 (IMAP), STARTTLS on 110 or 143."),
+  connection_security:K("How the connection to the remote server is secured."),username:K("The user name at the remote server."),
+  password:K("The password at the remote server. Accepted here and never shown."),
+  minutes_between_fetch:K("Minutes between downloads."),
+  days_to_keep_messages:K("Days to keep a message on the remote server; 0 deletes it after the download, -1 keeps every message."),
+  use_antispam:K("Run anti-spam on downloaded mail."),use_antivirus:K("Run anti-virus on downloaded mail."),
+  mirror_folders:K("Mirror every folder (IMAP only): a migration, verbatim, with flags and dates, nothing delivered."),
+  process_mime_recipients:K("Read the recipients from the message's headers and deliver to the local ones found there; when none are, to this account."),
+  process_mime_date:K("Use the message's own Date header as its date rather than the time of the download."),
+  enable_route_recipients:K("Also deliver to a recipient found in the headers when a route covers its domain."),
+  mime_recipient_headers:K("The headers the recipients are read from, comma-separated.")
 };
 function fetchProps(){
   const props=properties("/api/v1/accounts/{address}/fetch-accounts","post"), out={};
@@ -1891,16 +2000,16 @@ async function renderFetch(){
   f.items=f.address?asList(await api("/api/v1/accounts/"+encodeURIComponent(f.address)+"/fetch-accounts"),"fetch_accounts"):[];
   if(editing&&editing.kind==="fetch"){renderFetchEditor();return;}
   const rows=f.items.map(x=>`
-    <tr><td><b>${escHtml(x.name)}</b><div class="hint muted">id ${escHtml(x.id)}</div></td>
-        <td>${x.enabled?'<span class="badge good">On</span>':'<span class="badge warn">Off</span>'}${x.locked?' <span class="badge info">collecting</span>':""}</td>
+    <tr><td><b>${escHtml(x.name)}</b><div class="hint muted">${tf("id {0}",escHtml(x.id))}</div></td>
+        <td>${x.enabled?'<span class="badge good">'+t("On")+'</span>':'<span class="badge warn">'+t("Off")+'</span>'}${x.locked?' <span class="badge info">'+t("collecting")+'</span>':""}</td>
         <td><code>${escHtml(x.server_address)}:${escHtml(x.port)}</code><div class="hint muted">${escHtml(humanise(x.server_type))}, ${escHtml(humanise(x.connection_security))}</div></td>
         <td>${escHtml(x.username||"—")}</td>
-        <td>${escHtml(x.minutes_between_fetch)} min<div class="hint muted">keep ${escHtml(x.days_to_keep_messages)} days</div></td>
+        <td>${tf("{0} min",escHtml(x.minutes_between_fetch))}<div class="hint muted">${tf("keep {0} days",escHtml(x.days_to_keep_messages))}</div></td>
         <td>${escHtml(x.next_download_time||"—")}</td>
         <td style="text-align:right;white-space:nowrap">
-          <button class="btn ghost sm" data-act="fetchnow" data-id="${escHtml(x.id)}">Collect now</button>
-          <button class="btn ghost sm" data-act="fetchedit" data-id="${escHtml(x.id)}">Edit</button>
-          <button class="btn danger sm" data-act="fetchdel" data-id="${escHtml(x.id)}" data-name="${escHtml(x.name)}">Delete</button>
+          <button class="btn ghost sm" data-act="fetchnow" data-id="${escHtml(x.id)}">${t("Collect now")}</button>
+          <button class="btn ghost sm" data-act="fetchedit" data-id="${escHtml(x.id)}">${t("Edit")}</button>
+          <button class="btn danger sm" data-act="fetchdel" data-id="${escHtml(x.id)}" data-name="${escHtml(x.name)}">${t("Delete")}</button>
           <div class="err" id="err_fetch_${escHtml(x.id)}"></div></td></tr>`).join("");
   const domainChoices=cache.domains.map(d=>({value:d.name,label:d.name}));
   const accountChoices=f.accounts.map(a=>({value:a.address,label:a.address}));
@@ -1908,15 +2017,15 @@ async function renderFetch(){
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/accounts/{address}/fetch-accounts","get").description||"")}</p>
       <div class="row">
-        <label class="row" style="gap:7px">Domain <select id="fetchDomain" data-r="fetch-domain">${optionsHtml(domainChoices,f.domain)}</select></label>
-        <label class="row" style="gap:7px">Account <select id="fetchAccount" data-r="fetch-account">${optionsHtml(accountChoices,f.address)}</select></label>
+        <label class="row" style="gap:7px">${t("Domain")} <select id="fetchDomain" data-r="fetch-domain">${optionsHtml(domainChoices,f.domain)}</select></label>
+        <label class="row" style="gap:7px">${t("Account")} <select id="fetchAccount" data-r="fetch-account">${optionsHtml(accountChoices,f.address)}</select></label>
       </div>
     </div>
-    <div class="sect"><h2>${f.address?escHtml(f.address)+" — external accounts":"No account to collect for"}</h2>
+    <div class="sect"><h2>${f.address?tf("{0} — external accounts",escHtml(f.address)):t("No account to collect for")}</h2>
       <div class="card flat">
-        <div class="tablewrap"><table><thead><tr><th>Name</th><th>State</th><th>Server</th><th>User name</th><th>Every</th><th>Next download</th><th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="7" class="empty">'+(f.address?"No external accounts are collected for "+escHtml(f.address)+".":"Choose a domain that has accounts.")+'</td></tr>'}</tbody></table></div>
-        ${f.address?'<div class="row" style="margin-top:16px"><button class="btn" data-act="fetchnew">Add an external account</button></div>':""}
+        <div class="tablewrap"><table><thead><tr><th>${t("Name")}</th><th>${t("State")}</th><th>${t("Server")}</th><th>${t("User name")}</th><th>${t("Every")}</th><th>${t("Next download")}</th><th></th></tr></thead>
+        <tbody>${rows||'<tr><td colspan="7" class="empty">'+(f.address?tf("No external accounts are collected for {0}.",escHtml(f.address)):t("Choose a domain that has accounts."))+'</td></tr>'}</tbody></table></div>
+        ${f.address?'<div class="row" style="margin-top:16px"><button class="btn" data-act="fetchnew">'+t("Add an external account")+'</button></div>':""}
       </div></div></div>`;
 }
 function openFetch(id){
@@ -1930,17 +2039,17 @@ function openFetch(id){
 function renderFetchEditor(){
   const props=fetchProps(), required=requiredOf("/api/v1/accounts/{address}/fetch-accounts","post");
   const cards=groupedKeys(FETCH_GROUPS,props).map(g=>`
-    <div class="sect"><h2>${escHtml(g.title)}</h2>
+    <div class="sect"><h2>${escHtml(t(g.title))}</h2>
       <div class="card flat"><div class="form">${formHtml("fetch",pick(props,g.keys),editing.values,{required:required})}</div></div></div>`).join("");
   const op=editing.id?operation("/api/v1/accounts/{address}/fetch-accounts/{id}","put"):operation("/api/v1/accounts/{address}/fetch-accounts","post");
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All external accounts</button>
-    <div class="sect"><h2>${editing.id?"Edit external account "+escHtml(editing.id):"New external account"} for ${escHtml(cache.fetch.address)}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All external accounts")}</button>
+    <div class="sect"><h2>${editing.id?tf("Edit external account {0} for {1}",escHtml(editing.id),escHtml(cache.fetch.address)):tf("New external account for {0}",escHtml(cache.fetch.address))}</h2>
       <div class="card flat"><p class="note">${escHtml(op.description||"")}</p></div></div>
     ${cards}
     <div class="sect"><div class="row">
-      <button class="btn" data-act="fetchsave">Save external account</button>
-      <button class="btn ghost" data-act="cancel">Cancel</button>
+      <button class="btn" data-act="fetchsave">${t("Save external account")}</button>
+      <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
       <div class="err" id="err_fetchedit"></div>
     </div></div></div>`;
 }
@@ -1952,19 +2061,19 @@ async function saveFetch(){
   try{
     if(editing.id)await api("/api/v1/accounts/"+address+"/fetch-accounts/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api("/api/v1/accounts/"+address+"/fetch-accounts",{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast("External account saved");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetchedit",e.message);}
+    editing=null;toast(t("External account saved"));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_fetchedit",e.message);}
 }
 async function deleteFetch(id,name){
-  if(!confirm("Delete the external account "+name+"? Mail already collected stays."))return;
+  if(!confirm(tf("Delete the external account {0}? Mail already collected stays.",name)))return;
   setErr("err_fetch_"+id,"");
-  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id,{method:"DELETE"});toast("External account deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetch_"+id,e.message);}
+  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id,{method:"DELETE"});toast(t("External account deleted"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_fetch_"+id,e.message);}
 }
 async function fetchNow(id){
   setErr("err_fetch_"+id,"");
-  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id+"/download",{method:"POST"});toast("Collection queued");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_fetch_"+id,e.message);}
+  try{await api("/api/v1/accounts/"+encodeURIComponent(cache.fetch.address)+"/fetch-accounts/"+id+"/download",{method:"POST"});toast(t("Collection queued"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_fetch_"+id,e.message);}
 }
 
 /* ---------- Lists ----------
@@ -1980,22 +2089,32 @@ async function fetchNow(id){
    where the description has none - a score of 5 for a DNS list, 100 for a
    blocked sender, *.exe for an attachment. Save posts a new entry and PUTs
    the whole record of an existing one by id, as the range editor does, then
-   reads the collections again. The captions are the desktop editors'. */
+   reads the collections again. The captions are the desktop editors'. Each
+   collection carries its own sentences rather than a noun the sentences are
+   built around, because a noun's gender and case change the sentence in most
+   of the languages the page speaks. */
 const COLLECTIONS=[
-  {id:"dnsbl",path:"/api/v1/dns-blacklists",title:"DNS blacklists",noun:"DNS blacklist",columns:["active","dns_host","expected_result","reject_message","score"],
-    defaults:{score:5},hints:{active:"Consulted for the next message.",dns_host:"The zone the connecting address is looked up in.",expected_result:"The answers that mean listed: 127.0.0.2, a range or a wildcard.",reject_message:"The text of the refusal.",score:"The spam score a listing adds."}},
-  {id:"surbl",path:"/api/v1/surbl-servers",title:"SURBL servers",noun:"SURBL server",columns:["active","dns_host","expected_result","reject_message","score"],
-    defaults:{score:5},hints:{active:"Consulted for the next message.",dns_host:"The zone the domains in a message are looked up in.",expected_result:"The answers that mean listed; empty is any answer but a refusal code.",reject_message:"The text of the refusal.",score:"The spam score a listing adds."}},
-  {id:"whitelist",path:"/api/v1/whitelist-addresses",title:"Anti-spam white list",noun:"white-list address",columns:["lower_ip","upper_ip","email_address","description"],
-    defaults:{},hints:{lower_ip:"The lowest address of the range.",upper_ip:"The highest address of the range.",email_address:"The sender, with wildcards; empty is any.",description:"A note."}},
-  {id:"blocked",path:"/api/v1/blocked-senders",title:"Blocked senders",noun:"blocked sender",columns:["address","score","description"],
-    defaults:{score:100},hints:{address:"An address, or a domain that covers its subdomains.",score:"The spam score the sender adds; the desktop's 100 crosses every threshold.",description:"A note."}},
-  {id:"attachments",path:"/api/v1/blocked-attachments",title:"Blocked attachments",noun:"blocked attachment",columns:["wildcard","description"],
-    defaults:{wildcard:"*.exe"},hints:{wildcard:"A file-name pattern, such as *.exe.",description:"A note."}},
-  {id:"greylist",path:"/api/v1/greylisting-white-addresses",title:"Greylisting white list",noun:"greylisting white address",columns:["ip_address","description"],
-    defaults:{},hints:{ip_address:"An address, or a pattern such as 192.168.* or 2001:db8:*.",description:"A note."}},
-  {id:"relays",path:"/api/v1/incoming-relays",title:"Incoming relays",noun:"incoming relay",columns:["name","lower_ip","upper_ip"],
-    defaults:{},hints:{name:"A name for the relay.",lower_ip:"The lowest address of the range.",upper_ip:"The highest address of the range."}}
+  {id:"dnsbl",path:"/api/v1/dns-blacklists",title:K("DNS blacklists"),columns:["active","dns_host","expected_result","reject_message","score"],
+    add:K("Add a DNS blacklist"),fresh:K("New DNS blacklist"),edit:K("Edit DNS blacklist {0}"),save:K("Save DNS blacklist"),ask:K("Delete the DNS blacklist {0}?"),saved:K("DNS blacklist saved"),deleted:K("DNS blacklist deleted"),
+    defaults:{score:5},hints:{active:K("Consulted for the next message."),dns_host:K("The zone the connecting address is looked up in."),expected_result:K("The answers that mean listed: 127.0.0.2, a range or a wildcard."),reject_message:K("The text of the refusal."),score:K("The spam score a listing adds.")}},
+  {id:"surbl",path:"/api/v1/surbl-servers",title:K("SURBL servers"),columns:["active","dns_host","expected_result","reject_message","score"],
+    add:K("Add a SURBL server"),fresh:K("New SURBL server"),edit:K("Edit SURBL server {0}"),save:K("Save SURBL server"),ask:K("Delete the SURBL server {0}?"),saved:K("SURBL server saved"),deleted:K("SURBL server deleted"),
+    defaults:{score:5},hints:{active:K("Consulted for the next message."),dns_host:K("The zone the domains in a message are looked up in."),expected_result:K("The answers that mean listed; empty is any answer but a refusal code."),reject_message:K("The text of the refusal."),score:K("The spam score a listing adds.")}},
+  {id:"whitelist",path:"/api/v1/whitelist-addresses",title:K("Anti-spam white list"),columns:["lower_ip","upper_ip","email_address","description"],
+    add:K("Add a white-list address"),fresh:K("New white-list address"),edit:K("Edit white-list address {0}"),save:K("Save white-list address"),ask:K("Delete the white-list address {0}?"),saved:K("White-list address saved"),deleted:K("White-list address deleted"),
+    defaults:{},hints:{lower_ip:K("The lowest address of the range."),upper_ip:K("The highest address of the range."),email_address:K("The sender, with wildcards; empty is any."),description:K("A note.")}},
+  {id:"blocked",path:"/api/v1/blocked-senders",title:K("Blocked senders"),columns:["address","score","description"],
+    add:K("Add a blocked sender"),fresh:K("New blocked sender"),edit:K("Edit blocked sender {0}"),save:K("Save blocked sender"),ask:K("Delete the blocked sender {0}?"),saved:K("Blocked sender saved"),deleted:K("Blocked sender deleted"),
+    defaults:{score:100},hints:{address:K("An address, or a domain that covers its subdomains."),score:K("The spam score the sender adds; the desktop's 100 crosses every threshold."),description:K("A note.")}},
+  {id:"attachments",path:"/api/v1/blocked-attachments",title:K("Blocked attachments"),columns:["wildcard","description"],
+    add:K("Add a blocked attachment"),fresh:K("New blocked attachment"),edit:K("Edit blocked attachment {0}"),save:K("Save blocked attachment"),ask:K("Delete the blocked attachment {0}?"),saved:K("Blocked attachment saved"),deleted:K("Blocked attachment deleted"),
+    defaults:{wildcard:"*.exe"},hints:{wildcard:K("A file-name pattern, such as *.exe."),description:K("A note.")}},
+  {id:"greylist",path:"/api/v1/greylisting-white-addresses",title:K("Greylisting white list"),columns:["ip_address","description"],
+    add:K("Add a greylisting white address"),fresh:K("New greylisting white address"),edit:K("Edit greylisting white address {0}"),save:K("Save greylisting white address"),ask:K("Delete the greylisting white address {0}?"),saved:K("Greylisting white address saved"),deleted:K("Greylisting white address deleted"),
+    defaults:{},hints:{ip_address:K("An address, or a pattern such as 192.168.* or 2001:db8:*."),description:K("A note.")}},
+  {id:"relays",path:"/api/v1/incoming-relays",title:K("Incoming relays"),columns:["name","lower_ip","upper_ip"],
+    add:K("Add an incoming relay"),fresh:K("New incoming relay"),edit:K("Edit incoming relay {0}"),save:K("Save incoming relay"),ask:K("Delete the incoming relay {0}?"),saved:K("Incoming relay saved"),deleted:K("Incoming relay deleted"),
+    defaults:{},hints:{name:K("A name for the relay."),lower_ip:K("The lowest address of the range."),upper_ip:K("The highest address of the range.")}}
 ];
 function collectionById(id){return COLLECTIONS.filter(c=>c.id===id)[0];}
 function collectionProps(c){
@@ -2018,19 +2137,19 @@ async function renderLists(){
     const rows=cache.collections[c.id].map(x=>`
       <tr>${c.columns.map(k=>'<td>'+cell(c,x,k)+'</td>').join("")}
           <td style="text-align:right;white-space:nowrap">
-            <button class="btn ghost sm" data-act="colledit" data-coll="${c.id}" data-id="${escHtml(x.id)}">Edit</button>
-            <button class="btn danger sm" data-act="colldel" data-coll="${c.id}" data-id="${escHtml(x.id)}" data-label="${escHtml(x[labelKey]===undefined?x.id:x[labelKey])}">Delete</button>
+            <button class="btn ghost sm" data-act="colledit" data-coll="${c.id}" data-id="${escHtml(x.id)}">${t("Edit")}</button>
+            <button class="btn danger sm" data-act="colldel" data-coll="${c.id}" data-id="${escHtml(x.id)}" data-label="${escHtml(x[labelKey]===undefined?x.id:x[labelKey])}">${t("Delete")}</button>
             <div class="err" id="err_coll_${c.id}_${escHtml(x.id)}"></div></td></tr>`).join("");
-    return `<div class="sect"><h2>${escHtml(c.title)} <code class="muted">${escHtml(c.path)}</code></h2>
+    return `<div class="sect"><h2>${escHtml(t(c.title))} <code class="muted">${escHtml(c.path)}</code></h2>
       <div class="card flat">
         <p class="note">${escHtml(operation(c.path,"get").description||"")}</p>
         <div class="tablewrap"><table><thead><tr>${c.columns.map(k=>'<th>'+escHtml(humanise(k))+'</th>').join("")}<th></th></tr></thead>
-        <tbody>${rows||'<tr><td colspan="'+(c.columns.length+1)+'" class="empty">Nothing here.</td></tr>'}</tbody></table></div>
-        <div class="row" style="margin-top:16px"><button class="btn" data-act="collnew" data-coll="${c.id}">Add a ${escHtml(c.noun)}</button></div>
+        <tbody>${rows||'<tr><td colspan="'+(c.columns.length+1)+'" class="empty">'+t("Nothing here.")+'</td></tr>'}</tbody></table></div>
+        <div class="row" style="margin-top:16px"><button class="btn" data-act="collnew" data-coll="${c.id}">${t(c.add)}</button></div>
       </div></div>`;
   }).join("");
   $("#content").innerHTML=`<div class="view">
-    <div class="card flat"><p class="note">The lists the desktop Control Panel edits in its collection editors, each a resource of its own. Every table and every editor below is built from the server's OpenAPI document, so a key a collection gains appears here on its own.</p></div>
+    <div class="card flat"><p class="note">${t("The lists the desktop Control Panel edits in its collection editors, each a resource of its own. Every table and every editor below is built from the server's OpenAPI document, so a key a collection gains appears here on its own.")}</p></div>
     ${sections}</div>`;
 }
 function openCollectionItem(collId,id){
@@ -2043,14 +2162,14 @@ function openCollectionItem(collId,id){
 function renderCollectionEditor(){
   const c=collectionById(editing.coll), props=collectionProps(c);
   $("#content").innerHTML=`<div class="view">
-    <button class="btn ghost sm" data-act="cancel">‹ All lists</button>
-    <div class="sect"><h2>${editing.id?"Edit "+escHtml(c.noun)+" "+escHtml(editing.id):"New "+escHtml(c.noun)}</h2>
+    <button class="btn ghost sm" data-act="cancel">${t("‹ All lists")}</button>
+    <div class="sect"><h2>${editing.id?tf(c.edit,escHtml(editing.id)):t(c.fresh)}</h2>
       <div class="card flat">
         <p class="note">${escHtml(operation(editing.id?c.path+"/{id}":c.path,editing.id?"put":"post").description||"")}</p>
         <div class="form">${formHtml("coll",props,editing.values,{required:requiredOf(c.path,"post")})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="collsave">Save ${escHtml(c.noun)}</button>
-          <button class="btn ghost" data-act="cancel">Cancel</button>
+          <button class="btn" data-act="collsave">${t(c.save)}</button>
+          <button class="btn ghost" data-act="cancel">${t("Cancel")}</button>
           <div class="err" id="err_colledit"></div>
         </div>
       </div></div></div>`;
@@ -2063,15 +2182,15 @@ async function saveCollectionItem(){
   try{
     if(editing.id)await api(c.path+"/"+editing.id,{method:"PUT",body:JSON.stringify(body)});
     else await api(c.path,{method:"POST",body:JSON.stringify(body)});
-    editing=null;toast(humanise(c.noun).replace(/^./,ch=>ch.toUpperCase())+" saved");await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_colledit",e.message);}
+    editing=null;toast(t(c.saved));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_colledit",e.message);}
 }
 async function deleteCollectionItem(collId,id,label){
   const c=collectionById(collId);
-  if(!confirm("Delete the "+c.noun+" "+label+"?"))return;
+  if(!confirm(tf(c.ask,label)))return;
   setErr("err_coll_"+collId+"_"+id,"");
-  try{await api(c.path+"/"+id,{method:"DELETE"});toast(humanise(c.noun).replace(/^./,ch=>ch.toUpperCase())+" deleted");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_coll_"+collId+"_"+id,e.message);}
+  try{await api(c.path+"/"+id,{method:"DELETE"});toast(t(c.deleted));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_coll_"+collId+"_"+id,e.message);}
 }
 
 /* ---------- Backup ----------
@@ -2091,30 +2210,30 @@ async function renderBackup(){
   try{status=await api("/api/v1/backup");}catch(e){if(e.message==="auth")throw e;statusError=e.message;}
   const log=status&&Array.isArray(status.log)?status.log:[];
   $("#content").innerHTML=`<div class="view">
-    <div class="sect"><h2>Backup <code class="muted">PUT /api/v1/settings/backup</code></h2>
+    <div class="sect"><h2>${t("Backup")} <code class="muted">PUT /api/v1/settings/backup</code></h2>
       <div class="card flat">
         <p class="note">${escHtml(operation("/api/v1/settings/backup","put").description||"")}</p>
         <div class="form">${formHtml("set_backup",props,values,{})}</div>
         <div class="row" style="margin-top:18px">
-          <button class="btn" data-act="setsave" data-group="backup">Save backup settings</button>
-          <button class="btn ghost" data-act="backupstart">Start backup now</button>
+          <button class="btn" data-act="setsave" data-group="backup">${t("Save backup settings")}</button>
+          <button class="btn ghost" data-act="backupstart">${t("Start backup now")}</button>
           <div class="err" id="err_set_backup"></div>
           <div class="err" id="err_backupstart"></div>
         </div>
-        <p class="note" style="margin-top:12px">${escHtml(operation("/api/v1/backup","post").summary||"")}. ${escHtml(operation("/api/v1/backup","post").description||"")} The schedule is in hMailServer.ini (ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount, ScheduledBackupMaxAgeDays) and a restore is not on the API; both are the desktop Control Panel's.</p>
+        <p class="note" style="margin-top:12px">${escHtml(operation("/api/v1/backup","post").summary||"")}. ${escHtml(operation("/api/v1/backup","post").description||"")} ${t("The schedule is in hMailServer.ini (ScheduledBackupTime, ScheduledBackupIntervalMinutes, ScheduledBackupKeepCount, ScheduledBackupMaxAgeDays) and a restore is not on the API; both are the desktop Control Panel's.")}</p>
       </div></div>
-    <div class="sect"><h2>Status <code class="muted">GET /api/v1/backup</code></h2>
+    <div class="sect"><h2>${t("Status")} <code class="muted">GET /api/v1/backup</code></h2>
       <div class="card flat">
         ${statusError?'<div class="err">'+escHtml(statusError)+'</div>':
-          '<p class="note">'+(status.status?escHtml(status.status):"No failure recorded.")+'</p>'+
-          '<pre id="backupLog">'+escHtml(log.join("\n")||"(the backup log is empty)")+'</pre>'}
-        <div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="backupstatus">Re-read status</button></div>
+          '<p class="note">'+(status.status?escHtml(status.status):t("No failure recorded."))+'</p>'+
+          '<pre id="backupLog">'+escHtml(log.join("\n")||t("(the backup log is empty)"))+'</pre>'}
+        <div class="row" style="margin-top:12px"><button class="btn ghost sm" data-act="backupstatus">${t("Re-read status")}</button></div>
       </div></div></div>`;
 }
 async function startBackup(){
   setErr("err_backupstart","");
-  try{await api("/api/v1/backup",{method:"POST"});toast("Backup started");await render();}
-  catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_backupstart",e.message);}
+  try{await api("/api/v1/backup",{method:"POST"});toast(t("Backup started"));await render();}
+  catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_backupstart",e.message);}
 }
 
 /* ---------- Server messages ----------
@@ -2132,15 +2251,15 @@ async function renderMessages(){
     <div class="fr" data-k="${escHtml((m.name+" "+m.text).toLowerCase())}">
       <div class="lab"><b>${escHtml(m.name)}</b><code>${escHtml(m.name)}</code></div>
       <div class="ctl"><textarea id="msg_${i}" rows="3">${escHtml(m.text)}</textarea>
-        <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="msgsave" data-name="${escHtml(m.name)}" data-i="${i}">Save</button>
+        <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="msgsave" data-name="${escHtml(m.name)}" data-i="${i}">${t("Save")}</button>
         <div class="err" id="err_msg_${i}"></div></div></div>
     </div>`).join("");
   $("#content").innerHTML=`<div class="view">
     <div class="card flat">
       <p class="note">${escHtml(operation("/api/v1/settings/messages","get").description||"")} ${escHtml(operation("/api/v1/settings/messages/{name}","put").description||"")}</p>
-      <input id="msgFilter" placeholder="Filter messages by name or text" style="width:100%">
+      <input id="msgFilter" placeholder="${t("Filter messages by name or text")}" style="width:100%">
     </div>
-    <div class="sect"><div class="card flat"><div class="form">${rows||'<div class="empty">No server messages.</div>'}</div></div></div></div>`;
+    <div class="sect"><div class="card flat"><div class="form">${rows||'<div class="empty">'+t("No server messages.")+'</div>'}</div></div></div></div>`;
   $("#msgFilter").oninput=e=>{
     const q=e.target.value.trim().toLowerCase();
     document.querySelectorAll("#content .fr").forEach(r=>{r.hidden=!!q&&r.dataset.k.indexOf(q)<0;});
@@ -2150,11 +2269,11 @@ async function saveMessage(name,i){
   setErr("err_msg_"+i,"");
   const el=document.getElementById("msg_"+i);
   const was=cache.messages[i]?cache.messages[i].text:undefined;
-  if(!el||el.value===was){toast("Nothing changed");return;}
+  if(!el||el.value===was){toast(t("Nothing changed"));return;}
   try{
     await api("/api/v1/settings/messages/"+encodeURIComponent(name),{method:"PUT",body:JSON.stringify({text:el.value})});
-    toast("Message saved: "+name);await render();
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_msg_"+i,e.message);}
+    toast(tf("Message saved: {0}",name));await render();
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_msg_"+i,e.message);}
 }
 
 /* ---------- Logs ---------- */
@@ -2162,11 +2281,11 @@ async function renderLogs(){
   const files=asList(await api("/api/v1/logs"),"files");
   const rows=files.map(f=>`
     <tr><td>${escHtml(f.name)}</td><td>${escHtml(fmtBytes(f.size))}</td><td>${escHtml(f.created||"—")}</td>
-        <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="200">Last 200</button>
-        <button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="2000">Last 2000</button></td></tr>`).join("");
+        <td style="text-align:right;white-space:nowrap"><button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="200">${t("Last 200")}</button>
+        <button class="btn ghost sm" data-act="log" data-name="${escHtml(f.name)}" data-lines="2000">${t("Last 2000")}</button></td></tr>`).join("");
   $("#content").innerHTML=`<div class="card view">
-    <div class="tablewrap"><table><thead><tr><th>Log file</th><th>Size</th><th>Created</th><th></th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="4" class="empty">No log files. Logging may be off, or the folder is empty.</td></tr>'}</tbody></table></div>
+    <div class="tablewrap"><table><thead><tr><th>${t("Log file")}</th><th>${t("Size")}</th><th>${t("Created")}</th><th></th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="4" class="empty">'+t("No log files. Logging may be off, or the folder is empty.")+'</td></tr>'}</tbody></table></div>
     <div class="err" id="err_log" style="margin-top:10px"></div>
     <pre id="logPre" style="margin-top:14px;max-height:60vh;overflow:auto;white-space:pre-wrap" hidden></pre></div>`;
 }
@@ -2174,12 +2293,12 @@ function fmtBytes(n){n=Number(n)||0;if(n>=1048576)return (n/1048576).toFixed(1)+
 async function showLog(name,lines){
   setErr("err_log","");
   try{
-    const t=await api("/api/v1/logs/"+encodeURIComponent(name)+"?lines="+encodeURIComponent(lines||200));
+    const answer=await api("/api/v1/logs/"+encodeURIComponent(name)+"?lines="+encodeURIComponent(lines||200));
     const pre=$("#logPre");if(!pre)return;
     pre.hidden=false;
-    pre.textContent=(t.lines||[]).join("\n")||"(empty)";
+    pre.textContent=(answer.lines||[]).join("\n")||t("(empty)");
     pre.scrollTop=pre.scrollHeight;
-  }catch(e){if(e.message==="auth"){signedOut("The session ended. Sign in again.");return;}setErr("err_log","Could not read "+name+": "+e.message);}
+  }catch(e){if(e.message==="auth"){signedOut(t("The session ended. Sign in again."));return;}setErr("err_log",tf("Could not read {0}: {1}",name,e.message));}
 }
 
 /* ---------- Boot ----------
@@ -2191,7 +2310,12 @@ async function showLog(name,lines){
    of the page's. */
 let resumed=false;
 try{resumed=sessionStorage.getItem("hmsSession")==="1";}catch(_){}
-if(resumed)api("/api/v1/status").then(enter).catch(()=>{signedOut("The session ended. Sign in again.");});
+if(resumed)api("/api/v1/status").then(enter).catch(()=>{signedOut(t("The session ended. Sign in again."));});
+/* The language: the one this browser remembers, else the browser's own. English
+   is the page as it stands and asks the server for nothing. */
+let rememberedLanguage=null;
+try{rememberedLanguage=knownLanguage(localStorage.getItem("hmsLang"));}catch(_){}
+loadLanguage(rememberedLanguage||browserLanguage());
 </script>
 </body>
 </html>
