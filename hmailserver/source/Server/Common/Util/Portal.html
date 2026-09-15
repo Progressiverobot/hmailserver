@@ -984,6 +984,18 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div id="rule-status" class="status" aria-live="polite"></div>
 </div>
 <div class="card">
+<h2>Colour rows</h2>
+<p class="note">Rows from, to or about this text get the colour.</p>
+<form id="colour-form" class="row">
+<select id="colour-field" aria-label="Field"><option value="from">From</option><option value="to">To or Cc</option><option value="subject">Subject</option><option value="any">From, To or Subject</option></select>
+<span>contains</span>
+<input id="colour-text" type="text" maxlength="200" placeholder="text" aria-label="Text" required>
+<input id="colour-value" type="color" value="#36c2ff" aria-label="Colour">
+<button class="btn sm" type="submit">Add</button>
+</form>
+<div id="colour-rows"></div>
+</div>
+<div class="card">
 <h2>Filter script</h2>
 <p class="note">A Sieve script, run on every message as it arrives. It is checked before it is saved.</p>
 <form id="filter-form">

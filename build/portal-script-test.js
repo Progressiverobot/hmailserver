@@ -1399,6 +1399,26 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- rows coloured by a rule
+   location.hash = '#/filters';
+   await flush();
+   document.getElementById('colour-field').value = 'from';
+   document.getElementById('colour-text').value = 'b@example.net';
+   document.getElementById('colour-value').value = '#ff0000';
+   const beforeColour = requests.length;
+   document.getElementById('colour-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const colourPut = since(beforeColour).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences').map((r) => JSON.parse(r.body))[0];
+   check('a colour rule is kept with the account', !!colourPut && /b@example\.net/.test(colourPut.row_colours) && /#ff0000/.test(colourPut.row_colours), JSON.stringify(colourPut));
+   check('and listed on the Filters page', document.getElementById('colour-rows').children.length === 1 && document.getElementById('colour-rows').textContent.indexOf('b@example.net') >= 0,
+      document.getElementById('colour-rows').textContent);
+   location.hash = '#/f/1';
+   await flush();
+   const colouredRow = Array.from(document.getElementById('message-list').children).find((r) => (r.textContent || '').indexOf('Second') >= 0);
+   check('the row the rule matches carries the colour', !!colouredRow && String(colouredRow.getAttribute('style') || '').indexOf('#ff0000') >= 0, colouredRow ? String(colouredRow.getAttribute('style')) : 'no row');
+   const plainRow = Array.from(document.getElementById('message-list').children).find((r) => (r.textContent || '').indexOf('First') >= 0);
+   check('and one it does not match does not', !plainRow || !String(plainRow.getAttribute('style') || '').length, plainRow ? String(plainRow.getAttribute('style')) : 'no row');
+
    // ---- multiple stars: the star pressed again cycles amber, red, none
    location.hash = '#/f/1';
    await flush();

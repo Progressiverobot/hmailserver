@@ -618,6 +618,7 @@
   var messageRow = function (m, inThread) {
     var row = node('div', undefined, 'msg' + (m.flags.seen ? '' : ' unseen') + (inThread ? ' in-thread' : ''));
     row.setAttribute('role', 'listitem');
+    paintRow(row, colourFor(m));
     var folderId = m.folder_id || state.folderId;
     var entry = { id: m.id, row: row, m: m, folderId: folderId };
     if (isPinned(m)) { row.classList.add('pinned'); }
@@ -706,6 +707,7 @@
       var unseen = g.messages.some(function (m) { return !m.flags.seen; });
       var row = node('div', undefined, 'msg thread' + (unseen ? ' unseen' : ''));
       row.setAttribute('role', 'listitem');
+      paintRow(row, g.messages.map(colourFor).filter(function (c) { return c; })[0] || '');
       var folderId = newest.folder_id || state.folderId;
       var entry = { id: newest.id, ids: g.messages.map(function (m) { return m.id; }), ms: g.messages, row: row, m: newest, folderId: folderId };
       if (g.messages.some(isPinned)) { row.classList.add('pinned'); }
@@ -1752,7 +1754,7 @@
     if (head === 'held') { showPanel('quarantine-section', 'Held as suspected spam'); markNav('/held'); loadQuarantine(); return; }
     if (head === 'folders') { showPanel('folders-section', 'Manage folders'); markNav('/folders'); renderFolderAdmin(); return; }
     if (head === 'settings') { showPanel('settings-section', 'Settings'); markNav('/settings'); return; }
-    if (head === 'filters') { showPanel('filter-section', 'Filters'); markNav('/filters'); return; }
+    if (head === 'filters') { showPanel('filter-section', 'Filters'); markNav('/filters'); renderColourRules(); return; }
     if (head === 'contacts') { showPanel('contacts-section', 'Contacts'); markNav('/contacts'); loadContacts(); return; }
     if (head === 'away') { showPanel('away-section', 'Away and forwarding'); markNav('/away'); renderAwayAddresses(); loadScheduled(); return; }
     if (head === 'storage') { showPanel('storage-section', 'Storage'); markNav('/storage'); loadStorage(); loadFiles(); return; }
@@ -2939,6 +2941,59 @@
     el('rule-table').hidden = rules === null || currentRules.length === 0;
     fillFolderSelect(el('rule-folder'), 0);
   };
+  // ---- Rows coloured by a rule ----------------------------------------------
+  // Outlook's conditional formatting: a field, a text and a colour, kept with
+  // the account's preferences, edited on the Filters page beside the rules.
+  // The first rule that matches paints the row's edge; the labels keep their
+  // own colours, this is a rule on the row.
+  var rowColours = function () {
+    try {
+      var list = JSON.parse(pref('row_colours') || '[]');
+      return Array.isArray(list) ? list.filter(function (r) { return r && r.text && /^#[0-9a-f]{6}$/i.test(r.colour || ''); }) : [];
+    } catch (why) { return []; }
+  };
+  var colourFor = function (m) {
+    var rules = rowColours();
+    if (!rules.length || !m) { return ''; }
+    var from = String(m.from || '').toLowerCase();
+    var to = (String(m.to || '') + ' ' + String(m.cc || '')).toLowerCase();
+    var subject = String(m.subject || '').toLowerCase();
+    for (var i = 0; i < rules.length; i++) {
+      var needle = String(rules[i].text).toLowerCase();
+      var field = rules[i].field;
+      var hay = field === 'from' ? from : field === 'to' ? to : field === 'subject' ? subject : from + ' ' + to + ' ' + subject;
+      if (hay.indexOf(needle) >= 0) { return rules[i].colour; }
+    }
+    return '';
+  };
+  var paintRow = function (row, colour) {
+    if (colour) { row.setAttribute('style', 'box-shadow:inset 4px 0 0 ' + colour); }
+  };
+  var writeRowColours = function (list) {
+    return savePrefs({ row_colours: JSON.stringify(list.slice(0, 20)) }).then(function (ok) { if (ok) { renderColourRules(); lastListing = null; } return ok; });
+  };
+  var renderColourRules = function () {
+    var box = el('colour-rows');
+    clear(box);
+    rowColours().forEach(function (r, i) {
+      var line = node('div', undefined, 'row');
+      var swatch = node('span', undefined, 'swatch'); swatch.setAttribute('style', 'display:inline-block;width:14px;height:14px;border-radius:3px;background:' + r.colour);
+      line.appendChild(swatch);
+      var fieldWord = r.field === 'from' ? t('From') : r.field === 'to' ? t('To or Cc') : r.field === 'subject' ? t('Subject') : t('From, To or Subject');
+      line.appendChild(node('span', fieldWord + ' ' + t('contains') + ' ' + r.text));
+      var remove = button(t('Remove'), 'btn ghost sm');
+      remove.addEventListener('click', function () { writeRowColours(rowColours().filter(function (x, j) { return j !== i; })); });
+      line.appendChild(remove);
+      box.appendChild(line);
+    });
+  };
+  el('colour-form').addEventListener('submit', function (event) {
+    event.preventDefault();
+    var text = el('colour-text').value.trim();
+    var colour = String(el('colour-value').value || '').toLowerCase();
+    if (!text || !/^#[0-9a-f]{6}$/.test(colour)) { return; }
+    writeRowColours(rowColours().concat([{ field: el('colour-field').value, text: text, colour: colour }])).then(function (ok) { if (ok) { el('colour-text').value = ''; } });
+  });
   var saveRules = function (rules) {
     var script = scriptOf(rules);
     var before = el('filter-script').value;
