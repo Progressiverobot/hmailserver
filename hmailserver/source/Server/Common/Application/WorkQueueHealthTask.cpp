@@ -5,6 +5,8 @@
 #include "StdAfx.h"
 #include "WorkQueueHealthTask.h"
 
+#include "../Util/AlertManager.h"
+
 #include "Application.h"
 #include "../Threading/WorkQueue.h"
 #include "../Threading/WorkQueueManager.h"
@@ -56,10 +58,38 @@ namespace HM
       // problem rather than a tidiness one.
       std::vector<std::shared_ptr<WorkQueue> > queues = WorkQueueManager::Instance()->GetAllQueues();
 
+      String stalled;
+
       for (std::shared_ptr<WorkQueue> queue : queues)
       {
-         if (queue && queue->GetMonitorForStalls())
-            queue->ReportStalledTasks();
+         if (!queue || !queue->GetMonitorForStalls())
+            continue;
+
+         queue->ReportStalledTasks();
+
+         if (!queue->GetIsStalled())
+            continue;
+
+         if (!stalled.IsEmpty())
+            stalled += _T(", ");
+
+         stalled += queue->GetName();
+      }
+
+      // The alert, once for the whole set rather than once per queue: an
+      // administrator wants to be told that work has stopped, not to be told it
+      // again by each pool that has stopped doing it. HM5526 in the ERROR log
+      // still names the queue and the tasks it is stuck in.
+      if (stalled.IsEmpty())
+      {
+         AlertManager::Instance()->Clear(AlertManager::ConditionQueueStalled,
+            _T("Every monitored work queue is turning over again."));
+      }
+      else
+      {
+         AlertManager::Instance()->Raise(AlertManager::ConditionQueueStalled, ErrorManager::High,
+            Formatter::Format("Work has stopped on: {0}.", stalled),
+            _T("Every worker thread on the named queue has been inside the same task for longer than [Settings] AsyncQueueStallThreshold, so nothing posted to it can start. The ERROR log records HM5526 with the tasks each thread is in."));
       }
    }
 }

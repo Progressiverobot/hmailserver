@@ -5,6 +5,8 @@
 #include "StdAfx.h"
 #include "AutoBanFirewall.h"
 
+#include "AlertManager.h"
+
 #include "ProcessLauncher.h"
 #include "VariantDateTime.h"
 #include "Parsing/StringParser.h"
@@ -292,6 +294,11 @@ namespace HM
       // the server is told, because the ban itself has happened.
       LOG_APPLICATION(_T("Auto-ban: ") + String(address.ToString()) + _T(" is banned for ") + StringParser::IntToString(minutes) +
          _T(" minutes after ") + StringParser::IntToString(failures) + _T(" failed logons; last user name ") + username);
+
+      // Counted, not alerted: one ban is ordinary and a hundred in an hour is
+      // not, and only the second is worth telling anybody about. AlertTask asks
+      // for the count once a minute and compares it with the rule's threshold.
+      AlertManager::Instance()->NoteAutoBan();
 
       Synchronise(_T("ban"));
    }

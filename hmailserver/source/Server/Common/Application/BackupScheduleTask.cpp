@@ -6,6 +6,8 @@
 
 #include "BackupScheduleTask.h"
 
+#include "../Util/AlertManager.h"
+
 #include "Backup.h"
 #include "BackupManager.h"
 #include "BackupRetention.h"
@@ -645,6 +647,12 @@ namespace HM
          // Unreachable on the shipped default configuration, because the task is
          // only created once a schedule has been configured.
          ErrorManager::Instance()->ReportError(ErrorManager::High, errorCode, "BackupScheduleTask::DoWork", message);
+
+         // A backup that never ran is a backup that failed, from where the
+         // administrator sits. Same rule, same cool-down, same rate limiting as
+         // the one BackupManager raises for a backup that started and broke.
+         AlertManager::Instance()->RaiseOccurrence(AlertManager::ConditionBackupFailed, ErrorManager::High,
+            _T("A scheduled backup did not run."), message);
 
          last_reported_reason_ = reason;
       }

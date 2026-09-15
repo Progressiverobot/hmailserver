@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceRuleCriterias.h"
 
 #include "InterfaceRuleCriteria.h"
@@ -126,6 +127,8 @@ STDMETHODIMP InterfaceRuleCriterias::DeleteByDBID(LONG DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!rule_criterias)
          return GetAccessDenied();
 
@@ -143,6 +146,8 @@ STDMETHODIMP InterfaceRuleCriterias::Delete(LONG DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!rule_criterias)
          return GetAccessDenied();
 

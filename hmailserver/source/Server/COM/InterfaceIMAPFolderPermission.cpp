@@ -16,6 +16,7 @@
 #include "../IMAP/IMAPConfiguration.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceIMAPFolderPermission::InterfaceSupportsErrorInfo(REFIID riid)
 {
@@ -190,6 +191,8 @@ STDMETHODIMP InterfaceIMAPFolderPermission::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -246,6 +249,8 @@ STDMETHODIMP InterfaceIMAPFolderPermission::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

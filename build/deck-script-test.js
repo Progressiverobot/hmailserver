@@ -889,7 +889,17 @@ const state = {
       { name: 'hmailserver_2026-09-14.log', size: 2048, created: '2026-09-14 00:00:01' },
       { name: 'ERROR_hmailserver_2026-09-14.log', size: 10, created: '2026-09-14 00:00:02' }
    ],
-   logLines: ['"SMTPD" 1 "2026-09-14 09:00:00.000" "127.0.0.1" "SENT: 220 mail.example.com"', '"SMTPD" 1 "2026-09-14 09:00:01.000" "127.0.0.1" "RECEIVED: QUIT"']
+   logLines: ['"SMTPD" 1 "2026-09-14 09:00:00.000" "127.0.0.1" "SENT: 220 mail.example.com"', '"SMTPD" 1 "2026-09-14 09:00:01.000" "127.0.0.1" "RECEIVED: QUIT"'],
+   // The audit trail. Two rows, one made over COM by the Control Panel and one
+   // made over REST by an API key, because the column that tells them apart is
+   // the point of the page.
+   audit: [
+      { id: 2, time: 1789000060, actor: 'key:reporting', actor_type: 'apikey', interface: 'REST', address: '192.0.2.9',
+        object_type: 'domain', object: 'example.com', action: 'created', detail: 'domainname=example.com', hash: 'bb', previous_hash: 'aa' },
+      { id: 1, time: 1789000000, actor: 'Administrator', actor_type: 'administrator', interface: 'COM', address: '',
+        object_type: 'setting', object: 'AutoBanMinutes', action: 'updated', detail: 'AutoBanMinutes: 60 -> 120', hash: 'aa', previous_hash: '' }
+   ],
+   auditIntact: true
 };
 
 function json(status, payload, headers) {
@@ -1290,6 +1300,18 @@ function answer(method, path, headers, raw) {
       if (method === 'DELETE') { state.ports.splice(at, 1); return json(200, { deleted: true }); }
    }
    if (path === '/api/v1/server/reinitialize' && method === 'POST') { return json(202, { reinitializing: true }); }
+
+   if (path === '/api/v1/audit/verify' && method === 'GET') {
+      if (state.auditIntact) { return json(200, { intact: true, rows_checked: state.audit.length, first_broken_id: 0, reason: '' }); }
+      return json(200, { intact: false, rows_checked: 1, first_broken_id: 2, reason: 'the row has been edited' });
+   }
+   if (/^\/api\/v1\/audit(\?|$)/.test(path) && method === 'GET') {
+      const offset = Number((/offset=(\d+)/.exec(path) || [0, 0])[1]);
+      const limit = Number((/limit=(\d+)/.exec(path) || [0, 50])[1]);
+      const actor = (/actor=([^&]*)/.exec(path) || [0, ''])[1];
+      const matching = actor ? state.audit.filter((e) => e.actor.indexOf(decodeURIComponent(actor)) >= 0) : state.audit;
+      return json(200, { total: matching.length, offset, entries: matching.slice(offset, offset + limit) });
+   }
 
    if (path === '/api/v1/logs' && method === 'GET') { return json(200, state.logs); }
    if (/^\/api\/v1\/logs\/[^/]+/.test(path) && method === 'GET') {
@@ -2519,6 +2541,40 @@ async function main() {
    check('a file the server no longer has is an error under the list, naming it', document.getElementById('err_log').textContent.indexOf('gone.log') >= 0 && document.getElementById('err_log').textContent.indexOf('No such log file') >= 0,
       document.getElementById('err_log').textContent);
    state.logs.pop();
+
+   // ---- the audit trail
+   before = requests.length;
+   await goTo('audit');
+   check('the audit view asks for the first page', called(before, 'GET', /^\/api\/v1\/audit\?limit=50&offset=0$/).length === 1, paths(before));
+   check('and lists both changes', rows().length === 2, String(rows().length));
+   check('naming the interface each was made over', rows()[0].textContent.indexOf('REST') >= 0 && rows()[1].textContent.indexOf('COM') >= 0,
+      rows().length ? rows()[0].textContent + ' | ' + rows()[1].textContent : 'no rows');
+   check('and showing the old and new value of a setting', rows()[1].textContent.indexOf('60 -> 120') >= 0, rows()[1].textContent);
+   before = requests.length;
+   click(act('auditpage', { by: '50' }));
+   await flush();
+   check('Older asks for the next page', called(before, 'GET', /offset=50/).length === 1, paths(before));
+   before = requests.length;
+   click(act('auditpage', { by: '-50' }));
+   await flush();
+   check('Newer comes back and never asks for a negative offset', called(before, 'GET', /offset=0/).length === 1, paths(before));
+   before = requests.length;
+   click(act('auditverify'));
+   await flush();
+   check('Verify the chain asks the server', called(before, 'GET', '/api/v1/audit/verify').length === 1, paths(before));
+   check('and says so when it is intact', $('#toast').textContent.indexOf('2') >= 0, $('#toast').textContent);
+   state.auditIntact = false;
+   click(act('auditverify'));
+   await flush();
+   check('a broken chain names the row, in the error line rather than a toast',
+      document.getElementById('err_audit').textContent.indexOf('2') >= 0 && document.getElementById('err_audit').textContent.indexOf('edited') >= 0,
+      document.getElementById('err_audit').textContent);
+   state.auditIntact = true;
+   const auditRows = state.audit;
+   state.audit = [];
+   await goTo('audit');
+   check('an empty trail says what will appear here', content().textContent.indexOf('Nothing has been recorded yet') >= 0, content().textContent.slice(0, 120));
+   state.audit = auditRows;
 
    // ---- a session that ends under the page
    signedIn = false;

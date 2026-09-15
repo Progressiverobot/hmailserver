@@ -6,6 +6,8 @@
 
 #include "DiskSpace.h"
 
+#include "AlertManager.h"
+
 #ifdef HM_PLATFORM_POSIX
 // The free-space reading itself; see GetFreeBytesAvailable.
 #include <sys/statvfs.h>
@@ -220,6 +222,11 @@ namespace HM
             ErrorManager::Instance()->ReportError(ErrorManager::High, 6230, "DiskSpace::ReportBand_",
                Formatter::Format("Free disk space on the volume holding the message store has fallen to {0} MB, below the configured minimum of {1} MB ([Settings] MinimumFreeDiskSpaceMB in hMailServer.ini). New mail is being refused with a TEMPORARY failure until space is freed, so senders will retry rather than bounce.",
                   freeBytes / BYTES_PER_MEGABYTE, floorBytes / BYTES_PER_MEGABYTE));
+
+            AlertManager::Instance()->Raise(AlertManager::ConditionDiskLow, ErrorManager::High,
+               Formatter::Format("Free disk space is down to {0} MB and new mail is being refused.", freeBytes / BYTES_PER_MEGABYTE),
+               Formatter::Format("The volume holding the message store has {0} MB free, below the configured minimum of {1} MB. Mail is refused with a temporary failure until space is freed, so nothing is lost yet - senders will retry.",
+                  freeBytes / BYTES_PER_MEGABYTE, floorBytes / BYTES_PER_MEGABYTE));
             break;
 
          case BandWarning:
@@ -230,6 +237,13 @@ namespace HM
             LOG_APPLICATION(Formatter::Format("Free disk space on the volume holding the message store is down to {0} MB ({1}% of the volume), below the warning threshold of {2} MB ([Settings] DiskSpaceWarningThresholdMB in hMailServer.ini). Mail is still being accepted; it will be refused with a temporary failure below {3} MB.",
                freeBytes / BYTES_PER_MEGABYTE, PercentFree_(freeBytes, totalBytes),
                warnBytes / BYTES_PER_MEGABYTE, floorBytes / BYTES_PER_MEGABYTE));
+
+            // Raised at the warning band as well as below the floor, because the
+            // whole value of this one is that it arrives while there is still
+            // time to act. The condition is a state, so it says so once.
+            AlertManager::Instance()->Raise(AlertManager::ConditionDiskLow, ErrorManager::Medium,
+               Formatter::Format("Free disk space is down to {0} MB ({1}% of the volume).", freeBytes / BYTES_PER_MEGABYTE, PercentFree_(freeBytes, totalBytes)),
+               Formatter::Format("Mail is still being accepted. It will be refused with a temporary failure below {0} MB.", floorBytes / BYTES_PER_MEGABYTE));
             break;
 
          case BandUnknown:
@@ -252,6 +266,9 @@ namespace HM
             {
                LOG_APPLICATION(Formatter::Format("Free disk space on the volume holding the message store has recovered to {0} MB ({1}% of the volume). Mail is being accepted normally.",
                   freeBytes / BYTES_PER_MEGABYTE, PercentFree_(freeBytes, totalBytes)));
+
+               AlertManager::Instance()->Clear(AlertManager::ConditionDiskLow,
+                  Formatter::Format("Free disk space has recovered to {0} MB. Mail is being accepted normally.", freeBytes / BYTES_PER_MEGABYTE));
             }
             break;
          }

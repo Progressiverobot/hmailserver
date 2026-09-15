@@ -66,6 +66,7 @@
 #include <atomic>
 
 #include "HttpServer.h"
+#include "AuditTrail.h"
 
 namespace HM
 {
@@ -407,6 +408,17 @@ namespace HM
          // Utilities.CriteriaMatch over COM. Nothing is read or written;
          // server-wide as the Sieve evaluation is.
          RouteRuleMatch,
+         // The audit trail and the alerts (RestApiAudit.cpp). Every one of these
+         // is administrator-only - they are in IsApiKeyRoute_ - because the
+         // record of who changed what is the one thing a stolen key must not be
+         // able to read, edit the rules of, or watch for its own footprints.
+         RouteAuditList,
+         RouteAuditVerify,
+         RouteAlertRuleList,
+         RouteAlertRuleUpdate,
+         RouteAlertEventList,
+         RouteAlertTest,
+         RouteAlertRun,
          RouteOpenApi
       };
 
@@ -967,6 +979,16 @@ namespace HM
       static AnsiString GetJsonStringValue_(const AnsiString &json, const AnsiString &key);
       static const JsonValue *FindJsonMember_(const JsonValue &object, const std::string &key);
       static AnsiString JsonEscape_(const AnsiString &value);
+
+      // The audit trail's actor for one authorised request: the credential that
+      // was authenticated and the address it came from. Installed once, in
+      // ProcessRequest_, for the length of the dispatch - see AuditTrail.h.
+      static AuditTrail::Actor AuditActorFor_(const Caller &caller);
+
+      // GET /api/v1/audit, /api/v1/audit/verify and the alert rules and events.
+      // In RestApiAudit.cpp.
+      HttpResponse HandleAudit_(const Route &route, const AnsiString &requestBody);
+      static AnsiString OpenApiAuditPaths_();
 
       std::shared_ptr<HttpServer> server_;
       bool running_;

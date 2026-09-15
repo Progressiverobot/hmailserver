@@ -78,6 +78,7 @@
 #include "MessageStoreConsistencyTask.h"
 #include "WorkQueueHealthTask.h"
 #include "../Util/DiskSpace.h"
+#include "../Util/AlertManager.h"
 #include "BackupScheduleTask.h"
 #include "../LDAP/DirectorySyncTask.h"
 
@@ -821,6 +822,18 @@ namespace HM
       workQueueHealthTask->SetReoccurance(ScheduledTask::RunInfinitely);
       workQueueHealthTask->SetMinutesBetweenRun(1);
       scheduler_->ScheduleTask(workQueueHealthTask);
+
+      // Alerts. Registered unconditionally and every minute, because it is the
+      // ONLY thing that sends: everything that notices a condition writes a row
+      // and returns, so that a notification about the delivery queue is never
+      // submitted into the delivery queue by the thread that is stuck on it.
+      // A minute is the resolution a cool-down and a digest hour need; with
+      // AlertsEnabled off, or with every rule off, each pass is three selects
+      // that find nothing.
+      std::shared_ptr<AlertTask> alertTask = std::shared_ptr<AlertTask>(new AlertTask);
+      alertTask->SetReoccurance(ScheduledTask::RunInfinitely);
+      alertTask->SetMinutesBetweenRun(1);
+      scheduler_->ScheduleTask(alertTask);
 
       // Scheduled backups. Only registered when a schedule is configured in
       // hMailServer.ini ([Settings] ScheduledBackupTime or

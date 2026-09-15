@@ -10,6 +10,8 @@
 #include "DatabaseSettings.h"
 #include "DatabaseUnavailableMarker.h"
 
+#include "../Util/AuditTrail.h"
+
 // ADORecordset names the ADO smart pointers the Windows precompiled header
 // #imports; the roadmap section "Linux and AArch64" leaves that backend out of
 // the POSIX build. Nothing below uses the type, only the include had to go.
@@ -224,6 +226,14 @@ namespace HM
       MeasureQuery_(command, elapsedMicros);
 
       ReleaseConnection_(pDALConn);
+
+      // The audit trail's one chokepoint for object changes. It is AFTER the
+      // release on purpose: the row it may write is itself a statement through
+      // this function, and taking a second connection while still holding the
+      // first is how a pool of N deadlocks under N concurrent writers. It does
+      // nothing at all unless an interface has installed an actor on this
+      // thread, which the server's own writes never do - see AuditTrail.h.
+      AuditTrail::Instance()->RecordStatement(command, bResult);
 
       return bResult;
    }

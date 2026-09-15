@@ -11,6 +11,7 @@
 #include "../Common/Persistence/PersistentDomainAlias.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 
 STDMETHODIMP InterfaceDomainAlias::InterfaceSupportsErrorInfo(REFIID riid)
@@ -107,6 +108,8 @@ STDMETHODIMP InterfaceDomainAlias::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

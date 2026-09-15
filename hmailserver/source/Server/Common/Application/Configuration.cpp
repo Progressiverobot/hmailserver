@@ -696,6 +696,141 @@ namespace HM
       return GetSettings()->GetBool(PROPERTY_CREATE_DEFAULT_SPECIAL_USE_FOLDERS);
    }
 
+   bool
+   Configuration::GetAuditTrailEnabled()
+   {
+      return GetSettings()->GetBool(PROPERTY_AUDIT_TRAIL_ENABLED);
+   }
+
+   void
+   Configuration::SetAuditTrailEnabled(bool enabled)
+   {
+      GetSettings()->SetBool(PROPERTY_AUDIT_TRAIL_ENABLED, enabled);
+   }
+
+   int
+   Configuration::GetAuditRetentionDays()
+   {
+      return GetSettings()->GetLong(PROPERTY_AUDIT_RETENTION_DAYS);
+   }
+
+   void
+   Configuration::SetAuditRetentionDays(int days)
+   {
+      GetSettings()->SetLong(PROPERTY_AUDIT_RETENTION_DAYS, days < 0 ? 0 : days);
+   }
+
+   bool
+   Configuration::GetAlertsEnabled()
+   {
+      return GetSettings()->GetBool(PROPERTY_ALERTS_ENABLED);
+   }
+
+   void
+   Configuration::SetAlertsEnabled(bool enabled)
+   {
+      GetSettings()->SetBool(PROPERTY_ALERTS_ENABLED, enabled);
+   }
+
+   String
+   Configuration::GetAlertRecipient()
+   {
+      return GetSettings()->GetString(PROPERTY_ALERT_RECIPIENT);
+   }
+
+   void
+   Configuration::SetAlertRecipient(const String &address)
+   {
+      GetSettings()->SetString(PROPERTY_ALERT_RECIPIENT, address);
+   }
+
+   String
+   Configuration::GetAlertSenderAddress()
+   {
+      return GetSettings()->GetString(PROPERTY_ALERT_SENDER_ADDRESS);
+   }
+
+   void
+   Configuration::SetAlertSenderAddress(const String &address)
+   {
+      GetSettings()->SetString(PROPERTY_ALERT_SENDER_ADDRESS, address);
+   }
+
+   bool
+   Configuration::GetAlertDigestEnabled()
+   {
+      return GetSettings()->GetBool(PROPERTY_ALERT_DIGEST_ENABLED);
+   }
+
+   void
+   Configuration::SetAlertDigestEnabled(bool enabled)
+   {
+      GetSettings()->SetBool(PROPERTY_ALERT_DIGEST_ENABLED, enabled);
+   }
+
+   int
+   Configuration::GetAlertDigestHour()
+   {
+      int hour = GetSettings()->GetLong(PROPERTY_ALERT_DIGEST_HOUR);
+
+      // An hour outside the day would mean a digest that never goes out, which
+      // looks exactly like a digest with nothing in it.
+      if (hour < 0 || hour > 23)
+         return 7;
+
+      return hour;
+   }
+
+   void
+   Configuration::SetAlertDigestHour(int hour)
+   {
+      GetSettings()->SetLong(PROPERTY_ALERT_DIGEST_HOUR, (hour < 0 || hour > 23) ? 7 : hour);
+   }
+
+   int
+   Configuration::GetAlertMaxPerHour()
+   {
+      int maximum = GetSettings()->GetLong(PROPERTY_ALERT_MAX_PER_HOUR);
+
+      // 0 is the value a database that never got the row answers with, and it
+      // would mean "send nothing" - which is a feature switched off by an
+      // upgrade rather than by a person.
+      if (maximum <= 0)
+         return 20;
+
+      return maximum;
+   }
+
+   void
+   Configuration::SetAlertMaxPerHour(int maximum)
+   {
+      GetSettings()->SetLong(PROPERTY_ALERT_MAX_PER_HOUR, maximum <= 0 ? 20 : maximum);
+   }
+
+   int
+   Configuration::GetAlertWebhookMaxAttempts()
+   {
+      int attempts = GetSettings()->GetLong(PROPERTY_ALERT_WEBHOOK_MAX_ATTEMPTS);
+
+      if (attempts <= 0)
+         return 5;
+      if (attempts > 20)
+         return 20;
+
+      return attempts;
+   }
+
+   void
+   Configuration::SetAlertWebhookMaxAttempts(int attempts)
+   {
+      if (attempts <= 0)
+         attempts = 5;
+      if (attempts > 20)
+         attempts = 20;
+
+      GetSettings()->SetLong(PROPERTY_ALERT_WEBHOOK_MAX_ATTEMPTS, attempts);
+   }
+
    int
    Configuration::GetCrashSimulationMode() const
    {

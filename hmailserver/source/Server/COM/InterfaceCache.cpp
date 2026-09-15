@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceCache.h"
 
 #include "../Common/Cache/Cache.h"
@@ -59,6 +60,8 @@ InterfaceCache::put_Enabled(VARIANT_BOOL newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!cache_config_)
          return GetAccessDenied();
 
@@ -93,6 +96,8 @@ InterfaceCache::put_DomainCacheTTL(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!cache_config_)
          return GetAccessDenied();
 
@@ -202,6 +207,8 @@ InterfaceCache::put_AccountCacheTTL(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!cache_config_)
          return GetAccessDenied();
 
@@ -310,6 +317,8 @@ InterfaceCache::put_AliasCacheTTL(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!cache_config_)
          return GetAccessDenied();
 
@@ -417,6 +426,8 @@ InterfaceCache::put_DistributionListCacheTTL(long newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!cache_config_)
          return GetAccessDenied();
 

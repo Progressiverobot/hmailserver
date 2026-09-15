@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceDomainAliases.h"
 
 #include "InterfaceDomainAlias.h"
@@ -124,6 +125,8 @@ STDMETHODIMP InterfaceDomainAliases::Delete(LONG Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!domain_aliases_)
          return GetAccessDenied();
 
@@ -141,6 +144,8 @@ STDMETHODIMP InterfaceDomainAliases::DeleteByDBID(LONG DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!domain_aliases_)
          return GetAccessDenied();
 

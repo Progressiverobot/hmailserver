@@ -168,6 +168,29 @@ namespace HM
       bool GetCreateDefaultSpecialUseFolders();
       void SetCreateDefaultSpecialUseFolders(bool enabled);
 
+      // The audit trail (see Common/Util/AuditTrail.h) and the alerts (see
+      // Common/Util/AlertManager.h). All nine live in hm_settings, which is
+      // where a setting belongs; none of them is an hMailServer.ini key.
+      bool GetAuditTrailEnabled();
+      void SetAuditTrailEnabled(bool enabled);
+      int GetAuditRetentionDays();
+      void SetAuditRetentionDays(int days);
+
+      bool GetAlertsEnabled();
+      void SetAlertsEnabled(bool enabled);
+      String GetAlertRecipient();
+      void SetAlertRecipient(const String &address);
+      String GetAlertSenderAddress();
+      void SetAlertSenderAddress(const String &address);
+      bool GetAlertDigestEnabled();
+      void SetAlertDigestEnabled(bool enabled);
+      int GetAlertDigestHour();
+      void SetAlertDigestHour(int hour);
+      int GetAlertMaxPerHour();
+      void SetAlertMaxPerHour(int maximum);
+      int GetAlertWebhookMaxAttempts();
+      void SetAlertWebhookMaxAttempts(int attempts);
+
       int GetCrashSimulationMode() const;
       void SetCrashSimulationMode(int mode);
 

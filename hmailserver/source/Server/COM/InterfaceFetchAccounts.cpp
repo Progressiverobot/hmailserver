@@ -4,6 +4,7 @@
 
 #include "StdAfx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "InterfaceFetchAccounts.h"
 
@@ -90,6 +91,8 @@ STDMETHODIMP InterfaceFetchAccounts::Delete(LONG Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!fetch_accounts_)
          return GetAccessDenied();
 
@@ -107,6 +110,8 @@ STDMETHODIMP InterfaceFetchAccounts::DeleteByDBID(LONG DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!fetch_accounts_)
          return GetAccessDenied();
 

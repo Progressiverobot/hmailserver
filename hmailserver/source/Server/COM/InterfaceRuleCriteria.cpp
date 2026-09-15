@@ -10,6 +10,7 @@
 #include "../Common/Persistence/PersistentRuleCriteria.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceRuleCriteria::get_ID(long *pVal)
 {
@@ -32,6 +33,8 @@ STDMETHODIMP InterfaceRuleCriteria::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -259,6 +262,8 @@ STDMETHODIMP InterfaceRuleCriteria::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

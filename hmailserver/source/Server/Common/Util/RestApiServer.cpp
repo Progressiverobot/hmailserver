@@ -7,6 +7,8 @@
 #include "StdAfx.h"
 
 #include "RestApiServer.h"
+
+#include "AuditTrail.h"
 #include "HttpServer.h"
 #include "JsonDocument.h"
 #include "Encoding/ModifiedUTF7.h"
@@ -1468,6 +1470,17 @@ namespace HM
             return BuildForbiddenResponse_(refusalReason);
          }
 
+         // The audit trail's identity chokepoint for REST, and the only one:
+         // every route reaches its handler through the switch below, so an
+         // administrative change made over REST - by the Deck, by hmctl, by an
+         // API key or by a person with curl - is attributed to the credential
+         // that was just authorised and to the address it came from, whichever
+         // handler ends up making it. Nothing is recorded here: the record is
+         // taken where the change lands, in AuditTrail::RecordStatement and
+         // RecordSettingChange, so one change is one row however many routes
+         // could have caused it. See AuditTrail.h.
+         AuditScope auditScope(AuditActorFor_(caller));
+
          switch (route.kind)
          {
          case RouteApiKeyList:
@@ -1593,6 +1606,15 @@ namespace HM
          case RouteGroupMemberCreate:
          case RouteGroupMemberDelete:
             return HandleGroups_(route, GetRequestBody_(request));
+         case RouteAuditList:
+         case RouteAuditVerify:
+         case RouteAlertRuleList:
+         case RouteAlertRuleUpdate:
+         case RouteAlertEventList:
+         case RouteAlertTest:
+         case RouteAlertRun:
+            return HandleAudit_(route, GetRequestBody_(request));
+
          case RouteRuleMatch:
             return HandleRuleMatch_(GetRequestBody_(request));
          case RouteCertificateList:
@@ -3319,6 +3341,60 @@ namespace HM
             }
          }
       }
+      if (method == "GET" && path == "/api/v1/audit")
+      {
+         route.kind = RouteAuditList;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/audit/verify")
+      {
+         route.kind = RouteAuditVerify;
+         return;
+      }
+
+      if (method == "GET" && path == "/api/v1/alerts/events")
+      {
+         route.kind = RouteAlertEventList;
+         return;
+      }
+
+      // "I have configured this - does it work?" A condition raised on demand
+      // goes through exactly the path a real one does, so what arrives is what
+      // would arrive; and a pass run on demand saves waiting a minute for the
+      // scheduled one, which is the difference between verifying a webhook and
+      // giving up on it.
+      if (method == "POST" && path == "/api/v1/alerts/test")
+      {
+         route.kind = RouteAlertTest;
+         return;
+      }
+
+      if (method == "POST" && path == "/api/v1/alerts/run")
+      {
+         route.kind = RouteAlertRun;
+         return;
+      }
+
+      const AnsiString alertRulesPath = "/api/v1/alerts/rules";
+      if (method == "GET" && path == alertRulesPath)
+      {
+         route.kind = RouteAlertRuleList;
+         return;
+      }
+      if (method == "PUT" && path.StartsWith(alertRulesPath + "/"))
+      {
+         AnsiString condition = path.Mid(alertRulesPath.GetLength() + 1);
+
+         if (!condition.IsEmpty() && condition.Find("/") < 0)
+         {
+            route.kind = RouteAlertRuleUpdate;
+            route.identifier = condition;
+         }
+
+         return;
+      }
+
       if (method == "GET" && path == "/api/v1/openapi.json")
          route.kind = RouteOpenApi;
    }
@@ -3341,6 +3417,19 @@ namespace HM
       case RouteIniSettingGet:
       case RouteIniSettingPut:
       case RouteIniSettingDelete:
+      // The audit trail names every administrator and every change they made,
+      // and the alert rules hold the webhook secrets. A key that could read the
+      // first could watch for its own footprints; a key that could write the
+      // second could silence the alerting or point it at an endpoint of its own.
+      // Both are the administrator password's, and a key of any scope is
+      // answered 401 rather than 403 so that it learns nothing from asking.
+      case RouteAuditList:
+      case RouteAuditVerify:
+      case RouteAlertRuleList:
+      case RouteAlertRuleUpdate:
+      case RouteAlertEventList:
+      case RouteAlertTest:
+      case RouteAlertRun:
          return true;
 
       default:
@@ -3359,6 +3448,12 @@ namespace HM
       // slip past a read-only key by being spelled harmlessly.
       switch (kind)
       {
+      // Answered here as well as in IsApiKeyRoute_: a kind that writes must say
+      // so whether or not a key can reach it at all, so that the answer does not
+      // depend on the order two guards happen to be asked in.
+      case RouteAlertRuleUpdate:
+      case RouteAlertTest:
+      case RouteAlertRun:
       case RouteMeFileCreate:
       case RouteMeFileContent:
       case RouteMeFileUpdate:
@@ -10708,6 +10803,7 @@ namespace HM
       openApiJson += OpenApiMailboxPaths_();
       openApiJson += OpenApiAccountResourcesPaths_();
       openApiJson += OpenApiGroupsPaths_();
+      openApiJson += OpenApiAuditPaths_();
       openApiJson += openApiTail;
 
       return BuildResponse_(200, openApiJson);
@@ -11328,6 +11424,45 @@ namespace HM
       AnsiString utf8;
       Unicode::WideToMultiByte(value, utf8);
       return utf8;
+   }
+
+   /*
+      The credential, as the audit trail names it. "administrator" and "key:<id>"
+      are the identity strings Authenticate_ already produces for the rate
+      accounting and the log, so an audit row and a log line about the same
+      request name the caller the same way.
+   */
+   AuditTrail::Actor
+   RestApiServer::AuditActorFor_(const Caller &caller)
+   {
+      AuditTrail::Actor actor;
+
+      if (caller.result == AuthenticationFailed)
+         return actor;
+
+      actor.present = true;
+      actor.name = String(caller.identity);
+      actor.address = caller.peer.ToString();
+
+      // The Deck is a REST client with a session cookie, and it is worth saying
+      // so: "who changed this, and were they at a browser or holding a key" is
+      // the first question asked of a record like this.
+      actor.interface_name = caller.via_session ? _T("Deck") : _T("REST");
+
+      switch (caller.result)
+      {
+      case AuthenticatedAsAdministrator:
+         actor.kind = _T("administrator");
+         break;
+      case AuthenticatedWithApiKey:
+         actor.kind = _T("apikey");
+         break;
+      default:
+         actor.kind = _T("account");
+         break;
+      }
+
+      return actor;
    }
 
    AnsiString

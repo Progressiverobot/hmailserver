@@ -13,6 +13,7 @@
 #include "InterfaceRuleActions.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 STDMETHODIMP InterfaceRule::get_ID(long *pVal)
 {
@@ -262,6 +263,8 @@ STDMETHODIMP InterfaceRule::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -300,6 +303,8 @@ STDMETHODIMP InterfaceRule::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

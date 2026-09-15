@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceDistributionLists.h"
 
 #include "InterfaceDistributionList.h"
@@ -40,6 +41,8 @@ STDMETHODIMP InterfaceDistributionLists::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!distribution_lists_)
          return GetAccessDenied();
 
@@ -88,6 +91,8 @@ STDMETHODIMP InterfaceDistributionLists::Delete(long Index)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!distribution_lists_)
          return GetAccessDenied();
 

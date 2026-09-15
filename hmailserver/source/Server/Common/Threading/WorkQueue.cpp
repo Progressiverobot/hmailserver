@@ -438,6 +438,14 @@ namespace HM
       return result;
    }
 
+   bool
+   WorkQueue::GetIsStalled() const
+   {
+      boost::lock_guard<boost::recursive_mutex> guard(runningTasksMutex_);
+
+      return stall_reported_;
+   }
+
    void
    WorkQueue::ReportStalledTasks()
    //---------------------------------------------------------------------------

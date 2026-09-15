@@ -153,6 +153,24 @@
 
 #define PROPERTY_TLSOPTIONS                     _T("TlsOptions")
 
+// The audit trail. Recording is on by default: a server nobody has configured
+// still answers "who changed this", and the cost is one row per administrative
+// change. Retention of 0 keeps everything, which is what an audit trail is for;
+// a number of days is for the installation whose own policy says so.
+#define PROPERTY_AUDIT_TRAIL_ENABLED            _T("AuditTrailEnabled")
+#define PROPERTY_AUDIT_RETENTION_DAYS           _T("AuditRetentionDays")
+
+// Alerts. The master switch is on, and the rules in hm_alertrules are off
+// except the two worth waking up for; with no AlertRecipient set nothing is
+// sent, which is what makes "on" safe in a stock install.
+#define PROPERTY_ALERTS_ENABLED                 _T("AlertsEnabled")
+#define PROPERTY_ALERT_RECIPIENT                _T("AlertRecipient")
+#define PROPERTY_ALERT_SENDER_ADDRESS           _T("AlertSenderAddress")
+#define PROPERTY_ALERT_DIGEST_ENABLED           _T("AlertDigestEnabled")
+#define PROPERTY_ALERT_DIGEST_HOUR              _T("AlertDigestHour")
+#define PROPERTY_ALERT_MAX_PER_HOUR             _T("AlertMaxPerHour")
+#define PROPERTY_ALERT_WEBHOOK_MAX_ATTEMPTS     _T("AlertWebhookMaxAttempts")
+
 // 6006 adds hm_imapfolders.folderspecialuse (RFC 6154 SPECIAL-USE).
 // 6007 adds hm_domains.domaindkimsecondaryselector and
 //      hm_domains.domaindkimsecondaryprivatekeyfile, the staged half of a DKIM key
@@ -169,4 +187,4 @@
 //      administrator names the sealers to trust. The rows exist rather than being
 //      absent-with-a-default because PropertySet reports error 5015 on every read of
 //      a missing property, which would fill the error log on ARC-bearing mail.
-#define REQUIRED_DB_VERSION            6041
+#define REQUIRED_DB_VERSION            6043

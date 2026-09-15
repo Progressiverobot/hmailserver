@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceDirectories.h"
 
 InterfaceDirectories::InterfaceDirectories() :
@@ -32,6 +33,8 @@ STDMETHODIMP InterfaceDirectories::put_ProgramDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -64,6 +67,8 @@ STDMETHODIMP InterfaceDirectories::put_DatabaseDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -96,6 +101,8 @@ STDMETHODIMP InterfaceDirectories::put_DataDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -128,6 +135,8 @@ STDMETHODIMP InterfaceDirectories::put_LogDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -160,6 +169,8 @@ STDMETHODIMP InterfaceDirectories::put_TempDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 
@@ -192,6 +203,8 @@ STDMETHODIMP InterfaceDirectories::put_EventDirectory(BSTR newVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!ini_file_settings_)
          return GetAccessDenied();
 

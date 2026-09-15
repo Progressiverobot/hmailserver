@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceGroupMembers.h"
 
 #include "../Common/BO/GroupMember.h"
@@ -89,6 +90,8 @@ InterfaceGroupMembers::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!group_members_)
          return GetAccessDenied();
 

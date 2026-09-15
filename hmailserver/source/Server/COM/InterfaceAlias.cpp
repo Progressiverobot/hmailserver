@@ -9,6 +9,7 @@
 #include "../Common/Persistence/PersistentAlias.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #ifdef _DEBUG
 long InterfaceAlias::counter = 0;
@@ -174,6 +175,8 @@ STDMETHODIMP InterfaceAlias::Delete()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -191,6 +194,8 @@ STDMETHODIMP InterfaceAlias::Save()
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "InterfaceSURBLServers.h"
 #include "InterfaceSURBLServer.h"
@@ -90,6 +91,8 @@ InterfaceSURBLServers::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!surbl_servers_)
          return GetAccessDenied();
 

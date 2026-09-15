@@ -98,6 +98,13 @@ namespace HM
       // periodically from a thread that is not owned by this queue.
       void ReportStalledTasks();
 
+      // True while the last call to ReportStalledTasks found every worker thread
+      // stuck in the same task. Read by WorkQueueHealthTask, which needs the
+      // answer for the whole set of queues in order to raise the queue.stalled
+      // alert once and clear it once; ReportStalledTasks itself cannot answer
+      // that, because a queue that is fine returns without saying so.
+      bool GetIsStalled() const;
+
    private:
 
       struct RunningTask

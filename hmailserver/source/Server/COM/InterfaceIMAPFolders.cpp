@@ -10,6 +10,7 @@
 #include "../Common/BO/IMAPFolder.h"
 
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 
 #include "../Common/Util/Encoding/ModifiedUTF7.h"
 
@@ -147,6 +148,8 @@ InterfaceIMAPFolders::DeleteByDBID(long lDBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 
@@ -167,6 +170,8 @@ InterfaceIMAPFolders::Add(BSTR sName, IInterfaceIMAPFolder **pVal)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!object_)
          return GetAccessDenied();
 

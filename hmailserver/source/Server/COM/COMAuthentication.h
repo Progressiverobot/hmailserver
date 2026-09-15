@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "../Common/Util/AuditTrail.h"
+
 namespace HM
 {
    class Account;
@@ -29,6 +31,20 @@ namespace HM
 
       bool GetIsDomainAdmin() const;
       bool GetIsServerAdmin() const;
+
+      // The audit trail's identity chokepoint for COM. GetIsServerAdmin and
+      // GetIsDomainAdmin are the authorisation questions every COM write asks
+      // before it writes, and they are asked ON THE THREAD that is about to do
+      // the writing - which matters, because hMailServer's COM server is an
+      // out-of-process MTA and RPC dispatches each call on whichever pool thread
+      // is free. An actor installed when the client authenticated would be on a
+      // thread that never writes anything.
+      //
+      // The COM methods that write without asking - the settings property
+      // setters, which are reachable only once LoadSettings has asked once -
+      // carry an AuditScope of their own built from this; see
+      // COMAuthenticator::GetAuditActor and build/check-audit-choke-point.py.
+      AuditTrail::Actor GetAuditActor() const;
 
       __int64 GetAccountID() const;
       __int64 GetDomainID() const;

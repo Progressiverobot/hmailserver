@@ -4,6 +4,7 @@
 
 #include "stdafx.h"
 #include "COMError.h"
+#include "../Common/Util/AuditTrail.h"
 #include "InterfaceRoutes.h"
 
 #include "InterfaceRoute.h"
@@ -77,6 +78,8 @@ STDMETHODIMP InterfaceRoutes::DeleteByDBID(long DBID)
 {
    try
    {
+      HM::AuditScope auditScope(GetAuditActor());
+
       if (!routes_)
          return GetAccessDenied();
 
