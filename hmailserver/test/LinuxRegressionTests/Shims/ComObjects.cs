@@ -2345,6 +2345,13 @@ namespace hMailServer
       private string _vacationInternalSubject = string.Empty; public string VacationInternalSubject { get { return _vacationInternalSubject; } set { _vacationInternalSubject = value; Pend("vacation_internal_subject", Q(value)); } }
       private string _vacationInternalMessage = string.Empty; public string VacationInternalMessage { get { return _vacationInternalMessage; } set { _vacationInternalMessage = value; Pend("vacation_internal_message", Q(value)); } }
       private bool _vacationExternalOverride; public bool VacationExternalOverride { get { return _vacationExternalOverride; } set { _vacationExternalOverride = value; Pend("vacation_external_override", B(value)); } }
+      private bool _externalTagSubject; public bool ExternalTagSubject { get { return _externalTagSubject; } set { _externalTagSubject = value; Pend("external_tag_subject", B(value)); } }
+      private bool _externalTagHeader; public bool ExternalTagHeader { get { return _externalTagHeader; } set { _externalTagHeader = value; Pend("external_tag_header", B(value)); } }
+      private string _externalTagText = string.Empty; public string ExternalTagText { get { return _externalTagText; } set { _externalTagText = value; Pend("external_tag_text", Q(value)); } }
+      private bool _firstContactTip; public bool FirstContactTip { get { return _firstContactTip; } set { _firstContactTip = value; Pend("first_contact_tip", B(value)); } }
+      private bool _disclaimerEnabled; public bool DisclaimerEnabled { get { return _disclaimerEnabled; } set { _disclaimerEnabled = value; Pend("disclaimer_enabled", B(value)); } }
+      private string _disclaimerPlainText = string.Empty; public string DisclaimerPlainText { get { return _disclaimerPlainText; } set { _disclaimerPlainText = value; Pend("disclaimer_plain_text", Q(value)); } }
+      private string _disclaimerHtml = string.Empty; public string DisclaimerHTML { get { return _disclaimerHtml; } set { _disclaimerHtml = value; Pend("disclaimer_html", Q(value)); } }
       private eDKIMAlgorithm _dkimAlgorithm = eDKIMAlgorithm.eSHA256; public eDKIMAlgorithm DKIMSigningAlgorithm { get { return _dkimAlgorithm; } set { _dkimAlgorithm = value; Pend("dkim_signing_algorithm", Q(value == eDKIMAlgorithm.eSHA1 ? "sha1" : "sha256")); } }
       private int _retention; public int MessageRetentionDays { get { return _retention; } set { _retention = value; Pend("message_retention_days", N(value)); } }
       private string _relayHost = string.Empty; public string RelayHost { get { return _relayHost; } set { _relayHost = value; Pend("relay_host", Q(value)); } }
@@ -2427,6 +2434,13 @@ namespace hMailServer
          _vacationInternalSubject = ServerApi.StringOf(element, "vacation_internal_subject") ?? string.Empty;
          _vacationInternalMessage = ServerApi.StringOf(element, "vacation_internal_message") ?? string.Empty;
          _vacationExternalOverride = ServerApi.FlagOf(element, "vacation_external_override");
+         _externalTagSubject = ServerApi.FlagOf(element, "external_tag_subject");
+         _externalTagHeader = ServerApi.FlagOf(element, "external_tag_header");
+         _externalTagText = ServerApi.StringOf(element, "external_tag_text") ?? string.Empty;
+         _firstContactTip = ServerApi.FlagOf(element, "first_contact_tip");
+         _disclaimerEnabled = ServerApi.FlagOf(element, "disclaimer_enabled");
+         _disclaimerPlainText = ServerApi.StringOf(element, "disclaimer_plain_text") ?? string.Empty;
+         _disclaimerHtml = ServerApi.StringOf(element, "disclaimer_html") ?? string.Empty;
          _dkimSecondarySelector = ServerApi.StringOf(element, "dkim_secondary_selector") ?? string.Empty;
          _dkimSecondaryKeyFile = ServerApi.StringOf(element, "dkim_secondary_private_key_file") ?? string.Empty;
          _adDomainName = ServerApi.StringOf(element, "ad_domain_name") ?? string.Empty;

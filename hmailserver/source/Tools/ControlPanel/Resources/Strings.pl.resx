@@ -18,11 +18,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
-    <value>
-
-Czy mimo to zapisać to słabe hasło?</value>
-  </data>
   <data name="  Configured database type: {0}." xml:space="preserve">
     <value>  Skonfigurowany typ bazy danych: {0}.</value>
   </data>
@@ -178,6 +173,11 @@ Czy mimo to zapisać to słabe hasło?</value>
   </data>
   <data name=" — applied immediately." xml:space="preserve">
     <value> — stosowane natychmiast.</value>
+  </data>
+  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
+    <value>
+
+Czy mimo to zapisać to słabe hasło?</value>
   </data>
   <data name="&quot;Anyone in the domain&quot; means the sender's address is at a domain this server hosts, which an outsider can claim unless the list also requires authentication. Tick that below if the list must be restricted to people who have logged in." xml:space="preserve">
     <value>„Każdy w domenie” oznacza, że adres nadawcy należy do domeny obsługiwanej przez ten serwer, a osoba z zewnątrz może taki adres podać, o ile lista nie wymaga dodatkowo uwierzytelnienia. Jeśli lista ma być ograniczona do osób zalogowanych, należy zaznaczyć tę opcję poniżej.</value>
@@ -827,6 +827,9 @@ Control Panel może czytać pliki wiadomości tylko wtedy, gdy działa na tym sa
   <data name="Add a DNS blacklist; connections from listed addresses gain score or are refused." xml:space="preserve">
     <value>Dodaj czarną listę DNS; połączenia z wymienionych adresów otrzymują punkty lub są odrzucane.</value>
   </data>
+  <data name="Add a _header the reader shows as a banner" xml:space="preserve">
+    <value>Dodaj _nagłówek, który czytelnik pokazuje jako pasek</value>
+  </data>
   <data name="Add a domain or a mailbox" xml:space="preserve">
     <value>Dodaj domenę lub skrzynkę pocztową</value>
   </data>
@@ -928,6 +931,9 @@ Control Panel może czytać pliki wiadomości tylko wtedy, gdy działa na tym sa
   </data>
   <data name="Added at {0}." xml:space="preserve">
     <value>Dodano {0}.</value>
+  </data>
+  <data name="Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it." xml:space="preserve">
+    <value>Dodawane raz, do poczty mającej co najmniej jednego odbiorcę poza tym serwerem. Nigdy do wiadomości podpisanej lub zaszyfrowanej, do odpowiedzi automatycznej, do powiadomienia o niedostarczeniu ani do wpisu na listę, i nigdy po raz drugi do odpowiedzi, która już je cytuje.</value>
   </data>
   <data name="Address" xml:space="preserve">
     <value>Adres</value>
@@ -3445,6 +3451,9 @@ Poczta nie jest ruszana - indeks jest z niej wyprowadzany - ale dopóki odbudowa
   <data name="HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list." xml:space="preserve">
     <value>HS256 znajduje się w OAuth2AllowedAlgorithms, ale OAuth2HmacSecret jest puste, więc tokeny HS256 nigdy nie przejdą weryfikacji. Należy ustawić wspólny sekret albo usunąć HS256 z listy.</value>
   </data>
+  <data name="HTM_L disclaimer (empty = the plain text, with its line breaks)" xml:space="preserve">
+    <value>Oświadczenie jako HTM_L (puste = zwykły tekst z jego końcami wierszy)</value>
+  </data>
   <data name="HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set." xml:space="preserve">
     <value>HTTP Basic wymaga zarówno nazwy użytkownika, jak i hasła. Ustawiono tylko {0}, więc uwierzytelnianie Basic NIE jest włączone - serwer zapisuje to w dzienniku i zachowuje się tak, jakby nie ustawiono żadnego z nich.</value>
   </data>
@@ -4139,6 +4148,9 @@ Zweryfikowany instalator zostaje przekazany pomocnikowi aktualizacji: usługa je
   </data>
   <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
     <value>Poczta z pustym adresem nadawcy jest odrzucana. Wiele serwerów wysyła odbicia z adresu &lt;&gt;, które zostaną odrzucone.</value>
+  </data>
+  <data name="Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts." xml:space="preserve">
+    <value>Pocztę spoza organizacji można oznaczyć tak, aby czytelnik zobaczył to od razu. Nadawca jest z zewnątrz, gdy sesja się nie zalogowała, wiadomość nie przyszła przez zaufany przekaźnik przychodzący, a ani nadawca koperty, ani adres From nie należy do domeny hostowanej przez ten serwer.</value>
   </data>
   <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
     <value>Poczta się nie porusza, a nic się nie zawiesiło: która połowa utknęła, które wiersze dziennika nazywają przyczynę i które ustawienie ogranicza każdy z etapów.</value>
@@ -7328,6 +7340,12 @@ Uruchomić ją teraz ponownie?</value>
   <data name="Tag outbound envelope senders with BATV and validate returning bounces" xml:space="preserve">
     <value>Oznaczaj wychodzących nadawców koperty znacznikiem BATV i weryfikuj powracające zwroty</value>
   </data>
+  <data name="Tag te_xt (empty = [EXTERNAL], at most 100 characters)" xml:space="preserve">
+    <value>Te_kst znacznika (puste = [EXTERNAL], najwyżej 100 znaków)</value>
+  </data>
+  <data name="Tagging and disclaimer" xml:space="preserve">
+    <value>Oznaczanie i oświadczenie</value>
+  </data>
   <data name="Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts." xml:space="preserve">
     <value>Obowiązuje natychmiast, ale jest przechowywane wyłącznie w pamięci: nic nie zapisuje tej wartości, więc każde ponowne uruchomienie usługi przywraca wbudowane 10240 KB (10 MB). Aby zachować inny limit, trzeba go ustawiać po każdym uruchomieniu, na przykład ze skryptu startowego przez COM API. Wartości TTL i przełącznik włączający na tej karcie są zapisywane i przetrwają ponowne uruchomienie.</value>
   </data>
@@ -7351,6 +7369,9 @@ Uruchomić ją teraz ponownie?</value>
   </data>
   <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
     <value>Ucz SpamAssassin, gdy użytkownik odkłada wiadomość jako spam albo zabiera ją z powrotem</value>
+  </data>
+  <data name="Tell the reader about a _first contact from outside" xml:space="preserve">
+    <value>Powiadom czytelnika o _pierwszym kontakcie z zewnątrz</value>
   </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Informuje serwery wysyłające, że przy dostarczaniu do Twoich domen muszą używać TLS, zamykając lukę degradacji obecną w oportunistycznym TLS.</value>
@@ -7639,13 +7660,13 @@ Należy zaznaczyć klucz powyżej i skopiować go ręcznie - nie zostanie pokaza
   <data name="The fetch itself failed: {0} This says nothing about the policy." xml:space="preserve">
     <value>Samo pobranie nie powiodło się: {0} Nie mówi to nic o polityce.</value>
   </data>
+  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
+    <value>Nie udało się przetworzyć tego pliku jako certyfikatu PEM. Serwer wczytuje certyfikaty wyłącznie w formacie PEM, więc ten plik się nie wczyta, a każdy port TLS, który go używa, nie uruchomi się (błąd serwera 5113).</value>
+  </data>
   <data name="The file&#13;&#10;   {0}&#13;&#10;could not be loaded. The message has probably been delivered and is no longer in the queue." xml:space="preserve">
     <value>Nie udało się wczytać pliku
    {0}
 Wiadomość została prawdopodobnie dostarczona i nie ma jej już w kolejce.</value>
-  </data>
-  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
-    <value>Nie udało się przetworzyć tego pliku jako certyfikatu PEM. Serwer wczytuje certyfikaty wyłącznie w formacie PEM, więc ten plik się nie wczyta, a każdy port TLS, który go używa, nie uruchomi się (błąd serwera 5113).</value>
   </data>
   <data name="The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in front of a fast one is paid for on every clean message." xml:space="preserve">
     <value>Pierwszy skaner, który coś znajdzie, kończy skanowanie, więc kolejność jest zarazem kosztem: za wolny skaner ustawiony przed szybkim płaci się przy każdej czystej wiadomości.</value>
@@ -7929,6 +7950,9 @@ Odpowiada tu własny resolwer serwera - ten sam, którego używa dostarczanie SM
   <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
     <value>Serwer nie przechowuje historii: MetricsHistoryDays wynosi 0 w pliku hMailServer.ini. Należy ustawić liczbę dni do zachowania i ponownie uruchomić usługę.</value>
   </data>
+  <data name="The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off." xml:space="preserve">
+    <value>Serwer pamięta, kto pisał do każdego konta i do kogo pisało każde konto, i mówi o tym w czytniku, gdy nadawca z zewnątrz pojawia się po raz pierwszy. Kosztuje to jedno zapytanie do bazy danych na każdą wiadomość dostarczoną do tej domeny i zupełnie nic, dopóki jest to wyłączone.</value>
+  </data>
   <data name="The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists." xml:space="preserve">
     <value>Strona serwerowa jest gotowa: udostępnianie jest włączone, port HTTPS jest ustawiony i istnieje źródło certyfikatu.</value>
   </data>
@@ -7999,6 +8023,12 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   </data>
   <data name="The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement." xml:space="preserve">
     <value>Nie udało się odczytać zapisanego terminu wygaśnięcia w postaci, jakiej oczekuje ta strona (YYYY-MM-DD HH:MM:SS), więc nie da się stąd stwierdzić, czy serwer nadal przyjmuje ten klucz. Jeśli wiersz był edytowany ręcznie, należy go poprawić; w przeciwnym razie należy unieważnić klucz i utworzyć nowy w jego miejsce.</value>
+  </data>
+  <data name="The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it." xml:space="preserve">
+    <value>Znacznik w temacie psuje każdy podpis DKIM, który nadawca złożył pod swoim tematem, dokładnie tak jak przedrostek tematu w ochronie przed spamem. Nagłówek nie psuje, więc tam, gdzie czytelnik potrafi go pokazać, wybierz nagłówek.</value>
+  </data>
+  <data name="The tag text must be 100 characters or fewer." xml:space="preserve">
+    <value>Tekst znacznika może mieć najwyżej 100 znaków.</value>
   </data>
   <data name="The test itself failed unexpectedly: {0}" xml:space="preserve">
     <value>Sam test nieoczekiwanie się nie powiódł: {0}</value>
@@ -8860,6 +8890,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)" xml:space="preserve">
     <value>Z_ezwalaj na wysyłanie hasła przez połączenie niezabezpieczone (AllowUnprotectedPassword)</value>
   </data>
+  <data name="_Append a disclaimer to mail leaving the organisation" xml:space="preserve">
+    <value>Dołącz _oświadczenie do poczty opuszczającej organizację</value>
+  </data>
   <data name="_Apply" xml:space="preserve">
     <value>_Zastosuj</value>
   </data>
@@ -9100,6 +9133,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   <data name="_Permissions" xml:space="preserve">
     <value>_Uprawnienia</value>
   </data>
+  <data name="_Plain-text disclaimer" xml:space="preserve">
+    <value>Oświadczenie jako zwykł_y tekst</value>
+  </data>
   <data name="_Plain-text signature" xml:space="preserve">
     <value>_Podpis tekstowy</value>
   </data>
@@ -9207,6 +9243,9 @@ Będzie próbował dalej podczas korzystania z aplikacji.</value>
   </data>
   <data name="_Start the walk" xml:space="preserve">
     <value>_Rozpocznij przewodnik</value>
+  </data>
+  <data name="_Tag the subject of mail from outside" xml:space="preserve">
+    <value>Oznacz _temat poczty z zewnątrz</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Docelowy host SMTP</value>

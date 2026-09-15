@@ -9049,6 +9049,8 @@ namespace HM
       AnsiString listUnsubscribe;
       AnsiString listUnsubscribePost;
       AnsiString receiptRequestedBy;
+      AnsiString externalStamp;
+      AnsiString firstContactStamp;
       if (!header.IsEmpty())
       {
          MimeHeader mimeHeader;
@@ -9062,6 +9064,14 @@ namespace HM
          listUnsubscribePost = value ? value : "";
          value = mimeHeader.GetRawFieldValue("Disposition-Notification-To");
          receiptRequestedBy = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("X-hMailServer-External");
+         externalStamp = value ? value : "";
+         value = mimeHeader.GetRawFieldValue("X-hMailServer-First-Contact");
+         firstContactStamp = value ? value : "";
+         externalStamp.TrimLeft();
+         externalStamp.TrimRight();
+         firstContactStamp.TrimLeft();
+         firstContactStamp.TrimRight();
          listUnsubscribe.TrimLeft();
          listUnsubscribe.TrimRight();
          listUnsubscribePost.ToLower();
@@ -9085,7 +9095,17 @@ namespace HM
       // DMARC check parses it - not from the first @ in the header, which a
       // display name can carry.
       AnsiString senderDomain = DomainOfFrom(Utf8_(DMARC::ExtractAddressFromHeaderValue(String(from))));
-      bool external = !senderDomain.IsEmpty() && senderDomain != accountDomain;
+
+      // The server's own verdict when the recipient's domain asked for it -
+      // ExternalSenderTagger stamped X-hMailServer-External using the rule in
+      // MessageOrigin, which knows about authenticated submissions and trusted
+      // relays and this one does not. Where the domain has not turned the tag
+      // on there is no stamp, and the comparison below stands, which is what
+      // the badge has always done.
+      bool externalStamped = externalStamp.CompareNoCase("YES") == 0;
+      bool external = externalStamped ||
+                      (!senderDomain.IsEmpty() && senderDomain != accountDomain);
+      bool firstContact = firstContactStamp.CompareNoCase("YES") == 0;
 
       String listText;
       Unicode::MultiByteToWide(listUnsubscribe, listText);
@@ -9093,7 +9113,7 @@ namespace HM
       Unicode::MultiByteToWide(receiptRequestedBy, receiptText);
 
       AnsiString json;
-      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dkim_domain\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs,\"list_unsubscribe\":\"%hs\",\"list_unsubscribe_post\":%hs,\"receipt_requested_by\":\"%hs\"",
+      json.Format("\"headers\":\"%hs\",\"authentication\":{\"spf\":\"%hs\",\"dkim\":\"%hs\",\"dkim_domain\":\"%hs\",\"dmarc\":\"%hs\",\"results\":\"%hs\"},\"external\":%hs,\"external_stamped\":%hs,\"first_contact\":%hs,\"list_unsubscribe\":\"%hs\",\"list_unsubscribe_post\":%hs,\"receipt_requested_by\":\"%hs\"",
          JsonEscape_(Utf8_(headerText)).c_str(),
          VerdictOf(results, "spf").c_str(),
          VerdictOf(results, "dkim").c_str(),
@@ -9101,6 +9121,8 @@ namespace HM
          VerdictOf(results, "dmarc").c_str(),
          JsonEscape_(Utf8_(resultsText)).c_str(),
          external ? "true" : "false",
+         externalStamped ? "true" : "false",
+         firstContact ? "true" : "false",
          JsonEscape_(Utf8_(listText)).c_str(),
          listUnsubscribePost.Find("list-unsubscribe=one-click") >= 0 ? "true" : "false",
          JsonEscape_(Utf8_(receiptText)).c_str());
@@ -10788,7 +10810,7 @@ namespace HM
          "\"get\":{\"summary\":\"List domains\",\"description\":\"A domain-restricted key sees only its own domains. Each entry: name, active, postmaster.\",\"responses\":{\"200\":{\"description\":\"Array of domains\"}}},"
          "\"post\":{\"summary\":\"Create a domain\",\"description\":\"Body: name (required), active (default true) and postmaster. The name is judged as the Control Panel judges it - a valid domain name, not one a domain alias already has - and every other setting takes the default a new domain gets there. Server-wide; refused for domain-restricted keys.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"name\"],\"properties\":{\"name\":{\"type\":\"string\"},\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"}}}}}},\"responses\":{\"201\":{\"description\":\"Created: name, active, postmaster\"},\"400\":{\"description\":\"name missing, not a domain name, or taken by a domain alias (the reason is in error)\"},\"409\":{\"description\":\"A domain with that name exists\"}}}},"
          "\"/api/v1/domains/{domain}\":{"
-         "\"put\":{\"summary\":\"Change a domain: on or off, its postmaster, its limits and everything else the Control Panel's domain pages hold, or its name\",\"description\":\"Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), dkim_header_canonicalization and dkim_body_canonicalization (simple or relaxed), dkim_secondary_selector and dkim_secondary_private_key_file (the key a rotation promotes), dkim_sign_aliases, message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message, vacation_internal_subject and vacation_internal_message (the reply a sender in the same domain gets, when set), vacation_external_override, ad_domain_name (the Active Directory domain the domain's AD accounts log on to). A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"active\"],\"properties\":{\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The domain as saved, every field the listing shows\"},\"400\":{\"description\":\"active missing, a field refused, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"}}},"
+         "\"put\":{\"summary\":\"Change a domain: on or off, its postmaster, its limits and everything else the Control Panel's domain pages hold, or its name\",\"description\":\"Body: active (required) and any subset of postmaster, name (a new name renames the domain and every address in it, as the Control Panel does), max_message_size_kb, max_size_mb, max_account_size_mb, max_accounts, max_aliases, max_lists and their switches max_accounts_enabled, max_aliases_enabled, max_lists_enabled, plus_addressing_enabled, plus_addressing_character, use_greylisting, signature_enabled, signature_method (set_if_not_specified, overwrite or append), signature_plain_text, signature_html, signature_add_to_replies, signature_add_to_local_mail, dkim_enabled, dkim_selector, dkim_private_key_file, dkim_signing_algorithm (sha1 or sha256), dkim_header_canonicalization and dkim_body_canonicalization (simple or relaxed), dkim_secondary_selector and dkim_secondary_private_key_file (the key a rotation promotes), dkim_sign_aliases, message_retention_days, relay_host, relay_port, relay_requires_auth, relay_username, relay_password (write-only), relay_connection_security, vacation_enabled, vacation_subject, vacation_message, vacation_internal_subject and vacation_internal_message (the reply a sender in the same domain gets, when set), vacation_external_override, ad_domain_name (the Active Directory domain the domain's AD accounts log on to), external_tag_subject and external_tag_header (tag mail from outside this installation in the subject, in a header, or both), external_tag_text (the subject tag, at most 100 characters; empty is [EXTERNAL]), first_contact_tip (tell the reader when an outside sender has not written to the account before), disclaimer_enabled, disclaimer_plain_text and disclaimer_html (the legal footer appended to mail leaving the organisation). A field left out keeps its value; everything is checked before anything is applied, and an unknown field or a wrong type is a 400 naming it.\",\"requestBody\":{\"content\":{\"application/json\":{\"schema\":{\"type\":\"object\",\"required\":[\"active\"],\"properties\":{\"active\":{\"type\":\"boolean\"},\"postmaster\":{\"type\":\"string\"},\"name\":{\"type\":\"string\"}}}}}},\"responses\":{\"200\":{\"description\":\"The domain as saved, every field the listing shows\"},\"400\":{\"description\":\"active missing, a field refused, or the save refused (the reason is in error)\"},\"404\":{\"description\":\"Unknown domain\"}}},"
          "\"delete\":{\"summary\":\"Delete a domain with everything in it\",\"description\":\"The accounts and their messages, the aliases, the distribution lists, the domain aliases and the domain's directories go with it, exactly as when the Control Panel deletes a domain. Server-wide; refused for domain-restricted keys.\",\"responses\":{\"200\":{\"description\":\"Deleted\"},\"404\":{\"description\":\"Unknown domain\"}}}},"
          "\"/api/v1/domains/{domain}/accounts\":{"
          "\"get\":{\"summary\":\"List accounts in a domain\",\"responses\":{\"200\":{\"description\":\"Array of accounts\"},\"404\":{\"description\":\"Unknown domain\"}}},"

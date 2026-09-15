@@ -434,6 +434,7 @@
     <Compile Include="IMAP\TombstoneRetention.cs" />
     <Compile Include="IMAP\SharedMailboxes.cs" />
     <Compile Include="SMTP\ProxyProtocol.cs" />
+    <Compile Include="SMTP\DomainTransforms.cs" />
     <Compile Include="SMTP\OutOfOfficeScope.cs" />
     <Compile Include="SMTP\BinaryMime.cs" />
     <Compile Include="SMTP\DistributionListModeration.cs" />

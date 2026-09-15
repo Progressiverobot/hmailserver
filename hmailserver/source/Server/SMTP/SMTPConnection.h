@@ -146,6 +146,9 @@ namespace HM
       // for example where message signature and spam-headers are added.
 
       void SetMessageSignature_(std::shared_ptr<MessageData> &pMessageData);
+
+      // The first-contact memory's other half: what this account sends to.
+      void RememberOutgoingRecipients_();
       // Sets the signature of the message, based on the signature in the account
       // settings and domain settings.
 

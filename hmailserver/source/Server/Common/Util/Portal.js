@@ -1992,7 +1992,14 @@
     return loadContacts();
   };
   var warnAbout = function (m) {
-    var warnings = linkWarnings(m.html || '');
+    // What the server decided, first, because it knows two things this page
+    // cannot: whether the session that sent this authenticated, and whether
+    // the sender has ever written to this mailbox before. Both lines appear
+    // only when the recipient's domain asked for them.
+    var warnings = [];
+    if (m.external_stamped) { warnings.push(t('This message came from outside your organisation.')); }
+    if (m.first_contact) { warnings.push(t('You do not usually get mail from this sender.')); }
+    warnings = warnings.concat(linkWarnings(m.html || ''));
     showWarnings(warnings);
     ensureContacts().then(function (list) {
       if (current !== m) { return; }

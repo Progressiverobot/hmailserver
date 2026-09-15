@@ -11,6 +11,9 @@
 #include "../Mime/MimeTester.h"
 #include "../Util/Utilities.h"
 #include "../Util/MessageUtilities.h"
+#include "../Util/MessageOrigin.h"
+#include "../Util/ExternalSenderTagger.h"
+#include "../Util/DisclaimerAdder.h"
 #include "../Util/AcmeClient.h"
 #include "../Util/FileUtilities.h"
 #include "../Application/IniFileSettings.h"
@@ -111,6 +114,23 @@ namespace HM
       OutputDebugString(_T("hMailServer: Testing Formatter\n"));
       FormatterTester formatterTester;
       formatterTester.Test();
+
+      // What a domain does to a message: the rule that decides whether a sender
+      // is outside, the tag that rule produces, and the reply-chain guard on the
+      // disclaimer. All three are decisions made from values, so they are tested
+      // here rather than by delivering mail and reading it back - a delivery test
+      // proves the wiring, and these prove the rule.
+      OutputDebugString(_T("hMailServer: Testing MessageOrigin\n"));
+      MessageOriginTester messageOriginTester;
+      messageOriginTester.Test();
+
+      OutputDebugString(_T("hMailServer: Testing ExternalSenderTagger\n"));
+      ExternalSenderTaggerTester externalSenderTaggerTester;
+      externalSenderTaggerTester.Test();
+
+      OutputDebugString(_T("hMailServer: Testing DisclaimerAdder\n"));
+      DisclaimerAdderTester disclaimerAdderTester;
+      disclaimerAdderTester.Test();
 
       // Parameter substitution matters most on the two backends the bench does not
       // usually run: MySQL and PostgreSQL report GetSupportsCommandParameters() as

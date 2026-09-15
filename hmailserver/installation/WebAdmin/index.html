@@ -1361,6 +1361,14 @@ const DOMAIN_GROUPS=[
     vacation_enabled:{type:"boolean",description:K("Send a domain-wide out-of-office reply. It answers only for accounts that have no vacation message of their own, and at most one reply answers any message.")},
     vacation_subject:{type:"string",description:K("The reply's subject.")},
     vacation_message:{type:"string",format:"multiline",description:K("The reply's text.")}}},
+  {title:K("What this domain does to a message"),props:{
+    external_tag_subject:{type:"boolean",description:K("Put the tag text at the front of the subject of mail this domain receives from outside. It breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does; the header below costs the sender nothing.")},
+    external_tag_header:{type:"boolean",description:K("Stamp X-hMailServer-External on mail this domain receives from outside, which the webmail shows as a banner beside the sender.")},
+    external_tag_text:{type:"string",description:K("The text put at the front of the subject. Empty is the shipped [EXTERNAL]. At most 100 characters, so a domain whose readers do not read English can say it in the language they do.")},
+    first_contact_tip:{type:"boolean",description:K("Tell the reader when an outside sender has not written to this account before. It costs one database lookup for each message delivered here.")},
+    disclaimer_enabled:{type:"boolean",description:K("Append the legal footer below to mail this domain sends outside the organisation. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never twice on a reply chain.")},
+    disclaimer_plain_text:{type:"string",format:"multiline",description:K("The footer, as plain text.")},
+    disclaimer_html:{type:"string",format:"multiline",description:K("The footer, as HTML. Empty means the plain text is used, with its line breaks turned into line breaks in HTML.")}}},
   {title:K("DKIM"),props:{
     dkim_enabled:{type:"boolean",description:K("Sign outgoing mail from this domain.")},
     dkim_selector:{type:"string",description:K("The selector, which names the DNS record the public key is published under.")},

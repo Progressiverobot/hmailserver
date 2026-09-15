@@ -190,6 +190,23 @@ END_COM_MAP()
    STDMETHOD(put_RelayConnectionSecurity)(/*[in]*/ eConnectionSecurity newVal);
    STDMETHOD(DKIMPromoteSecondary)();
 
+   // What this domain does to a message: the external-sender tag, the
+   // first-contact note and the disclaimer. See Common/BO/Domain.h.
+   STDMETHOD(get_ExternalTagSubject)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_ExternalTagSubject)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_ExternalTagHeader)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_ExternalTagHeader)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_ExternalTagText)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_ExternalTagText)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_FirstContactTip)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_FirstContactTip)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_DisclaimerEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_DisclaimerEnabled)(/*[in]*/ VARIANT_BOOL newVal);
+   STDMETHOD(get_DisclaimerPlainText)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_DisclaimerPlainText)(/*[in]*/ BSTR newVal);
+   STDMETHOD(get_DisclaimerHTML)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_DisclaimerHTML)(/*[in]*/ BSTR newVal);
+
    // dkim end.
 private:
    

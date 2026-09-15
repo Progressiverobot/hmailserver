@@ -230,6 +230,55 @@ namespace HM
       bool GetVacationExternalOverride() const { return vacation_external_override_; }
       void SetVacationExternalOverride(bool bNewVal) { vacation_external_override_ = bNewVal; }
 
+      /*
+         WHAT THIS DOMAIN DOES TO A MESSAGE
+
+         Three transformations, all off by default, all applied to this domain's
+         own copies rather than to the queued message: see
+         hmailserver/docs/DomainTransforms.md.
+      */
+
+      // Put the tag text at the front of the Subject of a message this domain
+      // receives from outside. Breaks any DKIM signature the sender made over
+      // their Subject, exactly as the anti-spam subject prefix does and for the
+      // same reason - which is why it is separable from the header below, and
+      // why the header is the one to prefer where the reader can show it.
+      bool GetExternalTagSubject() const { return external_tag_subject_; }
+      void SetExternalTagSubject(bool bNewVal) { external_tag_subject_ = bNewVal; }
+
+      // Stamp X-hMailServer-External on a message this domain receives from
+      // outside. Prepending a field is signature-safe - DKIM selects duplicate
+      // fields from the bottom up - so this costs the sender's signature
+      // nothing, and the webmail turns it into a banner.
+      bool GetExternalTagHeader() const { return external_tag_header_; }
+      void SetExternalTagHeader(bool bNewVal) { external_tag_header_ = bNewVal; }
+
+      // The text put at the front of the subject. Empty means the shipped
+      // [EXTERNAL]. Per domain so that a domain whose readers do not read
+      // English can say it in the language they do.
+      String GetExternalTagText() const { return external_tag_text_; }
+      void SetExternalTagText(const String &sNewVal) { external_tag_text_ = sNewVal; }
+
+      // Tell the reader when a sender has not written to them before. Carries a
+      // per-message cost in the database - see PersistentKnownSender.
+      bool GetFirstContactTip() const { return first_contact_tip_; }
+      void SetFirstContactTip(bool bNewVal) { first_contact_tip_ = bNewVal; }
+
+      // Append the legal footer below to mail this domain sends outside the
+      // organisation. Never to a signed or encrypted message: see
+      // DisclaimerAdder.
+      bool GetDisclaimerEnabled() const { return disclaimer_enabled_; }
+      void SetDisclaimerEnabled(bool bNewVal) { disclaimer_enabled_ = bNewVal; }
+
+      String GetDisclaimerPlainText() const { return disclaimer_plain_text_; }
+      void SetDisclaimerPlainText(const String &sNewVal) { disclaimer_plain_text_ = sNewVal; }
+
+      // Empty means the plain text is used, its line breaks turned into <br>,
+      // which is what the signature does and what an administrator who fills in
+      // one box expects.
+      String GetDisclaimerHTML() const { return disclaimer_html_; }
+      void SetDisclaimerHTML(const String &sNewVal) { disclaimer_html_ = sNewVal; }
+
       int GetDKIMHeaderCanonicalizationMethod() const;
       void SetDKIMHeaderCanonicalizationMethod(int newValue);
 
@@ -299,6 +348,14 @@ namespace HM
       String vacation_internal_subject_;
       String vacation_internal_message_;
       bool vacation_external_override_;
+
+      bool external_tag_subject_;
+      bool external_tag_header_;
+      String external_tag_text_;
+      bool first_contact_tip_;
+      bool disclaimer_enabled_;
+      String disclaimer_plain_text_;
+      String disclaimer_html_;
 
       // Guards the lazy creation of the collections below. A Domain is shared by
       // every session of every account in it, and two sessions asking for a

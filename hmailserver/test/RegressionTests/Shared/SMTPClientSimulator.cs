@@ -290,6 +290,48 @@ namespace RegressionTests.Shared
          return input.TrimEnd('\r', '\n');
       }
 
+      // SendRaw for a session that signs in first, which is what a message
+      // being relayed OUT of this server needs: the default ranges require
+      // authentication for local-to-remote, and a test that wanted a message
+      // of its own shape sent outwards had nothing to call.
+      public void SendRaw(string username, string password, string sFrom, string sTo, string text)
+      {
+         if (!_tcpConnection.Connect(_ipaddress, _port))
+            throw new DeliveryFailedException("Unable to connect to server.");
+
+         _tcpConnection.Receive();
+
+         if (!Logon(EncodeBase64(username), EncodeBase64(password), out string errorMessage))
+            throw new DeliveryFailedException("Login failed: " + errorMessage);
+
+         SendAndReceive("MAIL FROM:<" + sFrom + ">
+");
+
+         var rcptResponse = SendAndReceive("RCPT TO:<" + sTo + ">
+");
+         if (!rcptResponse.StartsWith("2"))
+            throw new DeliveryFailedException("Unexpected response from server: " + rcptResponse);
+
+         SendAndReceive("DATA
+");
+
+         _tcpConnection.Send(text);
+         if (!text.EndsWith("
+"))
+            _tcpConnection.Send("
+");
+
+         var accepted = SendAndReceive(".
+");
+         if (accepted.Substring(0, 3) != "250")
+            throw new DeliveryFailedException("Unexpected response from server: " + accepted);
+
+         _tcpConnection.Send("QUIT
+");
+         _tcpConnection.Receive();
+         _tcpConnection.Disconnect();
+      }
+
       public void SendRaw(string sFrom, string sTo, string text)
       {
          if (!_tcpConnection.Connect(_port))

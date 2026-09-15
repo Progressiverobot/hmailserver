@@ -425,6 +425,61 @@ namespace RegressionTests.API
       }
 
       [Test]
+      [Description("PUT /api/v1/domains/{name} takes what the domain does to a message - the external-sender tag in the subject and in a header, its text, the first-contact note and the disclaimer in both forms - with COM reading every value the API set, the listing showing them, a field left out left alone, and an over-long tag text refused with nothing changed.")]
+      public void DomainMessageTransformFieldsRoundTripThroughCom()
+      {
+         string name = UniqueDomainName();
+         Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + name + "\"}").status);
+
+         // Off is the shipped state, and the listing says so.
+         StringAssert.Contains("\"external_tag_subject\":false", Http("GET", "/api/v1/domains/" + name).body);
+         StringAssert.Contains("\"disclaimer_enabled\":false", Http("GET", "/api/v1/domains/" + name).body);
+
+         (int status, string body) = Http("PUT", "/api/v1/domains/" + name,
+            "{\"active\":true,\"external_tag_subject\":true,\"external_tag_header\":true," +
+            "\"external_tag_text\":\"[EXTERN]\",\"first_contact_tip\":true," +
+            "\"disclaimer_enabled\":true,\"disclaimer_plain_text\":\"Confidential.\",\"disclaimer_html\":\"<p>Confidential.</p>\"}");
+         Assert.AreEqual(200, status, body);
+         StringAssert.Contains("\"external_tag_subject\":true", body);
+         StringAssert.Contains("\"external_tag_header\":true", body);
+         StringAssert.Contains("\"external_tag_text\":\"[EXTERN]\"", body);
+         StringAssert.Contains("\"first_contact_tip\":true", body);
+         StringAssert.Contains("\"disclaimer_enabled\":true", body);
+
+         Domain domain = DomainOverCom(name);
+         Assert.IsTrue(domain.ExternalTagSubject);
+         Assert.IsTrue(domain.ExternalTagHeader);
+         Assert.AreEqual("[EXTERN]", domain.ExternalTagText);
+         Assert.IsTrue(domain.FirstContactTip);
+         Assert.IsTrue(domain.DisclaimerEnabled);
+         Assert.AreEqual("Confidential.", domain.DisclaimerPlainText);
+         Assert.AreEqual("<p>Confidential.</p>", domain.DisclaimerHTML);
+
+         StringAssert.Contains("\"external_tag_text\":\"[EXTERN]\"", Http("GET", "/api/v1/domains").body);
+
+         // A body naming one of them leaves the rest alone.
+         Assert.AreEqual(200, Http("PUT", "/api/v1/domains/" + name, "{\"active\":true,\"external_tag_header\":false}").status);
+         domain = DomainOverCom(name);
+         Assert.IsFalse(domain.ExternalTagHeader);
+         Assert.IsTrue(domain.ExternalTagSubject, "Left out, so left alone.");
+         Assert.AreEqual("[EXTERN]", domain.ExternalTagText, "Left out, so left alone.");
+
+         // A switch given a string is refused, and a refused PUT applies nothing.
+         Assert.AreEqual(400, Http("PUT", "/api/v1/domains/" + name, "{\"active\":true,\"first_contact_tip\":\"yes\"}").status);
+         domain = DomainOverCom(name);
+         Assert.IsTrue(domain.FirstContactTip, "A refused PUT applies nothing.");
+
+         // The column holds a hundred characters, and a tag cut off in the
+         // middle is a tag every reader learns to ignore, so it is refused
+         // rather than truncated.
+         string tooLong = new string('x', 101);
+         (int longStatus, string longBody) = Http("PUT", "/api/v1/domains/" + name,
+            "{\"active\":true,\"external_tag_text\":\"" + tooLong + "\"}");
+         Assert.AreEqual(400, longStatus, longBody);
+         Assert.AreEqual("[EXTERN]", DomainOverCom(name).ExternalTagText, "A refused tag text changes nothing.");
+      }
+
+      [Test]
       [Description("PUT /api/v1/domains/{name} takes the rest of the domain dialog - DKIM canonicalisation, the secondary key and selector, alias signing, the internal automatic reply, the external override and the Active Directory domain - with COM reading every value the API set, the listing showing them, and a refused word changing nothing.")]
       public void DomainAdministratorFieldsRoundTripThroughCom()
       {

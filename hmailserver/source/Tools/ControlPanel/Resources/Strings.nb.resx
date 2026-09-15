@@ -18,11 +18,6 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
-  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
-    <value>
-
-Vil du lagre dette svake passordet likevel?</value>
-  </data>
   <data name="  Configured database type: {0}." xml:space="preserve">
     <value>  Konfigurert databasetype: {0}.</value>
   </data>
@@ -178,6 +173,11 @@ Vil du lagre dette svake passordet likevel?</value>
   </data>
   <data name=" — applied immediately." xml:space="preserve">
     <value> — tas i bruk umiddelbart.</value>
+  </data>
+  <data name="&#10;&#10;Save this weak password anyway?" xml:space="preserve">
+    <value>
+
+Vil du lagre dette svake passordet likevel?</value>
   </data>
   <data name="&quot;Anyone in the domain&quot; means the sender's address is at a domain this server hosts, which an outsider can claim unless the list also requires authentication. Tick that below if the list must be restricted to people who have logged in." xml:space="preserve">
     <value>«Alle i domenet» betyr at avsenderadressen ligger på et domene denne serveren er vert for, og det kan en utenforstående utgi seg for med mindre listen også krever autentisering. Kryss av for det nedenfor hvis listen skal være begrenset til folk som har logget inn.</value>
@@ -827,6 +827,9 @@ Control Panel kan bare lese meldingsfiler når det kjører på den samme maskine
   <data name="Add a DNS blacklist; connections from listed addresses gain score or are refused." xml:space="preserve">
     <value>Legg til en DNS-svarteliste; tilkoblinger fra oppførte adresser får poeng eller avvises.</value>
   </data>
+  <data name="Add a _header the reader shows as a banner" xml:space="preserve">
+    <value>Legg til en _header som leseren viser som et banner</value>
+  </data>
   <data name="Add a domain or a mailbox" xml:space="preserve">
     <value>Legg til et domene eller en postboks</value>
   </data>
@@ -928,6 +931,9 @@ Control Panel kan bare lese meldingsfiler når det kjører på den samme maskine
   </data>
   <data name="Added at {0}." xml:space="preserve">
     <value>Lagt til {0}.</value>
+  </data>
+  <data name="Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it." xml:space="preserve">
+    <value>Legges til én gang, til post med minst én mottaker utenfor denne serveren. Aldri til en signert eller kryptert melding, et automatisk svar, en returmelding eller et listeinnlegg, og aldri en gang til på et svar som allerede siterer den.</value>
   </data>
   <data name="Address" xml:space="preserve">
     <value>Adresse</value>
@@ -3445,6 +3451,9 @@ Ingen post røres - indeksen er utledet fra den - men til gjenoppbyggingen har t
   <data name="HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list." xml:space="preserve">
     <value>HS256 er i OAuth2AllowedAlgorithms, men OAuth2HmacSecret er tom, så HS256-token kan aldri verifiseres. Sett den delte hemmeligheten, eller fjern HS256 fra listen.</value>
   </data>
+  <data name="HTM_L disclaimer (empty = the plain text, with its line breaks)" xml:space="preserve">
+    <value>Ansvarsfraskrivelse som HTML (tom = ren tekst _med linjeskiftene)</value>
+  </data>
   <data name="HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set." xml:space="preserve">
     <value>HTTP Basic trenger både brukernavnet og passordet. Bare {0} er satt, så Basic-autentisering er IKKE aktivert - serveren logger dette og oppfører seg som om ingen av dem var satt.</value>
   </data>
@@ -4139,6 +4148,9 @@ Det verifiserte installasjonsprogrammet overleveres til oppdateringshjelperen: t
   </data>
   <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
     <value>Post fra en tom avsenderadresse nektes. Mange servere sender returer fra &lt;&gt;, som vil bli avvist.</value>
+  </data>
+  <data name="Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts." xml:space="preserve">
+    <value>Post utenfra organisasjonen kan merkes slik at en leser ser det med én gang. En avsender er utenfor når økten ikke logget på, meldingen ikke kom gjennom et betrodd innkommende relé, og verken konvoluttavsenderen eller From-adressen hører til et domene denne serveren er vert for.</value>
   </data>
   <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
     <value>Post beveger seg ikke og ingenting har krasjet: hvilken halvdel som har stoppet, logglinjene som navngir årsaken, og innstillingen som begrenser hvert trinn.</value>
@@ -7328,6 +7340,12 @@ Starte den på nytt nå?</value>
   <data name="Tag outbound envelope senders with BATV and validate returning bounces" xml:space="preserve">
     <value>Merk utgående konvoluttavsendere med BATV og valider returnerende avvisninger</value>
   </data>
+  <data name="Tag te_xt (empty = [EXTERNAL], at most 100 characters)" xml:space="preserve">
+    <value>Merkete_kst (tom = [EXTERNAL], høyst 100 tegn)</value>
+  </data>
+  <data name="Tagging and disclaimer" xml:space="preserve">
+    <value>Merking og ansvarsfraskrivelse</value>
+  </data>
   <data name="Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts." xml:space="preserve">
     <value>Trer i kraft med en gang, men holdes bare i minnet: ingenting lagrer denne verdien, så hver omstart av tjenesten tilbakestiller den til de innebygde 10240 KB (10 MB). For å beholde en annen grense må den settes på nytt etter hver omstart, for eksempel fra et oppstartsskript gjennom COM-API-et. TTL-ene og aktiveringsbryteren på dette kortet lagres og overlever omstarter.</value>
   </data>
@@ -7351,6 +7369,9 @@ Starte den på nytt nå?</value>
   </data>
   <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
     <value>Lær opp SpamAssassin når en bruker legger en melding bort som spam eller tar den ut igjen</value>
+  </data>
+  <data name="Tell the reader about a _first contact from outside" xml:space="preserve">
+    <value>_Fortell leseren om en første kontakt utenfra</value>
   </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Forteller avsendende servere at de må bruke TLS ved levering til domenene dine, og lukker nedgraderingshullet i opportunistisk TLS.</value>
@@ -7639,13 +7660,13 @@ Merk nøkkelen ovenfor og kopier den for hånd - den vises ikke igjen.</value>
   <data name="The fetch itself failed: {0} This says nothing about the policy." xml:space="preserve">
     <value>Selve hentingen mislyktes: {0} Dette sier ingenting om policyen.</value>
   </data>
+  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
+    <value>Filen kunne ikke parses som et PEM-sertifikat. Serveren laster sertifikater bare i PEM-format, så denne filen lastes ikke, og hver TLS-port som bruker den, vil ikke kunne starte (serverfeil 5113).</value>
+  </data>
   <data name="The file&#13;&#10;   {0}&#13;&#10;could not be loaded. The message has probably been delivered and is no longer in the queue." xml:space="preserve">
     <value>Filen
    {0}
 kunne ikke lastes. Meldingen er sannsynligvis levert og ikke lenger i køen.</value>
-  </data>
-  <data name="The file could not be parsed as a PEM certificate. The server loads certificates in PEM format only, so this file will not load and every TLS port using it will fail to start (server error 5113)." xml:space="preserve">
-    <value>Filen kunne ikke parses som et PEM-sertifikat. Serveren laster sertifikater bare i PEM-format, så denne filen lastes ikke, og hver TLS-port som bruker den, vil ikke kunne starte (serverfeil 5113).</value>
   </data>
   <data name="The first scanner to find something ends the scan, so the order is also the cost: a slow scanner in front of a fast one is paid for on every clean message." xml:space="preserve">
     <value>Den første skanneren som finner noe, avslutter skanningen, så rekkefølgen er også kostnaden: en treg skanner foran en rask betales for på hver ren melding.</value>
@@ -7929,6 +7950,9 @@ Dette er serverens egen resolver som svarer - den samme som SMTP-levering bruker
   <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
     <value>Serveren beholder ingen historikk: MetricsHistoryDays er 0 i hMailServer.ini. Sett den til antall dager som skal beholdes, og start tjenesten på nytt.</value>
   </data>
+  <data name="The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off." xml:space="preserve">
+    <value>Serveren husker hvem som har skrevet til hver konto og hvem hver konto har skrevet til, og sier fra i leseren første gang en avsender utenfra dukker opp. Det koster ett databaseoppslag for hver melding som leveres til dette domenet, og ingenting i det hele tatt mens det er av.</value>
+  </data>
   <data name="The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists." xml:space="preserve">
     <value>Serversiden er på plass: hosting er aktivert, HTTPS-porten er satt, og en sertifikatkilde finnes.</value>
   </data>
@@ -7999,6 +8023,12 @@ Det fortsetter å prøve mens du bruker programmet.</value>
   </data>
   <data name="The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement." xml:space="preserve">
     <value>Det lagrede utløpet kunne ikke leses i formen denne siden forventer (ÅÅÅÅ-MM-DD TT:MM:SS), så om serveren fortsatt godtar denne nøkkelen, kan ikke avgjøres herfra. Hvis linjen ble redigert for hånd, rett den; ellers tilbakekall nøkkelen og opprett en erstatning.</value>
+  </data>
+  <data name="The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it." xml:space="preserve">
+    <value>Emnemerket bryter enhver DKIM-signatur avsenderen har laget over sitt eget emne, akkurat som emneprefikset i spamvernet. Headeren gjør det ikke, så foretrekk headeren der leseren kan vise den.</value>
+  </data>
+  <data name="The tag text must be 100 characters or fewer." xml:space="preserve">
+    <value>Merketeksten må være på høyst 100 tegn.</value>
   </data>
   <data name="The test itself failed unexpectedly: {0}" xml:space="preserve">
     <value>Selve testen mislyktes uventet: {0}</value>
@@ -8860,6 +8890,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   <data name="_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)" xml:space="preserve">
     <value>Tillat at passordet sendes _over en ubeskyttet forbindelse (AllowUnprotectedPassword)</value>
   </data>
+  <data name="_Append a disclaimer to mail leaving the organisation" xml:space="preserve">
+    <value>_Tilføy en ansvarsfraskrivelse til post som forlater organisasjonen</value>
+  </data>
   <data name="_Apply" xml:space="preserve">
     <value>_Bruk</value>
   </data>
@@ -9100,6 +9133,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   <data name="_Permissions" xml:space="preserve">
     <value>_Tillatelser</value>
   </data>
+  <data name="_Plain-text disclaimer" xml:space="preserve">
+    <value>Ansvarsfraskrivelse som _ren tekst</value>
+  </data>
   <data name="_Plain-text signature" xml:space="preserve">
     <value>_Signatur i ren tekst</value>
   </data>
@@ -9207,6 +9243,9 @@ Ingen melding slettes, og ingen konto fjernes. Fortsette?</value>
   </data>
   <data name="_Start the walk" xml:space="preserve">
     <value>_Start omvisningen</value>
+  </data>
+  <data name="_Tag the subject of mail from outside" xml:space="preserve">
+    <value>Merk _emnet på post utenfra</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Mål-SMTP-vert</value>

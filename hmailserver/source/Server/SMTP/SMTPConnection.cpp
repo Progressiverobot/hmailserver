@@ -31,6 +31,8 @@
 #include "../Common/AntiSpam/SpamTestResult.h"
 #include "../Common/Util/Math.h"
 #include "../Common/Util/SignatureAdder.h"
+#include "../Common/Util/DisclaimerAdder.h"
+#include "../Common/Persistence/PersistentKnownSender.h"
 #include "../Common/BO/Routes.h"
 #include "../Common/BO/RouteAddresses.h"
 #include "../Common/BO/MessageRecipient.h"
@@ -2194,7 +2196,26 @@ namespace HM
 
       SetMessageSignature_(pMsgData);
 
-      if (pMsgData && !pMsgData->WriteReported(PersistentMessage::GetFileName(current_message_), "The message signature"))
+      // The sender domain's legal footer, on the same MessageData the signature
+      // was just appended to and committed by the same single write below.
+      // Beside the signature on purpose: this is the one place on this server
+      // where an outgoing message's body is modified, and a second one would be
+      // a second thing to keep correct. It is also before DKIMSigner::Sign,
+      // which runs at delivery, so this server's own signature covers the
+      // footer rather than being broken by it.
+      //
+      // The third argument is this session's answer to "is this message ours":
+      // a message relayed in from outside that merely claims one of our domains
+      // as its envelope sender must not have a customer's legal text attached.
+      DisclaimerAdder::Append(current_message_, sender_domain_,
+                              isAuthenticated_ || sender_account_ != nullptr,
+                              pMsgData);
+
+      // Who this account writes to is somebody it knows, so their reply is not
+      // a first contact.
+      RememberOutgoingRecipients_();
+
+      if (pMsgData && !pMsgData->WriteReported(PersistentMessage::GetFileName(current_message_), "The message signature and the domain disclaimer"))
       {
          // WriteReported has already put the failure itself in the error log; what
          // belongs here is the consequence, because it is what an administrator
@@ -2251,6 +2272,32 @@ namespace HM
       AuthenticationResultsWriter::Write(PersistentMessage::GetFileName(current_message_),
                                          current_message_,
                                          authentication_results_);
+   }
+
+   void
+   SMTPConnection::RememberOutgoingRecipients_()
+   //---------------------------------------------------------------------------()
+   // DESCRIPTION:
+   // Records each recipient of this message as somebody the signed-in account
+   // has written to, which is what stops their reply being announced to the
+   // reader as a first contact. Costs nothing unless the sender's domain asks
+   // for the note.
+   //
+   // Only for a session that authenticated. On an unauthenticated one the
+   // envelope sender is a claim rather than a fact, and believing it would let
+   // anybody seed an account's memory with the addresses they meant to write
+   // from, silencing the note in advance - which is the one thing the note is
+   // there to prevent.
+   //---------------------------------------------------------------------------()
+   {
+      if (!isAuthenticated_ || !sender_account_ || !sender_domain_ || !current_message_)
+         return;
+
+      if (!sender_domain_->GetFirstContactTip())
+         return;
+
+      for (auto recipient : current_message_->GetRecipients()->GetVector())
+         PersistentKnownSender::RememberOutgoing(sender_account_->GetID(), recipient->GetAddress());
    }
 
    void

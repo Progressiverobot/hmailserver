@@ -494,6 +494,14 @@ namespace HM
       pDomain->SetVacationInternalMessage(pRS->GetStringValue("domainvacationinternalmessage"));
       pDomain->SetVacationExternalOverride(pRS->GetLongValue("domainvacationexternaloverride") == 1);
 
+      pDomain->SetExternalTagSubject(pRS->GetLongValue("domainexternaltagsubject") == 1);
+      pDomain->SetExternalTagHeader(pRS->GetLongValue("domainexternaltagheader") == 1);
+      pDomain->SetExternalTagText(pRS->GetStringValue("domainexternaltagtext"));
+      pDomain->SetFirstContactTip(pRS->GetLongValue("domainfirstcontacttip") == 1);
+      pDomain->SetDisclaimerEnabled(pRS->GetLongValue("domaindisclaimerenabled") == 1);
+      pDomain->SetDisclaimerPlainText(pRS->GetStringValue("domaindisclaimerplaintext"));
+      pDomain->SetDisclaimerHTML(pRS->GetStringValue("domaindisclaimerhtml"));
+
       return true;
    }
 
@@ -590,6 +598,14 @@ namespace HM
       oStatement.AddColumn("domainvacationinternalsubject", pDomain->GetVacationInternalSubject());
       oStatement.AddColumn("domainvacationinternalmessage", pDomain->GetVacationInternalMessage());
       oStatement.AddColumn("domainvacationexternaloverride", pDomain->GetVacationExternalOverride() ? 1 : 0);
+
+      oStatement.AddColumn("domainexternaltagsubject", pDomain->GetExternalTagSubject() ? 1 : 0);
+      oStatement.AddColumn("domainexternaltagheader", pDomain->GetExternalTagHeader() ? 1 : 0);
+      oStatement.AddColumn("domainexternaltagtext", pDomain->GetExternalTagText());
+      oStatement.AddColumn("domainfirstcontacttip", pDomain->GetFirstContactTip() ? 1 : 0);
+      oStatement.AddColumn("domaindisclaimerenabled", pDomain->GetDisclaimerEnabled() ? 1 : 0);
+      oStatement.AddColumn("domaindisclaimerplaintext", pDomain->GetDisclaimerPlainText());
+      oStatement.AddColumn("domaindisclaimerhtml", pDomain->GetDisclaimerHTML());
 
       oStatement.SetTable("hm_domains");
       

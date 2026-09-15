@@ -191,7 +191,14 @@ create table hm_domains
 	domainvacationmessage text not null default '',
 	domainvacationinternalsubject varchar(200) not null default '',
 	domainvacationinternalmessage text not null default '',
-	domainvacationexternaloverride int not null default 0
+	domainvacationexternaloverride int not null default 0,
+	domainexternaltagsubject int not null default 0,
+	domainexternaltagheader int not null default 0,
+	domainexternaltagtext varchar(100) not null default '',
+	domainfirstcontacttip int not null default 0,
+	domaindisclaimerenabled int not null default 0,
+	domaindisclaimerplaintext text not null default '',
+	domaindisclaimerhtml text not null default ''
 );
 
 CREATE INDEX idx_hm_domains ON hm_domains (domainname);
@@ -1152,9 +1159,23 @@ ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccount
 
 ALTER TABLE hm_smimekeys ADD CONSTRAINT fk_hm_smimekeys_account FOREIGN KEY (smimeaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
+create table hm_knownsenders
+(
+	ksid bigserial not null primary key,
+	ksaccountid int not null,
+	ksaddress varchar(255) not null,
+	kscount int not null,
+	ksfirstseen varchar(32) not null,
+	kslastseen varchar(32) not null
+);
+
+CREATE UNIQUE INDEX idx_hm_knownsenders_account ON hm_knownsenders (ksaccountid, ksaddress);
+
 ALTER TABLE hm_calendars ADD CONSTRAINT fk_hm_calendars_account FOREIGN KEY (calendaraccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
 ALTER TABLE hm_calendarobjects ADD CONSTRAINT fk_hm_calendarobjects_calendar FOREIGN KEY (objectcalendarid) REFERENCES hm_calendars (calendarid) ON DELETE CASCADE;
+
+ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
 
@@ -1258,4 +1279,4 @@ insert into hm_settings (settingname, settingstring, settinginteger) values ('Au
 
 insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditRetentionDays', '', 0);
 
-insert into hm_dbversion values (6043);
+insert into hm_dbversion values (6045);
