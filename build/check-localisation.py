@@ -176,6 +176,7 @@ LOCALISED = {
    "Views/FluentDialogWindow.cs",
    "Services/DesignTokens.cs",
    "Services/ConnectionStatus.cs",
+   "Services/SettingsPageStatus.cs",
    "Services/ThemeTokens.cs",
 }
 
@@ -258,9 +259,17 @@ def marked_texts():
 
 # --- resx ---------------------------------------------------------------------
 
+# The licence header exactly as build/add-license-headers.py writes one into an
+# XML file: the three lines, each on its own, inside one comment element under
+# the declaration. It was the older two-line wording until 15 September 2026,
+# which meant that --write left all eighteen catalogues failing the SPDX check
+# and the person who had only added a caption had to find that out from CI.
 RESX_HEAD = """<?xml version="1.0" encoding="utf-8"?>
-<!-- Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd and the hMailServer contributors
-     SPDX-License-Identifier: AGPL-3.0-or-later -->
+<!--
+  https://www.progressiverobot.com
+  Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 <root>
   <!-- {comment} -->
   <resheader name="resmimetype">
