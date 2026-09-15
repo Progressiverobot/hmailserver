@@ -4,7 +4,7 @@
   Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
   SPDX-License-Identifier: AGPL-3.0-or-later
 -->
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -55,9 +55,16 @@ button{font:inherit;color:inherit}
 svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;flex:none;display:inline-block;vertical-align:middle}
 svg.i.sm{width:16px;height:16px}
 svg.i.filled{fill:currentColor;stroke:none}
+/* Written right to left - Arabic, Hebrew, Persian - the root carries dir=rtl and
+   the logical properties above mirror the page. What they cannot say: the sign
+   of a leading-edge shadow (--lead), and the icons that point a way - arrows and
+   chevrons, reply and forward, send, sign out, open out, the label's tip. */
+html{--lead:1}
+[dir=rtl]{--lead:-1}
+[dir=rtl] use[href="#i-back"],[dir=rtl] use[href="#i-left"],[dir=rtl] use[href="#i-right"],[dir=rtl] use[href="#i-reply"],[dir=rtl] use[href="#i-reply-all"],[dir=rtl] use[href="#i-forward"],[dir=rtl] use[href="#i-send"],[dir=rtl] use[href="#i-plane"],[dir=rtl] use[href="#i-signout"],[dir=rtl] use[href="#i-popout"],[dir=rtl] use[href="#i-expand"],[dir=rtl] use[href="#i-label"],[dir=rtl] use[href="#i-tag"],[dir=rtl] use[href="#i-flag"]{transform:scaleX(-1);transform-box:view-box;transform-origin:center}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.skip{position:absolute;left:-999px;top:8px;z-index:50;background:var(--surface);color:var(--accent-text);padding:8px 12px;border-radius:var(--radius);box-shadow:var(--shadow-2)}
-.skip:focus{left:8px}
+.skip{position:absolute;inset-inline-start:-999px;top:8px;z-index:50;background:var(--surface);color:var(--accent-text);padding:8px 12px;border-radius:var(--radius);box-shadow:var(--shadow-2)}
+.skip:focus{inset-inline-start:8px}
 @keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
@@ -114,10 +121,10 @@ code{font-family:var(--mono);font-size:12.5px}
 .empty{color:var(--muted);padding:56px 24px;text-align:center;font-size:14px}
 .empty svg.i{width:48px;height:48px;color:var(--line-2);display:block;margin:0 auto 12px}
 table.list{width:100%;border-collapse:collapse;font-size:13.5px}
-table.list th{text-align:left;font-weight:500;color:var(--muted);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+table.list th{text-align:start;font-weight:500;color:var(--muted);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
 table.list td{padding:10px;border-bottom:1px solid var(--line);vertical-align:middle}
 table.list tr:last-child td{border-bottom:none}
-table.list td .btn{margin:0 4px 0 0}
+table.list td .btn{margin:0;margin-inline-end:4px}
 ul.plain{list-style:none}
 ul.plain li{padding:6px 0;border-bottom:1px solid var(--line)}
 kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1px solid var(--line-2);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
@@ -136,8 +143,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 
 /* ---------- The shell ---------- */
 .app{display:flex;flex-direction:column;height:100%}
-.top{height:var(--top);display:flex;align-items:center;gap:8px;padding:0 16px 0 12px;background:var(--bg);flex:none}
-.top .brand{display:flex;align-items:center;gap:10px;min-width:calc(var(--nav) - 60px);padding-right:8px}
+.top{height:var(--top);display:flex;align-items:center;gap:8px;padding:0;padding-inline:12px 16px;background:var(--bg);flex:none}
+.top .brand{display:flex;align-items:center;gap:10px;min-width:calc(var(--nav) - 60px);padding-inline-end:8px}
 .top .brand b{font-size:19px;font-weight:500;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .top .brand small{display:none}
 .top .sp{flex:1}
@@ -145,7 +152,7 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .avatar{width:32px;height:32px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:#fff;background:var(--a1);flex:none;text-transform:uppercase;letter-spacing:.3px}
 .avatar.lg{width:40px;height:40px;font-size:15px}
 #account-btn{padding:0;width:40px;height:40px}
-.menu{position:absolute;top:calc(100% + 6px);right:0;min-width:240px;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-2);padding:8px;z-index:40;animation:rise .12s ease-out}
+.menu{position:absolute;top:calc(100% + 6px);inset-inline-end:0;min-width:240px;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-2);padding:8px;z-index:40;animation:rise .12s ease-out}
 .menu .who{padding:10px 12px 12px;border-bottom:1px solid var(--line);margin-bottom:6px}
 .menu .who .pill{font-size:13px;color:var(--text)}
 .menu button.item{all:unset;display:flex;align-items:center;gap:12px;width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px}
@@ -153,7 +160,7 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .top .tools > div{position:relative}
 
 /* The search box */
-.search{position:relative;display:flex;align-items:center;flex:1;max-width:720px;height:46px;background:var(--surface-3);border-radius:23px;padding:0 6px 0 8px;transition:background .15s,box-shadow .15s}
+.search{position:relative;display:flex;align-items:center;flex:1;max-width:720px;height:46px;background:var(--surface-3);border-radius:23px;padding:0;padding-inline:8px 6px;transition:background .15s,box-shadow .15s}
 .search:focus-within{background:var(--surface);box-shadow:var(--shadow)}
 [data-theme="dark"] .search{background:var(--surface-2)}
 .search input[type=search]{flex:1;background:transparent;border:none;box-shadow:none;padding:0 8px;height:44px;font-size:15px;min-width:0}
@@ -162,7 +169,7 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .search label.inline{display:none}
 .search .btn{display:none}
 .search #mail-search-clear{display:inline-flex}
-#search-advanced{position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-2);padding:16px 20px 14px;z-index:40;animation:rise .12s ease-out}
+#search-advanced{position:absolute;top:100%;inset-inline:0;margin-top:4px;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-2);padding:16px 20px 14px;z-index:40;animation:rise .12s ease-out}
 #search-advanced .grid{display:grid;grid-template-columns:110px 1fr;gap:10px 12px;align-items:center}
 #search-advanced .grid label{margin:0;font-weight:400;color:var(--text-2)}
 #search-advanced .grid input[type=text],#search-advanced .grid select,#search-advanced .grid input[type=date]{width:100%}
@@ -174,13 +181,13 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .shell{flex:1;display:flex;min-height:0}
 
 /* ---------- The navigation column ---------- */
-.side{width:var(--nav);flex:none;display:flex;flex-direction:column;padding:8px 8px 8px 12px;overflow:hidden;transition:width .2s,transform .2s}
-.side .compose{display:flex;align-items:center;gap:12px;height:48px;padding:0 20px 0 16px;border-radius:16px;background:var(--surface);color:var(--text);font-weight:500;font-size:14px;box-shadow:var(--shadow);margin:8px 0 14px 4px;width:auto;align-self:flex-start;transition:box-shadow .15s}
+.side{width:var(--nav);flex:none;display:flex;flex-direction:column;padding:8px;padding-inline:12px 8px;overflow:hidden;transition:width .2s,transform .2s}
+.side .compose{display:flex;align-items:center;gap:12px;height:48px;padding:0;padding-inline:16px 20px;border-radius:16px;background:var(--surface);color:var(--text);font-weight:500;font-size:14px;box-shadow:var(--shadow);margin:8px 0 14px;margin-inline-start:4px;width:auto;align-self:flex-start;transition:box-shadow .15s}
 [data-theme="dark"] .side .compose{background:#c2e7ff;color:#001d35}
 .side .compose:hover{box-shadow:var(--shadow-2)}
-.side .scroll{flex:1;overflow:auto;padding-right:4px}
+.side .scroll{flex:1;overflow:auto;padding-inline-end:4px}
 .nav{display:flex;flex-direction:column;gap:1px}
-.nav button,.nav a.item{all:unset;display:flex;align-items:center;gap:14px;height:32px;padding:0 12px 0 14px;border-radius:0 16px 16px 0;color:var(--text);font-size:14px;cursor:pointer;min-width:0;box-sizing:border-box}
+.nav button,.nav a.item{all:unset;display:flex;align-items:center;gap:14px;height:32px;padding:0;padding-inline:14px 12px;border-start-end-radius:16px;border-end-end-radius:16px;color:var(--text);font-size:14px;cursor:pointer;min-width:0;box-sizing:border-box}
 .nav button:hover{background:var(--surface-3)}
 .nav button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .nav button.on{background:var(--selected);color:var(--text);font-weight:700}
@@ -190,8 +197,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .nav .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav .ct{font-size:12px;font-weight:600;color:var(--text-2);flex:none}
 .nav button.unread .nm,.nav button.unread .ct{font-weight:700;color:var(--text)}
-.nav button.child{padding-left:38px}
-.nav button.child2{padding-left:54px}
+.nav button.child{padding-inline-start:38px}
+.nav button.child2{padding-inline-start:54px}
 .nav .chip{font-size:11px}
 .navhead,.nav-heading{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:500;letter-spacing:.3px;padding:14px 14px 4px;text-transform:uppercase}
 .navhead .grow{flex:1}
@@ -205,8 +212,8 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .dot.stale{background:var(--warn)}
 
 /* ---------- The work area ---------- */
-.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface);border-radius:16px 0 0 0;overflow:hidden;position:relative}
-[data-theme="dark"] .main{border:1px solid var(--line);border-right:none;border-bottom:none}
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--surface);border-start-start-radius:16px;overflow:hidden;position:relative}
+[data-theme="dark"] .main{border:1px solid var(--line);border-inline-end:none;border-bottom:none}
 .announce{background:var(--accent-soft);color:var(--accent-text);padding:10px 20px;font-size:13.5px;border-bottom:1px solid var(--line)}
 .announce.warn{background:var(--warn-soft);color:var(--warn)}
 .note.bar{background:var(--warn-soft);color:var(--warn);padding:10px 20px;margin:0;border-bottom:1px solid var(--line);font-size:13px}
@@ -235,18 +242,18 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 
 /* ---------- The mail view: the list beside the reading pane ---------- */
 #mail-section{flex-direction:row}
-.list-pane{flex:1;min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--line);container-type:inline-size}
+.list-pane{flex:1;min-width:0;display:flex;flex-direction:column;border-inline-end:1px solid var(--line);container-type:inline-size}
 #mail-section.has-pane:not(.pane-bottom) .list-pane{flex:0 0 44%;max-width:700px;min-width:340px}
-#mail-section:not(.has-pane) .list-pane{border-right:none}
+#mail-section:not(.has-pane) .list-pane{border-inline-end:none}
 .read-pane{flex:1;min-width:0;display:flex;flex-direction:column;overflow:auto}
 #mail-section:not(.has-pane) .read-pane{display:none}
 #mail-section.pane-bottom{flex-direction:column}
-#mail-section.pane-bottom .list-pane{border-right:none;border-bottom:1px solid var(--line);flex:1}
+#mail-section.pane-bottom .list-pane{border-inline-end:none;border-bottom:1px solid var(--line);flex:1}
 #mail-section.pane-bottom .read-pane{flex:1.1}
 /* Without a pane, a message takes the list's place */
 #mail-section.no-pane.has-message .list-pane{display:none}
 #mail-section.no-pane.has-message .read-pane{display:flex}
-.toolbar{height:48px;display:flex;align-items:center;gap:2px;padding:0 8px 0 10px;border-bottom:1px solid var(--line);flex:none;position:relative}
+.toolbar{height:48px;display:flex;align-items:center;gap:2px;padding:0;padding-inline:10px 8px;border-bottom:1px solid var(--line);flex:none;position:relative}
 .toolbar .sep{width:1px;height:20px;background:var(--line-2);margin:0 6px}
 .toolbar .sp{flex:1}
 .toolbar .count{font-size:12.5px;color:var(--muted);padding:0 8px;white-space:nowrap}
@@ -255,18 +262,19 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .textbtn.danger{color:var(--danger)}
 .toolbar select,.msg-toolbar select{width:auto;max-width:200px;height:32px;padding:4px 8px;font-size:13px;border-radius:6px}
 #select-all-wrap{display:flex;align-items:center;gap:0;position:relative}
-#select-all-wrap input{margin:0 2px 0 6px}
-#select-menu{position:absolute;top:100%;left:0;min-width:160px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);padding:6px;z-index:30}
+#select-all-wrap input{margin:0;margin-inline:6px 2px}
+#select-menu{position:absolute;top:100%;inset-inline-start:0;min-width:160px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);padding:6px;z-index:30}
 #select-menu button{all:unset;display:block;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13.5px}
 #select-menu button:hover{background:var(--surface-2)}
 #bulk-bar{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-#bulk-count{font-size:13px;color:var(--text-2);padding:0 8px 0 4px;white-space:nowrap}
-.more-menu{position:absolute;top:100%;right:8px;min-width:200px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);padding:6px;z-index:30}
+#bulk-count{font-size:13px;color:var(--text-2);padding:0;padding-inline:4px 8px;white-space:nowrap}
+.more-menu{position:absolute;top:100%;inset-inline-end:8px;min-width:200px;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);padding:6px;z-index:30}
 .more-menu button,.more-menu a{all:unset;display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13.5px;color:var(--text)}
 .more-menu button:hover,.more-menu a:hover{background:var(--surface-2)}
 .more-menu .sep{height:1px;background:var(--line);margin:4px 0}
+/* Placed at the pointer by the script, so physical on purpose */
 #context-menu{position:fixed;top:0;left:0;right:auto;z-index:65;min-width:220px}
-.msg.pinned .who::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;vertical-align:middle}
+.msg.pinned .who::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-inline-end:6px;vertical-align:middle}
 .msg.dragging{opacity:.5}
 .nav button.drop{background:var(--accent-soft);box-shadow:inset 0 0 0 2px var(--accent)}
 #message-list{flex:1;overflow:auto;outline:none}
@@ -275,11 +283,11 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .skeleton .sk i{display:block;height:12px;border-radius:6px;background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 37%,var(--surface-2) 63%);background-size:800px 100%;animation:shimmer 1.4s linear infinite}
 
 /* One row of the list */
-.msg{display:flex;align-items:center;gap:6px;height:var(--row);padding:0 8px 0 6px;border-bottom:1px solid var(--line);cursor:pointer;background:var(--read);position:relative;min-width:0;user-select:none}
+.msg{display:flex;align-items:center;gap:6px;height:var(--row);padding:0;padding-inline:6px 8px;border-bottom:1px solid var(--line);cursor:pointer;background:var(--read);position:relative;min-width:0;user-select:none}
 .msg:hover{box-shadow:inset 1px 0 0 var(--line-2),inset -1px 0 0 var(--line-2),0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);z-index:1}
 .msg.unseen{background:var(--unread)}
 .msg.unseen .who,.msg.unseen .subject,.msg.unseen .when{font-weight:700;color:var(--text)}
-.msg.msg-cursor{box-shadow:inset 3px 0 0 var(--accent),inset 1px 0 0 var(--line-2),inset -1px 0 0 var(--line-2)}
+.msg.msg-cursor{box-shadow:inset calc(3px * var(--lead)) 0 0 var(--accent),inset 1px 0 0 var(--line-2),inset -1px 0 0 var(--line-2)}
 .msg.selected{background:var(--selected)}
 .msg.open{background:var(--cursor)}
 .msg .cb{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex:none}
@@ -294,45 +302,45 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .msg .due{font-size:11px;line-height:16px;padding:0 7px;border-radius:999px;background:var(--surface-2);color:var(--text-2);white-space:nowrap}
 .msg .due.now{background:var(--warn-soft);color:var(--warn)}
 .msg .due.late{background:var(--danger-soft);color:var(--danger)}
-.msg .avatar{margin:0 6px 0 2px}
-.msg .who{width:190px;min-width:0;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:var(--text-2);padding-right:8px}
-.msg .who .n{color:var(--text-2);font-weight:400;margin-left:6px;font-size:12.5px}
+.msg .avatar{margin:0;margin-inline:2px 6px}
+.msg .who{width:190px;min-width:0;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;color:var(--text-2);padding-inline-end:8px}
+.msg .who .n{color:var(--text-2);font-weight:400;margin-inline-start:6px;font-size:12.5px}
 .msg .what{flex:1;min-width:0;max-width:100%;display:flex;align-items:center;gap:6px;font-size:14px;overflow:hidden;white-space:nowrap}
 .msg .what .subject{color:var(--text);overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
 .msg .what .snip{color:var(--muted);overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
 .msg .what .snip::before{content:" - "}
 .msg .what .chips{flex:none}
-#quick-steps{display:flex;align-items:center;gap:4px;margin-left:4px}
+#quick-steps{display:flex;align-items:center;gap:4px;margin-inline-start:4px}
 #quick-steps:empty{display:none}
 .msg .what .nudge{color:var(--warn);flex:none;overflow:hidden;text-overflow:ellipsis}
 .msg .what .nudge::before{content:" - "}
-.msg .meta{display:flex;align-items:center;gap:6px;flex:none;padding-left:8px;color:var(--muted)}
-.msg .when{font-size:12px;color:var(--muted);white-space:nowrap;min-width:64px;text-align:right}
+.msg .meta{display:flex;align-items:center;gap:6px;flex:none;padding-inline-start:8px;color:var(--muted)}
+.msg .when{font-size:12px;color:var(--muted);white-space:nowrap;min-width:64px;text-align:end}
 .msg .clip{color:var(--muted)}
 .msg .mute{color:var(--muted);display:inline-flex}
 .msg .mute svg.i{width:16px;height:16px}
-.msg .acts{display:none;position:absolute;right:8px;top:0;bottom:0;align-items:center;gap:0;background:inherit;padding-left:8px}
+.msg .acts{display:none;position:absolute;inset-inline-end:8px;top:0;bottom:0;align-items:center;gap:0;background:inherit;padding-inline-start:8px}
 .msg:hover .acts,.msg.msg-cursor .acts{display:flex}
 .msg:hover .meta,.msg.msg-cursor .meta{visibility:hidden}
 .msg .acts .iconbtn{width:32px;height:32px;color:var(--text-2)}
 .msg .acts .iconbtn svg.i{width:18px;height:18px}
-.msg.thread .who .tc{color:var(--muted);font-weight:400;margin-left:4px;font-size:12.5px}
-.msg.in-thread{padding-left:26px;background:var(--surface-2)}
+.msg.thread .who .tc{color:var(--muted);font-weight:400;margin-inline-start:4px;font-size:12.5px}
+.msg.in-thread{padding-inline-start:26px;background:var(--surface-2)}
 .msg.in-thread .avatar{width:24px;height:24px;font-size:10px}
 /* A narrow list - beside a reading pane, or on a phone - shows a row as two
    lines: the sender and the time, then the subject and its snippet. The
    shape follows the list's own width, whatever made it that wide. */
 @container (max-width:760px){
-  .msg{display:grid;grid-template-columns:36px 32px 44px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;height:auto;min-height:var(--row);padding:7px 10px 7px 6px;gap:1px 2px}
+  .msg{display:grid;grid-template-columns:36px 32px 44px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:center;height:auto;min-height:var(--row);padding:7px 0;padding-inline:6px 10px;gap:1px 2px}
   .msg .cb{grid-row:1/3;grid-column:1}
   .msg .star{grid-row:1/3;grid-column:2}
-  .msg .avatar{grid-row:1/3;grid-column:3;margin:0 8px 0 0}
-  .msg .who{grid-row:1;grid-column:4;width:auto;padding-right:8px}
-  .msg .meta{grid-row:1;grid-column:5;padding-left:4px}
+  .msg .avatar{grid-row:1/3;grid-column:3;margin:0;margin-inline-end:8px}
+  .msg .who{grid-row:1;grid-column:4;width:auto;padding-inline-end:8px}
+  .msg .meta{grid-row:1;grid-column:5;padding-inline-start:4px}
   .msg .what{grid-row:2;grid-column:4/6;font-size:13.5px}
   .msg .what .subject{max-width:70%}
-  .msg .acts{top:auto;bottom:auto;height:36px;background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:0 4px;right:10px}
-  .msg.in-thread{padding-left:26px}
+  .msg .acts{top:auto;bottom:auto;height:36px;background:var(--surface);border-radius:18px;box-shadow:var(--shadow);padding:0 4px;inset-inline-end:10px}
+  .msg.in-thread{padding-inline-start:26px}
 }
 [data-density="compact"] .msg .avatar{display:none}
 [data-density="compact"] .msg .who{width:160px}
@@ -343,43 +351,43 @@ kbd{font-family:var(--mono);font-size:12px;background:var(--surface-2);border:1p
 .msg-toolbar .sp{flex:1}
 .msg-body{flex:1;overflow:auto;padding:16px 28px 40px}
 #message-subject{font-size:22px;font-weight:400;line-height:1.3;margin:6px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-#message-badges{display:inline-flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+#message-badges{display:inline-flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto}
 #message-labels{margin:0 0 8px}
 .msg-card{border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-bottom:12px;background:var(--surface)}
 .msg-head{display:flex;align-items:flex-start;gap:12px}
 .msg-head .from{flex:1;min-width:0}
 .msg-head .from b{font-size:14px;font-weight:600}
-.msg-head .from .addr{color:var(--muted);font-size:13px;margin-left:6px}
+.msg-head .from .addr{color:var(--muted);font-size:13px;margin-inline-start:6px}
 .msg-head .from .to{color:var(--muted);font-size:13px;margin-top:2px}
 .msg-head .from .to button{all:unset;cursor:pointer;color:var(--muted);display:inline-flex;align-items:center;gap:2px}
 .msg-head .from .to button:hover{color:var(--text)}
 .msg-head .date{font-size:12.5px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:2px}
-#message-details{font-size:12.5px;color:var(--text-2);margin:10px 0 0 52px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:10px 12px;border-radius:8px;background:var(--surface-2)}
+#message-details{font-size:12.5px;color:var(--text-2);margin:10px 0 0;margin-inline-start:52px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;padding:10px 12px;border-radius:8px;background:var(--surface-2)}
 #message-details span:nth-child(odd){color:var(--muted)}
 #message-meta{display:none}
 #conversation .msg-card.collapsed{cursor:pointer;padding:10px 20px}
 #conversation .msg-card.collapsed:hover{background:var(--surface-2)}
 #conversation .msg-card .snip{color:var(--muted);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px}
-#conversation .msg-card .body{font-family:var(--font);font-size:14.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:14px 0 0 52px}
-#conversation .msg-card .atts{margin:14px 0 0 52px;display:flex;flex-wrap:wrap;gap:10px}
+#conversation .msg-card .body{font-family:var(--font);font-size:14.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:14px 0 0;margin-inline-start:52px}
+#conversation .msg-card .atts{margin:14px 0 0;margin-inline-start:52px;display:flex;flex-wrap:wrap;gap:10px}
 #conversation .count{font-size:12.5px;color:var(--muted);margin:0 0 8px}
 .warnbox{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:10px 14px;font-size:13px;margin:0 0 12px;line-height:1.5}
 .warnbox div+div{margin-top:4px}
 .infobar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:13px;color:var(--text-2);margin:0 0 12px}
 .infobar .btn{margin:0}
 #message-headers{margin:0 0 12px;font-size:12px;max-height:20rem;overflow:auto;background:var(--surface-2);border-radius:8px;padding:12px;white-space:pre-wrap;word-break:break-word;font-family:var(--mono)}
-#message-text{font-family:var(--font);font-size:14.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:16px 0 0 52px;color:var(--text)}
+#message-text{font-family:var(--font);font-size:14.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;margin:16px 0 0;margin-inline-start:52px;color:var(--text)}
 iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;background:#fff;margin:12px 0 0 0}
-#message-attachments{margin:18px 0 0 52px;display:flex;flex-wrap:wrap;gap:10px}
-#message-attachments .att{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 10px;max-width:280px;color:var(--text);text-decoration:none;background:var(--surface)}
+#message-attachments{margin:18px 0 0;margin-inline-start:52px;display:flex;flex-wrap:wrap;gap:10px}
+#message-attachments .att{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 0;padding-inline:10px 12px;max-width:280px;color:var(--text);text-decoration:none;background:var(--surface)}
 #message-attachments .att:hover{background:var(--surface-2)}
 #message-attachments .att .n{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #message-attachments .att .s{font-size:12px;color:var(--muted)}
 #message-attachments .att svg.i{color:var(--accent-text)}
-#message-previews{margin:12px 0 0 52px;display:flex;flex-wrap:wrap;gap:10px}
+#message-previews{margin:12px 0 0;margin-inline-start:52px;display:flex;flex-wrap:wrap;gap:10px}
 #message-previews img{max-width:min(100%,420px);max-height:360px;border-radius:8px;border:1px solid var(--line)}
 #message-previews iframe{width:100%;min-height:30rem;border:1px solid var(--line);border-radius:8px}
-.reply-bar{display:flex;gap:8px;margin:22px 0 0 52px;flex-wrap:wrap}
+.reply-bar{display:flex;gap:8px;margin:22px 0 0;margin-inline-start:52px;flex-wrap:wrap}
 .reply-bar .btn{margin:0}
 #label-menu,#snooze-menu{margin:0 0 12px;background:var(--surface-2);border-radius:8px;padding:8px 12px;font-size:13px}
 #label-menu .btn,#snooze-menu .btn{margin:0}
@@ -387,8 +395,8 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 #mail-status:empty{display:none}
 
 /* ---------- Toasts ---------- */
-#toasts{position:fixed;left:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{display:flex;align-items:center;gap:16px;background:#202124;color:#fff;padding:12px 16px 12px 20px;border-radius:8px;box-shadow:var(--shadow-2);font-size:14px;min-width:280px;max-width:520px;pointer-events:auto;animation:rise .15s ease-out}
+#toasts{position:fixed;inset-inline-start:24px;bottom:24px;z-index:60;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:16px;background:#202124;color:#fff;padding:12px 0;padding-inline:20px 16px;border-radius:8px;box-shadow:var(--shadow-2);font-size:14px;min-width:280px;max-width:520px;pointer-events:auto;animation:rise .15s ease-out}
 [data-theme="dark"] .toast{background:#e8eaed;color:#202124}
 .toast .sp{flex:1}
 .toast button{all:unset;cursor:pointer;color:#8ab4f8;font-weight:600;padding:6px 8px;border-radius:6px}
@@ -396,19 +404,19 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .toast button:hover{background:rgba(255,255,255,.1)}
 .toast button.x{color:inherit;opacity:.7;padding:4px}
 
-/* ---------- Compose: a window docked at the bottom right, or a card under the message it answers ---------- */
-.dock{position:fixed;right:24px;bottom:0;width:600px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--surface);border-radius:12px 12px 0 0;box-shadow:0 8px 24px rgba(0,0,0,.28);z-index:55;animation:rise .15s ease-out}
+/* ---------- Compose: a window docked at the bottom, on the trailing side, or a card under the message it answers ---------- */
+.dock{position:fixed;inset-inline-end:24px;bottom:0;width:600px;max-width:calc(100vw - 32px);max-height:calc(100vh - 80px);display:flex;flex-direction:column;background:var(--surface);border-radius:12px 12px 0 0;box-shadow:0 8px 24px rgba(0,0,0,.28);z-index:55;animation:rise .15s ease-out}
 [data-theme="dark"] .dock{border:1px solid var(--line);border-bottom:none}
 .dock.full{right:auto;left:50%;top:50%;bottom:auto;transform:translate(-50%,-50%);width:min(1000px,calc(100vw - 48px));height:min(88vh,900px);max-height:88vh;border-radius:12px}
 .dock.min{max-height:none;height:auto}
 .dock.min .dock-body{display:none}
-.dock-head{display:flex;align-items:center;gap:2px;padding:8px 8px 8px 16px;background:#404040;color:#fff;border-radius:12px 12px 0 0;flex:none;cursor:default}
+.dock-head{display:flex;align-items:center;gap:2px;padding:8px;padding-inline:16px 8px;background:#404040;color:#fff;border-radius:12px 12px 0 0;flex:none;cursor:default}
 [data-theme="dark"] .dock-head{background:#2b3138}
 .dock-head h2{font-size:14px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dock-head .iconbtn{color:#fff;width:32px;height:32px}
 .dock-head .iconbtn:hover{background:rgba(255,255,255,.15)}
 .dock-body{flex:1;min-height:0;overflow:auto;padding:0 16px 8px}
-.dock.inline{position:static;width:auto;max-width:none;max-height:none;border-radius:12px;box-shadow:none;border:1px solid var(--line);margin:18px 0 0 52px;animation:none;transform:none}
+.dock.inline{position:static;width:auto;max-width:none;max-height:none;border-radius:12px;box-shadow:none;border:1px solid var(--line);margin:18px 0 0;margin-inline-start:52px;animation:none;transform:none}
 .dock.inline .dock-head{border-radius:12px 12px 0 0}
 .dock.inline .dock-head #compose-min,.dock.inline .dock-head #compose-expand{display:none}
 .dock.inline .dock-body{max-height:none}
@@ -423,11 +431,11 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .field .links button:hover{color:var(--text);background:var(--surface-2)}
 .complete-wrap{position:relative;flex:1;display:flex}
 .complete-wrap input{width:100%}
-.msg .mention{display:inline-block;margin-right:6px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;line-height:18px}
-.complete{position:absolute;top:100%;left:0;right:0;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);z-index:30;max-height:14rem;overflow:auto;padding:6px}
+.msg .mention{display:inline-block;margin-inline-end:6px;padding:0 6px;border-radius:10px;background:var(--accent);color:#fff;font-weight:700;font-size:12px;line-height:18px}
+.complete{position:absolute;top:100%;inset-inline:0;background:var(--surface);border-radius:8px;box-shadow:var(--shadow-2);z-index:30;max-height:14rem;overflow:auto;padding:6px}
 .complete button{all:unset;display:block;width:100%;box-sizing:border-box;padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13.5px}
 .complete button:hover,.complete button.hit{background:var(--surface-2)}
-.history .head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 12px;font-size:12px;color:var(--muted)}
+.history .head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px;padding-inline:12px 4px;font-size:12px;color:var(--muted)}
 .history .head button{all:unset;cursor:pointer;padding:4px 8px;border-radius:6px;font-size:12px;color:var(--accent-text);white-space:nowrap}
 .history .head button:hover,.history .head button:focus-visible{background:var(--surface-2)}
 .history button.q{display:flex;align-items:center;gap:10px;color:var(--text)}
@@ -444,7 +452,7 @@ iframe#message-html{width:100%;min-height:24rem;border:none;border-radius:8px;ba
 .compose-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 0;border-top:1px solid var(--line);margin-top:8px}
 .compose-foot .btn{margin:0}
 .compose-foot .sp{flex:1}
-#compose-section label.inline{margin:6px 0;display:inline-flex;margin-right:16px}
+#compose-section label.inline{margin:6px 0;display:inline-flex;margin-inline-end:16px}
 #template-row,#later-row{margin:8px 0}
 #template-row select{width:auto;max-width:16rem;height:32px;padding:4px 8px;font-size:13px}
 #rich-row{margin-top:2px}
@@ -474,7 +482,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 #palette-list{list-style:none;max-height:50vh;overflow:auto;margin-top:4px}
 #palette-list li{padding:10px 14px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;gap:12px;align-items:center}
 #palette-list li.hit,#palette-list li:hover{background:var(--surface-2)}
-#palette-list li small{color:var(--muted);margin-left:auto;font-size:12px}
+#palette-list li small{color:var(--muted);margin-inline-start:auto;font-size:12px}
 .keys-help{margin-top:8px;font-size:13px;color:var(--muted)}
 
 /* ---------- Narrow screens ---------- */
@@ -485,10 +493,11 @@ table.keys td:first-child{white-space:nowrap;width:40%}
   .read-pane{flex:1.2}
 }
 @media (max-width:900px){
-  .top{padding:0 8px 0 4px}
+  .top{padding:0;padding-inline:4px 8px}
   .top .brand{min-width:0}
   .top .brand b{display:none}
-  .side{position:fixed;left:0;top:0;bottom:0;z-index:45;background:var(--bg);transform:translateX(-100%);box-shadow:none;width:280px;padding-top:12px}
+  .side{position:fixed;inset-inline-start:0;top:0;bottom:0;z-index:45;background:var(--bg);transform:translateX(-100%);box-shadow:none;width:280px;padding-top:12px}
+  [dir=rtl] .side{transform:translateX(100%)}
   .app.nav-open .side{transform:none;box-shadow:var(--shadow-2)}
   .app.nav-open .nav-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:44}
   .main{border-radius:0}
@@ -501,14 +510,14 @@ table.keys td:first-child{white-space:nowrap;width:40%}
   .msg .meta{visibility:visible !important}
   #mail-section.has-message .read-pane{display:flex;flex:1}
   .msg-body{padding:12px 16px 32px}
-  #message-text,#message-attachments,#message-previews,.reply-bar,#message-details{margin-left:0}
+  #message-text,#message-attachments,#message-previews,.reply-bar,#message-details{margin-inline-start:0}
   .view.page{padding:8px 16px 40px}
   #compose-section{padding:0 16px 32px}
   .search{height:40px;min-width:0}
   #keys-btn,#theme-btn,#settings-btn{display:none}
-  #toasts{left:12px;right:12px;bottom:12px}
+  #toasts{inset-inline:12px;bottom:12px}
   .dock,.dock.full{position:fixed;inset:0;width:auto;max-width:none;height:auto;max-height:none;border-radius:0;transform:none}
-  .dock.inline{position:static;margin-left:0}
+  .dock.inline{position:static;margin-inline-start:0}
   .dock-head{border-radius:0}
   .dock-head #compose-expand{display:none}
   .toast{min-width:0;width:100%}
@@ -673,7 +682,7 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div class="foot">
 <div id="quota"></div>
 <div class="meter"><div id="quota-bar" style="width:0"></div></div>
-<button id="storage-link" class="btn quiet sm" type="button" style="align-self:flex-start;margin-left:-8px">Manage storage</button>
+<button id="storage-link" class="btn quiet sm" type="button" style="align-self:flex-start;margin-inline-start:-8px">Manage storage</button>
 </div>
 </aside>
 
@@ -777,8 +786,8 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div id="label-menu" class="row" hidden></div>
 <pre id="message-headers" class="headers" hidden></pre>
 <div id="message-remote" class="infobar" hidden>Remote images and styles were not loaded. <span id="message-remote-count"></span> <span id="message-remote-habit"></span> <button id="remote-once" class="btn ghost sm" type="button">Show them</button><button id="remote-always" class="btn quiet sm" type="button">Always show from this sender</button></div>
-<pre id="message-text"></pre>
-<iframe id="message-html" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="The message as it was sent" hidden></iframe>
+<pre id="message-text" dir="auto"></pre>
+<iframe id="message-html" dir="auto" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" title="The message as it was sent" hidden></iframe>
 <div id="message-attachments"></div>
 <div id="message-previews"></div>
 <div class="reply-bar">
@@ -1124,11 +1133,11 @@ table.keys td:first-child{white-space:nowrap;width:40%}
 <div class="field"><label for="compose-to">To</label><div class="complete-wrap"><input id="compose-to" type="text" required autocomplete="off"></div><div class="links"><button id="show-cc" type="button">Cc</button><button id="show-bcc" type="button">Bcc</button></div></div>
 <div class="field" id="compose-cc-row" hidden><label for="compose-cc">Cc</label><div class="complete-wrap"><input id="compose-cc" type="text" autocomplete="off"></div></div>
 <div class="field" id="compose-bcc-row" hidden><label for="compose-bcc">Bcc</label><div class="complete-wrap"><input id="compose-bcc" type="text" autocomplete="off"></div></div>
-<div class="field"><label for="compose-subject">Subject</label><input id="compose-subject" type="text" maxlength="500" autocomplete="off"></div>
+<div class="field"><label for="compose-subject">Subject</label><input id="compose-subject" type="text" maxlength="500" autocomplete="off" dir="auto"></div>
 <div id="rich-row" class="row"><button id="rich-toggle" class="btn quiet sm" type="button">Formatting</button><div id="rich-tools" class="row" hidden><button class="btn quiet sm" type="button" data-cmd="bold" title="Bold"><b>B</b></button><button class="btn quiet sm" type="button" data-cmd="italic" title="Italic"><i>I</i></button><button class="btn quiet sm" type="button" data-cmd="underline" title="Underline"><u>U</u></button><button class="btn quiet sm" type="button" data-cmd="insertUnorderedList" title="List">List</button><button class="btn quiet sm" type="button" data-cmd="formatBlock" data-arg="blockquote" title="Quote">Quote</button><button class="btn quiet sm" type="button" data-cmd="createLink" title="Link">Link</button><button class="btn quiet sm" type="button" data-cmd="removeFormat" title="Remove formatting">Plain</button></div></div>
 <label for="compose-text" class="sr">Message</label>
-<textarea id="compose-text" placeholder="Write your message"></textarea>
-<div id="compose-editor" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message, formatted" hidden></div>
+<textarea id="compose-text" placeholder="Write your message" dir="auto"></textarea>
+<div id="compose-editor" class="editor" contenteditable="true" role="textbox" aria-multiline="true" aria-label="Message, formatted" dir="auto" hidden></div>
 <div class="row" id="template-row"><select id="template-pick" aria-label="Templates"><option value="">Templates</option></select><button id="template-use" class="btn ghost sm" type="button">Use</button><button id="template-save" class="btn quiet sm" type="button">Save as template</button></div>
 <div class="row" id="later-row"><label for="compose-later" class="inline">Send at</label><input id="compose-later" type="datetime-local" aria-label="Send at" style="width:auto"><button id="compose-send-later" class="btn ghost sm" type="button">Schedule</button></div>
 <label class="inline"><input id="compose-receipt" type="checkbox"> Ask for a read receipt</label>

@@ -26,6 +26,10 @@ if (!pagePath || !scriptPath) {
    console.error('usage: node build/portal-script-test.js <portal.html> <portal.js>');
    process.exit(2);
 }
+// The catalogues sit beside the page, one file per language; the server
+// answers /portal-lang/<code>.json out of them and so does the fetch stub
+// below, so a language the test chooses is the language that shipped.
+const cataloguesDir = pagePath.slice(0, Math.max(pagePath.lastIndexOf('/'), pagePath.lastIndexOf('\\')) + 1) + 'PortalLanguages/';
 
 /* ------------------------------------------------------------------ the DOM */
 
@@ -33,15 +37,20 @@ const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input'
 const RAW = new Set(['script', 'style']);
 
 class TextNode {
-   constructor(data) { this.data = data; this.parentNode = null; this.childNodes = []; }
+   constructor(data) { this.data = data; this.parentNode = null; this.childNodes = []; this.nodeType = 3; }
    get textContent() { return this.data; }
    set textContent(v) { this.data = String(v); }
+   get nodeValue() { return this.data; }
+   set nodeValue(v) { this.data = String(v); }
 }
 
 class Element {
    constructor(tag) {
       this.tagName = String(tag).toUpperCase();
       this.nodeName = this.tagName;
+      // An element is 1 and a text node is 3, as the DOM says: the localiser
+      // walks the markup by them, so without them it would walk past every text.
+      this.nodeType = 1;
       this.attributes = Object.create(null);
       this.childNodes = [];
       this.parentNode = null;
@@ -213,6 +222,8 @@ if (!document.body) { throw new Error('the page has no <body>'); }
    let node = document.body;
    while (node.parentNode && node.parentNode !== parsed.root) { node = node.parentNode; }
    node.parentNode = document;
+   // <html> itself: what the script writes lang and dir on.
+   document.documentElement = node;
 })();
 
 /* -------------------------------------------------- window, location, timers */
@@ -481,6 +492,12 @@ function answer(method, path, body) {
       if (changeStep === 2) { arrived = true; return json(200, { token: 't2', changed: true, folders: [{ id: 1, count: 4, unseen: 3 }, { id: 2, count: 1, unseen: 0 }, { id: 3, count: 0, unseen: 0 }] }); }
       return json(200, { token: 't2', changed: false, folders: [{ id: 1, count: 4, unseen: 3 }, { id: 2, count: 1, unseen: 0 }, { id: 3, count: 0, unseen: 0 }] });
    }
+   // The reader's language, as the server answers it: the catalogue itself.
+   const wantsCatalogue = /^\/portal-lang\/([A-Za-z-]+)\.json$/.exec(path);
+   if (wantsCatalogue && method === 'GET') {
+      try { return { status: 200, headers: { 'Content-Type': 'application/json' }, body: fs.readFileSync(cataloguesDir + wantsCatalogue[1] + '.json', 'utf8') }; }
+      catch (e) { return json(404, { error: 'No catalogue: ' + wantsCatalogue[1] }); }
+   }
    if (path === '/api/v1/me/folders' && method === 'POST') { return json(201, { id: 9, name: 'Bills' }); }
    if (/^\/api\/v1\/me\/folders\/\d+$/.test(path) && method === 'PUT') {
       if (renameRefusal) { return json(400, { error: renameRefusal }); }
@@ -499,8 +516,10 @@ function fetchStub(path, options) {
    const reply = answer(method, path, options && options.body);
    return Promise.resolve({
       status: reply.status,
+      ok: reply.status >= 200 && reply.status < 300,
       headers: { get: (name) => (name in reply.headers ? reply.headers[name] : null) },
       text: () => Promise.resolve(reply.body),
+      json: () => Promise.resolve(JSON.parse(reply.body)),
       blob: () => Promise.resolve({ type: reply.headers['Content-Type'] || 'application/octet-stream', base64: 'QUJD' })
    });
 }
@@ -1673,6 +1692,40 @@ async function main() {
    check('the mailto: handler is offered to the browser for this page', handlers.length === 1 && handlers[0].scheme === 'mailto' && handlers[0].url === 'http://portal.test/portal#/compose?mailto=%s',
       JSON.stringify(handlers));
 
+
+   // ---- written right to left. Arabic, Hebrew and Persian mirror the page:
+   // the root carries dir and lang, and the stylesheet's logical properties
+   // follow. A message keeps its own direction whichever way the page runs,
+   // so the panes it is shown in and the fields it is written in are dir=auto.
+   const arabic = JSON.parse(fs.readFileSync(cataloguesDir + 'ar.json', 'utf8'));
+   const german = JSON.parse(fs.readFileSync(cataloguesDir + 'de.json', 'utf8'));
+   check('the Arabic catalogue holds Arabic, not the English', /[؀-ۿ]/.test(arabic['Keyboard shortcuts']) && arabic['Keyboard shortcuts'] !== 'Keyboard shortcuts',
+      String(arabic['Keyboard shortcuts']));
+   const beforeArabic = requests.length;
+   document.getElementById('pref-language').value = 'ar';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('the catalogue is fetched from the route the server answers', since(beforeArabic).filter((r) => r.path === '/portal-lang/ar.json').length === 1,
+      JSON.stringify(since(beforeArabic).map((r) => r.path)));
+   check('choosing Arabic writes the direction on the document', document.documentElement.getAttribute('dir') === 'rtl',
+      String(document.documentElement.getAttribute('dir')));
+   check('and the language with it', document.documentElement.getAttribute('lang') === 'ar',
+      String(document.documentElement.getAttribute('lang')));
+   check('a caption of the markup is what the Arabic catalogue says', document.getElementById('keys-title').textContent === arabic['Keyboard shortcuts'],
+      document.getElementById('keys-title').textContent);
+   check('and so is an attribute a screen reader reads out', document.getElementById('keys-btn').getAttribute('aria-label') === arabic['Keyboard shortcuts'],
+      String(document.getElementById('keys-btn').getAttribute('aria-label')));
+   check('a message body is left to find its own direction', document.getElementById('message-text').getAttribute('dir') === 'auto' && document.getElementById('message-html').getAttribute('dir') === 'auto',
+      String(document.getElementById('message-text').getAttribute('dir')) + ' | ' + String(document.getElementById('message-html').getAttribute('dir')));
+   check('and so is what the reader writes', document.getElementById('compose-subject').getAttribute('dir') === 'auto' && document.getElementById('compose-text').getAttribute('dir') === 'auto',
+      String(document.getElementById('compose-subject').getAttribute('dir')) + ' | ' + String(document.getElementById('compose-text').getAttribute('dir')));
+   document.getElementById('pref-language').value = 'de';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   check('choosing German again puts the document back the other way', document.documentElement.getAttribute('dir') === 'ltr' && document.documentElement.getAttribute('lang') === 'de',
+      String(document.documentElement.getAttribute('dir')) + ' ' + String(document.documentElement.getAttribute('lang')));
+   check('and the caption is the German', document.getElementById('keys-title').textContent === german['Keyboard shortcuts'],
+      document.getElementById('keys-title').textContent);
 
    // ---- signing out ends the session and stops the probe
    const beforeOut = requests.length;

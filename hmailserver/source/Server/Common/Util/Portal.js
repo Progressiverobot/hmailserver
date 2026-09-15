@@ -12,7 +12,11 @@
   // script's own texts go through t() and tf(); the markup is walked once
   // the catalogue is known, and again on a change, each text node and
   // attribute keeping its English so it can be walked back.
-  var LANGUAGES = [['en', 'English'], ['cs', '\u010ce\u0161tina'], ['da', 'Dansk'], ['de', 'Deutsch'], ['el', '\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac'], ['es', 'Espa\u00f1ol'], ['fi', 'Suomi'], ['fr', 'Fran\u00e7ais'], ['it', 'Italiano'], ['ja', '\u65e5\u672c\u8a9e'], ['ko', '\ud55c\uad6d\uc5b4'], ['nb', 'Norsk bokm\u00e5l'], ['nl', 'Nederlands'], ['pl', 'Polski'], ['pt-BR', 'Portugu\u00eas (Brasil)'], ['pt-PT', 'Portugu\u00eas (Portugal)'], ['ru', '\u0420\u0443\u0441\u0441\u043a\u0438\u0439'], ['sv', 'Svenska'], ['tr', 'T\u00fcrk\u00e7e'], ['uk', '\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430'], ['zh-Hans', '\u7b80\u4f53\u4e2d\u6587']];
+  var LANGUAGES = [['en', 'English'], ['cs', '\u010ce\u0161tina'], ['da', 'Dansk'], ['de', 'Deutsch'], ['el', '\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac'], ['es', 'Espa\u00f1ol'], ['fi', 'Suomi'], ['fr', 'Fran\u00e7ais'], ['it', 'Italiano'], ['ja', '\u65e5\u672c\u8a9e'], ['ko', '\ud55c\uad6d\uc5b4'], ['nb', 'Norsk bokm\u00e5l'], ['nl', 'Nederlands'], ['pl', 'Polski'], ['pt-BR', 'Portugu\u00eas (Brasil)'], ['pt-PT', 'Portugu\u00eas (Portugal)'], ['ru', '\u0420\u0443\u0441\u0441\u043a\u0438\u0439'], ['sv', 'Svenska'], ['tr', 'T\u00fcrk\u00e7e'], ['uk', '\u0423\u043a\u0440\u0430\u0457\u043d\u0441\u044c\u043a\u0430'], ['zh-Hans', '\u7b80\u4f53\u4e2d\u6587'], ['ar', '\u0627\u0644\u0639\u0631\u0628\u064a\u0629'], ['he', '\u05e2\u05d1\u05e8\u05d9\u05ea'], ['fa', '\u0641\u0627\u0631\u0633\u06cc']];
+  // Written right to left: the document is mirrored for these - dir on the
+  // root, which the stylesheet's logical properties follow. A message keeps
+  // its own direction: the body panes and the compose fields are dir=auto.
+  var RTL = { ar: true, he: true, fa: true };
   var catalogue = {};
   var languageActive = 'en';
   var catalogueHas = function (key) { return Object.prototype.hasOwnProperty.call(catalogue, key) && typeof catalogue[key] === 'string' && catalogue[key] !== ''; };
@@ -53,7 +57,10 @@
     catalogue = data || {};
     languageActive = code;
     try { if (code === 'en') { localStorage.removeItem('hmPortalLang'); } else { localStorage.setItem('hmPortalLang', code); } } catch (e) { /* no storage */ }
-    if (document.documentElement && document.documentElement.setAttribute) { document.documentElement.setAttribute('lang', code); }
+    if (document.documentElement && document.documentElement.setAttribute) {
+      document.documentElement.setAttribute('lang', code);
+      document.documentElement.setAttribute('dir', RTL[code] ? 'rtl' : 'ltr');
+    }
     if (document.body) { localiseTree(document.body); }
     var select = el('pref-language');
     if (select) { select.value = code; }
@@ -3083,7 +3090,8 @@
     return '';
   };
   var paintRow = function (row, colour) {
-    if (colour) { row.setAttribute('style', 'box-shadow:inset 4px 0 0 ' + colour); }
+    // On the leading edge: --lead is 1, or -1 when the page is written right to left.
+    if (colour) { row.setAttribute('style', 'box-shadow:inset calc(4px * var(--lead, 1)) 0 0 ' + colour); }
   };
   var writeRowColours = function (list) {
     return savePrefs({ row_colours: JSON.stringify(list.slice(0, 20)) }).then(function (ok) { if (ok) { renderColourRules(); lastListing = null; } return ok; });
@@ -5195,7 +5203,7 @@
       head.appendChild(from);
       var when = node('div', whenText(x), 'date'); when.setAttribute('title', fullDate(x)); head.appendChild(when);
       card.appendChild(head);
-      var body = node('div', undefined, 'body'); body.hidden = true; card.appendChild(body);
+      var body = node('div', undefined, 'body'); body.hidden = true; body.setAttribute('dir', 'auto'); card.appendChild(body);
       var atts = node('div', undefined, 'atts'); atts.hidden = true; card.appendChild(atts);
       var loaded = null;
       card.addEventListener('click', function () {
@@ -5544,7 +5552,10 @@
     menu.hidden = false;
     if (menu.style) {
       var w = window.innerWidth || 1200, h = window.innerHeight || 800;
-      menu.style.left = Math.max(4, Math.min(x, w - 240)) + 'px';
+      // At the pointer, opening away from it: to the right of it normally, to
+      // the left of it when the page is written right to left.
+      var rtl = document.documentElement && document.documentElement.getAttribute && document.documentElement.getAttribute('dir') === 'rtl';
+      menu.style.left = Math.max(4, Math.min(rtl ? x - 240 : x, w - 240)) + 'px';
       menu.style.top = Math.max(4, Math.min(y, h - 320)) + 'px';
     }
   };
