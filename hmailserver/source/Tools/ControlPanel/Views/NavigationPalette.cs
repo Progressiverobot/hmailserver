@@ -36,6 +36,12 @@ namespace hMailServer.ControlPanel.Views
    ///     <see cref="PaletteSearch.NextSelectable"/> instead of incrementing an
    ///     index, so the arrow keys can never park the highlight on a caption and
    ///     leave Enter doing nothing.
+   ///
+   /// It is drawn with the design tokens: the card radius and the spacing scale
+   /// for the frame, the type ramp's keyed styles for every line of text, and
+   /// the results list on the theme's own implicit ListBox style with nothing
+   /// but its border and background taken away, so that a theme change reaches
+   /// every row.
    /// </summary>
    public class NavigationPalette : Window
    {
@@ -70,7 +76,7 @@ namespace hMailServer.ControlPanel.Views
          // The application face. The palette is a plain chromeless Window, not
          // a FluentDialogWindow, so it never inherited the face the rest of
          // the app gets from its window base classes.
-         FontFamily = new System.Windows.Media.FontFamily(Typography.UiFontFamily);
+         FontFamily = new FontFamily(Typography.UiFontFamily);
          WindowStyle = WindowStyle.None;
          AllowsTransparency = true;
          Background = Brushes.Transparent;
@@ -86,11 +92,16 @@ namespace hMailServer.ControlPanel.Views
          Top = owner.Top + 80;
          AutomationProperties.SetName(this, L("Search pages, settings and tasks"));
 
+         // The card radius and inset. The outline is the theme's elevation
+         // border rather than the card border token: the palette floats over
+         // the page, and the card token is the hairline a card has against the
+         // page behind it, too faint for an edge that has to separate two
+         // surfaces of the same colour.
          var root = new Border
          {
-            CornerRadius = new CornerRadius(10),
+            CornerRadius = new CornerRadius(DesignTokens.Radius.Card),
             BorderThickness = new Thickness(1),
-            Padding = new Thickness(10)
+            Padding = new Thickness(DesignTokens.Space.Md)
          };
          root.SetResourceReference(Border.BackgroundProperty, "ApplicationBackgroundBrush");
          root.SetResourceReference(Border.BorderBrushProperty, "ControlElevationBorderBrush");
@@ -102,31 +113,31 @@ namespace hMailServer.ControlPanel.Views
 
          searchBox_ = new Wpf.Ui.Controls.TextBox
          {
-            FontSize = Typography.SectionHeading,
-            Padding = new Thickness(8),
+            Padding = new Thickness(DesignTokens.Space.Sm),
             PlaceholderText = L("Search, or say what you want to do - \"stop spam\", \"block an IP\""),
             BorderThickness = new Thickness(0, 0, 0, 1),
             Background = Brushes.Transparent
          };
+         searchBox_.SetResourceReference(Control.FontSizeProperty, "AppFontSizeBody");
          searchBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         searchBox_.SetResourceReference(Control.BorderBrushProperty, "ControlElevationBorderBrush");
+         searchBox_.SetResourceReference(Control.BorderBrushProperty, "AppDividerBrush");
          searchBox_.TextChanged += (s, e) => Filter();
          AutomationProperties.SetName(searchBox_, L("Search pages, settings and tasks"));
          AutomationProperties.SetAutomationId(searchBox_, "palette-search");
          panel.Children.Add(searchBox_);
 
+         // The theme's own list, with only its box taken away: the palette is
+         // the box. The font and the colours come from the implicit style.
          resultsList_ = new ListBox
          {
             BorderThickness = new Thickness(0),
             Background = Brushes.Transparent,
-            FontSize = Typography.ItemTitle,
-            Margin = new Thickness(0, 8, 0, 0),
+            Margin = new Thickness(0, DesignTokens.Space.Sm, 0, 0),
             // The search box keeps the focus for the whole life of the palette so
             // that typing never has to be resumed after arrowing through results;
             // the list is driven from the key handler instead of taking focus.
             Focusable = false
          };
-         resultsList_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          resultsList_.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Disabled);
          AutomationProperties.SetName(resultsList_, L("Search results"));
          AutomationProperties.SetAutomationId(resultsList_, "palette-results");
@@ -135,12 +146,10 @@ namespace hMailServer.ControlPanel.Views
 
          emptyHint_ = new TextBlock
          {
-            FontSize = Typography.Label,
-            Margin = new Thickness(4, 14, 4, 4),
-            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(DesignTokens.Space.Xs, DesignTokens.Space.Lg, DesignTokens.Space.Xs, DesignTokens.Space.Xs),
             Visibility = Visibility.Collapsed
          };
-         emptyHint_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         emptyHint_.SetResourceReference(StyleProperty, "TextCaption");
          Grid.SetRow(emptyHint_, 1);
          panel.Children.Add(emptyHint_);
 
@@ -150,10 +159,9 @@ namespace hMailServer.ControlPanel.Views
          var footer = new TextBlock
          {
             Text = L("↑↓ move    Enter open    Esc close"),
-            FontSize = Typography.Caption,
-            Margin = new Thickness(4, 8, 4, 2)
+            Margin = new Thickness(DesignTokens.Space.Xs, DesignTokens.Space.Sm, DesignTokens.Space.Xs, DesignTokens.Space.Xs)
          };
-         footer.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+         footer.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          Grid.SetRow(footer, 2);
          panel.Children.Add(footer);
 
@@ -202,11 +210,10 @@ namespace hMailServer.ControlPanel.Views
             var caption = new TextBlock
             {
                Text = L(row.Title).ToUpperInvariant(),
-               FontSize = Typography.Caption,
                FontWeight = FontWeights.SemiBold,
-               Margin = new Thickness(2, 8, 2, 2)
+               Margin = new Thickness(DesignTokens.Space.Xs, DesignTokens.Space.Sm, DesignTokens.Space.Xs, DesignTokens.Space.Xs)
             };
-            caption.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+            caption.SetResourceReference(StyleProperty, "TextCaptionTertiary");
 
             return new ListBoxItem
             {
@@ -221,12 +228,14 @@ namespace hMailServer.ControlPanel.Views
          }
 
          var stack = new StackPanel();
-         stack.Children.Add(new TextBlock
+         var title = new TextBlock
          {
             Text = L(row.Title),
-            FontSize = Typography.Control,
+            TextWrapping = TextWrapping.NoWrap,
             TextTrimming = TextTrimming.CharacterEllipsis
-         });
+         };
+         title.SetResourceReference(StyleProperty, "TextBody");
+         stack.Children.Add(title);
 
          string secondary = Describe(row);
          if (secondary.Length > 0)
@@ -234,18 +243,17 @@ namespace hMailServer.ControlPanel.Views
             var detail = new TextBlock
             {
                Text = secondary,
-               FontSize = Typography.Caption,
-               TextTrimming = TextTrimming.CharacterEllipsis,
-               Margin = new Thickness(0, 1, 0, 0)
+               TextWrapping = TextWrapping.NoWrap,
+               TextTrimming = TextTrimming.CharacterEllipsis
             };
-            detail.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            detail.SetResourceReference(StyleProperty, "TextCaption");
             stack.Children.Add(detail);
          }
 
          var item = new ListBoxItem
          {
             Content = stack,
-            Padding = new Thickness(6, 5, 6, 5),
+            Padding = new Thickness(DesignTokens.Space.Sm, DesignTokens.Space.Xs, DesignTokens.Space.Sm, DesignTokens.Space.Xs),
             Tag = row
          };
 

@@ -2,9 +2,12 @@
 // Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -23,11 +26,15 @@ namespace hMailServer.ControlPanel.Views
    /// spread their arguments over several lines; none of them had to be
    /// touched.
    ///
-   /// The dialogs themselves follow the app's own conventions: theme
-   /// background, the shared type ramp, primary button first then Cancel
-   /// (Windows order, as every existing dialog footer already does), Enter and
-   /// Esc wired via IsDefault/IsCancel, and a severity icon in the theme's
-   /// status colours rather than the Win32 stock bitmaps.
+   /// The box is a dialog on the standard frame (<see cref="FluentDialogWindow.UseFrame"/>),
+   /// with the primary button first then Cancel (Windows order, as every
+   /// dialog footer here has), Enter and Escape wired, and the severity shown
+   /// the way every status in the application is shown: an <see cref="InlineNotice"/>
+   /// carrying the level's colour, its shape and its word, so an error reads
+   /// as one in greyscale and under High Contrast, where the Win32 bitmaps and
+   /// a tinted icon both fail. <see cref="Confirm"/> is the question whose
+   /// affirmative is named for what it does - Delete, Remove - rather than Yes,
+   /// for the call sites that can say so.
    /// </summary>
    public static class Dialogs
    {
@@ -72,142 +79,11 @@ namespace hMailServer.ControlPanel.Views
          if (defaultResult != MessageBoxResult.None && !Offers_(button, defaultResult))
             defaultResult = MessageBoxResult.None;
 
-         // SizeToContent.Height with a fixed width, not WidthAndHeight: auto-
-         // sizing both dimensions under FluentWindow's WindowChrome is the WPF
-         // combination known to clip the bottom of content on first show, and
-         // this is the most-shown window in the application. The 18 re-based
-         // dialogs all use exactly this fixed-width shape.
-         var window = new FluentDialogWindow
-         {
-            Title = string.IsNullOrWhiteSpace(caption) ? DefaultCaption : caption,
-            SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize,
-            Width = 480
-         };
+         var dialog = new MessageDialog(ActiveWindow_(), CaptionOrDefault_(caption), messageBoxText,
+            LevelFor(icon), ChoicesFor_(button, icon, defaultResult));
+         dialog.ShowDialog();
 
-         Window owner = ActiveWindow_();
-         if (owner != null && !ReferenceEquals(owner, window))
-         {
-            window.Owner = owner;
-            window.WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         }
-         else
-         {
-            // Startup errors can fire before any window exists; centre on the
-            // screen rather than on nothing.
-            window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-         }
-
-         var root = new StackPanel { Margin = new Thickness(24) };
-
-         var messageRow = new StackPanel { Orientation = Orientation.Horizontal };
-
-         var symbol = IconFor_(icon);
-         if (symbol != null)
-         {
-            messageRow.Children.Add(symbol);
-         }
-
-         var text = new TextBlock
-         {
-            Text = messageBoxText,
-            FontSize = Typography.Body,
-            TextWrapping = TextWrapping.Wrap,
-            // The window is 480 wide; 24px margins each side and the 36px icon
-            // column leave 396. A horizontal StackPanel measures its children
-            // with infinite width, so this MaxWidth is what makes the text wrap
-            // at all rather than run off the right edge.
-            MaxWidth = 380,
-            VerticalAlignment = VerticalAlignment.Center
-         };
-         text.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
-         messageRow.Children.Add(text);
-
-         root.Children.Add(messageRow);
-
-         var result = MessageBoxResult.None;
-
-         var footer = new StackPanel
-         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 20, 0, 0)
-         };
-
-         void AddButton(string label, MessageBoxResult value, bool primary, bool isCancel)
-         {
-            // The Win32 box let a caller name the DEFAULT button - used here for
-            // confirmations whose safe answer is Cancel, so Enter declines. The
-            // named button takes Enter; visual prominence stays with the primary.
-            bool isDefault = defaultResult == MessageBoxResult.None ? primary : value == defaultResult;
-
-            var buttonControl = new Wpf.Ui.Controls.Button
-            {
-               Content = label,
-               MinWidth = 88,
-               Margin = new Thickness(0, 0, isCancel ? 0 : 8, 0),
-               IsDefault = isDefault,
-               IsCancel = isCancel
-            };
-
-            if (primary)
-            {
-               // A destructive confirmation gets the danger appearance, so the
-               // button that deletes something never looks like the safe one.
-               //
-               // The rule is Warning + a confirmation shape, and deliberately
-               // NOT Error. In this application a Warning icon on a two-answer
-               // box always means "the affirmative destroys or risks something"
-               // (every such call site is a delete, revoke, replace or
-               // proceed-against-advice), and that includes OKCancel - the
-               // directory-synchronisation apply, which rewrites accounts in
-               // bulk, asks with OKCancel. An Error icon means a failure
-               // already happened, and the affirmative there acknowledges or
-               // RECOVERS - the crash dialog's "Yes" restarts the application -
-               // so painting it Danger would mark the recovery button as the
-               // destructive one.
-               buttonControl.Appearance = icon == MessageBoxImage.Warning &&
-                                          (button == MessageBoxButton.OKCancel ||
-                                           button == MessageBoxButton.YesNo ||
-                                           button == MessageBoxButton.YesNoCancel)
-                  ? Wpf.Ui.Controls.ControlAppearance.Danger
-                  : Wpf.Ui.Controls.ControlAppearance.Primary;
-            }
-
-            buttonControl.Click += (s, e) => { result = value; window.Close(); };
-            footer.Children.Add(buttonControl);
-         }
-
-         switch (button)
-         {
-            case MessageBoxButton.OKCancel:
-               AddButton(L("OK"), MessageBoxResult.OK, primary: true, isCancel: false);
-               AddButton(L("Cancel"), MessageBoxResult.Cancel, primary: false, isCancel: true);
-               break;
-
-            case MessageBoxButton.YesNo:
-               AddButton(L("Yes"), MessageBoxResult.Yes, primary: true, isCancel: false);
-               // Esc answering "No" preserves the old semantics: closing the
-               // Win32 YesNo box without choosing was impossible, and every
-               // caller treats anything-but-Yes as "do nothing".
-               AddButton(L("No"), MessageBoxResult.No, primary: false, isCancel: true);
-               break;
-
-            case MessageBoxButton.YesNoCancel:
-               AddButton(L("Yes"), MessageBoxResult.Yes, primary: true, isCancel: false);
-               AddButton(L("No"), MessageBoxResult.No, primary: false, isCancel: false);
-               AddButton(L("Cancel"), MessageBoxResult.Cancel, primary: false, isCancel: true);
-               break;
-
-            default:
-               AddButton(L("OK"), MessageBoxResult.OK, primary: true, isCancel: true);
-               break;
-         }
-
-         root.Children.Add(footer);
-         window.Content = root;
-
-         window.ShowDialog();
+         MessageBoxResult result = dialog.Result;
 
          // The Win32 box never returned None for OK-only; closing it was OK.
          if (result == MessageBoxResult.None && button == MessageBoxButton.OK)
@@ -222,6 +98,131 @@ namespace hMailServer.ControlPanel.Views
             result = MessageBoxResult.Cancel;
 
          return result;
+      }
+
+      /// <summary>
+      /// A question whose affirmative is named for what it does. "Remove the
+      /// recipient?" answered with a button that says Remove leaves no room for
+      /// the Yes-means-which reading a Yes/No pair invites, and a destructive
+      /// one is drawn in the danger appearance so the button that deletes
+      /// something never looks like the safe one. Escape and the title bar's
+      /// close both decline. True when the action was chosen.
+      /// </summary>
+      /// <param name="action">The caption of the affirmative, with its Alt key - one of the catalogued button captions.</param>
+      /// <param name="destructive">Whether the affirmative deletes, revokes or replaces something.</param>
+      public static bool Confirm(string text, string caption, string action, bool destructive = false)
+      {
+         var dispatcher = Application.Current?.Dispatcher;
+         if (dispatcher != null && !dispatcher.CheckAccess())
+            return dispatcher.Invoke(() => Confirm(text, caption, action, destructive));
+
+         var dialog = new MessageDialog(ActiveWindow_(), CaptionOrDefault_(caption), text,
+            destructive ? StatusLevel.Warning : StatusLevel.Normal,
+            new[]
+            {
+               new Choice(action, MessageBoxResult.Yes, Primary: true, IsCancel: false, IsDefault: true, Destructive: destructive),
+               new Choice(L("Cancel"), MessageBoxResult.Cancel, Primary: false, IsCancel: true, IsDefault: false, Destructive: false)
+            });
+         dialog.ShowDialog();
+         return dialog.Result == MessageBoxResult.Yes;
+      }
+
+      /// <summary>A fact the user must acknowledge, at the information level.</summary>
+      public static void Info(string text, string caption = null)
+         => Show(text, CaptionOrDefault_(caption), MessageBoxButton.OK, MessageBoxImage.Information);
+
+      /// <summary>Something that went wrong and stops here, at the critical level.</summary>
+      public static void Error(string text, string caption = null)
+         => Show(text, CaptionOrDefault_(caption), MessageBoxButton.OK, MessageBoxImage.Error);
+
+      /// <summary>Something that went partly wrong, at the warning level.</summary>
+      public static void Warn(string text, string caption = null)
+         => Show(text, CaptionOrDefault_(caption), MessageBoxButton.OK, MessageBoxImage.Warning);
+
+      /// <summary>
+      /// The status level a message-box image maps onto. Error, Warning and
+      /// Information carry a level and are drawn as a notice; a question and a
+      /// bare message carry none and are drawn as body text - a diamond and the
+      /// word Information in front of "Restart it now?" would be noise.
+      /// </summary>
+      public static StatusLevel LevelFor(MessageBoxImage image)
+      {
+         switch (image)
+         {
+            case MessageBoxImage.Error:
+               return StatusLevel.Critical;
+            case MessageBoxImage.Warning:
+               return StatusLevel.Warning;
+            case MessageBoxImage.Information:
+               return StatusLevel.Information;
+            default:
+               return StatusLevel.Normal;
+         }
+      }
+
+      private static string CaptionOrDefault_(string caption)
+         => string.IsNullOrWhiteSpace(caption) ? DefaultCaption : caption;
+
+      /// <summary>One button of the box: its caption, what it answers, and how it is drawn and wired.</summary>
+      private sealed record Choice(string Label, MessageBoxResult Value, bool Primary, bool IsCancel, bool IsDefault, bool Destructive);
+
+      private static IReadOnlyList<Choice> ChoicesFor_(MessageBoxButton button, MessageBoxImage icon, MessageBoxResult defaultResult)
+      {
+         // A destructive confirmation gets the danger appearance, so the
+         // button that deletes something never looks like the safe one.
+         //
+         // The rule is Warning + a confirmation shape, and deliberately
+         // NOT Error. In this application a Warning icon on a two-answer
+         // box always means "the affirmative destroys or risks something"
+         // (every such call site is a delete, revoke, replace or
+         // proceed-against-advice), and that includes OKCancel - the
+         // directory-synchronisation apply, which rewrites accounts in
+         // bulk, asks with OKCancel. An Error icon means a failure
+         // already happened, and the affirmative there acknowledges or
+         // RECOVERS - the crash dialog's "Yes" restarts the application -
+         // so painting it Danger would mark the recovery button as the
+         // destructive one.
+         bool destructive = icon == MessageBoxImage.Warning && button != MessageBoxButton.OK;
+
+         // The Win32 box let a caller name the DEFAULT button - used here for
+         // confirmations whose safe answer is Cancel, so Enter declines. The
+         // named button takes Enter; visual prominence stays with the primary.
+         bool IsDefault(bool primary, MessageBoxResult value)
+            => defaultResult == MessageBoxResult.None ? primary : value == defaultResult;
+
+         switch (button)
+         {
+            case MessageBoxButton.OKCancel:
+               return new[]
+               {
+                  new Choice(L("OK"), MessageBoxResult.OK, true, false, IsDefault(true, MessageBoxResult.OK), destructive),
+                  new Choice(L("Cancel"), MessageBoxResult.Cancel, false, true, IsDefault(false, MessageBoxResult.Cancel), false)
+               };
+
+            case MessageBoxButton.YesNo:
+               // Esc answering "No" preserves the old semantics: closing the
+               // Win32 YesNo box without choosing was impossible, and every
+               // caller treats anything-but-Yes as "do nothing".
+               return new[]
+               {
+                  new Choice(L("Yes"), MessageBoxResult.Yes, true, false, IsDefault(true, MessageBoxResult.Yes), destructive),
+                  new Choice(L("No"), MessageBoxResult.No, false, true, IsDefault(false, MessageBoxResult.No), false)
+               };
+
+            case MessageBoxButton.YesNoCancel:
+               return new[]
+               {
+                  new Choice(L("Yes"), MessageBoxResult.Yes, true, false, IsDefault(true, MessageBoxResult.Yes), destructive),
+                  new Choice(L("No"), MessageBoxResult.No, false, false, IsDefault(false, MessageBoxResult.No), false),
+                  new Choice(L("Cancel"), MessageBoxResult.Cancel, false, true, IsDefault(false, MessageBoxResult.Cancel), false)
+               };
+
+            default:
+               return new[]
+               {
+                  new Choice(L("OK"), MessageBoxResult.OK, true, true, true, false)
+               };
+         }
       }
 
       /// <summary>Whether this button set actually offers the given result.</summary>
@@ -244,53 +245,6 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      private static Wpf.Ui.Controls.SymbolIcon IconFor_(MessageBoxImage image)
-      {
-         Wpf.Ui.Controls.SymbolRegular symbol;
-         System.Windows.Media.Brush brush = null;
-         string themeBrushKey = null;
-
-         switch (image)
-         {
-            case MessageBoxImage.Error:
-               symbol = Wpf.Ui.Controls.SymbolRegular.DismissCircle24;
-               brush = ThemeTokens.Danger;   // live-retinted with the theme
-               break;
-
-            case MessageBoxImage.Warning:
-               symbol = Wpf.Ui.Controls.SymbolRegular.Warning24;
-               brush = ThemeTokens.Warning;
-               break;
-
-            case MessageBoxImage.Question:
-               symbol = Wpf.Ui.Controls.SymbolRegular.QuestionCircle24;
-               themeBrushKey = "TextFillColorSecondaryBrush";
-               break;
-
-            case MessageBoxImage.Information:
-               symbol = Wpf.Ui.Controls.SymbolRegular.Info24;
-               themeBrushKey = "TextFillColorSecondaryBrush";
-               break;
-
-            default:
-               return null;
-         }
-
-         var icon = new Wpf.Ui.Controls.SymbolIcon(symbol)
-         {
-            FontSize = 24,
-            Margin = new Thickness(0, 2, 12, 0),
-            VerticalAlignment = VerticalAlignment.Top
-         };
-
-         if (brush != null)
-            icon.Foreground = brush;
-         else
-            icon.SetResourceReference(Control.ForegroundProperty, themeBrushKey);
-
-         return icon;
-      }
-
       private static Window ActiveWindow_()
       {
          var application = Application.Current;
@@ -306,6 +260,91 @@ namespace hMailServer.ControlPanel.Views
          return application.MainWindow != null && application.MainWindow.IsVisible
             ? application.MainWindow
             : null;
+      }
+
+      /// <summary>
+      /// The box itself: the message as a notice at its level (or as body text
+      /// when it has none), the buttons in the frame's footer with the primary
+      /// first, the window sized to the message. A third button (YesNoCancel's
+      /// No) sits between the primary and Cancel, in the secondary slot beside
+      /// it, so the order Yes, No, Cancel is kept.
+      /// </summary>
+      private sealed class MessageDialog : FluentDialogWindow
+      {
+         public MessageBoxResult Result { get; private set; } = MessageBoxResult.None;
+
+         public MessageDialog(Window owner, string caption, string text, StatusLevel level, IReadOnlyList<Choice> choices)
+         {
+            // Startup errors can fire before any window exists; centre on the
+            // screen rather than on nothing. The owner is set before the frame,
+            // which reads it to decide where the window opens.
+            if (owner != null)
+               Owner = owner;
+
+            Title = caption;
+
+            UIElement body;
+            if (level == StatusLevel.Normal)
+            {
+               var block = new TextBlock { Text = text };
+               block.SetResourceReference(StyleProperty, "TextBody");
+               body = block;
+            }
+            else
+            {
+               body = new InlineNotice { Level = level, Text = text, Margin = new Thickness(0) };
+            }
+
+            Wpf.Ui.Controls.Button primary = null, cancel = null;
+            var others = new List<Wpf.Ui.Controls.Button>();
+            var buttons = new List<(Choice Choice, Wpf.Ui.Controls.Button Button)>();
+
+            foreach (Choice choice in choices)
+            {
+               var button = new Wpf.Ui.Controls.Button { Content = choice.Label, MinWidth = 88 };
+               if (choice.Primary)
+                  button.Appearance = choice.Destructive ? Wpf.Ui.Controls.ControlAppearance.Danger : Wpf.Ui.Controls.ControlAppearance.Primary;
+
+               MessageBoxResult value = choice.Value;
+               button.Click += (s, e) => { Result = value; Close(); };
+               buttons.Add((choice, button));
+
+               if (choice.Primary)
+                  primary = button;
+               else if (choice.IsCancel)
+                  cancel = button;
+               else
+                  others.Add(button);
+            }
+
+            // Every message box is the same width; the height follows the text.
+            DialogFrame frame = UseFrame(null, body, primary, cancel, null, 480);
+            AutomationProperties.SetName(frame, caption);
+
+            // The frame gave Enter to the primary and Escape to Cancel; the
+            // choices say which button actually takes each, since a caller may
+            // name a non-primary default, and the OK of an OK-only box is both.
+            foreach ((Choice choice, Wpf.Ui.Controls.Button button) in buttons)
+            {
+               button.IsDefault = choice.IsDefault;
+               button.IsCancel = choice.IsCancel;
+            }
+
+            if (others.Count > 0)
+            {
+               var trailing = new StackPanel { Orientation = Orientation.Horizontal };
+               foreach (Wpf.Ui.Controls.Button other in others)
+               {
+                  other.Margin = new Thickness(0, 0, DesignTokens.Space.Sm, 0);
+                  trailing.Children.Add(other);
+               }
+
+               if (cancel != null)
+                  trailing.Children.Add(cancel);
+
+               frame.SecondaryButton = trailing;
+            }
+         }
       }
    }
 }
