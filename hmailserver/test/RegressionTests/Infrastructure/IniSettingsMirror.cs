@@ -4,6 +4,7 @@
 
 using System;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using RegressionTests.Shared;
 
 namespace RegressionTests.Infrastructure
