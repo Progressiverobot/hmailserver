@@ -10,17 +10,16 @@ The page itself is the webmail's design: one `:root` block declares the palette 
 
 | Measure | Count |
 |---|---|
-| COM properties the desktop program writes | 330 |
-| of them writable over REST | 330 |
-| of them reachable from a Deck view | 324 |
+| COM properties the desktop program writes | 342 |
+| of them writable over REST | 342 |
+| of them reachable from a Deck view | 336 |
 | missing over REST | 0 |
 | over REST but not reached by any Deck view | 6 |
 | assignments left out of the count | 5 |
 | COM interfaces in the IDL | 94 |
 | desktop pages read | 58 |
-| REST routes (path and method) | 234, 107 of them writes |
-| REST routes (path and method) | 227, 104 of them writes |
-| Deck views | 16 |
+| REST routes (path and method) | 236, 107 of them writes |
+| Deck views | 18 |
 
 ## Missing over REST, by interface
 
@@ -234,6 +233,18 @@ Every COM property the desktop program writes, the page that writes it, the REST
 | `LogPOP3` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
 | `LogSMTP` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
 | `LogTCPIP` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogEnabled` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogFacility` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogHost` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogApplication` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogDebug` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogIMAP` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogPOP3` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogSMTP` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogLogTCPIP` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogMinimumSeverity` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogPort` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
+| `SyslogTransport` | ServerSettingsView | `PUT /api/v1/settings/logging` (setter) | backup, settings |
 
 ### DistributionList
 
@@ -748,7 +759,7 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `POST /api/v1/settings/indexing/clear` | MessageIndexing | - | yes |
 | `POST /api/v1/settings/indexing/index` | MessageIndexing | - | yes |
 | `PUT /api/v1/settings/ini/{name}` | - | `from`, `read`, `to`, `value` | - |
-| `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip` | yes |
+| `PUT /api/v1/settings/logging` | Logging | `device`, `enabled`, `keep_files_open`, `log_application`, `log_awstats`, `log_debug`, `log_format`, `log_imap`, `log_pop3`, `log_smtp`, `log_tcpip`, `syslog_enabled`, `syslog_facility`, `syslog_host`, `syslog_log_application`, `syslog_log_debug`, `syslog_log_imap`, `syslog_log_pop3`, `syslog_log_smtp`, `syslog_log_tcpip`, `syslog_minimum_severity`, `syslog_port`, `syslog_transport` | yes |
 | `POST /api/v1/settings/logon-failures/clear` | - | - | - |
 | `PUT /api/v1/settings/messages/{name}` | ServerMessage | `read`, `text` | yes |
 | `PUT /api/v1/settings/scripting` | Scripting | `enabled`, `language` | yes |
@@ -783,5 +794,6 @@ Every POST, PUT and PATCH route in the OpenAPI document and the settings tables,
 | `certs` | `GET /api/v1/certificates`, `POST /api/v1/certificates`, `DELETE /api/v1/certificates/{}`, `GET /api/v1/openapi.json` |
 | `ports` | `GET /api/v1/certificates`, `GET /api/v1/openapi.json`, `GET /api/v1/ports`, `POST /api/v1/ports`, `DELETE /api/v1/ports/{}`, `PUT /api/v1/ports/{}`, `POST /api/v1/server/reinitialize` |
 | `logs` | `GET /api/v1/logs`, `GET /api/v1/logs/{}?lines={}`, `GET /api/v1/status` |
+| `reports` | `GET /api/v1/domains`, `GET /api/v1/reports`, `GET /api/v1/reports/summary?{}` |
 | `audit` | `GET /api/v1/audit/verify`, `GET /api/v1/audit{}` |
 

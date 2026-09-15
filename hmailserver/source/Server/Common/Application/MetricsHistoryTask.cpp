@@ -12,6 +12,7 @@
 #include "../SQL/DALRecordset.h"
 #include "../SQL/DatabaseConnectionManager.h"
 #include "../Util/ServerStatus.h"
+#include "../Util/Reports.h"
 #include "../TCPIP/SocketConstants.h"
 
 #include <time.h>
@@ -43,7 +44,18 @@ namespace HM
          "auth_failures_total",
          "tls_handshakes_total",
          "tls_handshake_failures_total",
-         "messagestore_missing_files"
+         "messagestore_missing_files",
+         // Added 15 September 2026 for the reports. These two are not
+         // ServerStatus counters like everything above: they are an aggregate
+         // over hm_messages, which is why Reports::CachedStoreTotals computes
+         // them at most once an hour and hands out the cached figure in
+         // between. Sampled every minute like everything else so that a
+         // reader of the history sees one series of the same shape as the
+         // rest; the value simply steps once an hour. They exist because
+         // "storage growth" cannot be answered from anything else this
+         // server keeps - a mailbox's size is known only as it is now.
+         "store_bytes",
+         "store_messages"
       };
 
       // Prune on the first run and then once an hour: the delete is indexed and
@@ -115,6 +127,13 @@ namespace HM
       values.push_back(std::make_pair(AnsiString("tls_handshakes_total"), (double) status->GetNumberOfTlsHandshakesCompleted()));
       values.push_back(std::make_pair(AnsiString("tls_handshake_failures_total"), (double) status->GetNumberOfTlsHandshakeFailures()));
       values.push_back(std::make_pair(AnsiString("messagestore_missing_files"), (double) status->GetMessageStoreMissingFiles()));
+
+      __int64 storeBytes = 0;
+      __int64 storeMessages = 0;
+      Reports::CachedStoreTotals(storeBytes, storeMessages);
+
+      values.push_back(std::make_pair(AnsiString("store_bytes"), (double) storeBytes));
+      values.push_back(std::make_pair(AnsiString("store_messages"), (double) storeMessages));
    }
 
    int
