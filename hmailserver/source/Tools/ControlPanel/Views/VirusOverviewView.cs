@@ -15,6 +15,10 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -47,51 +51,45 @@ namespace hMailServer.ControlPanel.Views
    public class VirusOverviewView : UserControl, IPageLifecycle
    {
       private readonly StackPanel body_ = new();
+
+      // A read that failed is a warning in the flow of the page, not a grey line
+      // at the bottom: on a page whose verdicts are the product, an incomplete
+      // read has to be seen before the verdicts are believed.
+      private readonly InlineNotice readFailure_ = new()
+      {
+         Level = StatusLevel.Warning,
+         Visibility = Visibility.Collapsed
+      };
+
+      // Where the values came from - a provenance footnote, the quietest text.
       private readonly TextBlock status_ = new();
 
       public VirusOverviewView()
       {
-         var page = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
+         var page = new StackPanel { MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("Virus scanning overview") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
-         {
-            Text = L("Which scanners can actually run, what they are asked to look at, and what happens to a message one of them condemns. Nothing on this page can be edited — each row opens the page that owns the setting.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         header.Children.Add(heading);
-
-         var refresh = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Refresh"),
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(12, 4, 0, 0)
-         };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the anti-virus configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "virus-overview-refresh");
          refresh.Click += (s, e) => Reload();
-         Grid.SetColumn(refresh, 1);
-         header.Children.Add(refresh);
 
-         page.Children.Add(header);
+         page.Children.Add(new PageHeader
+         {
+            Title = L("Virus scanning overview"),
+            Subtitle = L("Which scanners can actually run, what they are asked to look at, and what happens to a message one of them condemns. Nothing on this page can be edited — each row opens the page that owns the setting."),
+            Actions = refresh
+         });
+
+         page.Children.Add(readFailure_);
          page.Children.Add(body_);
 
-         status_.FontSize = Typography.Caption;
-         status_.Margin = new Thickness(0, 6, 0, 0);
-         status_.TextWrapping = TextWrapping.Wrap;
-         status_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         status_.Margin = new Thickness(0, 12, 0, 0);
+         status_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          page.Children.Add(status_);
 
-         Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter() => Reload();
@@ -325,33 +323,27 @@ namespace hMailServer.ControlPanel.Views
          if (notes.Count > 0)
             body_.Children.Add(NotesCard(notes));
 
-         status_.Text = failedReads_ == 0
-            ? L("Read from the server. Values are read again every time this page is opened.")
+         status_.Text = L("Read from the server. Values are read again every time this page is opened.");
+
+         readFailure_.Text = failedReads_ == 0
+            ? null
             : F("{0} value(s) could not be read — {1} The rows above may be incomplete, so treat a scanner shown as unusable here as unconfirmed.", failedReads_, firstError_);
+         readFailure_.Visibility = failedReads_ == 0 ? Visibility.Collapsed : Visibility.Visible;
       }
 
-      private static Border Card(string title, out StackPanel content)
+      /// <summary>One section of the page. Named Section and not Card because the
+      /// component it builds is called that.</summary>
+      private static Card Section(string title, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 14, 0, 0) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var inner = new StackPanel();
-         inner.Children.Add(new TextBlock
-         {
-            Text = title,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 10)
-         });
-
-         border.Child = inner;
-         content = inner;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = title, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
-      private static Border VerdictCard(VirusPipelineConfig config)
+      private static Card VerdictCard(VirusPipelineConfig config)
       {
-         Border card = Card(L("What happens to an infected message"), out StackPanel content);
+         Card card = Section(L("What happens to an infected message"), out StackPanel content);
 
          content.Children.Add(Paragraph(VirusPipeline.Verdict(config), Typography.Body));
 
@@ -361,9 +353,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border ScannersCard(VirusPipelineConfig config)
+      private Card ScannersCard(VirusPipelineConfig config)
       {
-         Border card = Card(L("Scanners, in the order the server tries them"), out StackPanel content);
+         Card card = Section(L("Scanners, in the order the server tries them"), out StackPanel content);
 
          var grid = new Grid();
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // order
@@ -392,28 +384,21 @@ namespace hMailServer.ControlPanel.Views
          var order = new TextBlock
          {
             Text = scanner.Order.ToString(),
-            FontSize = Typography.Caption,
             Margin = new Thickness(0, 6, 10, 6),
             VerticalAlignment = VerticalAlignment.Top
          };
-         order.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+         order.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          Grid.SetRow(order, row);
          Grid.SetColumn(order, 0);
          grid.Children.Add(order);
 
          var text = new StackPanel { Margin = new Thickness(0, 6, 12, 6) };
 
-         var name = new TextBlock
-         {
-            Text = scanner.Name,
-            FontSize = Typography.Body,
-            FontWeight = scanner.Usable ? FontWeights.SemiBold : FontWeights.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            // Dimmed as well as labelled, because the label is what the reader who
-            // cannot see the dimming gets. An enabled-but-broken scanner is NOT
-            // dimmed - it is the one that most needs the eye drawn to it.
-            Opacity = scanner.Enabled ? 1.0 : 0.6
-         };
+         var name = new TextBlock { Text = scanner.Name, TextWrapping = TextWrapping.Wrap };
+         // Dimmed as well as labelled, because the label is what the reader who
+         // cannot see the dimming gets. An enabled-but-broken scanner is NOT
+         // dimmed - it is the one that most needs the eye drawn to it.
+         name.SetResourceReference(StyleProperty, scanner.Enabled ? "TextBodyStrong" : "TextSecondary");
 
          // The whole row as the accessible name of the one element in it with an
          // automation peer. A TextBlock has one and a Panel does not, so putting it
@@ -426,13 +411,8 @@ namespace hMailServer.ControlPanel.Views
 
          text.Children.Add(name);
 
-         var detail = new TextBlock
-         {
-            Text = scanner.Problem ?? scanner.Detail,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.75
-         };
+         var detail = new TextBlock { Text = scanner.Problem ?? scanner.Detail, TextWrapping = TextWrapping.Wrap };
+         detail.SetResourceReference(StyleProperty, "TextCaption");
 
          if (scanner.Problem != null)
             detail.SetResourceReference(TextBlock.ForegroundProperty, "AppDangerBrush");
@@ -442,41 +422,25 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetColumn(text, 1);
          grid.Children.Add(text);
 
-         // The state as a word with a shape beside it, so neither the colour nor the
-         // shape is load-bearing alone. "On, but cannot run" is a third state and is
-         // deliberately not collapsed into either "On" or "Off": it is the state the
-         // settings page cannot show and the whole reason for this one.
-         var statePanel = new StackPanel
+         // The state as a pill: the word, its shape and its colour together, so
+         // none of the three is load-bearing alone. "On, but cannot run" is a
+         // third state and is deliberately not collapsed into either "On" or
+         // "Off": it is the state the settings page cannot show and the whole
+         // reason for this one.
+         var state = new StatusPill
          {
-            Orientation = Orientation.Horizontal,
+            Level = !scanner.Enabled ? StatusLevel.Normal
+               : scanner.Usable ? StatusLevel.Good
+               : StatusLevel.Critical,
+            Text = scanner.StateText,
+            MaxWidth = 170,
             Margin = new Thickness(0, 6, 14, 6),
             VerticalAlignment = VerticalAlignment.Top
          };
 
-         StatusLevel level = !scanner.Enabled ? StatusLevel.Normal
-            : scanner.Usable ? StatusLevel.Good
-            : StatusLevel.Critical;
-
-         StatusPresentation presentation = StatusSemantics.For(level);
-
-         var mark = new Path { Width = 10, Height = 10, Stretch = Stretch.Fill, Margin = new Thickness(0, 4, 6, 0), VerticalAlignment = VerticalAlignment.Top };
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-         statePanel.Children.Add(mark);
-
-         var state = new TextBlock
-         {
-            Text = scanner.StateText,
-            FontSize = Typography.Label,
-            FontWeight = FontWeights.SemiBold,
-            MaxWidth = 150,
-            TextWrapping = TextWrapping.Wrap
-         };
-         state.SetResourceReference(TextBlock.ForegroundProperty, presentation.BrushKey);
-         statePanel.Children.Add(state);
-
-         Grid.SetRow(statePanel, row);
-         Grid.SetColumn(statePanel, 2);
-         grid.Children.Add(statePanel);
+         Grid.SetRow(state, row);
+         Grid.SetColumn(state, 2);
+         grid.Children.Add(state);
 
          FrameworkElement link = PageLink(scanner.Page, L("Settings…"),
             F("Open {0}, which owns the {1} settings", L(NavigationMap.TitleOf(scanner.Page)), scanner.Name));
@@ -487,9 +451,9 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(link);
       }
 
-      private Border WhatIsScannedCard(VirusPipelineConfig config)
+      private Card WhatIsScannedCard(VirusPipelineConfig config)
       {
-         Border card = Card(L("What gets scanned"), out StackPanel content);
+         Card card = Section(L("What gets scanned"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.MaxScanKilobytes > 0
@@ -515,18 +479,18 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private static Border InfectedCard(VirusPipelineConfig config)
+      private static Card InfectedCard(VirusPipelineConfig config)
       {
-         Border card = Card(L("When a scanner finds something"), out StackPanel content);
+         Card card = Section(L("When a scanner finds something"), out StackPanel content);
 
          content.Children.Add(Paragraph(VirusPipeline.ActionSummary(config), Typography.Body));
 
          return card;
       }
 
-      private Border AttachmentsCard(VirusPipelineConfig config)
+      private Card AttachmentsCard(VirusPipelineConfig config)
       {
-         Border card = Card(L("Attachment blocking, which is separate"), out StackPanel content);
+         Card card = Section(L("Attachment blocking, which is separate"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.AttachmentBlockingEnabled
@@ -547,51 +511,24 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private static Border NotesCard(IReadOnlyList<VirusPipelineNote> notes)
+      private static Card NotesCard(IReadOnlyList<VirusPipelineNote> notes)
       {
-         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
+         Card card = Section(L("Worth knowing about this configuration"), out StackPanel content);
 
+         // One notice per note, at the note's own level: the component draws the
+         // colour, the shape and the severity word, and puts the word first in
+         // its accessible name, which is what this card used to build by hand.
          foreach (VirusPipelineNote note in notes)
-         {
-            StatusPresentation presentation = StatusSemantics.For(note.Level);
-
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            // Colour, shape and word, so that none of the three is load-bearing on
-            // its own - the same three channels the dashboard status badges use.
-            var mark = new Path { Width = 11, Height = 11, Stretch = Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-            ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-            row.Children.Add(mark);
-
-            var text = new TextBlock
-            {
-               FontSize = Typography.Label,
-               TextWrapping = TextWrapping.Wrap
-            };
-            var severity = new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold };
-            text.Inlines.Add(severity);
-            text.Inlines.Add(new Run(note.Text));
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-
-            content.Children.Add(row);
-         }
+            content.Children.Add(new InlineNotice { Level = note.Level, Text = note.Text });
 
          return card;
       }
 
       private static TextBlock Paragraph(string text, double size)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = size,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 6),
-            Opacity = size <= Typography.Caption ? 0.75 : 1.0
-         };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, size <= Typography.Caption ? "TextCaption" : "TextBody");
+         return block;
       }
 
       /// <summary>

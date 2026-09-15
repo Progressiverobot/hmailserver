@@ -7,6 +7,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -31,8 +32,10 @@ namespace hMailServer.ControlPanel.Views
          VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
          Background = System.Windows.Media.Brushes.Transparent
       };
-      private readonly TextBlock pathText_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 8) };
-      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 12, 0, 0), TextWrapping = TextWrapping.Wrap };
+
+      // The card around the editor carries the file's path as its description.
+      private readonly Card card_ = new() { Padding = new Thickness(8) };
+      private readonly InlineNotice status_ = new() { Visibility = Visibility.Collapsed, Margin = new Thickness(0, 12, 0, 0) };
 
       private string scriptPath_;
 
@@ -43,25 +46,11 @@ namespace hMailServer.ControlPanel.Views
 
       private void Build()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-         var head = new StackPanel();
-         var title = new TextBlock { Text = L("Event scripts") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         head.Children.Add(title);
-         var sub = new TextBlock { Text = L("Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine. The engine's on/off switch and its language are on the Advanced page.") };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         head.Children.Add(sub);
-         root.Children.Add(head);
-
-         pathText_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         Grid.SetRow(pathText_, 1);
-         root.Children.Add(pathText_);
 
          // The editor is the only control in the Control Panel with AcceptsTab, so
          // it is the only one where Tab types a character instead of moving on.
@@ -75,14 +64,14 @@ namespace hMailServer.ControlPanel.Views
             L("Event handler script. Tab inserts a tab character; press Control and Tab together to move to the next control."));
          editor_.ToolTip = L("Tab indents. Use Ctrl+Tab to move focus out of the editor.");
 
-         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 10) };
-         Grid.SetRow(toolbar, 2);
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
 
          var templateCombo = new ComboBox { MinWidth = 240, VerticalAlignment = VerticalAlignment.Center };
          templateCombo.Items.Add(new ComboBoxItem { Content = L("Insert template\u2026"), Tag = "" });
          foreach ((string name, string body) in ScriptTemplates)
             templateCombo.Items.Add(new ComboBoxItem { Content = name, Tag = body });
          templateCombo.SelectedIndex = 0;
+         System.Windows.Automation.AutomationProperties.SetName(templateCombo, L("Insert template\u2026"));
          templateCombo.SelectionChanged += (s, e) =>
          {
             if (templateCombo.SelectedItem is ComboBoxItem cbi && cbi.Tag is string body && body.Length > 0)
@@ -91,22 +80,25 @@ namespace hMailServer.ControlPanel.Views
                templateCombo.SelectedIndex = 0;
             }
          };
-         toolbar.Children.Add(templateCombo);
+         actions.Children.Add(templateCombo);
 
-         toolbar.Children.Add(MakeButton(L("_Save & reload"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
-         toolbar.Children.Add(MakeButton(L("_Check syntax"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
-         toolbar.Children.Add(MakeButton(L("_Reload from disk"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
-         root.Children.Add(toolbar);
+         actions.Children.Add(MakeButton(L("_Save & reload"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => SaveScript()));
+         actions.Children.Add(MakeButton(L("_Check syntax"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => CheckSyntax()));
+         actions.Children.Add(MakeButton(L("_Reload from disk"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => LoadScript()));
 
-         var card = new Border { Padding = new Thickness(8) };
-         card.SetResourceReference(StyleProperty, "Card");
+         root.Children.Add(new PageHeader
+         {
+            Title = L("Event scripts"),
+            Subtitle = L("Edit the server event-handler script (OnAcceptMessage, OnDeliveryStart, OnHELO, ...). Saving writes the file and reloads the scripting engine. The engine's on/off switch and its language are on the Advanced page."),
+            Actions = actions
+         });
+
          editor_.SetResourceReference(ForegroundProperty, "TextFillColorPrimaryBrush");
-         card.Child = editor_;
-         Grid.SetRow(card, 3);
-         root.Children.Add(card);
+         card_.Content = editor_;
+         Grid.SetRow(card_, 1);
+         root.Children.Add(card_);
 
-         status_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         Grid.SetRow(status_, 4);
+         Grid.SetRow(status_, 2);
          root.Children.Add(status_);
 
          Content = root;
@@ -117,6 +109,14 @@ namespace hMailServer.ControlPanel.Views
          var b = new Wpf.Ui.Controls.Button { Content = text, Appearance = appearance, Margin = new Thickness(8, 0, 0, 0), MinWidth = 110 };
          b.Click += onClick;
          return b;
+      }
+
+      /// <summary>What the last load, save or check said, at its level.</summary>
+      private void Status_(StatusLevel level, string text)
+      {
+         status_.Level = level;
+         status_.Text = text;
+         status_.Visibility = Visibility.Visible;
       }
 
       // VBScript starter snippets for common integrations. Each is a complete
@@ -182,7 +182,7 @@ End Sub
          editor_.Text = editor_.Text + separator + body;
          editor_.CaretIndex = editor_.Text.Length;
          editor_.ScrollToEnd();
-         status_.Text = L("Template appended. If you already have an OnAcceptMessage handler, merge the two into a single Sub before saving.");
+         Status_(StatusLevel.Information, L("Template appended. If you already have an OnAcceptMessage handler, merge the two into a single Sub before saving."));
       }
 
       private void LoadScript()
@@ -190,16 +190,20 @@ End Sub
          scriptPath_ = ResolveScriptPath();
          if (scriptPath_ == null)
          {
-            pathText_.Text = L("Could not determine the event-script path.");
+            card_.Description = null;
+            Status_(StatusLevel.Critical, L("Could not determine the event-script path."));
             editor_.IsEnabled = false;
             return;
          }
 
-         pathText_.Text = scriptPath_;
+         card_.Description = scriptPath_;
          try
          {
             editor_.Text = File.Exists(scriptPath_) ? File.ReadAllText(scriptPath_) : "";
-            status_.Text = File.Exists(scriptPath_) ? L("Loaded from disk.") : L("File does not exist yet; saving will create it.");
+            if (File.Exists(scriptPath_))
+               Status_(StatusLevel.Information, L("Loaded from disk."));
+            else
+               Status_(StatusLevel.Information, L("File does not exist yet; saving will create it."));
             editor_.IsEnabled = true;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
@@ -208,7 +212,7 @@ End Sub
             // save overwrite the file on disk with the empty text shown here.
             editor_.Text = "";
             editor_.IsEnabled = false;
-            status_.Text = F("Could not read the file: {0}", ex.Message);
+            Status_(StatusLevel.Critical, F("Could not read the file: {0}", ex.Message));
          }
       }
 
@@ -262,13 +266,14 @@ End Sub
             scripting.Reload();
             string result = "";
             try { result = (string)scripting.CheckSyntax(); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
-            status_.Text = string.IsNullOrWhiteSpace(result)
-               ? F("Saved and reloaded at {0}. No syntax errors.", DateTime.Now.ToLongTimeString())
-               : F("Saved. Compiler reported: {0}", result);
+            if (string.IsNullOrWhiteSpace(result))
+               Status_(StatusLevel.Good, F("Saved and reloaded at {0}. No syntax errors.", DateTime.Now.ToLongTimeString()));
+            else
+               Status_(StatusLevel.Warning, F("Saved. Compiler reported: {0}", result));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = F("Saved, but reload failed: {0}", ex.Message);
+            Status_(StatusLevel.Critical, F("Saved, but reload failed: {0}", ex.Message));
          }
          finally
          {
@@ -282,13 +287,14 @@ End Sub
          try
          {
             string result = (string)scripting.CheckSyntax();
-            status_.Text = string.IsNullOrWhiteSpace(result)
-               ? L("No syntax errors reported.")
-               : F("Compiler reported: {0}", result);
+            if (string.IsNullOrWhiteSpace(result))
+               Status_(StatusLevel.Good, L("No syntax errors reported."));
+            else
+               Status_(StatusLevel.Warning, F("Compiler reported: {0}", result));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = F("Syntax check failed: {0}", ex.Message);
+            Status_(StatusLevel.Critical, F("Syntax check failed: {0}", ex.Message));
          }
          finally
          {

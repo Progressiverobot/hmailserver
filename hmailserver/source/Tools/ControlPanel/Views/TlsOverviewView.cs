@@ -16,6 +16,10 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -46,51 +50,45 @@ namespace hMailServer.ControlPanel.Views
    public class TlsOverviewView : UserControl, IPageLifecycle
    {
       private readonly StackPanel body_ = new();
+
+      // A read that failed is a warning in the flow of the page, not a grey line
+      // at the bottom: this page's whole product is a verdict, and a verdict
+      // reached from an incomplete read has to say so before it is believed.
+      private readonly InlineNotice readFailure_ = new()
+      {
+         Level = StatusLevel.Warning,
+         Visibility = Visibility.Collapsed
+      };
+
+      // Where the values came from - a provenance footnote, the quietest text.
       private readonly TextBlock status_ = new();
 
       public TlsOverviewView()
       {
-         var page = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
+         var page = new StackPanel { MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("Transport encryption overview") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
-         {
-            Text = L("What every listener protects, what it presents to prove who it is, and what can still be negotiated. Nothing on this page can be edited — each row opens the page that owns the setting.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         header.Children.Add(heading);
-
-         var refresh = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Refresh"),
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(12, 4, 0, 0)
-         };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the transport security configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "tls-overview-refresh");
          refresh.Click += (s, e) => Reload();
-         Grid.SetColumn(refresh, 1);
-         header.Children.Add(refresh);
 
-         page.Children.Add(header);
+         page.Children.Add(new PageHeader
+         {
+            Title = L("Transport encryption overview"),
+            Subtitle = L("What every listener protects, what it presents to prove who it is, and what can still be negotiated. Nothing on this page can be edited — each row opens the page that owns the setting."),
+            Actions = refresh
+         });
+
+         page.Children.Add(readFailure_);
          page.Children.Add(body_);
 
-         status_.FontSize = Typography.Caption;
-         status_.Margin = new Thickness(0, 6, 0, 0);
-         status_.TextWrapping = TextWrapping.Wrap;
-         status_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         status_.Margin = new Thickness(0, 12, 0, 0);
+         status_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          page.Children.Add(status_);
 
-         Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter() => Reload();
@@ -381,33 +379,27 @@ namespace hMailServer.ControlPanel.Views
          if (notes.Count > 0)
             body_.Children.Add(NotesCard(notes));
 
-         status_.Text = failedReads_ == 0
-            ? L("Read from the server. Values are read again every time this page is opened.")
+         status_.Text = L("Read from the server. Values are read again every time this page is opened.");
+
+         readFailure_.Text = failedReads_ == 0
+            ? null
             : F("{0} value(s) could not be read — {1} The rows above may be incomplete.", failedReads_, firstError_);
+         readFailure_.Visibility = failedReads_ == 0 ? Visibility.Collapsed : Visibility.Visible;
       }
 
-      private static Border Card(string title, out StackPanel content)
+      /// <summary>One section of the page. Named Section and not Card because the
+      /// component it builds is called that.</summary>
+      private static Card Section(string title, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 14, 0, 0) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var inner = new StackPanel();
-         inner.Children.Add(new TextBlock
-         {
-            Text = title,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 10)
-         });
-
-         border.Child = inner;
-         content = inner;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = title, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
-      private static Border VerdictCard(TlsPostureConfig config)
+      private static Card VerdictCard(TlsPostureConfig config)
       {
-         Border card = Card(L("Where this server stands"), out StackPanel content);
+         Card card = Section(L("Where this server stands"), out StackPanel content);
 
          content.Children.Add(Paragraph(TlsPosture.Verdict(config), Typography.Body));
 
@@ -417,9 +409,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border ListenersCard(TlsPostureConfig config)
+      private Card ListenersCard(TlsPostureConfig config)
       {
-         Border card = Card(L("Listeners"), out StackPanel content);
+         Card card = Section(L("Listeners"), out StackPanel content);
 
          var grid = new Grid();
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // protocol + port
@@ -454,12 +446,8 @@ namespace hMailServer.ControlPanel.Views
 
          var identity = new StackPanel { Margin = new Thickness(0, 6, 16, 6), VerticalAlignment = VerticalAlignment.Top };
 
-         var name = new TextBlock
-         {
-            Text = listener.Protocol + " " + listener.Port,
-            FontSize = Typography.Body,
-            FontWeight = FontWeights.SemiBold
-         };
+         var name = new TextBlock { Text = listener.Protocol + " " + listener.Port };
+         name.SetResourceReference(StyleProperty, "TextBodyStrong");
 
          // The whole row as the accessible name of the one element in it with an
          // automation peer, so a screen reader hears one statement rather than three
@@ -469,12 +457,9 @@ namespace hMailServer.ControlPanel.Views
 
          identity.Children.Add(name);
 
-         identity.Children.Add(new TextBlock
-         {
-            Text = listener.Address,
-            FontSize = Typography.Caption,
-            Opacity = 0.7
-         });
+         var address = new TextBlock { Text = listener.Address };
+         address.SetResourceReference(StyleProperty, "TextCaptionTertiary");
+         identity.Children.Add(address);
 
          Grid.SetRow(identity, row);
          Grid.SetColumn(identity, 0);
@@ -482,62 +467,43 @@ namespace hMailServer.ControlPanel.Views
 
          var text = new StackPanel { Margin = new Thickness(0, 6, 12, 6) };
 
-         text.Children.Add(new TextBlock
-         {
-            Text = verdict.Detail,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.85
-         });
+         var detail = new TextBlock { Text = verdict.Detail, TextWrapping = TextWrapping.Wrap };
+         detail.SetResourceReference(StyleProperty, "TextCaption");
+         text.Children.Add(detail);
 
-         text.Children.Add(new TextBlock
+         var certificate = new TextBlock
          {
             Text = string.IsNullOrWhiteSpace(listener.CertificateName)
                ? (listener.Security == TlsListenerSecurity.None ? L("No certificate needed") : L("No certificate assigned"))
                : "Certificate: " + listener.CertificateName,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.6
-         });
+            TextWrapping = TextWrapping.Wrap
+         };
+         certificate.SetResourceReference(StyleProperty, "TextCaptionTertiary");
+         text.Children.Add(certificate);
 
          Grid.SetRow(text, row);
          Grid.SetColumn(text, 1);
          grid.Children.Add(text);
 
-         // Colour, shape and word together, so none of the three carries the meaning
-         // on its own.
-         StatusPresentation presentation = StatusSemantics.For(verdict.Level);
-
-         var statePanel = new StackPanel
+         // Colour, shape and word together, so none of the three carries the
+         // meaning on its own - which is what the pill is.
+         var state = new StatusPill
          {
-            Orientation = Orientation.Horizontal,
+            Level = verdict.Level,
+            Text = verdict.Word,
+            MaxWidth = 150,
             Margin = new Thickness(0, 6, 0, 6),
             VerticalAlignment = VerticalAlignment.Top
          };
 
-         var mark = new Path { Width = 10, Height = 10, Stretch = Stretch.Fill, Margin = new Thickness(0, 4, 6, 0), VerticalAlignment = VerticalAlignment.Top };
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-         statePanel.Children.Add(mark);
-
-         var state = new TextBlock
-         {
-            Text = verdict.Word,
-            FontSize = Typography.Label,
-            FontWeight = FontWeights.SemiBold,
-            MaxWidth = 130,
-            TextWrapping = TextWrapping.Wrap
-         };
-         state.SetResourceReference(TextBlock.ForegroundProperty, presentation.BrushKey);
-         statePanel.Children.Add(state);
-
-         Grid.SetRow(statePanel, row);
-         Grid.SetColumn(statePanel, 2);
-         grid.Children.Add(statePanel);
+         Grid.SetRow(state, row);
+         Grid.SetColumn(state, 2);
+         grid.Children.Add(state);
       }
 
-      private Border CertificatesCard(TlsPostureConfig config)
+      private Card CertificatesCard(TlsPostureConfig config)
       {
-         Border card = Card(L("Certificates"), out StackPanel content);
+         Card card = Section(L("Certificates"), out StackPanel content);
 
          if (config.Certificates.Count == 0)
          {
@@ -597,19 +563,24 @@ namespace hMailServer.ControlPanel.Views
 
          StatusPresentation presentation = StatusSemantics.For(level);
 
-         var mark = new Path { Width = 10, Height = 10, Stretch = Stretch.Fill, Margin = new Thickness(0, 5, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-         row.Children.Add(mark);
+         row.Children.Add(new StatusPill
+         {
+            Level = level,
+            Text = presentation.SeverityWord,
+            Margin = new Thickness(0, 2, 10, 0),
+            VerticalAlignment = VerticalAlignment.Top
+         });
 
          string usage = certificate.InUse ? L("in use by a listener") : L("not used by any listener");
 
          var text = new TextBlock
          {
             Text = certificate.Name + " — " + detail + ", " + usage,
-            FontSize = Typography.Body,
             TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 820
+            MaxWidth = 820,
+            VerticalAlignment = VerticalAlignment.Center
          };
+         text.SetResourceReference(StyleProperty, "TextBody");
          System.Windows.Automation.AutomationProperties.SetName(text,
             certificate.Name + ", " + presentation.SeverityWord + ", " + detail + ", " + usage);
          row.Children.Add(text);
@@ -617,9 +588,9 @@ namespace hMailServer.ControlPanel.Views
          return row;
       }
 
-      private Border NegotiationCard(TlsPostureConfig config)
+      private Card NegotiationCard(TlsPostureConfig config)
       {
-         Border card = Card(L("What can be negotiated"), out StackPanel content);
+         Card card = Section(L("What can be negotiated"), out StackPanel content);
 
          content.Children.Add(Paragraph(F("Protocol versions enabled: {0}", TlsPosture.VersionSummary(config)), Typography.Body));
 
@@ -636,9 +607,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border AuthenticationCard(TlsPostureConfig config)
+      private Card AuthenticationCard(TlsPostureConfig config)
       {
-         Border card = Card(L("Passwords, and what is allowed to carry them"), out StackPanel content);
+         Card card = Section(L("Passwords, and what is allowed to carry them"), out StackPanel content);
 
          content.Children.Add(Paragraph(
             config.RangesTotal == 0
@@ -656,49 +627,24 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private static Border NotesCard(IReadOnlyList<TlsPostureNote> notes)
+      private static Card NotesCard(IReadOnlyList<TlsPostureNote> notes)
       {
-         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
+         Card card = Section(L("Worth knowing about this configuration"), out StackPanel content);
 
+         // One notice per note, at the note's own level: the component draws the
+         // colour, the shape and the severity word, and puts the word first in
+         // its accessible name, which is what this card used to build by hand.
          foreach (TlsPostureNote note in notes)
-         {
-            StatusPresentation presentation = StatusSemantics.For(note.Level);
-
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var mark = new Path { Width = 11, Height = 11, Stretch = Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-            ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-            row.Children.Add(mark);
-
-            var text = new TextBlock
-            {
-               FontSize = Typography.Label,
-               TextWrapping = TextWrapping.Wrap
-            };
-            var severity = new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold };
-            text.Inlines.Add(severity);
-            text.Inlines.Add(new Run(note.Text));
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-
-            content.Children.Add(row);
-         }
+            content.Children.Add(new InlineNotice { Level = note.Level, Text = note.Text });
 
          return card;
       }
 
       private static TextBlock Paragraph(string text, double size)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = size,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 6),
-            Opacity = size <= Typography.Caption ? 0.75 : 1.0
-         };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, size <= Typography.Caption ? "TextCaption" : "TextBody");
+         return block;
       }
 
       private static FrameworkElement PageLink(string page, string caption, string accessibleName)

@@ -9,6 +9,7 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -35,27 +36,26 @@ namespace hMailServer.ControlPanel.Views
       private Wpf.Ui.Controls.Button debugOn_;
       private Wpf.Ui.Controls.Button debugOff_;
 
-      private readonly TextBlock loggingStatus_ = new()
+      // The state of debug logging as a notice rather than a caption: the two
+      // states an administrator has to act on - logging off altogether, and debug
+      // left on - are a warning, and the ordinary state is information. It is
+      // never the Normal level: an InlineNotice draws its level's severity word,
+      // and "Normal" is not a thing to say about debug logging.
+      private readonly InlineNotice loggingStatus_ = new()
       {
-         FontSize = Typography.Caption,
-         TextWrapping = TextWrapping.Wrap,
-         Margin = new Thickness(0, 8, 0, 0)
+         Level = StatusLevel.Information,
+         Margin = new Thickness(0, 12, 0, 0)
       };
 
       public StalledMailView()
       {
-         var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
+         var panel = new StackPanel { MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = L("Diagnosing stalled mail") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         panel.Children.Add(title);
-
-         var subtitle = new TextBlock
+         panel.Children.Add(new PageHeader
          {
-            Text = L("Mail is not moving, the service is running, nothing has crashed and the log seems to stop mid-transaction. The server is not silent about this any more: the answer is usually in one line of the log, and this page says which.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         panel.Children.Add(subtitle);
+            Title = L("Diagnosing stalled mail"),
+            Subtitle = L("Mail is not moving, the service is running, nothing has crashed and the log seems to stop mid-transaction. The server is not silent about this any more: the answer is usually in one line of the log, and this page says which.")
+         });
 
          panel.Children.Add(WhichHalf());
          panel.Children.Add(DebugLogging());
@@ -65,7 +65,9 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(Bounds());
          panel.Children.Add(Report());
 
-         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter()
@@ -79,9 +81,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- the steps ---------------------------------------------------------
 
-      private Border WhichHalf()
+      private Card WhichHalf()
       {
-         var card = Card(L("First: which half is stuck?"),
+         var card = Section(L("First: which half is stuck?"),
             L("The two halves fail differently and have different causes. Work out which one you have before anything else."));
          var columns = new UniformGrid { Columns = 2 };
 
@@ -97,15 +99,15 @@ namespace hMailServer.ControlPanel.Views
          delivering.Children.Add(Link(L("Open the delivery queue"), "queue"));
          columns.Children.Add(delivering);
 
-         ((StackPanel)card.Child).Children.Add(columns);
+         ((StackPanel)card.Content).Children.Add(columns);
          return card;
       }
 
-      private Border DebugLogging()
+      private Card DebugLogging()
       {
-         var card = Card(L("Turn on debug logging first"),
+         var card = Section(L("Turn on debug logging first"),
             L("The lines this page refers to are written at debug level; the slow ones are also written at application level, so with application logging alone you still see the important ones. Reproduce the problem once, then read the log. Remember to turn debug logging off afterwards on a busy server."));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
 
          var row = new StackPanel { Orientation = Orientation.Horizontal };
          var enable = debugOn_ = new Wpf.Ui.Controls.Button
@@ -129,11 +131,11 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border Accepting()
+      private Card Accepting()
       {
-         var card = Card(L("Accepting: the sender times out after sending the message"),
+         var card = Section(L("Accepting: the sender times out after sending the message"),
             L("Between the 354 and the 250 the server runs the accept pipeline - spam tests, message modifications, archiving, the OnAcceptMessage script and the database save - on a bounded pool of threads, and replies only when it finishes. The log times each stage. Read it as a sequence and look for the last line written: the stage that is stuck is the one after it. Two stages announce themselves with a start line (spam-protection and script/save); message modifications do not, so a stall there shows as \"done spam-protection\" followed by silence. A stage taking ten seconds or more is logged at application level even without debug logging."));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
 
          content.Children.Add(Table(new[]
          {
@@ -153,11 +155,11 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border EveryMessage()
+      private Card EveryMessage()
       {
-         var card = Card(L("If every message stalls, not just one"),
+         var card = Section(L("If every message stalls, not just one"),
             L("Look for \"Task SMTP-accept session=42 ip=... waited 8 seconds for a thread in work queue Asynchronous task queue\" and, when it is severe, \"All 15 threads in work queue Asynchronous task queue have been busy for at least 120 seconds, so no further task on this queue can start\". That means every worker is occupied and messages are queuing behind them: one slow dependency does this to the whole server, which is why a single wedged scanner used to look like the server had stopped responding. The task names say which sessions are stuck; the stage timings say what they are stuck on."));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
          var links = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
          links.Children.Add(Link(L("Server status (who is connected)"), "status"));
          links.Children.Add(Link(L("Threads and the stall threshold"), "hardening"));
@@ -165,11 +167,11 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border Delivering()
+      private Card Delivering()
       {
-         var card = Card(L("Delivering: the message is accepted but never leaves"),
+         var card = Section(L("Delivering: the message is accepted but never leaves"),
             L("Delivery runs on a separate, smaller pool. The usual causes, in the order they occur:"));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
 
          content.Children.Add(Bullet(L("A virus scanner that stops responding. ClamAV is contacted after the message is accepted, so a wedged clamd shows up as accepted-but-never-delivered. Each socket operation is bounded by ClamMinTimeout / ClamMaxTimeout - a deadline on one read or write, armed afresh each time, so a large message streamed in chunks can take longer than ClamMaxTimeout in total.")));
          content.Children.Add(Bullet(L("A remote server that answers extremely slowly. The idle timeout is re-armed on every byte, so a host that sends one byte occasionally used to hold a delivery thread indefinitely; ClientSessionCeiling (30 minutes by default) is the absolute ceiling, armed once and never re-armed.")));
@@ -184,11 +186,11 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border Bounds()
+      private Card Bounds()
       {
-         var card = Card(L("The settings that bound each stage"),
+         var card = Section(L("The settings that bound each stage"),
             L("All in hMailServer.ini under [Settings], all in seconds, with defaults chosen to sit well inside a typical sending server's timeout. Two exceptions matter: SAMaxTimeout and ClamMaxTimeout go through TimeoutCalculator, which returns the minimum whenever the maximum is lower than it - so 0 gives a shorter bound, not an absent one. To lengthen either a long way, raise the matching ...MinTimeout too."));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
 
          content.Children.Add(Table(new[]
          {
@@ -211,11 +213,11 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border Report()
+      private Card Report()
       {
-         var card = Card(L("If none of that identifies it"),
+         var card = Section(L("If none of that identifies it"),
             L("Open an issue with: the log from the 354 (or from the delivery attempt) onwards, including the stage timing lines; the ERROR_hmailserver_<date>.log for the same window; which scanners and event scripts are enabled; and whether the message eventually arrives, arrives twice, or never arrives."));
-         var content = (StackPanel)card.Child;
+         var content = (StackPanel)card.Content;
 
          var open = new Wpf.Ui.Controls.Button { Content = L("Open the full _guide (DiagnosingStalledMail.md)"), Margin = new Thickness(0, 6, 8, 0) };
          AutomationProperties.SetName(open, L("Open the full guide on GitHub"));
@@ -238,8 +240,14 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            loggingStatus_.Text = F("Could not change logging: {0}", ex.Message);
+            Say_(StatusLevel.Critical, F("Could not change logging: {0}", ex.Message));
          }
+      }
+
+      private void Say_(StatusLevel level, string text)
+      {
+         loggingStatus_.Level = level;
+         loggingStatus_.Text = text;
       }
 
       private void RefreshLoggingStatus()
@@ -249,11 +257,17 @@ namespace hMailServer.ControlPanel.Views
             dynamic logging = ServerSession.Current.Application.Settings.Logging;
             bool enabled = (bool)logging.Enabled;
             bool debug = (bool)logging.LogDebug;
-            loggingStatus_.Text = !enabled
-               ? L("Logging is off altogether, so nothing below will be written until it is on.")
-               : debug
-                  ? L("Debug logging is ON. The stage timings and the DNS lines are being written; turn it off again when you have what you need.")
-                  : L("Debug logging is off. Application logging still records any stage that takes ten seconds or more.");
+
+            // Both states that cost something - nothing being written at all, and
+            // debug left on afterwards on a busy server - are warnings; the
+            // ordinary state is a plain statement.
+            if (!enabled)
+               Say_(StatusLevel.Warning, L("Logging is off altogether, so nothing below will be written until it is on."));
+            else if (debug)
+               Say_(StatusLevel.Warning, L("Debug logging is ON. The stage timings and the DNS lines are being written; turn it off again when you have what you need."));
+            else
+               Say_(StatusLevel.Information, L("Debug logging is off. Application logging still records any stage that takes ten seconds or more."));
+
             if (debugOn_ != null)
                debugOn_.IsEnabled = !(enabled && debug);
             if (debugOff_ != null)
@@ -261,7 +275,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            loggingStatus_.Text = F("Could not read the logging state: {0}", ex.Message);
+            Say_(StatusLevel.Critical, F("Could not read the logging state: {0}", ex.Message));
          }
       }
 
@@ -279,42 +293,38 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- building blocks -------------------------------------------------------
 
-      private static Border Card(string heading, string intro)
+      /// <summary>
+      /// One step of the guide, as a card: the step's question is the card's
+      /// title, the paragraph that answers it is its description, and what
+      /// follows goes in the content. Named Section and not Card because the
+      /// component it builds is called that.
+      /// </summary>
+      private static Card Section(string heading, string intro)
       {
-         var border = new Border { Margin = new Thickness(0, 0, 0, 14), Padding = new Thickness(16, 12, 16, 14) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var stack = new StackPanel();
-         stack.Children.Add(new TextBlock
-         {
-            Text = heading,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 6)
-         });
-         stack.Children.Add(Body(intro));
-         border.Child = stack;
-         return border;
+         var card = new Card { Title = heading, Description = intro, Content = new StackPanel() };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
       private static TextBlock Heading(string text)
       {
-         var block = new TextBlock { Text = text, FontSize = Typography.Body, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 4, 0, 4) };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 4, 0, 4) };
+         block.SetResourceReference(StyleProperty, "TextBodyStrong");
          AutomationProperties.SetHeadingLevel(block, AutomationHeadingLevel.Level2);   // the page title is level 1
          return block;
       }
 
       private static TextBlock Body(string text)
       {
-         var block = new TextBlock { Text = text, FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
-         block.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, "TextSecondary");
          return block;
       }
 
       private static TextBlock Bullet(string text)
       {
-         var block = new TextBlock { Text = "•  " + text, FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(8, 0, 0, 6) };
-         block.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         var block = new TextBlock { Text = "•  " + text, Margin = new Thickness(8, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, "TextSecondary");
          return block;
       }
 
@@ -328,20 +338,14 @@ namespace hMailServer.ControlPanel.Views
          {
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var what = new TextBlock
-            {
-               Text = rows[i].what,
-               FontSize = Typography.Body,
-               FontWeight = FontWeights.SemiBold,
-               TextWrapping = TextWrapping.Wrap,
-               Margin = new Thickness(0, 2, 12, 6)
-            };
+            var what = new TextBlock { Text = rows[i].what, Margin = new Thickness(0, 2, 12, 6) };
+            what.SetResourceReference(StyleProperty, "TextBodyStrong");
             Grid.SetRow(what, i);
             Grid.SetColumn(what, 0);
             grid.Children.Add(what);
 
-            var cause = new TextBlock { Text = rows[i].cause, FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 2, 0, 6) };
-            cause.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            var cause = new TextBlock { Text = rows[i].cause, Margin = new Thickness(0, 2, 0, 6) };
+            cause.SetResourceReference(StyleProperty, "TextSecondary");
             Grid.SetRow(cause, i);
             Grid.SetColumn(cause, 1);
             grid.Children.Add(cause);

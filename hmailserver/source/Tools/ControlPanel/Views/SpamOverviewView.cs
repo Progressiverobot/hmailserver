@@ -16,6 +16,10 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -42,51 +46,45 @@ namespace hMailServer.ControlPanel.Views
    public class SpamOverviewView : UserControl, IPageLifecycle
    {
       private readonly StackPanel body_ = new();
+
+      // A read that failed is a warning in the flow of the page, not a grey line
+      // at the bottom: it says the rows below may be incomplete, and on a page
+      // whose whole purpose is to be believed that has to be loud.
+      private readonly InlineNotice readFailure_ = new()
+      {
+         Level = StatusLevel.Warning,
+         Visibility = Visibility.Collapsed
+      };
+
+      // Where the values came from - a provenance footnote, the quietest text.
       private readonly TextBlock status_ = new();
 
       public SpamOverviewView()
       {
-         var page = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
+         var page = new StackPanel { MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("Spam filtering overview") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
-         {
-            Text = L("Every check in the order the server runs them, and what the score they add does to the message. Nothing on this page can be edited - each row opens the page that owns the setting.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         header.Children.Add(heading);
-
-         var refresh = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Refresh"),
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(12, 4, 0, 0)
-         };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the spam configuration from the server"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "spam-overview-refresh");
          refresh.Click += (s, e) => Reload();
-         Grid.SetColumn(refresh, 1);
-         header.Children.Add(refresh);
 
-         page.Children.Add(header);
+         page.Children.Add(new PageHeader
+         {
+            Title = L("Spam filtering overview"),
+            Subtitle = L("Every check in the order the server runs them, and what the score they add does to the message. Nothing on this page can be edited - each row opens the page that owns the setting."),
+            Actions = refresh
+         });
+
+         page.Children.Add(readFailure_);
          page.Children.Add(body_);
 
-         status_.FontSize = Typography.Caption;
-         status_.Margin = new Thickness(0, 6, 0, 0);
-         status_.TextWrapping = TextWrapping.Wrap;
-         status_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         status_.Margin = new Thickness(0, 12, 0, 0);
+         status_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          page.Children.Add(status_);
 
-         Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter() => Reload();
@@ -267,33 +265,27 @@ namespace hMailServer.ControlPanel.Views
          if (notes.Count > 0)
             body_.Children.Add(NotesCard(notes));
 
-         status_.Text = failedReads_ == 0
-            ? L("Read from the server. Values are read again every time this page is opened.")
+         status_.Text = L("Read from the server. Values are read again every time this page is opened.");
+
+         readFailure_.Text = failedReads_ == 0
+            ? null
             : F("{0} value(s) could not be read — {1} The rows below may be incomplete.", failedReads_, firstError_);
+         readFailure_.Visibility = failedReads_ == 0 ? Visibility.Collapsed : Visibility.Visible;
       }
 
-      private static Border Card(string title, out StackPanel content)
+      /// <summary>One section of the page. Named Section and not Card because the
+      /// component it builds is called that.</summary>
+      private static Card Section(string title, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 14, 0, 0) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var inner = new StackPanel();
-         inner.Children.Add(new TextBlock
-         {
-            Text = title,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 10)
-         });
-
-         border.Child = inner;
-         content = inner;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = title, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
-      private static Border VerdictCard(SpamPipelineConfig config)
+      private static Card VerdictCard(SpamPipelineConfig config)
       {
-         Border card = Card(L("What happens to a message"), out StackPanel content);
+         Card card = Section(L("What happens to a message"), out StackPanel content);
 
          content.Children.Add(Paragraph(SpamPipeline.Verdict(config), Typography.Body));
 
@@ -309,22 +301,22 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border ChecksCard(SpamPipelineConfig config)
+      private Card ChecksCard(SpamPipelineConfig config)
       {
-         Border card = Card(L("Checks, in the order the server runs them"), out StackPanel content);
+         Card card = Section(L("Checks, in the order the server runs them"), out StackPanel content);
 
          foreach (SpamCheckPhase phase in new[] { SpamCheckPhase.BeforeTheBody, SpamCheckPhase.AfterTheBody })
          {
-            content.Children.Add(new TextBlock
+            var phaseHeading = new TextBlock
             {
                Text = phase == SpamCheckPhase.BeforeTheBody
                   ? L("At RCPT TO, before the body is transferred — a refusal here is a 550")
                   : L("After the body has been received — a refusal here is a 554"),
-               FontSize = Typography.Label,
-               FontWeight = FontWeights.SemiBold,
-               Margin = new Thickness(0, 10, 0, 6),
-               TextWrapping = TextWrapping.Wrap
-            });
+               Margin = new Thickness(0, 12, 0, 8)
+            };
+            phaseHeading.SetResourceReference(StyleProperty, "TextBodyStrong");
+            System.Windows.Automation.AutomationProperties.SetHeadingLevel(phaseHeading, System.Windows.Automation.AutomationHeadingLevel.Level2);
+            content.Children.Add(phaseHeading);
 
             var grid = new Grid();
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });                       // order
@@ -352,27 +344,20 @@ namespace hMailServer.ControlPanel.Views
          var order = new TextBlock
          {
             Text = check.Order.ToString(),
-            FontSize = Typography.Caption,
             Margin = new Thickness(0, 6, 10, 6),
             VerticalAlignment = VerticalAlignment.Top
          };
-         order.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorTertiaryBrush");
+         order.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          Grid.SetRow(order, row);
          Grid.SetColumn(order, 0);
          grid.Children.Add(order);
 
          var text = new StackPanel { Margin = new Thickness(0, 6, 12, 6) };
 
-         var name = new TextBlock
-         {
-            Text = check.Name,
-            FontSize = Typography.Body,
-            FontWeight = check.Enabled ? FontWeights.SemiBold : FontWeights.Normal,
-            TextWrapping = TextWrapping.Wrap,
-            // A disabled check is dimmed as well as labelled "Off", because the
-            // label is what the reader who cannot see the dimming gets.
-            Opacity = check.Enabled ? 1.0 : 0.6
-         };
+         var name = new TextBlock { Text = check.Name, TextWrapping = TextWrapping.Wrap };
+         // A disabled check is dimmed as well as labelled "Off", because the
+         // label is what the reader who cannot see the dimming gets.
+         name.SetResourceReference(StyleProperty, check.Enabled ? "TextBodyStrong" : "TextSecondary");
 
          // The whole row as the name of the one element in it that has an
          // automation peer. A TextBlock has one and a Panel does not, so putting it
@@ -384,29 +369,22 @@ namespace hMailServer.ControlPanel.Views
 
          text.Children.Add(name);
 
-         var detail = new TextBlock
-         {
-            Text = check.Detail,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.7
-         };
+         var detail = new TextBlock { Text = check.Detail, TextWrapping = TextWrapping.Wrap };
+         detail.SetResourceReference(StyleProperty, "TextCaption");
          text.Children.Add(detail);
          Grid.SetRow(text, row);
          Grid.SetColumn(text, 1);
          grid.Children.Add(text);
 
-         // "On"/"Off" as words, coloured but never only coloured.
-         var state = new TextBlock
+         // "On"/"Off" as a pill: the word, the level's shape and the level's
+         // colour together, with Off drawn in the neutral grey that says nothing.
+         var state = new StatusPill
          {
+            Level = check.Enabled ? StatusLevel.Good : StatusLevel.Normal,
             Text = check.Enabled ? L("On") : L("Off"),
-            FontSize = Typography.Label,
-            FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 6, 14, 6),
             VerticalAlignment = VerticalAlignment.Top
          };
-         state.SetResourceReference(TextBlock.ForegroundProperty,
-            check.Enabled ? "AppSuccessBrush" : "TextFillColorTertiaryBrush");
          Grid.SetRow(state, row);
          Grid.SetColumn(state, 2);
          grid.Children.Add(state);
@@ -414,12 +392,12 @@ namespace hMailServer.ControlPanel.Views
          var score = new TextBlock
          {
             Text = check.ScoreText,
-            FontSize = Typography.Label,
             Margin = new Thickness(0, 6, 14, 6),
             VerticalAlignment = VerticalAlignment.Top,
             TextAlignment = TextAlignment.Right,
             MinWidth = 90
          };
+         score.SetResourceReference(StyleProperty, "TextCaption");
          Grid.SetRow(score, row);
          Grid.SetColumn(score, 3);
          grid.Children.Add(score);
@@ -433,9 +411,9 @@ namespace hMailServer.ControlPanel.Views
          grid.Children.Add(link);
       }
 
-      private Border GreylistingCard(SpamPipelineConfig config)
+      private Card GreylistingCard(SpamPipelineConfig config)
       {
-         Border card = Card(L("Greylisting"), out StackPanel content);
+         Card card = Section(L("Greylisting"), out StackPanel content);
 
          content.Children.Add(Paragraph(SpamPipeline.GreylistingSummary(config), Typography.Body));
          content.Children.Add(PageLink("antispam", L("Greylisting settings…"),
@@ -444,9 +422,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border ListsCard(SpamPipelineConfig config)
+      private Card ListsCard(SpamPipelineConfig config)
       {
-         Border card = Card(L("The lists behind the checks"), out StackPanel content);
+         Card card = Section(L("The lists behind the checks"), out StackPanel content);
 
          content.Children.Add(ListRow(L("DNS blacklists"), config.ActiveDnsBlackLists, config.TotalDnsBlackLists, "dnsbl"));
          content.Children.Add(ListRow(L("SURBL servers"), config.ActiveSurblServers, config.TotalSurblServers, "surbl"));
@@ -466,13 +444,8 @@ namespace hMailServer.ControlPanel.Views
             ? F("{0} active of {1}", active.Value, total)
             : total == 1 ? F("{0} entry", total) : F("{0} entries", total);
 
-         var text = new TextBlock
-         {
-            Text = name + " — " + count,
-            FontSize = Typography.Body,
-            VerticalAlignment = VerticalAlignment.Center,
-            TextWrapping = TextWrapping.Wrap
-         };
+         var text = new TextBlock { Text = name + " — " + count, VerticalAlignment = VerticalAlignment.Center };
+         text.SetResourceReference(StyleProperty, "TextBody");
          row.Children.Add(text);
 
          FrameworkElement link = PageLink(page, L("Open…"), F("Open {0}", L(NavigationMap.TitleOf(page))));
@@ -482,51 +455,24 @@ namespace hMailServer.ControlPanel.Views
          return row;
       }
 
-      private static Border NotesCard(IReadOnlyList<SpamPipelineNote> notes)
+      private static Card NotesCard(IReadOnlyList<SpamPipelineNote> notes)
       {
-         Border card = Card(L("Worth knowing about this configuration"), out StackPanel content);
+         Card card = Section(L("Worth knowing about this configuration"), out StackPanel content);
 
+         // One notice per note, at the note's own level: the component draws the
+         // colour, the shape and the severity word, and puts the word first in
+         // its accessible name, which is what this card used to build by hand.
          foreach (SpamPipelineNote note in notes)
-         {
-            StatusPresentation presentation = StatusSemantics.For(note.Level);
-
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 10) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            // Colour, shape and word, so that none of the three is load-bearing on
-            // its own - the same three channels the dashboard status badges use.
-            var mark = new Path { Width = 11, Height = 11, Stretch = Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-            ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-            row.Children.Add(mark);
-
-            var text = new TextBlock
-            {
-               FontSize = Typography.Label,
-               TextWrapping = TextWrapping.Wrap
-            };
-            var severity = new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold };
-            text.Inlines.Add(severity);
-            text.Inlines.Add(new Run(note.Text));
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-
-            content.Children.Add(row);
-         }
+            content.Children.Add(new InlineNotice { Level = note.Level, Text = note.Text });
 
          return card;
       }
 
       private static TextBlock Paragraph(string text, double size)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = size,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 6),
-            Opacity = size <= Typography.Caption ? 0.75 : 1.0
-         };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, size <= Typography.Caption ? "TextCaption" : "TextBody");
+         return block;
       }
 
       /// <summary>

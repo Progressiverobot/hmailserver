@@ -6,6 +6,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -28,11 +29,12 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class MessageTraceView : UserControl
    {
-      private readonly TextBox address_ = new()
-      {
-         Width = 320,
-         VerticalContentAlignment = VerticalAlignment.Center
-      };
+      /// <summary>
+      /// The toolbar's search box is the address: the search runs on Enter or the
+      /// Search button, not on every keystroke, because it is a query to the
+      /// server rather than a filter over rows already here.
+      /// </summary>
+      private readonly Toolbar toolbar_ = new() { SearchPlaceholder = L("Address") };
 
       /// <summary>
       /// A real grid, because the rows are a table and were being drawn as one.
@@ -54,28 +56,16 @@ namespace hMailServer.ControlPanel.Views
          IsReadOnly = true,
          CanUserAddRows = false,
          CanUserDeleteRows = false,
-         CanUserResizeRows = false,
-         SelectionMode = DataGridSelectionMode.Single,
-         SelectionUnit = DataGridSelectionUnit.FullRow,
-         HeadersVisibility = DataGridHeadersVisibility.Column,
-         GridLinesVisibility = DataGridGridLinesVisibility.None,
-         BorderThickness = new Thickness(0),
-         Background = System.Windows.Media.Brushes.Transparent,
-         RowBackground = System.Windows.Media.Brushes.Transparent,
-         MinHeight = 340
+         SelectionMode = DataGridSelectionMode.Single
       };
 
-      private readonly TextBlock status_ = new()
-      {
-         FontSize = Typography.Caption,
-         Margin = new Thickness(0, 10, 0, 0),
-         TextWrapping = TextWrapping.Wrap
-      };
+      private readonly InlineNotice status_ = new() { Visibility = Visibility.Collapsed };
+      private readonly EmptyState empty_ = new() { Icon = Wpf.Ui.Controls.SymbolRegular.DocumentSearch24, Visibility = Visibility.Collapsed };
 
       public MessageTraceView()
       {
          Build();
-         status_.Text = L("Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom.");
+         Status_(StatusLevel.Information, L("Enter an address and search. The trace records nothing at all until message tracing is switched on, on the Logging page - it is off by default because it stores who corresponds with whom."));
       }
 
       private dynamic OpenTrace()
@@ -117,9 +107,12 @@ namespace hMailServer.ControlPanel.Views
          }
 
          list_.ItemsSource = rows;
+         StatusText.Show(empty_, null, count, null, emptyMessage);
 
-         status_.Text = count == 0 ? emptyMessage
-            : count == 1 ? L("1 event.") : F("{0} events, newest first.", count);
+         if (count == 0)
+            status_.Visibility = Visibility.Collapsed;
+         else
+            Status_(StatusLevel.Information, count == 1 ? L("1 event.") : F("{0} events, newest first.", count));
       }
 
       /// <summary>
@@ -149,6 +142,14 @@ namespace hMailServer.ControlPanel.Views
             : F("Queue id {0} - select and choose \"Follow this message\".", QueueId);
       }
 
+      /// <summary>What the last search said, at its level.</summary>
+      private void Status_(StatusLevel level, string text)
+      {
+         status_.Level = level;
+         status_.Text = text;
+         status_.Visibility = Visibility.Visible;
+      }
+
       private void Search()
       {
          try
@@ -156,7 +157,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic trace = OpenTrace();
             try
             {
-               trace.Search(address_.Text.Trim());
+               trace.Search(toolbar_.SearchText.Trim());
                Fill(trace, L("No events for that address. Either nothing has happened to it, or the trace was switched off at the time - it records only while message tracing is on (Logging page)."));
             }
             finally
@@ -166,7 +167,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = ServerSession.DescribeComError(ex);
+            Status_(StatusLevel.Critical, ServerSession.DescribeComError(ex));
          }
       }
 
@@ -174,7 +175,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not TraceRow selected)
          {
-            status_.Text = L("Select an event first.");
+            Status_(StatusLevel.Information, L("Select an event first."));
             return;
          }
 
@@ -182,7 +183,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (queueId == 0)
          {
-            status_.Text = L("That event happened before the message was queued - a refusal during the SMTP conversation - so there is no message to follow.");
+            Status_(StatusLevel.Information, L("That event happened before the message was queued - a refusal during the SMTP conversation - so there is no message to follow."));
             return;
          }
 
@@ -193,7 +194,7 @@ namespace hMailServer.ControlPanel.Views
             {
                trace.SearchByQueueID(queueId);
                Fill(trace, L("No events for that message."));
-               status_.Text = F("Every event for queue id {0}, oldest first.", queueId);
+               Status_(StatusLevel.Information, F("Every event for queue id {0}, oldest first.", queueId));
             }
             finally
             {
@@ -202,7 +203,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = ServerSession.DescribeComError(ex);
+            Status_(StatusLevel.Critical, ServerSession.DescribeComError(ex));
          }
       }
 
@@ -215,9 +216,10 @@ namespace hMailServer.ControlPanel.Views
             {
                int removed = (int)trace.DeleteExpired();
 
-               status_.Text = removed == 0
-                  ? L("Nothing was old enough to remove. The window is MessageTraceRetentionDays, and 0 means never.")
-                  : F("{0} event(s) past the retention window were removed.", removed);
+               if (removed == 0)
+                  Status_(StatusLevel.Information, L("Nothing was old enough to remove. The window is MessageTraceRetentionDays, and 0 means never."));
+               else
+                  Status_(StatusLevel.Good, F("{0} event(s) past the retention window were removed.", removed));
             }
             finally
             {
@@ -226,60 +228,55 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = ServerSession.DescribeComError(ex);
+            Status_(StatusLevel.Critical, ServerSession.DescribeComError(ex));
          }
       }
 
       private void Build()
       {
-         // The shared page gutter and title style - these two pages were the
-         // newest and had drifted to their own 16px gutter and 22px title,
-         // which is exactly how a design system erodes: newest pages first.
-         var root = new StackPanel { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
+         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-         var title = new TextBlock { Text = L("Message trace") };
-         title.SetResourceReference(FrameworkElement.StyleProperty, "PageTitle");
-         root.Children.Add(title);
-
-         var hint = new TextBlock
+         root.Children.Add(new PageHeader
          {
-            Text = L("What happened to a particular message. Search by any address - it matches senders and recipients - then follow one row to see every event for that message in order."),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14)
-         };
-         hint.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         root.Children.Add(hint);
-
-         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-         toolbar.Children.Add(new TextBlock
-         {
-            Text = L("Address"),
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0)
+            Title = L("Message trace"),
+            Subtitle = L("What happened to a particular message. Search by any address - it matches senders and recipients - then follow one row to see every event for that message in order.")
          });
-         address_.KeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Search(); };
-         toolbar.Children.Add(address_);
-         toolbar.Children.Add(MakeButton(L("_Search"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
+
+         // Enter in the address box searches, as it always did.
+         toolbar_.PreviewKeyDown += (_, e) => { if (e.Key == System.Windows.Input.Key.Enter) Search(); };
+
+         var filters = new StackPanel { Orientation = Orientation.Horizontal };
+         filters.Children.Add(MakeButton(L("_Search"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => Search()));
+         toolbar_.Filters = filters;
+
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
          var follow = MakeButton(L("_Follow this message"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => FollowSelected());
-         toolbar.Children.Add(follow);
+         actions.Children.Add(follow);
          hMailServer.ControlPanel.Services.SelectionGate.Bind(list_, follow);
-         toolbar.Children.Add(MakeButton(L("_Remove expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
-         root.Children.Add(toolbar);
+         actions.Children.Add(MakeButton(L("_Remove expired"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => SweepExpired()));
+         toolbar_.Actions = actions;
+         Grid.SetRow(toolbar_, 1);
+         root.Children.Add(toolbar_);
 
-         BuildColumns();
-
-         var card = new Border { Padding = new Thickness(8) };
-         card.SetResourceReference(StyleProperty, "Card");
-         card.Child = list_;
-         root.Children.Add(card);
-
+         Grid.SetRow(status_, 2);
          root.Children.Add(status_);
 
-         Content = new ScrollViewer
-         {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = root
-         };
+         BuildColumns();
+         System.Windows.Automation.AutomationProperties.SetName(list_, L("Message trace"));
+
+         var host = new Grid();
+         host.Children.Add(list_);
+         host.Children.Add(empty_);
+         var card = new Card { Padding = new Thickness(8), Content = host };
+         Grid.SetRow(card, 3);
+         root.Children.Add(card);
+
+         Content = root;
       }
 
       /// <summary>
@@ -329,12 +326,14 @@ namespace hMailServer.ControlPanel.Views
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
 
-         list_.Columns.Add(new DataGridTextColumn
+         var status = new DataGridTextColumn
          {
             Header = L("Status"),
             Binding = new System.Windows.Data.Binding(nameof(TraceRow.StatusCode)),
             Width = DataGridLength.Auto
-         });
+         };
+         GridStyles.Number(status);
+         list_.Columns.Add(status);
 
          // The tip that used to live on each ListBoxItem. It says whether a row can
          // be followed at all, which is not otherwise visible - a refusal at RCPT

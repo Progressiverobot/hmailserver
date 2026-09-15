@@ -10,6 +10,10 @@ using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Shapes;
 using hMailServer.ControlPanel.Services;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 
 // The Control Panel has its own Typography (the type scale, in Services) and
 // System.Windows.Documents declares one too. That import is needed here for Run and
@@ -71,62 +75,52 @@ namespace hMailServer.ControlPanel.Views
    public class ExternalSetupView : UserControl, IPageLifecycle
    {
       private readonly StackPanel body_ = new();
-      private readonly TextBlock summary_ = new();
+
+      // The tally, as a notice at the level the tally itself implies: something
+      // needing action is a warning, something that cannot be told from here is
+      // information, and a clean sheet is good. The counts are still words, so
+      // the level is confirmation and never the only carrier.
+      private readonly InlineNotice summary_ = new() { Visibility = Visibility.Collapsed };
+
+      // A read that failed is its own notice: it says the items above may be
+      // incomplete, which is a different statement from the tally.
+      private readonly InlineNotice readFailure_ = new()
+      {
+         Level = StatusLevel.Warning,
+         Visibility = Visibility.Collapsed
+      };
+
+      // Where the verdicts came from - a provenance footnote under the list,
+      // the quietest text on the page.
       private readonly TextBlock status_ = new();
 
       public ExternalSetupView()
       {
-         var page = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
+         var page = new StackPanel { MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("External setup") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
-         {
-            Text = L("What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         header.Children.Add(heading);
-
-         var refresh = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Refresh"),
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(12, 4, 0, 0)
-         };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-check the external prerequisites"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "external-setup-refresh");
          refresh.Click += (s, e) => Reload();
-         Grid.SetColumn(refresh, 1);
-         header.Children.Add(refresh);
 
-         page.Children.Add(header);
+         page.Children.Add(new PageHeader
+         {
+            Title = L("External setup"),
+            Subtitle = L("What this server needs done outside it - DNS records, key and CA files, trusted lists. Each item shows a state; where the answer cannot be read from here, the item says what to check instead of guessing."),
+            Actions = refresh
+         });
 
-         // A one-line tally so the page can be judged without reading it all.
-         // Plain text, because a count that only exists as coloured badges does
-         // not exist for a screen-reader user or a greyscale printout.
-         summary_.FontSize = Typography.Body;
-         summary_.FontWeight = FontWeights.SemiBold;
-         summary_.Margin = new Thickness(0, 12, 0, 0);
-         summary_.TextWrapping = TextWrapping.Wrap;
          page.Children.Add(summary_);
-
+         page.Children.Add(readFailure_);
          page.Children.Add(body_);
 
-         status_.FontSize = Typography.Caption;
-         status_.Margin = new Thickness(0, 6, 0, 0);
-         status_.TextWrapping = TextWrapping.Wrap;
-         status_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         status_.Margin = new Thickness(0, 12, 0, 0);
+         status_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          page.Children.Add(status_);
 
-         Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter() => Reload();
@@ -157,9 +151,12 @@ namespace hMailServer.ControlPanel.Views
 
          checks_ = ExternalSetupChecks.Run();
 
-         baseStatus_ = checks_.FailedReads == 0
-            ? L("Checked against the server. Everything is re-checked every time this page is opened.")
+         baseStatus_ = L("Checked against the server. Everything is re-checked every time this page is opened.");
+
+         readFailure_.Text = checks_.FailedReads == 0
+            ? null
             : F("{0} value(s) could not be read — {1} The items above may be incomplete.", checks_.FailedReads, checks_.FirstError);
+         readFailure_.Visibility = checks_.FailedReads == 0 ? Visibility.Collapsed : Visibility.Visible;
 
          RenderItems(checks_.DnsLookupCount > 0
             ? F(" {0} DNS record(s) are being looked up in the background; the rows marked \"checking\" will update.", checks_.DnsLookupCount)
@@ -203,60 +200,47 @@ namespace hMailServer.ControlPanel.Views
          int done = checks_.Items.Count(i => i.State == SetupItemState.Done);
          int unused = checks_.Items.Count(i => i.State == SetupItemState.NotNeeded);
 
+         summary_.Level = action > 0 ? StatusLevel.Warning
+            : unknown > 0 ? StatusLevel.Information
+            : StatusLevel.Good;
          summary_.Text = F("{0} need action, {1} cannot be told from here, {2} done, {3} not needed.", action, unknown, done, unused);
+         summary_.Visibility = Visibility.Visible;
 
          status_.Text = baseStatus_ + dnsNote;
       }
 
-      private Border ItemCard(SetupItem item)
+      private Card ItemCard(SetupItem item)
       {
-         var border = new Border { Margin = new Thickness(0, 14, 0, 0) };
-         border.SetResourceReference(StyleProperty, "Card");
+         var card = new Card();
+         card.SetResourceReference(MarginProperty, "AppCardGap");
 
          var content = new StackPanel();
 
-         // Header: shape + state word + title. Colour, shape and word together,
-         // so no single channel is load-bearing - the same three channels the
-         // status badges use everywhere else in this application.
+         // Header: the state as a pill - colour, shape and word together, so no
+         // single channel is load-bearing - then the title, then the link to the
+         // page that owns the settings.
          var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-         StatusPresentation presentation = StatusSemantics.For(ExternalSetupChecks.LevelFor(item.State));
-
-         var mark = new Path { Width = 11, Height = 11, Stretch = System.Windows.Media.Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-         header.Children.Add(mark);
-
-         var stateWord = new TextBlock
+         header.Children.Add(new StatusPill
          {
+            Level = ExternalSetupChecks.LevelFor(item.State),
             Text = ExternalSetupChecks.StateWord(item.State),
-            FontSize = Typography.Label,
-            FontWeight = FontWeights.SemiBold,
             Margin = new Thickness(0, 0, 12, 0),
-            VerticalAlignment = VerticalAlignment.Top,
-            MinWidth = 92
-         };
-         stateWord.SetResourceReference(TextBlock.ForegroundProperty, presentation.BrushKey);
-         Grid.SetColumn(stateWord, 1);
-         header.Children.Add(stateWord);
+            VerticalAlignment = VerticalAlignment.Top
+         });
 
-         var title = new TextBlock
-         {
-            Text = item.Title,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            TextWrapping = TextWrapping.Wrap
-         };
+         var title = new TextBlock { Text = item.Title, TextWrapping = TextWrapping.Wrap };
+         title.SetResourceReference(StyleProperty, "TextBodyStrong");
 
          // The whole item, as one utterance, on the one header element that has
          // an automation peer: a listener hears the state, the subject, what it
          // is for and what to do, instead of four unrelated fragments.
          System.Windows.Automation.AutomationProperties.SetName(title,
             ExternalSetupChecks.StateWord(item.State) + ": " + item.Title + ". " + item.Purpose + " " + item.Action);
-         Grid.SetColumn(title, 2);
+         Grid.SetColumn(title, 1);
          header.Children.Add(title);
 
          if (item.Page != null)
@@ -264,26 +248,21 @@ namespace hMailServer.ControlPanel.Views
             FrameworkElement link = PageLink(item.Page, L("Settings…"),
                F("Open {0}, which owns the settings for: {1}", L(NavigationMap.TitleOf(item.Page)), L(item.Title)));
             link.VerticalAlignment = VerticalAlignment.Top;
-            Grid.SetColumn(link, 3);
+            Grid.SetColumn(link, 2);
             header.Children.Add(link);
          }
 
          content.Children.Add(header);
 
-         content.Children.Add(new TextBlock
-         {
-            Text = item.Purpose,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(19, 4, 0, 0),
-            Opacity = 0.75
-         });
+         var purpose = new TextBlock { Text = item.Purpose, Margin = new Thickness(0, 8, 0, 0) };
+         purpose.SetResourceReference(StyleProperty, "TextCaption");
+         content.Children.Add(purpose);
 
          foreach (SetupFinding finding in item.Findings)
          {
             StatusPresentation findingPresentation = StatusSemantics.For(ExternalSetupChecks.LevelFor(finding.State));
 
-            var row = new Grid { Margin = new Thickness(19, 8, 0, 0) };
+            var row = new Grid { Margin = new Thickness(0, 8, 0, 0) };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
@@ -310,19 +289,15 @@ namespace hMailServer.ControlPanel.Views
          // do. "Not needed" earns a quiet card; the instructions would be noise.
          if (item.State != SetupItemState.NotNeeded)
          {
-            var action = new TextBlock
-            {
-               FontSize = Typography.Label,
-               TextWrapping = TextWrapping.Wrap,
-               Margin = new Thickness(19, 10, 0, 0)
-            };
+            var action = new TextBlock { Margin = new Thickness(0, 12, 0, 0) };
+            action.SetResourceReference(StyleProperty, "TextCaption");
             action.Inlines.Add(new Run(L("What to do: ")) { FontWeight = FontWeights.SemiBold });
             action.Inlines.Add(new Run(item.Action));
             content.Children.Add(action);
          }
 
-         border.Child = content;
-         return border;
+         card.Content = content;
+         return card;
       }
 
       /// <summary>

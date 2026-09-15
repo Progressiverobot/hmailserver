@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -25,7 +26,10 @@ namespace hMailServer.ControlPanel.Views
          BorderThickness = new Thickness(0),
          Background = System.Windows.Media.Brushes.Transparent
       };
-      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 12, 0, 0) };
+      private readonly PageHeader header_ = new();
+      private readonly InlineNotice notice_ = new() { Visibility = Visibility.Collapsed };
+      private readonly EmptyState empty_ = new() { Icon = Wpf.Ui.Controls.SymbolRegular.FolderPeople24, Visibility = Visibility.Collapsed };
+      private readonly TextBlock count_ = new() { Margin = new Thickness(0, 12, 0, 0) };
 
       public PublicFoldersView() => Build();
 
@@ -34,43 +38,43 @@ namespace hMailServer.ControlPanel.Views
 
       private void Build()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var head = new StackPanel();
-         var title = new TextBlock { Text = L("Public folders") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         head.Children.Add(title);
-         var sub = new TextBlock { Text = L("Shared IMAP folders that several accounts can access. Use the hierarchy delimiter to create sub-folders, and edit permissions to grant access.") };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         head.Children.Add(sub);
-         root.Children.Add(head);
+         header_.Title = L("Public folders");
+         header_.Subtitle = L("Shared IMAP folders that several accounts can access. Use the hierarchy delimiter to create sub-folders, and edit permissions to grant access.");
+         System.Windows.Automation.AutomationProperties.SetName(list_, L("Public folders"));
 
-         var toolbar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 0, 12) };
-         Grid.SetRow(toolbar, 1);
-         toolbar.Children.Add(MakeButton(L("_Add folder"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
+         actions.Children.Add(MakeButton(L("_Add folder"), Wpf.Ui.Controls.ControlAppearance.Primary, (_, _) => AddFolder()));
          var permissions = MakeButton(L("_Permissions"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => EditPermissions());
-         toolbar.Children.Add(permissions);
+         actions.Children.Add(permissions);
          var delete = MakeButton(L("_Delete"), Wpf.Ui.Controls.ControlAppearance.Danger, (_, _) => DeleteFolder());
-         toolbar.Children.Add(delete);
+         actions.Children.Add(delete);
          hMailServer.ControlPanel.Services.SelectionGate.Bind(list_, permissions, delete);
-         toolbar.Children.Add(MakeButton(L("_Refresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
-         root.Children.Add(toolbar);
+         actions.Children.Add(MakeButton(L("_Refresh"), Wpf.Ui.Controls.ControlAppearance.Secondary, (_, _) => Reload()));
+         header_.Actions = actions;
+         root.Children.Add(header_);
 
-         var card = new Border { Padding = new Thickness(8) };
-         card.SetResourceReference(StyleProperty, "Card");
-         card.Child = list_;
+         Grid.SetRow(notice_, 1);
+         root.Children.Add(notice_);
+
+         var host = new Grid();
+         host.Children.Add(list_);
+         host.Children.Add(empty_);
+         var card = new Card { Padding = new Thickness(8), Content = host };
          Grid.SetRow(card, 2);
          root.Children.Add(card);
 
          list_.MouseDoubleClick += (_, _) => EditPermissions();
 
-         status_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-         Grid.SetRow(status_, 3);
-         root.Children.Add(status_);
+         count_.SetResourceReference(StyleProperty, "TextCaption");
+         Grid.SetRow(count_, 3);
+         root.Children.Add(count_);
 
          Content = root;
       }
@@ -82,9 +86,18 @@ namespace hMailServer.ControlPanel.Views
          return b;
       }
 
+      /// <summary>What the last action said, at its level.</summary>
+      private void Notice_(StatusLevel level, string text)
+      {
+         notice_.Level = level;
+         notice_.Text = text;
+         notice_.Visibility = Visibility.Visible;
+      }
+
       private void Reload()
       {
-         list_.Items.Clear();
+         var names = new List<string>();
+         string error = null;
          dynamic folders = ServerSession.Current.Application.Settings.PublicFolders;
          try
          {
@@ -92,19 +105,23 @@ namespace hMailServer.ControlPanel.Views
             for (int i = 0; i < count; i++)
             {
                dynamic f = folders.Item[i];
-               list_.Items.Add((string)f.Name);
+               names.Add((string)f.Name);
                ServerSession.Release(f);
             }
-            status_.Text = count == 1 ? L("1 public folder.") : F("{0} public folders.", count);
+            count_.Text = count == 1 ? L("1 public folder.") : F("{0} public folders.", count);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = F("Could not load public folders: {0}", ex.Message);
+            error = F("Could not load public folders: {0}", ex.Message);
+            count_.Text = "";
          }
          finally
          {
             ServerSession.Release(folders);
          }
+
+         list_.ItemsSource = names;
+         StatusText.Show(empty_, notice_, names.Count, error, F("{0} public folders.", 0));
       }
 
       private void AddFolder()
@@ -134,7 +151,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not string name)
          {
-            status_.Text = L("Select a folder first.");
+            Notice_(StatusLevel.Information, L("Select a folder first."));
             return;
          }
          if (MessageBox.Show(F("Delete the public folder '{0}' and all messages in it?", name), L("Control Panel"),
@@ -163,7 +180,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (list_.SelectedItem is not string name)
          {
-            status_.Text = L("Select a folder first.");
+            Notice_(StatusLevel.Information, L("Select a folder first."));
             return;
          }
          new FolderPermissionsDialog(Window.GetWindow(this), name).ShowDialog();

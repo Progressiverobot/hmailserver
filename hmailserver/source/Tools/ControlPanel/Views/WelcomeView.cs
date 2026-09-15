@@ -6,6 +6,7 @@ using System;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -13,52 +14,26 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>Landing page shown after connecting.</summary>
    public class WelcomeView : UserControl, IPageLifecycle
    {
-      private readonly TextBlock serverLine_ = new();
+      private readonly PageHeader header_ = new() { Title = L("Welcome") };
 
       public WelcomeView()
       {
-         var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
+         var panel = new StackPanel { MaxWidth = 980, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = L("Welcome") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         panel.Children.Add(title);
+         // The subtitle says which server this is, once connected (OnEnter).
+         panel.Children.Add(header_);
 
-         serverLine_.SetResourceReference(StyleProperty, "PageSubtitle");
-         panel.Children.Add(serverLine_);
-
-         panel.Children.Add(new TextBlock
-         {
-            Text = L("Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting."),
-            FontSize = Typography.Body,
-            Opacity = 0.8,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14)
-         });
+         panel.Children.Add(Text(L("Start with what you want to do, browse by area below, or press Ctrl+K to search every page and setting."),
+            "TextSecondary", new Thickness(0, 0, 0, 16)));
 
          // Keyed on intent, in the administrator's words, and short enough to scan:
          // the twelve reasons this application gets opened, with the one that had no
          // route at all - mail that has stalled - first. The list lives in
          // WelcomeIntents so a test can hold every entry to a page that exists.
-         panel.Children.Add(new TextBlock
-         {
-            Text = L("What do you want to do?"),
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 8)
-         });
-
-         var intents = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2, Margin = new Thickness(0, 0, 0, 10) };
+         var intents = new System.Windows.Controls.Primitives.UniformGrid { Columns = 2 };
          foreach (WelcomeIntent intent in WelcomeIntents.Entries)
             intents.Children.Add(IntentRow(intent));
-         panel.Children.Add(intents);
-
-         panel.Children.Add(new TextBlock
-         {
-            Text = L("Or browse by area"),
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 6, 0, 8)
-         });
+         panel.Children.Add(new SettingsSection { Heading = L("What do you want to do?"), Content = intents });
 
          var tiles = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3 };
          tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.Globe24, L("Domains & accounts"),
@@ -73,9 +48,18 @@ namespace hMailServer.ControlPanel.Views
             L("DANE, MTA-STS, ARC and TLS reporting."), "security"));
          tiles.Children.Add(Tile(Wpf.Ui.Controls.SymbolRegular.ArrowSync24, L("Backup & restore"),
             L("Back up or restore your configuration and data."), "backup"));
-         panel.Children.Add(tiles);
+         panel.Children.Add(new SettingsSection { Heading = L("Or browse by area"), Content = tiles, Margin = new Thickness(0) });
 
-         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroll = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroll.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroll;
+      }
+
+      private static TextBlock Text(string text, string style, Thickness margin)
+      {
+         var block = new TextBlock { Text = text, Margin = margin };
+         block.SetResourceReference(StyleProperty, style);
+         return block;
       }
 
       /// <summary>
@@ -86,27 +70,15 @@ namespace hMailServer.ControlPanel.Views
       private static Wpf.Ui.Controls.Button IntentRow(WelcomeIntent intent)
       {
          var stack = new StackPanel();
-         stack.Children.Add(new TextBlock
-         {
-            Text = L(intent.Heading),
-            FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 3)
-         });
-         stack.Children.Add(new TextBlock
-         {
-            Text = L(intent.Blurb),
-            FontSize = Typography.Caption,
-            Opacity = 0.72,
-            TextWrapping = TextWrapping.Wrap
-         });
+         stack.Children.Add(Text(L(intent.Heading), "TextBodyStrong", new Thickness(0, 0, 0, 4)));
+         stack.Children.Add(Text(L(intent.Blurb), "TextCaption", new Thickness(0)));
 
          var btn = new Wpf.Ui.Controls.Button
          {
             Content = stack,
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
-            Margin = new Thickness(0, 0, 12, 10),
-            Padding = new Thickness(14, 10, 14, 10),
+            Margin = new Thickness(0, 0, 12, 12),
+            Padding = new Thickness(16, 12, 16, 12),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Top,
@@ -129,34 +101,24 @@ namespace hMailServer.ControlPanel.Views
          {
             Symbol = icon,
             FontSize = 24,
-            Margin = new Thickness(0, 0, 0, 10),
+            Margin = new Thickness(0, 0, 0, 12),
             HorizontalAlignment = HorizontalAlignment.Center
          };
-         icn.Foreground = Services.ThemeTokens.Brand;
+         // By key, never by a held brush: the brand brush is republished on every
+         // theme change, and under High Contrast it is the system highlight.
+         icn.SetResourceReference(ForegroundProperty, "AppBrandBrush");
 
          var stack = new StackPanel();
          stack.Children.Add(icn);
-         stack.Children.Add(new TextBlock
-         {
-            Text = heading,
-            FontSize = 14,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-         stack.Children.Add(new TextBlock
-         {
-            Text = subtitle,
-            FontSize = Typography.Caption,
-            Opacity = 0.72,
-            TextWrapping = TextWrapping.Wrap
-         });
+         stack.Children.Add(Text(heading, "TextBodyStrong", new Thickness(0, 0, 0, 4)));
+         stack.Children.Add(Text(subtitle, "TextCaption", new Thickness(0)));
 
          var btn = new Wpf.Ui.Controls.Button
          {
             Content = stack,
             Appearance = Wpf.Ui.Controls.ControlAppearance.Secondary,
             Margin = new Thickness(0, 0, 12, 12),
-            Padding = new Thickness(16, 14, 16, 14),
+            Padding = new Thickness(16, 16, 16, 16),
             HorizontalAlignment = HorizontalAlignment.Stretch,
             // Stretch rather than Left: the content stack then spans the tile, which
             // is what lets the icon centre on the TILE and leaves the two text
@@ -164,7 +126,7 @@ namespace hMailServer.ControlPanel.Views
             // stretched vertical StackPanel still draws its text from the left).
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Top,
-            Height = 128,
+            MinHeight = 128,
             Cursor = System.Windows.Input.Cursors.Hand
          };
          System.Windows.Automation.AutomationProperties.SetName(btn, heading);
@@ -176,11 +138,11 @@ namespace hMailServer.ControlPanel.Views
       {
          try
          {
-            serverLine_.Text = F("Connected to hMailServer {0} on {1}.", (string)ServerSession.Current.Application.Version, ServerSession.Current.Host);
+            header_.Subtitle = F("Connected to hMailServer {0} on {1}.", (string)ServerSession.Current.Application.Version, ServerSession.Current.Host);
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
          {
-            serverLine_.Text = "";
+            header_.Subtitle = "";
          }
       }
 

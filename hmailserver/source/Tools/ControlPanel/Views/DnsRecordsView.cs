@@ -20,6 +20,11 @@ using hMailServer.ControlPanel.Services;
 // System.Windows.Documents declares one too. That import is needed here for Run and
 // Inlines, so the reference is aliased to the one meant rather than dropping the import.
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using FieldRow = hMailServer.ControlPanel.Views.Scaffold.FieldRow;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 
 // This file needs System.IO (the DKIM key file is read to derive the public key) and
 // System.Windows.Shapes (the status marks), and both declare a Path. The alias picks
@@ -86,7 +91,16 @@ namespace hMailServer.ControlPanel.Views
    /// </summary>
    public class DnsRecordsView : UserControl, IPageLifecycle
    {
-      private readonly ComboBox domainCombo_ = new() { FontSize = Typography.Body, MinWidth = 280, Margin = new Thickness(8, 0, 0, 0) };
+      private readonly ComboBox domainCombo_ = new() { MinWidth = 280, MaxWidth = 420, HorizontalAlignment = HorizontalAlignment.Left };
+
+      // A read that failed is a warning in the flow of the page: the records
+      // below are copied into somebody's DNS zone, so an incomplete read has to
+      // be seen before they are.
+      private readonly InlineNotice readFailure_ = new()
+      {
+         Level = StatusLevel.Warning,
+         Visibility = Visibility.Collapsed
+      };
       private readonly StackPanel body_ = new();
       private readonly TextBlock status_ = new();
 
@@ -106,62 +120,36 @@ namespace hMailServer.ControlPanel.Views
 
       public DnsRecordsView()
       {
-         var page = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
+         var page = new StackPanel { MaxWidth = 1000, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var header = new Grid();
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("DNS records") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
-         {
-            Text = L("The records this server needs published in each domain's DNS zone: type, host and value, ready to copy into your DNS provider's console, with a check for whether each one is really live. Checks use this machine's Windows resolver - the same one the DKIM rotation check uses.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         header.Children.Add(heading);
-
-         var refresh = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Refresh"),
-            VerticalAlignment = VerticalAlignment.Top,
-            Margin = new Thickness(12, 4, 0, 0)
-         };
+         var refresh = new Wpf.Ui.Controls.Button { Content = L("_Refresh") };
          System.Windows.Automation.AutomationProperties.SetName(refresh, L("Re-read the domains and server configuration"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(refresh, "dns-records-refresh");
          refresh.Click += (s, e) => Reload();
-         Grid.SetColumn(refresh, 1);
-         header.Children.Add(refresh);
 
-         page.Children.Add(header);
-
-         var domainRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
-         var domainLabel = new TextBlock
+         page.Children.Add(new PageHeader
          {
-            Text = L("Domain:"),
-            FontSize = Typography.Body,
-            VerticalAlignment = VerticalAlignment.Center
-         };
-         domainRow.Children.Add(domainLabel);
+            Title = L("DNS records"),
+            Subtitle = L("The records this server needs published in each domain's DNS zone: type, host and value, ready to copy into your DNS provider's console, with a check for whether each one is really live. Checks use this machine's Windows resolver - the same one the DKIM rotation check uses."),
+            Actions = refresh
+         });
+
          System.Windows.Automation.AutomationProperties.SetName(domainCombo_, L("Domain whose DNS records are shown"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(domainCombo_, "dns-records-domain");
          domainCombo_.SelectionChanged += (s, e) => BuildCards();
-         domainRow.Children.Add(domainCombo_);
-         page.Children.Add(domainRow);
+         page.Children.Add(new FieldRow { Label = L("Domain:"), Content = domainCombo_ });
 
+         page.Children.Add(readFailure_);
          page.Children.Add(body_);
 
-         status_.FontSize = Typography.Caption;
-         status_.Margin = new Thickness(0, 6, 0, 0);
+         status_.Margin = new Thickness(0, 12, 0, 0);
          status_.TextWrapping = TextWrapping.Wrap;
-         status_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         status_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          page.Children.Add(status_);
 
-         Content = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         var scroller = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       public void OnEnter() => Reload();
@@ -220,9 +208,12 @@ namespace hMailServer.ControlPanel.Views
             BuildCards();
          }
 
-         status_.Text = failedReads_ == 0
-            ? L("Configuration read from the server. Records are re-derived every time this page is opened; press Check to query DNS.")
+         status_.Text = L("Configuration read from the server. Records are re-derived every time this page is opened; press Check to query DNS.");
+
+         readFailure_.Text = failedReads_ == 0
+            ? null
             : F("{0} value(s) could not be read — {1} The cards below may be incomplete.", failedReads_, firstError_);
+         readFailure_.Visibility = failedReads_ == 0 ? Visibility.Collapsed : Visibility.Visible;
       }
 
       private string SelectedDomainName()
@@ -383,9 +374,9 @@ namespace hMailServer.ControlPanel.Views
       private string SuggestedSpf()
          => serverHostName_.Length > 0 ? "v=spf1 mx a:" + serverHostName_ + " ~all" : "v=spf1 mx ~all"; // no-loc: a DNS record
 
-      private Border SpfCard(DomainInfo domain)
+      private Card SpfCard(DomainInfo domain)
       {
-         Border card = Card(L("SPF — which machines may send mail as ") + domain.Name, out StackPanel content);
+         Card card = Section(L("SPF — which machines may send mail as ") + domain.Name, out StackPanel content);
 
          content.Children.Add(Paragraph(L("This server only CHECKS SPF on incoming mail; publishing the record is for everyone else - it tells receiving servers which machines are allowed to send mail claiming to be from ") + domain.Name + ".",
             Typography.Caption));
@@ -469,9 +460,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- DKIM ------------------------------------------------------------------
 
-      private Border DkimCard(DomainInfo domain)
+      private Card DkimCard(DomainInfo domain)
       {
-         Border card = Card(F("DKIM — the public key receivers verify {0}'s signatures against", domain.Name), out StackPanel content);
+         Card card = Section(F("DKIM — the public key receivers verify {0}'s signatures against", domain.Name), out StackPanel content);
 
          bool configured = domain.DkimSelector.Length > 0 && domain.DkimKeyFile.Length > 0;
 
@@ -740,9 +731,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- DMARC -----------------------------------------------------------------
 
-      private Border DmarcCard(DomainInfo domain)
+      private Card DmarcCard(DomainInfo domain)
       {
-         Border card = Card(L("DMARC — what receivers should do with mail that fails SPF and DKIM"), out StackPanel content);
+         Card card = Section(L("DMARC — what receivers should do with mail that fails SPF and DKIM"), out StackPanel content);
 
          // rua= is only offered when the domain has a postmaster address to send
          // reports to; inventing a mailbox would produce a record that asks the
@@ -846,9 +837,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- MTA-STS ---------------------------------------------------------------
 
-      private Border MtaStsCard(DomainInfo domain)
+      private Card MtaStsCard(DomainInfo domain)
       {
-         Border card = Card(L("MTA-STS — require TLS from servers delivering to ") + domain.Name, out StackPanel content);
+         Card card = Section(L("MTA-STS — require TLS from servers delivering to ") + domain.Name, out StackPanel content);
 
          content.Children.Add(Paragraph(F("Two halves: a TXT record that tells senders a policy exists, and the policy itself, fetched from https://mta-sts.{0}/.well-known/mta-sts.txt. This server serves that policy itself - there is no file to upload - when MtaStsHostingEnabled is on and an HTTPS web-services listener is running (RFC 8461 section 3.3 allows HTTPS only). The name mta-sts.{0} also needs an A or CNAME record pointing at this server, and the listener's certificate must cover that name.", domain.Name),
             Typography.Caption));
@@ -897,8 +888,9 @@ namespace hMailServer.ControlPanel.Views
          System.Windows.Automation.AutomationProperties.SetAutomationId(fetchButton, "dns-records-mtasts-fetch");
          content.Children.Add(fetchButton);
 
-         var fetchMark = new Path { Width = 11, Height = 11, Stretch = System.Windows.Media.Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-         var fetchText = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
+         var fetchMark = new StatusPill { Margin = new Thickness(0, 1, 10, 0), VerticalAlignment = VerticalAlignment.Top };
+         var fetchText = new TextBlock { TextWrapping = TextWrapping.Wrap };
+         fetchText.SetResourceReference(StyleProperty, "TextCaption");
          content.Children.Add(ResultRow(fetchMark, fetchText));
          SetResultOn(fetchMark, fetchText, StatusLevel.Normal, L("Not checked"),
             F("Press \"Check policy (HTTPS)\" to fetch https://mta-sts.{0}/.well-known/mta-sts.txt from this machine.", domain.Name));
@@ -1062,7 +1054,7 @@ namespace hMailServer.ControlPanel.Views
       /// still differ if a firewall treats this machine specially, and the result
       /// says so rather than claiming more than one vantage point can know.
       /// </summary>
-      private async Task FetchMtaStsPolicy(string domainName, Wpf.Ui.Controls.Button button, Path mark, TextBlock text)
+      private async Task FetchMtaStsPolicy(string domainName, Wpf.Ui.Controls.Button button, StatusPill mark, TextBlock text)
       {
          string url = "https://mta-sts." + domainName + "/.well-known/mta-sts.txt";
 
@@ -1127,9 +1119,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- TLS-RPT ---------------------------------------------------------------
 
-      private Border TlsRptCard(DomainInfo domain)
+      private Card TlsRptCard(DomainInfo domain)
       {
-         Border card = Card(L("TLS-RPT — ask other servers to report TLS failures when delivering to ") + domain.Name, out StackPanel content);
+         Card card = Section(L("TLS-RPT — ask other servers to report TLS failures when delivering to ") + domain.Name, out StackPanel content);
 
          content.Children.Add(Paragraph(F("Publishing this record asks every server that delivers to {0} to e-mail you a daily report when TLS to you fails or is downgraded. The reports go to the rua= mailbox, which must exist and accept mail from strangers. This works regardless of any hMailServer setting - the senders do the reporting.", domain.Name),
             Typography.Caption));
@@ -1283,9 +1275,9 @@ namespace hMailServer.ControlPanel.Views
       /// all), so it shows the one half it can know: the HELO name the PTR should
       /// agree with.
       /// </summary>
-      private Border PtrCard()
+      private Card PtrCard()
       {
-         Border card = Card(L("Reverse DNS (PTR) and the HELO name — set by whoever owns your IP address"), out StackPanel content);
+         Card card = Section(L("Reverse DNS (PTR) and the HELO name — set by whoever owns your IP address"), out StackPanel content);
 
          content.Children.Add(Paragraph(L("Receivers look up the PTR record of the connecting IP address and compare it with the name the server announces in HELO/EHLO; this server judges incoming mail by the same standard when the PTR and HELO checks on Anti-spam settings are on. Unlike every other record on this page, the PTR is NOT published in your domain's zone: it lives in the reverse zone of the IP address, which belongs to whoever owns the address - usually your hosting provider or ISP. Ask them to set it; there is nothing to paste into your own DNS console."),
             Typography.Caption));
@@ -1352,7 +1344,7 @@ namespace hMailServer.ControlPanel.Views
          public TextBox ValueBox;
          public Wpf.Ui.Controls.Button CopyValue;
          public Wpf.Ui.Controls.Button Check;
-         public Path Mark;
+         public StatusPill Mark;
          public TextBlock Result;
 
          public void SetResult(StatusLevel level, string word, string message)
@@ -1392,25 +1384,14 @@ namespace hMailServer.ControlPanel.Views
 
          if (copyWarning != null)
          {
-            StatusPresentation warning = StatusSemantics.For(StatusLevel.Warning);
-            var row = new Grid { Margin = new Thickness(0, 2, 0, 4) };
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-            var mark = new Path { Width = 11, Height = 11, Stretch = System.Windows.Media.Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-            ShapeMarkVisuals.ApplyMark(mark, warning.Shape, warning.BrushKey);
-            row.Children.Add(mark);
-
-            var text = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
-            var word = new Run(L("Before you copy — ")) { FontWeight = FontWeights.SemiBold };
-            word.SetResourceReference(TextElement.ForegroundProperty, warning.BrushKey);
-            text.Inlines.Add(word);
-            text.Inlines.Add(new Run(copyWarning));
-            System.Windows.Automation.AutomationProperties.SetName(text, F("Warning before copying. {0}", copyWarning));
-            Grid.SetColumn(text, 1);
-            row.Children.Add(text);
-
-            parent.Children.Add(row);
+            var notice = new InlineNotice
+            {
+               Level = StatusLevel.Warning,
+               Text = L("Before you copy — ") + copyWarning,
+               Margin = new Thickness(0, 4, 0, 8)
+            };
+            System.Windows.Automation.AutomationProperties.SetName(notice, F("Warning before copying. {0}", copyWarning));
+            parent.Children.Add(notice);
          }
 
          var copyRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
@@ -1439,8 +1420,9 @@ namespace hMailServer.ControlPanel.Views
 
          parent.Children.Add(copyRow);
 
-         block.Mark = new Path { Width = 11, Height = 11, Stretch = System.Windows.Media.Stretch.Fill, Margin = new Thickness(0, 4, 8, 0), VerticalAlignment = VerticalAlignment.Top };
-         block.Result = new TextBlock { FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
+         block.Mark = new StatusPill { Margin = new Thickness(0, 1, 10, 0), VerticalAlignment = VerticalAlignment.Top };
+         block.Result = new TextBlock { TextWrapping = TextWrapping.Wrap };
+         block.Result.SetResourceReference(StyleProperty, "TextCaption");
          parent.Children.Add(ResultRow(block.Mark, block.Result));
 
          block.SetResult(StatusLevel.Normal, L("Not checked"), L("Press \"Check\" to look the record up through this machine's resolver."));
@@ -1448,7 +1430,7 @@ namespace hMailServer.ControlPanel.Views
          return block;
       }
 
-      private static Grid ResultRow(Path mark, TextBlock text)
+      private static Grid ResultRow(StatusPill mark, TextBlock text)
       {
          var row = new Grid { Margin = new Thickness(0, 4, 0, 6) };
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -1463,17 +1445,15 @@ namespace hMailServer.ControlPanel.Views
       /// Colour, shape AND word, so none of the three is load-bearing on its own -
       /// the same three channels every status badge in this application uses.
       /// </summary>
-      private static void SetResultOn(Path mark, TextBlock text, StatusLevel level, string word, string message)
+      private static void SetResultOn(StatusPill mark, TextBlock text, StatusLevel level, string word, string message)
       {
-         StatusPresentation presentation = StatusSemantics.For(level);
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
+         // The pill carries the colour, the shape and the check's own word - which
+         // is more exact than the level's severity word ("Published", "Not served")
+         // and is therefore the one to show; the sentence beside it says the rest.
+         mark.Level = level;
+         mark.Text = word;
 
-         text.Inlines.Clear();
-         var wordRun = new Run(word + " — ") { FontWeight = FontWeights.SemiBold };
-         wordRun.SetResourceReference(TextElement.ForegroundProperty, presentation.BrushKey);
-         text.Inlines.Add(wordRun);
-         text.Inlines.Add(new Run(message));
-
+         text.Text = message;
          System.Windows.Automation.AutomationProperties.SetName(text, word + ". " + message);
       }
 
@@ -1628,42 +1608,27 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- shared UI helpers -------------------------------------------------------
 
-      private static Border Card(string title, out StackPanel content)
+      /// <summary>One section of the page. Named Section and not Card because the
+      /// component it builds is called that.</summary>
+      private static Card Section(string title, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 14, 0, 0) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var inner = new StackPanel();
-         inner.Children.Add(new TextBlock
-         {
-            Text = title,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 8)
-         });
-
-         border.Child = inner;
-         content = inner;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = title, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
       private static TextBlock Paragraph(string text, double size)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = size,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 6),
-            Opacity = size <= Typography.Caption ? 0.75 : 1.0
-         };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 6) };
+         block.SetResourceReference(StyleProperty, size <= Typography.Caption ? "TextCaption" : "TextBody");
+         return block;
       }
 
       private static TextBlock Label(string text)
       {
-         var label = new TextBlock { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
-         label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         var label = new TextBlock { Text = text, Margin = new Thickness(0, 8, 0, 4) };
+         label.SetResourceReference(StyleProperty, "TextCaption");
          return label;
       }
 
@@ -1676,6 +1641,7 @@ namespace hMailServer.ControlPanel.Views
          AcceptsReturn = true,
          TextWrapping = TextWrapping.Wrap,
          FontSize = Typography.Caption,
+         FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          MinHeight = minHeight,
          Padding = new Thickness(6),
          Margin = new Thickness(0, 0, 0, 4),
