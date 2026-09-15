@@ -396,6 +396,26 @@ const sessionStorage = storage();
 let clock = 0;
 const performance = { now: () => { clock += 1; return clock; } };
 
+/* The system's colour preference, and the listeners the page attaches to it:
+   the page's theme has three choices - light, dark and the system's - and
+   without this the third could only be guessed at. setSystemTheme changes the
+   preference and tells the listeners, which is what a reader turning their
+   desktop dark does. */
+let systemPrefersDark = true;
+const mediaListeners = [];
+function matchMedia(query) {
+   return {
+      media: query,
+      get matches() { return String(query).indexOf('dark') >= 0 ? systemPrefersDark : !systemPrefersDark; },
+      addEventListener: (type, fn) => { if (type === 'change') { mediaListeners.push(fn); } },
+      removeEventListener: () => { }
+   };
+}
+function setSystemTheme(dark) {
+   systemPrefersDark = dark;
+   mediaListeners.slice().forEach((fn) => fn({ matches: dark }));
+}
+
 const confirmations = [];
 let confirmAnswer = true;
 const consoleErrors = [];
@@ -593,6 +613,19 @@ function fetchProblem(parsed, creating) {
    return null;
 }
 
+// The account groups, as RestApiGroups.cpp emits them. A membership is a pair
+// and not a property of either side, so the members are a collection under the
+// group and a member is removed by the account's id.
+const GROUPS_GET = 'Settings.Groups over COM: the named sets of accounts a folder permission can name as one principal. Each entry: id, name. Read from the database on every call, so a group the Control Panel made is here. Server-wide; refused for domain-restricted keys.';
+const GROUPS_POST = 'Body: name (required, at most 255 characters). Saved as Groups.Add and Group.Save save one over COM, with the same check - a second group of the same name is refused - and added to the collection ACLManager consults, so a permission may name it at once. Server-wide; refused for domain-restricted and read-only keys.';
+const GROUPS_PUT = 'Body: name. The same check as POST; nothing changes when it is refused, and the permissions that name the group by id keep naming it. Server-wide; refused for domain-restricted and read-only keys.';
+const GROUPS_DELETE = 'What Groups.DeleteByDBID does over COM: the group, its membership rows and every folder permission that named it go together, and the next IMAP command decides without them. Server-wide; refused for domain-restricted and read-only keys.';
+const MEMBERS_GET = 'Group.Members over COM, read from the database as ACLManager reads them for every decision. Each entry: id (the membership row), group_id, account_id, account (the address; empty when the account no longer exists).';
+const MEMBERS_POST = 'Body: account_id or account (the address); both, and they must name the same account. What GroupMembers.Add, put_AccountID and Save do over COM; in force for the next IMAP command. Server-wide; refused for domain-restricted and read-only keys.';
+// Every account the recorded server knows, by the id the store gave it: a
+// membership names the account by its id, and the address is the way in.
+const ACCOUNT_IDS = { 'anna@example.com': 1, 'bob@example.com': 2, 'carla@example.com': 3 };
+
 // A domain as DomainEntryJson_ emits it: every field, the relay password
 // never among them.
 function domainRecord(name, active, postmaster) {
@@ -786,6 +819,20 @@ const spec = {
          delete: { summary: 'Delete an external (fetch) account' }
       },
       '/api/v1/accounts/{address}/fetch-accounts/{id}/download': { post: { summary: 'Collect from the remote mailbox now' } },
+      '/api/v1/groups': {
+         get: { summary: 'List the account groups', description: GROUPS_GET },
+         post: { summary: 'Create a group', description: GROUPS_POST, requestBody: body({ name: { type: 'string' } }, ['name']) }
+      },
+      '/api/v1/groups/{id}': {
+         get: { summary: 'One group' },
+         put: { summary: 'Rename a group', description: GROUPS_PUT, requestBody: body({ name: { type: 'string' } }) },
+         delete: { summary: 'Delete a group', description: GROUPS_DELETE }
+      },
+      '/api/v1/groups/{id}/members': {
+         get: { summary: 'The accounts in a group', description: MEMBERS_GET },
+         post: { summary: 'Add an account to a group', description: MEMBERS_POST, requestBody: body({ account_id: { type: 'integer' }, account: { type: 'string' } }) }
+      },
+      '/api/v1/groups/{id}/members/{account_id}': { delete: { summary: 'Remove an account from a group', description: 'By the account\'s id, as the membership is the pair.' } },
       '/api/v1/settings/backup': settingsPath('/api/v1/settings/backup'),
       ...collectionPaths(),
       '/api/v1/settings/messages': { get: { summary: 'The server\'s message texts', description: 'The texts the server puts in the mail it writes itself - Settings.ServerMessages over COM. Each entry: id, name, text. Server-wide; refused for domain-restricted keys.' } },
@@ -857,6 +904,8 @@ const state = {
       '/api/v1/greylisting-white-addresses': [{ id: 16, ip_address: '10.0.0.*', description: 'The office' }],
       '/api/v1/incoming-relays': [{ id: 17, name: 'Front relay', lower_ip: '192.0.2.1', upper_ip: '192.0.2.1' }]
    },
+   groups: [{ id: 3, name: 'Support' }, { id: 4, name: 'Everyone' }],
+   groupMembers: { 3: [{ id: 30, group_id: 3, account_id: 1, account: 'anna@example.com' }], 4: [] },
    ranges: [
       Object.assign({ id: 1, name: 'My computer', lower: '127.0.0.1', upper: '127.0.0.1', priority: 15, expires: false, expires_time: '' }, RANGE_CREATE_DEFAULTS,
          { require_auth_local_to_remote: false, require_auth_remote_to_remote: false, deliver_local_to_remote: true, deliver_remote_to_remote: true }),
@@ -966,6 +1015,55 @@ function answer(method, path, headers, raw) {
          delete state.domainAliases[name];
          return json(200, { deleted: true });
       }
+   }
+   if (path === '/api/v1/groups' && method === 'GET') { return json(200, state.groups); }
+   if (path === '/api/v1/groups' && method === 'POST') {
+      for (const key of Object.keys(parsed || {})) { if (key !== 'name') { return json(400, { error: 'unknown field: ' + key }); } }
+      const name = String((parsed && parsed.name) || '').trim();
+      if (!name) { return json(400, { error: 'name is required' }); }
+      if (state.groups.some((g) => g.name === name)) { return json(409, { error: 'A group with this name already exists.' }); }
+      const record = { id: nextId++, name };
+      state.groups.push(record);
+      state.groupMembers[record.id] = [];
+      return json(201, record);
+   }
+   if (/^\/api\/v1\/groups\/\d+$/.test(path)) {
+      const id = Number(segment(path, 4));
+      const at = state.groups.findIndex((g) => g.id === id);
+      if (at < 0) { return json(404, { error: 'group not found' }); }
+      if (method === 'GET') { return json(200, state.groups[at]); }
+      if (method === 'PUT') {
+         for (const key of Object.keys(parsed || {})) { if (key !== 'name') { return json(400, { error: 'unknown field: ' + key }); } }
+         const name = String((parsed && parsed.name) || '').trim();
+         if (!name) { return json(400, { error: 'name must not be empty' }); }
+         if (state.groups.some((g) => g.name === name && g.id !== id)) { return json(409, { error: 'A group with this name already exists.' }); }
+         state.groups[at].name = name;
+         return json(200, state.groups[at]);
+      }
+      if (method === 'DELETE') { state.groups.splice(at, 1); delete state.groupMembers[id]; return json(200, { deleted: true }); }
+   }
+   if (/^\/api\/v1\/groups\/\d+\/members$/.test(path)) {
+      const id = Number(segment(path, 4));
+      if (!(id in state.groupMembers)) { return json(404, { error: 'group not found' }); }
+      if (method === 'GET') { return json(200, state.groupMembers[id]); }
+      if (method === 'POST') {
+         const address = String((parsed && parsed.account) || '');
+         const accountId = ACCOUNT_IDS[address];
+         if (!accountId) { return json(400, { error: 'no account ' + address }); }
+         if (state.groupMembers[id].some((m) => m.account_id === accountId)) { return json(409, { error: 'The account is already a member of the group.' }); }
+         const member = { id: nextId++, group_id: id, account_id: accountId, account: address };
+         state.groupMembers[id].push(member);
+         return json(201, member);
+      }
+   }
+   if (/^\/api\/v1\/groups\/\d+\/members\/\d+$/.test(path) && method === 'DELETE') {
+      const id = Number(segment(path, 4));
+      const accountId = Number(segment(path, 6));
+      if (!(id in state.groupMembers) || !state.groupMembers[id].some((m) => m.account_id === accountId)) {
+         return json(404, { error: 'the account is not a member of the group' });
+      }
+      state.groupMembers[id] = state.groupMembers[id].filter((m) => m.account_id !== accountId);
+      return json(200, { deleted: true });
    }
    if (/^\/api\/v1\/domains\/[^/]+\/domain-aliases$/.test(path)) {
       const domain = segment(path, 4);
@@ -1358,6 +1456,12 @@ function setValue(id, value) { const el = document.getElementById(id); if (!el) 
 function setChecked(id, on) { const el = document.getElementById(id); if (!el) { throw new Error('no control #' + id); } el.checked = on; return el; }
 function lastBody(from, method, pattern) { const list = called(from, method, pattern); return list.length ? JSON.parse(list[list.length - 1].body) : null; }
 function toastText() { return $('#toast').textContent; }
+/* A key pressed: on a control when one holds the keyboard, on the document
+   when none does. The page listens on the document and the event reaches it
+   by bubbling, as it does in a browser. */
+function press(key, on) { (on || document).dispatchEvent(makeEvent('keydown', { key, target: on || document })); }
+const styleText = () => document.querySelector('style').textContent;
+const themeStored = () => localStorage.getItem('hmsTheme');
 
 /* ------------------------------------------------------------------ the run */
 
@@ -1374,6 +1478,7 @@ const world = {
    clearInterval: (id) => { const at = intervals.findIndex((t) => t.id === id); if (at >= 0) { intervals.splice(at, 1); } },
    requestAnimationFrame: (fn) => { fn(performance.now() + 5000); return 1; },
    confirm: (question) => { confirmations.push(question); return confirmAnswer; },
+   matchMedia,
    navigator: { clipboard: { writeText: (text) => { clipboard = text; return Promise.resolve(); } } },
    console: { error: (...args) => consoleErrors.push(args), log: () => { }, warn: () => { } }
 };
@@ -1399,7 +1504,41 @@ async function main() {
    check('a first visit shows the sign-in card', $('#gate').style.display !== 'none' && $('#app').style.display === 'none',
       'gate=' + $('#gate').style.display + ' app=' + $('#app').style.display);
    check('and asks the server nothing before there is a session', requests.length === 0, paths(0));
-   check('the theme starts dark and is the body\'s attribute', document.body.getAttribute('data-theme') === 'dark');
+
+   // ---- the tokens: one palette, a dark theme beside it, and nothing else
+   const css = styleText();
+   const blocks = css.match(/:root\{[^}]*\}/g) || [];
+   const dark = css.match(/\[data-theme="dark"\]\{[^}]*\}/g) || [];
+   check('the page declares one palette and one dark theme beside it', blocks.length === 1 && dark.length === 1,
+      blocks.length + ' root blocks, ' + dark.length + ' dark blocks');
+   check('and its colours are the webmail\'s, value for value, rather than a second design language',
+      ['--bg:#f6f8fc', '--surface:#fff', '--accent:#1a73e8', '--accent-soft:#e8f0fe', '--danger:#d93025', '--good:#188038', '--warn:#b06000', '--cursor:#e8f0fe']
+         .every((d) => blocks[0].indexOf(d) >= 0), blocks[0].slice(0, 240));
+   check('the dark theme is the webmail\'s dark theme',
+      ['--bg:#111418', '--surface:#1b1f24', '--accent:#8ab4f8', '--danger:#f28b82', '--good:#81c995'].every((d) => dark[0].indexOf(d) >= 0), dark[0].slice(0, 240));
+   check('the spacing scale, the radii and the type ramp are the desktop console\'s',
+      ['--s1:4px', '--s2:8px', '--s3:12px', '--s4:16px', '--s5:24px', '--s6:32px', '--radius-control:4px', '--radius:8px', '--pill:999px',
+         '--fs-caption:12px', '--fs-body:14px', '--fs-subtitle:20px', '--fs-title:28px', '--cmdbar:48px'].every((d) => blocks[0].indexOf(d) >= 0));
+   const painted = [blocks[0], dark[0]].reduce((text, block) => text.replace(block, ''), css).match(/#[0-9a-fA-F]{3,8}\b|\brgba?\(/g) || [];
+   check('and every colour the page paints with comes from a token: not one literal outside those two blocks',
+      painted.length === 0, JSON.stringify(painted));
+   check('everything that takes the keyboard is ringed while it holds it',
+      /:focus-visible\{[^}]*outline:2px solid var\(--accent\)/.test(css) && (css.match(/:focus-visible/g) || []).length >= 4,
+      (css.match(/:focus-visible/g) || []).length + ' focus-visible rules');
+
+   // ---- the shape: the frame the desktop console has, in the Deck's markup
+   check('a command bar carries the brand, the view, the search, the link\'s pill and the buttons',
+      $('.cmdbar .brand') !== null && $('.cmdbar #viewTitle') !== null && $('.cmdbar #deckSearch') !== null && $('.cmdbar #connPill') !== null &&
+      $('.cmdbar #themeBtn') !== null && $('.cmdbar #keysBtn') !== null && $('.cmdbar #logoutBtn') !== null);
+   check('a navigation column stands beside a content area under it', $('.shell .side #nav') !== null && $('.shell .main #content') !== null);
+   check('and a link carries the keyboard past the navigation into the content',
+      $('a.skip').getAttribute('href') === '#content' && $('#content').getAttribute('tabindex') === '-1');
+   check('every view keeps its name as a tool tip, which is what it has left when the column is a rail',
+      $$('#nav button').every((b) => b.getAttribute('title') === b.textContent.replace(/^\S/, '')),
+      JSON.stringify($$('#nav button').map((b) => b.getAttribute('title'))));
+   check('the theme starts at the system\'s choice, which is dark here, and is the body\'s attribute',
+      document.body.getAttribute('data-theme') === 'dark' && $('#themeBtn').getAttribute('aria-label') === 'Theme: the system\'s choice',
+      $('#themeBtn').getAttribute('aria-label'));
 
    // ---- a wrong password is the server's sentence
    $('#user').value = 'Administrator';
@@ -1447,6 +1586,9 @@ async function main() {
    check('the state as a badge', $('#kpiState').textContent === 'Running' && $('#kpiState').querySelector('.badge.good') !== null, $('#kpiState').innerHTML);
    check('the live sessions', $('#sesSmtp').textContent === '3' && $('#sesImap').textContent === '12' && $('#sesPop3').textContent === '1');
    check('the dashboard polls on an interval', intervals.length === 1 && intervals[0].ms === 3000, intervals.length + ' intervals');
+   check('the link is a status pill: a colour, a mark and a word, never a colour alone',
+      $('#connPill').getAttribute('data-level') === 'good' && $('#connMark').textContent === '\u25a0' && $('#connState').textContent === 'Connected',
+      $('#connPill').innerHTML);
    const tile = $('#kpiProcessed');
    const beforePoll = requests.length;
    state.status.processedMessages = 1300;
@@ -2439,6 +2581,10 @@ async function main() {
    check('the ports view reads the ports and the certificates', called(before, 'GET', '/api/v1/ports').length === 1 && called(before, 'GET', '/api/v1/certificates').length === 1 && rows().length === 2);
    check('a port row names its certificate rather than its id', rows()[0].textContent.indexOf('mail.example.com') >= 0 && rows()[0].textContent.indexOf('0.0.0.0:25') >= 0 && rows()[1].textContent.indexOf('—') >= 0);
    check('the restart wording is the document\'s', content().textContent.indexOf('takes effect when the server restarts') >= 0 && content().textContent.indexOf(REINITIALIZE.slice(0, 40)) >= 0);
+   check('and it is a notice at the warning level, with the mark and the word beside the colour',
+      content().querySelector('.notice[data-level="warn"]') !== null && content().querySelector('.notice .mark').textContent === '\u25b2' &&
+      content().querySelector('.notice[data-level="warn"]').textContent.indexOf('Warning') >= 0,
+      content().querySelector('.notice') ? content().querySelector('.notice').innerHTML : 'no notice');
    click(act('portnew'));
    await flush();
    check('a new port starts at the defaults the document states in prose', document.getElementById('port_address').value === '0.0.0.0' && document.getElementById('port_connection_security').value === 'none' &&
@@ -2520,14 +2666,192 @@ async function main() {
       document.getElementById('err_log').textContent);
    state.logs.pop();
 
+   // ---- groups: the last thing the census counted as writable over REST and
+   // reachable from no view here
+   before = requests.length;
+   await goTo('groups');
+   check('the groups view reads the groups', called(before, 'GET', '/api/v1/groups').length === 1 && $('#viewTitle').textContent === 'Groups', paths(before));
+   check('one row per group, the id under the name', rows().length === 2 && rows()[0].textContent.indexOf('Support') >= 0 && rows()[0].textContent.indexOf('id 3') >= 0,
+      rows().map((r) => r.textContent).join(' | '));
+   check('what a delete takes with it is said as a notice, in the route\'s own words',
+      content().querySelector('.notice[data-level="info"]') !== null && content().querySelector('.notice .mark').textContent === '\u25c6' &&
+      content().querySelector('.notice').textContent.indexOf('Information') >= 0 &&
+      content().textContent.indexOf('every folder permission that named it go together') >= 0,
+      content().querySelector('.notice') ? content().querySelector('.notice').textContent : 'no notice');
+
+   before = requests.length;
+   setValue('newGroup', '');
+   click(act('groupnew'));
+   await flush();
+   check('an empty name is refused by the page, not the server',
+      called(before, 'POST', '/api/v1/groups').length === 0 && document.getElementById('err_groupnew').textContent.indexOf('required') >= 0,
+      document.getElementById('err_groupnew').textContent);
+
+   before = requests.length;
+   setValue('newGroup', 'Wardens');
+   click(act('groupnew'));
+   await flush();
+   posted = lastBody(before, 'POST', '/api/v1/groups');
+   check('creating a group posts the one key the route takes', JSON.stringify(posted) === '{"name":"Wardens"}', JSON.stringify(posted));
+   check('and goes straight into its editor, on the record the server holds, with its members read',
+      called(before, 'GET', '/api/v1/groups').length === 1 && called(before, 'GET', /\/api\/v1\/groups\/\d+\/members$/).length === 1 &&
+      content().querySelector('h2').textContent.indexOf('Wardens') >= 0 && document.getElementById('group_name').value === 'Wardens', paths(before));
+   check('the name is a form row built from the create\'s own schema, marked required',
+      document.getElementById('group_name').closest('.fr').textContent.indexOf('required') >= 0 &&
+      document.getElementById('group_name').closest('.fr').querySelector('.hint').textContent.indexOf('folder permission') >= 0);
+   check('a group with nobody in it says so', content().textContent.indexOf('No accounts in this group.') >= 0);
+   check('and the toast names it', toastText() === 'Group created: Wardens', toastText());
+
+   before = requests.length;
+   setValue('group_name', 'Support');
+   click(act('groupsave'));
+   await flush();
+   check('a name another group already has is the server\'s sentence, with the editor kept open',
+      called(before, 'PUT', /\/api\/v1\/groups\/\d+$/).length === 1 &&
+      document.getElementById('err_groupedit').textContent === 'A group with this name already exists.' && document.getElementById('group_name') !== null,
+      document.getElementById('err_groupedit').textContent);
+
+   before = requests.length;
+   setValue('group_name', 'Wardens of the second floor');
+   click(act('groupsave'));
+   await flush();
+   put = lastBody(before, 'PUT', /\/api\/v1\/groups\/\d+$/);
+   check('renaming PUTs the name by id, reads it back and stays in the editor',
+      JSON.stringify(put) === '{"name":"Wardens of the second floor"}' && called(before, 'GET', '/api/v1/groups').length === 1 &&
+      document.getElementById('group_name').value === 'Wardens of the second floor' && toastText() === 'Group saved', JSON.stringify(put));
+
+   before = requests.length;
+   setValue('newMember', 'nobody@example.com');
+   click(act('memberadd'));
+   await flush();
+   check('an address that is nobody\'s is refused by the server, in its words, beside the box',
+      called(before, 'POST', /members$/).length === 1 && document.getElementById('err_member').textContent === 'no account nobody@example.com',
+      document.getElementById('err_member').textContent);
+
+   before = requests.length;
+   setValue('newMember', 'anna@example.com');
+   click(act('memberadd'));
+   await flush();
+   posted = lastBody(before, 'POST', /members$/);
+   check('adding an account posts the address, which is what the administrator has', JSON.stringify(posted) === '{"account":"anna@example.com"}', JSON.stringify(posted));
+   check('and the membership is read again with it in', content().textContent.indexOf('anna@example.com') >= 0 &&
+      toastText() === 'anna@example.com added to the group', toastText());
+
+   const memberBox = setValue('newMember', 'carla@example.com');
+   memberBox.dispatchEvent(makeEvent('keydown', { key: 'Enter', target: memberBox }));
+   await flush();
+   check('Enter in the box adds one as the button does', content().querySelectorAll('.erow').length === 2 &&
+      content().textContent.indexOf('carla@example.com') >= 0, content().querySelectorAll('.erow').length + ' members');
+
+   before = requests.length;
+   click(act('memberdel', { account: 1 }));
+   await flush();
+   check('removing one deletes by the account\'s id, which is what a membership is made of',
+      called(before, 'DELETE', /\/api\/v1\/groups\/\d+\/members\/1$/).length === 1 && content().textContent.indexOf('anna@example.com') < 0 &&
+      toastText() === 'anna@example.com removed from the group', paths(before));
+
+   before = requests.length;
+   click(act('groups'));
+   await flush();
+   check('the way back re-reads the groups with the new one among them', called(before, 'GET', '/api/v1/groups').length === 1 && rows().length === 3);
+
+   confirmAnswer = false;
+   before = requests.length;
+   click(act('groupdel', { name: 'Wardens of the second floor' }));
+   await flush();
+   check('deleting asks first, naming the group and what goes with it',
+      called(before, 'DELETE', /groups/).length === 0 && confirmations[confirmations.length - 1].indexOf('Wardens of the second floor') >= 0 &&
+      confirmations[confirmations.length - 1].indexOf('every folder permission that names it') >= 0, confirmations[confirmations.length - 1]);
+   confirmAnswer = true;
+   before = requests.length;
+   click(act('groupdel', { name: 'Wardens of the second floor' }));
+   await flush();
+   check('yes deletes it by id and the re-read list is without it',
+      called(before, 'DELETE', /\/api\/v1\/groups\/\d+$/).length === 1 && rows().length === 2 && toastText() === 'Group deleted', paths(before));
+
+   // ---- the keyboard: the page with no pointer at all
+   check('the shortcut list is shut until it is asked for', $('#keysOverlay').hidden === true);
+   press('?');
+   check('? opens it, drawn from the page\'s one table and taking the keyboard with it',
+      $('#keysOverlay').hidden === false && $('#keysList').querySelectorAll('kbd').length === 6 &&
+      $('#keysList').textContent.indexOf('Search this view') >= 0 && document.activeElement === $('#keysClose'), $('#keysList').textContent);
+   press('Tab', $('#keysClose'));
+   check('while it is open the keyboard stays on it and cannot act on what it hides',
+      $('#keysOverlay').hidden === false && document.activeElement === $('#keysClose'));
+   press('?');
+   check('a second ? shuts it again, as the list says it does', $('#keysOverlay').hidden === true);
+   press('?');
+   press('Escape');
+   check('Escape shuts it and hands the keyboard back to the button that opened it',
+      $('#keysOverlay').hidden === true && document.activeElement === $('#keysBtn'));
+   press('/');
+   check('/ puts the keyboard in the search box', document.activeElement === $('#deckSearch'));
+   setValue('deckSearch', 'everyone');
+   $('#deckSearch').dispatchEvent(makeEvent('input', { target: $('#deckSearch') }));
+   check('what is typed hides the rows that do not carry it',
+      rows().filter((r) => !r.hidden).length === 1 && rows().filter((r) => !r.hidden)[0].textContent.indexOf('Everyone') >= 0,
+      rows().map((r) => r.textContent + '=' + r.hidden).join(' | '));
+   press('Escape', $('#deckSearch'));
+   check('Escape empties the box and gives every row back', $('#deckSearch').value === '' && rows().every((r) => !r.hidden));
+   press('ArrowDown');
+   check('the first arrow puts the cursor on the first row', rows()[0].classList.contains('cur') && !rows()[1].classList.contains('cur'));
+   press('ArrowDown');
+   check('and the next moves it down one', rows()[1].classList.contains('cur') && !rows()[0].classList.contains('cur'));
+   press('ArrowUp');
+   check('and up again', rows()[0].classList.contains('cur'));
+   before = requests.length;
+   press('Enter');
+   await flush();
+   check('Enter opens the row the cursor is on, which is what its first button does',
+      called(before, 'GET', /\/api\/v1\/groups\/\d+\/members$/).length === 1 && document.getElementById('group_name') !== null, paths(before));
+   check('and a view drawn afresh starts with no row under the keyboard', rows().length === 0);
+   click(act('groups'));
+   await flush();
+   $('#nav button[data-view="groups"]').focus();
+   press('ArrowDown', $('#nav button[data-view="groups"]'));
+   check('the arrows move between the views while the keyboard is in the navigation column',
+      document.activeElement === $('#nav button[data-view="ipranges"]'),
+      document.activeElement ? JSON.stringify(document.activeElement.attributes) : 'nothing focused');
+   setValue('deckSearch', 'everyone');
+   $('#deckSearch').dispatchEvent(makeEvent('input', { target: $('#deckSearch') }));
+   await goTo('certs');
+   check('a view arrived at shows everything it has: the search belongs to the view it was typed in',
+      $('#deckSearch').value === '' && rows().every((r) => !r.hidden), rows().length + ' rows');
+   before = requests.length;
+   const asked = confirmations.length;
+   press('ArrowDown');
+   press('Enter');
+   await flush();
+   check('and a row whose only button deletes it is a row Enter leaves alone',
+      rows()[0].classList.contains('cur') && called(before, 'DELETE', /certificates/).length === 0 && confirmations.length === asked,
+      paths(before));
+
    // ---- a session that ends under the page
    signedIn = false;
    await goTo('queue');
    check('a 401 on any view returns to the sign-in card and says why', $('#gate').style.display === 'grid' && $('#loginErr').textContent.indexOf('session ended') >= 0, $('#loginErr').textContent);
    check('with the session mark removed', sessionStorage.getItem('hmsSession') === null);
 
-   // ---- the theme, and signing out
+   // ---- the theme: light, dark, or the system's, and the choice remembered
    await signIn();
+   check('with nothing chosen the theme is the system\'s, and the button says which it is on',
+      themeStored() === 'system' && document.body.getAttribute('data-theme') === 'dark' &&
+      $('#themeBtn').getAttribute('aria-label') === 'Theme: the system\'s choice', themeStored());
+   setSystemTheme(false);
+   check('a reader who turns their desktop light turns the page light, no choice having been made',
+      document.body.getAttribute('data-theme') === 'light' && themeStored() === 'system');
+   click($('#themeBtn'));
+   check('the button chooses light, says so, and remembers it',
+      document.body.getAttribute('data-theme') === 'light' && themeStored() === 'light' && $('#themeBtn').getAttribute('aria-label') === 'Theme: light');
+   click($('#themeBtn'));
+   check('the next press chooses dark', document.body.getAttribute('data-theme') === 'dark' && themeStored() === 'dark' &&
+      $('#themeBtn').getAttribute('aria-label') === 'Theme: dark');
+   setSystemTheme(true);
+   setSystemTheme(false);
+   check('and the system no longer overrules a choice that was made', document.body.getAttribute('data-theme') === 'dark');
+   click($('#themeBtn'));
+   check('a third press gives the system back, and the page follows it again', themeStored() === 'system' && document.body.getAttribute('data-theme') === 'light');
+   setSystemTheme(true);
    click($('#themeBtn'));
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light');
    check('and is remembered under a name that is not a secret', localStorage.getItem('hmsTheme') === 'light');
@@ -2560,6 +2884,8 @@ async function main() {
    check('the sidebar is walked: the Domains button reads the German', $('#nav button[data-view="domains"]').textContent.indexOf(de['Domains']) >= 0, $('#nav button[data-view="domains"]').textContent);
    check('the top bar title as well', $('#viewTitle').textContent === de['Domains'], $('#viewTitle').textContent);
    check('an attribute is walked: the sign-out button\'s title', $('#logoutBtn').getAttribute('title') === de['Sign out'], $('#logoutBtn').getAttribute('title'));
+   check('the theme button, whose name the script paints rather than the walk, is in the language too',
+      $('#themeBtn').getAttribute('aria-label') === de['Theme: light'], $('#themeBtn').getAttribute('aria-label'));
    check('and a placeholder on the sign-in card', $('#pass').getAttribute('placeholder') === de['Password']);
    check('both switches show the choice', $('#langSel').value === 'de' && $('#langSelGate').value === 'de');
    check('the view is drawn again, in German: the table headings', called(before, 'GET', '/api/v1/domains').length === 1 && content().querySelector('th').textContent === de['Domain'], content().querySelector('th').textContent);
