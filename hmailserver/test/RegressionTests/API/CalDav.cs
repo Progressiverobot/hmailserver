@@ -693,6 +693,39 @@ namespace RegressionTests.API
          }
       }
 
+      [Test]
+      [Description("A deleted object does not block a name that differs from it only in case: the PUT is a create, " +
+                   "on every database, and the object reads back under the name it was created with.")]
+      public void ADeletedObjectDoesNotBlockItsCaseTwin()
+      {
+         string lower = Calendar + "tombstone-twin.ics";
+         string upper = Calendar + "TOMBSTONE-TWIN.ics";
+
+         Assert.AreEqual(201, Put(lower, Event("tombstone-twin-1", "20260901T100000Z", "20260901T110000Z", "Gone"), "If-None-Match: *\r\n").Status);
+         Assert.AreEqual(204, Dav("DELETE", lower, Auth(Address, UserPassword)).Status);
+
+         string second = Event("tombstone-twin-2", "20260901T120000Z", "20260901T130000Z", "Back");
+         Response created = Put(upper, second, "If-None-Match: *\r\n");
+         Assert.AreEqual(201, created.Status, "A deleted object's case twin was refused. Body: " + created.Body);
+
+         Assert.AreEqual(second, Dav("GET", upper, Auth(Address, UserPassword)).Body);
+      }
+
+      [Test]
+      [Description("A request for an object name far longer than the column is a 404, and the server is still answering " +
+                   "afterwards. Bound as a long string and compared with the name column, such a value crashed the SQL " +
+                   "Server Compact provider inside the service.")]
+      public void AnObjectNameLongerThanTheColumnIsNotFoundAndTheServerSurvives()
+      {
+         string longName = Calendar + new string('n', 20000) + ".ics";
+
+         for (int attempt = 0; attempt < 3; attempt++)
+            Assert.AreEqual(404, Dav("GET", longName, Auth(Address, UserPassword)).Status);
+
+         Response listing = Propfind(Calendar, "1", "<D:getetag/>");
+         Assert.AreEqual(207, listing.Status, "The server stopped answering after an over-long object name. Body: " + listing.Body);
+      }
+
       private static string Event(string uid, string dtstart, string dtend, string summary, string rrule = null, string tzid = null)
       {
          string zone = tzid == null ? "" : ";TZID=" + tzid;

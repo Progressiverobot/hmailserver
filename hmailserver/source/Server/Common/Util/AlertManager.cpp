@@ -266,6 +266,10 @@ namespace HM
    bool
    AlertManager::GetRule(const String &condition, Rule &rule)
    {
+      // alertrulecondition is nvarchar(64), and the condition comes from a REST path.
+      if (condition.IsEmpty() || condition.GetLength() > 64)
+         return false;
+
       SQLCommand command(_T("select * from hm_alertrules where alertrulecondition = @CONDITION"));
       command.AddParameter("@CONDITION", condition);
 

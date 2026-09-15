@@ -667,6 +667,69 @@ namespace HM
       sInput.Replace(_T("'"), _T("''"));
    }
 
+   namespace
+   {
+      bool IsWordCharacter(wchar_t c)
+      {
+         return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z') || (c >= L'0' && c <= L'9') || c == L'_' || c == L'@';
+      }
+
+      // Where a whole word first occurs in the statement, case-insensitively, or -1.
+      int FindWord(const String &lowerText, const String &lowerWord, int from = 0)
+      {
+         int position = lowerText.Find(lowerWord, from);
+
+         while (position >= 0)
+         {
+            int end = position + lowerWord.GetLength();
+            bool startsClean = position == 0 || !IsWordCharacter(lowerText[position - 1]);
+            bool endsClean = end >= lowerText.GetLength() || !IsWordCharacter(lowerText[end]);
+
+            if (startsClean && endsClean)
+               return position;
+
+            position = lowerText.Find(lowerWord, position + 1);
+         }
+
+         return -1;
+      }
+
+      // Whether a placeholder is a value being WRITTEN - in an INSERT, or in an
+      // UPDATE's SET list - rather than a value a condition compares with.
+      bool IsWrittenValue(const String &queryString, const String &parameterName)
+      {
+         String text = queryString;
+         text.MakeLower();
+         String name = parameterName;
+         name.MakeLower();
+
+         int position = FindWord(text, name);
+         if (position < 0)
+            return false;
+
+         String head = text;
+         head.TrimLeft();
+
+         bool isInsert = head.Left(6) == _T("insert");
+         bool isUpdate = head.Left(6) == _T("update");
+
+         if (!isInsert && !isUpdate)
+            return false;
+
+         // Anything after the first WHERE is compared, in an insert ... select as
+         // much as in an update.
+         int where = FindWord(text, _T("where"));
+         if (where >= 0 && position > where)
+            return false;
+
+         if (isInsert)
+            return true;
+
+         int set = FindWord(text, _T("set"));
+         return set >= 0 && position > set;
+      }
+   }
+
    void
    SQLCEConnection::InitializeCommandParameters(_CommandPtr &adoCommand, const SQLCommand &sqlCommand, String &queryString) const
    {
@@ -709,15 +772,24 @@ namespace HM
             // the command overflowed the range of the type of the associated column" -
             // even when the column is ntext. So a CalDAV object, a domain disclaimer or
             // an alert's detail over 4,000 characters could not be saved at all. A
-            // longer value is bound as a long string sized to the value; a value too
-            // long for an nvarchar column is still refused, never truncated. Shorter
-            // values keep the fixed size, so the plan cache is not filled with one plan
-            // per length. Checked against Compact 4.0 on 15 September 2026 at 4,001,
-            // 9,000 and 1,048,576 characters, each read back intact.
-            if (value.GetLength() > 4000)
+            // longer value that is being WRITTEN is bound as a long string sized to
+            // the value, which Compact 4.0 stores and reads back intact at 4,001, 9,000
+            // and 1,048,576 characters; a value too long for an nvarchar column is still
+            // refused, never truncated.
+            //
+            // Only a written value. Bound the same way and COMPARED with an nvarchar
+            // column that has rows - "where accountaddress = @address" - the provider
+            // crashes with an access violation inside Execute instead of refusing, and
+            // it runs in this process, so the whole service goes. An IMAP LOGIN with a
+            // long literal username reaches that comparison before anybody has signed
+            // in. Compared values keep the binding that refuses cleanly: a value over
+            // 4,000 characters cannot equal any nvarchar value anyway. Shorter values
+            // keep the fixed size, so the plan cache is not filled with one plan per
+            // length.
+            if (value.GetLength() > 4000 && IsWrittenValue(queryString, parameterName))
                adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName), adLongVarWChar, adParamInput, value.GetLength(), stringType));
             else
-               adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName), adWChar, adParamInput, 8000, stringType));
+               adoCommand->Parameters->Append(adoCommand->CreateParameter(_bstr_t(parameterName), adWChar, adParamInput, value.GetLength() < 8000 ? 8000 : value.GetLength(), stringType));
          }
       }
    }

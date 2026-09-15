@@ -273,7 +273,8 @@ namespace HM
    bool
    CalendarStore::FindByUri(__int64 accountId, __int64 calendarId, const String &uri, CalendarObjectRecord &object)
    {
-      if (uri.IsEmpty())
+      // objecturi is nvarchar(255): a longer name from a request path cannot exist.
+      if (uri.IsEmpty() || uri.GetLength() > 255)
          return false;
 
       SQLCommand command(String(AnsiString("select ") + ObjectColumns + " from hm_calendarobjects where objectaccountid = @ACCOUNTID and objectcalendarid = @CALENDARID and objecturi = @URI and objectdeleted = 0"));
@@ -286,7 +287,7 @@ namespace HM
    bool
    CalendarStore::FindByUid(__int64 accountId, __int64 calendarId, const String &uid, CalendarObjectRecord &object)
    {
-      if (uid.IsEmpty())
+      if (uid.IsEmpty() || uid.GetLength() > 255)
          return false;
 
       SQLCommand command(String(AnsiString("select ") + ObjectColumns + " from hm_calendarobjects where objectaccountid = @ACCOUNTID and objectcalendarid = @CALENDARID and objectuid = @UID and objectdeleted = 0"));
@@ -299,10 +300,12 @@ namespace HM
    bool
    CalendarStore::FindCollationTwin(__int64 accountId, __int64 calendarId, const String &uri, CalendarObjectRecord &object)
    {
-      if (uri.IsEmpty())
+      if (uri.IsEmpty() || uri.GetLength() > 255)
          return false;
 
-      SQLCommand command(String(AnsiString("select ") + ObjectColumns + " from hm_calendarobjects where objectaccountid = @ACCOUNTID and objectcalendarid = @CALENDARID and objecturi = @URI"));
+      // Live objects only, as the header says: a deleted twin is revived by Insert
+      // under the new spelling rather than blocking the name.
+      SQLCommand command(String(AnsiString("select ") + ObjectColumns + " from hm_calendarobjects where objectaccountid = @ACCOUNTID and objectcalendarid = @CALENDARID and objecturi = @URI and objectdeleted = 0"));
       command.AddParameter("@ACCOUNTID", accountId);
       command.AddParameter("@CALENDARID", calendarId);
       command.AddParameter("@URI", uri);
@@ -332,17 +335,22 @@ namespace HM
       CalendarObjectRecord existing;
       if (ReadOneObject(find, existing))
       {
-         // Found under the collation. A row that is not exactly this name - a case
-         // or accent twin - is a different object the unique index will not let a
-         // second row sit beside, live or tombstoned, so the insert is refused
-         // rather than reviving somebody else's row under the wrong name.
-         if (!existing.deleted || existing.uri.Compare(object.uri) != 0)
+         // Found under the collation. A LIVE row that is not exactly this name - a
+         // case or accent twin - is a different object the unique index will not let
+         // a second row sit beside, so the insert is refused and the caller answers
+         // 409. A deleted one is only a tombstone holding the name: it is revived
+         // under the spelling asked for, which is what reviving a tombstone of the
+         // exact name has always done; a client whose sync token predates the delete
+         // then sees the object under its new name rather than the old one gone.
+         if (!existing.deleted)
             return false;
 
          SQLStatement statement;
          statement.SetTable("hm_calendarobjects");
          statement.SetStatementType(SQLStatement::STUpdate);
          AddObjectColumns(statement, object, token);
+         if (existing.uri.Compare(object.uri) != 0)
+            statement.AddColumn("objecturi", object.uri);
          statement.SetWhereClause("objectid = " + Int64Text(existing.id) + " and objectaccountid = " + Int64Text(accountId));
          if (!Application::Instance()->GetDBManager()->Execute(statement))
             return false;
