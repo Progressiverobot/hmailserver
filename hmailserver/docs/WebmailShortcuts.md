@@ -24,7 +24,7 @@ use.
 | `u` or `Esc` | Back to the list |
 | `x` | Tick or untick the message under the cursor |
 | `Shift` + click, `Ctrl` + click | On a row or its box: Shift ticks every row from the last one clicked (or ticked with `x`) to this one; Ctrl (Cmd on a Mac) ticks or unticks the row without opening it |
-| `s` | Star or unstar the message |
+| `s` | The star. **On a row in the list it cycles**: the star, a second star in amber, a third in red, then none - the second and third are the `$Star2` and `$Star3` keywords on top of the IMAP flag, so another client sees a flagged message and the Starred view holds all three. **On an open message it toggles the flag only**, which is a difference nobody asked for and a roadmap row. |
 | `e` | Archive the message |
 | `!` | File the message as junk, or as not junk from the Junk folder |
 | `#` | Delete the message (to Trash) |
