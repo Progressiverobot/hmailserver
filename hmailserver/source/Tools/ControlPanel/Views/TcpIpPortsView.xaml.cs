@@ -108,8 +108,8 @@ namespace hMailServer.ControlPanel.Views
          }
 
          PortGrid.ItemsSource = rows;
-         ListSearch.Apply(PortGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, null, L("No ports configured."));
+         ListSearch.Apply(PortGrid, SearchBar.SearchText);
+         StatusText.Show(EmptyStatus, null, rows.Count, null, L("No ports configured."));
 
          ShowListenerSummary(rows, local);
       }
@@ -150,8 +150,8 @@ namespace hMailServer.ControlPanel.Views
       {
          if (!local)
          {
-            ListenerSummary.Text = L("Connected to another host, so whether these ports are being listened on cannot be read from here - open the Control Panel on the server itself to see it.");
-            ListenerSummary.Visibility = Visibility.Visible;
+            ShowSummary_(StatusLevel.Information,
+               L("Connected to another host, so whether these ports are being listened on cannot be read from here - open the Control Panel on the server itself to see it."));
             return;
          }
 
@@ -167,10 +167,18 @@ namespace hMailServer.ControlPanel.Views
          foreach (PortRow row in down)
             names.Add(row.Protocol + " " + row.Address + ":" + row.Port);
 
-         ListenerSummary.Text =
+         ShowSummary_(StatusLevel.Warning,
             (down.Count == 1 ? L("One configured port is not being listened on: ") : F("{0} configured ports are not being listened on: ", down.Count))
             + string.Join(", ", names)
-            + L(". Connections to them are refused. The usual causes are another program already holding the port, a bind address that does not exist on this machine, or - on a TLS port - a certificate the server could not load; the server records which, once, in the error log at start-up.");
+            + L(". Connections to them are refused. The usual causes are another program already holding the port, a bind address that does not exist on this machine, or - on a TLS port - a certificate the server could not load; the server records which, once, in the error log at start-up."));
+      }
+
+      /// <summary>The summary as a notice at its level: a warning for a dead port,
+      /// information when the answer cannot be read from this machine.</summary>
+      private void ShowSummary_(StatusLevel level, string text)
+      {
+         ListenerSummary.Level = level;
+         ListenerSummary.Text = text;
          ListenerSummary.Visibility = Visibility.Visible;
       }
 
@@ -208,8 +216,8 @@ namespace hMailServer.ControlPanel.Views
          return map;
       }
 
-      private void Search_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(PortGrid, SearchBox.Text);
+      private void Search_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(PortGrid, SearchBar.SearchText);
 
       private static Dictionary<int, string> LoadCertNames()
       {

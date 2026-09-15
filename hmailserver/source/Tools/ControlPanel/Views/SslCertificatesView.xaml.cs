@@ -107,6 +107,14 @@ namespace hMailServer.ControlPanel.Views
       {
          int version = ++reloadVersion_;
 
+         // The first load waits for the file checks; a reload keeps the rows it
+         // has rather than blanking them for the wait.
+         if (CertGrid.Items.Count == 0)
+         {
+            EmptyStatus.Visibility = Visibility.Collapsed;
+            Loading.Visibility = Visibility.Visible;
+         }
+
          var rows = new List<CertRow>();
          string error = null;
 
@@ -136,12 +144,14 @@ namespace hMailServer.ControlPanel.Views
          if (version != reloadVersion_)
             return;   // superseded by a newer reload
 
+         Loading.Visibility = Visibility.Collapsed;
+
          foreach (CertRow row in rows)
             ComposeFindings(row);
 
          CertGrid.ItemsSource = rows;
-         ListSearch.Apply(CertGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, error, L("No certificates available yet."));
+         ListSearch.Apply(CertGrid, SearchBar.SearchText);
+         StatusText.Show(EmptyStatus, LoadNotice, rows.Count, error, L("No certificates available yet."));
 
          if (reselectId != 0)
          {
@@ -358,7 +368,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          DetailsCard.Visibility = Visibility.Visible;
-         DetailsTitle.Text = row.Name;
+         DetailsCard.Title = row.Name;
          PassphraseBox.Password = "";
 
          DetailsLines.Children.Clear();
@@ -471,8 +481,8 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- search / browse / add / delete ----------------------------------------
 
-      private void Search_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(CertGrid, SearchBox.Text);
+      private void Search_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(CertGrid, SearchBar.SearchText);
 
       private static string BrowsePem()
       {
@@ -523,25 +533,17 @@ namespace hMailServer.ControlPanel.Views
          }
          else
          {
-            AddHintRow.Visibility = Visibility.Collapsed;
+            AddHint.Visibility = Visibility.Collapsed;
          }
       }
 
-      /// <summary>Colour, shape and word for the add-form hint, like every other status here.</summary>
+      /// <summary>Colour, shape and word for the add-form hint, like every other
+      /// status here: the notice draws all three from the level.</summary>
       private void ShowAddHint(StatusLevel level, string message)
       {
-         StatusPresentation presentation = StatusSemantics.For(level);
-         ShapeMarkVisuals.ApplyMark(AddHintMark, presentation.Shape, presentation.BrushKey);
-
-         AddHintText.Inlines.Clear();
-         var word = new Run(presentation.SeverityWord + " — ") { FontWeight = FontWeights.SemiBold };
-         word.SetResourceReference(TextElement.ForegroundProperty, presentation.BrushKey);
-         AddHintText.Inlines.Add(word);
-         AddHintText.Inlines.Add(new Run(message));
-         System.Windows.Automation.AutomationProperties.SetName(AddHintText,
-            presentation.SeverityWord + ". " + message);
-
-         AddHintRow.Visibility = Visibility.Visible;
+         AddHint.Level = level;
+         AddHint.Text = message;
+         AddHint.Visibility = Visibility.Visible;
       }
 
       private async void Add_Click(object sender, RoutedEventArgs e)
@@ -614,7 +616,7 @@ namespace hMailServer.ControlPanel.Views
 
          NewCertName.Text = NewCertFile.Text = NewKeyFile.Text = "";
          NewKeyPassphrase.Password = "";
-         AddHintRow.Visibility = Visibility.Collapsed;
+         AddHint.Visibility = Visibility.Collapsed;
          Reload();
       }
 

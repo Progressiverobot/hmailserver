@@ -7,9 +7,8 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -371,16 +370,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          if (count == 0)
-         {
-            var ok = new TextBlock
-            {
-               Text = L("No configuration warnings."),
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 2, 0, 2)
-            };
-            ok.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-            WarningsPanel.Children.Add(ok);
-         }
+            WarningsPanel.Children.Add(new InlineNotice { Level = StatusLevel.Good, Text = L("No configuration warnings."), Margin = new Thickness(0) });
       }
 
       /// <summary>
@@ -405,69 +395,21 @@ namespace hMailServer.ControlPanel.Views
       /// And nothing joined the badge to the message, so a reader moving through the
       /// page heard "Critical" and then, as a separate unrelated item, a sentence.
       ///
-      /// It is now the presentation the dashboard's backlog badge already uses and
-      /// StatusSemanticsTests already pins: a shape, a word, and a theme brush key
-      /// that ThemeTokens keeps correct in all three themes. There is no
-      /// foreground/background pair left to get wrong, because there is no fill; the
-      /// shape carries the severity for a reader who cannot separate the colours;
-      /// and the message's accessible name carries the severity in words.
+      /// It is now an InlineNotice at the level StatusSemantics gives the server's
+      /// word - Critical, Warning or Information - which draws the shape, the word
+      /// and the theme brush in all three themes and puts the word first in its
+      /// accessible name. There is no foreground/background pair left to get wrong,
+      /// because there is no fill; the shape carries the severity for a reader who
+      /// cannot separate the colours.
       /// </summary>
       private int AddWarning(string severity, string text)
       {
-         StatusPresentation status = StatusSemantics.For(StatusSemantics.ForConfigurationWarning(severity));
-
-         var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(90) });
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-         var mark = new Path
+         WarningsPanel.Children.Add(new InlineNotice
          {
-            Width = 10,
-            Height = 10,
-            Stretch = Stretch.Fill,
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 5, 0)
-         };
-         // By resource key, never by resolved brush: ThemeTokens republishes these
-         // on every theme change and on Windows switching High Contrast, and a badge
-         // handed a brush would be the one element left painted for the old theme.
-         ShapeMarkVisuals.ApplyMark(mark, status.Shape, status.BrushKey);
-
-         var word = new TextBlock
-         {
-            Text = severity,
-            FontSize = Typography.Caption,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-         };
-         word.SetResourceReference(TextBlock.ForegroundProperty, status.BrushKey);
-
-         var badge = new StackPanel
-         {
-            Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 1, 12, 0),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top
-         };
-         badge.Children.Add(mark);
-         badge.Children.Add(word);
-         Grid.SetColumn(badge, 0);
-         row.Children.Add(badge);
-
-         var msg = new TextBlock { Text = text, FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap };
-         msg.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-
-         // The severity said again, in the message's own accessible name, so that a
-         // reader landing on the sentence directly - which is what a virtual cursor
-         // does - gets the complete statement rather than a bare sentence whose
-         // severity was two elements ago. It costs one repeated word to anyone
-         // reading straight through, which is the cheaper of the two mistakes.
-         AutomationProperties.SetName(msg, severity + ". " + text);
-
-         Grid.SetColumn(msg, 1);
-         row.Children.Add(msg);
-
-         WarningsPanel.Children.Add(row);
+            Level = StatusSemantics.ForConfigurationWarning(severity),
+            Text = text,
+            Margin = new Thickness(0, 0, 0, 8)
+         });
          return 1;
       }
 

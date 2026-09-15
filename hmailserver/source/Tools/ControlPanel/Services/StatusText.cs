@@ -4,6 +4,7 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using hMailServer.ControlPanel.Views.Scaffold;
 
 namespace hMailServer.ControlPanel.Services
 {
@@ -34,6 +35,44 @@ namespace hMailServer.ControlPanel.Services
          else
          {
             status.Visibility = Visibility.Collapsed;
+         }
+      }
+
+      /// <summary>
+      /// The same, for a page on the scaffold: the empty message goes on an
+      /// <see cref="EmptyState"/> in the grid's place, and a load failure on an
+      /// <see cref="InlineNotice"/> at the critical level above the grid - or,
+      /// for a page with no notice of its own, on the empty state, so the failure
+      /// is never silent. Both are hidden while there are rows.
+      /// </summary>
+      public static void Show(EmptyState empty, InlineNotice notice, int rowCount, string error,
+                              string emptyText, string errorPrefix = "")
+      {
+         bool failed = !string.IsNullOrEmpty(error);
+
+         if (notice != null)
+         {
+            notice.Level = StatusLevel.Critical;
+            notice.Text = failed ? errorPrefix + error : null;
+            notice.Visibility = failed ? Visibility.Visible : Visibility.Collapsed;
+         }
+
+         if (empty == null)
+            return;
+
+         if (failed)
+         {
+            empty.Text = errorPrefix + error;
+            empty.Visibility = notice == null ? Visibility.Visible : Visibility.Collapsed;
+         }
+         else if (rowCount == 0)
+         {
+            empty.Text = emptyText;
+            empty.Visibility = Visibility.Visible;
+         }
+         else
+         {
+            empty.Visibility = Visibility.Collapsed;
          }
       }
    }

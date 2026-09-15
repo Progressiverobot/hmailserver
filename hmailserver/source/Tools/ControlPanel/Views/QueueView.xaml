@@ -8,55 +8,67 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <Grid Margin="26,20">
+    <!-- A list page on the scaffold: the header with the page's actions, the
+         toolbar with the search, a notice for what the last action said, and
+         the grid filling the rest - the grid scrolls itself, so the page has
+         no ScrollViewer of its own and takes the page padding as a margin. -->
+    <Grid Margin="{StaticResource AppPagePadding}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid>
-            <StackPanel>
-                <TextBlock Text="{loc:L 'Delivery queue'}" Style="{StaticResource PageTitle}" />
-                <TextBlock x:Name="SubtitleText" Text="{loc:L 'Messages waiting for delivery.'}"
-                           Style="{StaticResource PageSubtitle}" />
-                <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search queue...'}" Width="300"
-                            HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                            AutomationProperties.Name="{loc:L 'Search the delivery queue'}">
-                    <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
-                </ui:TextBox>
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button x:Name="ViewButton" Content="{loc:L '_View source'}" Click="View_Click" Margin="0,0,8,0">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button x:Name="RetryButton" Content="{loc:L '_Deliver now'}" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button x:Name="RemoveButton" Content="{loc:L '_Remove'}" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="Delete24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button Content="{loc:L 'Re_fresh'}" Click="Refresh_Click">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
-                </ui:Button>
-            </StackPanel>
-        </Grid>
+        <scaffold:PageHeader x:Name="Header" Title="{loc:L 'Delivery queue'}"
+                             Subtitle="{loc:L 'Messages waiting for delivery.'}">
+            <scaffold:PageHeader.Actions>
+                <StackPanel Orientation="Horizontal">
+                    <ui:Button x:Name="ViewButton" Content="{loc:L '_View source'}" Click="View_Click" Margin="0,0,8,0">
+                        <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button x:Name="RetryButton" Content="{loc:L '_Deliver now'}" Appearance="Primary" Click="Retry_Click" Margin="0,0,8,0">
+                        <ui:Button.Icon><ui:SymbolIcon Symbol="Send24" /></ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button x:Name="RemoveButton" Content="{loc:L '_Remove'}" Appearance="Danger" Click="Remove_Click" Margin="0,0,8,0">
+                        <ui:Button.Icon><ui:SymbolIcon Symbol="Delete24" /></ui:Button.Icon>
+                    </ui:Button>
+                    <ui:Button Content="{loc:L 'Re_fresh'}" Click="Refresh_Click">
+                        <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
+                    </ui:Button>
+                </StackPanel>
+            </scaffold:PageHeader.Actions>
+        </scaffold:PageHeader>
 
-        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
-            <DataGrid x:Name="QueueGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                      HeadersVisibility="Column" GridLinesVisibility="None"
-                      Background="Transparent" BorderThickness="0" RowHeight="34"
-                      MouseDoubleClick="View_Click">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90" />
-                    <DataGridTextColumn Header="{loc:L 'Created'}" Binding="{Binding Created}" Width="150" />
-                    <DataGridTextColumn Header="{loc:L 'From'}" Binding="{Binding From}" Width="*" />
-                    <DataGridTextColumn Header="{loc:L 'Recipients'}" Binding="{Binding Recipients}" Width="*" />
-                    <DataGridTextColumn Header="{loc:L 'Next try'}" Binding="{Binding NextTry}" Width="150" />
-                    <DataGridTextColumn Header="{loc:L 'Tries'}" Binding="{Binding Tries}" Width="60" />
-                </DataGrid.Columns>
-            </DataGrid>
-        </Border>
+        <scaffold:Toolbar x:Name="SearchBar" Grid.Row="1" SearchPlaceholder="{loc:L 'Search the delivery queue'}"
+                          SearchTextChanged="Search_TextChanged" />
+
+        <!-- What the last action said: a retriggered delivery, a removal, a
+             failure. Collapsed until there is something to say. -->
+        <scaffold:InlineNotice x:Name="Notice" Grid.Row="2" Visibility="Collapsed" />
+
+        <scaffold:Card Grid.Row="3" Padding="8">
+            <Grid>
+                <DataGrid x:Name="QueueGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                          MouseDoubleClick="View_Click"
+                          AutomationProperties.Name="{loc:L 'Delivery queue'}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="ID" Binding="{Binding Id}" Width="90"
+                                            ElementStyle="{StaticResource GridNumberText}" HeaderStyle="{StaticResource GridNumberHeader}" />
+                        <DataGridTextColumn Header="{loc:L 'Created'}" Binding="{Binding Created}" Width="150" />
+                        <DataGridTextColumn Header="{loc:L 'From'}" Binding="{Binding From}" Width="*" />
+                        <DataGridTextColumn Header="{loc:L 'Recipients'}" Binding="{Binding Recipients}" Width="*" />
+                        <DataGridTextColumn Header="{loc:L 'Next try'}" Binding="{Binding NextTry}" Width="150" />
+                        <DataGridTextColumn Header="{loc:L 'Tries'}" Binding="{Binding Tries}" Width="70"
+                                            ElementStyle="{StaticResource GridNumberText}" HeaderStyle="{StaticResource GridNumberHeader}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+                <scaffold:EmptyState x:Name="EmptyStatus" Icon="Send24" Visibility="Collapsed"
+                                     AutomationProperties.LiveSetting="Polite" />
+            </Grid>
+        </scaffold:Card>
     </Grid>
 </UserControl>

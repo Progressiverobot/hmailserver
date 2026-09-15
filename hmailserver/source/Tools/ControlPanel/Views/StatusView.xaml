@@ -8,157 +8,136 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <Grid Margin="26,20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-        </Grid.RowDefinitions>
-
-        <Grid>
-            <StackPanel>
-                <TextBlock Text="{loc:L 'Server status'}" Style="{StaticResource PageTitle}" />
-                <TextBlock x:Name="SubtitleText" Text="{loc:L 'Server, database and health overview.'}"
-                           Style="{StaticResource PageSubtitle}" />
-            </StackPanel>
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
-                <ui:Button x:Name="CheckUpdateButton" Content="{loc:L 'Check for _updates'}" Click="CheckUpdate_Click" Margin="0,0,8,0"
-                           ToolTip="{loc:L 'Reads the project\'s release feed now and says whether a newer release exists. Nothing is downloaded or installed by this.'}">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="Globe24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button x:Name="DownloadUpdateButton" Content="{loc:L '_Download update'}" Click="DownloadUpdate_Click" IsEnabled="False" Margin="0,0,8,0"
-                           ToolTip="{loc:L 'Fetches the newer release\'s installer and verifies it against its Sigstore bundle before keeping it. The Control Panel waits while it does; an installer is tens of megabytes.'}">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button x:Name="InstallUpdateButton" Content="{loc:L '_Install update'}" Click="InstallUpdate_Click" IsEnabled="False" Margin="0,0,8,0"
-                           ToolTip="{loc:L 'Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back.'}">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="Server24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button x:Name="PauseButton" Content="{loc:L '_Pause'}" Click="PauseResume_Click" IsEnabled="False"
-                           Margin="0,0,8,0"
-                           ToolTip="{loc:L 'Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed.'}">
-                    <ui:Button.Icon><ui:SymbolIcon x:Name="PauseButtonIcon" Symbol="Pause24" /></ui:Button.Icon>
-                </ui:Button>
-                <ui:Button Content="{loc:L '_Refresh'}" Click="Refresh_Click">
-                    <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
-                </ui:Button>
-            </StackPanel>
-        </Grid>
-
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Margin="0,4,0,0">
-            <StackPanel>
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- Server -->
-                    <Border Style="{StaticResource Card}" Margin="0,0,6,0">
-                        <StackPanel>
-                            <TextBlock Text="{loc:L 'Server'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
-                            <Grid x:Name="ServerGrid">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:L 'Version'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:L 'State'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="StateValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:L 'Started'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="StartedValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:L 'Uptime'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="UptimeValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:L 'Update'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="4" Grid.Column="1" x:Name="UpdateValue" Style="{StaticResource StatusValue}" TextWrapping="Wrap" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Database -->
-                    <Border Grid.Column="1" Style="{StaticResource Card}" Margin="6,0,0,0">
-                        <StackPanel>
-                            <TextBlock Text="{loc:L 'Database'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:L 'Type'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" x:Name="DbTypeValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:L 'Host'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DbHostValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:L 'Name'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DbNameValue" Style="{StaticResource StatusValue}" />
-                                <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:L 'Schema'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DbVersionValue" Style="{StaticResource StatusValue}" />
-                            </Grid>
-                        </StackPanel>
-                    </Border>
-                </Grid>
-
-                <!-- Statistics -->
-                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                    <StackPanel>
-                        <TextBlock Text="{loc:L 'Statistics'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
-                        <UniformGrid Columns="3">
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{loc:L 'Processed messages'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="ProcessedValue" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{loc:L 'Spam removed'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="SpamValue" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,0,0,8">
-                                <TextBlock Text="{loc:L 'Viruses removed'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="VirusValue" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Text="{loc:L 'SMTP sessions'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="SmtpValue" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Text="{loc:L 'IMAP sessions'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="ImapValue" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Text="{loc:L 'POP3 sessions'}" Style="{StaticResource StatusLabel}" />
-                                <TextBlock x:Name="Pop3Value" FontSize="20" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextFillColorPrimaryBrush}" />
-                            </StackPanel>
-                        </UniformGrid>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="{StaticResource AppPagePadding}">
+        <StackPanel>
+            <scaffold:PageHeader x:Name="Header" Title="{loc:L 'Server status'}"
+                                 Subtitle="{loc:L 'Server, database and health overview.'}">
+                <scaffold:PageHeader.Actions>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button x:Name="PauseButton" Content="{loc:L '_Pause'}" Click="PauseResume_Click" IsEnabled="False"
+                                   Margin="0,0,8,0"
+                                   ToolTip="{loc:L 'Stops the mail server engine while the Windows service keeps running: no new connections are accepted and nothing is delivered until it is resumed.'}">
+                            <ui:Button.Icon><ui:SymbolIcon x:Name="PauseButtonIcon" Symbol="Pause24" /></ui:Button.Icon>
+                        </ui:Button>
+                        <ui:Button Content="{loc:L '_Refresh'}" Click="Refresh_Click">
+                            <ui:Button.Icon><ui:SymbolIcon Symbol="ArrowClockwise24" /></ui:Button.Icon>
+                        </ui:Button>
                     </StackPanel>
-                </Border>
+                </scaffold:PageHeader.Actions>
+            </scaffold:PageHeader>
 
-                <!-- Warnings -->
-                <Border Style="{StaticResource Card}" Margin="0,12,0,0">
-                    <StackPanel>
-                        <TextBlock Text="{loc:L 'Warnings'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
-                        <StackPanel x:Name="WarningsPanel" />
+            <Grid Margin="{StaticResource AppCardGap}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Server. The update actions sit under the Update readout they
+                     act on, in the card's footer. -->
+                <scaffold:Card Title="{loc:L 'Server'}" Margin="0,0,6,0">
+                    <Grid x:Name="ServerGrid">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:L 'Version'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="VersionValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:L 'State'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="StateValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:L 'Started'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="StartedValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:L 'Uptime'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="UptimeValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:L 'Update'}" Style="{StaticResource TextCaption}" Margin="0,0,16,0" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="4" Grid.Column="1" x:Name="UpdateValue" Style="{StaticResource TextBody}" />
+                    </Grid>
+                    <scaffold:Card.Footer>
+                        <WrapPanel Orientation="Horizontal">
+                            <ui:Button x:Name="CheckUpdateButton" Content="{loc:L 'Check for _updates'}" Click="CheckUpdate_Click" Margin="0,0,8,4"
+                                       ToolTip="{loc:L 'Reads the project\'s release feed now and says whether a newer release exists. Nothing is downloaded or installed by this.'}">
+                                <ui:Button.Icon><ui:SymbolIcon Symbol="Globe24" /></ui:Button.Icon>
+                            </ui:Button>
+                            <ui:Button x:Name="DownloadUpdateButton" Content="{loc:L '_Download update'}" Click="DownloadUpdate_Click" IsEnabled="False" Margin="0,0,8,4"
+                                       ToolTip="{loc:L 'Fetches the newer release\'s installer and verifies it against its Sigstore bundle before keeping it. The Control Panel waits while it does; an installer is tens of megabytes.'}">
+                                <ui:Button.Icon><ui:SymbolIcon Symbol="DocumentText24" /></ui:Button.Icon>
+                            </ui:Button>
+                            <ui:Button x:Name="InstallUpdateButton" Content="{loc:L '_Install update'}" Click="InstallUpdate_Click" IsEnabled="False" Margin="0,0,8,4"
+                                       ToolTip="{loc:L 'Hands the verified installer to the update helper. The service stops and starts; if it does not come back, the previous version is reinstalled. The outcome is reported here when the service is back.'}">
+                                <ui:Button.Icon><ui:SymbolIcon Symbol="Server24" /></ui:Button.Icon>
+                            </ui:Button>
+                        </WrapPanel>
+                    </scaffold:Card.Footer>
+                </scaffold:Card>
+
+                <!-- Database -->
+                <scaffold:Card Grid.Column="1" Title="{loc:L 'Database'}" Margin="6,0,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="{loc:L 'Type'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="DbTypeValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="{loc:L 'Host'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="DbHostValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:L 'Name'}" Style="{StaticResource TextCaption}" Margin="0,0,16,8" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="DbNameValue" Style="{StaticResource TextBody}" Margin="0,0,0,8" />
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:L 'Schema'}" Style="{StaticResource TextCaption}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="DbVersionValue" Style="{StaticResource TextBody}" />
+                    </Grid>
+                </scaffold:Card>
+            </Grid>
+
+            <!-- Statistics -->
+            <scaffold:Card Title="{loc:L 'Statistics'}" Margin="{StaticResource AppCardGap}">
+                <UniformGrid Columns="3">
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="{loc:L 'Processed messages'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="ProcessedValue" Style="{StaticResource TextSubtitle}" />
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
-    </Grid>
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="{loc:L 'Spam removed'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="SpamValue" Style="{StaticResource TextSubtitle}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,8">
+                        <TextBlock Text="{loc:L 'Viruses removed'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="VirusValue" Style="{StaticResource TextSubtitle}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="{loc:L 'SMTP sessions'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="SmtpValue" Style="{StaticResource TextSubtitle}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="{loc:L 'IMAP sessions'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="ImapValue" Style="{StaticResource TextSubtitle}" />
+                    </StackPanel>
+                    <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="{loc:L 'POP3 sessions'}" Style="{StaticResource TextCaption}" />
+                        <TextBlock x:Name="Pop3Value" Style="{StaticResource TextSubtitle}" />
+                    </StackPanel>
+                </UniformGrid>
+            </scaffold:Card>
+
+            <!-- Warnings: one notice per finding, at its level. -->
+            <scaffold:Card Title="{loc:L 'Warnings'}">
+                <StackPanel x:Name="WarningsPanel" />
+            </scaffold:Card>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

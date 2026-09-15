@@ -7,8 +7,8 @@ using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -45,9 +45,9 @@ namespace hMailServer.ControlPanel.Views
          else
          {
             CheckMessagesDbOnly.IsEnabled = false;
-            MessagesDbOnlyNote.Text = L("hMailServer.ini was not found on this machine, so BackupMessagesDBOnly can only be changed on the server itself.");
+            MessagesDbOnlyRow.Hint = L("hMailServer.ini was not found on this machine, so BackupMessagesDBOnly can only be changed on the server itself.");
             CheckVerifyRestore.IsEnabled = false;
-            VerifyRestoreNote.Text = L("hMailServer.ini was not found on this machine, so BackupVerifyRestore can only be changed on the server itself.");
+            VerifyRestoreRow.Hint = L("hMailServer.ini was not found on this machine, so BackupVerifyRestore can only be changed on the server itself.");
 
             // An editor that cannot read the value back must not write it either -
             // it would misreport its own state on the next visit.
@@ -70,10 +70,18 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = F("Could not read the backup settings: {0}", ex.Message);
+            ShowNotice_(StatusLevel.Critical, F("Could not read the backup settings: {0}", ex.Message));
          }
 
          RefreshScheduleStatus();
+      }
+
+      /// <summary>What the last action said, at its level, above the cards.</summary>
+      private void ShowNotice_(StatusLevel level, string text)
+      {
+         Notice.Level = level;
+         Notice.Text = text;
+         Notice.Visibility = Visibility.Visible;
       }
 
       public void OnLeave()
@@ -129,9 +137,9 @@ namespace hMailServer.ControlPanel.Views
          {
             // The COM properties are live immediately; the INI one is read when
             // the service starts, so don't claim both took effect.
-            SubtitleText.Text = iniStore_.IsAvailable
+            ShowNotice_(StatusLevel.Good, iniStore_.IsAvailable
                ? L("Backup settings saved - the message-metadata-only switch applies after a service restart.")
-               : L("Backup settings saved.");
+               : L("Backup settings saved."));
             Services.Toast.Success(L("Backup settings saved."));
 
             // The destination may have changed, and the destination is where the
@@ -150,7 +158,7 @@ namespace hMailServer.ControlPanel.Views
             dynamic manager = ServerSession.Current.Application.BackupManager;
             manager.StartBackup();
             ServerSession.Release(manager);
-            SubtitleText.Text = F("Backup started {0} - runs in the background on the server.", DateTime.Now.ToLongTimeString());
+            ShowNotice_(StatusLevel.Good, F("Backup started {0} - runs in the background on the server.", DateTime.Now.ToLongTimeString()));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -182,7 +190,7 @@ namespace hMailServer.ControlPanel.Views
             backup.StartRestore();
             ServerSession.Release(backup);
             ServerSession.Release(manager);
-            SubtitleText.Text = L("Restore started - runs in the background on the server.");
+            ShowNotice_(StatusLevel.Good, L("Restore started - runs in the background on the server."));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -234,7 +242,7 @@ namespace hMailServer.ControlPanel.Views
          KeepCountBox.Text = keepCount.ToString(CultureInfo.InvariantCulture);
          MaxAgeBox.Text = maxAgeDays.ToString(CultureInfo.InvariantCulture);
 
-         SubtitleText.Text = L("Backup schedule saved - the service reads these settings when it starts, so they apply after a service restart.");
+         ShowNotice_(StatusLevel.Good, L("Backup schedule saved - the service reads these settings when it starts, so they apply after a service restart."));
          Services.Toast.Success(L("Backup schedule saved."));
          RefreshScheduleStatus();
       }
@@ -320,7 +328,7 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
-         ApplyStatus(ScheduleMark, ScheduleStatusText, scheduleLevel, scheduleText);
+         ApplyStatus(ScheduleNotice, scheduleLevel, scheduleText);
 
          StatusLevel lastLevel;
          string lastText;
@@ -407,7 +415,7 @@ namespace hMailServer.ControlPanel.Views
             }
          }
 
-         ApplyStatus(LastBackupMark, LastBackupStatusText, lastLevel, lastText);
+         ApplyStatus(LastBackupNotice, lastLevel, lastText);
       }
 
       /// <summary>The saved destination, "" when none is set, or null when COM could not be read.</summary>
@@ -426,19 +434,12 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      private static void ApplyStatus(System.Windows.Shapes.Path mark, TextBlock text,
-                                      StatusLevel level, string message)
+      /// <summary>The notice draws the level's colour, shape and word, and puts the
+      /// word first in its accessible name.</summary>
+      private static void ApplyStatus(InlineNotice notice, StatusLevel level, string message)
       {
-         StatusPresentation presentation = StatusSemantics.For(level);
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-
-         text.Inlines.Clear();
-         text.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-         text.Inlines.Add(new Run(message));
-
-         // The severity word is part of the text itself, but the name is set too so
-         // the announcement survives any future change to how the inlines are built.
-         System.Windows.Automation.AutomationProperties.SetName(text, presentation.SeverityWord + ": " + message);
+         notice.Level = level;
+         notice.Text = message;
       }
 
       /// <summary>

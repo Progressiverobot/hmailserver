@@ -64,7 +64,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (folder == null || !Directory.Exists(folder))
          {
-            SubtitleText.Text = L("Log folder not found on this machine (live logs need a local server).");
+            Header.Subtitle = L("Log folder not found on this machine (live logs need a local server).");
             return;
          }
 
@@ -74,13 +74,13 @@ namespace hMailServer.ControlPanel.Views
 
          if (newest == null)
          {
-            SubtitleText.Text = F("No log files in {0} yet. Enable logging in the server settings.", folder);
+            Header.Subtitle = F("No log files in {0} yet. Enable logging in the server settings.", folder);
             return;
          }
 
          logFile_ = newest.FullName;
          position_ = Math.Max(0, newest.Length - 64 * 1024); // start with the last 64 KB
-         SubtitleText.Text = F("Streaming {0}", newest.Name);
+         Header.Subtitle = F("Streaming {0}", newest.Name);
 
          Poll();
          timer_.Start();

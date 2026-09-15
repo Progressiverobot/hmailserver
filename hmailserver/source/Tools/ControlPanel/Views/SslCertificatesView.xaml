@@ -8,135 +8,148 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:local="clr-namespace:hMailServer.ControlPanel.Views">
 
-    <Grid Margin="26,20">
+    <Grid Margin="{StaticResource AppPagePadding}">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-            <TextBlock Text="{loc:L 'SSL certificates'}" Style="{StaticResource PageTitle}" />
-            <TextBlock Text="{loc:L 'Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let\'s Encrypt certificates appear here automatically.'}"
-                       Style="{StaticResource PageSubtitle}" />
-            <ui:TextBox x:Name="SearchBox" PlaceholderText="{loc:L 'Search certificates...'}" Width="300"
-                        HorizontalAlignment="Left" Margin="0,10,0,0" TextChanged="Search_TextChanged"
-                        AutomationProperties.Name="{loc:L 'Search certificates'}">
-                <ui:TextBox.Icon><ui:SymbolIcon Symbol="Search24" /></ui:TextBox.Icon>
-            </ui:TextBox>
-        </StackPanel>
+        <scaffold:PageHeader Title="{loc:L 'SSL certificates'}"
+                             Subtitle="{loc:L 'Certificates available for TLS ports, with what this machine can verify about each: the files, the expiry date, and whether the key belongs to the certificate. With ACME enabled, Let\'s Encrypt certificates appear here automatically.'}" />
 
-        <Border Grid.Row="1" Style="{StaticResource Card}" Padding="6">
+        <scaffold:Toolbar x:Name="SearchBar" Grid.Row="1" SearchPlaceholder="{loc:L 'Search certificates'}"
+                          SearchTextChanged="Search_TextChanged">
+            <scaffold:Toolbar.Actions>
+                <ui:Button x:Name="DeleteButton" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click"
+                           AutomationProperties.Name="{loc:L 'Delete the selected certificate'}" />
+            </scaffold:Toolbar.Actions>
+        </scaffold:Toolbar>
+
+        <!-- A load that failed, above the grid rather than in its place. -->
+        <scaffold:InlineNotice x:Name="LoadNotice" Grid.Row="2" Visibility="Collapsed" />
+
+        <scaffold:Card Grid.Row="3" Padding="8">
             <Grid>
-            <!-- Row virtualization is off: the status cells are built in code at
-                 Loaded time (the badge needs theme-following brushes a XAML
-                 binding cannot express), and container recycling would re-fire
-                 Loaded against a different row's data. Certificate lists are a
-                 handful of rows, so nothing is lost. -->
-            <DataGrid x:Name="CertGrid" AutoGenerateColumns="False" IsReadOnly="True"
-                      HeadersVisibility="Column" GridLinesVisibility="None"
-                      Background="Transparent" BorderThickness="0"
-                      EnableRowVirtualization="False"
-                      SelectionMode="Single" SelectionChanged="CertGrid_SelectionChanged"
-                      AutomationProperties.Name="{loc:L 'SSL certificates'}">
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="{loc:L 'Name'}" Binding="{Binding Name}" Width="170" />
-                    <DataGridTextColumn Header="{loc:L 'Certificate file'}" Binding="{Binding CertificateFile}" Width="*" />
-                    <DataGridTextColumn Header="{loc:L 'Private key file'}" Binding="{Binding PrivateKeyFile}" Width="*" />
-                    <DataGridTemplateColumn Header="{loc:L 'Certificate'}" Width="210" SortMemberPath="CertificateState">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <ContentControl Loaded="CertificateBadge_Loaded" IsTabStop="False" Focusable="False" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <DataGridTemplateColumn Header="{loc:L 'Private key'}" Width="210" SortMemberPath="PrivateKeyState">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <ContentControl Loaded="KeyBadge_Loaded" IsTabStop="False" Focusable="False" />
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                </DataGrid.Columns>
-            </DataGrid>
-            <TextBlock x:Name="EmptyStatus" AutomationProperties.LiveSetting="Polite" Visibility="Collapsed"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="14" Opacity="0.7" TextWrapping="Wrap" TextAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <!-- Row virtualization is off: the status cells are built in code at
+                     Loaded time (the badge needs theme-following brushes a XAML
+                     binding cannot express), and container recycling would re-fire
+                     Loaded against a different row's data. Certificate lists are a
+                     handful of rows, so nothing is lost. -->
+                <DataGrid x:Name="CertGrid" AutoGenerateColumns="False" IsReadOnly="True"
+                          EnableRowVirtualization="False"
+                          SelectionMode="Single" SelectionChanged="CertGrid_SelectionChanged"
+                          AutomationProperties.Name="{loc:L 'SSL certificates'}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="{loc:L 'Name'}" Binding="{Binding Name}" Width="170" />
+                        <DataGridTextColumn Header="{loc:L 'Certificate file'}" Binding="{Binding CertificateFile}" Width="*" />
+                        <DataGridTextColumn Header="{loc:L 'Private key file'}" Binding="{Binding PrivateKeyFile}" Width="*" />
+                        <DataGridTemplateColumn Header="{loc:L 'Certificate'}" Width="210" SortMemberPath="CertificateState">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ContentControl Loaded="CertificateBadge_Loaded" IsTabStop="False" Focusable="False" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="{loc:L 'Private key'}" Width="210" SortMemberPath="PrivateKeyState">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <ContentControl Loaded="KeyBadge_Loaded" IsTabStop="False" Focusable="False" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <scaffold:EmptyState x:Name="EmptyStatus" Icon="Certificate24" Visibility="Collapsed"
+                                     AutomationProperties.LiveSetting="Polite" />
+                <!-- Shown while the first inspection runs off the UI thread. -->
+                <scaffold:LoadingState x:Name="Loading" Visibility="Collapsed" />
             </Grid>
-        </Border>
+        </scaffold:Card>
 
         <!-- The selected certificate, in full sentences: what was verified, what
              could not be, and the one secret this page can write but will never
-             read back - the private key passphrase. -->
-        <Border Grid.Row="2" x:Name="DetailsCard" Style="{StaticResource Card}" Margin="0,12,0,0" Visibility="Collapsed">
+             read back - the private key passphrase. The card's title is the
+             certificate's name, set from code. -->
+        <scaffold:Card Grid.Row="4" x:Name="DetailsCard" Margin="0,12,0,0" Visibility="Collapsed">
             <StackPanel>
-                <TextBlock x:Name="DetailsTitle" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" />
-                <StackPanel x:Name="DetailsLines" />
+                <StackPanel x:Name="DetailsLines" Margin="0,0,0,8" />
 
-                <TextBlock Text="{loc:L 'Private _key passphrase'}" local:Mnemonic.Target="{Binding ElementName=PassphraseBox}" FontSize="14" FontWeight="SemiBold" Margin="0,12,0,4" />
-                <TextBlock FontSize="12" Opacity="0.75" TextWrapping="Wrap" Margin="0,0,0,8"
-                           Text="{loc:L 'Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before.'}" />
+                <scaffold:FieldRow Label="{loc:L 'Private _key passphrase'}"
+                                   Hint="{loc:L 'Only needed when the key file is encrypted: with an encrypted key and no passphrase, the key does not load (server error 6170) and every TLS port using this certificate does not start - inbound mail on those ports stops. The passphrase is a secret: it is stored protected on the server and never displayed here again, and saving a new one replaces whatever was stored before.'}"
+                                   Margin="0">
+                    <local:PasswordField x:Name="PassphraseBox" MaxWidth="360" HorizontalAlignment="Left" PlaceholderText="{loc:L 'New passphrase'}"
+                                         AutomationProperties.Name="{loc:L 'New private key passphrase for the selected certificate'}" />
+                </scaffold:FieldRow>
+            </StackPanel>
+            <scaffold:Card.Footer>
                 <StackPanel Orientation="Horizontal">
-                    <local:PasswordField x:Name="PassphraseBox" Width="280" PlaceholderText="{loc:L 'New passphrase'}"
-                                    AutomationProperties.Name="{loc:L 'New private key passphrase for the selected certificate'}" />
-                    <ui:Button Content="{loc:L 'Save _passphrase'}" Appearance="Primary" Margin="8,0,0,0" Click="SavePassphrase_Click"
+                    <ui:Button Content="{loc:L 'Save _passphrase'}" Appearance="Primary" Click="SavePassphrase_Click" Margin="0,0,8,0"
                                AutomationProperties.Name="{loc:L 'Save the private key passphrase for the selected certificate'}" />
-                    <ui:Button Content="{loc:L '_Remove stored passphrase'}" Margin="8,0,0,0" Click="ClearPassphrase_Click"
+                    <ui:Button Content="{loc:L '_Remove stored passphrase'}" Click="ClearPassphrase_Click"
                                AutomationProperties.Name="{loc:L 'Remove the stored private key passphrase from the selected certificate'}" />
                 </StackPanel>
-            </StackPanel>
-        </Border>
+            </scaffold:Card.Footer>
+        </scaffold:Card>
 
-        <Border Grid.Row="3" Style="{StaticResource Card}" Margin="0,12,0,0">
+        <scaffold:Card Grid.Row="5" Title="{loc:L 'Add certificate'}" Margin="0,12,0,0">
             <StackPanel>
-                <TextBlock Text="{loc:L 'Add certificate'}" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12" />
                 <Grid>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" MinWidth="120" />
                         <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="2*" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" MinWidth="160" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ui:TextBox x:Name="NewCertName" PlaceholderText="{loc:L 'Name'}" Margin="0,0,8,0"
-                                AutomationProperties.Name="{loc:L 'Name for the new certificate'}" />
-                    <ui:TextBox x:Name="NewCertFile" Grid.Column="1" PlaceholderText="{loc:L 'Certificate file (PEM)'}" Margin="0,0,4,0"
-                                AutomationProperties.Name="{loc:L 'Certificate file for the new certificate'}" />
-                    <ui:Button Grid.Column="2" Content="…" Click="BrowseCert_Click" Margin="0,0,8,0"
-                               AutomationProperties.Name="{loc:L 'Browse for the certificate file'}" />
-                    <ui:TextBox x:Name="NewKeyFile" Grid.Column="3" PlaceholderText="{loc:L 'Private key file (PEM)'}" Margin="0,0,4,0"
-                                AutomationProperties.Name="{loc:L 'Private key file for the new certificate'}" />
-                    <ui:Button Grid.Column="4" Content="…" Click="BrowseKey_Click" Margin="0,0,8,0"
-                               AutomationProperties.Name="{loc:L 'Browse for the private key file'}" />
-                    <ui:Button Grid.Column="5" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click" Margin="0,0,8,0"
+                    <scaffold:FieldRow Label="{loc:L 'Name'}" Margin="0,0,8,0">
+                        <ui:TextBox x:Name="NewCertName"
+                                    AutomationProperties.Name="{loc:L 'Name for the new certificate'}" />
+                    </scaffold:FieldRow>
+                    <scaffold:FieldRow Grid.Column="1" Label="{loc:L 'Certificate file (PEM)'}" Margin="0,0,8,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="NewCertFile"
+                                        AutomationProperties.Name="{loc:L 'Certificate file for the new certificate'}" />
+                            <ui:Button Grid.Column="1" Content="…" Click="BrowseCert_Click" Margin="4,0,0,0"
+                                       AutomationProperties.Name="{loc:L 'Browse for the certificate file'}" />
+                        </Grid>
+                    </scaffold:FieldRow>
+                    <scaffold:FieldRow Grid.Column="2" Label="{loc:L 'Private key file (PEM)'}" Margin="0,0,8,0">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:TextBox x:Name="NewKeyFile"
+                                        AutomationProperties.Name="{loc:L 'Private key file for the new certificate'}" />
+                            <ui:Button Grid.Column="1" Content="…" Click="BrowseKey_Click" Margin="4,0,0,0"
+                                       AutomationProperties.Name="{loc:L 'Browse for the private key file'}" />
+                        </Grid>
+                    </scaffold:FieldRow>
+                    <scaffold:FieldRow Grid.Column="3" Label="{loc:L 'Key passphrase (only for an encrypted key)'}" Margin="0,0,8,0">
+                        <local:PasswordField x:Name="NewKeyPassphrase"
+                                             AutomationProperties.Name="{loc:L 'Private key passphrase for the certificate being added'}" />
+                    </scaffold:FieldRow>
+                    <ui:Button Grid.Column="4" Content="{loc:L '_Add'}" Appearance="Primary" Click="Add_Click"
+                               VerticalAlignment="Bottom" Margin="0,0,0,12"
                                AutomationProperties.Name="{loc:L 'Add the certificate'}" />
-                    <ui:Button x:Name="DeleteButton" Grid.Column="6" Content="{loc:L '_Delete selected'}" Appearance="Danger" Click="Delete_Click"
-                               AutomationProperties.Name="{loc:L 'Delete the selected certificate'}" />
                 </Grid>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <local:PasswordField x:Name="NewKeyPassphrase" Width="280"
-                                    PlaceholderText="{loc:L 'Key passphrase (only for an encrypted key)'}"
-                                    AutomationProperties.Name="{loc:L 'Private key passphrase for the certificate being added'}" />
-                </StackPanel>
                 <!-- Filled in by code when the picked key file turns out to be
                      encrypted: that is knowable from the file itself, and saying
                      it now is cheaper than error 6170 after the next restart. -->
-                <Grid x:Name="AddHintRow" Margin="0,6,0,0" Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Path x:Name="AddHintMark" Width="11" Height="11" Stretch="Fill" Margin="0,3,8,0" VerticalAlignment="Top" />
-                    <TextBlock x:Name="AddHintText" Grid.Column="1" FontSize="12" TextWrapping="Wrap" />
-                </Grid>
+                <scaffold:InlineNotice x:Name="AddHint" Margin="0" Visibility="Collapsed" />
             </StackPanel>
-        </Border>
+        </scaffold:Card>
     </Grid>
 </UserControl>

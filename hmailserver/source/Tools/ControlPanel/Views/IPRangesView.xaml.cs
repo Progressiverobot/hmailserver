@@ -67,18 +67,18 @@ namespace hMailServer.ControlPanel.Views
          }
 
          RangeGrid.ItemsSource = rows;
-         ListSearch.Apply(RangeGrid, SearchBox.Text);
-         StatusText.Show(EmptyStatus, rows.Count, null, L("No IP ranges defined yet."));
+         ListSearch.Apply(RangeGrid, SearchBar.SearchText);
+         StatusText.Show(EmptyStatus, null, rows.Count, null, L("No IP ranges defined yet."));
       }
 
-      private void Search_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(RangeGrid, SearchBox.Text);
+      private void Search_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(RangeGrid, SearchBar.SearchText);
 
       private void RangeGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {
          if (RangeGrid.SelectedItem is not RangeRow row)
          {
-            PermHeader.Text = L("Permissions (select a range)");
+            PermCard.Title = L("Permissions (select a range)");
             SavePermsButton.IsEnabled = false;
             return;
          }
@@ -90,7 +90,7 @@ namespace hMailServer.ControlPanel.Views
             if (range == null)
                return;
 
-            PermHeader.Text = F("Permissions - {0}", row.Name);
+            PermCard.Title = F("Permissions - {0}", row.Name);
             PermSmtp.IsChecked = (bool)range.AllowSMTPConnections;
             PermImap.IsChecked = (bool)range.AllowIMAPConnections;
             PermPop3.IsChecked = (bool)range.AllowPOP3Connections;
@@ -147,7 +147,7 @@ namespace hMailServer.ControlPanel.Views
             range.AllowDeliveryFromRemoteToRemote = PermRR.IsChecked is true;
             range.Save();
             ServerSession.Release(range);
-            PermHeader.Text = F("Permissions - {0} (saved)", row.Name);
+            PermCard.Title = F("Permissions - {0} (saved)", row.Name);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

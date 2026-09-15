@@ -94,17 +94,18 @@ namespace hMailServer.ControlPanel.Views
          }
 
          RuleGrid.ItemsSource = rows;
-         ListSearch.Apply(RuleGrid, SearchBox.Text);
-         SubtitleText.Text = rows.Count == 0
-            ? L("No rules defined yet - create one below.")
+         ListSearch.Apply(RuleGrid, SearchBar.SearchText);
+         StatusText.Show(EmptyStatus, null, rows.Count, null, L("No rules defined yet - create one below."));
+         HeaderPanel.Subtitle = rows.Count == 0
+            ? L("Server-wide message rules, evaluated top to bottom.")
             : F("{0} rule(s), evaluated top to bottom.", rows.Count);
 
          CriteriaGrid.ItemsSource = null;
          ActionsGrid.ItemsSource = null;
       }
 
-      private void Search_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(RuleGrid, SearchBox.Text);
+      private void Search_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(RuleGrid, SearchBar.SearchText);
 
       private static readonly string[] FieldNames =
          { "?", L("From"), L("To"), L("CC"), L("Subject"), L("Body"), L("Message size"), L("Recipient list"), L("Delivery attempts") };

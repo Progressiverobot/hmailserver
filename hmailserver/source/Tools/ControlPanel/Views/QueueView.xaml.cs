@@ -45,7 +45,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = L("Select a message first.");
+            ShowNotice_(StatusLevel.Information, L("Select a message first."));
             return;
          }
 
@@ -56,7 +56,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = L("Select a message first.");
+            ShowNotice_(StatusLevel.Information, L("Select a message first."));
             return;
          }
 
@@ -68,12 +68,12 @@ namespace hMailServer.ControlPanel.Views
             queue.ResetDeliveryTime(Convert.ToInt64(row.Id));
             queue.StartDelivery();
             ServerSession.Release(queue);
-            SubtitleText.Text = F("Delivery retriggered for message {0}.", row.Id);
             Reload();
+            ShowNotice_(StatusLevel.Good, F("Delivery retriggered for message {0}.", row.Id));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = F("Could not retrigger delivery: {0}", ex.Message);
+            ShowNotice_(StatusLevel.Critical, F("Could not retrigger delivery: {0}", ex.Message));
          }
       }
 
@@ -81,7 +81,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (QueueGrid.SelectedItem is not QueueRow row)
          {
-            SubtitleText.Text = L("Select a message first.");
+            ShowNotice_(StatusLevel.Information, L("Select a message first."));
             return;
          }
 
@@ -94,12 +94,12 @@ namespace hMailServer.ControlPanel.Views
             dynamic queue = ServerSession.Current.Application.GlobalObjects.DeliveryQueue;
             queue.Remove(Convert.ToInt64(row.Id));
             ServerSession.Release(queue);
-            SubtitleText.Text = F("Message {0} removed.", row.Id);
             Reload();
+            ShowNotice_(StatusLevel.Good, F("Message {0} removed.", row.Id));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = F("Could not remove the message: {0}", ex.Message);
+            ShowNotice_(StatusLevel.Critical, F("Could not remove the message: {0}", ex.Message));
          }
       }
 
@@ -129,18 +129,28 @@ namespace hMailServer.ControlPanel.Views
             }
 
             QueueGrid.ItemsSource = rows;
-            ListSearch.Apply(QueueGrid, SearchBox.Text);
-            SubtitleText.Text = rows.Count == 0
-               ? L("The delivery queue is empty.")
+            ListSearch.Apply(QueueGrid, SearchBar.SearchText);
+            StatusText.Show(EmptyStatus, Notice, rows.Count, null, L("The delivery queue is empty."));
+            Header.Subtitle = rows.Count == 0
+               ? L("Messages waiting for delivery.")
                : F("{0} message(s) waiting for delivery.", rows.Count);
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            SubtitleText.Text = F("Could not read the queue: {0}", ex.Message);
+            ShowNotice_(StatusLevel.Critical, F("Could not read the queue: {0}", ex.Message));
          }
       }
 
-      private void Search_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(QueueGrid, SearchBox.Text);
+      /// <summary>What the last action said, at its level: a confirmation in
+      /// green, a failure in red, each with its shape and word.</summary>
+      private void ShowNotice_(StatusLevel level, string text)
+      {
+         Notice.Level = level;
+         Notice.Text = text;
+         Notice.Visibility = Visibility.Visible;
+      }
+
+      private void Search_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(QueueGrid, SearchBar.SearchText);
    }
 }

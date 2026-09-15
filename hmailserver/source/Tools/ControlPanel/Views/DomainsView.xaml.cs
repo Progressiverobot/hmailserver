@@ -70,7 +70,8 @@ namespace hMailServer.ControlPanel.Views
          }
 
          DomainList.ItemsSource = rows;
-         ListSearch.Apply(DomainList, DomainSearch.Text);
+         ListSearch.Apply(DomainList, DomainSearch.SearchText);
+         StatusText.Show(DomainStatus, null, rows.Count, null, L("No domains yet. Add the first one to start receiving mail."));
 
          // Replacing ItemsSource clears the selection; put it back on the same
          // domain when it still exists, so a reload does not yank the accounts
@@ -82,11 +83,11 @@ namespace hMailServer.ControlPanel.Views
             DomainList.SelectedIndex = 0;
       }
 
-      private void DomainSearch_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(DomainList, DomainSearch.Text);
+      private void DomainSearch_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(DomainList, DomainSearch.SearchText);
 
-      private void AccountSearch_TextChanged(object sender, TextChangedEventArgs e)
-         => ListSearch.Apply(AccountList, AccountSearch.Text);
+      private void AccountSearch_TextChanged(object sender, EventArgs e)
+         => ListSearch.Apply(AccountList, AccountSearch.SearchText);
 
       private void DomainList_SelectionChanged(object sender, SelectionChangedEventArgs e)
       {
@@ -191,8 +192,8 @@ namespace hMailServer.ControlPanel.Views
       }
 
       // Shows a centered empty/error placeholder over a list when it has no rows.
-      private static void SetListStatus(TextBlock status, int rowCount, string error, string emptyText, string errorPrefix)
-         => StatusText.Show(status, rowCount, error, emptyText, errorPrefix);
+      private static void SetListStatus(Scaffold.EmptyState status, int rowCount, string error, string emptyText, string errorPrefix)
+         => StatusText.Show(status, null, rowCount, error, emptyText, errorPrefix);
 
       private void AddAlias_Click(object sender, RoutedEventArgs e)
       {
@@ -372,12 +373,13 @@ namespace hMailServer.ControlPanel.Views
          string domainName = SelectedDomainName();
          if (domainName == null)
          {
-            AccountsHeader.Text = L("Select a domain");
+            AccountsCard.Title = L("Select a domain");
             AccountList.ItemsSource = null;
+            AccountStatus.Visibility = Visibility.Collapsed;
             return;
          }
 
-         AccountsHeader.Text = F("{0} - accounts", domainName);
+         AccountsCard.Title = F("{0} - accounts", domainName);
          NewAccountBox.Text = "user@" + domainName;
 
          var rows = new List<AccountRow>();
@@ -402,7 +404,8 @@ namespace hMailServer.ControlPanel.Views
          }
 
          AccountList.ItemsSource = rows;
-         ListSearch.Apply(AccountList, AccountSearch.Text);
+         ListSearch.Apply(AccountList, AccountSearch.SearchText);
+         StatusText.Show(AccountStatus, null, rows.Count, null, L("No accounts in this domain yet."));
       }
 
       private void EditDomain_Click(object sender, RoutedEventArgs e)
