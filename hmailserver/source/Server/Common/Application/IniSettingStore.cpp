@@ -752,10 +752,16 @@ namespace HM
 
             if (String(current).IsEmpty() && !value.IsEmpty())
             {
+               // Braces: LOG_APPLICATION expands to an if of its own, so a bare
+               // else after it would pair with the macro.
                if (WriteIniValue_(_T("Settings"), name, value))
+               {
                   LOG_APPLICATION(Formatter::Format("IniSettingStore: the archive carried {0}, which this server keeps in hMailServer.INI only; the file had none, so the archived value has been written into the file and not into the database.", name));
+               }
                else
+               {
                   writeFailures.push_back(name);
+               }
             }
 
             continue;
