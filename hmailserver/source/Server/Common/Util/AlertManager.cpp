@@ -919,7 +919,12 @@ namespace HM
             continue;
          }
 
-         UpdateHook_(event.id, HookPending, tries, now + (__int64) WebhookBackoffMinutes(tries) * 60);
+         // The backoff is keyed on the attempts made BEFORE this one, which is what
+         // its table says: none before means no wait, so the first retry is on the
+         // next pass. Passing the count including this attempt put a minute's wait
+         // before the first retry, so an administrator's "run now" straight after a
+         // failure did nothing and a two-attempt dead letter took two minutes.
+         UpdateHook_(event.id, HookPending, tries, now + (__int64) WebhookBackoffMinutes(tries - 1) * 60);
       }
 
       return delivered;

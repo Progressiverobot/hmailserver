@@ -659,9 +659,17 @@ STDMETHODIMP InterfaceUtilities::RunTestSuite(BSTR sTestPassword)
    
       return S_OK;
    }
+   catch (const std::exception &failure)
+   {
+      // The testers say what failed by throwing std::logic_error with a sentence,
+      // and a generic "an error occurred" threw that sentence away - so the
+      // regression test that runs this could only report that some tester, of
+      // thirty, had failed.
+      return COMError::GenerateError(HM::String(HM::AnsiString("The internal test suite failed: ") + failure.what()));
+   }
    catch (...)
    {
-      return COMError::GenerateGenericMessage();
+      return COMError::GenerateError(_T("The internal test suite failed in a tester that threw without saying why. Run it under a debugger with OutputDebugString captured: the last \"hMailServer: Testing\" line names it."));
    }
 }
 

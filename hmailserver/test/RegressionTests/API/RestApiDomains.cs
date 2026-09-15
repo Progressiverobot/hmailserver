@@ -406,12 +406,25 @@ namespace RegressionTests.API
       [Description("PUT /api/v1/domains/{name} takes what the domain does to a message - the external-sender tag in the subject and in a header, its text, the first-contact note and the disclaimer in both forms - with COM reading every value the API set, the listing showing them, a field left out left alone, and an over-long tag text refused with nothing changed.")]
       public void DomainMessageTransformFieldsRoundTripThroughCom()
       {
+         // One domain's object out of GET /api/v1/domains: from its "name" to the
+         // next domain or the end of the array.
+         string DomainEntry(string domainName)
+         {
+            string listing = Http("GET", "/api/v1/domains").body;
+            int start = listing.IndexOf("\"name\":\"" + domainName + "\"", StringComparison.Ordinal);
+            Assert.GreaterOrEqual(start, 0, "The domain is not in the listing: " + listing);
+            int end = listing.IndexOf("},{\"", start, StringComparison.Ordinal);
+            return end < 0 ? listing.Substring(start) : listing.Substring(start, end - start);
+         }
+
          string name = UniqueDomainName();
          Assert.AreEqual(201, Http("POST", "/api/v1/domains", "{\"name\":\"" + name + "\"}").status);
 
-         // Off is the shipped state, and the listing says so.
-         StringAssert.Contains("\"external_tag_subject\":false", Http("GET", "/api/v1/domains/" + name).body);
-         StringAssert.Contains("\"disclaimer_enabled\":false", Http("GET", "/api/v1/domains/" + name).body);
+         // Off is the shipped state, and the listing says so. There is no GET for
+         // one domain - PUT and DELETE only - so the domain's own entry is taken
+         // out of the listing rather than asserting on every domain's fields at once.
+         StringAssert.Contains("\"external_tag_subject\":false", DomainEntry(name));
+         StringAssert.Contains("\"disclaimer_enabled\":false", DomainEntry(name));
 
          (int status, string body) = Http("PUT", "/api/v1/domains/" + name,
             "{\"active\":true,\"external_tag_subject\":true,\"external_tag_header\":true," +
