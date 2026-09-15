@@ -456,6 +456,12 @@
   };
   // A collapsed conversation is filed whole, one message after another,
   // as its tick box selects it whole.
+  // A swipe's action, from the settings: archive, delete, junk, mark as read, or nothing.
+  var swipeAction = function (what, entry) {
+    if (what === 'archive' || what === 'delete') { fileRow(entry, what); }
+    else if (what === 'junk') { fileRow(entry, junkTargetFor(state.folderId)); }
+    else if (what === 'read') { markRows([entry], true); }
+  };
   var fileRow = function (row, to) {
     if (!row) { return; }
     var entries = (row.ids || [row.id]).map(function (id) { return { id: id, folderId: row.folderId || state.folderId }; });
@@ -659,7 +665,7 @@
       if (touchX === null || !e.changedTouches || !e.changedTouches.length) { return; }
       var dx = e.changedTouches[0].clientX - touchX;
       touchX = null;
-      if (dx > 90) { fileRow(entry, 'archive'); } else if (dx < -90) { fileRow(entry, 'delete'); }
+      if (dx > 90) { swipeAction(pref('swipe_right'), entry); } else if (dx < -90) { swipeAction(pref('swipe_left'), entry); }
     }, { passive: true });
     listRows.push(entry);
     return row;
@@ -3493,9 +3499,16 @@
     });
   };
   el('message-snooze').addEventListener('click', function () { var m = el('snooze-menu'); m.hidden = !m.hidden; });
-  el('snooze-3h').addEventListener('click', function () { snoozeUntil(stampOf(new Date(Date.now() + 3 * 3600 * 1000))); });
-  el('snooze-tomorrow').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
-  el('snooze-week').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); snoozeUntil(stampOf(d)); });
+  var snoozeHours = function () { var n = Number(pref('snooze_hours')); return n > 0 && n <= 72 ? n : 3; };
+  var snoozeHour = function () { var n = Number(pref('snooze_hour')); return n >= 0 && n <= 23 ? n : 9; };
+  var renderSnoozePresets = function () {
+    el('snooze-3h').textContent = tf('in {0} hours', snoozeHours());
+    el('snooze-tomorrow').textContent = tf('tomorrow at {0}', snoozeHour());
+    el('snooze-week').textContent = tf('next week at {0}', snoozeHour());
+  };
+  el('snooze-3h').addEventListener('click', function () { snoozeUntil(stampOf(new Date(Date.now() + snoozeHours() * 3600 * 1000))); });
+  el('snooze-tomorrow').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(snoozeHour(), 0, 0, 0); snoozeUntil(stampOf(d)); });
+  el('snooze-week').addEventListener('click', function () { var d = new Date(); d.setDate(d.getDate() + 7); d.setHours(snoozeHour(), 0, 0, 0); snoozeUntil(stampOf(d)); });
   el('snooze-go').addEventListener('click', function () { var at = fromPicker(el('snooze-at').value); if (at.length === 16) { snoozeUntil(at); } else { say('mail-status', t('Choose when.'), false); } });
   // ---- Clean up conversation, as Outlook has it -----------------------------
   // The messages of a conversation whose whole text a later message of it
@@ -3810,7 +3823,7 @@
   // Kept with the account (GET/PUT /api/v1/me/preferences); the browser's
   // storage holds only the theme, for the sign-in page before there is one.
   var prefs = {};
-  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '', nudges: '1', timezone: '' };
+  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '', nudges: '1', timezone: '', swipe_right: 'archive', swipe_left: 'delete', snooze_hours: '3', snooze_hour: '9' };
   var renderListTools = function () {
     el('view-threads').textContent = pref('view') === 'threads' ? t('Show messages one by one') : t('Show conversations');
     var emptyable = !state.everywhere && (folderIs(state.folderId, 'Junk') || folderIs(state.folderId, 'Trash'));
@@ -3908,6 +3921,11 @@
     el('pref-language').value = knownLanguage(pref('language') || '') || languageActive;
     fillZones();
     el('pref-timezone').value = pref('timezone') || '';
+    el('pref-swipe-right').value = pref('swipe_right');
+    el('pref-swipe-left').value = pref('swipe_left');
+    el('pref-snooze-hours').value = String(snoozeHours());
+    el('pref-snooze-hour').value = String(snoozeHour());
+    renderSnoozePresets();
     renderNotifyFolders();
     renderTemplates();
     renderQuickSteps();
@@ -4178,7 +4196,7 @@
     var ticked = [];
     var labels = el('notify-folders').children;
     for (var i = 0; i < labels.length; i++) { var tick = labels[i].children[0]; if (tick && tick.checked) { ticked.push(tick.value); } }
-    savePrefs({ language: el('pref-language').value, timezone: el('pref-timezone').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
+    savePrefs({ language: el('pref-language').value, timezone: el('pref-timezone').value, swipe_right: el('pref-swipe-right').value, swipe_left: el('pref-swipe-left').value, snooze_hours: el('pref-snooze-hours').value, snooze_hour: el('pref-snooze-hour').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
                 notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(','), inbox: el('pref-inbox').value, nudges: el('pref-nudges').checked ? '1' : '0' }).then(function (ok) {
       if (ok) { say('prefs-status', t('Saved.'), true); if (lastPage) { renderMessages(lastPage); } }
     });

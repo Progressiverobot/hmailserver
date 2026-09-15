@@ -1399,6 +1399,46 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- snooze presets and swipe actions as settings
+   location.hash = '#/settings';
+   await flush();
+   document.getElementById('pref-swipe-right').value = 'read';
+   document.getElementById('pref-swipe-left').value = 'none';
+   document.getElementById('pref-snooze-hours').value = '5';
+   document.getElementById('pref-snooze-hour').value = '8';
+   const beforeSwipePrefs = requests.length;
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const swipePut = since(beforeSwipePrefs).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences').map((r) => JSON.parse(r.body))[0];
+   check('the swipe actions and the snooze presets are kept with the account', !!swipePut && swipePut.swipe_right === 'read' && swipePut.swipe_left === 'none' && swipePut.snooze_hours === '5' && swipePut.snooze_hour === '8',
+      JSON.stringify(swipePut));
+   location.hash = '#/m/102';
+   await flush();
+   check('the snooze menu offers the presets as set', document.getElementById('snooze-3h').textContent === 'in 5 hours' && document.getElementById('snooze-tomorrow').textContent === 'tomorrow at 8' && document.getElementById('snooze-week').textContent === 'next week at 8',
+      document.getElementById('snooze-3h').textContent + ' | ' + document.getElementById('snooze-tomorrow').textContent);
+   location.hash = '#/f/1';
+   await flush();
+   const swipeRow = Array.from(document.getElementById('message-list').children).find((r) => r.tagName !== 'DIV' || true);
+   const beforeSwipe = requests.length;
+   swipeRow.dispatchEvent(makeEvent('touchstart', { touches: [{ clientX: 100 }] }));
+   swipeRow.dispatchEvent(makeEvent('touchend', { changedTouches: [{ clientX: 320 }] }));
+   await flush();
+   check('a swipe to the right does what was chosen for it', since(beforeSwipe).some((r) => r.method === 'PUT' && /\/flags$/.test(r.path) && /"seen":true/.test(r.body || '')),
+      JSON.stringify(since(beforeSwipe).map((r) => r.method + ' ' + r.path).slice(0, 4)));
+   const beforeSwipeLeft = requests.length;
+   swipeRow.dispatchEvent(makeEvent('touchstart', { touches: [{ clientX: 320 }] }));
+   swipeRow.dispatchEvent(makeEvent('touchend', { changedTouches: [{ clientX: 100 }] }));
+   await flush();
+   check('and a swipe set to nothing does nothing', !since(beforeSwipeLeft).some((r) => r.method !== 'GET'), JSON.stringify(since(beforeSwipeLeft).map((r) => r.method + ' ' + r.path).slice(0, 4)));
+   location.hash = '#/settings';
+   await flush();
+   document.getElementById('pref-swipe-right').value = 'archive';
+   document.getElementById('pref-swipe-left').value = 'delete';
+   document.getElementById('pref-snooze-hours').value = '3';
+   document.getElementById('pref-snooze-hour').value = '9';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+
    // ---- trackers, counted: the remote-image notice says what it kept out
    location.hash = '#/m/102';
    await flush();
