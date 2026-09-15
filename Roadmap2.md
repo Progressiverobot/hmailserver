@@ -115,7 +115,7 @@ Each of these was checked against Roadmap.md before it was written here: none ha
 | ⬜ | **Saved searches as folders** | Outlook's search folders: a search saved with a name, shown in the folder list, always current. |
 | ⬜ | **Manage subscriptions** | One page listing every sender that offers an unsubscribe, with how much it sends and one button per row - Gmail's, and the reason most people go looking for it. |
 | ⬜ | **Brand logos** | BIMI on receipt: the logo a sender publishes, verified, as the avatar in the list, which Gmail and Outlook.com both show. |
-| ⬜ | **Contacts in and out** | vCard and CSV import and export in the address book, and a Google and Outlook contacts export walked through in the wiki. |
+| ✅ | **Contacts in and out** | **Done 15 September 2026.** The Contacts page exports the address book as vCard 3.0 (one card per contact: FN, N, EMAIL) or as CSV with the `Name,E-mail Address` header Outlook reads, and imports either: a vCard file of any number of cards (folded lines, escapes, several EMAILs on one card, quoted-printable cards skipped) or a CSV read by its own header row - Google Contacts' `Name` and `E-mail 1 - Value`, Outlook's `First Name`, `Last Name` and `E-mail Address`, or a plain `name,email` - adding what is not there yet by address and saying how many came in. The wiki's client page walks the Google and Outlook exports. Five harness checks. |
 | ⬜ | **Snooze, scheduled send and reminders on the phone** | The same features exist; whether they are reachable and readable on a phone is what the UX audit in section 3 measures. |
 
 ### The project

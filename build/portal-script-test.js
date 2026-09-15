@@ -403,6 +403,10 @@ function answer(method, path, body) {
    if (path === '/api/v1/me/settings' && method === 'GET') {
       return json(200, { name: { first: 'A', last: 'B' }, forwarding: { enabled: false, address: '', keep_original: true }, signature: { enabled: false, text: '' } });
    }
+   if (path === '/api/v1/me/contacts' && method === 'POST') {
+      const added = JSON.parse(body || '{}');
+      return json(201, { id: 100 + requests.length, name: added.name || '', address: added.address || '', source: 'manual' });
+   }
    if (path.startsWith('/api/v1/me/contacts?') && method === 'GET') {
       // The address book, narrowed the way the server narrows it: names and
       // addresses containing the text.
@@ -1394,6 +1398,34 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- contacts in and out: vCard and CSV out, either back in
+   location.hash = '#/contacts';
+   await flush();
+   const contactsSection = document.getElementById('contacts-section');
+   document.getElementById('contact-export-vcf').dispatchEvent(makeEvent('click'));
+   await flush();
+   const vcf = contactsSection.getAttribute('data-last-export') || '';
+   check('the address book exports as vCard 3.0, one card per contact', /BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice Example\r\nN:Example;Alice;;;\r\nEMAIL;TYPE=INTERNET:alice@example.net\r\nEND:VCARD/.test(vcf) && (vcf.match(/BEGIN:VCARD/g) || []).length === 2,
+      vcf.slice(0, 160));
+   document.getElementById('contact-export-csv').dispatchEvent(makeEvent('click'));
+   await flush();
+   const csv = contactsSection.getAttribute('data-last-export') || '';
+   check('and as CSV with the header Outlook reads', csv.indexOf('Name,E-mail Address\r\nAlice Example,alice@example.net\r\n') === 0, csv.slice(0, 80));
+   const beforeImport = requests.length;
+   const importInput = document.getElementById('contact-import-file');
+   importInput.files = [new File(['BEGIN:VCARD\r\nVERSION:3.0\r\nFN:New Person\r\nEMAIL:new@example.org\r\nEND:VCARD\r\nBEGIN:VCARD\r\nVERSION:3.0\r\nFN:Alice Again\r\nEMAIL:alice@example.net\r\nEND:VCARD\r\n'], 'contacts.vcf', { type: 'text/vcard' })];
+   importInput.dispatchEvent(makeEvent('change'));
+   await flush();
+   const posted = since(beforeImport).filter((r) => r.method === 'POST' && r.path === '/api/v1/me/contacts').map((r) => JSON.parse(r.body));
+   check('a vCard file imports the contacts that are not there yet', posted.length === 1 && posted[0].address === 'new@example.org' && posted[0].name === 'New Person', JSON.stringify(posted));
+   check('and says how many came in and how many were known', document.getElementById('contact-status').textContent === '1 contact(s) imported, 1 already there.', document.getElementById('contact-status').textContent);
+   const beforeCsv = requests.length;
+   importInput.files = [new File(['Name,Given Name,Family Name,E-mail 1 - Value,E-mail 2 - Value\r\n"Cara, Csv",Cara,Csv,cara@example.org,\r\n'], 'google.csv', { type: 'text/csv' })];
+   importInput.dispatchEvent(makeEvent('change'));
+   await flush();
+   const postedCsv = since(beforeCsv).filter((r) => r.method === 'POST' && r.path === '/api/v1/me/contacts').map((r) => JSON.parse(r.body));
+   check('a Google Contacts CSV imports by its own header row, quoted names intact', postedCsv.length === 1 && postedCsv[0].address === 'cara@example.org' && postedCsv[0].name === 'Cara, Csv', JSON.stringify(postedCsv));
+
    // ---- the installed app: the badge, a mailto: link, a share, the handler
    if (app.hidden) {
       document.getElementById('address').value = 'user@example.com';

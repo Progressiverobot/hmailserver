@@ -2068,6 +2068,132 @@
     });
   });
 
+  // ---- Contacts in and out ---------------------------------------------------
+  // The address book as a file and back: vCard 3.0, one card per contact, is
+  // what every phone and mail program reads; CSV with the header row Google
+  // Contacts and Outlook write is what people already have. An import adds
+  // what is not there yet, by address, and says how many it added.
+  var vcardEscape = function (s) { return String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;'); };
+  var vcardUnescape = function (s) { return String(s || '').replace(/\\n/gi, '\n').replace(/\\([\\,;])/g, '$1'); };
+  var contactsToVCard = function (list) {
+    return list.map(function (c) {
+      var name = c.name || c.address;
+      var words = String(c.name || '').trim().split(/\s+/).filter(function (w) { return w; });
+      var family = words.length > 1 ? words[words.length - 1] : '';
+      var given = words.length > 1 ? words.slice(0, -1).join(' ') : (words[0] || '');
+      return ['BEGIN:VCARD', 'VERSION:3.0', 'FN:' + vcardEscape(name), 'N:' + vcardEscape(family) + ';' + vcardEscape(given) + ';;;',
+        'EMAIL;TYPE=INTERNET:' + vcardEscape(c.address), 'END:VCARD'].join('\r\n') + '\r\n';
+    }).join('');
+  };
+  var csvCell = function (s) { s = String(s || ''); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  var contactsToCsv = function (list) {
+    return 'Name,E-mail Address\r\n' + list.map(function (c) { return csvCell(c.name) + ',' + csvCell(c.address) + '\r\n'; }).join('');
+  };
+  var parseVCards = function (text) {
+    var lines = String(text).replace(/\r\n?/g, '\n').replace(/\n[ \t]/g, '').split('\n');
+    var out = [];
+    var card = null;
+    lines.forEach(function (line) {
+      var colon = line.indexOf(':');
+      if (colon < 0) { return; }
+      var head = line.slice(0, colon); var value = line.slice(colon + 1);
+      var name = head.split(';')[0].toUpperCase();
+      if (name === 'BEGIN' && value.toUpperCase() === 'VCARD') { card = { name: '', n: '', emails: [] }; return; }
+      if (!card) { return; }
+      if (name === 'END') {
+        var display = card.name || card.n;
+        card.emails.forEach(function (address) { if (address.indexOf('@') > 0) { out.push({ name: display, address: address }); } });
+        card = null; return;
+      }
+      if (/ENCODING=QUOTED-PRINTABLE/i.test(head)) { return; }
+      if (name === 'FN') { card.name = vcardUnescape(value).trim(); }
+      else if (name === 'N') { var parts = value.split(';'); card.n = [vcardUnescape(parts[1] || ''), vcardUnescape(parts[0] || '')].join(' ').trim(); }
+      else if (name === 'EMAIL') { card.emails.push(vcardUnescape(value).trim()); }
+    });
+    return out;
+  };
+  var parseCsvRows = function (text) {
+    var rows = []; var row = []; var cell = ''; var quoted = false;
+    var s = String(text).replace(/^\uFEFF/, '');
+    for (var i = 0; i < s.length; i++) {
+      var ch = s[i];
+      if (quoted) {
+        if (ch === '"') { if (s[i + 1] === '"') { cell += '"'; i++; } else { quoted = false; } }
+        else { cell += ch; }
+      } else if (ch === '"') { quoted = true; }
+      else if (ch === ',') { row.push(cell); cell = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && s[i + 1] === '\n') { i++; } row.push(cell); rows.push(row); row = []; cell = ''; }
+      else { cell += ch; }
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (c) { return c.trim() !== ''; }); });
+  };
+  var parseContactsCsv = function (text) {
+    var rows = parseCsvRows(text);
+    if (rows.length < 2) { return []; }
+    var header = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+    var emailCols = []; header.forEach(function (h, i) { if (/^e-?mail/.test(h) && !/type|label/.test(h)) { emailCols.push(i); } });
+    var col = function (names) { for (var i = 0; i < header.length; i++) { if (names.indexOf(header[i]) >= 0) { return i; } } return -1; };
+    var nameCol = col(['name', 'display name', 'full name']);
+    var firstCol = col(['first name', 'given name']); var lastCol = col(['last name', 'family name', 'surname']);
+    if (!emailCols.length) { return []; }
+    var out = [];
+    rows.slice(1).forEach(function (r) {
+      var name = (nameCol >= 0 ? r[nameCol] : '') || [firstCol >= 0 ? r[firstCol] : '', lastCol >= 0 ? r[lastCol] : ''].join(' ');
+      name = String(name || '').trim();
+      emailCols.forEach(function (i) { var address = String(r[i] || '').trim(); if (address.indexOf('@') > 0) { out.push({ name: name, address: address }); } });
+    });
+    return out;
+  };
+  var downloadText = function (fileName, type, text) {
+    // The text is left on the section as well: a page without object URLs
+    // (a test harness) can still be asked what it would have sent.
+    el('contacts-section').setAttribute('data-last-export', text);
+    try {
+      var link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob([text], { type: type }));
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      if (typeof link.click === 'function') { link.click(); }
+      document.body.removeChild(link);
+    } catch (why) { /* nothing to download with */ }
+  };
+  var exportContacts = function (asCsv) {
+    var list = contactsCache || [];
+    if (!list.length) { say('contact-status', t('No contacts yet. Send a message, or add one above.'), false); return; }
+    if (asCsv) { downloadText('contacts.csv', 'text/csv', contactsToCsv(list)); } else { downloadText('contacts.vcf', 'text/vcard', contactsToVCard(list)); }
+    say('contact-status', tf('Exported {0} contact(s).', list.length), true);
+  };
+  el('contact-export-vcf').addEventListener('click', function () { exportContacts(false); });
+  el('contact-export-csv').addEventListener('click', function () { exportContacts(true); });
+  el('contact-import-file').addEventListener('change', function () {
+    var input = el('contact-import-file');
+    var file = (input.files || [])[0];
+    if (!file) { return; }
+    say('contact-status', t('Importing...'), true);
+    file.text().then(function (text) {
+      var list = /BEGIN:VCARD/i.test(text) ? parseVCards(text) : parseContactsCsv(text);
+      input.value = '';
+      if (!list.length) { say('contact-status', t('Nothing in that file looked like a contact.'), false); return; }
+      var known = {};
+      (contactsCache || []).forEach(function (c) { known[String(c.address).toLowerCase()] = true; });
+      var fresh = [];
+      list.forEach(function (c) { var key = c.address.toLowerCase(); if (!known[key]) { known[key] = true; fresh.push(c); } });
+      var imported = 0;
+      var chain = Promise.resolve();
+      fresh.forEach(function (c) {
+        chain = chain.then(function () {
+          return call('POST', '/api/v1/me/contacts', { name: c.name, address: c.address }).then(function (result) { if (result.status === 201) { imported++; } });
+        });
+      });
+      return chain.then(function () {
+        contactsCache = null;
+        say('contact-status', tf('{0} contact(s) imported, {1} already there.', imported, list.length - imported), true);
+        return loadContacts();
+      });
+    }, function () { say('contact-status', t('Nothing in that file looked like a contact.'), false); });
+  });
+
   // ---- To-field completion ---------------------------------------------------
   // The token being typed is the text after the last comma; on each keystroke the
   // address book is asked for it (small, so a fetch per key is fine) and a popup
