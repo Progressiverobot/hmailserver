@@ -1863,7 +1863,8 @@
     el('forward-keep').checked = !!s.forwarding.keep_original;
     el('signature-enabled').checked = !!s.signature.enabled;
     el('signature-text').value = s.signature.text || '';
-    signature = { enabled: !!s.signature.enabled, text: s.signature.text || '' };
+    el('signature-html').innerHTML = s.signature.html || '';
+    signature = { enabled: !!s.signature.enabled, text: s.signature.text || '', html: s.signature.html || '' };
   };
   var loadSettings = function () {
     call('GET', '/api/v1/me/settings').then(function (result) {
@@ -2727,11 +2728,46 @@
       say('vacation-status', result.status === 200 ? t('Saved.') : describe(result, t('Could not save')), result.status === 200);
     });
   });
+  // ---- The formatted signature ---------------------------------------------
+  // Beside the plain signature, one with layout: bold, italic, underline, a
+  // link, an image from a file kept as a data URI (the cleaner keeps those and
+  // nothing remote). Saved as signature.html, which the server has stored all
+  // along; put on formatted messages, the plain one on plain messages.
+  (function () {
+    var editor = el('signature-html');
+    var tools = el('signature-tools').children;
+    for (var i = 0; i < tools.length; i++) {
+      (function (b) {
+        if (!b.getAttribute('data-cmd')) { return; }
+        b.addEventListener('mousedown', function (event) { event.preventDefault(); });
+        b.addEventListener('click', function () {
+          var cmd = b.getAttribute('data-cmd');
+          var arg = null;
+          if (cmd === 'createLink') { arg = window.prompt ? window.prompt(t('Link address')) : ''; if (!arg) { return; } }
+          try { document.execCommand(cmd, false, arg); } catch (e) { /* a browser without the command keeps the text */ }
+        });
+      })(tools[i]);
+    }
+    el('signature-image').addEventListener('change', function () {
+      var file = (el('signature-image').files || [])[0];
+      if (!file) { return; }
+      if (file.size > 200 * 1024 || !/^image\/(png|jpeg|gif|webp)$/i.test(file.type || '')) { say('settings-status', t('An image for the signature: PNG, JPEG, GIF or WebP, 200 KB at most.'), false); el('signature-image').value = ''; return; }
+      var reader = new FileReader();
+      reader.onload = function () {
+        var img = document.createElement('img');
+        img.setAttribute('src', String(reader.result));
+        img.setAttribute('alt', '');
+        editor.appendChild(img);
+        el('signature-image').value = '';
+      };
+      reader.readAsDataURL(file);
+    });
+  })();
   el('settings-form').addEventListener('submit', function (event) {
     event.preventDefault();
     var body = {
       name: { first: el('name-first').value, last: el('name-last').value },
-      signature: { enabled: el('signature-enabled').checked, text: el('signature-text').value, html: '' }
+      signature: { enabled: el('signature-enabled').checked, text: el('signature-text').value, html: cleanHtml(el('signature-html')) }
     };
     call('PUT', '/api/v1/me/settings', body).then(function (result) {
       if (result.status === 200 && result.data) { renderSettings(result.data); say('settings-status', t('Saved.'), true); return; }
@@ -3508,7 +3544,20 @@
   var setRich = function (on) {
     richOn = on;
     var editor = el('compose-editor'), box = el('compose-text');
-    if (on) { textToEditor(box.value); editor.hidden = false; box.hidden = true; el('rich-tools').hidden = false; el('rich-toggle').textContent = 'Plain text'; }
+    if (on) {
+      var text = box.value;
+      if (signature.enabled && signature.html && signature.text) {
+        var plainBlock = '\n\n-- \n' + signature.text;
+        var at = text.lastIndexOf(plainBlock);
+        if (at >= 0 && text.slice(at + plainBlock.length).trim() === '') { text = text.slice(0, at); }
+      }
+      textToEditor(text);
+      if (signature.enabled && signature.html && editor.innerHTML.indexOf('data-sig="1"') < 0) {
+        var sig = document.createElement('div'); sig.setAttribute('data-sig', '1'); sig.innerHTML = '<br>-- <br>' + signature.html;
+        editor.appendChild(sig);
+      }
+      editor.hidden = false; box.hidden = true; el('rich-tools').hidden = false; el('rich-toggle').textContent = 'Plain text';
+    }
     else { box.value = plainOf(editor).replace(/\n+$/, ''); box.hidden = false; editor.hidden = true; el('rich-tools').hidden = true; el('rich-toggle').textContent = 'Formatting'; }
   };
   el('rich-toggle').addEventListener('click', function () { setRich(!richOn); if (richOn) { el('compose-editor').focus(); } });

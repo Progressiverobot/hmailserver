@@ -1399,6 +1399,20 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- a formatted signature: the editor, its tools, and the field the page saves
+   location.hash = '#/settings';
+   await flush();
+   check('the settings have a formatted signature with tools and an image control', !!document.getElementById('signature-html') && document.getElementById('signature-tools').children.length >= 5 && !!document.getElementById('signature-image'),
+      String(document.getElementById('signature-tools') && document.getElementById('signature-tools').children.length));
+   const beforeSig = requests.length;
+   document.getElementById('settings-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const sigPut = since(beforeSig).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/settings').map((r) => JSON.parse(r.body))[0];
+   // The cleaner walks real DOM nodes (nodeType, childNodes), which this
+   // harness's elements are not; what is checked here is that the page
+   // sends the formatted signature as a field of its own.
+   check('the formatted signature is saved as its own field', !!sigPut && typeof sigPut.signature.html === 'string', sigPut ? JSON.stringify(sigPut.signature) : 'no PUT');
+
    // ---- @mentions: the text asks the address book, the person goes to To
    location.hash = '#/compose';
    await flush();
