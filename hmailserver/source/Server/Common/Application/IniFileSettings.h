@@ -20,17 +20,31 @@ namespace HM
       void LoadSettings();
 
       /// <summary>
-      /// Reconciles the [Settings] section with the hm_inisettings table and makes
-      /// the result the source for the next LoadSettings(). Call once, after the
-      /// database is open AND its schema version has been accepted - the table only
-      /// exists at schema 6011, and querying it on an older database would replace
-      /// the clear "run DBUpdater" message with a SQL error.
+      /// Loads the [Settings] values from hm_inisettings - THE SETTINGS STORE from
+      /// schema 6042 - and makes them the source for the next LoadSettings(). Call
+      /// once, after the database is open AND its schema version has been accepted:
+      /// the table only exists at schema 6011, and querying it on an older database
+      /// would replace the clear "run DBUpdater" message with a SQL error.
       ///
-      /// Nothing else needs to change to benefit: the values are reconciled INTO the
-      /// ini file as well as out of it, so every reader that goes to the file
-      /// directly - the two DAV redirects in WebServicesServer, UseLanguage, the
-      /// Control Panel, hmconfig.ps1, hMailServer.exe /Register, which runs with no
-      /// database at all - keeps seeing the right value.
+      /// Three things happen here, in this order, and the order is the design:
+      ///
+      ///   1. IniSettingStore::Synchronize reconciles the file against the table.
+      ///      The table wins; a key edited in the file is named in the error log and
+      ///      not applied; a key the table has never seen is adopted. The values are
+      ///      written back INTO the file as well, so every reader that goes to it
+      ///      directly keeps seeing the right one - notably hMailServer.exe
+      ///      /Register, which reads ServiceAccountName and ServiceAccountPassword
+      ///      with no database open at all, because registering the service is what
+      ///      happens before there is one.
+      ///   2. [SettingsOverride] from the file is applied over the result and every
+      ///      key in it is named in the error log. This is the door for a database
+      ///      that is unreachable or holds a value that will not let the server
+      ///      start, and it deliberately shouts at every start so that nobody leaves
+      ///      one behind.
+      ///   3. The overlay is marked loaded, which is what makes ReadIniSettingString_
+      ///      and ReadIniSettingInteger_ consult it. It is marked loaded even when
+      ///      the table could not be read, PROVIDED there are overrides - because the
+      ///      unreachable database is exactly the case the door exists for.
       /// </summary>
       void LoadDatabaseSettings();
 
@@ -41,14 +55,6 @@ namespace HM
       /// outlive the database connection it came from.
       /// </summary>
       void ForgetDatabaseSettings();
-
-      /// <summary>
-      /// Records a [Settings] value in the database as well as in the file, so a
-      /// change made through the COM API is not lost from the mirror - and therefore
-      /// from the backup - until the next restart. Silent no-op before
-      /// LoadDatabaseSettings has run.
-      /// </summary>
-      void SaveDatabaseSetting(const String &key, const String &value);
 
       // ---- the administrative surface behind the COM API --------------------
       //
@@ -63,30 +69,36 @@ namespace HM
       // underneath live sessions. Persist now, apply on the next start - the same
       // contract an administrator editing the file by hand has always had, and the
       // one the Control Panel's "applies after a service restart" wording already
-      // describes.
+      // describes. Publishing a saved value to the running server is the next row of
+      // Roadmap2 section 13, and it needed the store moved first.
 
       /// <summary>
-      /// Reads one [Settings] value as it stands right now - through the reconciled
-      /// map when one has been loaded, and from the file otherwise.
+      /// Reads one [Settings] value as it stands right now - the stored value when
+      /// the overlay has been loaded, the override when one is in force, and the file
+      /// otherwise. Deliberately the effective value rather than the stored one: a
+      /// reader asking what a setting is should be told what the server is using.
       /// </summary>
       String GetSettingsValue(const String &key);
 
       /// <summary>
-      /// Writes one [Settings] value to the file and mirrors it. False means the FILE
-      /// could not be written and nothing was changed; see IniSettingStore::WriteSetting
-      /// for why that ordering matters.
+      /// Stores one [Settings] value and brings the file's copy into line. False means
+      /// the DATABASE could not be written and nothing was changed; see
+      /// IniSettingStore::WriteSetting for why that ordering is the opposite of what
+      /// it was.
       /// </summary>
       bool WriteSettingsValue(const String &key, const String &value);
 
       /// <summary>
-      /// Removes one [Settings] key, returning the setting to its default, and drops
-      /// its row to match. Deliberately distinct from writing an empty string: an
-      /// absent key falls back to the caller's default, while "Key=" reads as 0
-      /// through GetPrivateProfileInt.
+      /// Drops one setting's row and removes its key from the file, returning the
+      /// setting to its default. Deliberately distinct from writing an empty string:
+      /// an absent key falls back to the caller's default, while "Key=" reads as 0
+      /// through GetPrivateProfileInt. This is now the ONLY way to return a setting
+      /// to its default - deleting the line by hand no longer does it, because the
+      /// row would be written straight back at the next start.
       /// </summary>
       bool RemoveSettingsValue(const String &key);
 
-      /// <summary>Every [Settings] name currently in the file.</summary>
+      /// <summary>Every setting name the server holds: the table and the file, united.</summary>
       void GetSettingsNames(std::vector<String> &names);
 
       bool CheckSettings(String &sErrorMessage);
@@ -969,11 +981,14 @@ namespace HM
       int ReadPasswordHashWorkFactor_(const String &sKey, int minimum, int maximum);
 
       /// <summary>
-      /// The reconciled [Settings] values, or empty before LoadDatabaseSettings has
-      /// run. Consulted ONLY for the [Settings] section: the keys that are needed to
-      /// reach the database in the first place - everything in [Database],
-      /// [Directories] and the administrator password - can never be overridden from
-      /// the database, which is the ordering answer and the security answer at once.
+      /// The stored [Settings] values with any [SettingsOverride] applied over them,
+      /// or empty before LoadDatabaseSettings has run. Consulted ONLY for the
+      /// [Settings] section: the keys that are needed to reach the database in the
+      /// first place - everything in [Database], [Directories] and the administrator
+      /// password - can never come from the database, which is the ordering answer
+      /// and the security answer at once. A server whose database location could be
+      /// changed through the database it is currently using is a server that can be
+      /// pointed somewhere else by anyone who reaches the one it is on.
       ///
       /// Guarded because the two readers are called from LoadSettings, which runs on
       /// the startup thread and again on a COM thread (get_Directories,
@@ -983,6 +998,12 @@ namespace HM
       /// </summary>
       std::map<String, String> database_settings_;
       bool database_settings_loaded_;
+
+      /// <summary>
+      /// The names in [SettingsOverride], kept beside the values so that a caller
+      /// about to store a value can be told the override will go on shadowing it.
+      /// </summary>
+      std::set<String> file_overrides_;
       mutable boost::recursive_mutex database_settings_mutex_;
 
       String database_server_;

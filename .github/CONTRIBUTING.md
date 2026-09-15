@@ -81,12 +81,15 @@ The rule, from 15 September 2026: **a setting belongs in the database, not in `h
 Put it in `hm_settings` - the store the COM `Settings` object and the Control Panel's classic pages have
 always used, reached through `Property` and `PropertySet` - and give it a Control Panel editor, which
 `build/check-ini-coverage.py` already requires of every key in the file. Do not add a key to the
-`[Settings]` section.
+`[Settings]` section: `build/check-ini-coverage.py` compares every key the server reads against
+`build/ini-settings-baseline.txt` and fails the pull request if a new one appears there.
 
 The file keeps only what is needed to reach the database, or to be let in without one:
-`[Directories]`, `[Database]`, and `[Security]`'s administrator password and second-factor secret. If
-something genuinely has to be readable before the database is open, that is the exception - say so in the
-commit message, and expect to be asked.
+`[Directories]`, `[Database]`, `[Security]`'s administrator password and second-factor secret, and
+`[GUILanguages]`, which `Languages::Load` reads before the database is opened. If something genuinely has
+to be readable before the database is open, that is the exception: add it to one of those sections, add the
+line to `build/ini-settings-baseline.txt` in the same commit - the check names the file when it fails - say
+so in the commit message, and expect to be asked.
 
 Why, in one line each:
 
@@ -96,10 +99,23 @@ Why, in one line each:
 * A change to a file setting is saved now and applied at the next service start; a change in the
   database can be published to the running server.
 
-The 238 keys already in the file are being migrated - `Roadmap2.md`, section 13 - and `hm_inisettings`
-(schema 6011) already mirrors them, so the work is flipping which store is the truth rather than moving
-them one at a time. `IniFileSettings` is the seam that makes that possible, and
-`build/check-ini-coverage.py` proves on every pull request that every section is read through it.
+The 238 keys already in the file were migrated at schema 6042 - `Roadmap2.md`, section 13. They are read
+from and written to `hm_inisettings`, and the `[Settings]` section of `hMailServer.ini` is now a CACHE the
+server rewrites at every start, kept complete because `hMailServer.exe /Register` reads the service account
+from it with no database open at all. Three consequences worth knowing before you touch this area:
+
+* **Editing `[Settings]` in the file changes nothing.** The stored value is used, the edit is named in
+  `hMailServer_ERROR.log`, and the line is put back. A test that needs to change a setting goes through
+  `Settings.SetIniSetting` over COM - `RegressionTests`' own `IniFileSetting.Write` does.
+* **Deleting a line no longer returns a setting to its default.** `DeleteIniSetting`,
+  `DELETE /api/v1/settings/ini/{name}` and the Control Panel do, by dropping the row and the line together.
+* **`[SettingsOverride]` is the door**, for a database that is unreachable or holds a value the server will
+  not start on. A key there is applied over the store and announced by name in the error log at every
+  start. Nothing writes that section but a person.
+
+`IniFileSettings` is the seam every reader goes through, with `IniSettingStore` behind it as the only class
+that touches the file as a file, and `build/check-ini-coverage.py` proves on every pull request that every
+section is read through it.
 
 ## Looking at the two browser pages
 

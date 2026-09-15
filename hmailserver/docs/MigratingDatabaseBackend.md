@@ -143,20 +143,22 @@ would remove every domain, account and alias on the server, so it will not do it
 and will tell you why.
 
 **If your mail store is large, use the database-only mode.** Set
+`BackupMessagesDBOnly` to `1` before both the backup and the restore — in the
+Control Panel, over the REST API (`PUT /api/v1/settings/ini/BackupMessagesDBOnly`
+with `1`), or with `hmctl` — and restart the service, because it is read at start.
+It is stored in the database, not in `hMailServer.ini`: writing it into the file
+does not set it, and since schema 6042 the server names the edit in its error log
+and puts the line back. This stores and restores the message *rows* — which is what
+you are actually migrating — while leaving the `.eml` files alone on disk. On an
+installation with a few hundred gigabytes of mail this is the difference between
+minutes and most of a day, and since the data folder is not moving, copying it out
+and back achieves nothing.
 
-```ini
-[Settings]
-BackupMessagesDBOnly=1
-```
-
-in `hMailServer.ini` before both the backup and the restore. This stores and
-restores the message *rows* — which is what you are actually migrating — while
-leaving the `.eml` files alone on disk. On an installation with a few hundred
-gigabytes of mail this is the difference between minutes and most of a day, and
-since the data folder is not moving, copying it out and back achieves nothing.
-
-The setting has to be identical for the backup and the restore. Remove it
-afterwards so your ordinary scheduled backups go back to including the files.
+The setting has to be identical for the backup and the restore, and this is one of
+the few places where that means setting it **on both servers**: it is a setting of
+the server doing the work, and the new server has its own database. Remove it
+afterwards, in the same place, so your ordinary scheduled backups go back to
+including the files.
 
 ### 3. Create the new database
 

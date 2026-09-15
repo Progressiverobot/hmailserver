@@ -908,18 +908,52 @@ namespace HM
 
       std::map<String, String> resolved;
 
-      if (!store.Synchronize(resolved))
+      // Synchronize reports its own reason when it fails. Carrying on rather than
+      // refusing to start is deliberate: the file still holds a complete copy of
+      // the settings, written by this same store, so a server whose settings table
+      // is momentarily unreadable runs on that copy rather than not running at all.
+      bool stored = store.Synchronize(resolved);
+
+      // The door. Read from the file, applied over everything, and read EVEN WHEN
+      // the table could not be - because a database that cannot be reached, or that
+      // holds a value which stops the server starting, is the case this exists for.
+      std::map<String, String> overrides;
+      IniSettingStore::ReadOverrides(overrides);
+
+      std::set<String> overridden;
+
+      for (auto iter = overrides.begin(); iter != overrides.end(); iter++)
       {
-         // Synchronize has already reported why. Carry on with the file alone rather
-         // than refusing to start: a server that will not boot because a settings
-         // MIRROR is unavailable is worse than one running on the configuration
-         // sitting in front of it.
+         resolved[(*iter).first] = (*iter).second;
+         overridden.insert((*iter).first);
+      }
+
+      if (!overrides.empty())
+      {
+         std::vector<String> names;
+         for (auto iter = overrides.begin(); iter != overrides.end(); iter++)
+            names.push_back((*iter).first);
+
+         // Every start, by name, and as an error rather than a log line. An override
+         // is a deliberate deviation from the stored configuration that no page will
+         // show and no backup will carry, and the way it stops being forgotten is
+         // that it says so every time the service starts.
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5807, "IniFileSettings::LoadDatabaseSettings",
+            Formatter::Format("These settings are being forced from the [SettingsOverride] section of hMailServer.INI and are NOT what the database holds: {0}. That section is honoured on purpose - it is how a server is started when its stored configuration is unreachable or wrong - but it is invisible to the Control Panel, to the REST API and to every backup. Remove it once the stored value is right.",
+               StringParser::JoinVector(names, _T(", "))));
+      }
+
+      if (!stored && overrides.empty())
+      {
+         // Nothing to overlay and nothing stored: leave the overlay unloaded so that
+         // every read goes to the file, which is what the bootstrap has always done.
          return;
       }
 
       boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
 
       database_settings_ = resolved;
+      file_overrides_ = overridden;
       database_settings_loaded_ = true;
    }
 
@@ -929,32 +963,17 @@ namespace HM
       boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
 
       database_settings_.clear();
+      file_overrides_.clear();
       database_settings_loaded_ = false;
-   }
-
-   void
-   IniFileSettings::SaveDatabaseSetting(const String &key, const String &value)
-   {
-      {
-         boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
-
-         if (!database_settings_loaded_)
-            return;
-
-         database_settings_[key] = value;
-      }
-
-      IniSettingStore store;
-      store.Save(key, value);
    }
 
    String
    IniFileSettings::GetSettingsValue(const String &key)
    {
       // Straight through the ordinary read path, so a value fetched over COM is the
-      // same value the server itself would read for that key - overlay included.
-      // A separate implementation here would be a second answer to the same
-      // question, and the two would eventually disagree.
+      // same value the server itself would read for that key - overlay and override
+      // included. A separate implementation here would be a second answer to the
+      // same question, and the two would eventually disagree.
       return ReadIniSettingString_(_T("Settings"), key, _T(""));
    }
 
@@ -964,14 +983,29 @@ namespace HM
       if (!IniSettingStore::WriteSetting(key, value))
          return false;
 
-      // The overlay is updated only after the write succeeded, and to the value that
-      // actually reached the file. Updating it first would make this process read
-      // back a value that no other reader of the file can see.
+      // The overlay is updated only after the store took the value. Updating it
+      // first would make this process read back a value nothing else can see.
+      //
+      // An override is NOT disturbed: what the file forces is what the server is
+      // running on, and quietly replacing it here would make the overlay disagree
+      // with the next start. The administrator is told instead, because a save that
+      // is stored and then shadowed is the one case where "saved" and "in effect"
+      // are not the same thing.
+      bool shadowed = false;
+
       {
          boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
 
-         if (database_settings_loaded_)
+         shadowed = file_overrides_.find(key) != file_overrides_.end();
+
+         if (database_settings_loaded_ && !shadowed)
             database_settings_[key] = value;
+      }
+
+      if (shadowed)
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5808, "IniFileSettings::WriteSettingsValue",
+            Formatter::Format("The setting '{0}' was stored, but the [SettingsOverride] section of hMailServer.INI forces a different value for it, so the stored one will not take effect. Remove the key from that section to let the stored value be used.", key));
       }
 
       return true;
@@ -1021,7 +1055,11 @@ namespace HM
       {
          boost::lock_guard<boost::recursive_mutex> guard(database_settings_mutex_);
 
-         if (database_settings_loaded_)
+         // An override is left where it is, for the same reason as above: it is what
+         // the server is running on, and it is the file's statement rather than the
+         // store's. Erasing the overlay entry would have this process read the
+         // default while the next start read the override.
+         if (database_settings_loaded_ && file_overrides_.find(key) == file_overrides_.end())
             database_settings_.erase(key);
       }
 
@@ -1037,7 +1075,7 @@ namespace HM
    String
    IniFileSettings::ReadIniSettingString_(const String &sSection, const String &sKey, const String &sDefault)
    {
-      // [Settings] only, and only once the reconciliation has run. Every other
+      // [Settings] only, and only once the store has been loaded. Every other
       // section is read from the file and nowhere else, because those are the
       // sections that say where the database IS - so a value from the database could
       // never be needed to reach it, and allowing one would be a way to point a
@@ -1229,14 +1267,17 @@ namespace HM
    void 
    IniFileSettings::SetUserInterfaceLanguage(String sLanguage)
    {
-      WritePrivateProfileString(_T("Settings"), _T("UseLanguage"), sLanguage, GetInitializationFile());
-
-      // UseLanguage is the one [Settings] key that is neither loaded by
-      // LoadSettings nor cached in a member - GetUserInterfaceLanguage reads the
-      // file on every call - so it is not served from the reconciled map and does
-      // not need to be. It is mirrored anyway so that it reaches backups, which is
-      // the whole point of the table.
-      SaveDatabaseSetting(_T("UseLanguage"), sLanguage);
+      // Through the ordinary store-then-file path, like every other setting.
+      //
+      // This wrote the file itself and then recorded the value in the table, which
+      // was the right order while the file was the store and is the wrong one now: a
+      // failed row write would have left the file holding a language the store did
+      // not have, and the next start would have seen a file edited away from its
+      // stored value and correctly put it back - reverting a save that reported
+      // success. UseLanguage remains the one [Settings] key that is neither loaded by
+      // LoadSettings nor cached in a member - GetUserInterfaceLanguage reads the file
+      // on every call - which is exactly why the file copy has to keep being written.
+      WriteSettingsValue(_T("UseLanguage"), sLanguage);
    }
 
    int 
@@ -1504,12 +1545,12 @@ namespace HM
    IniFileSettings::SetRewriteEnvelopeFromWhenForwarding(bool value)
    {
       rewrite_envelope_from_when_forwarding_ = value;
-      WriteIniSetting_("Settings", "RewriteEnvelopeFromWhenForwarding", value ? 1 : 0);
 
-      // And into the mirror, or the change would be absent from the next backup and
-      // would look to the reconciliation on the next start like a file-side edit -
-      // correct in the end, but only by accident.
-      SaveDatabaseSetting("RewriteEnvelopeFromWhenForwarding", value ? _T("1") : _T("0"));
+      // Store first, file second, as every write does now. Writing the file here and
+      // recording the row afterwards - which is what this did - would let a failed
+      // row write produce a file the next start reads as an administrator's edit and
+      // puts back, reverting a change that reported success.
+      WriteSettingsValue(_T("RewriteEnvelopeFromWhenForwarding"), value ? _T("1") : _T("0"));
    }
 
    String

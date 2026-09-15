@@ -82,7 +82,11 @@ message-store directory.
 ## 3. Health checks and readiness gating
 
 hMailServer exposes Kubernetes-style probes on the metrics listener. Enable it on
-**both** nodes:
+**both** nodes. These are stored settings: set them in the Control Panel, over
+`/api/v1/settings/ini`, or with `hmctl`, and restart the service. They are shown
+below in the `[Settings]` shape they have always been written in, and that section of
+each node's `hMailServer.ini` still holds a copy — but since schema 6042 it is a copy
+the server maintains, not the place to change them.
 
 ```
 [Settings]

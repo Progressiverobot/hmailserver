@@ -121,66 +121,77 @@ namespace hMailServer.ControlPanel.Services
       }
 
       /// <summary>
-      /// Reads a [Settings] value: from the file when it is on this machine, and over
-      /// COM otherwise.
+      /// Reads a [Settings] value: over COM when there is a session, and from the
+      /// file otherwise.
       ///
-      /// The file is preferred where both are possible, because it is the copy the
-      /// server itself runs on - the mirror follows it, not the other way round - so
-      /// reading it cannot show a value the running server disagrees with.
+      /// THE ORDER INVERTED when the settings store moved into the database (schema
+      /// 6042, Roadmap2 section 13). The file used to be preferred because it was the
+      /// copy the server ran on and the table followed it. It is now the other way
+      /// round: the table is the store, the file is its cache, and a
+      /// [SettingsOverride] entry can make the running server use something that is
+      /// in neither. Only the server knows the effective value, so the server is
+      /// asked first, and the file is what is left when there is nobody to ask.
       /// </summary>
       public string Read(string key, string defaultValue = "")
       {
+         Func<string, string> read = ComReadSetting;
+
+         if (read != null)
+         {
+            try
+            {
+               string value = read(key);
+
+               // The server cannot tell "absent" from "empty" either - an ini reader
+               // never can - so an empty answer means the caller's default applies,
+               // exactly as GetPrivateProfileString would decide below.
+               return string.IsNullOrEmpty(value) ? defaultValue : value;
+            }
+            catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
+            {
+               // An older server without these members, or a session that has gone
+               // away. Fall through to the file, which on the server itself is a
+               // complete copy written by the server.
+            }
+         }
+
          if (IsAvailable)
             return ProfileApi.ReadString(Section, key, defaultValue, IniPath, 2048);
 
-         Func<string, string> read = ComReadSetting;
-
-         if (read == null)
-            return defaultValue;
-
-         try
-         {
-            string value = read(key);
-
-            // The server cannot tell "absent" from "empty" either - an ini reader
-            // never can - so an empty answer means the caller's default applies,
-            // exactly as GetPrivateProfileString would have decided above.
-            return string.IsNullOrEmpty(value) ? defaultValue : value;
-         }
-         catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck))
-         {
-            // An older server without these members, or a session that has gone
-            // away. The default is the same answer this returned before the COM
-            // route existed, so nothing that worked stops working.
-            return defaultValue;
-         }
+         return defaultValue;
       }
 
       public bool ReadBool(string key, bool defaultValue)
          => Read(key, defaultValue ? "1" : "0").Trim() == "1";
 
       /// <summary>
-      /// Writes a [Settings] value: to the file when it is on this machine, and over
-      /// COM otherwise.
+      /// Writes a [Settings] value over COM, which stores it in hm_inisettings - the
+      /// settings store - and brings the file's copy into line in the same call.
       ///
-      /// A COM write also updates the database mirror in the same call, because the
-      /// server does both; a local file write is picked up by the merge on the next
-      /// start. Either way the file ends up holding the value, which is what keeps
-      /// /Register, hmconfig.ps1 and the DAV redirects correct.
+      /// THIS NO LONGER WRITES THE FILE ITSELF, even when the file is right here, and
+      /// that is the whole point of the change. While the file was the store, writing
+      /// it was the write. Now the table is the store and a line in the file is a
+      /// cache entry: writing it directly would produce a value that reads back
+      /// correctly on the next visit to this page, is named in the server's error log
+      /// as an edit that was ignored, and is put back to the stored value at the next
+      /// start. That "saved, and silently reverted" shape is the exact defect this
+      /// project keeps removing, so the only write left is the one that goes to the
+      /// store.
+      ///
+      /// Which means a Control Panel with no session cannot change a setting even
+      /// sitting on the server, and it says so rather than pretending. Reading still
+      /// falls back to the file, because a complete copy of the configuration is
+      /// exactly what the file still is.
       /// </summary>
       public void Write(string key, string value)
       {
-         if (IsAvailable)
-         {
-            ProfileApi.WriteString(Section, key, value, IniPath);
-            return;
-         }
-
          Action<string, string> write = ComWriteSetting;
 
          if (write == null)
             throw new InvalidOperationException(
-               "hMailServer.INI is not on this machine and the server did not offer the settings API, so this value cannot be changed from here.");
+               "Settings are stored in the server's database, so changing one needs a connection to the server. " +
+               "Editing hMailServer.INI by hand does not change a setting: the stored value is used, and the edit is " +
+               "reported in the server's error log and undone at the next start.");
 
          write(key, value);
       }

@@ -173,8 +173,13 @@ destination in question.
 Settings that bound each stage
 ------------------------------
 
-All are in `hMailServer.ini` under `[Settings]` and all are in seconds. Defaults
-are chosen to be well inside a typical sending server's timeout.
+All are stored in the database and all are in seconds. Change one in the Control
+Panel, over the REST API at `/api/v1/settings/ini/<name>`, or with `hmctl`, and
+restart the service; each is read once at start. They also appear in the `[Settings]`
+section of `hMailServer.ini`, which since schema 6042 is a copy the server keeps
+current rather than the place they are set — editing one there is named in
+`hMailServer_ERROR.log` and put back at the next start. Defaults are chosen to be
+well inside a typical sending server's timeout.
 
 | Setting | Default | Bounds | `0` means |
 |---|---|---|---|
