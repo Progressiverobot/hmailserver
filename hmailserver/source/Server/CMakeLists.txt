@@ -310,6 +310,28 @@ add_executable(hmailserver ${SERVER_DIR}/platform/main.cpp)
 target_link_libraries(hmailserver PRIVATE hmailserver_core)
 set_target_properties(hmailserver PROPERTIES OUTPUT_NAME hmailserver)
 
+# ---------------------------------------------------------------- the SPF tests
+#
+# The SPF module's four testers as a program of their own: the openspf.org
+# conformance suite for RFC 7208, all 203 of its cases, and the three testers that
+# cover what the corpus does not - the grammar, macro expansion, and the corners of
+# section 4 no case visits.
+#
+# It exists because the Windows route to them does not exist here. There they run
+# inside hMailServer.exe: ClassTester::DoTests calls SPFTester::Test and the
+# regression suite reaches it through the COM method Utilities.RunTestSuite, which
+# the Linux suite's shim skips because there is no COM to reach it by. So the same
+# testers are linked into a binary instead, and .github/workflows/linux-build.yml
+# runs it in the build job - on x86-64 and AArch64, under clang and under GCC.
+#
+# Not installed, and deliberately not part of the packages: it is a bench tool.
+# Nothing here touches the network or reads the configuration - every tester
+# answers the evaluation's DNS queries out of a table - so the run is milliseconds
+# and depends on nothing outside this repository.
+add_executable(spf-tests ${SERVER_DIR}/platform/spf_tests_main.cpp)
+target_link_libraries(spf-tests PRIVATE hmailserver_core)
+set_target_properties(spf-tests PROPERTIES OUTPUT_NAME spf-tests)
+
 include(GNUInstallDirs)
 install(TARGETS hmailserver RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(DIRECTORY ${SERVER_DIR}/../DBScripts/

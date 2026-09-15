@@ -189,73 +189,145 @@ namespace HM
       // When DNSSEC validation is enabled, TXT records used for sender
       // authentication (SPF/DKIM/DMARC keys and policies) are validated
       // in-process. Forged (bogus) data is treated as a lookup failure.
-      if (IniFileSettings::Instance()->GetDnssecValidationEnabled() && !sDomain.IsEmpty())
+      std::vector<AnsiString> texts;
+      bool answered = false;
+      bool bogus = false;
+
+      if (TryValidatedTxtRecords_(sDomain, texts, answered, bogus))
       {
-         DnssecResolver dnssecResolver;
-         std::vector<AnsiString> texts;
-
-         DnssecResolver::ChainStatus status = dnssecResolver.QueryTxt(sDomain, texts);
-
-         if (status == DnssecResolver::ChainStatus::Bogus)
-         {
-            LOG_DEBUG("DNSSEC: TXT records for " + sDomain + " failed DNSSEC validation. Treating the lookup as failed.");
+         if (bogus)
             return false;
-         }
 
-         if (status == DnssecResolver::ChainStatus::Secure)
+         if (answered)
          {
             for (const AnsiString &text : texts)
                foundResult.push_back(String(text));
 
             return true;
          }
-
-         // Insecure: the validating path may have been blocked at the
-         // transport level, so fall through to the system resolver to
-         // avoid losing records.
       }
 
       return GetTXTRecordsRecursive_(sDomain, foundResult, 0);
    }
 
    bool
+   DNSResolver::TryValidatedTxtRecords_(const String &sDomain, std::vector<AnsiString> &texts, bool &answered, bool &bogus)
+   {
+      answered = false;
+      bogus = false;
+
+      if (!IniFileSettings::Instance()->GetDnssecValidationEnabled() || sDomain.IsEmpty())
+         return false;
+
+      DnssecResolver dnssecResolver;
+
+      DnssecResolver::ChainStatus status = dnssecResolver.QueryTxt(sDomain, texts);
+
+      if (status == DnssecResolver::ChainStatus::Bogus)
+      {
+         LOG_DEBUG("DNSSEC: TXT records for " + sDomain + " failed DNSSEC validation. Treating the lookup as failed.");
+
+         bogus = true;
+         return true;
+      }
+
+      if (status == DnssecResolver::ChainStatus::Secure)
+      {
+         answered = true;
+         return true;
+      }
+
+      // Insecure: the validating path may have been blocked at the
+      // transport level, so fall through to the system resolver to
+      // avoid losing records.
+      return false;
+   }
+
+   bool
    DNSResolver::GetTXTRecordsRecursive_(const String &sDomain, std::vector<String> &foundResult, int recursionLevel)
    {
-      if (sDomain.IsEmpty())
+      std::vector<DNSRecord> records;
+
+      bool result = GetRecordsOfTypeRecursive_(sDomain, DNS_TYPE_TEXT, records, recursionLevel);
+
+      foundResult = GetDnsRecordsValues_(records);
+
+      return result;
+   }
+
+   bool
+   DNSResolver::GetRecordsOfType(const AnsiString &query, int resourceType, std::vector<AnsiString> &values)
+   {
+      values.clear();
+
+      // A TXT lookup made here is a lookup of the same records GetTXTRecords returns,
+      // so it goes through the same DNSSEC gate. Leaving it out would mean SPF - the
+      // one caller of this method - read a forged policy that the DKIM and DMARC
+      // lookups beside it would have refused, which is the wrong half of the pair to
+      // trust less.
+      if (resourceType == DNS_TYPE_TEXT)
       {
-         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5516, "DNSResolver::GetTXTRecordsRecursive_", "Attempted DNS lookup for empty host name.");
+         std::vector<AnsiString> texts;
+         bool answered = false;
+         bool bogus = false;
+
+         if (TryValidatedTxtRecords_(String(query), texts, answered, bogus))
+         {
+            if (bogus)
+               return false;
+
+            if (answered)
+            {
+               values = texts;
+               return true;
+            }
+         }
+      }
+
+      std::vector<DNSRecord> records;
+
+      bool result = GetRecordsOfTypeRecursive_(String(query), resourceType, records, 0);
+
+      for (DNSRecord record : records)
+         values.push_back(record.GetValue());
+
+      return result;
+   }
+
+   bool
+   DNSResolver::GetRecordsOfTypeRecursive_(const String &query, int resourceType, std::vector<DNSRecord> &records, int recursionLevel)
+   {
+      if (query.IsEmpty())
+      {
+         ErrorManager::Instance()->ReportError(ErrorManager::Medium, 5516, "DNSResolver::GetRecordsOfTypeRecursive_", "Attempted DNS lookup for empty host name.");
          return false;
       }
 
       if (recursionLevel > 10)
       {
-         String sMessage = Formatter::Format("Too many recursions during TXT record lookup. Query: {0}", sDomain);
-         ErrorManager::Instance()->ReportError(ErrorManager::Low, 4402, "DNSResolver::GetTXTRecordsRecursive_", sMessage);
+         String sMessage = Formatter::Format("Too many recursions during record lookup. Query: {0}, type {1}", query, resourceType);
+         ErrorManager::Instance()->ReportError(ErrorManager::Low, 4402, "DNSResolver::GetRecordsOfTypeRecursive_", sMessage);
 
          return false;
       }
-      
+
       DNSResolverWinApi resolver;
 
-      std::vector<DNSRecord> foundRecords;
+      bool result = resolver.Query(query, resourceType, records);
 
-      bool result = resolver.Query(sDomain, DNS_TYPE_TEXT, foundRecords);
-
-      if (foundRecords.size() == 0)
+      if (records.size() == 0)
       {
-         // The queries for TXT didn't return any records. Attempt to look up via CNAME
+         // Nothing of the type asked for. The name may be an alias.
          std::vector<DNSRecord> foundCNames;
-         bool cnameQueryResult = resolver.Query(sDomain, DNS_TYPE_CNAME, foundCNames);
+         bool cnameQueryResult = resolver.Query(query, DNS_TYPE_CNAME, foundCNames);
 
          // A CNAME should only point at a single host name.
          if (cnameQueryResult && foundCNames.size() == 1)
          {
             auto cnameHostName = foundCNames[0].GetValue();
-            return GetTXTRecordsRecursive_(cnameHostName, foundResult, recursionLevel + 1);
+            return GetRecordsOfTypeRecursive_(cnameHostName, resourceType, records, recursionLevel + 1);
          }
       }
-
-      foundResult = GetDnsRecordsValues_(foundRecords);
 
       return result;
    }

@@ -285,15 +285,19 @@ namespace RegressionTests.AntiSpam
             "Seed body\r\n";
 
          // The envelope sender is deliberately a DIFFERENT organizational
-         // domain from the From header. The SPF evaluator gives 127.0.0.1 a
-         // free pass (discovered when this fixture's first run reported
-         // spf=pass), so an envelope matching the From domain would ALIGN,
-         // turn the whole evaluation into a DMARC pass, and record the one row
-         // shape this fixture is least interested in. Unaligned, the raw SPF
-         // result can be whatever the environment makes it - the ALIGNED
-         // verdict in policy_evaluated is deterministically fail, which is
-         // also the aligned-vs-raw distinction the report schema exists to
-         // keep apart.
+         // domain from the From header, so an envelope matching the From domain
+         // would ALIGN, turn the whole evaluation into a DMARC pass, and record
+         // the one row shape this fixture is least interested in. Unaligned, the
+         // raw SPF result can be whatever the environment makes it - the ALIGNED
+         // verdict in policy_evaluated is deterministically fail, which is also
+         // the aligned-vs-raw distinction the report schema exists to keep apart.
+         //
+         // The first run of this fixture reported spf=pass, which was the SPF
+         // library of the day handing 127.0.0.1 a pass whatever the domain
+         // published. The RFC 7208 evaluator of 15 September 2026 does not, and
+         // unaligned-envelope.test publishes nothing in the suite's zone, so the
+         // raw result is now a none - which changes nothing here, because it is
+         // the aligned verdict this fixture asserts.
          SmtpClientSimulator.StaticSendRaw("bounce@unaligned-envelope.test", "seedrcpt@example.test", message);
       }
 

@@ -139,24 +139,19 @@ namespace RegressionTests.Shared
       ///    announcing a limitation that is already known and already on the roadmap; it
       ///    would otherwise fail every passing test that happens to send a message.
       ///
-      ///    HM6406 is the only one so far: the SPF implementation resolves names through
-      ///    the Windows DNS client, which this platform does not have, so every lookup is
-      ///    refused and every SPF check returns TempError. RMSPF.cpp reports it under a
-      ///    std::call_once, so it is written once for the life of the server process and
-      ///    does not accumulate - but the one test that happens to be running when it
-      ///    fires is failed by it, and which test that is depends on nothing but when the
-      ///    server was last restarted. Measured: it was written at 03:48 on 10 September
-      ///    2026 by a server that had started at 03:29, and it failed
-      ///    AWStatsLoggingTests.SuccessfulDeliveriesShouldBeLogged, whose own assertions
-      ///    had all passed. Note that an SPF lookup happens here even though use_spf is
-      ///    false: SpamTestDMARC calls SPF::Test as part of a DMARC evaluation, and DMARC
-      ///    is on.
+      ///    HM6406 was the first, and it is gone: the SPF implementation resolved names
+      ///    through the Windows DNS client, which this platform does not have, so every
+      ///    lookup was refused and every SPF check returned TempError - written once per
+      ///    process by RMSPF.cpp and failing whichever test happened to be running when
+      ///    it fired. The RFC 7208 evaluator that replaced that library resolves through
+      ///    this server's own DNSResolver, which works here, so the line is not written
+      ///    any more and nothing is dropped for it. An HM6406 from this server now is a
+      ///    real failure and fails the test, which is the point of taking the entry out
+      ///    rather than leaving it to match nothing.
       ///
-      ///    Matched on the code and on the sentence that names the cause, so that an
-      ///    HM6406 raised for some other reason still fails the test.
-      ///
-      ///    Two more, each only where the server's build object says the gap is real:
-      ///    HM5607, PreferredHashAlgorithm asks for Argon2id and the build's OpenSSL
+      ///    Three remain, each only where the server's build object says the gap is real:
+      ///    HM5710, an event script asked for on a build with no script engine; HM5607,
+      ///    PreferredHashAlgorithm asks for Argon2id and the build's OpenSSL
       ///    (below 3.2) has no such KDF, so scrypt is used - written at every reload
       ///    while the hash-policy fixtures have the setting at 5, and blamed on
       ///    whichever test was running, a skipped one included; and HM5720, the
@@ -172,7 +167,6 @@ namespace RegressionTests.Shared
          var noScriptEngine = !ServerApi.Capability("script_engine");
          return errorLines
             .Where(line => !LogHandler.IsExpectedError(line))
-            .Where(line => !(line.Contains("HM6406") && line.Contains("resolves names through the Windows DNS client")))
             .Where(line => !(noScriptEngine && line.Contains("HM5710") && line.Contains("no script engine")))
             .Where(line => !(noArgon2id && line.Contains("HM5607") && line.Contains("has no Argon2id KDF")))
             .Where(line => !(classicalOnly && line.Contains("HM5720") && line.Contains("Failed to set the TLS key exchange groups")))

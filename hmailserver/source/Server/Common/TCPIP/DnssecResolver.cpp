@@ -2259,18 +2259,4 @@ namespace HM
       return status;
    }
 
-   // Bridge for the vendored SPF implementation (RMSPF.cpp), which uses
-   // the Windows system resolver. A bogus DNSSEC chain for a TXT name
-   // means the data is forged and the lookup must be treated as failed.
-   bool
-   DnssecTxtLookupIsBogus(const char *name)
-   {
-      if (!IniFileSettings::Instance()->GetDnssecValidationEnabled())
-         return false;
-
-      DnssecResolver resolver;
-      std::vector<AnsiString> texts;
-
-      return resolver.QueryTxt(String(name), texts) == DnssecResolver::ChainStatus::Bogus;
-   }
 }

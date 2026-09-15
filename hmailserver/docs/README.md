@@ -26,7 +26,7 @@ codebase map and contribution notes live at the repository root
 | [PackageManagers.md](PackageManagers.md) | Installing the server with `winget` or `choco`, or asking how the manifests behind those commands are made. What a user types, why an unattended install deliberately leaves the administrator password unset, where every value in the manifests comes from in the installer script, and - for the maintainer - the render-and-check step every release runs, the first submission by hand to microsoft/winget-pkgs and the Chocolatey community feed, and the two secrets that arm every release after it to submit itself. |
 | [ThirdPartyBinaries.md](ThirdPartyBinaries.md) | Asking what the 40 binary files committed to this repository are, where they came from, and whether they should be there. Every one is inventoried with a SHA-256, an upstream and a reason, and CI fails if a committed binary changes or if one appears that nobody wrote down. Thirteen of the forty are duplicates or dead files and the document says which. |
 | [third-party-binaries.json](third-party-binaries.json) | The machine-readable half of the above — the hashes CI checks. Read the document, not this, unless you are updating an entry. |
-| [Licenses/](Licenses/) | Third-party licence texts for the bundled dependencies. |
+| [Licenses/](Licenses/) | Third-party licence texts for the bundled dependencies, and for the one piece of third-party material that is not a dependency: the openspf.org RFC 7208 test suite, which is vendored under `source/Server/SMTP/SPF/Conformance/` as test data and is neither compiled into the server nor shipped. `License - RMSPF.rtf` left on 15 September 2026 with the SPF library it covered. |
 
 Elsewhere in the repository
 ---------------------------

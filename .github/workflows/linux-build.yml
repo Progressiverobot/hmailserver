@@ -166,6 +166,18 @@ jobs:
           ./build/linux/hmailserver --version
           ./build/linux/hmailserver --help > /dev/null
 
+      # The SPF module's four testers, the openspf.org conformance suite for RFC 7208
+      # among them: 203 cases, all of them decided, and the count printed either way.
+      # It is here rather than in the regression job because it needs no server, no
+      # database and no network - every case is answered out of a table - so it runs
+      # on both architectures and under both compilers for the cost of a second.
+      #
+      # On Windows the same testers run inside hMailServer.exe through
+      # Utilities.RunTestSuite; there is no COM here to reach them by, which is why
+      # the CMake build makes this binary.
+      - name: The SPF tests, and the RFC 7208 conformance suite
+        run: ./build/linux/spf-tests
+
       # The binary the regression job below tests. Kept on every run rather than
       # only on a tag, because the tests must run on every push; it is one file and
       # it is gone in three days.

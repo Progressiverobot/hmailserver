@@ -109,7 +109,7 @@ namespace HM
       {
          String sExplanation;
          SPF::Result spfResult = SPF::Instance()->Test(originatingAddress.ToString(), pTestData->GetEnvelopeFrom(), pTestData->GetHeloHost(), sExplanation);
-         spfPassed = (spfResult == SPF::Pass);
+         spfPassed = (spfResult == SPF::Result::Pass);
       }
 
       // Evaluate DKIM and collect the signing domains that verified, and the

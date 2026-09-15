@@ -187,12 +187,19 @@ namespace RegressionTests.AntiSpam
          // record for the shared-hosting providers who asked to be in it, and which
          // DMARCbis lets any provider declare for itself without asking anyone.
          //
-         // SPF passes for the envelope domain because the evaluator gives 127.0.0.1 a
-         // free pass, so the ONLY variable in the alignment is the organizational
-         // domain each side resolves to.
+         // SPF passes for the envelope domain, so the ONLY variable in the alignment is
+         // the organizational domain each side resolves to.
+         //
+         // That pass used to be free: the SPF library this server carried until 15
+         // September 2026 gave 127.0.0.1 a pass whatever the domain published, which is
+         // how this test came to depend on it without saying so. The RFC 7208 evaluator
+         // that replaced it gives nothing away - and it resolves through this server's
+         // configured resolver, so the policy that makes the pass happen can simply be
+         // published here, next to the two DMARC records, where it can be read.
          SuiteDns.Zone
             .WithTxt("_dmarc.hosting.test", "v=DMARC1; p=none; psd=y")
-            .WithTxt("_dmarc.a.hosting.test", "v=DMARC1; p=none");
+            .WithTxt("_dmarc.a.hosting.test", "v=DMARC1; p=none")
+            .WithTxt("b.hosting.test", "v=spf1 ip4:127.0.0.1 -all");
          try
          {
             ServerIniFile.SetSetting("DmarcTreeWalkEnabled", "1");
