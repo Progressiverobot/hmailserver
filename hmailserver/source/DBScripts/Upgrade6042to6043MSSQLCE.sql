@@ -72,22 +72,22 @@ insert into hm_alertrules (alertrulecondition, alertruleenabled, alertrulethresh
 
 insert into hm_alertrules (alertrulecondition, alertruleenabled, alertrulethreshold, alertruleactions, alertruleaddress, alertrulewebhook, alertrulesecret, alertrulecooldown, alertruledigest) values ('minidump.written', 0, 0, 1, '', '', '', 60, 1)
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertsEnabled', '', 1)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertsEnabled', '', 1 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertsEnabled')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertRecipient', '', 0)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertRecipient', '', 0 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertRecipient')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertSenderAddress', '', 0)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertSenderAddress', '', 0 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertSenderAddress')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertDigestEnabled', '', 1)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertDigestEnabled', '', 1 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertDigestEnabled')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertDigestHour', '', 7)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertDigestHour', '', 7 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertDigestHour')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertMaxPerHour', '', 20)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertMaxPerHour', '', 20 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertMaxPerHour')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AlertWebhookMaxAttempts', '', 5)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AlertWebhookMaxAttempts', '', 5 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AlertWebhookMaxAttempts')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditTrailEnabled', '', 1)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AuditTrailEnabled', '', 1 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AuditTrailEnabled')
 
-insert into hm_settings (settingname, settingstring, settinginteger) values ('AuditRetentionDays', '', 0)
+insert into hm_settings (settingname, settingstring, settinginteger) select 'AuditRetentionDays', '', 0 from hm_dbversion where not exists (select settingname from hm_settings where settingname = 'AuditRetentionDays')
 
 update hm_dbversion set value = 6043

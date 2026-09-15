@@ -96,6 +96,8 @@ jobs:
         run: python3 build/check-ini-coverage.py
       - name: Every statement in a MySQL script ends with a blank line
         run: python3 build/check-sql-separators.py
+      - name: An upgrade step adds a setting row only if it is not already there
+        run: python3 build/check-upgrade-inserts.py
 
       # A table that holds one account's data and is in neither the backup nor
       # the list of what is carried elsewhere is data a RESTORE destroys: every
