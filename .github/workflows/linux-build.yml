@@ -1065,7 +1065,14 @@ jobs:
           # wrong password, 201 to a domain created through it.
           listening=$(docker exec hm-smoke sh -c 'grep -cE ":(0019|1F6D) 00000000:0000 0A" /proc/net/tcp' || true)
           [ "${listening}" -ge 2 ] || { echo "::error::expected listeners on 25 and 8045 inside the container, found ${listening}."; exit 1; }
-          banner=$(timeout 5 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2525; head -c 120 <&3' | head -1 | tr -d '\r')
+          # One LINE, not 120 bytes: the banner is about thirty ("220 <host> ESMTP")
+          # and the server then waits for a command rather than closing, so
+          # `head -c 120` blocked until the timeout killed it and the step died with
+          # exit 124 - which is what happened to the v6.3.3 tag run, and to every tag
+          # run that reached this line. `read` returns at the newline; if nothing
+          # arrives the banner is empty and the case below says so in words, rather
+          # than the job ending on a bare timeout code that names nothing.
+          banner=$(timeout 5 bash -c 'exec 3<>/dev/tcp/127.0.0.1/2525; IFS= read -r line <&3 && printf "%s" "$line"' | tr -d '\r' || true)
           echo "banner: ${banner}"
           case "$banner" in
             220\ *\ ESMTP*) echo "the banner is hMailServer's" ;;

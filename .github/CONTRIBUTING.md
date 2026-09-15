@@ -74,6 +74,18 @@ fix is `git commit --amend -s` and a push.
   (`build/check-localisation.py`, `build/check-catalogues.py`); every INI setting
   the server reads has a Control Panel editor (`build/check-ini-coverage.py`).
 
+## Looking at the two browser pages
+
+The webmail (`/portal`) and the browser Control Deck (`/`) are pages a person uses, and a page is judged by looking at it. `.mcp.json` in the repository root declares one Model Context Protocol server for that: **Playwright** (`@playwright/mcp`, pinned), which drives a real Chromium against a running server so an agent - or a contributor pairing with one - can open a view, sign in, click through a flow, take a screenshot and read the accessibility tree rather than guess from the source. It is optional: nothing in the build, the tests or CI uses it, and a checkout that never starts it behaves exactly as before.
+
+Point it at a server you are already running (`https://localhost:8045/portal` on the bench). Nothing else is declared, deliberately:
+
+* **A design-tool server** (Figma and the like) would need designs in that tool, and this project has none - the desktop console's design system is `hmailserver/docs/ControlPanelDesign.md` and the pages are hand-written.
+* **Component-library servers** (shadcn, Tailwind and friends) describe a stack this project does not use: the webmail and the Deck are plain markup, one stylesheet and one script each, embedded in the binary, and the Control Panel is WPF.
+* **A third-party accessibility server** would put an unvetted npm package inside the repository with an agent driving it. Accessibility belongs in a check this project owns and runs in CI, which is a roadmap row rather than a convenience.
+
+The repository's own harnesses stay the authority on behaviour: `build/check-portal-script.py` and `build/check-deck-script.py` run each page's script against a small DOM and a recorded server, with no browser and no network, and they run on every pull request. A browser is for what a harness cannot see - how it looks, and whether it can be used.
+
 ## Architecture
 
 The layering is BO → Persistence → SQL, with Cache in front of the hot reads.
