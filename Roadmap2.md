@@ -181,7 +181,7 @@ Gmail and Google Workspace, Outlook.com and Microsoft 365 with Exchange behind i
 | ⬜ | **A mailbox export** (Google Takeout, Proton's export) | The reader downloads their whole mailbox as mbox and their contacts as vCard, from Settings, with no administrator involved - data portability as the law and decency require. |
 | ⬜ | **Import from the old provider** (Proton's Easy Switch, Fastmail's import) | The reader's side of the migration: sign in to Gmail or Outlook.com over IMAP (OAuth for the two), pick folders, and watch them arrive - the server's IMAP mirror, driven from the page for one account. |
 | ⬜ | **Right-to-left languages** | Twenty catalogues, none right-to-left. Arabic, Hebrew and Persian, with the layout mirrored, which is a stylesheet's `dir` and a day of checking every view. |
-| ⬜ | **The reader's own time zone** | Dates are shown in the browser's zone; a reader travelling, or reading from a server on another continent, sets the zone once and every date, rule and scheduled send uses it. |
+| ✅ | **The reader's own time zone** | **Done 15 September 2026.** Settings has a *Time zone* choice - the zones the browser knows, *Where this browser is* as the default - kept with the account; the list's times, the open message's date and the conversation cards render in it, and today and this year are decided in it. Three harness checks. |
 | ⬜ | **Undo more** | Undo covers filing and sending. Undo for a label removed, a rule saved, a contact deleted, a sender blocked. |
 
 ### Normal users: the phone

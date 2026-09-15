@@ -3732,7 +3732,7 @@
   // Kept with the account (GET/PUT /api/v1/me/preferences); the browser's
   // storage holds only the theme, for the sign-in page before there is one.
   var prefs = {};
-  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '', nudges: '1' };
+  var basePrefs = { theme: 'system', density: 'comfortable', undo_seconds: '5', notify: '0', notify_folders: '', view: 'threads', pane: 'right', inbox: 'tabs', tabs_by_sender: '', nudges: '1', timezone: '' };
   var renderListTools = function () {
     el('view-threads').textContent = pref('view') === 'threads' ? t('Show messages one by one') : t('Show conversations');
     var emptyable = !state.everywhere && (folderIs(state.folderId, 'Junk') || folderIs(state.folderId, 'Trash'));
@@ -3828,6 +3828,8 @@
     el('pref-nudges').checked = nudgesOn();
     el('pref-inbox').value = inboxMode();
     el('pref-language').value = knownLanguage(pref('language') || '') || languageActive;
+    fillZones();
+    el('pref-timezone').value = pref('timezone') || '';
     renderNotifyFolders();
     renderTemplates();
     renderQuickSteps();
@@ -4098,7 +4100,7 @@
     var ticked = [];
     var labels = el('notify-folders').children;
     for (var i = 0; i < labels.length; i++) { var tick = labels[i].children[0]; if (tick && tick.checked) { ticked.push(tick.value); } }
-    savePrefs({ language: el('pref-language').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
+    savePrefs({ language: el('pref-language').value, timezone: el('pref-timezone').value, theme: el('pref-theme').value, density: el('pref-density').value, pane: el('pref-pane').value, undo_seconds: el('pref-undo').value,
                 notify: el('pref-notify').checked ? '1' : '0', notify_folders: ticked.join(','), inbox: el('pref-inbox').value, nudges: el('pref-nudges').checked ? '1' : '0' }).then(function (ok) {
       if (ok) { say('prefs-status', t('Saved.'), true); if (lastPage) { renderMessages(lastPage); } }
     });
@@ -4355,21 +4357,43 @@
     if (isNaN(d.getTime())) { d = new Date(String(m.received || '').replace(' ', 'T')); }
     return isNaN(d.getTime()) ? null : d;
   };
+  // The reader's own zone, when one is chosen in Settings: every date and
+  // time the page shows is rendered in it, and today and this year are
+  // decided in it, so a reader away from home, or reading a server on
+  // another continent, sees their own clock. Empty means the browser's.
+  var zoneOptions = function (options) {
+    var zone = pref('timezone');
+    if (zone) { options.timeZone = zone; }
+    return options;
+  };
+  var dayKey = function (d) { try { return d.toLocaleDateString('en-CA', zoneOptions({ year: 'numeric', month: '2-digit', day: '2-digit' })); } catch (e) { return d.toDateString(); } };
   // The time today, the day this year, the date otherwise - what a list shows.
   var whenText = function (m) {
     var d = dateOf(m);
     if (!d) { return m.date || m.received || ''; }
     var now = new Date();
     try {
-      if (d.toDateString() === now.toDateString()) { return d.toLocaleTimeString(languageActive, { hour: '2-digit', minute: '2-digit', hour12: false }); }
-      if (d.getFullYear() === now.getFullYear()) { return d.toLocaleDateString(languageActive, { day: 'numeric', month: 'short' }); }
-      return d.toLocaleDateString(languageActive, { year: 'numeric', month: 'short', day: 'numeric' });
+      var day = dayKey(d), today = dayKey(now);
+      if (day === today) { return d.toLocaleTimeString(languageActive, zoneOptions({ hour: '2-digit', minute: '2-digit', hour12: false })); }
+      if (day.slice(0, 4) === today.slice(0, 4)) { return d.toLocaleDateString(languageActive, zoneOptions({ day: 'numeric', month: 'short' })); }
+      return d.toLocaleDateString(languageActive, zoneOptions({ year: 'numeric', month: 'short', day: 'numeric' }));
     } catch (e) { return d.toDateString(); }
   };
   var fullDate = function (m) {
     var d = dateOf(m);
     if (!d) { return m.date || m.received || ''; }
-    try { return d.toLocaleString(languageActive, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); } catch (e) { return d.toString(); }
+    try { return d.toLocaleString(languageActive, zoneOptions({ weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })); } catch (e) { return d.toString(); }
+  };
+  // The zones a browser knows, or a short list when it cannot say.
+  var fillZones = function () {
+    var select = el('pref-timezone');
+    if (select.children.length > 1) { return; }
+    var zones = [];
+    try { zones = (typeof Intl !== 'undefined' && Intl.supportedValuesOf) ? Intl.supportedValuesOf('timeZone') : []; } catch (e) { zones = []; }
+    if (!zones.length) { zones = ['UTC', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Rome', 'Europe/Amsterdam', 'Europe/Stockholm', 'Europe/Warsaw', 'Europe/Athens', 'Europe/Kyiv', 'Europe/Moscow', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'America/Sao_Paulo', 'Asia/Tokyo', 'Asia/Seoul', 'Asia/Shanghai', 'Asia/Kolkata', 'Australia/Sydney']; }
+    var chosen = pref('timezone');
+    if (chosen && zones.indexOf(chosen) < 0) { zones.push(chosen); }
+    zones.forEach(function (z) { var o = document.createElement('option'); o.value = z; o.textContent = z; select.appendChild(o); });
   };
 
   // ---- Toasts, with undo ----------------------------------------------------

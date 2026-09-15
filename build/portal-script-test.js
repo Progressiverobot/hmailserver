@@ -1398,6 +1398,31 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- the reader's own time zone: every date the page shows, rendered in it
+   location.hash = '#/m/102';
+   await flush();
+   const dateHere = document.getElementById('message-date').textContent;
+   location.hash = '#/settings';
+   await flush();
+   const zoneSelect = document.getElementById('pref-timezone');
+   check('the settings offer the zones the browser knows', zoneSelect.children.length > 20 && Array.from(zoneSelect.children).some((o) => o.value === 'Asia/Tokyo'), String(zoneSelect.children.length));
+   zoneSelect.value = 'Asia/Tokyo';
+   const beforeZone = requests.length;
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+   const zonePut = since(beforeZone).filter((r) => r.method === 'PUT' && r.path === '/api/v1/me/preferences')[0];
+   check('the zone is kept with the account', !!zonePut && JSON.parse(zonePut.body).timezone === 'Asia/Tokyo', zonePut ? zonePut.body : 'no PUT');
+   location.hash = '#/m/102';
+   await flush();
+   const expectedThere = new Date('2026-09-08 09:00').toLocaleString('en', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+   check('and the open message is dated in that zone', document.getElementById('message-date').textContent === expectedThere && document.getElementById('message-date').textContent !== dateHere,
+      document.getElementById('message-date').textContent + ' vs ' + expectedThere + ' (was ' + dateHere + ')');
+   location.hash = '#/settings';
+   await flush();
+   document.getElementById('pref-timezone').value = '';
+   document.getElementById('prefs-form').dispatchEvent(makeEvent('submit'));
+   await flush();
+
    // ---- saved searches: named, kept with the account, listed as folders, run afresh
    location.hash = '#/f/1';
    await flush();
