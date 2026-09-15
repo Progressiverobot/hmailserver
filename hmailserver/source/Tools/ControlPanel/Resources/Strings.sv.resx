@@ -3915,9 +3915,6 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="Loaded from disk." xml:space="preserve">
     <value>Inläst från disk.</value>
   </data>
-  <data name="Loaded from server." xml:space="preserve">
-    <value>Läst från servern.</value>
-  </data>
   <data name="Loading…" xml:space="preserve">
     <value>Läser in…</value>
   </data>
@@ -4530,6 +4527,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="No account found with address '{0}'." xml:space="preserve">
     <value>Inget konto hittades med adressen '{0}'.</value>
   </data>
+  <data name="No accounts in this domain yet." xml:space="preserve">
+    <value>Inga konton i den här domänen än.</value>
+  </data>
   <data name="No active sessions" xml:space="preserve">
     <value>Inga aktiva sessioner</value>
   </data>
@@ -4590,6 +4590,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="No domains are configured, so there is nothing to sign and no record to publish." xml:space="preserve">
     <value>Inga domäner är konfigurerade, så det finns inget att signera och ingen post att publicera.</value>
   </data>
+  <data name="No domains yet. Add the first one to start receiving mail." xml:space="preserve">
+    <value>Inga domäner än. Lägg till den första så att servern kan ta emot post.</value>
+  </data>
   <data name="No encryption is available on this port at all. Every password and every message on it crosses the network readable by anything on the path." xml:space="preserve">
     <value>Ingen kryptering är tillgänglig på den här porten alls. Varje lösenord och varje meddelande på den korsar nätverket läsbart för allt på vägen.</value>
   </data>
@@ -4625,6 +4628,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   </data>
   <data name="No host set" xml:space="preserve">
     <value>Ingen värd satt</value>
+  </data>
+  <data name="No incoming relays. Add one only for a gateway in front of this server whose address you trust." xml:space="preserve">
+    <value>Inga inkommande reläer. Lägg bara till en gateway framför den här servern vars adress du litar på.</value>
   </data>
   <data name="No key of any scope can create or revoke keys - that needs the administrator password, or this page. A key restricted to particular domains is also refused the delivery-queue endpoints outright, because the queue is server-wide and cannot be filtered by domain." xml:space="preserve">
     <value>Ingen nyckel av något omfång kan skapa eller återkalla nycklar - det kräver administratörslösenordet, eller den här sidan. En nyckel begränsad till vissa domäner nekas också leveranskö-slutpunkterna helt, eftersom kön är serverövergripande och inte kan filtreras per domän.</value>
@@ -6402,17 +6408,11 @@ Fortsätt?</value>
   <data name="Search IP ranges" xml:space="preserve">
     <value>Sök IP-intervall</value>
   </data>
-  <data name="Search IP ranges..." xml:space="preserve">
-    <value>Sök IP-intervall...</value>
-  </data>
   <data name="Search _filter" xml:space="preserve">
     <value>Sö_kfilter</value>
   </data>
   <data name="Search accounts" xml:space="preserve">
     <value>Sök konton</value>
-  </data>
-  <data name="Search accounts..." xml:space="preserve">
-    <value>Sök konton...</value>
   </data>
   <data name="Search bas_e (SearchBase)" xml:space="preserve">
     <value>Sö_kbas (SearchBase)</value>
@@ -6420,14 +6420,8 @@ Fortsätt?</value>
   <data name="Search certificates" xml:space="preserve">
     <value>Sök certifikat</value>
   </data>
-  <data name="Search certificates..." xml:space="preserve">
-    <value>Sök certifikat...</value>
-  </data>
   <data name="Search domains" xml:space="preserve">
     <value>Sök domäner</value>
-  </data>
-  <data name="Search domains..." xml:space="preserve">
-    <value>Sök domäner...</value>
   </data>
   <data name="Search failed — " xml:space="preserve">
     <value>Sökningen misslyckades — </value>
@@ -6447,26 +6441,14 @@ Fortsätt?</value>
   <data name="Search ports" xml:space="preserve">
     <value>Sök portar</value>
   </data>
-  <data name="Search ports..." xml:space="preserve">
-    <value>Sök portar...</value>
-  </data>
-  <data name="Search queue..." xml:space="preserve">
-    <value>Sök i kön...</value>
-  </data>
   <data name="Search results" xml:space="preserve">
     <value>Sökresultat</value>
   </data>
   <data name="Search routes" xml:space="preserve">
     <value>Sök rutter</value>
   </data>
-  <data name="Search routes..." xml:space="preserve">
-    <value>Sök rutter...</value>
-  </data>
   <data name="Search rules" xml:space="preserve">
     <value>Sök regler</value>
-  </data>
-  <data name="Search rules..." xml:space="preserve">
-    <value>Sök regler...</value>
   </data>
   <data name="Search the delivery queue" xml:space="preserve">
     <value>Sök i leveranskön</value>

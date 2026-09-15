@@ -20,6 +20,16 @@ using MessageBoxButton = System.Windows.MessageBoxButton;
 using MessageBoxResult = System.Windows.MessageBoxResult;
 using System.Linq;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+
+// Wpf.Ui.Controls has a Card of its own, so the scaffold's components are named
+// explicitly here rather than imported wholesale.
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using EmptyState = hMailServer.ControlPanel.Views.Scaffold.EmptyState;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
+using Toolbar = hMailServer.ControlPanel.Views.Scaffold.Toolbar;
+using StatusLevel = hMailServer.ControlPanel.Services.StatusLevel;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -72,8 +82,15 @@ namespace hMailServer.ControlPanel.Views
       private readonly bool embedded_;
       private readonly DataGrid grid_ = new();
       private readonly ObservableCollection<Row> rows_ = new();
-      private readonly TextBlock countBadge_ = new();
-      private readonly TextBlock status_ = new();
+
+      // How many entries there are, as a pill beside the page title - a state,
+      // so it is drawn the way every other state on every other page is. Normal,
+      // because a count says nothing on its own.
+      private readonly StatusPill countBadge_ = new() { Level = StatusLevel.Normal };
+
+      // What the last action said, at its level, and what an empty list means.
+      private readonly InlineNotice status_ = new() { Visibility = Visibility.Collapsed };
+      private readonly EmptyState empty_ = new() { Icon = SymbolRegular.DocumentBulletList24, Visibility = Visibility.Collapsed };
 
       public CollectionEditorView(CollectionSpec spec) : this(spec, false)
       {
@@ -102,64 +119,18 @@ namespace hMailServer.ControlPanel.Views
 
       private void Build()
       {
-         var root = new Grid { Margin = embedded_ ? new Thickness(0, 8, 0, 0) : new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         if (embedded_)
+            root.Margin = new Thickness(0, 8, 0, 0);
+         else
+            root.SetResourceReference(MarginProperty, "AppPagePadding");
+
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         // Title + subtitle (page mode) or a compact hint (embedded mode).
-         if (embedded_)
-         {
-            if (!string.IsNullOrEmpty(spec_.Subtitle))
-            {
-               var hint = new TextBlock
-               {
-                  Text = spec_.Subtitle,
-                  FontSize = Typography.Caption,
-                  TextWrapping = TextWrapping.Wrap,
-                  Margin = new Thickness(0, 0, 0, 10)
-               };
-               hint.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
-               root.Children.Add(hint);
-            }
-         }
-         else
-         {
-            var head = new StackPanel();
-            head.Children.Add(new TextBlock { Text = spec_.Title, Style = (Style)FindResource("PageTitle") });
-            head.Children.Add(new TextBlock { Text = spec_.Subtitle, Style = (Style)FindResource("PageSubtitle") });
-            root.Children.Add(head);
-         }
-
-         // Toolbar: count badge + actions
-         var toolbar = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-         toolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         toolbar.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-         var badge = new Border
-         {
-            CornerRadius = new CornerRadius(11),
-            Padding = new Thickness(12, 4, 12, 4),
-            HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Center
-         };
-         // The accent-button pair, exactly as Appearance=Primary buttons use it,
-         // so the badge always carries whatever contrast the theme's own accent
-         // buttons do. The previous hardcoded White on BrandBrush failed in the
-         // dark theme: ThemeTokens retints BrandBrush to #4C8DFF there, and
-         // white on #4C8DFF is 3.2:1 - below the 4.5:1 required for this 12px
-         // SemiBold text. The pair is defined in every WPF-UI theme dictionary,
-         // High Contrast included, and both references re-resolve on theme flips.
-         badge.SetResourceReference(Border.BackgroundProperty, "AccentButtonBackground");
-         countBadge_.SetResourceReference(TextBlock.ForegroundProperty, "AccentButtonForeground");
-         countBadge_.FontSize = Typography.Label;
-         countBadge_.FontWeight = FontWeights.SemiBold;
-         badge.Child = countBadge_;
-         toolbar.Children.Add(badge);
-
          var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         Grid.SetColumn(actions, 1);
          if (spec_.CanAdd)
             actions.Children.Add(MakeButton(L("_Add"), ControlAppearance.Primary, SymbolRegular.Add24, (_, _) => OpenDialog(null)));
          var edit = MakeButton(L("_Edit"), ControlAppearance.Secondary, SymbolRegular.Edit24, (_, _) => EditSelected());
@@ -179,25 +150,44 @@ namespace hMailServer.ControlPanel.Views
             Services.SelectionGate.Bind(grid_, edit, del);
          else
             Services.SelectionGate.Bind(grid_, edit);
-         toolbar.Children.Add(actions);
-         Grid.SetRow(toolbar, 1);
-         root.Children.Add(toolbar);
+
+         // Page mode puts the title, the count and the actions in one header;
+         // embedded mode has no page title to hang them on, so the hint goes
+         // above a toolbar that carries the count and the same actions.
+         if (embedded_)
+         {
+            if (!string.IsNullOrEmpty(spec_.Subtitle))
+            {
+               var hint = new TextBlock { Text = spec_.Subtitle, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10) };
+               hint.SetResourceReference(StyleProperty, "TextCaption");
+               root.Children.Add(hint);
+            }
+
+            var toolbar = new Toolbar { ShowSearch = false, Filters = countBadge_, Actions = actions };
+            Grid.SetRow(toolbar, 1);
+            root.Children.Add(toolbar);
+         }
+         else
+         {
+            root.Children.Add(new PageHeader
+            {
+               Title = spec_.Title,
+               Subtitle = spec_.Subtitle,
+               Status = countBadge_,
+               Actions = actions
+            });
+         }
 
          // Grid in a card
-         var card = new Border { Padding = new Thickness(6) };
-         card.SetResourceReference(StyleProperty, "Card");
+         var card = new Card { Padding = new Thickness(6) };
          Grid.SetRow(card, 2);
 
          grid_.AutoGenerateColumns = false;
          grid_.IsReadOnly = true;
-         grid_.HeadersVisibility = DataGridHeadersVisibility.Column;
-         grid_.GridLinesVisibility = DataGridGridLinesVisibility.None;
-         grid_.Background = Brushes.Transparent;
-         grid_.BorderThickness = new Thickness(0);
-         grid_.RowHeight = 34;
          grid_.SelectionMode = DataGridSelectionMode.Single;
          grid_.ItemsSource = rows_;
          grid_.MouseDoubleClick += (_, _) => EditSelected();
+         System.Windows.Automation.AutomationProperties.SetName(grid_, spec_.Title);
 
          foreach (FieldSpec f in spec_.Fields.Where(f => f.ShowInGrid))
          {
@@ -219,15 +209,22 @@ namespace hMailServer.ControlPanel.Views
                   ? new DataGridLength(1, DataGridLengthUnitType.Star)
                   : new DataGridLength(f.GridWidth)
             };
+
+            // A number column is right-aligned, header and all, so the digits
+            // line up and a column of scores can be read down.
+            if (f.Kind == FieldKind.Number)
+               GridStyles.Number(col);
+
             grid_.Columns.Add(col);
          }
 
-         card.Child = grid_;
+         var host = new Grid();
+         host.Children.Add(grid_);
+         host.Children.Add(empty_);
+         card.Content = host;
          root.Children.Add(card);
 
          status_.Margin = new Thickness(0, 12, 0, 0);
-         status_.FontSize = Typography.Caption;
-         status_.SetResourceReference(ForegroundProperty, "TextFillColorSecondaryBrush");
          Grid.SetRow(status_, 3);
          root.Children.Add(status_);
 
@@ -270,14 +267,25 @@ namespace hMailServer.ControlPanel.Views
                rows_.Add(row);
                ServerSession.Release(item);
             }
-            // An empty list is a state to name, not a blank to stare at.
-            status_.Text = rows_.Count == 0 && spec_.CanAdd
-               ? L("Nothing here yet - Add creates the first entry.")
-               : L("Loaded from server.");
+            // An empty list is a state to name, not a blank to stare at: the
+            // empty state says so in the grid's own place.
+            // The empty state carries the sentence that was in the status line.
+            // Only a list that can be added to has one: the one collection that
+            // cannot (the fixed set of server messages) is never empty, and
+            // inventing a sentence for it would be a new text for a state that
+            // does not occur.
+            if (spec_.CanAdd)
+               StatusText.Show(empty_, null, rows_.Count, null, L("Nothing here yet - Add creates the first entry."));
+
+            // A load that worked says nothing: the count beside the title and
+            // the empty state in the grid's place already say what there is, and
+            // a notice on every visit to every list page would be noise.
+            status_.Visibility = Visibility.Collapsed;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            status_.Text = L("Could not load — ") + ServerSession.DescribeComError(ex);
+            empty_.Visibility = Visibility.Collapsed;
+            Say_(StatusLevel.Critical, L("Could not load — ") + ServerSession.DescribeComError(ex));
          }
          finally
          {
@@ -287,6 +295,14 @@ namespace hMailServer.ControlPanel.Views
          countBadge_.Text = rows_.Count == 1
             ? "1 " + spec_.ItemNoun
             : rows_.Count + " " + Pluralize(spec_.ItemNoun);
+      }
+
+      /// <summary>What the last action said, at its level.</summary>
+      private void Say_(StatusLevel level, string text)
+      {
+         status_.Level = level;
+         status_.Text = text;
+         status_.Visibility = Visibility.Visible;
       }
 
       private static string Pluralize(string noun)
@@ -306,7 +322,7 @@ namespace hMailServer.ControlPanel.Views
          if (grid_.SelectedItem is Row row)
             OpenDialog(row);
          else
-            status_.Text = L("Select a row first.");
+            Say_(StatusLevel.Information, L("Select a row first."));
       }
 
       private void OpenDialog(Row existing)
@@ -323,7 +339,7 @@ namespace hMailServer.ControlPanel.Views
             item = existing == null ? collection.Add() : FindById(collection, existing.Id);
             if (item == null)
             {
-               status_.Text = L("The item no longer exists.");
+               Say_(StatusLevel.Warning, L("The item no longer exists."));
                return;
             }
 
@@ -331,7 +347,7 @@ namespace hMailServer.ControlPanel.Views
                SetProp(item, kv.Key, kv.Value);
 
             item.Save();
-            status_.Text = existing == null ? F("Added at {0}.", DateTime.Now.ToLongTimeString()) : F("Saved at {0}.", DateTime.Now.ToLongTimeString());
+            Say_(StatusLevel.Good, existing == null ? F("Added at {0}.", DateTime.Now.ToLongTimeString()) : F("Saved at {0}.", DateTime.Now.ToLongTimeString()));
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -350,7 +366,7 @@ namespace hMailServer.ControlPanel.Views
       {
          if (grid_.SelectedItem is not Row row)
          {
-            status_.Text = L("Select a row first.");
+            Say_(StatusLevel.Information, L("Select a row first."));
             return;
          }
 
@@ -366,7 +382,7 @@ namespace hMailServer.ControlPanel.Views
             item = FindById(collection, row.Id);
             if (item != null)
                item.Delete();
-            status_.Text = "Deleted.";
+            Say_(StatusLevel.Good, "Deleted.");
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {

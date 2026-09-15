@@ -12,6 +12,10 @@ using System.Windows.Media;
 using hMailServer.ControlPanel.Services;
 
 using Typography = hMailServer.ControlPanel.Services.Typography;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using FieldRow = hMailServer.ControlPanel.Views.Scaffold.FieldRow;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -71,8 +75,14 @@ namespace hMailServer.ControlPanel.Views
       private Wpf.Ui.Controls.Button applyButton_;
       private Wpf.Ui.Controls.Button saveButton_;
 
-      private readonly TextBlock stateText_ = new();
-      private readonly TextBlock summaryText_ = new();
+      // Whether a run can happen at all, as a notice at the level of the answer:
+      // yes is good, a missing prerequisite is a warning, and an answer that
+      // cannot be reached from this machine is information.
+      private readonly InlineNotice stateText_ = new();
+
+      // What the last run said, and what in it needs a person - a notice and a
+      // caption, because the second is a qualification of the first.
+      private readonly InlineNotice summaryText_ = new() { Visibility = Visibility.Collapsed };
       private readonly TextBlock attentionText_ = new();
       private readonly StackPanel rows_ = new();
       private readonly TextBlock footerStatus_ = new();
@@ -97,23 +107,17 @@ namespace hMailServer.ControlPanel.Views
 
       public DirectorySyncView()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("Directory synchronisation") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
+         root.Children.Add(new PageHeader
          {
-            Text = L("Creates and updates mailboxes to match an LDAP directory. Only domains that have an Active Directory domain name set take part, so this cannot provision into a hosted domain by accident. Nothing here ever deletes an account or a message: the most it does is mark one inactive, and only when you ask it to.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         root.Children.Add(heading);
+            Title = L("Directory synchronisation"),
+            Subtitle = L("Creates and updates mailboxes to match an LDAP directory. Only domains that have an Active Directory domain name set take part, so this cannot provision into a hosted domain by accident. Nothing here ever deletes an account or a message: the most it does is mark one inactive, and only when you ask it to.")
+         });
 
          var cards = new StackPanel { Margin = new Thickness(0, 0, 12, 0), MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left };
          cards.Children.Add(BuildStateCard_());
@@ -145,63 +149,32 @@ namespace hMailServer.ControlPanel.Views
       // Layout
       // =========================================================================
 
-      private static Border Card_(string cardTitle, string blurb, out StackPanel content)
+      /// <summary>One section of the page. Named Section_ and not Card_ because
+      /// the component it builds is called Card.</summary>
+      private static Card Section_(string cardTitle, string blurb, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var panel = new StackPanel();
-         panel.Children.Add(new TextBlock
-         {
-            Text = cardTitle,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-
-         if (!string.IsNullOrEmpty(blurb))
-         {
-            panel.Children.Add(new TextBlock
-            {
-               Text = blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 0, 0, 14)
-            });
-         }
-
-         border.Child = panel;
-         content = panel;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = cardTitle, Description = blurb, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
-      private static FrameworkElement LabelledBox_(string label, Wpf.Ui.Controls.TextBox box,
+      /// <summary>
+      /// One field: the caption with its Alt key, the editor, the sentence that
+      /// explains it. FieldRow wires the mnemonic and gives the editor its
+      /// accessible name and help text from the two, so only the automation id -
+      /// which the page owns - is set here.
+      /// </summary>
+      private static FieldRow LabelledBox_(string label, Wpf.Ui.Controls.TextBox box,
          string automationId, string caption, string placeholder = "")
       {
-         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, box));
-
-         box.FontSize = Typography.Body;
          box.MaxWidth = 620;
          box.MinWidth = 320;
          box.HorizontalAlignment = HorizontalAlignment.Left;
          box.PlaceholderText = placeholder;
-         System.Windows.Automation.AutomationProperties.SetName(box, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(box, automationId);
-         System.Windows.Automation.AutomationProperties.SetHelpText(box, caption);
-         panel.Children.Add(box);
 
-         panel.Children.Add(new TextBlock
-         {
-            Text = caption,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.65,
-            Margin = new Thickness(0, 4, 0, 0)
-         });
-
-         return panel;
+         return new FieldRow { Label = label, Content = box, Hint = caption };
       }
 
       /// <summary>
@@ -209,12 +182,11 @@ namespace hMailServer.ControlPanel.Views
       /// is pressed. Three things have to be true and each has a different fix, so the
       /// card names which one is missing rather than saying "not configured".
       /// </summary>
-      private Border BuildStateCard_()
+      private Card BuildStateCard_()
       {
-         Border card = Card_(L("Can this server provision from the directory?"), null, out StackPanel content);
+         Card card = Section_(L("Can this server provision from the directory?"), null, out StackPanel content);
 
-         stateText_.FontSize = Typography.Body;
-         stateText_.TextWrapping = TextWrapping.Wrap;
+         stateText_.Margin = new Thickness(0);
          System.Windows.Automation.AutomationProperties.SetAutomationId(stateText_, "dirsync-state");
          System.Windows.Automation.AutomationProperties.SetLiveSetting(stateText_,
             System.Windows.Automation.AutomationLiveSetting.Polite);
@@ -223,9 +195,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildSelectionCard_()
+      private Card BuildSelectionCard_()
       {
-         Border card = Card_(L("Which directory entries become mailboxes"),
+         Card card = Section_(L("Which directory entries become mailboxes"),
             L("These are read by the server from the [LDAP] section of hMailServer.INI, and re-read within two seconds of a save, so no restart is needed. The defaults suit Active Directory; a directory that is not Windows will not have sAMAccountName and needs the attribute names changed."),
             out StackPanel content);
 
@@ -262,38 +234,26 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildRunCard_()
+      private Card BuildRunCard_()
       {
-         Border card = Card_(L("Preview, then apply"),
+         Card card = Section_(L("Preview, then apply"),
             L("Preview changes nothing and reports exactly what Apply would do - they share one decider in the server, so a preview cannot describe an action the apply would not take. Apply stays disabled until a preview has been run with the options as they stand."),
             out StackPanel content);
 
-         var domainPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         domainPanel.Children.Add(new TextBlock
-         {
-            Text = L("Domain"),
-            FontSize = Typography.Body,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
          domainChoice_.MinWidth = 320;
          domainChoice_.MaxWidth = 620;
          domainChoice_.HorizontalAlignment = HorizontalAlignment.Left;
          System.Windows.Automation.AutomationProperties.SetName(domainChoice_, L("Which domain to synchronise"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(domainChoice_, "dirsync-domain");
          domainChoice_.SelectionChanged += (s, e) => InvalidatePreview_();
-         domainPanel.Children.Add(domainChoice_);
-         domainPanel.Children.Add(new TextBlock
+         content.Children.Add(new FieldRow
          {
-            Text = L("Only domains with an Active Directory domain name set are listed - that field is what links a mail domain to a directory. Bringing one domain over at a time is the sane way to do this the first time."),
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.65,
-            Margin = new Thickness(0, 4, 0, 0)
+            Label = L("Domain"),
+            Content = domainChoice_,
+            Hint = L("Only domains with an Active Directory domain name set are listed - that field is what links a mail domain to a directory. Bringing one domain over at a time is the sane way to do this the first time.")
          });
-         content.Children.Add(domainPanel);
 
          disableMissing_.Content = L("Also mark accounts _inactive when their directory entry has gone");
-         disableMissing_.FontSize = Typography.Body;
          disableMissing_.Margin = new Thickness(0, 0, 0, 4);
          System.Windows.Automation.AutomationProperties.SetName(disableMissing_,
             L("Also mark accounts inactive when their directory entry has gone"));
@@ -304,14 +264,14 @@ namespace hMailServer.ControlPanel.Views
          disableMissing_.Unchecked += (s, e) => InvalidatePreview_();
          content.Children.Add(disableMissing_);
 
-         content.Children.Add(new TextBlock
+         var disableHint = new TextBlock
          {
             Text = L("Off by default. An account that stops being visible in the directory is far more often a search that changed than a person who left, and the two mistakes do not cost the same. Nothing is disabled at all when the enumeration was cut short or came back empty."),
-            FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.65,
-            Margin = new Thickness(24, 0, 0, 14)
-         });
+            Margin = new Thickness(24, 0, 0, 16)
+         };
+         disableHint.SetResourceReference(StyleProperty, "TextCaptionTertiary");
+         content.Children.Add(disableHint);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 12) };
 
@@ -336,16 +296,14 @@ namespace hMailServer.ControlPanel.Views
 
          content.Children.Add(buttons);
 
-         summaryText_.FontSize = Typography.Body;
-         summaryText_.TextWrapping = TextWrapping.Wrap;
-         summaryText_.Margin = new Thickness(0, 0, 0, 4);
+         summaryText_.Margin = new Thickness(0, 0, 0, 8);
          System.Windows.Automation.AutomationProperties.SetAutomationId(summaryText_, "dirsync-summary");
          System.Windows.Automation.AutomationProperties.SetLiveSetting(summaryText_,
             System.Windows.Automation.AutomationLiveSetting.Polite);
          content.Children.Add(summaryText_);
 
-         attentionText_.FontSize = Typography.Caption;
          attentionText_.TextWrapping = TextWrapping.Wrap;
+         attentionText_.SetResourceReference(StyleProperty, "TextCaption");
          attentionText_.Margin = new Thickness(0, 0, 0, 10);
          System.Windows.Automation.AutomationProperties.SetAutomationId(attentionText_, "dirsync-attention");
          content.Children.Add(attentionText_);
@@ -356,9 +314,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildScheduleCard_()
+      private Card BuildScheduleCard_()
       {
-         Border card = Card_(L("Unattended synchronisation"),
+         Card card = Section_(L("Unattended synchronisation"),
             L("A schedule creates and updates accounts with nobody watching. It never disables one, whatever the checkbox above is set to - departures are left to a person who has read a preview. Switch this on only after a preview has told you what it is going to do."),
             out StackPanel content);
 
@@ -374,11 +332,10 @@ namespace hMailServer.ControlPanel.Views
          var footer = new Grid { Margin = new Thickness(0, 14, 12, 0) };
 
          footerStatus_.VerticalAlignment = VerticalAlignment.Center;
-         footerStatus_.FontSize = Typography.Caption;
          footerStatus_.TextWrapping = TextWrapping.Wrap;
          footerStatus_.MaxWidth = 520;
          footerStatus_.HorizontalAlignment = HorizontalAlignment.Left;
-         footerStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         footerStatus_.SetResourceReference(StyleProperty, "TextCaption");
          footer.Children.Add(footerStatus_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -583,15 +540,13 @@ namespace hMailServer.ControlPanel.Views
          // readable domains, which is not the same fact as having no linked ones.
          if (!store_.IsAvailable)
          {
-            stateText_.Text = L("Cannot tell from here. hMailServer.INI is not reachable from this computer, so the [LDAP] section cannot be read - and it is that section, not anything on this page, which decides whether a run can happen. Press Preview: it runs inside the server and will say exactly what is missing, if anything is.");
-            stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            State_(StatusLevel.Information, L("Cannot tell from here. hMailServer.INI is not reachable from this computer, so the [LDAP] section cannot be read - and it is that section, not anything on this page, which decides whether a run can happen. Press Preview: it runs inside the server and will say exactly what is missing, if anything is."));
             return;
          }
 
          if (!domainsRead_)
          {
-            stateText_.Text = L("Cannot tell from here - the server's domain list could not be read, so which domains are linked to a directory is unknown. That is a connection problem rather than a configuration one.");
-            stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+            State_(StatusLevel.Information, L("Cannot tell from here - the server's domain list could not be read, so which domains are linked to a directory is unknown. That is a connection problem rather than a configuration one."));
             return;
          }
 
@@ -611,13 +566,25 @@ namespace hMailServer.ControlPanel.Views
 
          if (problems.Count == 0)
          {
-            stateText_.Text = F("Yes. {0} domain(s) are linked to a directory and will take part. Run a preview first: the shape of a directory is rarely what anyone expects, and the skipped rows are where the surprises are.", linkedDomains);
-            stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorPrimaryBrush");
+            State_(StatusLevel.Good, F("Yes. {0} domain(s) are linked to a directory and will take part. Run a preview first: the shape of a directory is rarely what anyone expects, and the skipped rows are where the surprises are.", linkedDomains));
             return;
          }
 
-         stateText_.Text = L("Not yet - ") + string.Join("; ", problems) + ".";
-         stateText_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         State_(StatusLevel.Warning, L("Not yet - ") + string.Join("; ", problems) + ".");
+      }
+
+      private void State_(StatusLevel level, string text)
+      {
+         stateText_.Level = level;
+         stateText_.Text = text;
+      }
+
+      /// <summary>What the last run said, at the level of what it says.</summary>
+      private void Summary_(StatusLevel level, string text)
+      {
+         summaryText_.Level = level;
+         summaryText_.Text = text;
+         summaryText_.Visibility = Visibility.Visible;
       }
 
       /// <summary>
@@ -666,7 +633,7 @@ namespace hMailServer.ControlPanel.Views
 
          previewButton_.IsEnabled = false;
          applyButton_.IsEnabled = false;
-         summaryText_.Text = apply ? "Applying..." : L("Reading the directory...");
+         Summary_(StatusLevel.Information, apply ? "Applying..." : L("Reading the directory..."));
          attentionText_.Text = "";
          rows_.Children.Clear();
 
@@ -698,7 +665,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            summaryText_.Text = L("The run failed: ") + ServerSession.DescribeComError(ex);
+            Summary_(StatusLevel.Critical, L("The run failed: ") + ServerSession.DescribeComError(ex));
             previewedOptions_ = null;
          }
          finally
@@ -714,7 +681,7 @@ namespace hMailServer.ControlPanel.Views
          // the click and the handler.
          if (previewedOptions_ == null || previewedOptions_ != CurrentOptions_())
          {
-            summaryText_.Text = L("Run a preview first: the options have changed since the last one, so it no longer describes what this would do.");
+            Summary_(StatusLevel.Warning, L("Run a preview first: the options have changed since the last one, so it no longer describes what this would do."));
             applyButton_.IsEnabled = false;
             return;
          }
@@ -744,7 +711,7 @@ namespace hMailServer.ControlPanel.Views
          // make it safer.
          if (previewedOptions_ != CurrentOptions_())
          {
-            summaryText_.Text = L("Nothing was applied: the options changed while the confirmation was open, so the preview no longer describes what this would do. Run the preview again.");
+            Summary_(StatusLevel.Warning, L("Nothing was applied: the options changed while the confirmation was open, so the preview no longer describes what this would do. Run the preview again."));
             applyButton_.IsEnabled = false;
             previewedOptions_ = null;
             return;
@@ -784,7 +751,7 @@ namespace hMailServer.ControlPanel.Views
       {
          rows_.Children.Clear();
 
-         summaryText_.Text = report.Summary;
+         Summary_(report.Succeeded ? StatusLevel.Information : StatusLevel.Critical, report.Summary);
 
          if (!report.Succeeded)
          {
@@ -855,13 +822,10 @@ namespace hMailServer.ControlPanel.Views
          // entry with no mail attribute - so a count of skipped entries read as two more
          // unidentifiable mailboxes. It is also placed HERE, directly under the rows it
          // summarises, rather than trailing four hundred lines below them.
-         rows_.Children.Add(new TextBlock
-         {
-            Text = L("Skipped, by reason"),
-            FontSize = Typography.Body,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 14, 0, 4)
-         });
+         var skipped = new TextBlock { Text = L("Skipped, by reason"), Margin = new Thickness(0, 16, 0, 4) };
+         skipped.SetResourceReference(StyleProperty, "TextBodyStrong");
+         System.Windows.Automation.AutomationProperties.SetHeadingLevel(skipped, System.Windows.Automation.AutomationHeadingLevel.Level2);
+         rows_.Children.Add(skipped);
 
          foreach (string line in report.SkipBreakdown)
          {
@@ -870,16 +834,16 @@ namespace hMailServer.ControlPanel.Views
             // line with an unexplained gap in it.
             string[] parts = line.Split('\t');
 
-            rows_.Children.Add(new TextBlock
+            var skipLine = new TextBlock
             {
                Text = parts.Length >= 2
                   ? parts[0].Trim() + "  -  " + string.Join(" ", parts, 1, parts.Length - 1).Trim()
                   : line,
-               FontSize = Typography.Caption,
                TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.75,
                Margin = new Thickness(0, 0, 0, 2)
-            });
+            };
+            skipLine.SetResourceReference(StyleProperty, "TextCaption");
+            rows_.Children.Add(skipLine);
          }
       }
 
@@ -890,19 +854,14 @@ namespace hMailServer.ControlPanel.Views
          var head = new TextBlock
          {
             Text = (row.Address.Length == 0 ? L("(no address)") : row.Address) + "  -  " + row.Action,
-            FontSize = Typography.Body,
-            FontWeight = emphasise ? FontWeights.SemiBold : FontWeights.Normal,
             TextWrapping = TextWrapping.Wrap
          };
+         head.SetResourceReference(StyleProperty, emphasise ? "TextBodyStrong" : "TextBody");
          panel.Children.Add(head);
 
-         panel.Children.Add(new TextBlock
-         {
-            Text = row.Detail,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.75
-         });
+         var detail = new TextBlock { Text = row.Detail, TextWrapping = TextWrapping.Wrap };
+         detail.SetResourceReference(StyleProperty, "TextCaption");
+         panel.Children.Add(detail);
 
          return panel;
       }

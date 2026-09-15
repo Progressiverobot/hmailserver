@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -17,62 +18,72 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>Incoming relays: trusted upstream servers whose IPs are skipped in spam host checks.</summary>
    public class IncomingRelaysView : UserControl, IPageLifecycle
    {
-      private readonly ListView list_ = new() { BorderThickness = new Thickness(0), Background = System.Windows.Media.Brushes.Transparent };
-      private readonly Wpf.Ui.Controls.TextBox name_ = new() { PlaceholderText = L("Name"), Margin = new Thickness(0, 0, 8, 0) };
-      private readonly Wpf.Ui.Controls.TextBox lower_ = new() { PlaceholderText = L("Lower IP"), Margin = new Thickness(0, 0, 8, 0) };
-      private readonly Wpf.Ui.Controls.TextBox upper_ = new() { PlaceholderText = L("Upper IP"), Margin = new Thickness(0, 0, 8, 0) };
+      private readonly ListView list_ = new()
+      {
+         BorderThickness = new Thickness(0),
+         Background = System.Windows.Media.Brushes.Transparent,
+         HorizontalContentAlignment = HorizontalAlignment.Stretch
+      };
+      // The three boxes are captioned by their FieldRows now, so the caption is
+      // the accessible name and the placeholder would only repeat it.
+      private readonly Wpf.Ui.Controls.TextBox name_ = new();
+      private readonly Wpf.Ui.Controls.TextBox lower_ = new();
+      private readonly Wpf.Ui.Controls.TextBox upper_ = new();
+      private readonly EmptyState empty_ = new() { Icon = Wpf.Ui.Controls.SymbolRegular.ArrowRouting24, Visibility = Visibility.Collapsed };
 
       public IncomingRelaysView()
       {
-         var grid = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var grid = new Grid();
+         grid.SetResourceReference(MarginProperty, "AppPagePadding");
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new StackPanel();
-         var title = new TextBlock { Text = L("Incoming relays") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         header.Children.Add(title);
-         var sub = new TextBlock { Text = L("Upstream gateways (spam filters, load balancers) whose IP addresses should not count as the connecting client in anti-spam host checks.") };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         header.Children.Add(sub);
-         grid.Children.Add(header);
+         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete selected"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
+         del.Click += (s, e) => DeleteSelected();
 
-         var listCard = new Border { Padding = new Thickness(10) };
-         listCard.SetResourceReference(StyleProperty, "Card");
-         listCard.Child = list_;
+         grid.Children.Add(new PageHeader
+         {
+            Title = L("Incoming relays"),
+            Subtitle = L("Upstream gateways (spam filters, load balancers) whose IP addresses should not count as the connecting client in anti-spam host checks."),
+            Actions = del
+         });
+
+         System.Windows.Automation.AutomationProperties.SetName(list_, L("Incoming relays"));
+         var listHost = new Grid();
+         listHost.Children.Add(list_);
+         listHost.Children.Add(empty_);
+         var listCard = new Card { Padding = new Thickness(10), Content = listHost };
+         listCard.SetResourceReference(MarginProperty, "AppCardGap");
          Grid.SetRow(listCard, 1);
          grid.Children.Add(listCard);
-
-         var addCard = new Border { Margin = new Thickness(0, 12, 0, 0) };
-         addCard.SetResourceReference(StyleProperty, "Card");
-         var addPanel = new StackPanel();
-         addPanel.Children.Add(new TextBlock { Text = L("Add relay"), FontSize = Typography.SectionHeading, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) });
 
          var row = new Grid();
          for (int i = 0; i < 3; i++)
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-         row.Children.Add(name_);
-         Grid.SetColumn(lower_, 1);
-         row.Children.Add(lower_);
-         Grid.SetColumn(upper_, 2);
-         row.Children.Add(upper_);
+         var nameField = new FieldRow { Label = L("Name"), Content = name_, Margin = new Thickness(0, 0, 8, 0) };
+         row.Children.Add(nameField);
+         var lowerField = new FieldRow { Label = L("Lower IP"), Content = lower_, Margin = new Thickness(0, 0, 8, 0) };
+         Grid.SetColumn(lowerField, 1);
+         row.Children.Add(lowerField);
+         var upperField = new FieldRow { Label = L("Upper IP"), Content = upper_, Margin = new Thickness(0, 0, 8, 0) };
+         Grid.SetColumn(upperField, 2);
+         row.Children.Add(upperField);
 
-         var add = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0) };
+         var add = new Wpf.Ui.Controls.Button
+         {
+            Content = L("_Add"),
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 0, 12)
+         };
          add.Click += (s, e) => Add();
          Grid.SetColumn(add, 3);
          row.Children.Add(add);
 
-         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete selected"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger };
-         del.Click += (s, e) => DeleteSelected();
-         Grid.SetColumn(del, 4);
-         row.Children.Add(del);
-
-         addPanel.Children.Add(row);
-         addCard.Child = addPanel;
+         var addCard = new Card { Title = L("Add relay"), Content = row };
          Grid.SetRow(addCard, 2);
          grid.Children.Add(addCard);
 
@@ -105,6 +116,8 @@ namespace hMailServer.ControlPanel.Views
          }
 
          list_.ItemsSource = rows;
+         StatusText.Show(empty_, null, rows.Count, null,
+            L("No incoming relays. Add one only for a gateway in front of this server whose address you trust."));
       }
 
       private void Add()
@@ -183,7 +196,7 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>MX query utility (same as the classic Utilities > MX-query).</summary>
    public class MxQueryView : UserControl, IPageLifecycle
    {
-      private readonly Wpf.Ui.Controls.TextBox domain_ = new() { PlaceholderText = L("Domain (e.g. gmail.com)"), Margin = new Thickness(0, 0, 8, 0) };
+      private readonly Wpf.Ui.Controls.TextBox domain_ = new();
       private readonly TextBox output_ = new()
       {
          IsReadOnly = true,
@@ -197,25 +210,34 @@ namespace hMailServer.ControlPanel.Views
 
       public MxQueryView()
       {
-         var grid = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var grid = new Grid();
+         grid.SetResourceReference(MarginProperty, "AppPagePadding");
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-         var header = new StackPanel();
-         var title = new TextBlock { Text = L("MX query") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         header.Children.Add(title);
-         var sub = new TextBlock { Text = L("Look up the mail exchanger records for a domain - where e-mail to that domain is delivered.") };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         header.Children.Add(sub);
-         grid.Children.Add(header);
+         grid.Children.Add(new PageHeader
+         {
+            Title = L("MX query"),
+            Subtitle = L("Look up the mail exchanger records for a domain - where e-mail to that domain is delivered.")
+         });
 
-         var inputRow = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+         var inputRow = new Grid();
+         inputRow.SetResourceReference(MarginProperty, "AppCardGap");
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         inputRow.Children.Add(domain_);
-         var actions = new StackPanel { Orientation = Orientation.Horizontal };
+         inputRow.Children.Add(new FieldRow
+         {
+            Label = L("Domain (e.g. gmail.com)"),
+            Content = domain_,
+            Margin = new Thickness(0, 0, 8, 0)
+         });
+         var actions = new StackPanel
+         {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 0, 12)
+         };
          var run = new Wpf.Ui.Controls.Button { Content = L("_Query"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary };
          run.Click += async (s, e) => await RunQuery();
          actions.Children.Add(run);
@@ -227,9 +249,8 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(inputRow, 1);
          grid.Children.Add(inputRow);
 
-         var card = new Border { Padding = new Thickness(12) };
-         card.SetResourceReference(StyleProperty, "Card");
-         card.Child = output_;
+         System.Windows.Automation.AutomationProperties.SetName(output_, L("MX query"));
+         var card = new Card { Padding = new Thickness(12), Content = output_ };
          Grid.SetRow(card, 2);
          grid.Children.Add(card);
 
@@ -316,7 +337,9 @@ namespace hMailServer.ControlPanel.Views
       // be "Administrator", which read as though the account name were a word
       // that translates. It is not: see the comment in ConnectView.xaml.
       private readonly Wpf.Ui.Controls.TextBox fromName_ = new() { PlaceholderText = L("Sender name, as recipients see it") };
-      private readonly Wpf.Ui.Controls.TextBox subject_ = new() { PlaceholderText = L("Subject") };
+      // No placeholder: the field's caption is the same word, and a placeholder
+      // that repeats the caption is a second copy of it inside the editor.
+      private readonly Wpf.Ui.Controls.TextBox subject_ = new();
       private readonly TextBox body_ = new()
       {
          AcceptsReturn = true,
@@ -326,57 +349,44 @@ namespace hMailServer.ControlPanel.Views
          FontSize = Typography.Body,
          Padding = new Thickness(6)
       };
-      private readonly TextBlock status_ = new() { FontSize = Typography.Caption, Margin = new Thickness(0, 10, 0, 0), Opacity = 0.7 };
+      private readonly InlineNotice status_ = new() { Visibility = Visibility.Collapsed };
 
       public SendoutView()
       {
-         var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 20), MaxWidth = 680, HorizontalAlignment = HorizontalAlignment.Left };
+         var panel = new StackPanel { MaxWidth = 680, HorizontalAlignment = HorizontalAlignment.Left };
 
-         var title = new TextBlock { Text = L("Server sendout") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         panel.Children.Add(title);
-         var sub = new TextBlock { Text = L("Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements.") };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         panel.Children.Add(sub);
+         panel.Children.Add(new PageHeader
+         {
+            Title = L("Server sendout"),
+            Subtitle = L("Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements.")
+         });
 
-         var card = new Border();
-         card.SetResourceReference(StyleProperty, "Card");
          var form = new StackPanel();
 
-         form.Children.Add(Label(L("Recipient wildcard (* = everyone)")));
-         form.Children.Add(Spaced(wildcard_));
-         form.Children.Add(Label(L("From address")));
-         form.Children.Add(Spaced(fromAddress_));
-         form.Children.Add(Label(L("From name")));
-         form.Children.Add(Spaced(fromName_));
-         form.Children.Add(Label(L("Subject")));
-         form.Children.Add(Spaced(subject_));
-         form.Children.Add(Label(L("Message")));
+         form.Children.Add(new FieldRow { Label = L("Recipient wildcard (* = everyone)"), Content = wildcard_ });
+         form.Children.Add(new FieldRow { Label = L("From address"), Content = fromAddress_ });
+         form.Children.Add(new FieldRow { Label = L("From name"), Content = fromName_ });
+         form.Children.Add(new FieldRow { Label = L("Subject"), Content = subject_ });
          body_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
          body_.Background = System.Windows.Media.Brushes.Transparent;
-         form.Children.Add(body_);
+         form.Children.Add(new FieldRow { Label = L("Message"), Content = body_ });
 
          var send = new Wpf.Ui.Controls.Button
          {
             Content = L("_Send to all matching accounts"),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-            Margin = new Thickness(0, 14, 0, 0)
+            Margin = new Thickness(0, 4, 0, 0)
          };
          send.Click += (s, e) => Send();
          form.Children.Add(send);
+         status_.Margin = new Thickness(0, 12, 0, 0);
          form.Children.Add(status_);
 
-         card.Child = form;
-         panel.Children.Add(card);
-         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-      }
+         panel.Children.Add(new Card { Content = form });
 
-      private static TextBlock Label(string text) => new() { Text = text, FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
-
-      private static FrameworkElement Spaced(FrameworkElement element)
-      {
-         element.Margin = new Thickness(0, 0, 0, 6);
-         return element;
+         var scroller = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+         scroller.SetResourceReference(PaddingProperty, "AppPagePadding");
+         Content = scroller;
       }
 
       private void Send()
@@ -399,9 +409,11 @@ namespace hMailServer.ControlPanel.Views
             ServerSession.Release(utilities);
             // The server reports failure through the return value rather than an
             // error, so don't claim success when it declined the sendout.
+            status_.Level = queued ? StatusLevel.Good : StatusLevel.Critical;
             status_.Text = queued
                ? F("Sendout queued {0}.", DateTime.Now.ToLongTimeString())
                : L("The server did not queue the sendout. Check the address wildcard and the hMailServer error log.");
+            status_.Visibility = Visibility.Visible;
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
@@ -438,12 +450,7 @@ namespace hMailServer.ControlPanel.Views
       // it is a background task gated on hMailServer.INI MessageStoreConsistencyCheck
       // that rewrites a recovery report in the log folder on every run - so the
       // Control Panel shows the result by reading that report.
-      private readonly TextBlock consistencyStatus_ = new()
-      {
-         FontSize = Typography.Label,
-         TextWrapping = TextWrapping.Wrap,
-         Margin = new Thickness(0, 0, 0, 10)
-      };
+      private readonly InlineNotice consistencyStatus_ = new();
       // A DataGrid rather than a ListView with a GridView: the application's
       // implicit DataGrid styles theme it, and nothing themes a GridView, whose
       // white header and system-hyperlink text were unreadable on the dark theme.
@@ -451,11 +458,7 @@ namespace hMailServer.ControlPanel.Views
       {
          AutoGenerateColumns = false,
          IsReadOnly = true,
-         HeadersVisibility = DataGridHeadersVisibility.Column,
-         GridLinesVisibility = DataGridGridLinesVisibility.None,
          SelectionMode = DataGridSelectionMode.Single,
-         BorderThickness = new Thickness(0),
-         Background = System.Windows.Media.Brushes.Transparent,
          // A badly damaged store can list thousands of messages; cap the section
          // so it scrolls internally instead of pushing the page around.
          MaxHeight = 260,
@@ -473,7 +476,8 @@ namespace hMailServer.ControlPanel.Views
 
       public DiagnosticsView()
       {
-         var grid = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var grid = new Grid();
+         grid.SetResourceReference(MarginProperty, "AppPagePadding");
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -481,19 +485,14 @@ namespace hMailServer.ControlPanel.Views
          // a clean scan is one line, and the connectivity output keeps the rest.
          grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var header = new StackPanel();
-         var title = new TextBlock { Text = L("Diagnostics") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         header.Children.Add(title);
-         var sub = new TextBlock
+         grid.Children.Add(new PageHeader
          {
-            Text = L("Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report.")
-         };
-         sub.SetResourceReference(StyleProperty, "PageSubtitle");
-         header.Children.Add(sub);
-         grid.Children.Add(header);
+            Title = L("Diagnostics"),
+            Subtitle = L("Runs the server's built-in connectivity and configuration checks (outbound port 25, MX resolution, backup directory, IP configuration). The message-store consistency scan below is a separate read-only background task - the server runs it at start-up and hourly and records what it found in a recovery report.")
+         });
 
-         var inputRow = new Grid { Margin = new Thickness(0, 0, 0, 12) };
+         var inputRow = new Grid();
+         inputRow.SetResourceReference(MarginProperty, "AppCardGap");
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          inputRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -519,50 +518,33 @@ namespace hMailServer.ControlPanel.Views
          Grid.SetRow(inputRow, 1);
          grid.Children.Add(inputRow);
 
-         var card = new Border { Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 12) };
-         card.SetResourceReference(StyleProperty, "Card");
-         card.Child = output_;
+         System.Windows.Automation.AutomationProperties.SetName(output_, L("Diagnostics"));
+         var card = new Card { Padding = new Thickness(12), Content = output_ };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
          Grid.SetRow(card, 2);
          grid.Children.Add(card);
 
-         var consistencyCard = new Border();
-         consistencyCard.SetResourceReference(StyleProperty, "Card");
-         consistencyCard.Child = BuildConsistencySection();
+         Card consistencyCard = BuildConsistencySection();
          Grid.SetRow(consistencyCard, 3);
          grid.Children.Add(consistencyCard);
 
          Content = grid;
       }
 
-      private FrameworkElement BuildConsistencySection()
+      private Card BuildConsistencySection()
       {
          var section = new Grid();
          section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         section.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          section.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-         var titleRow = new Grid { Margin = new Thickness(0, 0, 0, 12) };
-         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-         titleRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         titleRow.Children.Add(new TextBlock
-         {
-            Text = L("Message-store consistency"),
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            VerticalAlignment = VerticalAlignment.Center
-         });
+         consistencyStatus_.Margin = new Thickness(0);
+         section.Children.Add(consistencyStatus_);
 
-         var consistencyActions = new StackPanel { Orientation = Orientation.Horizontal };
+         var consistencyActions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
          consistencyRefresh_.Click += async (s, e) => await LoadConsistencyReport();
          consistencyActions.Children.Add(consistencyRefresh_);
          consistencyOpen_.Click += (s, e) => OpenReport();
          consistencyActions.Children.Add(consistencyOpen_);
-         Grid.SetColumn(consistencyActions, 1);
-         titleRow.Children.Add(consistencyActions);
-         section.Children.Add(titleRow);
-
-         Grid.SetRow(consistencyStatus_, 1);
-         section.Children.Add(consistencyStatus_);
 
          consistencyList_.Columns.Add(new DataGridTextColumn
          {
@@ -582,25 +564,27 @@ namespace hMailServer.ControlPanel.Views
             Binding = new System.Windows.Data.Binding(nameof(Services.MessageStoreConsistencyEntry.ExpectedPath)),
             Width = new DataGridLength(1, DataGridLengthUnitType.Star)
          });
-         Grid.SetRow(consistencyList_, 2);
+         Grid.SetRow(consistencyList_, 1);
+         System.Windows.Automation.AutomationProperties.SetName(consistencyList_, L("Message-store consistency"));
          section.Children.Add(consistencyList_);
 
-         return section;
+         return new Card
+         {
+            Title = L("Message-store consistency"),
+            Content = section,
+            Footer = consistencyActions
+         };
       }
 
-      /// <summary>A small caption above an input, in the secondary text colour.</summary>
-      private static StackPanel Captioned(string caption, FrameworkElement input)
+      /// <summary>One captioned input, as the form row the design system draws.</summary>
+      private static FieldRow Captioned(string caption, FrameworkElement input)
       {
-         var label = new TextBlock { Text = caption, FontSize = Typography.Caption, Margin = new Thickness(0, 0, 0, 4) };
-         label.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-         // The panel takes the input's place in its grid: its column, and its margin.
-         var panel = new StackPanel { Margin = input.Margin };
-         Grid.SetColumn(panel, Grid.GetColumn(input));
-         Grid.SetRow(panel, Grid.GetRow(input));
+         // The row takes the input's place in its grid: its column, and its margin.
+         var field = new FieldRow { Label = caption, Content = input, Margin = input.Margin };
+         Grid.SetColumn(field, Grid.GetColumn(input));
+         Grid.SetRow(field, Grid.GetRow(input));
          input.Margin = new Thickness(0);
-         panel.Children.Add(label);
-         panel.Children.Add(input);
-         return panel;
+         return field;
       }
 
       public void OnEnter()
@@ -712,7 +696,7 @@ namespace hMailServer.ControlPanel.Views
          consistencyOpen_.IsEnabled = false;
          consistencyList_.ItemsSource = null;
          consistencyList_.Visibility = Visibility.Collapsed;
-         consistencyStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         consistencyStatus_.Level = StatusLevel.Information;
          consistencyStatus_.Text = L("Reading the recovery report...");
          reportPath_ = null;
 
@@ -722,18 +706,12 @@ namespace hMailServer.ControlPanel.Views
 
             reportPath_ = result.ReportPath;
             consistencyStatus_.Text = result.Message;
-            switch (result.Level)
+            consistencyStatus_.Level = result.Level switch
             {
-               case Severity.Good:
-                  consistencyStatus_.Foreground = Services.ThemeTokens.Success;
-                  break;
-               case Severity.Bad:
-                  consistencyStatus_.Foreground = Services.ThemeTokens.Danger;
-                  break;
-               default:
-                  consistencyStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
-                  break;
-            }
+               Severity.Good => StatusLevel.Good,
+               Severity.Bad => StatusLevel.Critical,
+               _ => StatusLevel.Information
+            };
 
             if (result.Entries != null && result.Entries.Count > 0)
             {
@@ -745,8 +723,8 @@ namespace hMailServer.ControlPanel.Views
          {
             // Nothing awaits the load started from OnEnter, so report the failure
             // on the page rather than losing it in an unobserved task.
+            consistencyStatus_.Level = StatusLevel.Critical;
             consistencyStatus_.Text = F("Could not read the consistency report: {0}", ex.Message);
-            consistencyStatus_.Foreground = Services.ThemeTokens.Danger;
          }
          finally
          {

@@ -12,6 +12,11 @@ using hMailServer.ControlPanel.Services;
 
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using Path = System.Windows.Shapes.Path;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using EmptyState = hMailServer.ControlPanel.Views.Scaffold.EmptyState;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
+using StatusPill = hMailServer.ControlPanel.Views.Scaffold.StatusPill;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -42,34 +47,55 @@ namespace hMailServer.ControlPanel.Views
    public class ApiKeysView : UserControl, IPageLifecycle
    {
       private readonly StackPanel list_ = new();
-      private readonly TextBlock summary_ = new();
-      private readonly Path summaryMark_ = new();
+
+      // What the key store as a whole amounts to, at its level. The counts are
+      // words, so the level confirms and never carries alone.
+      private readonly InlineNotice summary_ = new();
       private readonly TextBlock storePath_ = new();
+      private readonly EmptyState empty_ = new()
+      {
+         Icon = Wpf.Ui.Controls.SymbolRegular.Key24,
+         Visibility = Visibility.Collapsed
+      };
 
       /// <summary>The card shown after a key is created, holding the one copy of
       /// the token that will ever exist.</summary>
-      private readonly Border newKeyCard_;
+      private readonly Card newKeyCard_;
       private readonly TextBlock newKeyToken_ = new();
       private readonly TextBlock newKeyLabel_ = new();
 
       public ApiKeysView()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("REST API keys") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
 
-         var subtitle = new TextBlock
+         var create = new Wpf.Ui.Controls.Button
          {
-            Text = L("Credentials for the REST administration API that are not the administrator password: each one expires, can be limited to reading only, to particular domains and to particular source addresses, and can be revoked on its own. The server re-reads the key store on every request, so anything changed here is live at once - no service restart.")
+            Content = L("_Create a key…"),
+            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
+            Margin = new Thickness(0, 0, 8, 0)
          };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         root.Children.Add(heading);
+         System.Windows.Automation.AutomationProperties.SetName(create, L("Create a new REST API key"));
+         System.Windows.Automation.AutomationProperties.SetAutomationId(create, "apikeys-create");
+         create.Click += (s, e) => CreateKey_();
+         actions.Children.Add(create);
+
+         var reload = new Wpf.Ui.Controls.Button { Content = L("_Reload") };
+         System.Windows.Automation.AutomationProperties.SetName(reload, L("Re-read the key store from disk"));
+         System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "apikeys-reload");
+         reload.Click += (s, e) => Reload_();
+         actions.Children.Add(reload);
+
+         root.Children.Add(new PageHeader
+         {
+            Title = L("REST API keys"),
+            Subtitle = L("Credentials for the REST administration API that are not the administrator password: each one expires, can be limited to reading only, to particular domains and to particular source addresses, and can be revoked on its own. The server re-reads the key store on every request, so anything changed here is live at once - no service restart."),
+            Actions = actions
+         });
 
          var cards = new StackPanel { Margin = new Thickness(0, 0, 12, 0), MaxWidth = 860, HorizontalAlignment = HorizontalAlignment.Left };
 
@@ -99,81 +125,27 @@ namespace hMailServer.ControlPanel.Views
       // Layout
       // =========================================================================
 
-      private static Border Card_(string cardTitle, string blurb, out StackPanel content)
+      /// <summary>One section of the page. Named Section_ and not Card_ because
+      /// the component it builds is called Card.</summary>
+      private static Card Section_(string cardTitle, string blurb, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var panel = new StackPanel();
-         panel.Children.Add(new TextBlock
-         {
-            Text = cardTitle,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-
-         if (!string.IsNullOrEmpty(blurb))
-         {
-            panel.Children.Add(new TextBlock
-            {
-               Text = blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 0, 0, 14)
-            });
-         }
-
-         border.Child = panel;
-         content = panel;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = cardTitle, Description = blurb, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
-      private Border BuildSummaryCard_()
+      private Card BuildSummaryCard_()
       {
-         Border card = Card_(L("Key store"), null, out StackPanel content);
+         Card card = Section_(L("Key store"), null, out StackPanel content);
 
-         var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 6) };
+         summary_.Margin = new Thickness(0, 0, 0, 8);
+         content.Children.Add(summary_);
 
-         summaryMark_.Width = 12;
-         summaryMark_.Height = 12;
-         summaryMark_.Margin = new Thickness(0, 3, 8, 0);
-         summaryMark_.VerticalAlignment = VerticalAlignment.Top;
-         row.Children.Add(summaryMark_);
-
-         summary_.FontSize = Typography.Body;
-         summary_.TextWrapping = TextWrapping.Wrap;
-         summary_.MaxWidth = 700;
-         row.Children.Add(summary_);
-
-         content.Children.Add(row);
-
-         storePath_.FontSize = Typography.Caption;
          storePath_.TextWrapping = TextWrapping.Wrap;
-         storePath_.Opacity = 0.65;
+         storePath_.SetResourceReference(StyleProperty, "TextCaptionTertiary");
          content.Children.Add(storePath_);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 14, 0, 0) };
-
-         var create = new Wpf.Ui.Controls.Button
-         {
-            Content = L("_Create a key…"),
-            Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-            Margin = new Thickness(0, 0, 8, 0)
-         };
-         System.Windows.Automation.AutomationProperties.SetName(create, L("Create a new REST API key"));
-         System.Windows.Automation.AutomationProperties.SetAutomationId(create, "apikeys-create");
-         create.Click += (s, e) => CreateKey_();
-         buttons.Children.Add(create);
-
-         var reload = new Wpf.Ui.Controls.Button { Content = L("_Reload") };
-         System.Windows.Automation.AutomationProperties.SetName(reload, L("Re-read the key store from disk"));
-         System.Windows.Automation.AutomationProperties.SetAutomationId(reload, "apikeys-reload");
-         reload.Click += (s, e) => Reload_();
-         buttons.Children.Add(reload);
-
-         content.Children.Add(buttons);
          return card;
       }
 
@@ -181,16 +153,15 @@ namespace hMailServer.ControlPanel.Views
       /// Where a new key is shown. It is the only place the clear text ever
       /// appears, so it says so, in the imperative, before the value itself.
       /// </summary>
-      private Border BuildNewKeyCard_()
+      private Card BuildNewKeyCard_()
       {
-         Border card = Card_(L("Copy this key now"),
+         Card card = Section_(L("Copy this key now"),
             L("This is the only time it will ever be shown. The store keeps a SHA-256 digest, not the key, so it cannot be recovered or re-displayed - if it is lost, revoke it here and create another."),
             out StackPanel content);
 
          card.Visibility = Visibility.Collapsed;
 
-         newKeyLabel_.FontSize = Typography.Caption;
-         newKeyLabel_.Opacity = 0.65;
+         newKeyLabel_.SetResourceReference(StyleProperty, "TextCaption");
          newKeyLabel_.Margin = new Thickness(0, 0, 0, 6);
          content.Children.Add(newKeyLabel_);
 
@@ -239,20 +210,21 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildListCard_()
+      private Card BuildListCard_()
       {
-         Border card = Card_(L("API keys"),
+         Card card = Section_(L("API keys"),
             L("Only a digest of each key is stored, so a key cannot be read back from here or from the file. Revoking one removes its section from the store and takes effect on the very next request."),
             out StackPanel content);
 
          System.Windows.Automation.AutomationProperties.SetAutomationId(list_, "apikeys-list");
          content.Children.Add(list_);
+         content.Children.Add(empty_);
          return card;
       }
 
-      private static Border BuildExplanationCard_()
+      private static Card BuildExplanationCard_()
       {
-         Border card = Card_(L("How a key is used"), null, out StackPanel content);
+         Card card = Section_(L("How a key is used"), null, out StackPanel content);
 
          content.Children.Add(Paragraph_(
             L("Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API & monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else.")));
@@ -273,13 +245,9 @@ namespace hMailServer.ControlPanel.Views
 
       private static TextBlock Paragraph_(string text)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = Typography.Body,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 10)
-         };
+         var block = new TextBlock { Text = text, Margin = new Thickness(0, 0, 0, 10) };
+         block.SetResourceReference(StyleProperty, "TextBody");
+         return block;
       }
 
       /// <summary>Same construction as SpamOverviewView.PageLink: the way out to the
@@ -325,7 +293,9 @@ namespace hMailServer.ControlPanel.Views
 
          if (keys.Count == 0)
          {
-            SetSummary_(StatusLevel.Normal,
+            // Information and never Normal: an InlineNotice draws its level's
+            // severity word, and "Normal" is not a statement about a key store.
+            SetSummary_(StatusLevel.Information,
                L("No API keys exist. Every REST request therefore has to carry the administrator password, which carries full authority over every domain and cannot be scoped, expired or revoked on its own."));
          }
          else
@@ -348,15 +318,7 @@ namespace hMailServer.ControlPanel.Views
          foreach (ApiKeyRecord key in keys)
             list_.Children.Add(BuildKeyRow_(key));
 
-         if (keys.Count == 0)
-         {
-            list_.Children.Add(new TextBlock
-            {
-               Text = L("No keys yet."),
-               FontSize = Typography.Body,
-               Opacity = 0.65
-            });
-         }
+         StatusText.Show(empty_, null, keys.Count, null, L("No keys yet."));
       }
 
       private static string Plural_(int count, string one, string many)
@@ -368,10 +330,10 @@ namespace hMailServer.ControlPanel.Views
          {
             Margin = new Thickness(0, 0, 0, 8),
             Padding = new Thickness(12, 10, 12, 10),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(4)
+            BorderThickness = new Thickness(1)
          };
-         border.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
+         border.SetResourceReference(Border.CornerRadiusProperty, "AppControlCornerRadius");
+         border.SetResourceReference(Border.BorderBrushProperty, "AppCardBorderBrush");
 
          var grid = new Grid();
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -379,7 +341,8 @@ namespace hMailServer.ControlPanel.Views
 
          var details = new StackPanel();
 
-         var headline = new TextBlock { FontSize = Typography.Body, TextWrapping = TextWrapping.Wrap };
+         var headline = new TextBlock { TextWrapping = TextWrapping.Wrap };
+         headline.SetResourceReference(StyleProperty, "TextBody");
          headline.Inlines.Add(new Run(key.Label.Length > 0 ? key.Label : L("(no label)")) { FontWeight = FontWeights.SemiBold });
          // A Run is an Inline and has no Opacity; the secondary text brush is how
          // the rest of the application recedes a caption, and it is theme-aware,
@@ -430,19 +393,18 @@ namespace hMailServer.ControlPanel.Views
 
          var stateRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 6, 0, 0) };
 
-         var mark = new Path
+         // The pill carries the colour, the shape and the severity word together;
+         // the sentence beside it says what that means for this key.
+         stateRow.Children.Add(new StatusPill
          {
-            Width = 10,
-            Height = 10,
-            Margin = new Thickness(0, 4, 8, 0),
+            Level = level,
+            Text = presentation.SeverityWord,
+            Margin = new Thickness(0, 1, 8, 0),
             VerticalAlignment = VerticalAlignment.Top
-         };
-         ShapeMarkVisuals.ApplyMark(mark, presentation.Shape, presentation.BrushKey);
-         stateRow.Children.Add(mark);
+         });
 
-         var stateText = new TextBlock { FontSize = Typography.Caption, TextWrapping = TextWrapping.Wrap, MaxWidth = 560 };
-         stateText.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-         stateText.Inlines.Add(new Run(state));
+         var stateText = new TextBlock { Text = state, TextWrapping = TextWrapping.Wrap, MaxWidth = 560 };
+         stateText.SetResourceReference(StyleProperty, "TextCaption");
          System.Windows.Automation.AutomationProperties.SetName(stateText, presentation.SeverityWord + ": " + state);
          stateRow.Children.Add(stateText);
 
@@ -454,14 +416,14 @@ namespace hMailServer.ControlPanel.Views
             key.AllowedFrom.Length == 0 ? L("any source address") : F("only from {0}", key.AllowedFrom)
          };
 
-         details.Children.Add(new TextBlock
+         var scope = new TextBlock
          {
             Text = L("Scope: ") + string.Join("; ", restrictions) + ".",
-            FontSize = Typography.Caption,
-            Opacity = 0.65,
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(18, 4, 0, 0)
-         });
+            Margin = new Thickness(0, 6, 0, 0)
+         };
+         scope.SetResourceReference(StyleProperty, "TextCaptionTertiary");
+         details.Children.Add(scope);
 
          Grid.SetColumn(details, 0);
          grid.Children.Add(details);
@@ -486,14 +448,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void SetSummary_(StatusLevel level, string text)
       {
-         StatusPresentation presentation = StatusSemantics.For(level);
-         ShapeMarkVisuals.ApplyMark(summaryMark_, presentation.Shape, presentation.BrushKey);
-
-         summary_.Inlines.Clear();
-         summary_.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-         summary_.Inlines.Add(new Run(text));
-
-         System.Windows.Automation.AutomationProperties.SetName(summary_, presentation.SeverityWord + ": " + text);
+         summary_.Level = level;
+         summary_.Text = text;
       }
 
       // =========================================================================

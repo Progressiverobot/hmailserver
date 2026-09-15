@@ -17,6 +17,10 @@ using hMailServer.ControlPanel.Services;
 // meant rather than dropping the imports.
 using Typography = hMailServer.ControlPanel.Services.Typography;
 using Path = System.Windows.Shapes.Path;
+using Card = hMailServer.ControlPanel.Views.Scaffold.Card;
+using FieldRow = hMailServer.ControlPanel.Views.Scaffold.FieldRow;
+using InlineNotice = hMailServer.ControlPanel.Views.Scaffold.InlineNotice;
+using PageHeader = hMailServer.ControlPanel.Views.Scaffold.PageHeader;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -85,8 +89,9 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- state card -----------------------------------------------------------
 
-      private readonly Path stateMark_ = new();
-      private readonly TextBlock stateText_ = new();
+      // The verdict as a notice at its own level: the component draws the colour,
+      // the shape and the severity word that this card used to build by hand.
+      private readonly InlineNotice stateText_ = new();
       private readonly TextBlock stateDetail_ = new();
 
       // ---- connection test ------------------------------------------------------
@@ -95,8 +100,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly Wpf.Ui.Controls.TextBox testDomain_ = new();
       private readonly hMailServer.ControlPanel.Views.PasswordField testPassword_ = new();
       private Wpf.Ui.Controls.Button testButton_;
-      private readonly Path testMark_ = new();
-      private readonly TextBlock testText_ = new();
+      private readonly InlineNotice testText_ = new();
 
       // ---- footer ---------------------------------------------------------------
 
@@ -113,23 +117,17 @@ namespace hMailServer.ControlPanel.Views
 
       public LdapSettingsView()
       {
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var heading = new StackPanel();
-         var title = new TextBlock { Text = L("Directory authentication (LDAP)") };
-         title.SetResourceReference(StyleProperty, "PageTitle");
-         heading.Children.Add(title);
-
-         var subtitle = new TextBlock
+         root.Children.Add(new PageHeader
          {
-            Text = L("Accounts marked as directory-linked log on with their domain password through an LDAP bind - unlike Windows logon, this works from a host that is not joined to the domain, which is the usual situation for a mail server in a DMZ. Edits the [LDAP] section of hMailServer.INI; the server re-reads that section within two seconds of a save, so no service restart is needed.")
-         };
-         subtitle.SetResourceReference(StyleProperty, "PageSubtitle");
-         heading.Children.Add(subtitle);
-         root.Children.Add(heading);
+            Title = L("Directory authentication (LDAP)"),
+            Subtitle = L("Accounts marked as directory-linked log on with their domain password through an LDAP bind - unlike Windows logon, this works from a host that is not joined to the domain, which is the usual situation for a mail server in a DMZ. Edits the [LDAP] section of hMailServer.INI; the server re-reads that section within two seconds of a save, so no service restart is needed.")
+         });
 
          var cards = new StackPanel { Margin = new Thickness(0, 0, 12, 0), MaxWidth = 760, HorizontalAlignment = HorizontalAlignment.Left };
          cards.Children.Add(BuildStateCard_());
@@ -176,11 +174,10 @@ namespace hMailServer.ControlPanel.Views
          var footer = new Grid { Margin = new Thickness(0, 14, 12, 0) };
 
          footerStatus_.VerticalAlignment = VerticalAlignment.Center;
-         footerStatus_.FontSize = Typography.Caption;
          footerStatus_.TextWrapping = TextWrapping.Wrap;
          footerStatus_.MaxWidth = 480;
          footerStatus_.HorizontalAlignment = HorizontalAlignment.Left;
-         footerStatus_.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+         footerStatus_.SetResourceReference(StyleProperty, "TextCaption");
          footer.Children.Add(footerStatus_);
 
          var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
@@ -201,47 +198,21 @@ namespace hMailServer.ControlPanel.Views
          return footer;
       }
 
-      private static Border Card_(string cardTitle, string blurb, out StackPanel content)
+      /// <summary>One section of the page. Named Section_ and not Card_ because
+      /// the component it builds is called Card.</summary>
+      private static Card Section_(string cardTitle, string blurb, out StackPanel content)
       {
-         var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-         border.SetResourceReference(StyleProperty, "Card");
-
-         var panel = new StackPanel();
-         panel.Children.Add(new TextBlock
-         {
-            Text = cardTitle,
-            FontSize = Typography.SectionHeading,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-
-         if (!string.IsNullOrEmpty(blurb))
-         {
-            panel.Children.Add(new TextBlock
-            {
-               Text = blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 0, 0, 14)
-            });
-         }
-
-         border.Child = panel;
-         content = panel;
-         return border;
+         content = new StackPanel();
+         var card = new Card { Title = cardTitle, Description = blurb, Content = content };
+         card.SetResourceReference(MarginProperty, "AppCardGap");
+         return card;
       }
 
       private static TextBlock Caption_(string text)
       {
-         return new TextBlock
-         {
-            Text = text,
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap,
-            Opacity = 0.65,
-            Margin = new Thickness(0, 4, 0, 0)
-         };
+         var block = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0) };
+         block.SetResourceReference(StyleProperty, "TextCaption");
+         return block;
       }
 
       /// <summary>
@@ -251,72 +222,54 @@ namespace hMailServer.ControlPanel.Views
       /// sitting loose in the panel is reached only after the editor, and a note
       /// qualifying what the server does with the value has to be heard with it.
       /// </summary>
-      private static FrameworkElement LabelledBox_(string label, Wpf.Ui.Controls.TextBox box,
+      /// <summary>
+      /// A labelled text box, as the form row the design system draws: FieldRow
+      /// wires the Alt key through Mnemonic and gives the editor its accessible
+      /// name from the caption and its help text from the hint, which is the same
+      /// double delivery this page built by hand - a caption sitting loose in the
+      /// panel is reached only after the editor, and a note qualifying what the
+      /// server does with the value has to be heard with it.
+      /// </summary>
+      private static FieldRow LabelledBox_(string label, Wpf.Ui.Controls.TextBox box,
          string automationId, string caption, string placeholder = "")
       {
-         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, box));
-
-         box.FontSize = Typography.Body;
          box.MaxWidth = 520;
          box.MinWidth = 320;
          box.HorizontalAlignment = HorizontalAlignment.Left;
          box.PlaceholderText = placeholder;
-         System.Windows.Automation.AutomationProperties.SetName(box, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(box, automationId);
-         panel.Children.Add(box);
 
-         if (!string.IsNullOrEmpty(caption))
-         {
-            System.Windows.Automation.AutomationProperties.SetHelpText(box, caption);
-            panel.Children.Add(Caption_(caption));
-         }
-
-         return panel;
+         return new FieldRow { Label = label, Content = box, Hint = caption };
       }
 
-      private static FrameworkElement LabelledCheck_(CheckBox box, string label, string automationId, string caption)
+      /// <summary>
+      /// A check box and the sentence that qualifies it. The box names itself from
+      /// its content, so the FieldRow carries no caption of its own - a second
+      /// label above a checkbox would be the same words twice.
+      /// </summary>
+      private static FieldRow LabelledCheck_(CheckBox box, string label, string automationId, string caption)
       {
-         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-
          box.Content = label;   // a checkbox names itself from its content
-         box.FontSize = Typography.Control;
          System.Windows.Automation.AutomationProperties.SetAutomationId(box, automationId);
-         panel.Children.Add(box);
 
          if (!string.IsNullOrEmpty(caption))
-         {
             System.Windows.Automation.AutomationProperties.SetHelpText(box, caption);
-            panel.Children.Add(Caption_(caption));
-         }
 
-         return panel;
+         return new FieldRow { Content = box, Hint = caption };
       }
 
-      private static FrameworkElement LabelledCombo_(string label, ComboBox combo,
+      private static FieldRow LabelledCombo_(string label, ComboBox combo,
          string automationId, string caption, params (int Value, string Text)[] options)
       {
-         var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         panel.Children.Add(Mnemonic.Apply(new TextBlock { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) }, label, combo));
-
-         combo.FontSize = Typography.Body;
          combo.MinWidth = 320;
          combo.MaxWidth = 520;
          combo.HorizontalAlignment = HorizontalAlignment.Left;
          foreach ((int value, string text) in options)
             combo.Items.Add(new ComboBoxItem { Content = text, Tag = value });
 
-         System.Windows.Automation.AutomationProperties.SetName(combo, MnemonicText.Strip(label));
          System.Windows.Automation.AutomationProperties.SetAutomationId(combo, automationId);
-         panel.Children.Add(combo);
 
-         if (!string.IsNullOrEmpty(caption))
-         {
-            System.Windows.Automation.AutomationProperties.SetHelpText(combo, caption);
-            panel.Children.Add(Caption_(caption));
-         }
-
-         return panel;
+         return new FieldRow { Label = label, Content = combo, Hint = caption };
       }
 
       private static void SelectByTag_(ComboBox combo, int value)
@@ -339,33 +292,18 @@ namespace hMailServer.ControlPanel.Views
 
       // ---- the cards ------------------------------------------------------------
 
-      private Border BuildStateCard_()
+      private Card BuildStateCard_()
       {
-         Border card = Card_(L("Is this configuration complete?"), null, out StackPanel content);
+         Card card = Section_(L("Is this configuration complete?"), null, out StackPanel content);
 
-         var row = new Grid();
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-         stateMark_.Width = 12;
-         stateMark_.Height = 12;
-         stateMark_.Margin = new Thickness(0, 4, 8, 0);
-         stateMark_.VerticalAlignment = VerticalAlignment.Top;
-         row.Children.Add(stateMark_);
-
-         stateText_.FontSize = Typography.Body;
-         stateText_.TextWrapping = TextWrapping.Wrap;
+         stateText_.Margin = new Thickness(0);
          System.Windows.Automation.AutomationProperties.SetAutomationId(stateText_, "ldap-state");
          System.Windows.Automation.AutomationProperties.SetLiveSetting(stateText_, System.Windows.Automation.AutomationLiveSetting.Polite);
-         Grid.SetColumn(stateText_, 1);
-         row.Children.Add(stateText_);
+         content.Children.Add(stateText_);
 
-         content.Children.Add(row);
-
-         stateDetail_.FontSize = Typography.Caption;
          stateDetail_.TextWrapping = TextWrapping.Wrap;
-         stateDetail_.Opacity = 0.75;
-         stateDetail_.Margin = new Thickness(20, 6, 0, 0);
+         stateDetail_.SetResourceReference(StyleProperty, "TextCaption");
+         stateDetail_.Margin = new Thickness(0, 8, 0, 0);
          content.Children.Add(stateDetail_);
 
          // This mirrors LdapConfiguration::IsComplete and the two refusal gates in
@@ -377,9 +315,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildConnectionCard_()
+      private Card BuildConnectionCard_()
       {
-         Border card = Card_(L("Directory server"), null, out StackPanel content);
+         Card card = Section_(L("Directory server"), null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(enabled_,
             L("_Use LDAP directory authentication (Enabled)"),
@@ -412,9 +350,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildBindMethodCard_()
+      private Card BuildBindMethodCard_()
       {
-         Border card = Card_(L("How the password is proved"),
+         Card card = Section_(L("How the password is proved"),
             L("Two bind methods, and the difference matters more than it looks: one sends the password to the directory, the other never puts it on the wire at all."), out StackPanel content);
 
          content.Children.Add(LabelledCombo_(L("_Bind method (BindMethod)"), bindMethod_, "ldap-bind-method",
@@ -430,9 +368,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildLookupCard_()
+      private Card BuildLookupCard_()
       {
-         Border card = Card_(L("Finding the user's directory entry"),
+         Card card = Section_(L("Finding the user's directory entry"),
             L("A simple bind needs the user's distinguished name. There are two ways to get one - search for it, or compute it from a template - and Negotiate needs neither, because SSPI authenticates by user name and domain, which the account already carries."), out StackPanel content);
 
          content.Children.Add(LabelledBox_(L("Search bas_e (SearchBase)"), searchBase_, "ldap-search-base",
@@ -450,9 +388,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildServiceCredentialCard_()
+      private Card BuildServiceCredentialCard_()
       {
-         Border card = Card_(L("Service account (search mode only)"),
+         Card card = Section_(L("Service account (search mode only)"),
             L("Active Directory refuses anonymous searches by default, so search mode normally needs a credential that may read the directory. Negotiate and DN-template configurations need none of this."),
             out StackPanel content);
 
@@ -460,27 +398,21 @@ namespace hMailServer.ControlPanel.Views
             L("Whatever your directory accepts for a simple bind: a UPN (svc-mail@example.local), DOMAIN\\name, or a full DN. Left empty, the server searches anonymously - which usually fails against Active Directory, with a reported reason that names this setting."),
             placeholder: "svc-mail@example.local"));
 
-         var passwordPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         passwordPanel.Children.Add(new TextBlock
-         {
-            Text = L("Service account password (ServicePassword)"),
-            FontSize = Typography.Body,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-
-         servicePassword_.FontSize = Typography.Body;
          servicePassword_.MaxWidth = 520;
          servicePassword_.MinWidth = 320;
          servicePassword_.HorizontalAlignment = HorizontalAlignment.Left;
          System.Windows.Automation.AutomationProperties.SetName(servicePassword_, L("Service account password (ServicePassword)"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(servicePassword_, "ldap-service-password");
-         passwordPanel.Children.Add(servicePassword_);
 
          string passwordCaption =
             L("Write-only: a stored password is never shown here again - leave the box blank to keep it. It is stored as plain text in hMailServer.INI on the server, because the server has to present it to the directory verbatim and so cannot hash it; restrict file access to the INI accordingly. It only ever leaves the server over the transport configured above.");
          System.Windows.Automation.AutomationProperties.SetHelpText(servicePassword_, passwordCaption);
-         passwordPanel.Children.Add(Caption_(passwordCaption));
-         content.Children.Add(passwordPanel);
+         content.Children.Add(new FieldRow
+         {
+            Label = L("Service account password (ServicePassword)"),
+            Content = servicePassword_,
+            Hint = passwordCaption
+         });
 
          content.Children.Add(LabelledCheck_(clearServicePassword_,
             L("Remove the stored service account pass_word when saving"),
@@ -493,18 +425,17 @@ namespace hMailServer.ControlPanel.Views
          // BindServiceCredential_). An editable box for a value the server never
          // uses is the WorkerThreadPriority defect again, so the key is shown as a
          // statement instead.
-         serviceDomainNote_.FontSize = Typography.Caption;
          serviceDomainNote_.TextWrapping = TextWrapping.Wrap;
-         serviceDomainNote_.Opacity = 0.65;
+         serviceDomainNote_.SetResourceReference(StyleProperty, "TextCaption");
          System.Windows.Automation.AutomationProperties.SetAutomationId(serviceDomainNote_, "ldap-service-domain-note");
          content.Children.Add(serviceDomainNote_);
 
          return card;
       }
 
-      private Border BuildFallbackCard_()
+      private Card BuildFallbackCard_()
       {
-         Border card = Card_(L("If the directory cannot answer"), null, out StackPanel content);
+         Card card = Section_(L("If the directory cannot answer"), null, out StackPanel content);
 
          content.Children.Add(LabelledCheck_(fallback_,
             L("Retr_y through Windows logon when the directory is unavailable (FallbackToWindowsLogon)"),
@@ -514,9 +445,9 @@ namespace hMailServer.ControlPanel.Views
          return card;
       }
 
-      private Border BuildPrerequisitesCard_()
+      private Card BuildPrerequisitesCard_()
       {
-         Border card = Card_(L("What has to exist outside this server"),
+         Card card = Section_(L("What has to exist outside this server"),
             L("hMailServer cannot create any of these for itself. Each one missing has its own failure shape, and the server reports which one it hit - see the error log."), out StackPanel content);
 
          AddBullet_(content,
@@ -545,19 +476,21 @@ namespace hMailServer.ControlPanel.Views
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
 
-         var dot = new TextBlock { Text = "•", FontSize = Typography.Body, Margin = new Thickness(2, 0, 8, 0), VerticalAlignment = VerticalAlignment.Top };
+         var dot = new TextBlock { Text = "•", Margin = new Thickness(2, 0, 8, 0), VerticalAlignment = VerticalAlignment.Top };
+         dot.SetResourceReference(StyleProperty, "TextBody");
          row.Children.Add(dot);
 
-         var body = new TextBlock { Text = text, FontSize = Typography.Label, TextWrapping = TextWrapping.Wrap };
+         var body = new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap };
+         body.SetResourceReference(StyleProperty, "TextCaption");
          Grid.SetColumn(body, 1);
          row.Children.Add(body);
 
          content.Children.Add(row);
       }
 
-      private Border BuildTestCard_()
+      private Card BuildTestCard_()
       {
-         Border card = Card_(L("Test the connection"),
+         Card card = Section_(L("Test the connection"),
             L("Runs the same steps the server runs, in the same order, using the values in the editors above as they stand: connect, protect the transport, bind the service credential, search for the user - and, only if a password is typed below, bind as that user to prove it. The password is used once and never stored, and the test refuses to run any configuration that would put a password on the network unprotected. One honest caveat: the test runs from this computer, so a firewall that treats this machine and the hMailServer service differently can make the two disagree."),
             out StackPanel content);
 
@@ -569,24 +502,18 @@ namespace hMailServer.ControlPanel.Views
             L("Used for the %d placeholder and for a Negotiate bind (NTLM needs it on a host that is not domain-joined). The server takes this from the account's Directory tab; type the same value here."),
             placeholder: "EXAMPLE")); // no-loc
 
-         var passwordPanel = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
-         passwordPanel.Children.Add(new TextBlock
-         {
-            Text = L("Password (optional - only to test a real logon)"),
-            FontSize = Typography.Body,
-            Margin = new Thickness(0, 0, 0, 4)
-         });
-         testPassword_.FontSize = Typography.Body;
          testPassword_.MaxWidth = 520;
          testPassword_.MinWidth = 320;
          testPassword_.HorizontalAlignment = HorizontalAlignment.Left;
          testPassword_.PlaceholderText = L("Leave empty to test only the infrastructure");
          System.Windows.Automation.AutomationProperties.SetName(testPassword_, L("Password (optional - only to test a real logon)"));
          System.Windows.Automation.AutomationProperties.SetAutomationId(testPassword_, "ldap-test-password");
-         System.Windows.Automation.AutomationProperties.SetHelpText(testPassword_,
-            L("Used once for a test bind and never stored. With no password the test still proves the connection, the transport, the service credential and the search."));
-         passwordPanel.Children.Add(testPassword_);
-         content.Children.Add(passwordPanel);
+         content.Children.Add(new FieldRow
+         {
+            Label = L("Password (optional - only to test a real logon)"),
+            Content = testPassword_,
+            Hint = L("Used once for a test bind and never stored. With no password the test still proves the connection, the transport, the service credential and the search.")
+         });
 
          testButton_ = new Wpf.Ui.Controls.Button { Content = L("_Test connection") };
          System.Windows.Automation.AutomationProperties.SetName(testButton_, L("Test the directory connection with the values on this page"));
@@ -594,25 +521,11 @@ namespace hMailServer.ControlPanel.Views
          testButton_.Click += async (s, e) => await RunTest_();
          content.Children.Add(testButton_);
 
-         var resultRow = new Grid { Margin = new Thickness(0, 12, 0, 0) };
-         resultRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         resultRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-
-         testMark_.Width = 12;
-         testMark_.Height = 12;
-         testMark_.Margin = new Thickness(0, 4, 8, 0);
-         testMark_.VerticalAlignment = VerticalAlignment.Top;
-         testMark_.Visibility = Visibility.Collapsed;
-         resultRow.Children.Add(testMark_);
-
-         testText_.FontSize = Typography.Label;
-         testText_.TextWrapping = TextWrapping.Wrap;
+         testText_.Margin = new Thickness(0, 12, 0, 0);
+         testText_.Visibility = Visibility.Collapsed;
          System.Windows.Automation.AutomationProperties.SetAutomationId(testText_, "ldap-test-result");
          System.Windows.Automation.AutomationProperties.SetLiveSetting(testText_, System.Windows.Automation.AutomationLiveSetting.Polite);
-         Grid.SetColumn(testText_, 1);
-         resultRow.Children.Add(testText_);
-
-         content.Children.Add(resultRow);
+         content.Children.Add(testText_);
 
          return card;
       }
@@ -992,14 +905,12 @@ namespace hMailServer.ControlPanel.Views
          }
 
          StatusPresentation presentation = StatusSemantics.For(level);
-         ShapeMarkVisuals.ApplyMark(stateMark_, presentation.Shape, presentation.BrushKey);
 
-         stateText_.Inlines.Clear();
-         stateText_.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-         stateText_.Inlines.Add(new Run(headline));
+         stateText_.Level = level;
+         stateText_.Text = headline;
 
          // Word first in the accessible name, so a screen reader hears the severity
-         // even though the visible badge carries it as shape and colour.
+         // even though the visible notice carries it as shape, colour and word.
          System.Windows.Automation.AutomationProperties.SetName(stateText_,
             presentation.SeverityWord + ": " + headline + (detail.Length > 0 ? " " + detail : ""));
 
@@ -1015,12 +926,9 @@ namespace hMailServer.ControlPanel.Views
       {
          StatusPresentation presentation = StatusSemantics.For(level);
 
-         testMark_.Visibility = Visibility.Visible;
-         ShapeMarkVisuals.ApplyMark(testMark_, presentation.Shape, presentation.BrushKey);
-
-         testText_.Inlines.Clear();
-         testText_.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-         testText_.Inlines.Add(new Run(text));
+         testText_.Level = level;
+         testText_.Text = text;
+         testText_.Visibility = Visibility.Visible;
 
          System.Windows.Automation.AutomationProperties.SetName(testText_, presentation.SeverityWord + ": " + text);
       }

@@ -311,15 +311,13 @@ namespace hMailServer.ControlPanel.Views
 
          editor_ = new CollectionEditorView(spec, embedded: true);
 
-         var root = new Grid { Margin = new Thickness(26, 20, 26, 20) };
+         var root = new Grid();
+         root.SetResourceReference(MarginProperty, "AppPagePadding");
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
          root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
          root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-         var head = new StackPanel();
-         head.Children.Add(new TextBlock { Text = spec.Title, Style = (Style)FindResource("PageTitle") });
-         head.Children.Add(new TextBlock { Text = subtitle, Style = (Style)FindResource("PageSubtitle") });
-         root.Children.Add(head);
+         root.Children.Add(new Scaffold.PageHeader { Title = spec.Title, Subtitle = subtitle });
 
          Grid.SetRow(editor_, 1);
          root.Children.Add(editor_);
@@ -339,12 +337,11 @@ namespace hMailServer.ControlPanel.Views
          membersHint_ = new TextBlock
          {
             Text = HintNoSelection,
-            FontSize = Typography.Caption,
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(10, 0, 0, 0)
          };
-         membersHint_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         membersHint_.SetResourceReference(StyleProperty, "TextCaption");
          membersRow.Children.Add(membersHint_);
 
          Grid.SetRow(membersRow, 2);

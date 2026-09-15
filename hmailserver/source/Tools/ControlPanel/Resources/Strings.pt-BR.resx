@@ -3915,9 +3915,6 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="Loaded from disk." xml:space="preserve">
     <value>Carregado do disco.</value>
   </data>
-  <data name="Loaded from server." xml:space="preserve">
-    <value>Carregado do servidor.</value>
-  </data>
   <data name="Loading…" xml:space="preserve">
     <value>Carregando…</value>
   </data>
@@ -4530,6 +4527,9 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="No account found with address '{0}'." xml:space="preserve">
     <value>Nenhuma conta encontrada com o endereço '{0}'.</value>
   </data>
+  <data name="No accounts in this domain yet." xml:space="preserve">
+    <value>Ainda não há contas neste domínio.</value>
+  </data>
   <data name="No active sessions" xml:space="preserve">
     <value>Nenhuma sessão ativa</value>
   </data>
@@ -4590,6 +4590,9 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   <data name="No domains are configured, so there is nothing to sign and no record to publish." xml:space="preserve">
     <value>Nenhum domínio está configurado, então não há nada a assinar e nenhum registro a publicar.</value>
   </data>
+  <data name="No domains yet. Add the first one to start receiving mail." xml:space="preserve">
+    <value>Ainda não há domínios. Adicione o primeiro para o servidor começar a receber mensagens.</value>
+  </data>
   <data name="No encryption is available on this port at all. Every password and every message on it crosses the network readable by anything on the path." xml:space="preserve">
     <value>Nenhuma criptografia está disponível nesta porta, de forma alguma. Toda senha e toda mensagem nela atravessam a rede legíveis por qualquer coisa no caminho.</value>
   </data>
@@ -4625,6 +4628,9 @@ O instalador verificado é entregue ao auxiliar de atualização: o serviço par
   </data>
   <data name="No host set" xml:space="preserve">
     <value>Nenhum host definido</value>
+  </data>
+  <data name="No incoming relays. Add one only for a gateway in front of this server whose address you trust." xml:space="preserve">
+    <value>Nenhum relay de entrada. Adicione apenas um gateway à frente deste servidor cujo endereço você considere confiável.</value>
   </data>
   <data name="No key of any scope can create or revoke keys - that needs the administrator password, or this page. A key restricted to particular domains is also refused the delivery-queue endpoints outright, because the queue is server-wide and cannot be filtered by domain." xml:space="preserve">
     <value>Nenhuma chave, de qualquer escopo, pode criar ou revogar chaves - isso exige a senha de administrador, ou esta página. Uma chave restrita a determinados domínios também tem os endpoints da fila de entrega negados por completo, porque a fila é de todo o servidor e não pode ser filtrada por domínio.</value>
@@ -6402,17 +6408,11 @@ Continuar?</value>
   <data name="Search IP ranges" xml:space="preserve">
     <value>Buscar faixas de IP</value>
   </data>
-  <data name="Search IP ranges..." xml:space="preserve">
-    <value>Buscar faixas de IP...</value>
-  </data>
   <data name="Search _filter" xml:space="preserve">
     <value>_Filtro de busca</value>
   </data>
   <data name="Search accounts" xml:space="preserve">
     <value>Buscar contas</value>
-  </data>
-  <data name="Search accounts..." xml:space="preserve">
-    <value>Buscar contas...</value>
   </data>
   <data name="Search bas_e (SearchBase)" xml:space="preserve">
     <value>Bas_e de busca (SearchBase)</value>
@@ -6420,14 +6420,8 @@ Continuar?</value>
   <data name="Search certificates" xml:space="preserve">
     <value>Buscar certificados</value>
   </data>
-  <data name="Search certificates..." xml:space="preserve">
-    <value>Buscar certificados...</value>
-  </data>
   <data name="Search domains" xml:space="preserve">
     <value>Buscar domínios</value>
-  </data>
-  <data name="Search domains..." xml:space="preserve">
-    <value>Buscar domínios...</value>
   </data>
   <data name="Search failed — " xml:space="preserve">
     <value>A busca falhou — </value>
@@ -6447,26 +6441,14 @@ Continuar?</value>
   <data name="Search ports" xml:space="preserve">
     <value>Buscar portas</value>
   </data>
-  <data name="Search ports..." xml:space="preserve">
-    <value>Buscar portas...</value>
-  </data>
-  <data name="Search queue..." xml:space="preserve">
-    <value>Buscar na fila...</value>
-  </data>
   <data name="Search results" xml:space="preserve">
     <value>Resultados da busca</value>
   </data>
   <data name="Search routes" xml:space="preserve">
     <value>Buscar rotas</value>
   </data>
-  <data name="Search routes..." xml:space="preserve">
-    <value>Buscar rotas...</value>
-  </data>
   <data name="Search rules" xml:space="preserve">
     <value>Buscar regras</value>
-  </data>
-  <data name="Search rules..." xml:space="preserve">
-    <value>Buscar regras...</value>
   </data>
   <data name="Search the delivery queue" xml:space="preserve">
     <value>Buscar na fila de entrega</value>
