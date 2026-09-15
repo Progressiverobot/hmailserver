@@ -102,6 +102,21 @@ Common causes, in the order they actually occur:
 > with `DNS_QUERY_BYPASS_CACHE`, so setting `DNSServer` still means every lookup
 > pays full price. Leave it empty unless you need a specific resolver.
 
+> **SPF did not honour `DNSServer` at all until 15 September 2026, and could not
+> be evaluated on Linux.** The SPF evaluator was a vendored library that resolved
+> names itself, through the Windows DNS client, rather than through this server's
+> resolver. So on Windows an SPF check went to the system resolvers whatever
+> `DNSServer` said — a server pointed at an internal resolver was asking the
+> outside world about its senders — and on Linux there was no Windows DNS client
+> to ask, so every SPF check returned a temporary error and said so in the error
+> log once per process (`HM6406`). Because `SpamTestDMARC` evaluates SPF, DMARC on
+> that platform lost its SPF half with it: a domain that authenticates by SPF
+> alone could not align. The RFC 7208 evaluator that replaced the library resolves
+> through the same `DNSResolver` as every other lookup, so `DNSServer`, the DNS
+> cache setting, the query timeout and DNSSEC validation all apply to SPF now as
+> they always did to everything else. If you run 6.3.3 or earlier on Linux, an SPF
+> or DMARC verdict from it is not a verdict.
+
 Since 6.2.17 acceptance is also bounded: if it exceeds `FinalizationTimeout`
 (240 seconds by default) the server answers `451` and the sender retries, rather
 than leaving it waiting for a reply that never comes. If you see `451 4.3.1`
@@ -215,6 +230,7 @@ and its own ten-second escalation); `WorkQueue::ExecuteTask` and
 `TimeoutCalculator::Calculate` (the `0` exceptions); `SpamAssassinClient`'s
 `SetSessionCeiling(GetSAMaxTimeout() + 30)`; `SMTPConnection::ProtocolRCPT_`'s two
 `DatabaseUnavailableMarker::Scope` blocks (`451 4.3.2` rather than `550`);
-`DNSResolverWinApi::Query` (the `DNSServer` regression and the cache bypass); and
-`Logger`'s `ERROR_hmailserver_%s.log`. If you change one of those, this page is
-the second place to look.
+`DNSResolverWinApi::Query` (the `DNSServer` regression and the cache bypass);
+`SPFDnsResolver` and `DNSResolver::GetRecordsOfType` (SPF reaching the configured
+resolver at all); and `Logger`'s `ERROR_hmailserver_%s.log`. If you change one of
+those, this page is the second place to look.

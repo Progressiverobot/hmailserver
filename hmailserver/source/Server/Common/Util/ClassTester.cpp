@@ -139,7 +139,9 @@ namespace HM
       BLCheckTester blchecktester;
       blchecktester.Test();
 
-      OutputDebugString(_T("hMailServer: Testing SPF\n"));
+      // The grammar, the macros, check_host() and the openspf.org conformance suite
+      // for RFC 7208 - 203 cases, all of them, none of them touching the network.
+      OutputDebugString(_T("hMailServer: Testing SPF against RFC 7208 and its conformance suite\n"));
       SPFTester *pSPF = new SPFTester();
       pSPF->Test();
       delete pSPF;

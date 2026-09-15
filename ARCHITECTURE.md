@@ -78,7 +78,9 @@ The most complex module: reception, relay decisions, the disk-backed delivery qu
 bounces, DKIM signing, and outbound delivery. Outbound transport security lives here
 too — `TlsPolicy` implements MTA-STS discovery/caching and DANE TLSA lookups,
 `ExternalDelivery` applies the per-host requirements, `TlsRptReporterTask` sends the
-daily RFC 8460 reports. The vendored SPF implementation is `SPF/RMSPF.cpp`.
+daily RFC 8460 reports. SPF is `SPF/`, an implementation of RFC 7208 with a README of
+its own; it reaches DNS only through `SPFDnsLookup`, which is what lets the conformance
+suite beside it answer 203 cases without a network.
 
 ### `Server/IMAP/` and `Server/POP3/`
 

@@ -86,8 +86,4 @@ namespace HM
                                        std::vector<std::vector<unsigned char>> &rdatas);
    };
 
-   // Returns true if DNSSEC validation is enabled and the TXT records for
-   // the given name have a bogus (forged) chain of trust. Used by the
-   // vendored SPF resolver, which cannot consume DnssecResolver directly.
-   bool DnssecTxtLookupIsBogus(const char *name);
 }

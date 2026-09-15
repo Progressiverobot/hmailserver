@@ -49,8 +49,8 @@ namespace hMailServer.ControlPanel.Views
    /// Every generated value is read from the server's own configuration or code,
    /// never invented:
    ///
-   ///   SPF      - the server only CHECKS SPF on incoming mail (SMTP/SPF/SPF.cpp,
-   ///              vendored RMSPF.cpp, records beginning "v=spf1"). The suggested
+   ///   SPF      - the server only CHECKS SPF on incoming mail (SMTP/SPF/, an
+   ///              implementation of RFC 7208; records beginning "v=spf1"). The suggested
    ///              record names this server's outbound identity: the HELO/EHLO host
    ///              name, which is Settings.HostName (Utilities::ComputerName falls
    ///              back to the Windows computer name when it is empty).
@@ -417,7 +417,7 @@ namespace hMailServer.ControlPanel.Views
                   return;
                }
 
-               // RFC 7208 (and the vendored RMSPF.cpp): an SPF record is the TXT
+               // RFC 7208 section 4.5: an SPF record is the TXT
                // record whose value begins "v=spf1".
                List<string> spf = result.Records.Where(IsSpfRecord).ToList();
 

@@ -120,6 +120,7 @@
     <Compile Include="..\RegressionTests\AntiSpam\GreyListing.cs" Link="AntiSpam\GreyListing.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\PerAccountSpamSettings.cs" Link="AntiSpam\PerAccountSpamSettings.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\SenderBlacklist.cs" Link="AntiSpam\SenderBlacklist.cs" />
+    <Compile Include="..\RegressionTests\AntiSpam\SpfEvaluation.cs" Link="AntiSpam\SpfEvaluation.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\SpamAssassinLearning.cs" Link="AntiSpam\SpamAssassinLearning.cs" />
     <Compile Include="..\RegressionTests\AntiSpam\SpamAssassinUserHeader.cs" Link="AntiSpam\SpamAssassinUserHeader.cs" />
     <Compile Include="..\RegressionTests\Domains\DomainDeleteCascade.cs" Link="Domains\DomainDeleteCascade.cs" />

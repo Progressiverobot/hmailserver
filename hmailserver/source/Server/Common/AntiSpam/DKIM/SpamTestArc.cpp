@@ -384,7 +384,7 @@ namespace HM
       {
          String sExplanation;
          SPF::Result spfResult = SPF::Instance()->Test(originatingAddress.ToString(), pTestData->GetEnvelopeFrom(), pTestData->GetHeloHost(), sExplanation);
-         spfPassed = (spfResult == SPF::Pass);
+         spfPassed = (spfResult == SPF::Result::Pass);
       }
 
       std::vector<AnsiString> dkimPassingDomains;

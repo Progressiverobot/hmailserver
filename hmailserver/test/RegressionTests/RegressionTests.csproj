@@ -522,6 +522,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AntiSpam\AuthenticationResultsHeader.cs" />
+    <Compile Include="AntiSpam\SpfEvaluation.cs" />
     <Compile Include="AntiSpam\DmarcOrganizationalDomain.cs" />
     <Compile Include="AntiSpam\FilterHook.cs" />
     <Compile Include="AntiSpam\DmarcNonExistentSubdomainPolicy.cs" />
