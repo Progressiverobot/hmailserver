@@ -89,6 +89,9 @@ PATH_SCOPE = {
     'recipients': ['DistributionListRecipient'],
     'rules': ['Rule', 'RuleCriteria', 'RuleAction'],
     'routes': ['Route', 'RouteAddress'],
+    # What this server will do for a named remote domain; the effective query and
+    # the verification-cache clear hang off the same collection.
+    'remote-domains': ['RemoteDomainPolicy', 'RemoteDomainPolicies'],
     'certificates': ['SSLCertificate'],
     'ports': ['TCPIPPort'],
     'ipranges': ['SecurityRange'],
