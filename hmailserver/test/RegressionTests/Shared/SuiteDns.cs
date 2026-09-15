@@ -55,6 +55,20 @@ namespace RegressionTests
       {
          Zone = Seed_(new FakeDnsServer());
 
+         if (TestSetup.ConsoleServer)
+         {
+            // A console server (hMailServer.exe /Debug under a coverage tool) read
+            // the ini at its start and no service command can restart it, so the
+            // run that launched it wrote the resolver first; that is checked here
+            // rather than restarted into. Ignoring instead, as the restart helper
+            // does for a fixture, would ignore every test of the run from this
+            // one setup - which is what the coverage run of 15 September 2026 did.
+            Assert.AreEqual(Resolver, ServerIniFile.GetSetting("DNSServer"),
+               "A console server must be started with DNSServer=" + Resolver + " already in hMailServer.ini: " +
+               "the suite cannot restart it into its zone.");
+            return;
+         }
+
          ServerIniFile.SetSetting("DNSServer", Resolver);
 
          // The ini is read once, at process start.
@@ -64,6 +78,15 @@ namespace RegressionTests
       [OneTimeTearDown]
       public void RestoreTheSystemResolver()
       {
+         if (TestSetup.ConsoleServer)
+         {
+            // The launcher that wrote the resolver takes it out again once the
+            // console server has been ended; the zone just goes.
+            Zone.Dispose();
+            Zone = null;
+            return;
+         }
+
          // The zone stays up until the server is back on the system resolver, so
          // the restart never runs against a dead one.
          using (Zone)
