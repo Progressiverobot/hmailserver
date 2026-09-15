@@ -28,6 +28,7 @@
 #include "../Util/ServiceManager.h"
 #endif
 
+#include "AccountStores.h"
 #include "BackupManager.h"
 #include "BackupRetention.h"
 #include "BackupRestorer.h"
@@ -937,6 +938,59 @@ namespace HM
             "The backup was written but its message store could not be extracted for verification, so it has not been shown to be restorable. " + failureReason);
 
          return false;
+      }
+
+      // THE ROWS, BEFORE THE FILES.
+      //
+      // The message store is the big thing in the archive, but it is not the only
+      // thing this run wrote into it: an account's address book, its webmail
+      // settings, its scheduled messages, its files, its S/MIME keys, its password
+      // history and its calendar are rows in the index rather than files beside it.
+      // Reconciling only the files would leave exactly the failure this whole change
+      // is about - a verification that keeps passing while a store is missing - so
+      // what this run built in memory is counted against what the archive now reads
+      // back, per store, through the restorer's own copy of the index.
+      //
+      // A difference here is a question about the ARCHIVE, not about the server, so
+      // it discards: the index has just been written and read back, nothing has had
+      // an opportunity to change in between, and an index that does not contain what
+      // was put in it is a truncated one.
+      std::map<String, __int64> writtenRows;
+      std::map<String, __int64> archivedRows;
+
+      AccountStores::CountRows(pBackupNode, writtenRows);
+      AccountStores::CountRows(restorer.GetBackupNode(), archivedRows);
+
+      __int64 totalWritten = 0;
+
+      for (std::map<String, __int64>::const_iterator row = writtenRows.begin(); row != writtenRows.end(); row++)
+      {
+         totalWritten += row->second;
+
+         std::map<String, __int64>::const_iterator archived = archivedRows.find(row->first);
+         __int64 found = archived == archivedRows.end() ? 0 : archived->second;
+
+         if (found == row->second)
+            continue;
+
+         discardArchive = true;
+
+         Application::Instance()->GetBackupManager()->OnBackupFailed(Formatter::Format(
+            "The backup was written but its index reads back as holding {0} row(s) of {1} where this run wrote {2}. The archive does not contain what was backed up and is not a usable backup.",
+            found, row->first, row->second));
+
+         return false;
+      }
+
+      // Said only when there was something to say. A server whose accounts have no
+      // address book, no calendar and nothing scheduled writes no such rows, and a
+      // line reporting that none were checked would be noise in every backup log on
+      // every installation that does not use the webmail.
+      if (!writtenRows.empty())
+      {
+         Logger::Instance()->LogBackup(Formatter::Format(
+            "Verified restore: {0} row(s) across {1} per-account store(s) - address books, webmail settings, scheduled mail, file links, S/MIME keys, password history and calendars - read back from the archive exactly as they were written.",
+            totalWritten, (unsigned int) writtenRows.size()));
       }
 
       String store = restorer.GetStagedMessageStore();

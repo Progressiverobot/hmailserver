@@ -304,6 +304,16 @@ namespace HM
       pNode->AppendAttr(_T("Size"), StringParser::IntToString(message_size_));
       pNode->AppendAttr(_T("NoOfRetries"), StringParser::IntToString(no_of_retries_));
       pNode->AppendAttr(_T("Flags"), StringParser::IntToString(flags_));
+
+      // The flags that are not system flags: the webmail's labels, its second and
+      // third stars, its follow-up flag, mute and pin, and every keyword an IMAP
+      // client has ever set with STORE. They live in messagekeywords beside
+      // messageflags and are written by the same statement - but this method wrote
+      // only the flags, so from the day keywords arrived a restore silently returned
+      // every message with its labels stripped. Nothing announced it, because a
+      // message that comes back unlabelled still comes back.
+      pNode->AppendAttr(_T("Keywords"), keywords_);
+
       pNode->AppendAttr(_T("ID"), StringParser::IntToString(id_));
       pNode->AppendAttr(_T("UID"), StringParser::IntToString(uid_));
 
@@ -320,6 +330,12 @@ namespace HM
       message_size_ = _ttoi(pNode->GetAttrValue(_T("Size")));
       no_of_retries_ = _ttoi(pNode->GetAttrValue(_T("NoOfRetries")));
       flags_ = _ttoi(pNode->GetAttrValue(_T("Flags")));
+
+      // An archive taken before the attribute existed simply has none, and
+      // GetAttrValue answers an empty string for that - which is exactly "no
+      // keywords" and is what those messages had. No version check is needed.
+      keywords_ = pNode->GetAttrValue(_T("Keywords"));
+
       uid_ = _ttoi(pNode->GetAttrValue(_T("UID")));
 
       return true;
