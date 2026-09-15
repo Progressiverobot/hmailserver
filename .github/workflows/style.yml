@@ -154,6 +154,20 @@ jobs:
       # unescaped, where the English stood), and is in the catalogues' form.
       - name: The Control Deck's catalogues match the page
         run: python3 build/check-deck-languages.py
+      # The parity census: every property the desktop Control Panel writes, whether
+      # the REST API can write it and whether a Deck view reaches it. The document is
+      # generated and committed so a reader sees the gap without running anything;
+      # this regenerates it and fails when the committed copy is behind, the way
+      # ci.yml holds the settings index. The script produces the same bytes on Linux
+      # as on Windows (checked on 15 September 2026).
+      - name: The parity census in docs/DeckParity.md is current
+        run: |
+          python3 build/check-deck-parity.py > /dev/null
+          if ! git diff --quiet -- hmailserver/docs/DeckParity.md; then
+            git --no-pager diff -- hmailserver/docs/DeckParity.md | head -80
+            echo "::error file=hmailserver/docs/DeckParity.md::Out of date. Run python build/check-deck-parity.py and commit the result."
+            exit 1
+          fi
       - name: The webmail's S/MIME module, against OpenSSL both ways
         run: node build/check-portal-smime.js
       - name: The S/MIME module embedded in the server is current
