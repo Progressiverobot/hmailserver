@@ -8,10 +8,10 @@ using static hMailServer.ControlPanel.Services.Loc;
 namespace hMailServer.ControlPanel.Services
 {
    /// <summary>The state of the server settings page, as the pill in its header shows it.
-/// Distinct from <see cref="SettingsPageState"/>, which is the lifecycle of an
-/// hMailServer.INI page: that one is read, written and then waits on a service
-/// restart, and this one is read and written over COM and takes effect as it is
-/// saved. Two pages, two lifecycles, two types.</summary>
+   /// Distinct from <see cref="SettingsPageState"/>, which is the lifecycle of an
+   /// hMailServer.INI page: that one is read, written and then waits on a service
+   /// restart, and this one is read and written over COM and takes effect as it is
+   /// saved. Two pages, two lifecycles, two types.</summary>
    public enum ServerSettingsPageState
    {
       /// <summary>What is on screen is what the server holds. Nothing to say, so no pill.</summary>
@@ -82,7 +82,7 @@ namespace hMailServer.ControlPanel.Services
             case ServerSettingsPageState.Unsaved:
                return L("Unsaved changes");
             case ServerSettingsPageState.Saving:
-               return L("Savingâ€¦");
+               return L("Saving…");
             case ServerSettingsPageState.Saved:
                return L("Saved");
             case ServerSettingsPageState.PartlySaved:
@@ -105,7 +105,7 @@ namespace hMailServer.ControlPanel.Services
          if (failedReads <= 0)
             return null;
 
-         return F("{0} setting(s) could not be read â€” {1}", failedReads, diagnosis ?? "");
+         return F("{0} setting(s) could not be read — {1}", failedReads, diagnosis ?? "");
       }
 
       /// <summary>
