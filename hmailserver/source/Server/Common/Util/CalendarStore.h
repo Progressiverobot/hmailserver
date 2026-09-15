@@ -82,6 +82,13 @@ namespace HM
       static bool FindByUri(__int64 accountId, __int64 calendarId, const String &uri, CalendarObjectRecord &object);
       static bool FindByUid(__int64 accountId, __int64 calendarId, const String &uid, CalendarObjectRecord &object);
 
+      // A live object whose name the database's collation takes for this one while
+      // it is not exactly this one: a different case on every backend but
+      // PostgreSQL, and also different accents or trailing spaces on MySQL. The
+      // unique index on the name is compared the same way, so such a name cannot
+      // be created beside it; CalDavServer answers 409 and names the object.
+      static bool FindCollationTwin(__int64 accountId, __int64 calendarId, const String &uri, CalendarObjectRecord &object);
+
       // A new object under the client's name, reviving a tombstone of that
       // name if there is one. The collection's token is stepped and answered.
       static bool Insert(__int64 accountId, __int64 calendarId, const CalendarObjectRecord &object, CalendarObjectRecord &inserted, __int64 &token);

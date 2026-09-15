@@ -103,6 +103,37 @@ namespace HM
          return true;
       }
 
+      // The row whose resource name, or UID, is exactly the one asked for. The WHERE
+      // clause compares under the column's collation, which ignores case on SQL
+      // Server and Compact and case, accents and trailing spaces on MySQL, while a
+      // CalDAV resource name (an RFC 3986 path segment) and an iCalendar UID are
+      // case-sensitive. So the database narrows the candidates and this decides:
+      // "Event.ics" and "event.ics" are two objects, and a PUT to one must never
+      // overwrite the other. Every row is walked, because no unique index covers
+      // UIDs.
+      bool ReadExactObject(const SQLCommand &command, bool byUid, const String &value, CalendarObjectRecord &object)
+      {
+         std::shared_ptr<DALRecordset> recordset = Application::Instance()->GetDBManager()->OpenRecordset(command);
+         if (!recordset)
+            return false;
+
+         while (!recordset->IsEOF())
+         {
+            CalendarObjectRecord candidate;
+            ReadObject(recordset, candidate);
+
+            if ((byUid ? candidate.uid : candidate.uri).Compare(value) == 0)
+            {
+               object = candidate;
+               return true;
+            }
+
+            recordset->MoveNext();
+         }
+
+         return false;
+      }
+
       // The collection's counter stepped by one, and the new value read
       // back. Called with write_mutex held.
       bool StepToken(__int64 accountId, __int64 calendarId, __int64 &token)
@@ -249,7 +280,7 @@ namespace HM
       command.AddParameter("@ACCOUNTID", accountId);
       command.AddParameter("@CALENDARID", calendarId);
       command.AddParameter("@URI", uri);
-      return ReadOneObject(command, object);
+      return ReadExactObject(command, false, uri, object);
    }
 
    bool
@@ -262,7 +293,26 @@ namespace HM
       command.AddParameter("@ACCOUNTID", accountId);
       command.AddParameter("@CALENDARID", calendarId);
       command.AddParameter("@UID", uid);
-      return ReadOneObject(command, object);
+      return ReadExactObject(command, true, uid, object);
+   }
+
+   bool
+   CalendarStore::FindCollationTwin(__int64 accountId, __int64 calendarId, const String &uri, CalendarObjectRecord &object)
+   {
+      if (uri.IsEmpty())
+         return false;
+
+      SQLCommand command(String(AnsiString("select ") + ObjectColumns + " from hm_calendarobjects where objectaccountid = @ACCOUNTID and objectcalendarid = @CALENDARID and objecturi = @URI"));
+      command.AddParameter("@ACCOUNTID", accountId);
+      command.AddParameter("@CALENDARID", calendarId);
+      command.AddParameter("@URI", uri);
+
+      CalendarObjectRecord candidate;
+      if (!ReadOneObject(command, candidate) || candidate.uri.Compare(uri) == 0)
+         return false;
+
+      object = candidate;
+      return true;
    }
 
    bool
@@ -282,7 +332,11 @@ namespace HM
       CalendarObjectRecord existing;
       if (ReadOneObject(find, existing))
       {
-         if (!existing.deleted)
+         // Found under the collation. A row that is not exactly this name - a case
+         // or accent twin - is a different object the unique index will not let a
+         // second row sit beside, live or tombstoned, so the insert is refused
+         // rather than reviving somebody else's row under the wrong name.
+         if (!existing.deleted || existing.uri.Compare(object.uri) != 0)
             return false;
 
          SQLStatement statement;

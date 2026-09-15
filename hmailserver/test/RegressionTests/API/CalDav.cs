@@ -627,6 +627,72 @@ namespace RegressionTests.API
       // One VEVENT in a VCALENDAR. With a zone, DTSTART and DTEND carry TZID
       // and the times are wall-clock; without, they are as given (UTC or
       // floating).
+      [Test]
+      [Description("An object longer than 4,000 characters is stored, read back byte for byte and updated. SQL Server " +
+                   "Compact refused any string parameter over 4,000 characters, even into ntext, so every such PUT was " +
+                   "a 500 on the bench while the server advertised a one-megabyte max-resource-size.")]
+      public void AnObjectLongerThanFourThousandCharactersIsStoredAndUpdated()
+      {
+         const string uid = "long-object-0001";
+         string href = Calendar + uid + ".ics";
+
+         var filler = new System.Text.StringBuilder();
+         for (int line = 0; line < 150; line++)
+            filler.Append("X-FILLER-" + line.ToString("D3") + ":" + new string((char) ('a' + line % 26), 60) + "\r\n");
+
+         string sent = Event(uid, "20260701T100000Z", "20260701T110000Z", "Long").Replace("SEQUENCE:0\r\n", "SEQUENCE:0\r\n" + filler);
+         Assert.Greater(sent.Length, 9000, "The object must be well past 4,000 characters for this to prove anything.");
+
+         Response created = Put(href, sent, "If-None-Match: *\r\n");
+         Assert.AreEqual(201, created.Status, "Body: " + created.Body);
+
+         Response read = Dav("GET", href, Auth(Address, UserPassword));
+         Assert.AreEqual(200, read.Status, "Body: " + read.Body);
+         Assert.AreEqual(sent, read.Body, "A long object must come back as it was sent.");
+
+         string changed = sent.Replace("SUMMARY:Long", "SUMMARY:Long (moved)");
+         Response updated = Put(href, changed, "If-Match: " + created.Header("ETag") + "\r\n");
+         Assert.AreEqual(204, updated.Status, "Body: " + updated.Body);
+         Assert.AreEqual(changed, Dav("GET", href, Auth(Address, UserPassword)).Body);
+      }
+
+      [Test]
+      [Description("Two resource names that differ only in case are two objects. The lookup compared under the column's " +
+                   "collation, which ignores case on SQL Server and Compact, so a PUT to one found the other and " +
+                   "overwrote it. The twin is now its own object where the database allows it, and a 409 where not.")]
+      public void NamesThatDifferOnlyInCaseAreTwoObjects()
+      {
+         string lower = Calendar + "case-twin.ics";
+         string upper = Calendar + "CASE-TWIN.ics";
+
+         string first = Event("case-twin-lower", "20260801T100000Z", "20260801T110000Z", "Lower");
+         string second = Event("case-twin-upper", "20260801T120000Z", "20260801T130000Z", "Upper");
+
+         Response createdLower = Put(lower, first, "If-None-Match: *\r\n");
+         Assert.AreEqual(201, createdLower.Status, "Body: " + createdLower.Body);
+
+         // Without If-None-Match: a client that PUTs a name it believes is new. The
+         // lookup used to find the lower-case object for it and overwrite it.
+         Response twin = Put(upper, second);
+
+         Assert.AreEqual(first, Dav("GET", lower, Auth(Address, UserPassword)).Body, "The first object was overwritten by its case twin.");
+
+         // The database decides whether two names that differ only in case can both
+         // exist: PostgreSQL compares exactly, the others do not. Either the twin is
+         // its own object, or it is refused with 409 - never a 500, never the other.
+         if (twin.Status == 201)
+         {
+            Assert.AreEqual(second, Dav("GET", upper, Auth(Address, UserPassword)).Body);
+         }
+         else
+         {
+            Assert.AreEqual(409, twin.Status, "Body: " + twin.Body);
+            StringAssert.Contains("differs from this one only in case", twin.Body);
+            Assert.AreEqual(404, Dav("GET", upper, Auth(Address, UserPassword)).Status,
+               "A refused twin must not be readable at its own name through the other object.");
+         }
+      }
+
       private static string Event(string uid, string dtstart, string dtend, string summary, string rrule = null, string tzid = null)
       {
          string zone = tzid == null ? "" : ";TZID=" + tzid;

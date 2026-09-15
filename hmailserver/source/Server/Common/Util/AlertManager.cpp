@@ -85,7 +85,13 @@ namespace HM
          if (value.GetLength() <= maximum)
             return value;
 
-         return value.Mid(0, maximum) + _T("...");
+         // The ellipsis counts towards the maximum, so the result is never longer
+         // than asked for: 4,000 meant 4,003 before, one past what SQL Server
+         // Compact takes in a string parameter.
+         if (maximum <= 3)
+            return value.Mid(0, maximum);
+
+         return value.Mid(0, maximum - 3) + _T("...");
       }
 
       AnsiString JsonEscape(const AnsiString &value)
@@ -278,6 +284,12 @@ namespace HM
 
       String condition = rule.condition;
       condition.Trim();
+
+      // Conditions are lower-case constants. PostgreSQL compares = case-sensitively,
+      // so a rule saved as "Disk.Low" would sit beside the shipped "disk.low" there
+      // and never be the one the evaluator reads; the other three backends would
+      // have matched it. One case, on every backend.
+      condition.MakeLower();
 
       if (condition.IsEmpty() || condition.GetLength() > 64)
       {

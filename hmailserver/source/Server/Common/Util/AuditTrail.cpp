@@ -658,10 +658,21 @@ namespace HM
          where += clause;
       };
 
-      if (!filter.object_type.IsEmpty())
-         addClause(_T("auditobjecttype = @OBJECTTYPE"));
-      if (!filter.action.IsEmpty())
-         addClause(_T("auditaction = @ACTION"));
+      // Folded to one case on both sides. PostgreSQL compares case-sensitively and
+      // the other three backends, under their default collations, do not - so a
+      // filter of "Setting" or an actor of "Admin@" found rows on three backends and
+      // nothing on the fourth. A %x% LIKE cannot use the actor index anyway.
+      String objectType = filter.object_type;
+      objectType.MakeLower();
+      String action = filter.action;
+      action.MakeLower();
+      String actor = filter.actor;
+      actor.MakeLower();
+
+      if (!objectType.IsEmpty())
+         addClause(_T("lower(auditobjecttype) = @OBJECTTYPE"));
+      if (!action.IsEmpty())
+         addClause(_T("lower(auditaction) = @ACTION"));
       if (filter.since > 0)
          addClause(_T("audittime >= @SINCE"));
       if (filter.until > 0)
@@ -670,21 +681,21 @@ namespace HM
       // The actor filter is a substring so that "key:" finds every API key and a
       // domain finds every account in it. A LIKE with the caller's text as a
       // parameter, never as part of the statement.
-      if (!filter.actor.IsEmpty())
-         addClause(_T("auditactor like @ACTOR"));
+      if (!actor.IsEmpty())
+         addClause(_T("lower(auditactor) like @ACTOR"));
 
-      auto bind = [&filter] (SQLCommand &command)
+      auto bind = [&filter, &objectType, &action, &actor] (SQLCommand &command)
       {
-         if (!filter.object_type.IsEmpty())
-            command.AddParameter("@OBJECTTYPE", filter.object_type);
-         if (!filter.action.IsEmpty())
-            command.AddParameter("@ACTION", filter.action);
+         if (!objectType.IsEmpty())
+            command.AddParameter("@OBJECTTYPE", objectType);
+         if (!action.IsEmpty())
+            command.AddParameter("@ACTION", action);
          if (filter.since > 0)
             command.AddParameter("@SINCE", (__int64) filter.since);
          if (filter.until > 0)
             command.AddParameter("@UNTIL", (__int64) filter.until);
-         if (!filter.actor.IsEmpty())
-            command.AddParameter("@ACTOR", String(_T("%")) + filter.actor + String(_T("%")));
+         if (!actor.IsEmpty())
+            command.AddParameter("@ACTOR", String(_T("%")) + actor + String(_T("%")));
       };
 
       String countSql = _T("select count(*) as auditcount from hm_audit");

@@ -213,7 +213,9 @@ namespace HM
 
       case RouteAlertRuleUpdate:
          {
+            // Conditions are stored lower-case; see AlertManager::SaveRule.
             String condition = String(route.identifier);
+            condition.MakeLower();
 
             AlertManager::Rule rule;
             bool exists = AlertManager::Instance()->GetRule(condition, rule);
@@ -304,6 +306,7 @@ namespace HM
 
             String condition = String(AnsiString(document.GetString("condition").c_str()));
             condition.Trim();
+            condition.MakeLower();
 
             if (condition.IsEmpty())
                return BuildResponse_(400, "{\"error\":\"name the condition to raise\"}");

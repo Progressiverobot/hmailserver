@@ -7,6 +7,8 @@
 #include "./PersistentMessageIndex.h"
 #include "./PersistentMessage.h"
 #include "../BO/Message.h"
+#include "../Application/IniFileSettings.h"
+#include "../SQL/DatabaseSettings.h"
 
 #include <algorithm>
 
@@ -271,9 +273,21 @@ namespace HM
    {
       (void) accountID;
 
-      SQLCommand command("insert into hm_messageindexterms (mitmessageid, mitaccountid, mitterm) "
-                         "select messageid, messageaccountid, '" + SQLStatement::Escape(term) + "' "
-                         "from hm_messages where messageid = @MESSAGEID");
+      // N'...' on SQL Server and Compact. A bare '...' constant is varchar in the
+      // database's code page there, so a character the code page lacks was stored as
+      // '?' - under the default SQL_Latin1_General_CP1_CI_AS "привет" became "??????"
+      // and could never be found again. MySQL and PostgreSQL keep the plain quote,
+      // where N'' is not Unicode's spelling.
+      const DatabaseSettings::SQLDBType databaseType = IniFileSettings::Instance()->GetDatabaseType();
+      const bool unicodeLiteral = databaseType == DatabaseSettings::TypeMSSQLServer ||
+                                  databaseType == DatabaseSettings::TypeMSSQLCompactEdition;
+
+      String sql = _T("insert into hm_messageindexterms (mitmessageid, mitaccountid, mitterm) select messageid, messageaccountid, ");
+      sql += unicodeLiteral ? _T("N'") : _T("'");
+      sql += SQLStatement::Escape(term);
+      sql += _T("' from hm_messages where messageid = @MESSAGEID");
+
+      SQLCommand command(sql);
       command.AddParameter("@MESSAGEID", messageID);
 
       return Application::Instance()->GetDBManager()->Execute(command);
