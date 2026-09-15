@@ -7,18 +7,11 @@ using System.Collections.Generic;
 using System.ServiceProcess;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Shapes;
-
-// System.Windows.Documents (imported above for Run/Inlines) declares a Typography
-// of its own, so the unqualified name is ambiguous. Aliased to the Control Panel's
-// type scale rather than dropping the import - the same fix ExternalSetupView and
-// SslCertificatesView already carry.
-using Typography = hMailServer.ControlPanel.Services.Typography;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using System.Linq;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
@@ -31,6 +24,13 @@ namespace hMailServer.ControlPanel.Views
    /// certificates (ACME), integrations (REST API, Prometheus metrics,
    /// ManageSieve), authentication (OAuth2, password storage), the DNS
    /// resolver and the public web services listener.
+   ///
+   /// On the scaffold since the fourth wave: the header is a PageHeader with a
+   /// StatusPill for where the page stands (SettingsPageStatus), each card is a
+   /// Card holding a SettingsSection of FieldRows, a computed warning is an
+   /// InlineNotice, and the state's sentence is one too. The definition below -
+   /// every Key and Label - is what build/generate-settings-index.ps1 and the
+   /// search-index test read, and is untouched by that.
    /// </summary>
    public partial class FeatureSettingsView : UserControl, IPageLifecycle
    {
@@ -88,7 +88,7 @@ namespace hMailServer.ControlPanel.Views
          protected static void SetAid(FrameworkElement element, string id)
          {
             if (element != null && !string.IsNullOrEmpty(id))
-               System.Windows.Automation.AutomationProperties.SetAutomationId(element, id);
+               AutomationProperties.SetAutomationId(element, id);
          }
 
          /// <summary>
@@ -106,33 +106,33 @@ namespace hMailServer.ControlPanel.Views
             SetAid(element, id);
 
             if (element != null && !string.IsNullOrEmpty(AccessibleName))
-               System.Windows.Automation.AutomationProperties.SetName(element, AccessibleName);
+               AutomationProperties.SetName(element, AccessibleName);
          }
 
          /// <summary>
-         /// Prints <see cref="Blurb"/> under the control and attaches it to the
-         /// control as accessible help text. Both, for the reason given on
-         /// ServerSettingsView's Annotate: a caption sitting loose in the panel is
-         /// reached only after the editor, and a note saying the server does less
-         /// than the control suggests has to be heard with it.
+         /// The editor in its row: the caption above it, <see cref="Blurb"/> (or
+         /// <paramref name="hint"/>) under it and attached to the editor as help
+         /// text. Both, for the reason given on ServerSettingsView's Annotate: a
+         /// caption sitting loose in the panel is reached only after the editor,
+         /// and a note saying the server does less than the control suggests has
+         /// to be heard with it. The row attaches it to a bare editor itself; an
+         /// editor inside a grid - a path beside its browse button - is passed as
+         /// <paramref name="editor"/> and told here, since the row sees the grid.
          /// </summary>
-         protected void Annotate(FrameworkElement editor, Panel panel)
+         protected FieldRow Row(FrameworkElement content, string caption, FrameworkElement editor = null, string hint = null)
          {
-            if (string.IsNullOrEmpty(Blurb))
-               return;
+            hint ??= Blurb;
+            if (string.IsNullOrEmpty(hint))
+               hint = null;
 
-            if (editor != null)
-               System.Windows.Automation.AutomationProperties.SetHelpText(editor, Blurb);
+            if (editor != null && hint != null)
+               AutomationProperties.SetHelpText(editor, hint);
 
-            panel?.Children.Add(new TextBlock
-            {
-               Text = Blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 4, 0, 0)
-            });
+            return new FieldRow { Label = caption, Hint = hint, Content = content };
          }
+
+         /// <summary>The width of a text editor on these pages: one column, whatever the value.</summary>
+         protected const double EditorWidth = 520;
       }
 
       private class BoolSetting : Setting
@@ -142,14 +142,7 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-
-            box_ = new CheckBox
-            {
-               Content = Label,
-               IsChecked = store.ReadBool(Key, Default),
-               FontSize = Typography.Body
-            };
+            box_ = new CheckBox { Content = Label, IsChecked = store.ReadBool(Key, Default) };
             SetAid(box_, Key);
 
             // A checkbox names itself from its Content, so it needs an override
@@ -158,12 +151,11 @@ namespace hMailServer.ControlPanel.Views
             if (!string.IsNullOrEmpty(AccessibleName) &&
                 !string.Equals(AccessibleName, Label, StringComparison.Ordinal))
             {
-               System.Windows.Automation.AutomationProperties.SetName(box_, AccessibleName);
+               AutomationProperties.SetName(box_, AccessibleName);
             }
 
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            // The check box is its own caption, so the row has none.
+            return Row(box_, null);
          }
 
          public override void Save(IniFeatureStore store)
@@ -189,26 +181,15 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = Label,
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
             box_ = new Wpf.Ui.Controls.TextBox
             {
                Text = store.Read(Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = Typography.Body,
-               MaxWidth = 520,
-               MinWidth = 320,
+               Width = EditorWidth,
                HorizontalAlignment = HorizontalAlignment.Left
             };
             Describe(box_, Key);
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            return Row(box_, Label);
          }
 
          public override void Save(IniFeatureStore store)
@@ -237,15 +218,7 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = Label,
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
-
-            var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
+            var row = new Grid { Width = EditorWidth, HorizontalAlignment = HorizontalAlignment.Left };
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
@@ -253,7 +226,6 @@ namespace hMailServer.ControlPanel.Views
             {
                Text = store.Read(Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = Typography.Body,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Key);
@@ -264,7 +236,7 @@ namespace hMailServer.ControlPanel.Views
             {
                Content = "\u2026",
                MinWidth = 40,
-               Margin = new Thickness(8, 0, 0, 0),
+               Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0),
                VerticalAlignment = VerticalAlignment.Bottom,
                ToolTip = PickFolder ? L("Browse for a folder") : L("Browse for a file")
             };
@@ -272,7 +244,7 @@ namespace hMailServer.ControlPanel.Views
             // The content is a single ellipsis, so without this the certificate and
             // private-key browse buttons on the REST API card are announced as two
             // identical "\u2026" and there is no way to tell which one is which.
-            System.Windows.Automation.AutomationProperties.SetName(browse,
+            AutomationProperties.SetName(browse,
                PickFolder
                   ? F("Browse for a folder for {0}", AccessibleName ?? Label ?? L("this setting"))
                   : F("Browse for a file for {0}", AccessibleName ?? Label ?? L("this setting")));
@@ -287,9 +259,7 @@ namespace hMailServer.ControlPanel.Views
             Grid.SetColumn(browse, 1);
             row.Children.Add(browse);
 
-            panel.Children.Add(row);
-            Annotate(box_, panel);
-            return panel;
+            return Row(row, Label, box_);
          }
 
          public override void Save(IniFeatureStore store)
@@ -312,15 +282,7 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = Label,
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
-
-            combo_ = new ComboBox { FontSize = Typography.Body, MinWidth = 320, HorizontalAlignment = HorizontalAlignment.Left };
+            combo_ = new ComboBox { Width = EditorWidth, HorizontalAlignment = HorizontalAlignment.Left };
             if (!int.TryParse(store.Read(Key, Default.ToString()), out int current))
                current = Default;
             foreach ((int value, string label) in Options)
@@ -334,9 +296,7 @@ namespace hMailServer.ControlPanel.Views
                combo_.SelectedIndex = 0;
 
             Describe(combo_, Key);
-            panel.Children.Add(combo_);
-            Annotate(combo_, panel);
-            return panel;
+            return Row(combo_, Label);
          }
 
          public override void Save(IniFeatureStore store)
@@ -398,9 +358,6 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock { Text = Label, FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 4) });
-
             hasStored_ = !string.IsNullOrEmpty(store.Read(Key, "").Trim());
             string placeholder = hasStored_
                ? L("A secret is configured — leave blank to keep it")
@@ -409,7 +366,6 @@ namespace hMailServer.ControlPanel.Views
             box_ = new hMailServer.ControlPanel.Views.PasswordField
             {
                PlaceholderText = placeholder,
-               FontSize = Typography.Body,
                HorizontalAlignment = HorizontalAlignment.Stretch
             };
             Describe(box_, Key);
@@ -418,60 +374,42 @@ namespace hMailServer.ControlPanel.Views
             // whether a secret is already stored is the one thing this control
             // conveys that its label does not - leaving the field blank keeps the
             // existing value, so a listener who cannot see the placeholder has no
-            // way to know whether there is one.
-            System.Windows.Automation.AutomationProperties.SetHelpText(box_,
-               string.IsNullOrEmpty(Blurb) ? placeholder : placeholder + " " + Blurb);
+            // way to know whether there is one. The row's hint carries it, under
+            // the editor and in its help text alike.
+            string hint = !hasStored_ ? Blurb
+               : string.IsNullOrEmpty(Blurb) ? placeholder : placeholder + " " + Blurb;
 
-            if (OfferGenerate)
+            if (!OfferGenerate)
             {
-               var row = new Grid { Width = 520, HorizontalAlignment = HorizontalAlignment.Left };
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-               row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-
-               Grid.SetColumn(box_, 0);
-               row.Children.Add(box_);
-
-               var generate = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
-               {
-                  Content = L("Generate"),
-                  Margin = new Thickness(8, 0, 0, 0),
-                  VerticalAlignment = VerticalAlignment.Bottom,
-                  ToolTip = L("Fill in a strong random secret")
-               };
-               SetAid(generate, Key + "Generate"); // no-loc
-               // The visible content is the same word on every secret that offers
-               // it, so the accessible name says which secret this one fills.
-               System.Windows.Automation.AutomationProperties.SetName(generate,
-                  F("Generate a random value for {0}", AccessibleName ?? Label ?? L("this secret")));
-               generate.Click += (s, e) => box_.Password = PasswordGenerator.Generate(32);
-               Grid.SetColumn(generate, 1);
-               row.Children.Add(generate);
-
-               panel.Children.Add(row);
-            }
-            else
-            {
-               box_.MaxWidth = 520;
-               box_.MinWidth = 320;
+               box_.Width = EditorWidth;
                box_.HorizontalAlignment = HorizontalAlignment.Left;
-               panel.Children.Add(box_);
+               return Row(box_, Label, hint: hint);
             }
 
-            // Annotate would overwrite the help text set just above, so only the
-            // printed caption is wanted here.
-            if (!string.IsNullOrEmpty(Blurb))
+            var row = new Grid { Width = EditorWidth, HorizontalAlignment = HorizontalAlignment.Left };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            Grid.SetColumn(box_, 0);
+            row.Children.Add(box_);
+
+            var generate = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
             {
-               panel.Children.Add(new TextBlock
-               {
-                  Text = Blurb,
-                  FontSize = Typography.Caption,
-                  TextWrapping = TextWrapping.Wrap,
-                  Opacity = 0.65,
-                  Margin = new Thickness(0, 4, 0, 0)
-               });
-            }
+               Content = L("Generate"),
+               Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0),
+               VerticalAlignment = VerticalAlignment.Bottom,
+               ToolTip = L("Fill in a strong random secret")
+            };
+            SetAid(generate, Key + "Generate"); // no-loc
+            // The visible content is the same word on every secret that offers
+            // it, so the accessible name says which secret this one fills.
+            AutomationProperties.SetName(generate,
+               F("Generate a random value for {0}", AccessibleName ?? Label ?? L("this secret")));
+            generate.Click += (s, e) => box_.Password = PasswordGenerator.Generate(32);
+            Grid.SetColumn(generate, 1);
+            row.Children.Add(generate);
 
-            return panel;
+            return Row(row, Label, box_, hint);
          }
 
          public override void Save(IniFeatureStore store)
@@ -545,26 +483,15 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = Label,
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
             box_ = new Wpf.Ui.Controls.TextBox
             {
                Text = IniDirect.ReadValue(store.IniPath, Section, Key, Default),
                PlaceholderText = Placeholder,
-               FontSize = Typography.Body,
-               MaxWidth = 520,
-               MinWidth = 320,
+               Width = EditorWidth,
                HorizontalAlignment = HorizontalAlignment.Left
             };
             Describe(box_, Key);
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            return Row(box_, Label);
          }
 
          public override void Save(IniFeatureStore store)
@@ -598,23 +525,13 @@ namespace hMailServer.ControlPanel.Views
 
          public override FrameworkElement CreateEditor(IniFeatureStore store)
          {
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = Label,
-               FontSize = Typography.Body,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
-
             loaded_ = Normalize(IniDirect.ReadSectionLines(store.IniPath, Section));
 
             box_ = new Wpf.Ui.Controls.TextBox
             {
                Text = loaded_,
                PlaceholderText = Placeholder,
-               FontSize = Typography.Body,
-               MaxWidth = 520,
-               MinWidth = 320,
+               Width = EditorWidth,
                MinHeight = 88,
                AcceptsReturn = true,
                TextWrapping = TextWrapping.NoWrap,
@@ -622,9 +539,7 @@ namespace hMailServer.ControlPanel.Views
                HorizontalAlignment = HorizontalAlignment.Left
             };
             Describe(box_, Key);
-            panel.Children.Add(box_);
-            Annotate(box_, panel);
-            return panel;
+            return Row(box_, Label);
          }
 
          public override void Save(IniFeatureStore store)
@@ -677,30 +592,29 @@ namespace hMailServer.ControlPanel.Views
             if (string.IsNullOrEmpty(destination))
                destination = NavigationMap.TitleOf(page_);
 
-            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+            var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Sm) };
 
             var text = new TextBlock
             {
                Text = Label + "  →  " + destination,
-               FontSize = Typography.Body,
-               TextWrapping = TextWrapping.Wrap,
                VerticalAlignment = VerticalAlignment.Center,
                MaxWidth = 420
             };
+            text.SetResourceReference(StyleProperty, "TextBody");
             row.Children.Add(text);
 
             var button = new Wpf.Ui.Controls.Button   // per setting: no access key, the rows are reached with the arrow keys
             {
                Content = L("Open…"),
                Appearance = Wpf.Ui.Controls.ControlAppearance.Transparent,
-               FontSize = Typography.Caption,
-               Padding = new Thickness(8, 3, 8, 3),
-               Margin = new Thickness(10, 0, 0, 0),
+               Padding = new Thickness(DesignTokens.Space.Sm, DesignTokens.Space.Xs, DesignTokens.Space.Sm, DesignTokens.Space.Xs),
+               Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0),
                VerticalAlignment = VerticalAlignment.Center,
-               Cursor = System.Windows.Input.Cursors.Hand,
+               Cursor = Cursors.Hand,
                ToolTip = F("Open {0}", destination)
             };
-            System.Windows.Automation.AutomationProperties.SetName(button, F("Open {0}, which now has {1}", destination, Label));
+            button.SetResourceReference(FontSizeProperty, "AppFontSizeCaption");
+            AutomationProperties.SetName(button, F("Open {0}, which now has {1}", destination, Label));
             SetAid(button, "elsewhere-" + page_);
             button.Click += (s, e) => (Application.Current?.MainWindow as MainWindow)?.NavigateTo(page_);
             row.Children.Add(button);
@@ -748,13 +662,11 @@ namespace hMailServer.ControlPanel.Views
       private readonly IniFeatureStore store_ = new();
       private List<CardDef> cards_;
 
-      /// <summary>One built warning row: the definition and the WPF pieces it drives.</summary>
+      /// <summary>One built warning: the definition and the notice it drives.</summary>
       private class WarningRow
       {
          public WarningDef Def;
-         public Grid Row;
-         public System.Windows.Shapes.Path Mark;
-         public TextBlock Text;
+         public InlineNotice Notice;
       }
 
       private readonly List<WarningRow> warningRows_ = new();
@@ -1411,8 +1323,8 @@ namespace hMailServer.ControlPanel.Views
          switch (section_)
          {
             case Section.Security:
-               TitleText.Text = L("Transport security");
-               SubtitleText.Text = L("Outbound mail authentication and encryption policies (hMailServer.INI). Changes take effect after a service restart.");
+               Header.Title = L("Transport security");
+               Header.Subtitle = L("Outbound mail authentication and encryption policies (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
                   Title = L("DANE & DNSSEC"),
@@ -1643,8 +1555,8 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Automation:
-               TitleText.Text = L("Automatic certificates (ACME)");
-               SubtitleText.Text = L("Built-in Let's Encrypt integration: certificates are issued, renewed, assigned to TLS ports and hot-reloaded automatically.");
+               Header.Title = L("Automatic certificates (ACME)");
+               Header.Subtitle = L("Built-in Let's Encrypt integration: certificates are issued, renewed, assigned to TLS ports and hot-reloaded automatically.");
                cards_.Add(new CardDef
                {
                   Title = L("ACME (Let's Encrypt)"),
@@ -1676,8 +1588,8 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Integration:
-               TitleText.Text = L("API & monitoring");
-               SubtitleText.Text = L("REST administration API, Prometheus metrics and remote script management. The public web services listener (autoconfiguration, MTA-STS hosting) is on the Web services & autoconfiguration page; OAuth2 token authentication is on the Authentication page.");
+               Header.Title = L("API & monitoring");
+               Header.Subtitle = L("REST administration API, Prometheus metrics and remote script management. The public web services listener (autoconfiguration, MTA-STS hosting) is on the Web services & autoconfiguration page; OAuth2 token authentication is on the Authentication page.");
                cards_.Add(new CardDef
                {
                   Title = L("REST administration API + Web Control Deck"),
@@ -2055,8 +1967,8 @@ namespace hMailServer.ControlPanel.Views
             // nav key stays "hardening" and the old titles stay as search aliases,
             // so every existing link and bookmark still lands here.
             case Section.Hardening:
-               TitleText.Text = L("Server limits & expert settings");
-               SubtitleText.Text = L("Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature. The defaults are safe; change these only with a specific reason. Stored in hMailServer.INI, and unless a card says otherwise, changes take effect after a service restart.");
+               Header.Title = L("Server limits & expert settings");
+               Header.Subtitle = L("Server-wide ceilings, durability and abuse controls that belong to no single protocol or feature. The defaults are safe; change these only with a specific reason. Stored in hMailServer.INI, and unless a card says otherwise, changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
                   Title = L("Timeouts and queue bounds"),
@@ -2379,8 +2291,8 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Authentication:
-               TitleText.Text = L("Authentication");
-               SubtitleText.Text = L("How mailbox users prove who they are: external identity providers, how passwords are stored, and where SMTP AUTH is offered (hMailServer.INI). Changes take effect after a service restart.");
+               Header.Title = L("Authentication");
+               Header.Subtitle = L("How mailbox users prove who they are: external identity providers, how passwords are stored, and where SMTP AUTH is offered (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
                   Title = L("OAuth2 / external identity provider"),
@@ -2473,8 +2385,8 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.Dns:
-               TitleText.Text = L("DNS resolver");
-               SubtitleText.Text = L("How this server resolves MX, PTR, SPF, DKIM, DMARC and blacklist lookups (hMailServer.INI). Changes take effect after a service restart.");
+               Header.Title = L("DNS resolver");
+               Header.Subtitle = L("How this server resolves MX, PTR, SPF, DKIM, DMARC and blacklist lookups (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
                   Title = L("Name servers"),
@@ -2511,8 +2423,8 @@ namespace hMailServer.ControlPanel.Views
                break;
 
             case Section.WebServices:
-               TitleText.Text = L("Web services & client autoconfiguration");
-               SubtitleText.Text = L("The built-in HTTP listener that serves mail-client autoconfiguration and MTA-STS policies for your local domains (hMailServer.INI). Changes take effect after a service restart.");
+               Header.Title = L("Web services & client autoconfiguration");
+               Header.Subtitle = L("The built-in HTTP listener that serves mail-client autoconfiguration and MTA-STS policies for your local domains (hMailServer.INI). Changes take effect after a service restart.");
                cards_.Add(new CardDef
                {
                   Title = L("Listener"),
@@ -2615,49 +2527,40 @@ namespace hMailServer.ControlPanel.Views
 
          if (!store_.IsAvailable)
          {
-            SubtitleText.Text = L("hMailServer.INI was not found on this machine. These settings can only be edited on the server itself.");
+            SetState_(SettingsPageState.Unavailable,
+               L("hMailServer.INI was not found on this machine. These settings can only be edited on the server itself."));
+            PathText.Visibility = Visibility.Collapsed;
             SaveButton.IsEnabled = false;
             return;
          }
 
          foreach (CardDef card in cards_)
          {
-            var border = new Border { Margin = new Thickness(0, 0, 0, 12) };
-            border.SetResourceReference(StyleProperty, "Card");
+            // One card, one section: the card is the surface, the section the
+            // level-2 heading a screen reader walks the page by, the rows the
+            // fields, and a computed warning a notice under the fields it is
+            // about. The last row gives up its gap so the card's own padding
+            // closes the card.
+            var fields = new StackPanel();
+            foreach (Setting setting in card.Settings)
+               fields.Children.Add(setting.CreateEditor(store_));
 
-            var panel = new StackPanel();
-            panel.Children.Add(new TextBlock
-            {
-               Text = card.Title,
-               FontSize = Typography.SectionHeading,
-               FontWeight = FontWeights.SemiBold,
-               Margin = new Thickness(0, 0, 0, 4)
-            });
-            panel.Children.Add(new TextBlock
-            {
-               Text = card.Blurb,
-               FontSize = Typography.Caption,
-               TextWrapping = TextWrapping.Wrap,
-               Opacity = 0.65,
-               Margin = new Thickness(0, 0, 0, 14)
-            });
-
-            FrameworkElement lastEditor = null;
-            foreach (FrameworkElement editor in card.Settings.Select(s => s.CreateEditor(store_)))
-            {
-               editor.Margin = new Thickness(0, 0, 0, 12);
-               panel.Children.Add(editor);
-               lastEditor = editor;
-            }
-
-            if (lastEditor != null)
-               lastEditor.Margin = new Thickness(0, 0, 0, 2);
+            if (fields.Children.Count > 0 && fields.Children[fields.Children.Count - 1] is FrameworkElement last)
+               last.Margin = new Thickness(0);
 
             foreach (WarningDef def in card.Warnings)
-               panel.Children.Add(BuildWarningRow_(def));
+               fields.Children.Add(BuildWarningRow_(def));
 
-            border.Child = panel;
-            CardsPanel.Children.Add(border);
+            var section = new SettingsSection
+            {
+               Heading = card.Title,
+               Description = card.Blurb,
+               Content = fields,
+               Margin = new Thickness(0)
+            };
+            var surface = new Card { Content = section };
+            surface.SetResourceReference(MarginProperty, "AppCardGap");
+            CardsPanel.Children.Add(surface);
          }
 
          // Wire every editor to the warnings AFTER all the editors exist, because
@@ -2668,43 +2571,53 @@ namespace hMailServer.ControlPanel.Views
 
          RefreshWarnings_();
 
-         StatusText.Text = F("Editing {0}", store_.IniPath);
+         PathText.Text = F("Editing {0}", store_.IniPath);
+         PathText.Visibility = Visibility.Visible;
+         SaveButton.IsEnabled = true;
+         SetState_(SettingsPageState.Editing, null);
       }
 
       /// <summary>
-      /// One (initially collapsed) warning row: the shape mark and the text beside
-      /// it, in the same three channels - colour, shape and word - as the dashboard
-      /// and Spam overview badges, so none of the three is load-bearing alone.
+      /// One (initially collapsed) computed warning: an InlineNotice, which carries
+      /// the same three channels - colour, shape and word - as the dashboard and
+      /// Spam overview badges, so none of the three is load-bearing alone.
       /// </summary>
       private FrameworkElement BuildWarningRow_(WarningDef def)
       {
-         var row = new Grid { Margin = new Thickness(0, 10, 0, 2), Visibility = Visibility.Collapsed };
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         var notice = new InlineNotice
+         {
+            Visibility = Visibility.Collapsed,
+            Margin = new Thickness(0, DesignTokens.Space.Md, 0, 0)
+         };
 
          if (!string.IsNullOrEmpty(def.Aid))
-            System.Windows.Automation.AutomationProperties.SetAutomationId(row, def.Aid);
+            AutomationProperties.SetAutomationId(notice, def.Aid);
 
-         var mark = new System.Windows.Shapes.Path
+         warningRows_.Add(new WarningRow { Def = def, Notice = notice });
+         return notice;
+      }
+
+      /// <summary>
+      /// Where the page stands, in the header's pill and - when there is a
+      /// sentence to go with it - in the notice under the header. The notice
+      /// takes the state's level unless the caller says otherwise: a restart in
+      /// progress is a warning on the pill (what is on screen is not yet what
+      /// runs) and information in the sentence.
+      /// </summary>
+      private void SetState_(SettingsPageState state, string message, StatusLevel? noticeLevel = null)
+      {
+         StatePill.Level = SettingsPageStatus.LevelFor(state);
+         StatePill.Text = SettingsPageStatus.WordFor(state);
+
+         if (string.IsNullOrEmpty(message))
          {
-            Width = 11,
-            Height = 11,
-            Stretch = Stretch.Fill,
-            Margin = new Thickness(0, 4, 8, 0),
-            VerticalAlignment = VerticalAlignment.Top
-         };
-         row.Children.Add(mark);
+            StatusNotice.Visibility = Visibility.Collapsed;
+            return;
+         }
 
-         var text = new TextBlock
-         {
-            FontSize = Typography.Caption,
-            TextWrapping = TextWrapping.Wrap
-         };
-         Grid.SetColumn(text, 1);
-         row.Children.Add(text);
-
-         warningRows_.Add(new WarningRow { Def = def, Row = row, Mark = mark, Text = text });
-         return row;
+         StatusNotice.Level = noticeLevel ?? SettingsPageStatus.LevelFor(state);
+         StatusNotice.Text = message;
+         StatusNotice.Visibility = Visibility.Visible;
       }
 
       /// <summary>
@@ -2731,18 +2644,13 @@ namespace hMailServer.ControlPanel.Views
 
             if (state == null)
             {
-               row.Row.Visibility = Visibility.Collapsed;
+               row.Notice.Visibility = Visibility.Collapsed;
                continue;
             }
 
-            StatusPresentation presentation = StatusSemantics.For(state.Level);
-            ShapeMarkVisuals.ApplyMark(row.Mark, presentation.Shape, presentation.BrushKey);
-
-            row.Text.Inlines.Clear();
-            row.Text.Inlines.Add(new Run(presentation.SeverityWord + ": ") { FontWeight = FontWeights.SemiBold });
-            row.Text.Inlines.Add(new Run(state.Text));
-
-            row.Row.Visibility = Visibility.Visible;
+            row.Notice.Level = state.Level;
+            row.Notice.Text = state.Text;
+            row.Notice.Visibility = Visibility.Visible;
          }
       }
 
@@ -2787,12 +2695,11 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save: {0}", ex.Message), L("Control Panel"),
-               MessageBoxButton.OK, MessageBoxImage.Error);
+            SetState_(SettingsPageState.Editing, F("Could not save: {0}", ex.Message), StatusLevel.Critical);
             return;
          }
 
-         StatusText.Text = F("Saved {0} - restart the service to apply.", DateTime.Now.ToLongTimeString());
+         SetState_(SettingsPageState.Saved, F("Saved {0} - restart the service to apply.", DateTime.Now.ToLongTimeString()));
 
          if (MessageBox.Show(
                 L("Settings saved. The hMailServer service must be restarted for the changes to take effect.\n\nRestart it now?"),
@@ -2804,18 +2711,16 @@ namespace hMailServer.ControlPanel.Views
 
       private async void RestartService()
       {
-         StatusText.Text = L("Restarting the hMailServer service...");
+         SetState_(SettingsPageState.Restarting, L("Restarting the hMailServer service..."), StatusLevel.Information);
 
          string error = await Task.Run(() => TryRestartService());
          if (error != null)
          {
-            StatusText.Text = L("The service could not be restarted.");
-            MessageBox.Show(F("Could not restart the service: {0}", error),
-               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            SetState_(SettingsPageState.RestartFailed, F("Could not restart the service: {0}", error));
             return;
          }
 
-         StatusText.Text = L("Service restarted - settings are live.");
+         SetState_(SettingsPageState.Applied, L("Service restarted - settings are live."));
          Reattach();
       }
 
@@ -2898,10 +2803,8 @@ namespace hMailServer.ControlPanel.Views
                return;
 
             session.Invalidate();
-            StatusText.Text = L("Service restarted, but the Control Panel could not reconnect.");
-            MessageBox.Show(
-               F("The service was restarted but the Control Panel could not reconnect to it: {0}\n\nIt will keep trying as you use the application.", error),
-               L("Control Panel"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            SetState_(SettingsPageState.NotConnected,
+               F("The service was restarted but the Control Panel could not reconnect to it: {0}\n\nIt will keep trying as you use the application.", error));
          }
          finally
          {

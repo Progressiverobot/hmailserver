@@ -43,6 +43,11 @@
          pure functions, and both are what the page waves code against. -->
     <Compile Include="..\ControlPanel\Services\DesignTokens.cs" />
     <Compile Include="..\ControlPanel\Services\ConnectionStatus.cs" />
+    <!-- The same again for the two page waves: the feature-settings pill's word and
+         severity per page state, and the arithmetic that sizes a tabbed dialog on
+         the frame to its tallest tab within the work area. -->
+    <Compile Include="..\ControlPanel\Services\SettingsPageStatus.cs" />
+    <Compile Include="..\ControlPanel\Services\DialogLayout.cs" />
     <Compile Include="..\ControlPanel\Services\Typography.cs" />
     <Compile Include="..\ControlPanel\Services\SpamPipeline.cs" />
     <!-- Same arrangement, for the same reason: the account comparison and the

@@ -8,31 +8,34 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:loc="clr-namespace:hMailServer.ControlPanel.Services"
+    xmlns:scaffold="clr-namespace:hMailServer.ControlPanel.Views.Scaffold"
     xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
 
-    <Grid Margin="26,20">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
-        </Grid.RowDefinitions>
-
+    <!-- A settings page on the scaffold: the page owns its ScrollViewer with
+         AppPagePadding, a PageHeader carries the title, the page's sentence, the
+         pill that says where the page stands (SettingsPageStatus) and the two
+         actions; the state's sentence is an InlineNotice; the cards are built in
+         code from the section's definition, one Card holding one SettingsSection
+         of FieldRows. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="{StaticResource AppPagePadding}">
         <StackPanel>
-            <TextBlock x:Name="TitleText" Style="{StaticResource PageTitle}" />
-            <TextBlock x:Name="SubtitleText" Style="{StaticResource PageSubtitle}" />
-        </StackPanel>
+            <scaffold:PageHeader x:Name="Header">
+                <scaffold:PageHeader.Status>
+                    <scaffold:StatusPill x:Name="StatePill" AutomationProperties.AutomationId="feature-settings-state" />
+                </scaffold:PageHeader.Status>
+                <scaffold:PageHeader.Actions>
+                    <StackPanel Orientation="Horizontal">
+                        <ui:Button Content="{loc:L '_Reload'}" Margin="0,0,8,0" Click="Reload_Click" />
+                        <ui:Button x:Name="SaveButton" Content="{loc:L '_Save changes'}" Appearance="Primary" Click="Save_Click" />
+                    </StackPanel>
+                </scaffold:PageHeader.Actions>
+            </scaffold:PageHeader>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <StackPanel x:Name="CardsPanel" Margin="0,0,12,0" MaxWidth="760" HorizontalAlignment="Left" />
-        </ScrollViewer>
-
-        <Grid Grid.Row="2" Margin="0,14,12,0">
-            <TextBlock x:Name="StatusText" AutomationProperties.LiveSetting="Polite" VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" FontSize="12" />
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <ui:Button Content="{loc:L '_Reload'}" Margin="0,0,8,0" Click="Reload_Click" />
-                <ui:Button x:Name="SaveButton" Content="{loc:L '_Save changes'}" Appearance="Primary" Click="Save_Click" />
+            <StackPanel MaxWidth="760" HorizontalAlignment="Left">
+                <scaffold:InlineNotice x:Name="StatusNotice" Visibility="Collapsed" />
+                <TextBlock x:Name="PathText" Style="{StaticResource TextCaptionTertiary}" Margin="{StaticResource AppCardGap}" />
+                <StackPanel x:Name="CardsPanel" />
             </StackPanel>
-        </Grid>
-    </Grid>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
