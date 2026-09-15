@@ -36,6 +36,8 @@ namespace HM
          bool atLineStart = true;
          bool inTag = false;
          bool pendingSpace = false;
+         String tagName;
+         bool tagNameDone = false;
 
          for (int i = 0; i < value.GetLength(); i++)
          {
@@ -44,18 +46,45 @@ namespace HM
             if (isHtml && c == '<')
             {
                inTag = true;
+               tagName.Empty();
+               tagNameDone = false;
                continue;
             }
 
             if (isHtml && c == '>' && inTag)
             {
                inTag = false;
-               pendingSpace = true;
+
+               // A block element separates words and an inline one does not: a
+               // client that bolds the last word of the footer - "may be
+               // <b>privileged</b>." - must not turn it into "privileged ." and
+               // stop matching the footer it quotes.
+               tagName.ToLower();
+               bool inlineTag = tagName == _T("b") || tagName == _T("i") || tagName == _T("u") || tagName == _T("s") ||
+                                tagName == _T("em") || tagName == _T("strong") || tagName == _T("span") || tagName == _T("a") ||
+                                tagName == _T("font") || tagName == _T("small") || tagName == _T("big") || tagName == _T("sub") ||
+                                tagName == _T("sup") || tagName == _T("code") || tagName == _T("mark");
+               if (!inlineTag)
+                  pendingSpace = true;
+
                continue;
             }
 
             if (inTag)
+            {
+               if (!tagNameDone)
+               {
+                  if (c == '/' && tagName.IsEmpty())
+                     continue;
+
+                  if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))
+                     tagName += c;
+                  else
+                     tagNameDone = true;
+               }
+
                continue;
+            }
 
             if (c == '\r' || c == '\n')
             {

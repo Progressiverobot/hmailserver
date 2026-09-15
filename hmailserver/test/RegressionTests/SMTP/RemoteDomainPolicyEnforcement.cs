@@ -105,7 +105,7 @@ namespace RegressionTests.SMTP
 
             CustomAsserts.AssertRecipientsInDeliveryQueue(0);
 
-            string bounce = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
+            string bounce = Decoded_(Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test"));
 
             StringAssert.Contains("remote domain policy for " + RemoteDomain, bounce,
                "The failure does not say which rule refused the delivery.");
@@ -175,7 +175,7 @@ namespace RegressionTests.SMTP
 
             CustomAsserts.AssertRecipientsInDeliveryQueue(0);
 
-            string bounce = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
+            string bounce = Decoded_(Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test"));
 
             StringAssert.Contains("remote domain policy for " + RemoteDomain, bounce,
                "The failure does not say which rule refused the delivery.");
@@ -239,7 +239,7 @@ namespace RegressionTests.SMTP
             // makes permanent.
             CustomAsserts.AssertRecipientsInDeliveryQueue(0, false);
 
-            string bounce = Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test");
+            string bounce = Decoded_(Pop3ClientSimulator.AssertGetFirstMessageText(_account.Address, "test"));
 
             StringAssert.Contains("remote domain policy for " + RemoteDomain, bounce,
                "The bounce does not say which rule refused the message.");
@@ -325,12 +325,29 @@ namespace RegressionTests.SMTP
          });
       }
 
+      /// <summary>
+      ///    A bounce as a reader sees it. The server writes the report's text part
+      ///    quoted-printable, so a sentence longer than a line arrives split by soft
+      ///    line breaks ("policy=20=" then "for ...") and a space may be =20; the
+      ///    assertions are about the words, so the encoding is undone first.
+      /// </summary>
+      private static string Decoded_(string raw)
+      {
+         string joined = raw.Replace("=\r\n", "").Replace("=\n", "");
+         return System.Text.RegularExpressions.Regex.Replace(joined, "=([0-9A-F]{2})",
+            match => ((char) System.Convert.ToInt32(match.Groups[1].Value, 16)).ToString());
+      }
+
       private static string RcptReply_(string recipient)
       {
          var smtp = new TcpConnection();
          smtp.Connect(25);
          smtp.Receive();
-         smtp.SendAndReceive("HELO client.test\r\n");
+         // EHLO, not HELO: RFC 2034 decorates replies with an enhanced status code
+         // only in an ESMTP session, and the refusal's 5.1.1 is part of what is tested.
+         string ehlo = smtp.SendAndReceive("EHLO client.test\r\n");
+         for (int read = 0; read < 20 && !ehlo.StartsWith("250 ") && !ehlo.Contains("\r\n250 "); read++)
+            ehlo += smtp.Receive();
          smtp.SendAndReceive("MAIL FROM:<someone@sender.test>\r\n");
          string reply = smtp.SendAndReceive("RCPT TO:<" + recipient + ">\r\n");
          smtp.SendAndReceive("QUIT\r\n");

@@ -53,6 +53,11 @@ namespace RegressionTests.API
          Assert.AreEqual(200, probe.status, "REST API did not answer /api/v1/status. Body: " + probe.body);
 
          _application.Database.ExecuteSQL("delete from hm_alertevents");
+
+         // The teardown puts the test conditions back to disabled rather than removing
+         // them, so on any database a previous run has used, "test.state" already
+         // exists and the first write of it is an update, not a create.
+         _application.Database.ExecuteSQL("delete from hm_alertrules where alertrulecondition like 'test.%'");
       }
 
       [TearDown]
@@ -298,6 +303,11 @@ namespace RegressionTests.API
          StringAssert.Contains("\"webhook_attempts\":2", events, events);
          StringAssert.Contains("Nobody is listening.", events,
             "The event is kept, with what it said. It simply stops being retried.");
+
+         // The administrator is told once, in the error log, that an endpoint is not
+         // answering - which is the point, and which would otherwise fail the next
+         // test's SetUp as an error nobody expected.
+         CustomAsserts.AssertReportedError("HM6543", "dead-lettered");
       }
 
       [Test]
