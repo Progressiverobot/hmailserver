@@ -1399,6 +1399,25 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- multiple stars: the star pressed again cycles amber, red, none
+   location.hash = '#/f/1';
+   await flush();
+   const starRow = Array.from(document.getElementById('message-list').children)[0];
+   const starBtn = Array.from(starRow.children).find((c) => (c.className || '').indexOf('star') >= 0) || Array.from(starRow.children).flatMap((c) => Array.from(c.children || [])).find((c) => (c.className || '').indexOf('star') === 0);
+   const stageBodies = [];
+   for (let press = 0; press < 4; press += 1) {
+      const before = requests.length;
+      starBtn.dispatchEvent(makeEvent('click'));
+      await flush();
+      const call = since(before).filter((r) => r.method === 'PUT' && /\/flags$/.test(r.path))[0];
+      stageBodies.push(call ? JSON.parse(call.body) : null);
+   }
+   const stagesRight = stageBodies.length === 4 && stageBodies.every(Boolean)
+      && stageBodies[1].flagged === true && (stageBodies[1].keywords_add || []).join() === '$Star2'
+      && stageBodies[2].flagged === true && (stageBodies[2].keywords_add || []).join() === '$Star3' && (stageBodies[2].keywords_remove || []).indexOf('$Star2') >= 0
+      && stageBodies[3].flagged === false && (stageBodies[3].keywords_remove || []).length === 2;
+   check('the star pressed again goes amber, then red, then off, as flag and keywords', stagesRight, JSON.stringify(stageBodies));
+
    // ---- snooze presets and swipe actions as settings
    location.hash = '#/settings';
    await flush();

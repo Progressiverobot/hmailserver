@@ -994,9 +994,8 @@
     unread.setAttribute('aria-label', seen ? t('Mark as unread') : t('Mark as read'));
     setIcon(unread, seen ? 'mail' : 'mail-open');
     var flag = el('message-flag');
-    flag.classList.toggle('on', !!current.flags.flagged);
-    flag.setAttribute('title', current.flags.flagged ? t('Unstar') : t('Star'));
-    flag.setAttribute('aria-label', current.flags.flagged ? t('Unstar') : t('Star'));
+    paintStar(flag, starStage(current));
+    flag.setAttribute('aria-label', starTitle(starStage(current)));
     var follow = el('message-followup');
     var dueDay = dueOf(current);
     follow.classList.toggle('on', hasFollowUp(current));
@@ -1931,7 +1930,7 @@
   })();
   el('message-back').addEventListener('click', function () { closeMessage(false); });
   el('message-unread').addEventListener('click', function () { if (current) { setFlags({ seen: !current.flags.seen }, false); } });
-  el('message-flag').addEventListener('click', function () { if (current) { setFlags({ flagged: !current.flags.flagged }, false); } });
+  el('message-flag').addEventListener('click', function () { if (current) { cycleStar(current, null); } });
   el('message-delete').addEventListener('click', function () { fileCurrent('delete'); });
   var remoteAllowed = { id: 0 };
   var remoteSenders = function () { return String(pref('remote_senders') || '').toLowerCase().split(',').filter(Boolean); };
@@ -4627,20 +4626,49 @@
     });
     chain.then(function () { lastListing = null; loadFolders(); reloadKeepingPlace(); });
   };
-  var toggleStar = function (m, star) {
-    var flagged = !m.flags.flagged;
-    call('PUT', '/api/v1/me/messages/' + m.id + '/flags', { flagged: flagged }).then(function (result) {
+  // Three stars, as Gmail has them: the star, then amber, then red, then
+  // none again. The first is the IMAP flag every client shows; the second
+  // and third are the keywords $Star2 and $Star3 on top of it, which other
+  // clients ignore and the Starred view includes all the same.
+  var STAR_KEYWORDS = ['$Star2', '$Star3'];
+  var starStage = function (m) {
+    if (!m.flags.flagged) { return 0; }
+    var keys = (m.flags.keywords || []).map(function (k) { return k.toLowerCase(); });
+    return keys.indexOf('$star3') >= 0 ? 3 : keys.indexOf('$star2') >= 0 ? 2 : 1;
+  };
+  var starTitle = function (stage) { return stage === 0 ? t('Star') : stage === 1 ? t('Second star') : stage === 2 ? t('Third star') : t('Unstar'); };
+  var paintStar = function (button, stage) {
+    button.classList.toggle('on', stage > 0);
+    button.classList.toggle('s2', stage === 2);
+    button.classList.toggle('s3', stage === 3);
+    button.setAttribute('title', starTitle(stage));
+  };
+  var applyStarStage = function (m, stage) {
+    m.flags.flagged = stage > 0;
+    m.flags.keywords = (m.flags.keywords || []).filter(function (k) { return STAR_KEYWORDS.indexOf(k) < 0 && k.toLowerCase() !== '$star2' && k.toLowerCase() !== '$star3'; });
+    if (stage >= 2) { m.flags.keywords.push(STAR_KEYWORDS[stage - 2]); }
+  };
+  var cycleStar = function (m, star) {
+    var stage = (starStage(m) + 1) % 4;
+    var body = { flagged: stage > 0 };
+    if (stage >= 2) { body.keywords_add = [STAR_KEYWORDS[stage - 2]]; }
+    body.keywords_remove = STAR_KEYWORDS.filter(function (k) { return !(stage >= 2 && k === STAR_KEYWORDS[stage - 2]); });
+    return call('PUT', '/api/v1/me/messages/' + m.id + '/flags', body).then(function (result) {
       if (result.status !== 200) { say('mail-status', describe(result, t('Could not change the flags')), false); return; }
-      m.flags.flagged = flagged;
-      star.classList.toggle('on', flagged);
-      star.setAttribute('title', flagged ? t('Unstar') : t('Star'));
-      if (current && current.id === m.id) { current.flags.flagged = flagged; renderActions(); }
+      // The star and the keywords from the server's answer; the rest of the
+      // flags - seen, answered - stay as the row had them.
+      if (result.data && result.data.flags) { m.flags.flagged = !!result.data.flags.flagged; m.flags.keywords = result.data.flags.keywords || []; } else { applyStarStage(m, stage); }
+      if (star) { paintStar(star, starStage(m)); }
+      if (current && current.id === m.id) { if (current !== m) { current.flags = m.flags; } renderActions(); }
+      lastListing = null;
     });
   };
+  var toggleStar = function (m, star) { return cycleStar(m, star); };
   var starButton = function (m) {
-    var star = node('button', undefined, 'star' + (m.flags.flagged ? ' on' : ''));
+    var stage = starStage(m);
+    var star = node('button', undefined, 'star' + (stage > 0 ? ' on' : '') + (stage === 2 ? ' s2' : '') + (stage === 3 ? ' s3' : ''));
     star.type = 'button';
-    star.setAttribute('title', m.flags.flagged ? t('Unstar') : t('Star'));
+    star.setAttribute('title', starTitle(stage));
     star.setAttribute('aria-label', t('Star'));
     star.appendChild(icon('star'));
     star.addEventListener('click', function (event) { event.stopPropagation(); toggleStar(m, star); });
