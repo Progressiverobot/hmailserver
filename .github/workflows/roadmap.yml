@@ -1,0 +1,40 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The roadmap's counts are the truth of its tick boxes, and the release build
+# checks them at step 5 - which is how a contents line one row short was first
+# seen on 14 September 2026, at the release, rather than on the pull request
+# that changed the row. build/check-roadmap.ps1 runs here on every change to
+# the file, so the pull request says so.
+name: Roadmap
+
+on:
+  push:
+    branches: [master]
+    paths: ['Roadmap.md', 'build/check-roadmap.ps1']
+  pull_request:
+    paths: ['Roadmap.md', 'build/check-roadmap.ps1']
+
+permissions:
+  contents: read
+
+jobs:
+  counts:
+    name: the counts match the tick boxes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check Roadmap.md
+        shell: pwsh
+        run: ./build/check-roadmap.ps1
