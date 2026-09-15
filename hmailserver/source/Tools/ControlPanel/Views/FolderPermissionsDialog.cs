@@ -5,63 +5,27 @@
 using System;
 using System.Collections.Generic;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
-using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
-   /// <summary>Small reusable single-line text prompt.</summary>
+   /// <summary>Small reusable single-line text prompt, on the standard frame through <see cref="DialogFields.PromptText"/>.</summary>
    internal static class InputDialog
    {
       public static string Prompt(Window owner, string title, string prompt, string initial = "")
-      {
-         var dlg = new FluentDialogWindow
-         {
-            Owner = owner,
-            Title = title,
-            Width = 420,
-            SizeToContent = SizeToContent.Height,
-            ResizeMode = ResizeMode.NoResize,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner
-         };
-         dlg.SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
-
-         var panel = new StackPanel { Margin = new Thickness(20) };
-         var label = new TextBlock { Text = prompt, FontSize = Typography.Label, Margin = new Thickness(0, 0, 0, 6) };
-         label.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         panel.Children.Add(label);
-         var box = new TextBox { Text = initial, FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 12) };
-         // The prompt is a TextBlock above the box, which UI Automation does not
-         // connect to it: this is the dialog that asks for a public folder name, and
-         // a screen reader announced it as an unnamed "edit".
-         System.Windows.Automation.AutomationProperties.SetName(box,
-            hMailServer.ControlPanel.Services.AccessibleNames.Qualify(prompt, ""));
-         panel.Children.Add(box);
-
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         string result = null;
-         // Enter accepts and Escape cancels. This is a single-field prompt, so typing
-         // a name and pressing Enter is the only way anyone expects to use it, and it
-         // did nothing at all.
-         var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
-         ok.Click += (s, e) => { result = box.Text; dlg.DialogResult = true; dlg.Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
-         cancel.Click += (s, e) => dlg.Close();
-         buttons.Children.Add(ok);
-         buttons.Children.Add(cancel);
-         panel.Children.Add(buttons);
-
-         dlg.Content = panel;
-         box.Loaded += (s, e) => { box.Focus(); box.SelectAll(); };
-         return dlg.ShowDialog() == true ? result : null;
-      }
+         => DialogFields.PromptText(owner, title, prompt, initial);
    }
 
    /// <summary>
    /// ACL permission editor for one public IMAP folder. Lists the access-control
    /// entries (user / group / anyone) and lets each be added, edited or removed.
+   /// On the standard frame: the folder is the heading, the three buttons that
+   /// act on the list sit under it, what went wrong is a notice above it, and
+   /// Close is alone in the footer.
    /// </summary>
    public class FolderPermissionsDialog : FluentDialogWindow
    {
@@ -87,47 +51,41 @@ namespace hMailServer.ControlPanel.Views
       };
 
       private readonly string folderName_;
-      private readonly ListBox list_ = new() { FontSize = Typography.Body, Height = 260, Margin = new Thickness(0, 0, 0, 12) };
+      private readonly ListBox list_ = new() { Height = 260, Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
       private readonly List<int> ids_ = new();
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public FolderPermissionsDialog(Window owner, string folderName)
       {
          folderName_ = folderName;
          Owner = owner;
          Title = L("Permissions - ") + folderName;
-         Width = 520;
-         SizeToContent = SizeToContent.Height;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         ResizeMode = ResizeMode.NoResize;
-         SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var panel = new StackPanel { Margin = new Thickness(20) };
-         var header = new TextBlock { Text = folderName, FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 12) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         panel.Children.Add(header);
-         panel.Children.Add(list_);
+         var body = new StackPanel();
+         body.Children.Add(notice_);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-         var add = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         AutomationProperties.SetName(list_, F("Access-control entries for {0}", folderName));
+         body.Children.Add(list_);
+
+         var actions = new StackPanel { Orientation = Orientation.Horizontal };
+         var add = new Wpf.Ui.Controls.Button { Content = L("_Add"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, DesignTokens.Space.Sm, 0), MinWidth = 88 };
          add.Click += (s, e) => AddOrEdit(-1);
-         var edit = new Wpf.Ui.Controls.Button { Content = L("_Edit"), Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var edit = new Wpf.Ui.Controls.Button { Content = L("_Edit"), Margin = new Thickness(0, 0, DesignTokens.Space.Sm, 0), MinWidth = 88 };
          edit.Click += (s, e) => { if (list_.SelectedIndex >= 0) AddOrEdit(ids_[list_.SelectedIndex]); };
-         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80 };
+         var del = new Wpf.Ui.Controls.Button { Content = L("_Delete"), Appearance = Wpf.Ui.Controls.ControlAppearance.Danger, MinWidth = 88 };
          del.Click += (s, e) => DeleteSelected();
-         // IsCancel only. "Add" is deliberately not the default button: Enter with a
+         actions.Children.Add(add);
+         actions.Children.Add(edit);
+         actions.Children.Add(del);
+         body.Children.Add(actions);
+
+         // Escape only. "Add" is deliberately not the default button: Enter with a
          // row selected in the list must not open the add dialog, and the list's own
          // double-click already covers "open the thing I am looking at".
-         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 80, IsCancel = true };
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 88 };
          close.Click += (s, e) => Close();
-         System.Windows.Automation.AutomationProperties.SetName(list_,
-            F("Access-control entries for {0}", folderName));
-         buttons.Children.Add(add);
-         buttons.Children.Add(edit);
-         buttons.Children.Add(del);
-         buttons.Children.Add(close);
-         panel.Children.Add(buttons);
 
-         Content = panel;
+         UseFrame(folderName, body, null, close, width: 520);
          list_.MouseDoubleClick += (s, e) => { if (list_.SelectedIndex >= 0) AddOrEdit(ids_[list_.SelectedIndex]); };
          Loaded += (s, e) => Reload();
       }
@@ -156,7 +114,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not load permissions: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not load permissions: {0}", ex.Message));
          }
          finally
          {
@@ -199,6 +157,7 @@ namespace hMailServer.ControlPanel.Views
             return;
          int id = ids_[list_.SelectedIndex];
 
+         notice_.Hide();
          dynamic folders = ServerSession.Current.Application.Settings.PublicFolders;
          try
          {
@@ -210,7 +169,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not delete the permission: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not delete the permission: {0}", ex.Message));
          }
          finally
          {
@@ -246,16 +205,17 @@ namespace hMailServer.ControlPanel.Views
          if (dlg.ShowDialog() != true)
             return;
 
+         notice_.Hide();
          int subjectId = 0;
          if (dlg.SelectedType == 0)
          {
             subjectId = ResolveAccountId(dlg.Subject);
-            if (subjectId == 0) { MessageBox.Show(F("No account found with address '{0}'.", dlg.Subject), L("Control Panel")); return; }
+            if (subjectId == 0) { notice_.Show(StatusLevel.Warning, F("No account found with address '{0}'.", dlg.Subject)); return; }
          }
          else if (dlg.SelectedType == 1)
          {
             subjectId = ResolveGroupId(dlg.Subject);
-            if (subjectId == 0) { MessageBox.Show(F("No group found named '{0}'.", dlg.Subject), L("Control Panel")); return; }
+            if (subjectId == 0) { notice_.Show(StatusLevel.Warning, F("No group found named '{0}'.", dlg.Subject)); return; }
          }
 
          dynamic folders2 = ServerSession.Current.Application.Settings.PublicFolders;
@@ -275,7 +235,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the permission: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the permission: {0}", ex.Message));
          }
          finally
          {
@@ -329,12 +289,12 @@ namespace hMailServer.ControlPanel.Views
       }
    }
 
-   /// <summary>Add/edit dialog for a single ACL entry.</summary>
+   /// <summary>Add/edit dialog for a single ACL entry, on the standard frame.</summary>
    internal class PermissionEditDialog : FluentDialogWindow
    {
-      private readonly ComboBox typeCombo_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
-      private readonly TextBox subject_ = new() { FontSize = Typography.Body, Padding = new Thickness(6), Margin = new Thickness(0, 0, 0, 10) };
-      private readonly TextBlock subjectLabel_;
+      private readonly ComboBox typeCombo_ = new();
+      private readonly TextBox subject_ = new();
+      private readonly FieldRow subjectRow_;
       private readonly List<(CheckBox Box, int Bit)> flagBoxes_ = new();
 
       public int SelectedType { get; private set; }
@@ -345,43 +305,32 @@ namespace hMailServer.ControlPanel.Views
       {
          Owner = owner;
          Title = L("Access-control entry");
-         Width = 420;
-         SizeToContent = SizeToContent.Height;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         ResizeMode = ResizeMode.NoResize;
-         SetResourceReference(Control.BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var panel = new StackPanel { Margin = new Thickness(20) };
-         panel.Children.Add(Label(L("Applies _to"), typeCombo_));
+         var body = new StackPanel();
          foreach ((int value, string label) in types)
             typeCombo_.Items.Add(new ComboBoxItem { Content = label, Tag = value });
          typeCombo_.SelectedIndex = 0;
          typeCombo_.SelectionChanged += (s, e) => UpdateSubjectState();
-         panel.Children.Add(typeCombo_);
+         body.Children.Add(Label(L("Applies _to"), typeCombo_));
 
-         subjectLabel_ = Label(L("_Account address"), subject_);
-         panel.Children.Add(subjectLabel_);
-         panel.Children.Add(subject_);
+         subjectRow_ = Label(L("_Account address"), subject_);
+         body.Children.Add(subjectRow_);
 
-         panel.Children.Add(Label(L("Permissions")));
+         body.Children.Add(DialogFields.Caption(L("Permissions")));
          foreach ((string label, int bit) in flags)
          {
-            var cb = new CheckBox { Content = label, FontSize = Typography.Label, Margin = new Thickness(0, 2, 0, 2) };
+            var cb = new CheckBox { Content = label, Margin = new Thickness(0, DesignTokens.Space.Xs, 0, DesignTokens.Space.Xs) };
             flagBoxes_.Add((cb, bit));
-            panel.Children.Add(cb);
+            body.Children.Add(cb);
          }
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         // Enter saves, Escape cancels. Neither worked before.
-         var ok = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         // Enter saves, Escape cancels.
+         var ok = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          ok.Click += (s, e) => Commit();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => Close();
-         buttons.Children.Add(ok);
-         buttons.Children.Add(cancel);
-         panel.Children.Add(buttons);
 
-         Content = panel;
+         UseFrame(L("Access-control entry"), body, ok, cancel, width: 420);
          UpdateSubjectState();
       }
 
@@ -400,15 +349,14 @@ namespace hMailServer.ControlPanel.Views
       {
          int type = typeCombo_.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
          bool needsSubject = type != 2; // Anyone needs no subject
-         subjectLabel_.Text = type == 1 ? L("Group name") : L("Account address");
-         subjectLabel_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
-         subject_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
+         subjectRow_.Label = type == 1 ? L("Group name") : L("Account address");
+         subjectRow_.Visibility = needsSubject ? Visibility.Visible : Visibility.Collapsed;
 
          // The caption above this box changes with the entry type, so its accessible
-         // name has to change with it. Setting the name once at construction - which
-         // is what Label does for every other editor in this file - would leave a
-         // group entry announcing itself as "Account address".
-         System.Windows.Automation.AutomationProperties.SetName(subject_, subjectLabel_.Text);
+         // name has to change with it. The row names the editor once, from the
+         // caption it was built with; a group entry would otherwise announce
+         // itself as "Account address".
+         AutomationProperties.SetName(subject_, subjectRow_.Label);
       }
 
       private void Commit()
@@ -425,20 +373,10 @@ namespace hMailServer.ControlPanel.Views
       }
 
       /// <summary>
-      /// A caption, and - when the editor it captions is passed in - that editor's
-      /// accessible name. A TextBlock above a control tells UI Automation nothing.
-      /// The eleven permission checkboxes are already named by their own Content.
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation. The eleven permission checkboxes are already named by their
+      /// own Content.
       /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
-      {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 6, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            System.Windows.Automation.AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
-         return t;
-      }
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }

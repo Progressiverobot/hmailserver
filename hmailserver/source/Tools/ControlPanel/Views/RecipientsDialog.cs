@@ -9,20 +9,26 @@ using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using hMailServer.ControlPanel.Services;
-using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
    /// <summary>
-   /// Modal editor for the recipients of a distribution list.
+   /// Modal editor for the recipients of a distribution list, on the standard
+   /// frame: the list, the add row under it, what happened in a notice above,
+   /// and Close alone in the footer - the three buttons that act on the list
+   /// stay beside the list, and the one that ends the dialog stays apart from
+   /// them, because putting a "leave" next to a "delete" is how the wrong one
+   /// gets pressed.
    /// </summary>
    public class RecipientsDialog : FluentDialogWindow
    {
       private readonly string domainName_;
       private readonly string listAddress_;
-      private readonly ListBox listBox_ = new();
+      private readonly ListBox listBox_ = new() { Height = 240 };
       private readonly TextBox addBox_ = new();
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public RecipientsDialog(Window owner, string domainName, string listAddress)
       {
@@ -31,36 +37,21 @@ namespace hMailServer.ControlPanel.Views
 
          Owner = owner;
          Title = L("Recipients - ") + listAddress;
-         Width = 440;
-         Height = 420;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var grid = new Grid { Margin = new Thickness(16) };
-         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         var body = new StackPanel();
+         body.Children.Add(notice_);
 
-         listBox_.BorderThickness = new Thickness(1);
-         listBox_.SetResourceReference(Control.BorderBrushProperty, "ControlElevationBorderBrush");
-         listBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         listBox_.Background = System.Windows.Media.Brushes.Transparent;
-         listBox_.FontSize = Typography.Body;
          AutomationProperties.SetName(listBox_, F("Recipients of {0}", listAddress));
-         grid.Children.Add(listBox_);
+         body.Children.Add(listBox_);
 
-         var bottom = new Grid { Margin = new Thickness(0, 12, 0, 0) };
+         var bottom = new Grid { Margin = new Thickness(0, DesignTokens.Space.Md, 0, 0) };
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          bottom.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-         addBox_.FontSize = Typography.Body;
-         addBox_.Padding = new Thickness(6);
-         addBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         addBox_.Background = System.Windows.Media.Brushes.Transparent;
-
          // The box has no caption anywhere on the dialog - it is a bare box beside
-         // three buttons - so a screen reader announced it as "edit".
+         // three buttons - so its accessible name says what it is for.
          AutomationProperties.SetName(addBox_, L("E-mail address to add to the list"));
 
          // Enter adds. Handled, so the keystroke cannot also reach a default button
@@ -75,12 +66,12 @@ namespace hMailServer.ControlPanel.Views
          };
          bottom.Children.Add(addBox_);
 
-         var addButton = new Wpf.Ui.Controls.Button { Content = L("_Add"), Margin = new Thickness(8, 0, 0, 0) };
+         var addButton = new Wpf.Ui.Controls.Button { Content = L("_Add"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
          addButton.Click += (s, e) => AddRecipient();
          Grid.SetColumn(addButton, 1);
          bottom.Children.Add(addButton);
 
-         var adButton = new Wpf.Ui.Controls.Button { Content = L("Add from A_D\u2026"), Margin = new Thickness(8, 0, 0, 0) };
+         var adButton = new Wpf.Ui.Controls.Button { Content = L("Add from A_D…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0) };
          adButton.Click += (s, e) => ImportFromActiveDirectory();
          Grid.SetColumn(adButton, 2);
          bottom.Children.Add(adButton);
@@ -88,41 +79,22 @@ namespace hMailServer.ControlPanel.Views
          var removeButton = new Wpf.Ui.Controls.Button
          {
             Content = L("_Remove selected"),
-            Margin = new Thickness(8, 0, 0, 0),
+            Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0),
             Appearance = Wpf.Ui.Controls.ControlAppearance.Danger
          };
          removeButton.Click += (s, e) => RemoveSelected();
          Grid.SetColumn(removeButton, 3);
          bottom.Children.Add(removeButton);
 
-         Grid.SetRow(bottom, 1);
-         grid.Children.Add(bottom);
+         body.Children.Add(bottom);
 
-         // This dialog had no closing button of any kind, and nothing marked
-         // IsCancel, so the only ways out were the title-bar X and Alt+F4: a
-         // keyboard user who opened it could operate every control in it and could
-         // not leave it. Escape now closes it, and there is a visible Close for
-         // anybody who was looking for one.
-         //
-         // A row of its own rather than beside Add / Add from AD / Remove selected,
-         // because those three act on the list and this one ends the dialog -
-         // putting a "leave" next to a "delete" is how the wrong one gets pressed.
-         var closeButton = new Wpf.Ui.Controls.Button
-         {
-            Content = L("Close"),
-            MinWidth = 88,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 10, 0, 0),
-            IsCancel = true
-         };
+         // Escape closes; there is no default button, because Enter in the add
+         // box means "add" and Enter with a row selected must not close the list.
+         var closeButton = new Wpf.Ui.Controls.Button { Content = L("Close"), MinWidth = 88 };
          closeButton.Click += (s, e) => Close();
          AutomationProperties.SetName(closeButton, L("Close the recipient list"));
 
-         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         Grid.SetRow(closeButton, 2);
-         grid.Children.Add(closeButton);
-
-         Content = grid;
+         UseFrame(F("Recipients of {0}", listAddress), body, null, closeButton, width: 520);
          Loaded += (s, e) => Reload();
       }
 
@@ -186,6 +158,7 @@ namespace hMailServer.ControlPanel.Views
          if (address.Length == 0)
             return;
 
+         notice_.Hide();
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -203,7 +176,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not add the recipient: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not add the recipient: {0}", ex.Message));
          }
          finally
          {
@@ -220,6 +193,7 @@ namespace hMailServer.ControlPanel.Views
          if (picker.ShowDialog() != true || picker.SelectedUsers.Count == 0)
             return;
 
+         notice_.Hide();
          var emails = new List<string>();
          int skipped = 0;
          foreach (AdUser u in picker.SelectedUsers)
@@ -232,7 +206,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (emails.Count == 0)
          {
-            MessageBox.Show(L("None of the selected accounts have an e-mail address."), L("Control Panel"));
+            notice_.Show(StatusLevel.Warning, L("None of the selected accounts have an e-mail address."));
             return;
          }
 
@@ -258,7 +232,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not add all recipients: {0}", ServerSession.DescribeComError(ex)), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not add all recipients: {0}", ServerSession.DescribeComError(ex)));
          }
          finally
          {
@@ -267,7 +241,7 @@ namespace hMailServer.ControlPanel.Views
 
          Reload();
          if (skipped > 0)
-            MessageBox.Show(F("{0} recipient(s) added. {1} account(s) had no e-mail address and were skipped.", added, skipped), L("Control Panel"));
+            notice_.Show(StatusLevel.Information, F("{0} recipient(s) added. {1} account(s) had no e-mail address and were skipped.", added, skipped));
       }
 
       private void RemoveSelected()
@@ -276,10 +250,10 @@ namespace hMailServer.ControlPanel.Views
          if (address == null)
             return;
 
-         if (MessageBox.Show(F("Remove the recipient {0} from this list?", address), L("Control Panel"),
-             MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+         if (!Dialogs.Confirm(F("Remove the recipient {0} from this list?", address), L("Control Panel"), L("_Remove"), destructive: true))
             return;
 
+         notice_.Hide();
          dynamic domains = ServerSession.Current.Application.Domains;
          try
          {
@@ -305,7 +279,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not remove the recipient: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not remove the recipient: {0}", ex.Message));
          }
          finally
          {

@@ -18,27 +18,24 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>
    /// Modal Active Directory account browser. Lists the forest's domains, searches their
    /// users and returns the selected account(s). Used to fill the AD fields on an account
-   /// and to bulk-import members into groups / distribution lists.
+   /// and to bulk-import members into groups / distribution lists. On the standard
+   /// frame: the query row above the list, the status line under it, Select and
+   /// Cancel in the footer.
    /// </summary>
    public class ActiveDirectoryPickerDialog : FluentDialogWindow
    {
       private readonly bool multiSelect_;
-      private readonly ComboBox domainBox_ = new() { FontSize = Typography.Body, MinWidth = 240, Padding = new Thickness(6) };
-      private readonly TextBox searchBox_ = new() { FontSize = Typography.Body, Padding = new Thickness(6) };
-      private readonly ListView list_ = new() { FontSize = Typography.Body };
+      private readonly ComboBox domainBox_ = new() { MinWidth = 240 };
+      private readonly TextBox searchBox_ = new();
+      private readonly ListView list_ = new() { Height = 300 };
 
-      private readonly TextBlock status_ = new()
-      {
-         FontSize = Typography.Label,
-         TextWrapping = TextWrapping.Wrap,
-         Margin = new Thickness(2, 8, 2, 0)
-      };
+      private readonly TextBlock status_ = DialogFields.Note("");
 
       private readonly Wpf.Ui.Controls.Button okButton_ = new()
       {
          Content = L("_Select"),
          Appearance = Wpf.Ui.Controls.ControlAppearance.Primary,
-         Margin = new Thickness(0, 0, 8, 0),
+         MinWidth = 88,
          IsEnabled = false
       };
 
@@ -54,70 +51,41 @@ namespace hMailServer.ControlPanel.Views
 
          Owner = owner;
          Title = L("Browse Active Directory");
-         Width = 680;
-         Height = 560;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // header
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // domain + search
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // list
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // status
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // buttons
-
-         var header = new TextBlock
-         {
-            Text = multiSelect ? L("Select Active Directory accounts") : L("Select an Active Directory account"),
-            FontSize = Typography.DialogTitle,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(2, 0, 0, 12)
-         };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
-
-         root.Children.Add(BuildQueryRow());
+         var body = new StackPanel();
+         body.Children.Add(BuildQueryRow());
 
          BuildList();
-         Grid.SetRow(list_, 2);
-         root.Children.Add(list_);
+         body.Children.Add(list_);
 
-         status_.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Grid.SetRow(status_, 3);
-         root.Children.Add(status_);
+         status_.Margin = new Thickness(0, DesignTokens.Space.Sm, 0, 0);
+         body.Children.Add(status_);
 
-         var buttons = new StackPanel
-         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 14, 0, 0)
-         };
          okButton_.Click += (s, e) => Accept();
 
-         // Escape closes. It did not before, on a dialog that can sit for several
-         // seconds on a directory query.
-         //
-         // Select is deliberately NOT the default button. Enter in the search box
-         // means "search" and always has (see BuildQueryRow), and a default button
-         // would fire on the same keystroke - so Enter would search and then try to
-         // accept a selection the search had just cleared. Enter on the results list
-         // is the natural "select" gesture and is reached by tabbing to the list,
-         // which is why the list's key handling is left to the ListView.
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
+         // Escape closes. Select is deliberately NOT the default button, which
+         // the frame would otherwise make it: Enter in the search box means
+         // "search" and always has (see BuildQueryRow), and a default button
+         // would fire on the same keystroke - so Enter would search and then try
+         // to accept a selection the search had just cleared. Enter on the
+         // results list is the natural "select" gesture and is reached by tabbing
+         // to the list, which is why the list's key handling is left to the
+         // ListView.
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => { DialogResult = false; Close(); };
-         buttons.Children.Add(okButton_);
-         buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 4);
-         root.Children.Add(buttons);
 
-         Content = root;
-         Loaded += (s, e) => LoadDomains();
+         UseFrame(multiSelect ? L("Select Active Directory accounts") : L("Select an Active Directory account"),
+            body, okButton_, cancel, width: 680);
+         okButton_.IsDefault = false;
+
+         // After the frame's own handler, which lands on the domain list: the
+         // search box is where the typing happens.
+         Loaded += (s, e) => { LoadDomains(); searchBox_.Focus(); };
       }
 
       private FrameworkElement BuildQueryRow()
       {
-         var grid = new Grid { Margin = new Thickness(0, 0, 0, 10) };
+         var grid = new Grid { Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md) };
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
          grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -127,20 +95,16 @@ namespace hMailServer.ControlPanel.Views
          {
             Text = L("Domain"),
             VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-            FontSize = Typography.Body
+            Margin = new Thickness(0, 0, DesignTokens.Space.Sm, 0)
          };
-         domainLabel.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
+         domainLabel.SetResourceReference(StyleProperty, "TextCaption");
          Grid.SetColumn(domainLabel, 0);
          grid.Children.Add(domainLabel);
 
-         domainBox_.Margin = new Thickness(0, 0, 12, 0);
+         domainBox_.Margin = new Thickness(0, 0, DesignTokens.Space.Md, 0);
          AutomationProperties.SetName(domainBox_, L("Domain"));
          Grid.SetColumn(domainBox_, 1);
          grid.Children.Add(domainBox_);
-
-         searchBox_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         searchBox_.Background = System.Windows.Media.Brushes.Transparent;
 
          // The search box has no caption of its own at all - it is a bare box
          // between the domain list and the Search button, so a screen reader
@@ -151,9 +115,8 @@ namespace hMailServer.ControlPanel.Views
          AutomationProperties.SetName(searchBox_,
             L("Search for part of an account name. Leave empty to list every user in the domain."));
 
-         // Handled, so the keystroke stops here. Without that, adding a default
-         // button anywhere in this dialog would make one Enter both search and
-         // accept.
+         // Handled, so the keystroke stops here. Without that, a default button
+         // anywhere in this dialog would make one Enter both search and accept.
          searchBox_.KeyDown += (s, e) =>
          {
             if (e.Key != Key.Enter)
@@ -168,23 +131,18 @@ namespace hMailServer.ControlPanel.Views
          var searchButton = new Wpf.Ui.Controls.Button
          {
             Content = L("Sea_rch"),
-            Margin = new Thickness(8, 0, 0, 0)
+            Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0)
          };
          searchButton.Click += (s, e) => Search();
          Grid.SetColumn(searchButton, 3);
          grid.Children.Add(searchButton);
 
-         Grid.SetRow(grid, 1);
          return grid;
       }
 
       private void BuildList()
       {
          list_.SelectionMode = multiSelect_ ? SelectionMode.Extended : SelectionMode.Single;
-         list_.BorderThickness = new Thickness(1);
-         list_.SetResourceReference(Control.BorderBrushProperty, "ControlElevationBorderBrush");
-         list_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         list_.Background = System.Windows.Media.Brushes.Transparent;
 
          var gridView = new GridView();
          gridView.Columns.Add(new GridViewColumn { Header = L("Account"), DisplayMemberBinding = new System.Windows.Data.Binding(nameof(AdUser.SamAccountName)), Width = 160 });
@@ -251,7 +209,7 @@ namespace hMailServer.ControlPanel.Views
          }
 
          string filter = searchBox_.Text;
-         status_.Text = L("Searching ") + domain + "\u2026";
+         status_.Text = L("Searching ") + domain + "…";
          Mouse.OverrideCursor = Cursors.Wait;
          list_.ItemsSource = null;
          okButton_.IsEnabled = false;

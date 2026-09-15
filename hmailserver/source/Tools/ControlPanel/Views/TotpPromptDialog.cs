@@ -4,17 +4,21 @@
 
 using System.Windows;
 using hMailServer.ControlPanel.Services;
-using System.Windows.Controls;
-using System.Windows.Input;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
-   /// <summary>Prompts for a 6-digit two-factor verification code at login.</summary>
+   /// <summary>
+   /// Prompts for a 6-digit two-factor verification code at login. On the
+   /// standard frame: one field, OK takes Enter, Cancel takes Escape, and the
+   /// keyboard is in the code box when the dialog opens.
+   /// </summary>
    public class TotpPromptDialog : FluentDialogWindow
    {
       private readonly Wpf.Ui.Controls.TextBox code_ = new()
       {
+         // 28 is the ramp's Title rung: six digits read from a phone are typed
+         // one at a time and checked by eye, and the setup dialog shows the same.
          FontSize = 28,
          FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
          MaxLength = 6,
@@ -30,36 +34,15 @@ namespace hMailServer.ControlPanel.Views
       {
          Owner = owner;
          Title = L("Two-factor authentication");
-         Width = 400;
-         Height = 230;
-         ResizeMode = ResizeMode.NoResize;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var panel = new StackPanel { Margin = new Thickness(20) };
-         var info = new TextBlock
-         {
-            Text = L("Enter the 6-digit code from your authenticator app:"),
-            FontSize = Typography.Body,
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14)
-         };
-         info.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         panel.Children.Add(info);
-         panel.Children.Add(code_);
-
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 18, 0, 0) };
-         var ok = new Wpf.Ui.Controls.Button { Content = "OK", Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         var ok = new Wpf.Ui.Controls.Button { Content = L("OK"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          ok.Click += (s, e) => { DialogResult = true; Close(); };
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => { DialogResult = false; Close(); };
-         buttons.Children.Add(ok);
-         buttons.Children.Add(cancel);
-         panel.Children.Add(buttons);
 
-         Content = panel;
-         Loaded += (s, e) => code_.Focus();
-         code_.KeyDown += (s, e) => { if (e.Key == Key.Enter) { DialogResult = true; Close(); } };
+         UseFrame(L("Two-factor authentication"),
+            DialogFields.Field(L("Enter the 6-digit code from your authenticator app:"), code_),
+            ok, cancel, width: 400);
       }
    }
 }

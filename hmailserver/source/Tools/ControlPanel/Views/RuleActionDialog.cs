@@ -4,15 +4,15 @@
 
 using System;
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
-   /// <summary>Add/edit a single rule action, with the contextual fields for each action type.</summary>
+   /// <summary>Add/edit a single rule action, with the contextual fields for each action type, on the standard frame.</summary>
    public class RuleActionDialog : FluentDialogWindow
    {
       private readonly int ruleId_;
@@ -20,10 +20,10 @@ namespace hMailServer.ControlPanel.Views
       private readonly Func<dynamic> rulesProvider_;
       private readonly bool serverLevel_;
 
-      private readonly ComboBox type_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 12) };
+      private readonly ComboBox type_ = new();
 
       private readonly TextBox to_ = new();
-      private readonly CheckBox abortSpam_ = new() { Content = L("Abort on messages _marked as spam"), FontSize = Typography.Body, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly CheckBox abortSpam_ = new() { Content = L("Abort on messages _marked as spam") };
       private readonly TextBox fromName_ = new();
       private readonly TextBox fromAddress_ = new();
       private readonly TextBox subject_ = new();
@@ -32,7 +32,7 @@ namespace hMailServer.ControlPanel.Views
       private readonly TextBox scriptFunction_ = new();
       private readonly TextBox headerName_ = new();
       private readonly TextBox value_ = new();
-      private readonly ComboBox route_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly ComboBox route_ = new();
       private readonly TextBox bindAddress_ = new();
 
       private readonly StackPanel forwardPanel_ = new();
@@ -42,7 +42,8 @@ namespace hMailServer.ControlPanel.Views
       private readonly StackPanel headerPanel_ = new();
       private readonly StackPanel routePanel_ = new();
       private readonly StackPanel bindPanel_ = new();
-      private readonly TextBlock noParams_ = new() { Text = L("This action has no additional parameters."), FontSize = Typography.Label, Margin = new Thickness(0, 4, 0, 0) };
+      private readonly TextBlock noParams_ = DialogFields.Note(L("This action has no additional parameters."));
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public RuleActionDialog(Window owner, int ruleId, int actionId, Func<dynamic> rulesProvider = null, bool serverLevel = true)
       {
@@ -52,112 +53,78 @@ namespace hMailServer.ControlPanel.Views
          serverLevel_ = serverLevel;
          Owner = owner;
          Title = actionId == 0 ? L("Add action") : L("Edit action");
-         Width = 520;
-         Height = 540;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
-
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-         // Upper-case deliberately, sentence-case sweep notwithstanding: "THEN"
-         // is the rule grammar's keyword, not prose - the pair to RuleCriteria-
-         // Dialog's "IF", both echoing RulesView's editor panes.
-         var header = new TextBlock { Text = L("THEN"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
 
          var body = new StackPanel();
+         body.Children.Add(notice_);
+
          body.Children.Add(Label(L("_Action"), type_));
-         type_.Items.Add(Combo(L("Delete e-mail"), 1));
-         type_.Items.Add(Combo(L("Forward e-mail"), 2));
-         type_.Items.Add(Combo(L("Reply"), 3));
-         type_.Items.Add(Combo(L("Move to IMAP folder"), 4));
-         type_.Items.Add(Combo(L("Run script function"), 5));
-         type_.Items.Add(Combo(L("Stop rule processing"), 6));
-         type_.Items.Add(Combo(L("Set header value"), 7));
+         type_.Items.Add(DialogFields.Combo(L("Delete e-mail"), 1));
+         type_.Items.Add(DialogFields.Combo(L("Forward e-mail"), 2));
+         type_.Items.Add(DialogFields.Combo(L("Reply"), 3));
+         type_.Items.Add(DialogFields.Combo(L("Move to IMAP folder"), 4));
+         type_.Items.Add(DialogFields.Combo(L("Run script function"), 5));
+         type_.Items.Add(DialogFields.Combo(L("Stop rule processing"), 6));
+         type_.Items.Add(DialogFields.Combo(L("Set header value"), 7));
          if (serverLevel)
-            type_.Items.Add(Combo(L("Send using route"), 8));
-         type_.Items.Add(Combo(L("Create copy"), 9));
+            type_.Items.Add(DialogFields.Combo(L("Send using route"), 8));
+         type_.Items.Add(DialogFields.Combo(L("Create copy"), 9));
          if (serverLevel)
-            type_.Items.Add(Combo(L("Bind to address"), 10));
+            type_.Items.Add(DialogFields.Combo(L("Bind to address"), 10));
          type_.SelectionChanged += (s, e) => UpdateVisibility();
-         body.Children.Add(type_);
 
          // Forward
          forwardPanel_.Children.Add(Label(L("_To"), to_));
-         forwardPanel_.Children.Add(Input(to_));
-         forwardPanel_.Children.Add(abortSpam_);
+         forwardPanel_.Children.Add(DialogFields.Field(null, abortSpam_));
          body.Children.Add(forwardPanel_);
 
          // Reply
          replyPanel_.Children.Add(Label(L("From (_name)"), fromName_));
-         replyPanel_.Children.Add(Input(fromName_));
          replyPanel_.Children.Add(Label(L("From (a_ddress)"), fromAddress_));
-         replyPanel_.Children.Add(Input(fromAddress_));
          replyPanel_.Children.Add(Label(L("Su_bject"), subject_));
-         replyPanel_.Children.Add(Input(subject_));
          replyPanel_.Children.Add(Label(L("Bod_y"), body_));
-         Input(body_);
-         replyPanel_.Children.Add(body_);
          body.Children.Add(replyPanel_);
 
          // Move to folder
          folderPanel_.Children.Add(Label(L("_IMAP folder (e.g. INBOX.Archive)"), imapFolder_));
-         folderPanel_.Children.Add(Input(imapFolder_));
          body.Children.Add(folderPanel_);
 
          // Script
          scriptPanel_.Children.Add(Label(L("Script _function"), scriptFunction_));
-         scriptPanel_.Children.Add(Input(scriptFunction_));
          body.Children.Add(scriptPanel_);
 
          // Set header
          headerPanel_.Children.Add(Label(L("_Header name"), headerName_));
-         headerPanel_.Children.Add(Input(headerName_));
          headerPanel_.Children.Add(Label(L("_Value"), value_));
-         headerPanel_.Children.Add(Input(value_));
          body.Children.Add(headerPanel_);
 
          // Route
          routePanel_.Children.Add(Label(L("_Route"), route_));
-         routePanel_.Children.Add(route_);
          body.Children.Add(routePanel_);
 
          // Bind to address
          bindPanel_.Children.Add(Label(L("I_P address"), bindAddress_));
-         bindPanel_.Children.Add(Input(bindAddress_));
          body.Children.Add(bindPanel_);
 
          body.Children.Add(noParams_);
 
-         var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-         Grid.SetRow(scroll, 1);
-         root.Children.Add(scroll);
-
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         // Enter saves, Escape cancels. Neither worked before. Safe alongside the
-         // multi-line reply body: a TextBox with AcceptsReturn handles Enter itself
-         // and marks the key handled, so it never reaches the default button.
-         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
+         // Enter saves, Escape cancels. Safe alongside the multi-line reply body:
+         // a TextBox with AcceptsReturn handles Enter itself and marks the key
+         // handled, so it never reaches the default button.
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => Close();
-         buttons.Children.Add(save);
-         buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
 
-         Content = root;
+         // Upper-case deliberately, sentence-case sweep notwithstanding: "THEN"
+         // is the rule grammar's keyword, not prose - the pair to RuleCriteria-
+         // Dialog's "IF", both echoing RulesView's editor panes.
+         UseFrame(L("THEN"), body, save, cancel, width: 520);
          Loaded += (s, e) => Load();
       }
 
       private void UpdateVisibility()
       {
-         int type = ComboValue(type_);
+         int type = DialogFields.ComboValue(type_);
          forwardPanel_.Visibility = type == 2 ? Visibility.Visible : Visibility.Collapsed;
          replyPanel_.Visibility = type == 3 ? Visibility.Visible : Visibility.Collapsed;
          folderPanel_.Visibility = type == 4 ? Visibility.Visible : Visibility.Collapsed;
@@ -196,7 +163,7 @@ namespace hMailServer.ControlPanel.Views
 
          if (actionId_ == 0)
          {
-            SelectCombo(type_, 1);
+            DialogFields.SelectCombo(type_, 1);
             UpdateVisibility();
             return;
          }
@@ -211,7 +178,7 @@ namespace hMailServer.ControlPanel.Views
             {
                dynamic a = actions.ItemByDBID[actionId_];
                int type = (int)a.Type;
-               SelectCombo(type_, type);
+               DialogFields.SelectCombo(type_, type);
                to_.Text = (string)a.To ?? "";
                abortSpam_.IsChecked = (bool)a.AbortSpamFlagged;
                fromName_.Text = (string)a.FromName ?? "";
@@ -223,7 +190,7 @@ namespace hMailServer.ControlPanel.Views
                headerName_.Text = (string)a.HeaderName ?? "";
                value_.Text = (string)a.Value ?? "";
                bindAddress_.Text = (string)a.Value ?? "";
-               SelectCombo(route_, (int)a.RouteID);
+               DialogFields.SelectCombo(route_, (int)a.RouteID);
                ServerSession.Release(a);
             }
             finally
@@ -248,7 +215,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         int type = ComboValue(type_);
+         notice_.Hide();
+         int type = DialogFields.ComboValue(type_);
 
          dynamic rules = rulesProvider_();
          try
@@ -285,7 +253,7 @@ namespace hMailServer.ControlPanel.Views
                      a.Value = value_.Text;
                      break;
                   case 8:
-                     a.RouteID = ComboValue(route_);
+                     a.RouteID = DialogFields.ComboValue(route_);
                      break;
                   case 10:
                      a.Value = bindAddress_.Text.Trim();
@@ -304,7 +272,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the action: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the action: {0}", ex.Message));
          }
          finally
          {
@@ -312,44 +280,11 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      // ---- UI helpers ----
-
       /// <summary>
-      /// A caption, and - when the editor it captions is passed in - that editor's
-      /// accessible name. A TextBlock above a control tells UI Automation nothing,
-      /// and this dialog has eleven of them: to a screen reader every parameter of
-      /// every rule action was an anonymous "edit".
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation - this dialog has eleven of them, and to a screen reader
+      /// every parameter of every rule action was an anonymous "edit" once.
       /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
-      {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
-         return t;
-      }
-
-      private static TextBox Input(TextBox box)
-      {
-         box.FontSize = Typography.Body;
-         box.Padding = new Thickness(6);
-         box.Margin = new Thickness(0, 0, 0, 8);
-         box.Background = System.Windows.Media.Brushes.Transparent;
-         box.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         return box;
-      }
-
-      private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
-
-      private static void SelectCombo(ComboBox combo, int value)
-      {
-         foreach (ComboBoxItem item in combo.Items)
-            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
-      }
-
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }

@@ -10,9 +10,8 @@ using System.Windows.Controls;
 using Wpf.Ui.Controls;
 using Button = Wpf.Ui.Controls.Button;
 using TextBox = Wpf.Ui.Controls.TextBox;
-using TextBlock = System.Windows.Controls.TextBlock;
-using MessageBox = System.Windows.MessageBox;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using System.Linq;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -29,6 +28,7 @@ namespace hMailServer.ControlPanel.Views
    /// perhaps a dozen places. Until this pass there was one: each field's wording
    /// was a TextBlock placed above the control with nothing connecting the two, so
    /// every box in every one of those dialogs was announced as an unnamed "edit".
+   /// Every field is a <see cref="FieldRow"/> now, on the standard frame.
    /// </summary>
    internal sealed class FieldDialog : FluentDialogWindow
    {
@@ -40,14 +40,9 @@ namespace hMailServer.ControlPanel.Views
       {
          Owner = owner;
          Title = existing == null ? F("Add {0}", spec.ItemNoun) : F("Edit {0}", spec.ItemNoun);
-         Width = 460;
-         SizeToContent = SizeToContent.Height;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         ResizeMode = ResizeMode.NoResize;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
          AutomationProperties.SetName(this, Title);
 
-         var panel = new StackPanel { Margin = new Thickness(22) };
+         var panel = new StackPanel();
 
          List<CollectionEditorView.FieldSpec> fields =
             spec.Fields.Where(f => f.Prop != "ID").ToList();
@@ -66,16 +61,10 @@ namespace hMailServer.ControlPanel.Views
                ? v
                : f.Default;
 
-            BuildField(panel, f, current, names[i]);
+            panel.Children.Add(BuildField(f, current, names[i]));
          }
 
-         var buttons = new StackPanel
-         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 8, 0, 0)
-         };
-         var ok = new Button { Content = L("_Save"), Appearance = ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 88, IsDefault = true };
+         var ok = new Button { Content = L("_Save"), Appearance = ControlAppearance.Primary, MinWidth = 88 };
          ok.Click += (_, _) =>
          {
             if (committers_.Any(commit => !commit()))
@@ -83,16 +72,13 @@ namespace hMailServer.ControlPanel.Views
             DialogResult = true;
             Close();
          };
-         var cancel = new Button { Content = L("Cancel"), MinWidth = 88, IsCancel = true };
+         var cancel = new Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (_, _) => Close();
-         buttons.Children.Add(ok);
-         buttons.Children.Add(cancel);
-         panel.Children.Add(buttons);
 
-         Content = panel;
+         UseFrame(Title, panel, ok, cancel, width: 460);
       }
 
-      private void BuildField(Panel host, CollectionEditorView.FieldSpec f, object current, string accessibleName)
+      private FieldRow BuildField(CollectionEditorView.FieldSpec f, object current, string accessibleName)
       {
          string prop = f.Prop;
 
@@ -100,13 +86,7 @@ namespace hMailServer.ControlPanel.Views
          {
             case CollectionEditorView.FieldKind.Bool:
                {
-                  var box = new CheckBox
-                  {
-                     Content = f.Label,
-                     IsChecked = current is bool b && b,
-                     FontSize = Typography.Body,
-                     Margin = new Thickness(0, 6, 0, 10)
-                  };
+                  var box = new CheckBox { Content = f.Label, IsChecked = current is bool b && b };
                   // A checkbox is named by its Content, so it only needs an override
                   // when the name was qualified to tell it from an identically worded
                   // field elsewhere in the dialog.
@@ -114,14 +94,12 @@ namespace hMailServer.ControlPanel.Views
                      Describe(box, prop, accessibleName);
                   else
                      AutomationProperties.SetAutomationId(box, prop);
-                  host.Children.Add(box);
                   committers_.Add(() => { Result[prop] = box.IsChecked is true; return true; });
-                  break;
+                  return DialogFields.Field(null, box);
                }
             case CollectionEditorView.FieldKind.Combo:
                {
-                  host.Children.Add(Label(f.Label));
-                  var combo = new ComboBox { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+                  var combo = new ComboBox();
                   int sel = current is int ci ? ci : Convert.ToInt32(current ?? 0);
                   foreach ((int Value, string Label) opt in f.Options)
                   {
@@ -133,49 +111,36 @@ namespace hMailServer.ControlPanel.Views
                   if (combo.SelectedItem == null && combo.Items.Count > 0)
                      combo.SelectedIndex = 0;
                   Describe(combo, prop, accessibleName);
-                  host.Children.Add(combo);
                   committers_.Add(() =>
                   {
                      Result[prop] = combo.SelectedItem is ComboBoxItem cbi ? (int)cbi.Tag : 0;
                      return true;
                   });
-                  break;
+                  return DialogFields.Field(f.Label, combo);
                }
             case CollectionEditorView.FieldKind.Multiline:
                {
-                  host.Children.Add(Label(f.Label));
                   var box = new TextBox
                   {
                      Text = Convert.ToString(current) ?? "",
-                     FontSize = Typography.Body,
                      AcceptsReturn = true,
                      TextWrapping = TextWrapping.Wrap,
                      MinLines = 4,
-                     MaxLines = 10,
-                     Margin = new Thickness(0, 0, 0, 10)
+                     MaxLines = 10
                   };
                   Describe(box, prop, accessibleName);
-                  host.Children.Add(box);
                   committers_.Add(() => { Result[prop] = box.Text; return true; });
-                  break;
+                  return DialogFields.Field(f.Label, box);
                }
             case CollectionEditorView.FieldKind.Password:
                {
-                  host.Children.Add(Label(f.Label));
-                  var box = new hMailServer.ControlPanel.Views.PasswordField
-                  {
-                     Password = Convert.ToString(current) ?? "",
-                     FontSize = Typography.Body,
-                     Margin = new Thickness(0, 0, 0, 10)
-                  };
+                  var box = new hMailServer.ControlPanel.Views.PasswordField { Password = Convert.ToString(current) ?? "" };
                   Describe(box, prop, accessibleName);
-                  host.Children.Add(box);
                   committers_.Add(() => { Result[prop] = box.Password; return true; });
-                  break;
+                  return DialogFields.Field(f.Label, box);
                }
             case CollectionEditorView.FieldKind.Number:
                {
-                  host.Children.Add(Label(f.Label));
                   double cur = 0;
                   try { cur = Convert.ToDouble(current ?? 0); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { cur = 0; }
                   var box = new Wpf.Ui.Controls.NumberBox
@@ -183,23 +148,18 @@ namespace hMailServer.ControlPanel.Views
                      Value = cur,
                      MaxDecimalPlaces = 0,
                      SmallChange = 1,
-                     LargeChange = 10,
-                     FontSize = Typography.Body,
-                     Margin = new Thickness(0, 0, 0, 10)
+                     LargeChange = 10
                   };
                   Describe(box, prop, accessibleName);
-                  host.Children.Add(box);
                   committers_.Add(() => { Result[prop] = (int)(box.Value ?? 0); return true; });
-                  break;
+                  return DialogFields.Field(f.Label, box);
                }
             default:
                {
-                  host.Children.Add(Label(f.Label));
-                  var box = new TextBox { Text = Convert.ToString(current) ?? "", FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 10) };
+                  var box = new TextBox { Text = Convert.ToString(current) ?? "" };
                   Describe(box, prop, accessibleName);
-                  host.Children.Add(box);
                   committers_.Add(() => { Result[prop] = box.Text; return true; });
-                  break;
+                  return DialogFields.Field(f.Label, box);
                }
          }
       }
@@ -220,12 +180,5 @@ namespace hMailServer.ControlPanel.Views
          if (!string.IsNullOrEmpty(accessibleName))
             AutomationProperties.SetName(element, accessibleName);
       }
-
-      private static TextBlock Label(string text) => new()
-      {
-         Text = text,
-         FontSize = Typography.Label,
-         Margin = new Thickness(0, 6, 0, 4)
-      };
    }
 }

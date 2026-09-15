@@ -7,6 +7,7 @@ using hMailServer.ControlPanel.Services;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using hMailServer.ControlPanel.Views.Scaffold;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
@@ -14,43 +15,34 @@ namespace hMailServer.ControlPanel.Views
    /// <summary>
    /// Read-only viewer for a queued message's raw source (headers + body), read
    /// straight from the .eml file on disk like hMailServer Administrator does.
+   /// On the standard frame, keeping its reading layout: the path above, the
+   /// source in a monospaced box with a fixed reading height, Copy at the
+   /// footer's left, Close taking Enter and Escape both.
    /// </summary>
    public class MessageViewerDialog : FluentDialogWindow
    {
+      // The reading height. The frame sizes the window to its content and a
+      // body inside it cannot stretch to a resized window, so the box takes a
+      // height of its own rather than the old window's 620 less its chrome.
+      private const double ReadingHeight = 400;
+
       public MessageViewerDialog(Window owner, string filePath)
       {
          Owner = owner;
          Title = L("Message source");
-         Width = 760;
-         Height = 620;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         var body = new StackPanel();
 
-         var header = new TextBlock { Text = L("Message source"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 10) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
-
-         var pathBox = new TextBox
+         var pathBox = new Wpf.Ui.Controls.TextBox
          {
             Text = filePath ?? "",
             IsReadOnly = true,
-            FontSize = Typography.Caption,
-            Padding = new Thickness(6),
-            Margin = new Thickness(0, 0, 0, 10),
-            Background = System.Windows.Media.Brushes.Transparent
+            Margin = new Thickness(0, 0, 0, DesignTokens.Space.Md)
          };
-         pathBox.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Grid.SetRow(pathBox, 1);
-         root.Children.Add(pathBox);
+         pathBox.SetResourceReference(FontSizeProperty, "AppFontSizeCaption");
+         body.Children.Add(pathBox);
 
-         var content = new TextBox
+         var content = new Wpf.Ui.Controls.TextBox
          {
             IsReadOnly = true,
             AcceptsReturn = true,
@@ -58,36 +50,26 @@ namespace hMailServer.ControlPanel.Views
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             FontFamily = new System.Windows.Media.FontFamily(Typography.MonoFontFamily),
-            FontSize = Typography.Label,
-            Padding = new Thickness(8),
-            Background = System.Windows.Media.Brushes.Transparent,
+            Height = ReadingHeight,
             Text = ReadMessage(filePath)
          };
-         content.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         var contentBorder = new Border
-         {
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(6),
-            Child = content
-         };
-         contentBorder.SetResourceReference(Border.BorderBrushProperty, "ControlElevationBorderBrush");
-         Grid.SetRow(contentBorder, 2);
-         root.Children.Add(contentBorder);
+         content.SetResourceReference(FontSizeProperty, "AppFontSizeCaption");
+         body.Children.Add(content);
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy"), Margin = new Thickness(0, 0, 8, 0) };
+         var copy = new Wpf.Ui.Controls.Button { Content = L("_Copy") };
          copy.Click += (s, e) =>
          {
             try { Clipboard.SetText(content.Text); } catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          };
-         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, IsCancel = true };
-         close.Click += (s, e) => Close();
-         buttons.Children.Add(copy);
-         buttons.Children.Add(close);
-         Grid.SetRow(buttons, 3);
-         root.Children.Add(buttons);
 
-         Content = root;
+         // Close is the one thing to do here, so it is the primary and takes
+         // Enter; it takes Escape as well, as it always did.
+         var close = new Wpf.Ui.Controls.Button { Content = L("Close"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
+         close.Click += (s, e) => Close();
+
+         DialogFrame frame = UseFrame(L("Message source"), body, close, null, width: 760);
+         close.IsCancel = true;
+         frame.Footer = copy;
       }
 
       private static string ReadMessage(string filePath)

@@ -4,26 +4,27 @@
 
 using System;
 using System.Windows;
-using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
 namespace hMailServer.ControlPanel.Views
 {
-   /// <summary>Add/edit a single rule criterion (predefined field or custom header, match type, value).</summary>
+   /// <summary>Add/edit a single rule criterion (predefined field or custom header, match type, value), on the standard frame.</summary>
    public class RuleCriteriaDialog : FluentDialogWindow
    {
       private readonly int ruleId_;
       private readonly int criteriaId_; // 0 = new
       private readonly Func<dynamic> rulesProvider_;
 
-      private readonly ComboBox field_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly ComboBox field_ = new();
       private readonly TextBox header_ = new();
-      private readonly StackPanel headerPanel_ = new();
-      private readonly ComboBox match_ = new() { FontSize = Typography.Body, Margin = new Thickness(0, 0, 0, 8) };
+      private readonly FieldRow headerRow_;
+      private readonly ComboBox match_ = new();
       private readonly TextBox value_ = new();
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public RuleCriteriaDialog(Window owner, int ruleId, int criteriaId, Func<dynamic> rulesProvider = null)
       {
@@ -32,86 +33,61 @@ namespace hMailServer.ControlPanel.Views
          rulesProvider_ = rulesProvider ?? (() => ServerSession.Current.Application.Rules);
          Owner = owner;
          Title = criteriaId == 0 ? L("Add criterion") : L("Edit criterion");
-         Width = 480;
-         Height = 380;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var root = new Grid { Margin = new Thickness(18) };
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+         var body = new StackPanel();
+         body.Children.Add(notice_);
+
+         body.Children.Add(Label(L("_Field"), field_));
+         field_.Items.Add(DialogFields.Combo(L("From"), 1));
+         field_.Items.Add(DialogFields.Combo(L("To"), 2));
+         field_.Items.Add(DialogFields.Combo(L("CC"), 3));
+         field_.Items.Add(DialogFields.Combo(L("Subject"), 4));
+         field_.Items.Add(DialogFields.Combo(L("Body"), 5));
+         field_.Items.Add(DialogFields.Combo(L("Message size"), 6));
+         field_.Items.Add(DialogFields.Combo(L("Recipient list"), 7));
+         field_.Items.Add(DialogFields.Combo(L("Delivery attempts"), 8));
+         field_.Items.Add(DialogFields.Combo(L("Custom header…"), 0));
+         field_.SelectionChanged += (s, e) => UpdateVisibility();
+
+         headerRow_ = Label(L("_Header name (e.g. X-Spam-Status)"), header_);
+         body.Children.Add(headerRow_);
+
+         body.Children.Add(Label(L("_Match type"), match_));
+         match_.Items.Add(DialogFields.Combo(L("equals"), 1));
+         match_.Items.Add(DialogFields.Combo(L("contains"), 2));
+         match_.Items.Add(DialogFields.Combo(L("is less than"), 3));
+         match_.Items.Add(DialogFields.Combo(L("is greater than"), 4));
+         match_.Items.Add(DialogFields.Combo(L("matches regex"), 5));
+         match_.Items.Add(DialogFields.Combo(L("does not contain"), 6));
+         match_.Items.Add(DialogFields.Combo(L("does not equal"), 7));
+         match_.Items.Add(DialogFields.Combo(L("matches wildcard"), 8));
+
+         body.Children.Add(Label(L("_Value"), value_));
+
+         // Enter saves, Escape cancels.
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
+         save.Click += (s, e) => Save();
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
+         cancel.Click += (s, e) => Close();
 
          // Upper-case deliberately, sentence-case sweep notwithstanding: "IF" is
          // the rule grammar's keyword, not prose. RulesView's editor panes carry
          // the same IF/THEN pair, and this dialog edits one clause of it.
-         var header = new TextBlock { Text = L("IF"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 0, 0, 12) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         Grid.SetRow(header, 0);
-         root.Children.Add(header);
-
-         var body = new StackPanel();
-         body.Children.Add(Label(L("_Field"), field_));
-         field_.Items.Add(Combo(L("From"), 1));
-         field_.Items.Add(Combo(L("To"), 2));
-         field_.Items.Add(Combo(L("CC"), 3));
-         field_.Items.Add(Combo(L("Subject"), 4));
-         field_.Items.Add(Combo(L("Body"), 5));
-         field_.Items.Add(Combo(L("Message size"), 6));
-         field_.Items.Add(Combo(L("Recipient list"), 7));
-         field_.Items.Add(Combo(L("Delivery attempts"), 8));
-         field_.Items.Add(Combo(L("Custom header\u2026"), 0));
-         field_.SelectionChanged += (s, e) => UpdateVisibility();
-         body.Children.Add(field_);
-
-         headerPanel_.Children.Add(Label(L("_Header name (e.g. X-Spam-Status)"), header_));
-         headerPanel_.Children.Add(Input(header_));
-         body.Children.Add(headerPanel_);
-
-         body.Children.Add(Label(L("_Match type"), match_));
-         match_.Items.Add(Combo(L("equals"), 1));
-         match_.Items.Add(Combo(L("contains"), 2));
-         match_.Items.Add(Combo(L("is less than"), 3));
-         match_.Items.Add(Combo(L("is greater than"), 4));
-         match_.Items.Add(Combo(L("matches regex"), 5));
-         match_.Items.Add(Combo(L("does not contain"), 6));
-         match_.Items.Add(Combo(L("does not equal"), 7));
-         match_.Items.Add(Combo(L("matches wildcard"), 8));
-         body.Children.Add(match_);
-
-         body.Children.Add(Label(L("_Value"), value_));
-         body.Children.Add(Input(value_));
-
-         var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-         Grid.SetRow(scroll, 1);
-         root.Children.Add(scroll);
-
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
-         // Enter saves, Escape cancels. Neither worked before.
-         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), IsDefault = true };
-         save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), IsCancel = true };
-         cancel.Click += (s, e) => Close();
-         buttons.Children.Add(save);
-         buttons.Children.Add(cancel);
-         Grid.SetRow(buttons, 2);
-         root.Children.Add(buttons);
-
-         Content = root;
+         UseFrame(L("IF"), body, save, cancel, width: 480);
          Loaded += (s, e) => Load();
       }
 
       private void UpdateVisibility()
       {
-         headerPanel_.Visibility = ComboValue(field_) == 0 ? Visibility.Visible : Visibility.Collapsed;
+         headerRow_.Visibility = DialogFields.ComboValue(field_) == 0 ? Visibility.Visible : Visibility.Collapsed;
       }
 
       private void Load()
       {
          if (criteriaId_ == 0)
          {
-            SelectCombo(field_, 1);
-            SelectCombo(match_, 2);
+            DialogFields.SelectCombo(field_, 1);
+            DialogFields.SelectCombo(match_, 2);
             UpdateVisibility();
             return;
          }
@@ -126,13 +102,13 @@ namespace hMailServer.ControlPanel.Views
             {
                dynamic c = criterias.ItemByDBID[criteriaId_];
                if ((bool)c.UsePredefined)
-                  SelectCombo(field_, (int)c.PredefinedField);
+                  DialogFields.SelectCombo(field_, (int)c.PredefinedField);
                else
                {
-                  SelectCombo(field_, 0);
+                  DialogFields.SelectCombo(field_, 0);
                   header_.Text = (string)c.HeaderField ?? "";
                }
-               SelectCombo(match_, (int)c.MatchType);
+               DialogFields.SelectCombo(match_, (int)c.MatchType);
                value_.Text = (string)c.MatchValue ?? "";
                ServerSession.Release(c);
             }
@@ -158,7 +134,8 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
-         int field = ComboValue(field_);
+         notice_.Hide();
+         int field = DialogFields.ComboValue(field_);
 
          dynamic rules = rulesProvider_();
          try
@@ -180,7 +157,7 @@ namespace hMailServer.ControlPanel.Views
                   c.UsePredefined = true;
                   c.PredefinedField = field;
                }
-               c.MatchType = ComboValue(match_);
+               c.MatchType = DialogFields.ComboValue(match_);
                c.MatchValue = value_.Text;
                c.Save();
                ServerSession.Release(c);
@@ -195,7 +172,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the criterion: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the criterion: {0}", ex.Message));
          }
          finally
          {
@@ -203,43 +180,11 @@ namespace hMailServer.ControlPanel.Views
          }
       }
 
-      // ---- UI helpers ----
-
       /// <summary>
-      /// A caption, and - when the editor it captions is passed in - that editor's
-      /// accessible name. A TextBlock above a control tells UI Automation nothing,
-      /// so this dialog announced itself as "combo box, edit, combo box, edit".
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation - without it this dialog announced itself as "combo box,
+      /// edit, combo box, edit".
       /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
-      {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
-         return t;
-      }
-
-      private static TextBox Input(TextBox box)
-      {
-         box.FontSize = Typography.Body;
-         box.Padding = new Thickness(6);
-         box.Margin = new Thickness(0, 0, 0, 8);
-         box.Background = System.Windows.Media.Brushes.Transparent;
-         box.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         return box;
-      }
-
-      private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
-
-      private static void SelectCombo(ComboBox combo, int value)
-      {
-         foreach (ComboBoxItem item in combo.Items)
-            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
-      }
-
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }

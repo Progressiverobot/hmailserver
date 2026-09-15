@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using hMailServer.ControlPanel.Services;
+using hMailServer.ControlPanel.Views.Scaffold;
 using MessageBox = hMailServer.ControlPanel.Views.Dialogs;
 using static hMailServer.ControlPanel.Services.Loc;
 
@@ -16,7 +17,10 @@ namespace hMailServer.ControlPanel.Views
    /// Editor for one TCP/IP port binding, including the SSL certificate to use
    /// (which the inline add-form on the page cannot set) and the client
    /// certificate (mutual TLS) policy, which nothing else in the interface
-   /// could set at all.
+   /// could set at all. On the standard frame: a port number that will not do
+   /// is said on the port field, a client-certificate combination the server
+   /// refuses is said in a notice while it is being chosen, and a save the
+   /// server refuses is said in a notice above the fields.
    /// </summary>
    public class TcpIpPortDialog : FluentDialogWindow
    {
@@ -25,72 +29,56 @@ namespace hMailServer.ControlPanel.Views
       private readonly ComboBox protocol_ = new();
       private readonly TextBox address_ = new();
       private readonly TextBox port_ = new();
+      private readonly FieldRow portRow_;
       private readonly ComboBox security_ = new();
       private readonly ComboBox certificate_ = new();
       private readonly ComboBox clientCertPolicy_ = new();
       private readonly TextBox clientCertCaFile_ = new();
-      private readonly TextBlock clientCertWarning_ = new();
+      private readonly InlineNotice clientCertNotice_ = DialogFields.Notice();
+      private readonly InlineNotice notice_ = DialogFields.Notice();
 
       public TcpIpPortDialog(Window owner, int portId)
       {
          portId_ = portId;
          Owner = owner;
          Title = L("TCP/IP port");
-         Width = 520;
-         SizeToContent = SizeToContent.Height;
-         ResizeMode = ResizeMode.NoResize;
-         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-         SetResourceReference(BackgroundProperty, "ApplicationBackgroundBrush");
 
-         var panel = new StackPanel { Margin = new Thickness(22) };
-         var header = new TextBlock { Text = L("Port binding"), FontSize = Typography.DialogTitle, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 14) };
-         header.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         panel.Children.Add(header);
+         var body = new StackPanel();
+         body.Children.Add(notice_);
 
-         protocol_.Items.Add(Combo("SMTP", ServerSession.SessionSmtp));
-         protocol_.Items.Add(Combo("POP3", ServerSession.SessionPop3));
-         protocol_.Items.Add(Combo("IMAP", ServerSession.SessionImap));
-         StyleCombo(protocol_);
-         panel.Children.Add(Label(L("_Protocol"), protocol_));
-         panel.Children.Add(protocol_);
+         protocol_.Items.Add(DialogFields.Combo("SMTP", ServerSession.SessionSmtp));
+         protocol_.Items.Add(DialogFields.Combo("POP3", ServerSession.SessionPop3));
+         protocol_.Items.Add(DialogFields.Combo("IMAP", ServerSession.SessionImap));
+         body.Children.Add(Label(L("_Protocol"), protocol_));
 
-         panel.Children.Add(Label(L("_Bind address"), address_));
-         panel.Children.Add(Input(address_));
-         panel.Children.Add(Label(L("P_ort"), port_));
-         panel.Children.Add(Input(port_));
+         body.Children.Add(Label(L("_Bind address"), address_));
+         portRow_ = Label(L("P_ort"), port_);
+         body.Children.Add(portRow_);
 
-         security_.Items.Add(Combo(L("None"), 0));
-         security_.Items.Add(Combo(L("SSL/TLS"), 1));
-         security_.Items.Add(Combo(L("STARTTLS (optional)"), 2));
-         security_.Items.Add(Combo(L("STARTTLS (required)"), 3));
-         StyleCombo(security_);
-         panel.Children.Add(Label(L("_Connection security"), security_));
-         panel.Children.Add(security_);
+         security_.Items.Add(DialogFields.Combo(L("None"), 0));
+         security_.Items.Add(DialogFields.Combo(L("SSL/TLS"), 1));
+         security_.Items.Add(DialogFields.Combo(L("STARTTLS (optional)"), 2));
+         security_.Items.Add(DialogFields.Combo(L("STARTTLS (required)"), 3));
+         body.Children.Add(Label(L("_Connection security"), security_));
 
-         StyleCombo(certificate_);
-         panel.Children.Add(Label(L("SSL c_ertificate (required for SSL/TLS and STARTTLS)"), certificate_));
-         panel.Children.Add(certificate_);
+         body.Children.Add(Label(L("SSL c_ertificate (required for SSL/TLS and STARTTLS)"), certificate_));
 
          // Client certificates (mutual TLS), per port. The three options are the
          // three values of ClientCertificatePolicy in SocketConstants.h, spelled
-         // out as what each one does to a connection.
-         clientCertPolicy_.Items.Add(Combo(L("Off"), 0));
-         clientCertPolicy_.Items.Add(Combo(L("Request (verify and log, never refuse)"), 1));
-         clientCertPolicy_.Items.Add(Combo(L("Require (refuse a connection without a trusted certificate)"), 2));
-         StyleCombo(clientCertPolicy_);
-         panel.Children.Add(Label(L("Client certificate polic_y (mutual TLS)"), clientCertPolicy_));
-         AutomationProperties.SetHelpText(clientCertPolicy_,
-            L("Request asks every client for a certificate, verifies and logs one if it is offered, and never refuses the connection - use it to inventory which clients would survive Require before enforcing it. Require refuses the connection unless the client presents a certificate that chains to the CA bundle below."));
-         panel.Children.Add(clientCertPolicy_);
+         // out as what each one does to a connection. The sentence that was the
+         // combo's help text is the row's hint now, read and heard alike.
+         clientCertPolicy_.Items.Add(DialogFields.Combo(L("Off"), 0));
+         clientCertPolicy_.Items.Add(DialogFields.Combo(L("Request (verify and log, never refuse)"), 1));
+         clientCertPolicy_.Items.Add(DialogFields.Combo(L("Require (refuse a connection without a trusted certificate)"), 2));
+         body.Children.Add(Label(L("Client certificate polic_y (mutual TLS)"), clientCertPolicy_)
+            .WithHint(L("Request asks every client for a certificate, verifies and logs one if it is offered, and never refuses the connection - use it to inventory which clients would survive Require before enforcing it. Require refuses the connection unless the client presents a certificate that chains to the CA bundle below.")));
 
-         panel.Children.Add(Label(L("C_A certificate bundle (PEM) that client certificates must chain to"), clientCertCaFile_));
          var caRow = new Grid();
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
          caRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-         Input(clientCertCaFile_);
          Grid.SetColumn(clientCertCaFile_, 0);
          caRow.Children.Add(clientCertCaFile_);
-         var caBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(8, 0, 0, 4), VerticalAlignment = VerticalAlignment.Top };
+         var caBrowse = new Wpf.Ui.Controls.Button { Content = L("B_rowse…"), Margin = new Thickness(DesignTokens.Space.Sm, 0, 0, 0), VerticalAlignment = VerticalAlignment.Top };
          AutomationProperties.SetAutomationId(caBrowse, "ClientCertCaBrowse");
          AutomationProperties.SetName(caBrowse, L("Browse for a CA certificate bundle file"));
          caBrowse.Click += (s, e) =>
@@ -102,49 +90,40 @@ namespace hMailServer.ControlPanel.Views
          };
          Grid.SetColumn(caBrowse, 1);
          caRow.Children.Add(caBrowse);
-         panel.Children.Add(caRow);
 
-         TextBlock caNote = Note(L("hMailServer does not create or manage client certificates. The certificate authority and the client certificates themselves must be produced outside hMailServer (for example with OpenSSL or an internal PKI) - the server only trusts the CA bundle it is given here."));
-         AutomationProperties.SetHelpText(clientCertCaFile_, caNote.Text);
-         panel.Children.Add(caNote);
+         // The note is the kind of thing an administrator has to read before they
+         // go looking for a "generate" button that does not exist. The row shows
+         // it under the box; the box itself is told it as help text, because the
+         // row only sees the grid the box and its browse button share.
+         string caNote = L("hMailServer does not create or manage client certificates. The certificate authority and the client certificates themselves must be produced outside hMailServer (for example with OpenSSL or an internal PKI) - the server only trusts the CA bundle it is given here.");
+         FieldRow caFieldRow = Label(L("C_A certificate bundle (PEM) that client certificates must chain to"), caRow).WithHint(caNote);
+         AutomationProperties.SetHelpText(clientCertCaFile_, caNote);
+         body.Children.Add(caFieldRow);
 
          // Inline validation for the combinations the server refuses to save, so
          // the dialog says so while the user is still choosing rather than
-         // relaying a COM error after Save. The state is carried by the text
-         // itself (present or absent), never by colour, and the live setting
-         // makes a screen reader announce it when it appears.
-         clientCertWarning_.FontSize = Typography.Caption;
-         clientCertWarning_.TextWrapping = TextWrapping.Wrap;
-         clientCertWarning_.Margin = new Thickness(0, 6, 0, 0);
-         clientCertWarning_.Visibility = Visibility.Collapsed;
-         clientCertWarning_.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         AutomationProperties.SetLiveSetting(clientCertWarning_, AutomationLiveSetting.Polite);
-         panel.Children.Add(clientCertWarning_);
+         // relaying a COM error after Save. A notice carries the state in colour,
+         // shape and word, and is a polite live region, so a screen reader hears
+         // it when it appears.
+         body.Children.Add(clientCertNotice_);
 
          security_.SelectionChanged += (s, e) => UpdateClientCertificateValidation();
          clientCertPolicy_.SelectionChanged += (s, e) => UpdateClientCertificateValidation();
          clientCertCaFile_.TextChanged += (s, e) => UpdateClientCertificateValidation();
 
-         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-         // Enter saves and Escape cancels. Neither did anything here: a dialog whose
-         // only way out is the mouse or Alt+F4 is a dialog a keyboard user is stuck
-         // in, and the two properties that fix it are the ones the account and domain
-         // dialogs already set.
-         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, Margin = new Thickness(0, 0, 8, 0), MinWidth = 80, IsDefault = true };
+         // Enter saves and Escape cancels.
+         var save = new Wpf.Ui.Controls.Button { Content = L("_Save"), Appearance = Wpf.Ui.Controls.ControlAppearance.Primary, MinWidth = 88 };
          save.Click += (s, e) => Save();
-         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 80, IsCancel = true };
+         var cancel = new Wpf.Ui.Controls.Button { Content = L("Cancel"), MinWidth = 88 };
          cancel.Click += (s, e) => Close();
-         buttons.Children.Add(save);
-         buttons.Children.Add(cancel);
-         panel.Children.Add(buttons);
 
-         Content = panel;
+         UseFrame(L("Port binding"), body, save, cancel, width: 520);
          Loaded += (s, e) => Load();
       }
 
       private void LoadCertificates(int selectedId)
       {
-         certificate_.Items.Add(Combo(L("(none)"), 0));
+         certificate_.Items.Add(DialogFields.Combo(L("(none)"), 0));
          dynamic certs = ServerSession.Current.Application.Settings.SSLCertificates;
          try
          {
@@ -152,13 +131,13 @@ namespace hMailServer.ControlPanel.Views
             for (int i = 0; i < count; i++)
             {
                dynamic c = certs.Item[i];
-               certificate_.Items.Add(Combo((string)c.Name, (int)c.ID));
+               certificate_.Items.Add(DialogFields.Combo((string)c.Name, (int)c.ID));
                ServerSession.Release(c);
             }
          }
          catch (Exception fatalCheck) when (!ExceptionPolicy.IsFatal(fatalCheck)) { /* Deliberately ignored: best effort only, and the outcome of the surrounding operation does not depend on this succeeding. */ }
          finally { ServerSession.Release(certs); }
-         SelectCombo(certificate_, selectedId);
+         DialogFields.SelectCombo(certificate_, selectedId, orFirst: true);
       }
 
       private dynamic FindPort(dynamic ports)
@@ -181,12 +160,12 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic p = FindPort(ports);
             if (p == null) { Close(); return; }
-            SelectCombo(protocol_, (int)p.Protocol);
+            DialogFields.SelectCombo(protocol_, (int)p.Protocol, orFirst: true);
             address_.Text = (string)p.Address ?? "";
             port_.Text = ((int)p.PortNumber).ToString();
-            SelectCombo(security_, (int)p.ConnectionSecurity);
+            DialogFields.SelectCombo(security_, (int)p.ConnectionSecurity, orFirst: true);
             LoadCertificates((int)p.SSLCertificateID);
-            SelectCombo(clientCertPolicy_, (int)p.ClientCertificatePolicy);
+            DialogFields.SelectCombo(clientCertPolicy_, (int)p.ClientCertificatePolicy, orFirst: true);
             clientCertCaFile_.Text = (string)p.ClientCertificateCAFile ?? "";
             UpdateClientCertificateValidation();
             ServerSession.Release(p);
@@ -204,20 +183,23 @@ namespace hMailServer.ControlPanel.Views
 
       private void Save()
       {
+         notice_.Hide();
+         DialogFields.ClearErrors(portRow_);
+
          if (!int.TryParse(port_.Text.Trim(), out int portNumber) || portNumber <= 0 || portNumber > 65535)
          {
-            MessageBox.Show(L("Enter a valid port number."), L("Control Panel"));
+            DialogFields.ShowError(portRow_, L("Enter a valid port number."));
             return;
          }
 
          // The server refuses these combinations too (PersistentTCPIPPort), so
          // this is a courtesy, not the enforcement: a COM save error is still
-         // handled below in case the dialog and the server ever disagree.
-         string clientCertError = ClientCertificateValidationError();
-         if (clientCertError != null)
+         // handled below in case the dialog and the server ever disagree. The
+         // notice is already on screen; the keyboard goes to the policy.
+         if (ClientCertificateValidationError() != null)
          {
             UpdateClientCertificateValidation();
-            MessageBox.Show(clientCertError, L("Control Panel"));
+            clientCertPolicy_.Focus();
             return;
          }
 
@@ -226,12 +208,12 @@ namespace hMailServer.ControlPanel.Views
          {
             dynamic p = FindPort(ports);
             if (p == null) { Close(); return; }
-            p.Protocol = ComboValue(protocol_);
+            p.Protocol = DialogFields.ComboValue(protocol_);
             p.Address = address_.Text.Trim();
             p.PortNumber = portNumber;
-            p.ConnectionSecurity = ComboValue(security_);
-            p.SSLCertificateID = ComboValue(certificate_);
-            p.ClientCertificatePolicy = ComboValue(clientCertPolicy_);
+            p.ConnectionSecurity = DialogFields.ComboValue(security_);
+            p.SSLCertificateID = DialogFields.ComboValue(certificate_);
+            p.ClientCertificatePolicy = DialogFields.ComboValue(clientCertPolicy_);
             p.ClientCertificateCAFile = clientCertCaFile_.Text.Trim();
             p.Save();
             ServerSession.Release(p);
@@ -239,7 +221,7 @@ namespace hMailServer.ControlPanel.Views
          }
          catch (Exception ex) when (!ExceptionPolicy.IsFatal(ex))
          {
-            MessageBox.Show(F("Could not save the port: {0}", ex.Message), L("Control Panel"));
+            notice_.Show(StatusLevel.Critical, F("Could not save the port: {0}", ex.Message));
          }
          finally
          {
@@ -257,11 +239,11 @@ namespace hMailServer.ControlPanel.Views
       /// </summary>
       private string ClientCertificateValidationError()
       {
-         int policy = ComboValue(clientCertPolicy_);
+         int policy = DialogFields.ComboValue(clientCertPolicy_);
          if (policy == 0)
             return null;
 
-         int security = ComboValue(security_);
+         int security = DialogFields.ComboValue(security_);
 
          // A client certificate is only ever exchanged during a TLS handshake,
          // so on a plaintext port the policy could never run.
@@ -286,69 +268,17 @@ namespace hMailServer.ControlPanel.Views
       private void UpdateClientCertificateValidation()
       {
          string error = ClientCertificateValidationError();
-         clientCertWarning_.Text = error == null ? "" : F("Cannot save: {0}", error);
-         clientCertWarning_.Visibility = error == null ? Visibility.Collapsed : Visibility.Visible;
-      }
-
-      // ---- UI helpers ----
-
-      /// <summary>
-      /// A caption, and - when the editor it captions is passed in - the editor's
-      /// accessible name.
-      ///
-      /// A TextBlock placed above a control tells UI Automation nothing: this dialog
-      /// binds a network port and announced itself to a screen reader as "combo box,
-      /// edit, edit, combo box, combo box". That is the same defect
-      /// <see cref="AccessibleNames"/> was written for on the generated settings
-      /// pages, and the hand-built dialogs were never done. The cleaning rule comes
-      /// from there too, so "Host:" is not read out as "Host colon".
-      /// </summary>
-      private static TextBlock Label(string text, FrameworkElement editor = null)
-      {
-         var t = new TextBlock { FontSize = Typography.Label, Margin = new Thickness(0, 8, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         Mnemonic.Apply(t, text, editor);
-
-         if (editor != null)
-            AutomationProperties.SetName(editor, AccessibleNames.Qualify(MnemonicText.Strip(text), ""));
-
-         return t;
+         if (error == null)
+            clientCertNotice_.Hide();
+         else
+            clientCertNotice_.Show(StatusLevel.Critical, F("Cannot save: {0}", error));
       }
 
       /// <summary>
-      /// A wrapped caption for a statement that belongs on screen rather than in
-      /// a tooltip - the CA-provenance note is the kind of thing an administrator
-      /// has to read before they go looking for a "generate" button that does
-      /// not exist. Callers attach the same text to the control as accessible
-      /// help text so it is heard with the editor, not after it.
+      /// A caption and its editor as one row, which names the editor to UI
+      /// Automation. This dialog binds a network port and once announced itself
+      /// to a screen reader as "combo box, edit, edit, combo box, combo box".
       /// </summary>
-      private static TextBlock Note(string text)
-      {
-         var t = new TextBlock { Text = text, FontSize = Typography.Caption, TextWrapping = TextWrapping.Wrap, Opacity = 0.75, Margin = new Thickness(0, 2, 0, 4) };
-         t.SetResourceReference(Control.ForegroundProperty, "TextFillColorSecondaryBrush");
-         return t;
-      }
-
-      private static TextBox Input(TextBox box)
-      {
-         box.FontSize = Typography.Body;
-         box.Padding = new Thickness(6);
-         box.Margin = new Thickness(0, 0, 0, 4);
-         box.Background = System.Windows.Media.Brushes.Transparent;
-         box.SetResourceReference(Control.ForegroundProperty, "TextFillColorPrimaryBrush");
-         return box;
-      }
-
-      private static ComboBoxItem Combo(string text, int value) => new() { Content = text, Tag = value };
-      private static void StyleCombo(ComboBox combo) { combo.FontSize = Typography.Body; combo.Margin = new Thickness(0, 0, 0, 4); }
-
-      private static void SelectCombo(ComboBox combo, int value)
-      {
-         foreach (ComboBoxItem item in combo.Items)
-            if ((int)item.Tag == value) { combo.SelectedItem = item; return; }
-         if (combo.Items.Count > 0) combo.SelectedIndex = 0;
-      }
-
-      private static int ComboValue(ComboBox combo) => combo.SelectedItem is ComboBoxItem item ? (int)item.Tag : 0;
+      private static FieldRow Label(string text, FrameworkElement editor) => DialogFields.Field(text, editor);
    }
 }
