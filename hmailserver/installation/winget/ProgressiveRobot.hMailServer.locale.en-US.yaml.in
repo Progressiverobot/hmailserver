@@ -1,0 +1,77 @@
+#~ https://www.progressiverobot.com
+#~ Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+#~ SPDX-License-Identifier: AGPL-3.0-or-later
+#~
+#~ The winget DEFAULT LOCALE manifest: what the package is called, who publishes
+#~ it, its licence and the words a user reads in `winget show`. Rendered by
+#~ build/make-package-manifests.ps1; lines opening with "#~" are the template's
+#~ own and are not rendered.
+#~
+#~ Every claim here has to be true of the version being submitted, the way every
+#~ claim in the release notes does: this text is read by people deciding whether
+#~ to put a mail server on the Internet. Nothing is promised that the server does
+#~ not do by default or cannot be told to do.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+
+# Generated from hmailserver/installation/winget by build/make-package-manifests.ps1.
+PackageIdentifier: ProgressiveRobot.hMailServer
+PackageVersion: "@VERSION@"
+PackageLocale: en-US
+Publisher: Progressive Robot Ltd
+PublisherUrl: https://www.progressiverobot.com
+PublisherSupportUrl: https://github.com/Progressiverobot/hmailserver/issues
+Author: Christopher Holloway
+PackageName: hMailServer
+PackageUrl: https://github.com/Progressiverobot/hmailserver
+License: AGPL-3.0-or-later
+LicenseUrl: https://github.com/Progressiverobot/hmailserver/blob/master/LICENSE
+Copyright: Copyright (c) 2026 Progressive Robot Ltd. Based on hMailServer by Martin Knafve.
+CopyrightUrl: https://github.com/Progressiverobot/hmailserver/blob/master/LICENSE
+ShortDescription: A free, open-source mail server for Windows - SMTP, IMAP and POP3, with anti-spam and anti-virus filtering, DKIM, DMARC, MTA-STS, a webmail client and a REST API.
+Description: |-
+  hMailServer is a free, open-source mail server implementing SMTP, IMAP and POP3, with
+  a Windows administration program, a browser administration console, a webmail client and
+  a REST API. This is the maintained fork of the original project, which is no longer
+  developed upstream: a current toolchain, current cryptography, and the transport-security
+  and authentication standards a mail server is expected to speak in 2026 - while remaining
+  a drop-in upgrade for an existing hMailServer installation, with a continuous database
+  upgrade chain from every earlier version.
+
+  What it does: SMTP with submission and implicit TLS, IMAP4rev1 with the extensions a
+  modern client asks for, POP3, ManageSieve, SPF, DKIM signing and verification, DMARC with
+  reporting, MTA-STS and TLS-RPT, DANE, ARC, SpamAssassin and ClamAV integration, greylisting,
+  DNS blacklists and SURBL, auto-ban, two-factor authentication for administrators and
+  accounts, application passwords, OAuth 2.0 (inbound and outbound, including Microsoft 365),
+  CardDAV address books, full-text search, quarantine, archiving and legal holds, backup and
+  restore, Prometheus metrics and OpenTelemetry export.
+
+  Every release is validated by the full regression suite run against the exact binary that
+  ships, with live SpamAssassin and ClamAV, and SPF, DKIM and DMARC evaluated through the
+  resolver code path - nothing but DNS is mocked. The installer is Authenticode-signed and
+  every release carries an SBOM and Sigstore signatures.
+
+  This package installs the server, the Control Panel and the setup tools. An unattended
+  install configures the embedded database and leaves the administrator password unset:
+  set one from the Control Panel, or with `hMailServer.exe --set-admin-password`, before the
+  server is reachable from anywhere but the machine itself.
+Moniker: hmailserver
+Tags:
+  - mail
+  - mail-server
+  - email
+  - smtp
+  - imap
+  - pop3
+  - dkim
+  - dmarc
+  - spam-filter
+  - webmail
+  - server
+ReleaseNotesUrl: https://github.com/Progressiverobot/hmailserver/releases/tag/@TAG@
+Documentations:
+  - DocumentLabel: Documentation
+    DocumentUrl: https://github.com/Progressiverobot/hmailserver/wiki
+  - DocumentLabel: Release notes
+    DocumentUrl: https://github.com/Progressiverobot/hmailserver/releases
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

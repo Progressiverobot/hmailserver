@@ -1,0 +1,57 @@
+#~ https://www.progressiverobot.com
+#~ Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+#~ SPDX-License-Identifier: AGPL-3.0-or-later
+#~
+#~ The winget INSTALLER manifest: where the installer is, what it hashes to, how
+#~ it is driven without a wizard, and how winget recognises it once installed.
+#~ Rendered by build/make-package-manifests.ps1; lines opening with "#~" are the
+#~ template's own and are not rendered.
+#~
+#~ Every value here is the installer's own, not a guess - see
+#~ hmailserver/installation/section_setup.iss and section_setup_64.iss:
+#~   MinVersion=10.0.14393       -> MinimumOSVersion (the .NET 10 runtime's floor)
+#~   AppId=hMailServer           -> the uninstall key hMailServer_is1, the ProductCode
+#~   AppVerName=hMailServer x-x64 -> the DisplayName Inno writes
+#~   AppVersion=<version>        -> the DisplayVersion Inno writes, which is what
+#~                                  `winget upgrade` compares against PackageVersion
+#~   PrivilegesRequired=admin    -> ElevationRequirement: elevatesSelf
+#~
+#~ The silent switches are the installer-smoke workflow's, minus /TYPE=full: on a
+#~ FIRST install Inno's default type is "full" anyway (section_types.iss lists it
+#~ first), and on an UPGRADE Inno preselects the components already installed -
+#~ so forcing the full type would quietly add the Control Panel back to a server
+#~ where the administrator had deliberately left it out. /SUPPRESSMSGBOXES is not
+#~ optional: without it a database-setup failure shows a message box, silent mode
+#~ answers it with the default button, and a broken install reports success.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.10.0.schema.json
+
+# Generated from hmailserver/installation/winget by build/make-package-manifests.ps1.
+PackageIdentifier: ProgressiveRobot.hMailServer
+PackageVersion: "@VERSION@"
+MinimumOSVersion: 10.0.14393.0
+InstallerType: inno
+Scope: machine
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+InstallerSwitches:
+  Silent: /VERYSILENT /SUPPRESSMSGBOXES /NORESTART
+  SilentWithProgress: /SILENT /SUPPRESSMSGBOXES /NORESTART
+  Log: /LOG="<LOGPATH>"
+UpgradeBehavior: install
+ElevationRequirement: elevatesSelf
+ProductCode: hMailServer_is1
+ReleaseDate: "@RELEASE_DATE@"
+AppsAndFeaturesEntries:
+  - DisplayName: hMailServer @VERSION@-x64
+    DisplayVersion: "@VERSION@"
+    Publisher: Progressive Robot Ltd
+    ProductCode: hMailServer_is1
+    InstallerType: inno
+Installers:
+  - Architecture: x64
+    InstallerUrl: @INSTALLER_URL@
+    InstallerSha256: @INSTALLER_SHA256@
+ManifestType: installer
+ManifestVersion: 1.10.0

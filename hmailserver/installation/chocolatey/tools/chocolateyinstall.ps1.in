@@ -1,0 +1,44 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The Chocolatey install script. Rendered by build/make-package-manifests.ps1,
+# which substitutes @VERSION@, @INSTALLER_URL@ and @INSTALLER_SHA256@.
+#
+# The installer is downloaded from the release rather than embedded: it is 76 MB,
+# it is Authenticode-signed, and Chocolatey checks the SHA-256 below before it is
+# run - so the bytes that execute are the bytes the release published, and a
+# package that has been tampered with fails before anything is installed.
+
+$ErrorActionPreference = 'Stop'
+
+$packageArgs = @{
+    packageName    = 'hmailserver'
+    fileType       = 'exe'
+    url64bit       = '@INSTALLER_URL@'
+    checksum64     = '@INSTALLER_SHA256@'
+    checksumType64 = 'sha256'
+
+    # The installer-smoke workflow's switches. /SUPPRESSMSGBOXES is not optional:
+    # without it a database-setup failure shows a message box, silent mode answers
+    # it with the default button, and a broken install reports success. /TYPE is
+    # deliberately not passed - on a first install Inno's default type is the full
+    # one, and on an upgrade Inno preselects the components already there, so
+    # forcing the full type would add the Control Panel back to a server where the
+    # administrator had left it out.
+    silentArgs     = '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+    validExitCodes = @(0)
+    softwareName   = 'hMailServer*'
+}
+
+Install-ChocolateyPackage @packageArgs
+
+Write-Host ''
+Write-Host 'hMailServer @VERSION@ is installed. The administrator password is NOT set by an'
+Write-Host 'unattended install - the wizard page that asks for one is skipped. Set one before'
+Write-Host 'the server is reachable from anywhere but this machine:'
+Write-Host ''
+Write-Host '    "C:\Program Files\hMailServer\Bin\hMailServer.exe" --set-admin-password'
+Write-Host ''
+Write-Host 'or open the Control Panel from the Start menu. Documentation:'
+Write-Host 'https://github.com/Progressiverobot/hmailserver/wiki'

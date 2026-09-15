@@ -1,0 +1,17 @@
+#~ https://www.progressiverobot.com
+#~ Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+#~ SPDX-License-Identifier: AGPL-3.0-or-later
+#~
+#~ The winget VERSION manifest, the one that names the package and says which
+#~ locale is its default. Rendered by build/make-package-manifests.ps1, which
+#~ substitutes every @TOKEN@ and drops every line that opens with "#~" - those
+#~ are the template's own and have no business in a manifest submitted to
+#~ microsoft/winget-pkgs.
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.10.0.schema.json
+
+# Generated from hmailserver/installation/winget by build/make-package-manifests.ps1.
+PackageIdentifier: ProgressiveRobot.hMailServer
+PackageVersion: "@VERSION@"
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.10.0

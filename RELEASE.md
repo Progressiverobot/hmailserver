@@ -314,7 +314,28 @@ already cost a release cycle or nearly shipped a defect.
     And a tag is spent once: a tag that has backed an immutable release cannot back
     another, even after that release is deleted. There is no re-cutting a broken
     release under the same version - it needs the next number.
-13. **Close the loop**: answer every issue the release resolves (and close
+13. **The package managers**, once the release is published and its installer
+    signed. The *Package managers* workflow runs itself on `release: published`:
+    it downloads the installer the release actually attached, refuses it unless
+    its Authenticode signature is valid, computes the SHA-256 from those bytes,
+    renders the three winget manifests and the Chocolatey package from the
+    templates in `hmailserver\installation`, validates them against Microsoft's
+    published schemas and packs the `.nupkg`. The files are kept as an artifact
+    of the run.
+
+    Submitting them is deliberately not automatic until it has been armed once:
+    a new package identifier is reviewed by a person at microsoft/winget-pkgs,
+    so the FIRST submission is by hand. `hmailserver\docs\PackageManagers.md` is
+    the walk - the fork, the token, `wingetcreate submit`, the Chocolatey API
+    key - and says what to set (the `PACKAGE_MANAGER_SUBMIT` variable, the
+    `WINGET_TOKEN` and `CHOCO_API_KEY` secrets) so that every release after
+    that submits itself.
+
+    The hash is computed there and never copied from a release note, because the
+    signed installer is not the built installer: signing changes the bytes, and a
+    package manager handing out a mismatched hash is a broken install for every
+    user of it.
+14. **Close the loop**: answer every issue the release resolves (and close
     them), update the ones it does not resolve saying so plainly.
 
 ## Standing rules

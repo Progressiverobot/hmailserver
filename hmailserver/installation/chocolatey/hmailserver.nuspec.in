@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--#~
+  https://www.progressiverobot.com
+  Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+  SPDX-License-Identifier: AGPL-3.0-or-later
+
+  The Chocolatey package's metadata. Rendered by build/make-package-manifests.ps1,
+  which substitutes every @TOKEN@; this comment is the template's own and is
+  removed when it is rendered.
+
+  The package downloads the release's own signed installer and checks it against
+  the SHA-256 the manifest carries - it does not embed the 76 MB installer, which
+  is why there is no tools/VERIFICATION.txt: nothing binary is shipped inside it.
+-->
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>hmailserver</id>
+    <version>@VERSION@</version>
+    <packageSourceUrl>https://github.com/Progressiverobot/hmailserver/tree/master/hmailserver/installation/chocolatey</packageSourceUrl>
+    <owners>Progressive Robot Ltd</owners>
+    <title>hMailServer</title>
+    <authors>Christopher Holloway, Progressive Robot Ltd</authors>
+    <projectUrl>https://github.com/Progressiverobot/hmailserver</projectUrl>
+    <copyright>Copyright (c) 2026 Progressive Robot Ltd. Based on hMailServer by Martin Knafve.</copyright>
+    <licenseUrl>https://github.com/Progressiverobot/hmailserver/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/Progressiverobot/hmailserver</projectSourceUrl>
+    <docsUrl>https://github.com/Progressiverobot/hmailserver/wiki</docsUrl>
+    <bugTrackerUrl>https://github.com/Progressiverobot/hmailserver/issues</bugTrackerUrl>
+    <tags>hmailserver mail mailserver email smtp imap pop3 dkim dmarc spam webmail server admin</tags>
+    <summary>A free, open-source mail server for Windows - SMTP, IMAP and POP3, with anti-spam and anti-virus filtering, DKIM, DMARC, MTA-STS, a webmail client and a REST API.</summary>
+    <description><![CDATA[
+hMailServer is a free, open-source mail server implementing SMTP, IMAP and POP3, with a Windows
+administration program, a browser administration console, a webmail client and a REST API. This is
+the maintained fork of the original project, which is no longer developed upstream: a current
+toolchain, current cryptography, and the transport-security and authentication standards a mail
+server is expected to speak in 2026 - while remaining a drop-in upgrade for an existing hMailServer
+installation, with a continuous database upgrade chain from every earlier version.
+
+### What it does
+
+SMTP with submission and implicit TLS, IMAP4rev1 with the extensions a modern client asks for, POP3,
+ManageSieve, SPF, DKIM signing and verification, DMARC with reporting, MTA-STS and TLS-RPT, DANE,
+ARC, SpamAssassin and ClamAV integration, greylisting, DNS blacklists and SURBL, auto-ban,
+two-factor authentication for administrators and accounts, application passwords, OAuth 2.0
+(inbound and outbound, including Microsoft 365), CardDAV address books, full-text search,
+quarantine, archiving and legal holds, backup and restore, Prometheus metrics and OpenTelemetry
+export.
+
+### What this package does
+
+It downloads the release's Authenticode-signed installer from GitHub, checks it against the SHA-256
+recorded in this package, and runs it unattended. That installs the server, the Control Panel and
+the setup tools, and configures the embedded database.
+
+An unattended install leaves the administrator password unset, because the wizard page that asks
+for one is skipped. Set one before the server is reachable from anywhere but the machine itself:
+open the Control Panel, or run `"C:\Program Files\hMailServer\Bin\hMailServer.exe" --set-admin-password`.
+
+Uninstalling runs the installer's own uninstaller. It does not delete the message store or the
+database: that is deliberate, and removing them is the administrator's decision to make by hand.
+]]></description>
+    <releaseNotes>https://github.com/Progressiverobot/hmailserver/releases/tag/@TAG@</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

@@ -102,6 +102,10 @@ NORMALISE_ONLY = {'.resx', '.md', '.ini', '.conf', '.service', '.logrotate'}
 SKIP_DIRS = {'.git', 'obj', 'bin', 'publish', 'packages', 'Output',
              'x64', 'Debug', 'Release', 'node_modules', 'DotNet', 'coverage',
              '.nuget', '.obsidian',
+             # Build output: git ignores /logs/, and since 15 September 2026
+             # build/make-package-manifests.ps1 renders a Chocolatey install
+             # script into it, which is generated and not source.
+             'logs',
              # Vendored third-party source under its own licence (see docs/Licenses).
              'zlib'}
 

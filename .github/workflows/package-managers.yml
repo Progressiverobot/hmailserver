@@ -1,0 +1,257 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The winget manifests and the Chocolatey package for a release: rendered from
+# the templates in hmailserver/installation, checked against Microsoft's own
+# schemas, and - when the maintainer has armed it - submitted.
+#
+# Why a workflow and not a note in RELEASE.md: the one value that must be right
+# is the SHA-256 of the installer as PUBLISHED, which is not the SHA-256 of the
+# installer as built - the release is Authenticode-signed after the build, and
+# signing changes the bytes. A person copying a hash between two windows gets
+# that wrong eventually, and the failure mode is every user of the package
+# getting "hash mismatch" or, far worse, not getting one. Here the asset is
+# downloaded from the release that has just been published, its signature is
+# checked, and the hash is computed from the bytes that users will receive.
+#
+# Nothing is submitted by accident. A release renders the files and keeps them
+# as an artifact; the submission steps run only when the repository variable
+# PACKAGE_MANAGER_SUBMIT is 'true' (or the dispatch input says so) AND the
+# corresponding secret exists. The FIRST submission to microsoft/winget-pkgs is
+# by hand whatever this says - a new package identifier is reviewed by a person
+# there - and hmailserver/docs/PackageManagers.md has that walk.
+name: Package managers
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version without the v (e.g. 6.3.3). Leave blank to use the latest release.'
+        type: string
+        required: false
+      release_date:
+        description: 'Release date, YYYY-MM-DD. Leave blank for the release''s own publication date.'
+        type: string
+        required: false
+      submit:
+        description: 'Submit to winget-pkgs and Chocolatey (needs WINGET_TOKEN / CHOCO_API_KEY).'
+        type: boolean
+        required: false
+        default: false
+  pull_request:
+    paths:
+      - 'hmailserver/installation/winget/**'
+      - 'hmailserver/installation/chocolatey/**'
+      - 'build/make-package-manifests.ps1'
+      - 'build/check-package-manifests.py'
+      - '.github/workflows/package-managers.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'hmailserver/installation/winget/**'
+      - 'hmailserver/installation/chocolatey/**'
+      - 'build/make-package-manifests.ps1'
+      - 'build/check-package-manifests.py'
+      - '.github/workflows/package-managers.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # On a pull request there is no release to describe, so what is checked is the
+  # one thing that can be checked without one: that the templates still render,
+  # that every token in them is one the renderer knows, and that the three winget
+  # manifests still agree with each other. That is the failure this catches - a
+  # template edited months before the next release and wrong ever since.
+  templates:
+    name: The templates render
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Render with placeholder values and check the shape
+        shell: pwsh
+        run: ./build/make-package-manifests.ps1 -Check
+
+      - name: Check the rendered files against the winget schemas
+        shell: pwsh
+        run: |
+          python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema
+          # A real version number, a placeholder hash and no release: enough for
+          # the schemas and the cross-checks, which is what a pull request can
+          # honestly prove. The URL check is skipped with --offline, since the
+          # release it would name does not exist yet.
+          ./build/make-package-manifests.ps1 -Version 9.9.9 -ReleaseDate 2026-01-01 `
+            -Sha256 ('A' * 64) -OutputDirectory "$env:RUNNER_TEMP/manifests"
+          python build/check-package-manifests.py "$env:RUNNER_TEMP/manifests" --offline
+
+  manifests:
+    name: Render, check and keep the manifests for the release
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Work out which release this is
+        id: release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          EVENT_PUBLISHED: ${{ github.event.release.published_at }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_DATE: ${{ inputs.release_date }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:EVENT_TAG
+          $published = $env:EVENT_PUBLISHED
+
+          if ($env:INPUT_VERSION) {
+            $tag = "v$($env:INPUT_VERSION)"
+            $published = ''
+          }
+          if (-not $tag) {
+            $tag = (gh release view --json tagName --jq .tagName)
+            $published = ''
+          }
+          if (-not $published) {
+            $published = (gh release view $tag --json publishedAt --jq .publishedAt)
+          }
+
+          $version = $tag -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "The tag $tag does not name a three-number version; pre-releases are not submitted to package managers."
+          }
+
+          $date = if ($env:INPUT_DATE) { $env:INPUT_DATE } else { ([datetime]$published).ToString('yyyy-MM-dd') }
+
+          "tag=$tag"         | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "date=$date"       | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "hMailServer $version ($tag), published $date"
+
+      - name: Download the installer the release published
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP/asset" | Out-Null
+          gh release download "${{ steps.release.outputs.tag }}" `
+            --pattern 'hMailServer-*-x64.exe' --dir "$env:RUNNER_TEMP/asset"
+          Get-ChildItem "$env:RUNNER_TEMP/asset" | ForEach-Object {
+            Write-Host "$($_.Name)  $([math]::Round($_.Length / 1MB, 1)) MB"
+          }
+
+      # The signature check is the reason the file is downloaded rather than
+      # hashed from a URL: a package manager hands this installer to every user
+      # of it, and an unsigned or badly-signed one must never reach a manifest.
+      # -RequireSignedInstaller fails the step rather than warning.
+      - name: Render the manifests from the signed asset
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem "$env:RUNNER_TEMP/asset" -Filter 'hMailServer-*-x64.exe' | Select-Object -First 1
+          ./build/make-package-manifests.ps1 `
+            -Version '${{ steps.release.outputs.version }}' `
+            -Tag '${{ steps.release.outputs.tag }}' `
+            -ReleaseDate '${{ steps.release.outputs.date }}' `
+            -InstallerPath $exe.FullName `
+            -RequireSignedInstaller `
+            -OutputDirectory "$env:RUNNER_TEMP/manifests"
+
+      - name: Check them against Microsoft's schemas, and the package against Chocolatey's rules
+        shell: pwsh
+        run: |
+          python -m pip install --quiet --disable-pip-version-check pyyaml jsonschema
+          python build/check-package-manifests.py "$env:RUNNER_TEMP/manifests"
+
+      # The winget client is not installed on a hosted runner in this session, so
+      # this is best-effort: when it is there, its verdict is the authoritative
+      # one and a failure fails the job; when it is not, the schema check above
+      # already stands on its own.
+      - name: And with the winget client, if this runner has one
+        shell: pwsh
+        run: |
+          $winget = Get-Command winget -ErrorAction SilentlyContinue
+          if (-not $winget) {
+            Write-Host 'No winget client on this runner; the schema check is the check.'
+            exit 0
+          }
+          $directory = "$env:RUNNER_TEMP/manifests/winget/manifests/p/ProgressiveRobot/hMailServer/${{ steps.release.outputs.version }}"
+          winget validate --manifest $directory
+          if ($LASTEXITCODE -ne 0) { throw "winget validate refused the manifests ($LASTEXITCODE)." }
+
+      - name: Pack the Chocolatey package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $chocolatey = "$env:RUNNER_TEMP/manifests/chocolatey"
+          choco pack "$chocolatey/hmailserver.nuspec" --outputdirectory $chocolatey
+          if ($LASTEXITCODE -ne 0) { throw "choco pack failed ($LASTEXITCODE)." }
+          Get-ChildItem $chocolatey -Filter *.nupkg | ForEach-Object { Write-Host $_.Name }
+
+      - name: Keep them
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: package-manifests-${{ steps.release.outputs.version }}
+          path: ${{ runner.temp }}/manifests
+          retention-days: 90
+
+      # ---------------------------------------------------------------------
+      # Submission. Both steps are inert without their secret, and both are
+      # skipped unless this run was asked for one.
+      # ---------------------------------------------------------------------
+
+      - name: Submit to microsoft/winget-pkgs
+        if: ${{ inputs.submit || vars.PACKAGE_MANAGER_SUBMIT == 'true' }}
+        shell: pwsh
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:WINGET_TOKEN) {
+            Write-Host '::notice::No WINGET_TOKEN secret, so nothing was submitted. The manifests are in this run''s artifact and hmailserver/docs/PackageManagers.md says how to submit them by hand.'
+            exit 0
+          }
+
+          # wingetcreate is a single self-contained executable; it opens the pull
+          # request against microsoft/winget-pkgs from the token's own fork.
+          $tool = "$env:RUNNER_TEMP/wingetcreate.exe"
+          Invoke-WebRequest -Uri 'https://aka.ms/wingetcreate/latest' -OutFile $tool -UseBasicParsing
+
+          $signature = Get-AuthenticodeSignature -LiteralPath $tool
+          if ($signature.Status -ne 'Valid') {
+            throw "wingetcreate.exe is $($signature.Status), not Valid - refusing to run it."
+          }
+
+          $directory = "$env:RUNNER_TEMP/manifests/winget/manifests/p/ProgressiveRobot/hMailServer/${{ steps.release.outputs.version }}"
+          & $tool submit --token $env:WINGET_TOKEN --prtitle 'New version: ProgressiveRobot.hMailServer version ${{ steps.release.outputs.version }}' $directory
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate submit failed ($LASTEXITCODE)." }
+
+      - name: Push to the Chocolatey community feed
+        if: ${{ inputs.submit || vars.PACKAGE_MANAGER_SUBMIT == 'true' }}
+        shell: pwsh
+        env:
+          CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:CHOCO_API_KEY) {
+            Write-Host '::notice::No CHOCO_API_KEY secret, so nothing was pushed. The .nupkg is in this run''s artifact.'
+            exit 0
+          }
+
+          $package = Get-ChildItem "$env:RUNNER_TEMP/manifests/chocolatey" -Filter *.nupkg | Select-Object -First 1
+          choco push $package.FullName --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+          if ($LASTEXITCODE -ne 0) { throw "choco push failed ($LASTEXITCODE)." }
