@@ -2642,6 +2642,21 @@ namespace RegressionTests.API
          Assert.IsFalse(plain.Body.Contains("id=\"lang-data\""), "No catalogue for English.");
          Response englishFirst = Raw("GET", "/portal", null, null, "Accept-Language: en-GB,de;q=0.7\r\n");
          Assert.IsFalse(englishFirst.Body.Contains("id=\"lang-data\""), "English before German is the page as it is.");
+
+         // The direction of the first paint, not only the catalogue. The page is
+         // shipped left to right and the script turns it round from the catalogue it
+         // is handed, but it runs at the end of the body: without this an Arabic,
+         // Hebrew or Persian reader sees one left-to-right frame. Three of the
+         // twenty-three catalogues are read right to left; the other twenty are not,
+         // and must not be turned round.
+         Response arabic = Raw("GET", "/portal", null, null, "Accept-Language: ar\r\n");
+         StringAssert.Contains("<html lang=\"ar\" dir=\"rtl\">", arabic.Body);
+         Response hebrew = Raw("GET", "/portal", null, null, "Accept-Language: he-IL,he;q=0.9\r\n");
+         StringAssert.Contains("<html lang=\"he\" dir=\"rtl\">", hebrew.Body);
+         Response persian = Raw("GET", "/portal", null, null, "Accept-Language: fa\r\n");
+         StringAssert.Contains("<html lang=\"fa\" dir=\"rtl\">", persian.Body);
+         StringAssert.Contains("<html lang=\"de\" dir=\"ltr\">", page.Body);
+         StringAssert.Contains("<html lang=\"en\" dir=\"ltr\">", plain.Body);
       }
 
       private static string Between(string body, string after, string until)

@@ -10512,6 +10512,21 @@ namespace HM
       if (!language.IsEmpty())
          languageBlock = "<script type=\"application/json\" id=\"lang-data\" data-lang=\"" + language + "\">" + PortalLanguageJson_(language) + "</script>";
       page.Replace("<!--hm-language-->", languageBlock.c_str());
+      // And the direction of the first paint, which the script alone cannot give:
+      // the page ships <html lang="en" dir="ltr"> and Portal.js settles both from
+      // the catalogue it is handed, but it runs at the end of the body - so a reader
+      // of Arabic, Hebrew or Persian saw one left-to-right frame before the page
+      // turned round. The language is already known here, so the tag leaves the
+      // server right. The script writes the same two attributes again when it runs,
+      // and on every later change of language, which is where a choice made in the
+      // page is answered.
+      if (!language.IsEmpty())
+      {
+         const bool rightToLeft = language == "ar" || language == "he" || language == "fa";
+         const AnsiString tag = "<html lang=\"" + language + "\" dir=\"" +
+            AnsiString(rightToLeft ? "rtl" : "ltr") + "\">";
+         page.Replace("<html lang=\"en\" dir=\"ltr\">", tag.c_str());
+      }
       response.body = page;
       response.extra_headers = PortalHeaders;
       return response;
