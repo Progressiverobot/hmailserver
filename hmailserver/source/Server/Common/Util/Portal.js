@@ -919,6 +919,54 @@
   // Remote images, fonts and styles stay blocked unless the reader asked
   // for this message, or for this sender, to show them; the server says
   // whether the part names any (html_remote), so the note is right.
+  // What the remote-image block kept out, counted from the HTML as sent: the
+  // images that point at a host, the hosts, and the ones that look like
+  // tracking pixels - a pixel or less in size, hidden, or named as one. The
+  // sender's habit is the number of their messages seen carrying pixels, kept
+  // in this browser, each message counted once.
+  var countRemote = function (html) {
+    var out = { images: 0, hosts: {}, pixels: 0 };
+    var tags = String(html || '').match(/<img\b[^>]*>/gi) || [];
+    tags.forEach(function (tag) {
+      var src = (tag.match(/\bsrc\s*=\s*["']?\s*(https?:\/\/[^"'\s>]+)/i) || [])[1];
+      if (!src) { return; }
+      out.images++;
+      var host = (src.match(/^https?:\/\/([^\/?#]+)/i) || [])[1];
+      if (host) { out.hosts[host.toLowerCase()] = true; }
+      var w = (tag.match(/\bwidth\s*=\s*["']?\s*(\d+)/i) || [])[1];
+      var h = (tag.match(/\bheight\s*=\s*["']?\s*(\d+)/i) || [])[1];
+      var tiny = (w !== undefined && Number(w) <= 1) || (h !== undefined && Number(h) <= 1) || /width\s*:\s*[01]px|height\s*:\s*[01]px/i.test(tag);
+      var hidden = /display\s*:\s*none|visibility\s*:\s*hidden/i.test(tag);
+      var named = /pixel|track|beacon|open\.gif|\/o\.gif|\/open\b|\/img\/open|spacer/i.test(src);
+      if (tiny || hidden || named) { out.pixels++; }
+    });
+    (String(html || '').match(/url\(\s*["']?https?:\/\/[^)"']+/gi) || []).forEach(function (u) {
+      out.images++;
+      var host = (u.match(/https?:\/\/([^\/?#"')]+)/i) || [])[1];
+      if (host) { out.hosts[host.toLowerCase()] = true; }
+    });
+    out.hostCount = Object.keys(out.hosts).length;
+    return out;
+  };
+  var TRACKERS = 'hmPortalTrackers';
+  var trackerHabit = function (sender, messageId, pixels) {
+    var record = {};
+    try { record = JSON.parse(localStorage.getItem(TRACKERS) || '{}') || {}; } catch (e) { record = {}; }
+    var entry = record[sender] || { count: 0, seen: [] };
+    if (pixels && entry.seen.indexOf(messageId) < 0) {
+      entry.count++; entry.seen.push(messageId);
+      if (entry.seen.length > 50) { entry.seen = entry.seen.slice(-50); }
+      record[sender] = entry;
+      try { localStorage.setItem(TRACKERS, JSON.stringify(record)); } catch (e) { /* a browser without storage forgets */ }
+    }
+    return entry.count;
+  };
+  var describeRemote = function (showing, sender) {
+    var counted = countRemote(showing.html);
+    el('message-remote-count').textContent = counted.images ? tf('{0} remote image(s) from {1} host(s) were not loaded; {2} look like tracking pixels.', counted.images, counted.hostCount, counted.pixels) : '';
+    var habit = trackerHabit(sender, showing.id, counted.pixels);
+    el('message-remote-habit').textContent = habit ? tf('This sender has used tracking pixels in {0} message(s).', habit) : '';
+  };
   var renderHtml = function () {
     var frame = el('message-html');
     if (!current || !current.html || !showHtml) { frame.hidden = true; frame.removeAttribute('src'); el('message-text').hidden = false; return Promise.resolve(); }
@@ -926,6 +974,7 @@
     var sender = addressOf(showing.from).toLowerCase();
     var allowed = remoteAllowed.id === showing.id || remoteSenders().indexOf(sender) >= 0;
     el('message-remote').hidden = !(showing.html_remote && !allowed);
+    if (!el('message-remote').hidden) { describeRemote(showing, sender); }
     frame.setAttribute('src', '/api/v1/me/messages/' + showing.id + '/html' + (allowed ? '?remote=1' : ''));
     frame.hidden = false;
     el('message-text').hidden = true;

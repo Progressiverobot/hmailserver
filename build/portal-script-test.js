@@ -1399,6 +1399,14 @@ async function main() {
    check('the theme can be turned over', document.body.getAttribute('data-theme') === 'light',
       document.body.getAttribute('data-theme'));
    check('and is remembered', store.get('hmPortalTheme') === 'light');
+   // ---- trackers, counted: the remote-image notice says what it kept out
+   location.hash = '#/m/102';
+   await flush();
+   check('the notice counts the remote images, their hosts and the pixels among them', document.getElementById('message-remote-count').textContent === '1 remote image(s) from 1 host(s) were not loaded; 1 look like tracking pixels.',
+      document.getElementById('message-remote-count').textContent);
+   check('and remembers the sender\'s habit in this browser', document.getElementById('message-remote-habit').textContent === 'This sender has used tracking pixels in 1 message(s).' && String(store.get('hmPortalTrackers')).indexOf('b@example.net') >= 0,
+      document.getElementById('message-remote-habit').textContent);
+
    // ---- undo more: a contact removed and a rule saved come back from the toast
    location.hash = '#/contacts';
    await flush();
