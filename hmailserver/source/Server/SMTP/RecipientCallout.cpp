@@ -341,12 +341,20 @@ namespace HM
 
       reason = verdictReason;
 
+      // Braced: the logging macros expand to an if of their own, and an else after
+      // one binds to the macro's if rather than to the one written here.
       if (verdict == CalloutRejected)
+      {
          LOG_APPLICATION("Recipient callout: " + domain + " does not accept " + address + ". " + verdictReason);
+      }
       else if (verdict == CalloutAccepted)
+      {
          LOG_DEBUG("Recipient callout: " + domain + " accepts " + address + ".");
+      }
       else
+      {
          LOG_APPLICATION("Recipient callout for " + address + " gave no verdict (" + verdictReason + "). The recipient is accepted.");
+      }
 
       return verdict;
    }
@@ -362,7 +370,17 @@ namespace HM
 
       std::vector<HostNameAndIpAddress> candidates;
 
-      if (!configuredHost.IsEmpty())
+      if (!configuredHost.IsEmpty() && IPAddress::IsValid(AnsiString(configuredHost)))
+      {
+         // An address typed as an address. Not sent through the resolver: what a
+         // DNS server answers for a query named "192.0.2.1" is the resolver's
+         // business, and a primary named by its address should not depend on it.
+         HostNameAndIpAddress candidate;
+         candidate.SetHostName(configuredHost);
+         candidate.SetIpAddress(configuredHost);
+         candidates.push_back(candidate);
+      }
+      else if (!configuredHost.IsEmpty())
       {
          std::vector<String> addresses;
          resolver.GetIpAddresses(configuredHost, addresses, true);
