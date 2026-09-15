@@ -390,7 +390,18 @@ What is not covered yet
 -----------------------
 
 * **HTML**, reached through the HTML-to-text conversion and message rewriting.
-* **iCalendar and vCard**, reached through attachment handling.
+* **iCalendar and vCard**, reached through attachment handling - and, since
+  CardDAV (6.3.3) and CalDAV (15 September 2026, in the tree), reached directly
+  by an authenticated `PUT` of a card or a calendar object, which is a shorter
+  path to `Common/Util/VCard.cpp` and `Common/Util/ICalendar.cpp` than an
+  attachment is. `ICalendar` is the more exposed of the two: it parses a
+  component tree and then *expands* a recurrence rule, which is arithmetic over
+  attacker-chosen numbers rather than only a reader. Its expansion is bounded
+  deliberately - a ceiling on instances, on periods scanned, on empty periods in
+  a row, and the year 9999 - and one defect of exactly this shape has already
+  been found and fixed by hand rather than by a fuzzer: the number reader took
+  seven characters at most, so `COUNT=100000000` (nine digits) was misread.
+  That is the argument for the target, not against it.
 * **`MimeBody::LoadFromFile`'s byte bookkeeping.** The in-memory targets do not
   cover the `body_byte_offset_` / `body_byte_end_` arithmetic or the
   trailing-CRLF trim, which decide which bytes `SaveAllToFile` copies verbatim.
