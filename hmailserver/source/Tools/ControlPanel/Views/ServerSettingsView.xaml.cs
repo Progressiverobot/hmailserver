@@ -2012,6 +2012,78 @@ namespace hMailServer.ControlPanel.Views
          afterBuildUi_ = () => WireLogFormatDependency(format, json);
          logging.Cards.Add(log);
 
+         // syslog, next to the destination it is an alternative reading of. It is
+         // the first question a Linux administrator asks about any daemon, and the
+         // answer until now was "log files, or an OTLP collector" - neither of
+         // which is what their existing collector reads.
+         var syslog = Card(L("syslog (RFC 5424)"),
+            L("A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it."));
+
+         syslog.Settings.Add(new ComBool
+         {
+            Path = "Logging.SyslogEnabled",
+            Label = L("Send log entries to syslog"),
+            Blurb = L(SettingClaims.NoteFor("Logging.SyslogEnabled"))
+         });
+         syslog.Settings.Add(new ComText
+         {
+            Path = "Logging.SyslogHost",
+            Label = L("Collector host name or address"),
+            Blurb = L(SettingClaims.NoteFor("Logging.SyslogHost"))
+         });
+         syslog.Settings.Add(new ComText
+         {
+            Path = "Logging.SyslogPort",
+            Label = L("Collector port"),
+            Numeric = true,
+            Blurb = L("514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS.")
+         });
+         syslog.Settings.Add(new ComCombo
+         {
+            Path = "Logging.SyslogTransport",
+            Label = L("How entries reach the collector"),
+            Options = ToOptions(SettingClaims.SyslogTransportOptions),
+            Blurb = L(SettingClaims.NoteFor("Logging.SyslogTransport"))
+         });
+         syslog.Settings.Add(new ComText
+         {
+            Path = "Logging.SyslogFacility",
+            Label = L("Facility (0 to 23)"),
+            Numeric = true,
+            Blurb = L("2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used.")
+         });
+         syslog.Settings.Add(new ComCombo
+         {
+            Path = "Logging.SyslogMinimumSeverity",
+            Label = L("Send entries at least this severe"),
+            Options = ToOptions(SettingClaims.SyslogSeverityOptions),
+            Blurb = L("Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug.")
+         });
+
+         // Which categories are sent, as switches rather than as a number, for the
+         // same reason the log mask above is: it is one stored integer either way,
+         // and nobody should have to add 2, 4, 16 and 64 to configure a log.
+         // Errors are not on the list on purpose - the error log is written
+         // whatever the log mask says, and this mirrors that.
+         // Worded "... to syslog" rather than repeating the six captions of the
+         // Log categories card above. Two rows on one page with the same caption
+         // read identically in the Ctrl+K palette, which lists a setting by its
+         // label and its page and not by its card - and the palette is how most
+         // administrators find a setting at all.
+         syslog.Settings.Add(new ComBool { Path = "Logging.SyslogLogSMTP", Label = L("SMTP conversations to syslog") });
+         syslog.Settings.Add(new ComBool { Path = "Logging.SyslogLogIMAP", Label = L("IMAP conversations to syslog") });
+         syslog.Settings.Add(new ComBool { Path = "Logging.SyslogLogPOP3", Label = L("POP3 conversations to syslog") });
+         syslog.Settings.Add(new ComBool { Path = "Logging.SyslogLogApplication", Label = L("Application events to syslog") });
+         syslog.Settings.Add(new ComBool { Path = "Logging.SyslogLogTCPIP", Label = L("TCP/IP activity to syslog") });
+         syslog.Settings.Add(new ComBool
+         {
+            Path = "Logging.SyslogLogDebug",
+            Label = L("Debug messages to syslog"),
+            Blurb = L("Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it.")
+         });
+
+         logging.Cards.Add(syslog);
+
          // How much is written, next to what is written and how long it is kept -
          // an admin dealing with log volume should not have to find three pages.
          var detail = Card(L("Log detail"),

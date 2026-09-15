@@ -8,6 +8,7 @@
 #include "../Util/File.h"
 #include "../Util/FileUtilities.h"
 #include "../Util/OtelLogExporter.h"
+#include "../Util/SyslogSink.h"
 
 #include "NcsaLogFormatter.h"
 #include "SqlLogDevice.h"
@@ -177,6 +178,14 @@ namespace HM
       OtelLogExporter::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
                                               entry.remote_host, entry.message);
 
+      // And to the syslog sink, on the same terms and for the same reason: beside
+      // the devices rather than in front of one, so an entry the SQL device takes
+      // reaches a collector too, and from the entry rather than the rendered line,
+      // so RFC 5424 does not inherit whichever file format is configured. A no-op
+      // unless the syslog settings name somewhere to send to.
+      SyslogSink::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
+                                         entry.remote_host, entry.time, entry.message);
+
       if (log_device_ == DeviceSQL)
       {
          if (SqlLogDevice::Instance()->Enqueue(entry.category, (int) lt, entry.thread, entry.session,
@@ -317,12 +326,17 @@ namespace HM
       if (GetLoggingEnabled())
          Write_(entry, sData, Normal);
       else
+      {
          // The error log is written even when logging is off, and the OTLP logs
-         // signal mirrors that: an error must reach a configured collector
-         // whatever the log mask says. When logging IS enabled the Write_ call
-         // above already forwarded this entry, so this is not a second copy.
+         // signal and the syslog sink mirror that: an error must reach a
+         // configured collector whatever the log mask says. When logging IS
+         // enabled the Write_ call above already forwarded this entry, so
+         // neither of these is a second copy.
          OtelLogExporter::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
                                                  entry.remote_host, entry.message);
+         SyslogSink::Instance()->OnLogEntry(entry.category, entry.thread, entry.session,
+                                            entry.remote_host, entry.time, entry.message);
+      }
    }
 
 

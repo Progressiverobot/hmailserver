@@ -92,6 +92,45 @@ public:
    STDMETHOD(get_LiveLog)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(get_LiveLoggingEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
 
+   // The syslog sink. The six SyslogLog* switches are bits of one stored
+   // integer, exactly as LogSMTP and its five siblings above are bits of the
+   // logging mask.
+   STDMETHOD(get_SyslogEnabled)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogEnabled)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogHost)(/*[out, retval]*/ BSTR *pVal);
+   STDMETHOD(put_SyslogHost)(/*[in]*/ BSTR newVal);
+
+   STDMETHOD(get_SyslogPort)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SyslogPort)(/*[in]*/ long newVal);
+
+   STDMETHOD(get_SyslogTransport)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SyslogTransport)(/*[in]*/ long newVal);
+
+   STDMETHOD(get_SyslogFacility)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SyslogFacility)(/*[in]*/ long newVal);
+
+   STDMETHOD(get_SyslogMinimumSeverity)(/*[out, retval]*/ long *pVal);
+   STDMETHOD(put_SyslogMinimumSeverity)(/*[in]*/ long newVal);
+
+   STDMETHOD(get_SyslogLogSMTP)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogSMTP)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogLogPOP3)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogPOP3)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogLogIMAP)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogIMAP)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogLogApplication)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogApplication)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogLogTCPIP)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogTCPIP)(/*[in]*/ VARIANT_BOOL newVal);
+
+   STDMETHOD(get_SyslogLogDebug)(/*[out, retval]*/ VARIANT_BOOL *pVal);
+   STDMETHOD(put_SyslogLogDebug)(/*[in]*/ VARIANT_BOOL newVal);
+
    STDMETHOD(get_CurrentEventLog)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(get_CurrentErrorLog)(/*[out, retval]*/ BSTR *pVal);
    STDMETHOD(get_CurrentAwstatsLog)(/*[out, retval]*/ BSTR *pVal);

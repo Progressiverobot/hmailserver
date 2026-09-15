@@ -356,6 +356,9 @@ Spara det här svaga lösenordet ändå?</value>
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 kvarhållanden om 15 minuter är ungefär fyra timmar. 0 betyder att oskannad post aldrig köas alls - meddela avsändaren omedelbart. Ett kvarhållet meddelande levereras så snart någon skanner svarar; räkningen hålls i minnet, så en omstart av tjänsten ger ett kvarhållet meddelande en ny budget.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 är mail, dit en e-postservers rader hör hemma och vad en insamlares mail.*-regel redan matchar. 16 till 23 är local0 till local7, för en plats som sorterar sina egna program där. 0 är kernel och bör inte användas.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Eller ange inställningsnyckeln nedan för hand.</value>
   </data>
@@ -382,6 +385,9 @@ Spara det här svaga lösenordet ändå?</value>
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Befordra den förberedda nyckeln till signeringsnyckel:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 är den registrerade porten för UDP och för vanlig TCP; 6514 är den registrerade porten för syslog över TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 dagar</value>
@@ -421,6 +427,9 @@ Spara det här svaga lösenordet ändå?</value>
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>En kod från en autentiseringsapp, som krävs tillsammans med det här kontots lösenord. Den gäller där en kod faktiskt kan anges - Kontrollpanelen och API:et. E-postklienter kan inte visa upp en, så när detta är på måste de använda ett applösenord i stället.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>En kopia av varje loggpost, som RFC 5424, till en syslog-insamlare - rsyslog, syslog-ng, ett SIEM - vid sidan av loggfilerna och inte i stället för dem. På Linux utan angiven insamlare skriver en server under systemd till journalen, där journalctl kan läsa den.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>En inloggningsuppgift är satt men lyssnaren har ingen TLS, så uppgiften går över nätverket i klartext vid varje skrapning och kan spelas upp igen av vem som helst på vägen. Ange certifikat- och nyckelfilerna, eller bind till 127.0.0.1. Servern startar ändå - den loggar samma varning.</value>
@@ -1164,6 +1173,9 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
   <data name="Application events" xml:space="preserve">
     <value>Programhändelser</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Programhändelser till syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Tillämpat</value>
   </data>
@@ -1172,6 +1184,9 @@ Starta om Kontrollpanelen nu? Välj Nej för att försöka fortsätta arbeta.</v
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Gäller _för</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Träder i kraft vid nästa omstart av tjänsten eller vid ominitiering. Loggfilerna påverkas inte: detta skickar en kopia, det flyttar ingenting. Utan insamlarvärd nedan skriver en server under systemd på Linux till journalen i stället - på Linux är alltså denna enda brytare hela konfigurationen.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Tillämpa katalogsynkronisering</value>
@@ -1798,6 +1813,12 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Fäll ihop navigeringen</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Insamlarens värdnamn eller adress</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Insamlarport</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Kommandorad (använd %FILE% för filen som skannas)</value>
@@ -2458,6 +2479,9 @@ Den förberedda selektorn "{0}" tas bort från serverkonfigurationen; signeringe
   <data name="Debug messages" xml:space="preserve">
     <value>Felsökningsmeddelanden</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Felsökningsmeddelanden till syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Standard 10, tillåtet intervall 1 till 90. Servern läser värden under 1 som 10 och begränsar värden över 90, eftersom "vänta för evigt" på en onåbar katalog är så anslutningstrådar tar slut.</value>
   </data>
@@ -2869,6 +2893,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Tomt betyder ingen. XCLIENT annonseras inte ens i EHLO till en uppströmsvärd som inte listas här, så en angripare lär sig inget om installationen genom att fråga.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Tomt betyder systemd-journalen på Linux, och på Windows att ingenting skickas. En insamlare som slutar svara fördröjer aldrig post: poster köas, de äldsta kastas när 4096 väntar, och programloggen säger det en gång vid början och en gång när insamlaren är tillbaka.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>_Aktivera / inaktivera</value>
   </data>
@@ -2992,6 +3019,18 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Kuvertavsändare som avvisas direkt, eller poängsätts. En post med ett @ är en exakt adress; utan ett är den en hel domän inklusive dess underdomäner. Standardpoängen 100 passerar borttagningströskeln och avvisar meddelandet under SMTP-konversationen. Detta matchar den adress avsändaren PÅSTÅR sig ha, så det stoppar en korrespondent som fortsätter använda en adress - det är inte ett verktyg mot förfalskning, och stoppar inget som byter adresser.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Felposter bär den allvarsgrad servern själv registrerade: critical, error, warning eller notice. Allt annat är informational, utom TCP/IP och felsökning, som är debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Fel och varningar (allvarsgrad 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Fel skickas alltid, oavsett vilka av dessa som är av - felloggen skrivs även när loggning är avstängd, och detta följer den.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Endast fel (allvarsgrad 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Utvärdera DMARC-policyer</value>
   </data>
@@ -3061,11 +3100,17 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Allt som ErrorManager rapporterar</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Allt utom felsökning (allvarsgrad 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Allt som avgör om ett meddelande är önskat.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Allt den här servern behöver få gjort utanför sig själv - DNS-poster, nyckel- och CA-filer, betrodda listor - och läget för var och en.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Allt, inklusive felsökning (allvarsgrad 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Körbar fil hittad: {0}</value>
@@ -3153,6 +3198,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Extra leveransförsök per ytterligare MX-värd (0 = standard)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0 till 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Misslyckade inloggningar från en listad adress räknas inte alls, så den kan aldrig stängas av. Skriv in adresserna du administrerar från här innan du slår på brandväggsvalet: en avstängning som når brandväggen stänger ute adressen från alla e-postportar på den här maskinen. Exempel: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. En post som inte är en adress rapporteras med namn i felloggen och ignoreras.</value>
@@ -3511,6 +3559,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Hur konton bevisar vilka de är: lösenordshashning, OAuth2 / XOAUTH2 och krävda mekanismer.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Hur posterna når insamlaren</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Hur länge en anslutning får stå overksam innan den stängs, per protokoll, i sekunder. "Server" är hMailServer som tar emot en anslutning från en e-postklient eller en annan e-postserver; "klient" är hMailServer som ansluter utåt för att leverera post eller hämta den från ett externt POP3-konto. Den faktiska tidsgränsen rör sig mellan minimum och maximum med serverns belastning, så en upptagen server släpper overksamma anslutningar tidigare. Gäller efter en omstart av tjänsten.</value>
   </data>
@@ -3585,6 +3636,9 @@ Ingen post rörs - indexet härleds från den - men tills ombyggnaden kommer ika
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP-konversationer</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP-konversationer till syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>Gränser för IMAP-sökning</value>
@@ -5229,6 +5283,9 @@ Det verifierade installationsprogrammet lämnas över till uppdateringshjälpen:
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3-konversationer</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3-konversationer till syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3 har inget sätt för servern att tala om för en klient att post har kommit, så klienter som vill verka snabba pollar - och vissa pollar med några sekunders mellanrum. Varje poll är en ny anslutning, en TLS-handskakning och en lösenordsverifiering, som med Argon2id är medvetet dyr, så en handfull ivriga klienter kan kosta mer än posten gör. Att sätta en fördröjning talar om intervallet för klienter i serverns kapabilitetslista och avvisar inloggningar som kommer för tidigt med en kod klienten förstår som "sakta ner" snarare än som fel lösenord. Gäller efter en omstart av tjänsten.</value>
   </data>
@@ -6174,6 +6231,9 @@ Fortsätt?</value>
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP-konversationer</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP-konversationer till syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP-relä (smart värd)</value>
   </data>
@@ -6591,11 +6651,17 @@ Fortsätt?</value>
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Skicka ett meddelande till varje konto på servern (eller de som matchar en joker) - för underhållsmeddelanden.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Skicka poster med minst denna allvarsgrad</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Skicka allt genom min leverantör</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Skicka den som en bearer-token:  Authorization: Bearer hmapi_...  till REST-lyssnaren som konfigurerats på sidan API &amp; övervakning. Administratörslösenordet fungerar också och är obegränsat, vilket är skälet att föredra en nyckel: en nyckel kan vara skrivskyddad, begränsad till namngivna domäner, begränsad till en källadress, ges en utgångstid och återkallas utan att något annat ändras.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Skicka loggposter till syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Skicka det här meddelandet till alla konton som matchar '{0}'?</value>
@@ -7142,8 +7208,17 @@ Starta om den nu?</value>
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Syntaxkontrollen misslyckades: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - levereras i ordning, inget kapas</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP över TLS (RFC 5425), certifikat verifieras</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP-aktivitet</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP-aktivitet till syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP-port</value>
@@ -8277,6 +8352,12 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Typ:        TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - ingen leveransgaranti, kapas vid 1024 byte</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP kapar en post vid 1024 byte, vilket är RFC 5426:s rekommendation och ligger under varje relevant väg-MTU; de två strömtransporterna ramar in varje post med dess egen längd (RFC 5425) och kapar ingenting. TLS verifierar insamlarens certifikatkedja och dess namn mot maskinens rotlager och avvisar anslutningen om något av det misslyckas - en insamlare med självsignerat certifikat kräver därför att certifikatet är betrott på den här maskinen.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Kan inte nå servern (RPC otillgängligt).</value>
@@ -9747,6 +9828,9 @@ Inget meddelande tas bort och inget konto avlägsnas. Fortsätt?</value>
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>stoppa skräppost</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>berätta för alla om underhåll</value>

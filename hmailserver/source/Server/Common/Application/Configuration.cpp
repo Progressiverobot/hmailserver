@@ -61,7 +61,9 @@ namespace HM
 
       property_set_ = std::shared_ptr<PropertySet>(new PropertySet());
       property_set_->Refresh();
-      
+
+      EnsureSettingDefaults_();
+
       pop3_configuration_ = std::shared_ptr<POP3Configuration>(new POP3Configuration);
       smtp_configuration_ = std::shared_ptr<SMTPConfiguration>(new SMTPConfiguration);
       imap_configuration_ = std::shared_ptr<IMAPConfiguration>(new IMAPConfiguration);
@@ -89,7 +91,30 @@ namespace HM
       return imap_configuration_->Load();
    }
 
-   void 
+   void
+   Configuration::EnsureSettingDefaults_()
+   {
+      if (!property_set_)
+         return;
+
+      // The syslog sink. Every default is the server as it has always been: off,
+      // with nowhere to send to. The rows exist all the same, because a read of a
+      // missing property reports HM5015 - see PropertySet::EnsureLong.
+      property_set_->EnsureLong(PROPERTY_SYSLOG_ENABLED, 0);
+      property_set_->EnsureString(PROPERTY_SYSLOG_HOST, _T(""));
+      property_set_->EnsureLong(PROPERTY_SYSLOG_PORT, 514);
+      property_set_->EnsureLong(PROPERTY_SYSLOG_TRANSPORT, 0);          // UDP
+      property_set_->EnsureLong(PROPERTY_SYSLOG_FACILITY, 2);           // mail
+      property_set_->EnsureLong(PROPERTY_SYSLOG_SEVERITY, 6);           // informational
+
+      // SMTP, POP3, IMAP and application events, which is what an administrator
+      // watching a mail server wants. TCP/IP and debug are left out: both are
+      // diagnostic chatter, and a collector charged by volume is a real cost.
+      property_set_->EnsureLong(PROPERTY_SYSLOG_LOGTYPES,
+         Logger::LSSMTP | Logger::LSPOP3 | Logger::LSApplication | Logger::LSIMAP);
+   }
+
+   void
    Configuration::OnPropertyChanged(std::shared_ptr<Property> pProperty)
    {
       String sPropertyName = pProperty->GetName();
@@ -448,6 +473,109 @@ namespace HM
    Configuration::SetLogDevice(long newVal)
    {
       GetSettings()->SetLong(PROPERTY_LOGDEVICE, newVal);
+   }
+
+   bool
+   Configuration::GetSyslogEnabled() const
+   {
+      return GetSettings()->GetBool(PROPERTY_SYSLOG_ENABLED);
+   }
+
+   void
+   Configuration::SetSyslogEnabled(bool newVal)
+   {
+      GetSettings()->SetBool(PROPERTY_SYSLOG_ENABLED, newVal);
+   }
+
+   String
+   Configuration::GetSyslogHost() const
+   {
+      return GetSettings()->GetString(PROPERTY_SYSLOG_HOST);
+   }
+
+   void
+   Configuration::SetSyslogHost(const String &newVal)
+   {
+      GetSettings()->SetString(PROPERTY_SYSLOG_HOST, newVal);
+   }
+
+   long
+   Configuration::GetSyslogPort() const
+   {
+      return GetSettings()->GetLong(PROPERTY_SYSLOG_PORT);
+   }
+
+   void
+   Configuration::SetSyslogPort(long newVal)
+   {
+      GetSettings()->SetLong(PROPERTY_SYSLOG_PORT, newVal);
+   }
+
+   long
+   Configuration::GetSyslogTransport() const
+   {
+      return GetSettings()->GetLong(PROPERTY_SYSLOG_TRANSPORT);
+   }
+
+   void
+   Configuration::SetSyslogTransport(long newVal)
+   {
+      GetSettings()->SetLong(PROPERTY_SYSLOG_TRANSPORT, newVal);
+   }
+
+   long
+   Configuration::GetSyslogFacility() const
+   {
+      return GetSettings()->GetLong(PROPERTY_SYSLOG_FACILITY);
+   }
+
+   void
+   Configuration::SetSyslogFacility(long newVal)
+   {
+      GetSettings()->SetLong(PROPERTY_SYSLOG_FACILITY, newVal);
+   }
+
+   long
+   Configuration::GetSyslogMinimumSeverity() const
+   {
+      return GetSettings()->GetLong(PROPERTY_SYSLOG_SEVERITY);
+   }
+
+   void
+   Configuration::SetSyslogMinimumSeverity(long newVal)
+   {
+      GetSettings()->SetLong(PROPERTY_SYSLOG_SEVERITY, newVal);
+   }
+
+   long
+   Configuration::GetSyslogLogTypes() const
+   {
+      return GetSettings()->GetLong(PROPERTY_SYSLOG_LOGTYPES);
+   }
+
+   void
+   Configuration::SetSyslogLogTypes(long newVal)
+   {
+      GetSettings()->SetLong(PROPERTY_SYSLOG_LOGTYPES, newVal);
+   }
+
+   bool
+   Configuration::GetSyslogLogType(int mask) const
+   {
+      return (GetSettings()->GetLong(PROPERTY_SYSLOG_LOGTYPES) & mask) != 0;
+   }
+
+   void
+   Configuration::SetSyslogLogType(int mask, bool enabled)
+   {
+      long types = GetSettings()->GetLong(PROPERTY_SYSLOG_LOGTYPES);
+
+      if (enabled)
+         types |= mask;
+      else
+         types &= ~mask;
+
+      GetSettings()->SetLong(PROPERTY_SYSLOG_LOGTYPES, types);
    }
 
    String 

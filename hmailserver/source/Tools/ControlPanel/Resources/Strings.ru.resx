@@ -356,6 +356,9 @@
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 задержек по 15 минут — это около четырёх часов. 0 означает, что непроверенная почта не ставится в очередь вовсе: отправителю сообщают об этом сразу. Задержанное сообщение доставляется, как только ответит любой сканер; счётчик хранится в памяти, поэтому после перезапуска службы у задержанного сообщения появляется новый запас.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 - это mail, куда и относятся строки почтового сервера и что правило mail.* сборщика уже перехватывает. С 16 по 23 - это local0 - local7, для площадки, которая размещает там собственные приложения. 0 - это kernel, и его использовать не следует.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Либо введите показанный ниже ключ настройки вручную.</value>
   </data>
@@ -382,6 +385,9 @@
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Повысьте подготовленный ключ до ключа подписи:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 - зарегистрированный порт для UDP и для обычного TCP; 6514 - зарегистрированный порт для syslog поверх TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 дней</value>
@@ -421,6 +427,9 @@
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>Код из приложения-аутентификатора, требуемый вместе с паролем этой учётной записи. Он применяется там, где код действительно можно ввести, — в Control Panel и в API. Почтовые клиенты предъявить его не могут, поэтому после включения им придётся использовать пароль приложения.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>Копия каждой записи журнала в формате RFC 5424 сборщику syslog - rsyslog, syslog-ng, SIEM - рядом с файлами журнала, а не вместо них. В Linux, если сборщик не указан, сервер под управлением systemd пишет в journal, где его читает journalctl.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>Учётные данные заданы, но у прослушивателя нет TLS, поэтому при каждом сборе метрик они передаются по сети открытым текстом и могут быть воспроизведены любым, кто находится на пути. Задайте файлы сертификата и ключа либо привяжитесь к 127.0.0.1. Сервер всё равно запускается — он записывает в журнал это же предупреждение.</value>
@@ -1164,6 +1173,9 @@ Control Panel может читать файлы сообщений только
   <data name="Application events" xml:space="preserve">
     <value>События приложения</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>События приложения в syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Применено</value>
   </data>
@@ -1172,6 +1184,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>_Применяется к</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Вступает в силу при следующем запуске службы или при повторной инициализации. Файлы журнала не затрагиваются: отправляется копия, ничего не перемещается. Если узел сборщика ниже не указан, сервер под управлением systemd в Linux пишет в journal - то есть в Linux этот один переключатель и есть вся настройка.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Применить синхронизацию с каталогом</value>
@@ -1798,6 +1813,12 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Свернуть навигацию</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Имя узла или адрес сборщика</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Порт сборщика</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Командная строка (для проверяемого файла используйте %FILE%)</value>
@@ -2458,6 +2479,9 @@ Control Panel может читать файлы сообщений только
   <data name="Debug messages" xml:space="preserve">
     <value>Отладочные сообщения</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Отладочные сообщения в syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>По умолчанию 10, допустимый диапазон — от 1 до 90. Значения меньше 1 сервер читает как 10, а значения больше 90 подтягивает к границе, потому что «ждать вечно» недоступного каталога — это как раз то, из-за чего заканчиваются потоки подключений.</value>
   </data>
@@ -2869,6 +2893,9 @@ Control Panel может читать файлы сообщений только
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Пустое значение означает «никто». Вышестоящему узлу, которого здесь нет, XCLIENT даже не объявляется в EHLO, поэтому злоумышленник ничего не узнаёт об установке, просто спросив.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Пустое значение означает journal systemd в Linux, а в Windows - что ничего не отправляется. Переставший отвечать сборщик никогда не задерживает почту: записи ставятся в очередь, самые старые отбрасываются, когда ожидают 4096, а журнал приложения сообщает об этом один раз в начале и один раз, когда сборщик возвращается.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>Включить / _отключить</value>
   </data>
@@ -2992,6 +3019,18 @@ Control Panel может читать файлы сообщений только
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Отправители конверта, которым отказывают сразу или которым начисляется оценка. Запись с символом @ — это один точный адрес; запись без него — целый домен вместе с его поддоменами. Оценка по умолчанию, равная 100, превышает порог удаления и приводит к отказу от сообщения прямо во время SMTP-диалога. Сопоставление идёт с тем адресом, который отправитель ЗАЯВЛЯЕТ, поэтому оно останавливает корреспондента, продолжающего пользоваться одним адресом; это не средство против подделки отправителя, и никого, кто меняет адреса, оно не останавливает.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Записи об ошибках несут ту важность, которую зафиксировал сам сервер: critical, error, warning или notice. Всё остальное - informational, кроме TCP/IP и отладки, которые относятся к debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Ошибки и предупреждения (важность 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Ошибки отправляются всегда, какие бы из этих переключателей ни были выключены: журнал ошибок пишется даже при отключённом ведении журнала, и это следует за ним.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Только ошибки (важность 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Оценивать политики DMARC</value>
   </data>
@@ -3061,11 +3100,17 @@ Control Panel может читать файлы сообщений только
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Всё, о чём сообщает ErrorManager</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Всё, кроме отладки (важность 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Всё, что решает, нужное ли это сообщение.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Всё, что нужно сделать за пределами этого сервера, — записи DNS, файлы ключей и ЦС, списки доверия, — и состояние каждого пункта.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Всё, включая отладку (важность 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Исполняемый файл найден: {0}</value>
@@ -3153,6 +3198,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Дополнительные попытки доставки на каждый дополнительный узел MX (0 — по умолчанию)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (от 0 до 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Неудачные входы с адреса из списка не считаются вовсе, поэтому его нельзя забанить никогда. Внесите сюда адреса, с которых вы администрируете, прежде чем включать параметр межсетевого экрана: бан, дошедший до межсетевого экрана, закрывает этому адресу все почтовые порты этой машины. Пример: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. Запись, не являющаяся адресом, сообщается по имени в журнале ошибок и пропускается.</value>
@@ -3511,6 +3559,9 @@ Control Panel может читать файлы сообщений только
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>Как учётные записи подтверждают, кто они: хеширование паролей, OAuth2 / XOAUTH2 и обязательные механизмы.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>Как записи попадают к сборщику</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>Сколько соединение может простаивать до закрытия, по каждому протоколу, в секундах. «Сервер» — это hMailServer, принимающий подключение от почтового клиента или другого почтового сервера; «клиент» — это hMailServer, подключающийся наружу, чтобы доставить почту или забрать её из внешней учётной записи POP3. Действующий тайм-аут перемещается между минимумом и максимумом в зависимости от нагрузки на сервер, поэтому загруженный сервер разрывает простаивающие соединения раньше. Вступает в силу после перезапуска службы.</value>
   </data>
@@ -3585,6 +3636,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>Диалоги IMAP</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>Диалоги IMAP в syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>Ограничения поиска IMAP</value>
@@ -5229,6 +5283,9 @@ Control Panel может читать файлы сообщений только
   <data name="POP3 conversations" xml:space="preserve">
     <value>Диалоги POP3</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>Диалоги POP3 в syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>В POP3 у сервера нет способа сообщить клиенту о поступлении почты, поэтому клиенты, желающие выглядеть отзывчивыми, опрашивают сервер — а некоторые делают это каждые несколько секунд. Каждый опрос — это новое подключение, рукопожатие TLS и проверка пароля, которая с Argon2id намеренно сделана дорогой, так что горстка усердных клиентов может обойтись дороже, чем сама почта. Заданная задержка сообщает клиентам интервал в списке возможностей сервера и отклоняет входы, случившиеся раньше срока, кодом, который клиент понимает как «сбавь темп», а не как неверный пароль. Вступает в силу после перезапуска службы.</value>
   </data>
@@ -6174,6 +6231,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="SMTP conversations" xml:space="preserve">
     <value>Диалоги SMTP</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>Диалоги SMTP в syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>Ретранслятор SMTP (smart host)</value>
   </data>
@@ -6591,11 +6651,17 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Отправьте сообщение всем учётным записям на сервере (или тем, что подходят под шаблон) — для объявлений об обслуживании.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Отправлять записи не ниже этой важности</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Отправлять всё через моего поставщика</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Передавайте его как токен-носитель:  Authorization: Bearer hmapi_...  прослушивателю REST, настроенному на странице «API и мониторинг». Пароль администратора тоже подходит и ничем не ограничен — именно поэтому ключ предпочтительнее: ключ можно сделать доступным только для чтения, ограничить названными доменами, ограничить одним исходным адресом, задать ему срок действия и отозвать, не меняя больше ничего.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Отправлять записи журнала в syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Отправить это сообщение всем учётным записям, подходящим под «{0}»?</value>
@@ -7142,8 +7208,17 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Проверка синтаксиса не пройдена: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - доставка по порядку, ничего не обрезается</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP поверх TLS (RFC 5425), сертификат проверяется</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>Активность TCP/IP</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>Активность TCP/IP в syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>Порт TCP/IP</value>
@@ -8277,6 +8352,12 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Тип:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - без гарантии доставки, обрезается до 1024 байт</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP обрезает запись до 1024 байт, что соответствует рекомендации RFC 5426 и укладывается в любой значимый MTU пути; два потоковых транспорта обрамляют каждую запись её собственной длиной (RFC 5425) и ничего не обрезают. TLS проверяет цепочку сертификатов сборщика и его имя по корневому хранилищу этого компьютера и отклоняет соединение, если что-либо из этого не проходит, - поэтому сборщику с самоподписанным сертификатом нужно, чтобы этот сертификат был доверенным на данном компьютере.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Не удалось достучаться до сервера (RPC недоступен).</value>
@@ -9747,6 +9828,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>остановить спам</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>сообщить всем о техническом обслуживании</value>

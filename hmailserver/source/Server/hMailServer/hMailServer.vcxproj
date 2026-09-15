@@ -617,6 +617,8 @@ EXIT 0
     <ClCompile Include="..\Common\Util\SSPIValidation.cpp" />
     <ClCompile Include="..\Common\Util\Strings\FormatArgument.cpp" />
     <ClCompile Include="..\Common\Util\Strings\Formatter.cpp" />
+    <ClCompile Include="..\Common\Util\SyslogFormatter.cpp" />
+    <ClCompile Include="..\Common\Util\SyslogSink.cpp" />
     <ClCompile Include="..\Common\Util\SystemInformation.cpp" />
     <ClCompile Include="..\Common\Util\Time.cpp" />
     <ClCompile Include="..\Common\Util\TLD.cpp" />
@@ -1346,6 +1348,8 @@ EXIT 0
     <ClInclude Include="..\Common\Util\StorePath.h" />
     <ClInclude Include="..\Common\Util\Strings\FormatArgument.h" />
     <ClInclude Include="..\Common\Util\Strings\Formatter.h" />
+    <ClInclude Include="..\Common\Util\SyslogFormatter.h" />
+    <ClInclude Include="..\Common\Util\SyslogSink.h" />
     <ClInclude Include="..\Common\Util\SystemInformation.h" />
     <ClInclude Include="..\Common\Util\Time.h" />
     <ClInclude Include="..\Common\Util\TLD.h" />

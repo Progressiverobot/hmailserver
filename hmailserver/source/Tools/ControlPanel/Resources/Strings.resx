@@ -356,6 +356,9 @@ Save this weak password anyway?</value>
   <data name="16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget." xml:space="preserve">
     <value>16 holds at 15 minutes is about four hours. 0 means never queue unscanned mail at all - tell the sender immediately. A held message is delivered as soon as any scanner answers; the count is kept in memory, so a service restart gives a held message a fresh budget.</value>
   </data>
+  <data name="2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used." xml:space="preserve">
+    <value>2 is mail, which is where a mail server's lines belong and what a collector's mail.* rule already matches. 16 to 23 are local0 to local7, for a site that files its own applications there. 0 is kernel and should not be used.</value>
+  </data>
   <data name="2.  Or enter the setup key shown below by hand." xml:space="preserve">
     <value>2.  Or enter the setup key shown below by hand.</value>
   </data>
@@ -382,6 +385,9 @@ Save this weak password anyway?</value>
   </data>
   <data name="5. Promote the staged key to become the signing key:" xml:space="preserve">
     <value>5. Promote the staged key to become the signing key:</value>
+  </data>
+  <data name="514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS." xml:space="preserve">
+    <value>514 is the registered port for UDP and for plain TCP; 6514 is the registered port for syslog over TLS.</value>
   </data>
   <data name="7 days" xml:space="preserve">
     <value>7 days</value>
@@ -421,6 +427,9 @@ Save this weak password anyway?</value>
   </data>
   <data name="A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead." xml:space="preserve">
     <value>A code from an authenticator app, required alongside this account's password. It applies where a code can actually be entered - the Control Panel and the API. Mail clients cannot present one, so once this is on they must use an app password instead.</value>
+  </data>
+  <data name="A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it." xml:space="preserve">
+    <value>A copy of every log entry, as RFC 5424, to a syslog collector - rsyslog, syslog-ng, a SIEM - beside the log files rather than instead of them. On Linux with no collector named, a server running under systemd writes to the journal, where journalctl can read it.</value>
   </data>
   <data name="A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning." xml:space="preserve">
     <value>A credential is set but the listener has no TLS, so the credential crosses the network in clear text on every scrape and can be replayed by anyone on the path. Set the certificate and key files, or bind to 127.0.0.1. The server still starts - it logs this same warning.</value>
@@ -1164,6 +1173,9 @@ Restart the Control Panel now? Choose No to try to keep working.</value>
   <data name="Application events" xml:space="preserve">
     <value>Application events</value>
   </data>
+  <data name="Application events to syslog" xml:space="preserve">
+    <value>Application events to syslog</value>
+  </data>
   <data name="Applied" xml:space="preserve">
     <value>Applied</value>
   </data>
@@ -1172,6 +1184,9 @@ Restart the Control Panel now? Choose No to try to keep working.</value>
   </data>
   <data name="Applies _to" xml:space="preserve">
     <value>Applies _to</value>
+  </data>
+  <data name="Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration." xml:space="preserve">
+    <value>Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration.</value>
   </data>
   <data name="Apply directory synchronisation" xml:space="preserve">
     <value>Apply directory synchronisation</value>
@@ -1798,6 +1813,12 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   </data>
   <data name="Collapse the navigation" xml:space="preserve">
     <value>Collapse the navigation</value>
+  </data>
+  <data name="Collector host name or address" xml:space="preserve">
+    <value>Collector host name or address</value>
+  </data>
+  <data name="Collector port" xml:space="preserve">
+    <value>Collector port</value>
   </data>
   <data name="Command line (use %FILE% for the scanned file)" xml:space="preserve">
     <value>Command line (use %FILE% for the scanned file)</value>
@@ -2458,6 +2479,9 @@ The staged selector "{0}" is removed from the server configuration; signing cont
   <data name="Debug messages" xml:space="preserve">
     <value>Debug messages</value>
   </data>
+  <data name="Debug messages to syslog" xml:space="preserve">
+    <value>Debug messages to syslog</value>
+  </data>
   <data name="Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because &quot;wait forever&quot; for an unreachable directory is how connection threads get exhausted." xml:space="preserve">
     <value>Default 10, allowed range 1 to 90. The server reads values below 1 as 10 and clamps values above 90, because "wait forever" for an unreachable directory is how connection threads get exhausted.</value>
   </data>
@@ -2869,6 +2893,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking." xml:space="preserve">
     <value>Empty means nobody. XCLIENT is not even advertised in EHLO to an upstream that is not listed here, so an attacker learns nothing about the deployment by asking.</value>
   </data>
+  <data name="Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back." xml:space="preserve">
+    <value>Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back.</value>
+  </data>
   <data name="Ena_ble / disable" xml:space="preserve">
     <value>Ena_ble / disable</value>
   </data>
@@ -2992,6 +3019,18 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses." xml:space="preserve">
     <value>Envelope senders refused outright, or scored. An entry with an @ is one exact address; without one it is a whole domain including its subdomains. The default score of 100 crosses the delete threshold and refuses the message during the SMTP conversation. This matches the address the sender CLAIMS, so it stops a correspondent who keeps using one address - it is not an anti-spoofing tool, and stops nothing that rotates addresses.</value>
   </data>
+  <data name="Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug." xml:space="preserve">
+    <value>Error entries carry the severity the server itself recorded: critical, error, warning or notice. Everything else is informational, except TCP/IP and debug, which are debug.</value>
+  </data>
+  <data name="Errors and warnings (severity 4)" xml:space="preserve">
+    <value>Errors and warnings (severity 4)</value>
+  </data>
+  <data name="Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it." xml:space="preserve">
+    <value>Errors are always sent, whichever of these are off - the error log is written even when logging is disabled, and this follows it.</value>
+  </data>
+  <data name="Errors only (severity 3)" xml:space="preserve">
+    <value>Errors only (severity 3)</value>
+  </data>
   <data name="Evaluate DMARC policies" xml:space="preserve">
     <value>Evaluate DMARC policies</value>
   </data>
@@ -3061,11 +3100,17 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="Everything ErrorManager reports" xml:space="preserve">
     <value>Everything ErrorManager reports</value>
   </data>
+  <data name="Everything except debug (severity 6)" xml:space="preserve">
+    <value>Everything except debug (severity 6)</value>
+  </data>
   <data name="Everything that decides whether a message is wanted." xml:space="preserve">
     <value>Everything that decides whether a message is wanted.</value>
   </data>
   <data name="Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one." xml:space="preserve">
     <value>Everything this server needs done outside it - DNS records, key and CA files, trusted lists - and the state of each one.</value>
+  </data>
+  <data name="Everything, debug included (severity 7)" xml:space="preserve">
+    <value>Everything, debug included (severity 7)</value>
   </data>
   <data name="Executable found: {0}" xml:space="preserve">
     <value>Executable found: {0}</value>
@@ -3153,6 +3198,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   </data>
   <data name="Extra delivery attempts per additional MX host (0 = default)" xml:space="preserve">
     <value>Extra delivery attempts per additional MX host (0 = default)</value>
+  </data>
+  <data name="Facility (0 to 23)" xml:space="preserve">
+    <value>Facility (0 to 23)</value>
   </data>
   <data name="Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored." xml:space="preserve">
     <value>Failed logons from a listed address are not counted at all, so it can never be banned. Put the addresses you administer from here before turning the firewall option on: a ban that reaches the firewall locks that address out of every mail port on this machine. Example: 192.0.2.10, 203.0.113.0/24, 2001:db8::/32. An entry that is not an address is reported by name in the error log and ignored.</value>
@@ -3511,6 +3559,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   <data name="How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms." xml:space="preserve">
     <value>How accounts prove who they are: password hashing, OAuth2 / XOAUTH2, and required mechanisms.</value>
   </data>
+  <data name="How entries reach the collector" xml:space="preserve">
+    <value>How entries reach the collector</value>
+  </data>
   <data name="How long a connection may sit idle before it is closed, per protocol, in seconds. &quot;Server&quot; is hMailServer accepting a connection from a mail client or another mail server; &quot;client&quot; is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart." xml:space="preserve">
     <value>How long a connection may sit idle before it is closed, per protocol, in seconds. "Server" is hMailServer accepting a connection from a mail client or another mail server; "client" is hMailServer connecting out to deliver mail or to fetch it from an external POP3 account. The effective timeout moves between the minimum and the maximum with server load, so a busy server drops idle connections sooner. Applies after a service restart.</value>
   </data>
@@ -3585,6 +3636,9 @@ No mail is touched - the index is derived from it - but until the rebuild catche
   </data>
   <data name="IMAP conversations" xml:space="preserve">
     <value>IMAP conversations</value>
+  </data>
+  <data name="IMAP conversations to syslog" xml:space="preserve">
+    <value>IMAP conversations to syslog</value>
   </data>
   <data name="IMAP search limits" xml:space="preserve">
     <value>IMAP search limits</value>
@@ -5229,6 +5283,9 @@ The verified installer is handed to the update helper: the service stops, the ne
   <data name="POP3 conversations" xml:space="preserve">
     <value>POP3 conversations</value>
   </data>
+  <data name="POP3 conversations to syslog" xml:space="preserve">
+    <value>POP3 conversations to syslog</value>
+  </data>
   <data name="POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as &quot;slow down&quot; rather than as a wrong password. Applies after a service restart." xml:space="preserve">
     <value>POP3 has no way for the server to tell a client that mail has arrived, so clients that want to look responsive poll - and some poll every few seconds. Each poll is a new connection, a TLS handshake and a password verification, which with Argon2id is deliberately expensive, so a handful of eager clients can cost more than the mail does. Setting a delay tells clients the interval in the server's capability list and refuses logins that arrive early with a code the client understands as "slow down" rather than as a wrong password. Applies after a service restart.</value>
   </data>
@@ -6174,6 +6231,9 @@ Continue?</value>
   <data name="SMTP conversations" xml:space="preserve">
     <value>SMTP conversations</value>
   </data>
+  <data name="SMTP conversations to syslog" xml:space="preserve">
+    <value>SMTP conversations to syslog</value>
+  </data>
   <data name="SMTP relayer (smart host)" xml:space="preserve">
     <value>SMTP relayer (smart host)</value>
   </data>
@@ -6591,11 +6651,17 @@ Continue?</value>
   <data name="Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements." xml:space="preserve">
     <value>Send a message to every account on the server (or those matching a wildcard) - for maintenance announcements.</value>
   </data>
+  <data name="Send entries at least this severe" xml:space="preserve">
+    <value>Send entries at least this severe</value>
+  </data>
   <data name="Send everything through my provider" xml:space="preserve">
     <value>Send everything through my provider</value>
   </data>
   <data name="Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else." xml:space="preserve">
     <value>Send it as a bearer token:  Authorization: Bearer hmapi_...  to the REST listener configured on the API &amp; monitoring page. The administrator password also works and is unrestricted, which is the reason to prefer a key: a key can be read-only, limited to named domains, limited to one source address, given an expiry, and revoked without changing anything else.</value>
+  </data>
+  <data name="Send log entries to syslog" xml:space="preserve">
+    <value>Send log entries to syslog</value>
   </data>
   <data name="Send this message to all accounts matching '{0}'?" xml:space="preserve">
     <value>Send this message to all accounts matching '{0}'?</value>
@@ -7142,8 +7208,17 @@ Restart it now?</value>
   <data name="Syntax check failed: {0}" xml:space="preserve">
     <value>Syntax check failed: {0}</value>
   </data>
+  <data name="TCP - delivered in order, nothing truncated" xml:space="preserve">
+    <value>TCP - delivered in order, nothing truncated</value>
+  </data>
+  <data name="TCP over TLS (RFC 5425), certificate verified" xml:space="preserve">
+    <value>TCP over TLS (RFC 5425), certificate verified</value>
+  </data>
   <data name="TCP/IP activity" xml:space="preserve">
     <value>TCP/IP activity</value>
+  </data>
+  <data name="TCP/IP activity to syslog" xml:space="preserve">
+    <value>TCP/IP activity to syslog</value>
   </data>
   <data name="TCP/IP port" xml:space="preserve">
     <value>TCP/IP port</value>
@@ -8277,6 +8352,12 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="Type:       TXT" xml:space="preserve">
     <value>Type:       TXT</value>
+  </data>
+  <data name="UDP - no delivery guarantee, truncated at 1024 bytes" xml:space="preserve">
+    <value>UDP - no delivery guarantee, truncated at 1024 bytes</value>
+  </data>
+  <data name="UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine." xml:space="preserve">
+    <value>UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine.</value>
   </data>
   <data name="Unable to reach the server (RPC unavailable)." xml:space="preserve">
     <value>Unable to reach the server (RPC unavailable).</value>
@@ -9747,6 +9828,9 @@ No message is deleted and no account is removed. Continue?</value>
   </data>
   <data name="stop spam" xml:space="preserve">
     <value>stop spam</value>
+  </data>
+  <data name="syslog (RFC 5424)" xml:space="preserve">
+    <value>syslog (RFC 5424)</value>
   </data>
   <data name="tell everyone about maintenance" xml:space="preserve">
     <value>tell everyone about maintenance</value>

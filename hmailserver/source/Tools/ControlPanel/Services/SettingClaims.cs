@@ -142,6 +142,57 @@ namespace hMailServer.ControlPanel.Services
             (LogDeviceSql, N("Database (SQL)"))
          };
 
+      // ---- Logging.SyslogTransport -------------------------------------------
+
+      /// <summary>SyslogTransport: a UDP datagram per entry.</summary>
+      public const int SyslogTransportUdp = 0;
+
+      /// <summary>SyslogTransport: one TCP connection, octet-counted framing.</summary>
+      public const int SyslogTransportTcp = 1;
+
+      /// <summary>SyslogTransport: the same over TLS, RFC 5425.</summary>
+      public const int SyslogTransportTls = 2;
+
+      /// <summary>
+      /// What the "How entries reach the collector" combo may offer. UDP first
+      /// because it is what an unconfigured rsyslog on the same machine listens
+      /// for; the warning it carries is the honest one, since a datagram that is
+      /// lost is lost silently.
+      /// </summary>
+      public static readonly IReadOnlyList<(int Value, string Label)> SyslogTransportOptions =
+         new (int, string)[]
+         {
+            (SyslogTransportUdp, N("UDP - no delivery guarantee, truncated at 1024 bytes")),
+            (SyslogTransportTcp, N("TCP - delivered in order, nothing truncated")),
+            (SyslogTransportTls, N("TCP over TLS (RFC 5425), certificate verified"))
+         };
+
+      // ---- Logging.SyslogMinimumSeverity -------------------------------------
+
+      /// <summary>
+      /// What the "Send entries at least this severe" combo may offer. The numbers
+      /// are RFC 5424 severities, and the four offered are the ones that
+      /// correspond to something this server actually produces: it emits err,
+      /// warning, notice, informational and debug, and nothing more severe.
+      /// </summary>
+      public static readonly IReadOnlyList<(int Value, string Label)> SyslogSeverityOptions =
+         new (int, string)[]
+         {
+            (3, N("Errors only (severity 3)")),
+            (4, N("Errors and warnings (severity 4)")),
+            (6, N("Everything except debug (severity 6)")),
+            (7, N("Everything, debug included (severity 7)"))
+         };
+
+      /// <summary>
+      /// Shown on the syslog switch. Two things an administrator has to be told
+      /// before they turn it on, and neither is guessable from the switch: that
+      /// the setting is read when the sink starts, and that an empty host is not
+      /// "off" but "the journal" on a systemd machine.
+      /// </summary>
+      public static readonly string SyslogAppliesOnRestart = N(
+         "Applies at the next service restart or Reinitialize. Log files are unaffected: this sends a copy, it does not move anything. With no collector host below, a server running under systemd on Linux writes to the journal instead - so on Linux this switch alone is the whole configuration.");
+
       /// <summary>
       /// Shown under each of the four Cache.*MaxSizeKb editors on the Performance
       /// page.
@@ -194,6 +245,20 @@ namespace hMailServer.ControlPanel.Services
             N("The database destination creates its table on first use and inserts asynchronously, so a log write never blocks a mail session. If the database is unreachable the entries go to the log files instead and the server says so in the application log - nothing is discarded.")),
 
          new SettingClaim("JsonLogging", ClaimKind.Conditional, JsonOverriddenByNcsa),
+
+         // Verified against the server: SyslogSink::Start reads these settings and
+         // nothing re-reads them while it runs, so the claim the switch makes is
+         // "from the next start", not "now". Conditional rather than Honoured for
+         // the same reason the OTLP endpoints are not: with no collector host and
+         // no systemd journal to fall back on, the switch is on and nothing is
+         // sent - and the server says so once in the application log.
+         new SettingClaim("Logging.SyslogEnabled", ClaimKind.Conditional, SyslogAppliesOnRestart),
+
+         new SettingClaim("Logging.SyslogTransport", ClaimKind.Honoured,
+            N("UDP truncates an entry to 1024 bytes, which is RFC 5426's guidance and is under every path MTU that matters; the two stream transports frame each entry with its own length (RFC 5425) and truncate nothing. TLS verifies the collector's certificate chain and its name against the machine's root store, and refuses the connection when either fails - so a collector with a self-signed certificate needs that certificate trusted on this machine.")),
+
+         new SettingClaim("Logging.SyslogHost", ClaimKind.Conditional,
+            N("Empty means the systemd journal on Linux, and means nothing is sent on Windows. A collector that stops answering never delays mail: entries queue, the oldest are dropped once 4096 are waiting, and the application log says so once when it starts and once when the collector comes back.")),
 
          // The four in-memory cache size limits. Honoured - the server applies
          // the value immediately and the getter reads the live value back - but

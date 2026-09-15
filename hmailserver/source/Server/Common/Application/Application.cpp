@@ -36,6 +36,7 @@
 #include "../Util/OtelTracer.h"
 #include "../Util/OtelMetricsExporter.h"
 #include "../Util/OtelLogExporter.h"
+#include "../Util/SyslogSink.h"
 #include "../Mime/MimeCode.h"
 
 #include "Property.h"
@@ -547,6 +548,12 @@ namespace HM
       OtelMetricsExporter::Instance()->Start();
       OtelLogExporter::Instance()->Start();
 
+      // The syslog sink: RFC 5424 to a collector, or the journal on a systemd
+      // host with no collector configured. Reads its settings from hm_settings,
+      // which Configuration::Load has already refreshed, so this is also where a
+      // Reinitialize picks a changed setting up.
+      SyslogSink::Instance()->Start();
+
       // Start the REST administration API if enabled in hMailServer.ini.
       int restApiPort = IniFileSettings::Instance()->GetRestApiPort();
       if (restApiPort > 0)
@@ -975,6 +982,11 @@ namespace HM
       // Stop the OpenTelemetry exporters (each flushes what it has queued). The
       // log exporter goes last of the three so the others' shutdown log lines
       // still reach a collector.
+      // Before the OpenTelemetry exporters, so that their own shutdown lines
+      // still reach a collector: this one stops taking entries first and then
+      // flushes what it holds on the connection it already has.
+      SyslogSink::Instance()->Stop();
+
       OtelTracer::Instance()->Stop();
       OtelMetricsExporter::Instance()->Stop();
       OtelLogExporter::Instance()->Stop();
