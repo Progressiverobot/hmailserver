@@ -92,6 +92,18 @@ New-Item -ItemType Directory -Force -Path $webAdminDir | Out-Null
 Copy-Item -Force -Path $webAdminSource -Destination $webAdminDir
 Write-Host "Control Deck page copied to $webAdminDir"
 
+# And its catalogues, for exactly the same reason: since 15 September 2026 the
+# page asks the server for WebAdmin\languages\<code>.json, which the server
+# reads from the directory beside the page. Without this a locally built server
+# answers 404 to every catalogue and the Deck stays in English whatever the
+# browser asks for - which no test would fail on, because the page falls back
+# to English by design.
+$webAdminLanguageSource = Join-Path $scriptRoot '..\hmailserver\installation\WebAdmin\languages\*.json'
+$webAdminLanguageDir = Join-Path $webAdminDir 'languages'
+New-Item -ItemType Directory -Force -Path $webAdminLanguageDir | Out-Null
+Copy-Item -Force -Path $webAdminLanguageSource -Destination $webAdminLanguageDir
+Write-Host "Control Deck catalogues copied to $webAdminLanguageDir"
+
 # The COM type library, for the same reason and from the same place
 # post-build.bat takes it: MIDL writes it into the intermediate directory and
 # the installer ships it out of the output directory. Without this the installer
