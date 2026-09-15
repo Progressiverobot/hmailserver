@@ -740,8 +740,10 @@ namespace HM
 
          if (isInsert)
          {
-            // Inside the parentheses that follow VALUES, and no SELECT anywhere.
-            if (FindWord(text, _T("select")) >= 0)
+            // Inside the parentheses that follow VALUES, and no SELECT or CASE anywhere:
+            // a comparison inside a CASE in a VALUES list crashed the provider as surely
+            // as one in a SET list.
+            if (FindWord(text, _T("select")) >= 0 || FindWord(text, _T("case")) >= 0)
                return false;
 
             int values = FindWord(text, _T("values"));
