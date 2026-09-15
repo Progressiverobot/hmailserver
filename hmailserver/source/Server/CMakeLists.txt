@@ -385,6 +385,15 @@ install(FILES ${SERVER_DIR}/platform/packaging/fail2ban/filter.d/hmailserver.con
 install(FILES ${SERVER_DIR}/platform/packaging/fail2ban/jail.d/hmailserver.conf
    DESTINATION /etc/fail2ban/jail.d)
 
+# The command-line client, beside the server it administers. It is one Python 3
+# file with nothing but the standard library behind it, and it speaks the REST
+# API rather than anything in this binary - so it administers this server, a
+# server on another machine, or a Windows one, from a shell. python3 is a
+# recommendation and not a dependency: a server that never runs hmctl should not
+# pull an interpreter in, and the package manager offers it where it is wanted.
+install(PROGRAMS ${SERVER_DIR}/../Tools/Cli/hmctl
+   DESTINATION ${CMAKE_INSTALL_BINDIR})
+
 set(CPACK_PACKAGE_NAME hmailserver)
 set(CPACK_PACKAGE_VENDOR "Progressive Robot Ltd")
 set(CPACK_PACKAGE_CONTACT "christopher.j.holloway@outlook.com")
@@ -416,16 +425,14 @@ endif()
 set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
 set(CPACK_DEBIAN_PACKAGE_SECTION mail)
 set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-# The backup writes its archive with the system's 7-Zip (Compression.cpp looks
-# for 7zz, 7z, 7za or 7zr on PATH); recommended rather than required, because a
-# server that never takes a backup does not need it.
-set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "7zip | p7zip-full")
-set(CPACK_RPM_PACKAGE_SUGGESTS "p7zip")
-# The backup writes its archive with the system's 7-Zip (Compression.cpp looks
-# for 7zz, 7z, 7za or 7zr on PATH); recommended rather than required, because a
-# server that never takes a backup does not need it.
-set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "7zip | p7zip-full")
-set(CPACK_RPM_PACKAGE_SUGGESTS "p7zip")
+# Two things the server can do without and most servers want: the system's
+# 7-Zip, which the backup writes its archive with (Compression.cpp looks for
+# 7zz, 7z, 7za or 7zr on PATH), and Python 3, which /usr/bin/hmctl is written
+# in. Recommended rather than required: a server that never takes a backup and
+# is administered from somewhere else needs neither, and a mail server should
+# not drag an interpreter onto a machine to sit unused.
+set(CPACK_DEBIAN_PACKAGE_RECOMMENDS "7zip | p7zip-full, python3")
+set(CPACK_RPM_PACKAGE_SUGGESTS "p7zip python3")
 # An upgrade must not overwrite the configuration. CPack's DEB generator writes no
 # conffiles list of its own, so one is generated here and handed to dpkg with the
 # maintainer scripts; the RPM equivalent is the %config(noreplace) list below.

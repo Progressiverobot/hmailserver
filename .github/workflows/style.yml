@@ -123,6 +123,16 @@ jobs:
       - name: The Control Deck's script does what the page needs
         run: python3 build/check-deck-script.py
 
+      # The two command-line clients are the REST API with a vocabulary in front
+      # of it, so what can go wrong is the vocabulary pointing at the wrong
+      # route - and a check that needs a running server is a check nobody runs.
+      # This stands a recorded server in front of both and asserts the method,
+      # the path, the Authorization header and the body of every request each
+      # one makes, so hmctl and the PowerShell module cannot drift apart or
+      # drift away from the API.
+      - name: hmctl and the PowerShell module ask for what the API answers
+        run: python3 build/check-cli.py
+
       # Every language's catalogue has every text the page has and nothing
       # else, keeps the tokens a reader types verbatim, and the embedded unit
       # is what the generator writes now.

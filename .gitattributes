@@ -28,6 +28,11 @@
 ###############################################################################
 hmailserver/source/Server/platform/packaging/** text eol=lf
 build/*.sh text eol=lf
+# And the command-line client, which the .deb and the .rpm install as
+# /usr/bin/hmctl: it opens with a shebang, so a CRLF checkout ships a file that
+# fails as "bad interpreter: /usr/bin/env python3^M" on the user's machine and
+# nowhere else.
+hmailserver/source/Tools/Cli/hmctl text eol=lf
 
 # Explicitly binary
 *.exe binary

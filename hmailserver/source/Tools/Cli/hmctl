@@ -1,0 +1,1023 @@
+#!/usr/bin/env python3
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+"""hmctl - administer an hMailServer over its REST API from a command line.
+
+The Windows Control Panel is the administration program and always will be; on
+Linux the administration is the browser Control Deck and the REST API. This is
+the third way: the same API from a shell, for the things a shell is better at -
+making fifty accounts from a file, reading a setting in a script, watching the
+queue, or asking what a rule criterion would decide.
+
+It speaks nothing but HTTP and JSON, and it is one file with no dependencies
+beyond the Python standard library, so it runs wherever Python 3.8 does -
+including on the machine the server is on, where the .deb and the .rpm install
+it as /usr/bin/hmctl.
+
+CREDENTIALS, in the order they are looked for:
+
+    --api-key KEY           or  HMAIL_API_KEY       Authorization: Bearer KEY
+    --password PASSWORD     or  HMAIL_PASSWORD      Basic Administrator:PASSWORD
+    --password-file FILE    or  HMAIL_PASSWORD_FILE the same, read from a file
+    (nothing)                                       prompted for, not echoed
+
+The server's address comes from --url or HMAIL_URL and defaults to
+https://localhost:8045. A server with a self-signed certificate needs
+--insecure, which is refused for any host but the loopback: a credential sent to
+a remote host over a connection nobody checked is the failure this tool must not
+make easy.
+
+WHAT IT DOES NOT DO: it does not read or write the message store, and it is not
+a backup tool. `hmctl backup start` asks the server to run its own backup.
+
+Run `hmctl` with no arguments for the resources, `hmctl <resource> --help` for
+one resource's verbs, and `hmctl api` for the escape hatch - any method, any
+path - which is what to use when a route is newer than this file.
+"""
+
+import argparse
+import base64
+import csv
+import getpass
+import io
+import json
+import os
+import ssl
+import sys
+import urllib.error
+import urllib.parse
+import urllib.request
+
+VERSION = "1.0"
+
+DEFAULT_URL = "https://localhost:8045"
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+EXIT_AUTH = 3
+EXIT_NOTFOUND = 4
+
+
+# ---------------------------------------------------------------------------
+# The resources.
+#
+# One table, because every resource answers the same four or five verbs over the
+# same shapes and the differences between them are data, not code: the path, the
+# name of the thing, what a listing is called in the answer, which fields are
+# worth a column, and which verbs the API actually carries. A resource whose
+# route does not exist is not listed here at all - `hmctl api` reaches it.
+# ---------------------------------------------------------------------------
+
+RESOURCES = {
+    "domain": {
+        "collection": "/api/v1/domains",
+        "item": "/api/v1/domains/{id}",
+        "key": "domains",
+        "id": "name",
+        "columns": ["name", "active", "max_size_mb", "account_count"],
+        "verbs": ["list", "get", "create", "update", "delete"],
+        "help": "the domains this server hosts",
+        "create_example": "hmctl domain create --set name=example.com --set active=true",
+    },
+    "account": {
+        # Listed and made under the domain that owns them, read and written at
+        # their own address: which is how the API is shaped, and it is right -
+        # an account belongs to a domain, and an address is unique in itself.
+        "collection": "/api/v1/domains/{parent}/accounts",
+        "item": "/api/v1/accounts/{id}",
+        "parent": "domain",
+        "key": "accounts",
+        "id": "address",
+        "columns": ["address", "active", "max_size_mb", "admin_level"],
+        "verbs": ["list", "get", "create", "update", "delete"],
+        "help": "the mailboxes",
+        "create_example": "hmctl account create --domain example.com --set address=ann@example.com --set password=...",
+    },
+    "alias": {
+        "collection": "/api/v1/domains/{parent}/aliases",
+        "item": "/api/v1/aliases/{id}",
+        "parent": "domain",
+        "key": "aliases",
+        "id": "address",
+        "columns": ["name", "value", "active"],
+        "verbs": ["list", "create", "delete"],
+        "help": "address aliases",
+        "create_example": "hmctl alias create --domain example.com --set name=sales@example.com --set value=ann@example.com",
+    },
+    "list": {
+        "collection": "/api/v1/domains/{parent}/lists",
+        "item": "/api/v1/lists/{id}",
+        "parent": "domain",
+        "key": "lists",
+        "id": "address",
+        "columns": ["address", "active", "mode", "member_count"],
+        "verbs": ["list", "create", "update", "delete"],
+        "help": "distribution lists",
+    },
+    "group": {
+        "collection": "/api/v1/groups",
+        "item": "/api/v1/groups/{id}",
+        "key": "groups",
+        "id": "id",
+        "columns": ["id", "name"],
+        "verbs": ["list", "get", "create", "update", "delete"],
+        "help": "account groups, which a folder permission can name as one principal",
+    },
+    "rule": {
+        "collection": "/api/v1/rules",
+        "item": "/api/v1/rules/{id}",
+        "key": "rules",
+        "id": "id",
+        "columns": ["id", "name", "active", "sort_order"],
+        "verbs": ["list", "create", "update", "delete"],
+        "help": "the global rules",
+    },
+    "route": {
+        "collection": "/api/v1/routes",
+        "item": "/api/v1/routes/{id}",
+        "key": "routes",
+        "id": "id",
+        "columns": ["id", "domain_name", "target_smtp_host", "target_smtp_port"],
+        "verbs": ["list", "create", "update", "delete"],
+        "help": "SMTP routes",
+    },
+    "port": {
+        "collection": "/api/v1/ports",
+        "item": "/api/v1/ports/{id}",
+        "key": "ports",
+        "id": "id",
+        "columns": ["id", "protocol", "address", "port", "connection_security"],
+        "verbs": ["list", "create", "update", "delete"],
+        "help": "the listeners",
+    },
+    "iprange": {
+        "collection": "/api/v1/ipranges",
+        "item": "/api/v1/ipranges/{id}",
+        "key": "ipranges",
+        "id": "id",
+        "columns": ["id", "name", "lower_ip", "upper_ip", "priority"],
+        "verbs": ["list", "create", "update", "delete"],
+        "help": "IP ranges",
+    },
+    "certificate": {
+        "collection": "/api/v1/certificates",
+        "item": "/api/v1/certificates/{id}",
+        "key": "certificates",
+        "id": "id",
+        "columns": ["id", "name", "certificate_file"],
+        "verbs": ["list", "create", "delete"],
+        "help": "SSL certificates",
+    },
+    "fetchaccount": {
+        "collection": "/api/v1/accounts/{parent}/fetch-accounts",
+        "item": "/api/v1/accounts/{parent}/fetch-accounts/{id}",
+        "parent": "address",
+        "key": "fetch_accounts",
+        "id": "id",
+        "columns": ["id", "name", "server_address", "active"],
+        "verbs": ["list", "get", "create", "update", "delete"],
+        "help": "external POP3 accounts an account collects from",
+    },
+    "apikey": {
+        "collection": "/api/v1/apikeys",
+        "item": "/api/v1/apikeys/{id}",
+        "key": "apikeys",
+        "id": "id",
+        "columns": ["id", "name", "scope", "domain", "created", "last_used"],
+        "verbs": ["list", "create", "delete"],
+        "help": "API keys (administrator password only)",
+    },
+}
+
+SETTING_GROUPS = [
+    "settings",
+    "antispam",
+    "antivirus",
+    "logging",
+    "backup",
+    "cache",
+    "indexing",
+    "scripting",
+    "directories",
+]
+
+
+class ApiError(Exception):
+    def __init__(self, status, message, body=None):
+        Exception.__init__(self, message)
+        self.status = status
+        self.message = message
+        self.body = body
+
+
+class Client:
+    """Everything that talks to the server. Nothing else in this file does."""
+
+    def __init__(self, url, api_key=None, password=None, insecure=False, timeout=30):
+        self.url = url.rstrip("/")
+        self.api_key = api_key
+        self.password = password
+        self.timeout = timeout
+
+        parsed = urllib.parse.urlparse(self.url)
+        self.host = parsed.hostname or ""
+        self.scheme = parsed.scheme
+
+        if insecure:
+            # A credential travelling to a host whose certificate nobody checked
+            # is the mistake this tool must not make convenient. On loopback the
+            # certificate is beside the point - nothing is on the wire - and a
+            # self-signed one there is the ordinary case.
+            if self.host not in ("localhost", "127.0.0.1", "::1", "[::1]"):
+                raise ApiError(0, "--insecure is refused for %s: it is only allowed for the loopback address, "
+                                  "because it would send the administrator password to a host nobody verified. "
+                                  "Give the server a certificate the client trusts." % self.host)
+            self.context = ssl._create_unverified_context()
+        elif self.scheme == "https":
+            self.context = ssl.create_default_context()
+        else:
+            self.context = None
+
+    def authorization(self):
+        if self.api_key:
+            return "Bearer " + self.api_key
+        if self.password is not None:
+            raw = ("Administrator:" + self.password).encode("utf-8")
+            return "Basic " + base64.b64encode(raw).decode("ascii")
+        return None
+
+    def request(self, method, path, body=None, query=None):
+        url = self.url + path
+        if query:
+            pairs = [(k, v) for k, v in query.items() if v is not None]
+            if pairs:
+                url += "?" + urllib.parse.urlencode(pairs)
+
+        data = None
+        headers = {"Accept": "application/json", "User-Agent": "hmctl/" + VERSION}
+        if body is not None:
+            data = json.dumps(body).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+
+        authorization = self.authorization()
+        if authorization:
+            headers["Authorization"] = authorization
+
+        request = urllib.request.Request(url, data=data, headers=headers, method=method)
+
+        try:
+            if self.context is not None:
+                response = urllib.request.urlopen(request, timeout=self.timeout, context=self.context)
+            else:
+                response = urllib.request.urlopen(request, timeout=self.timeout)
+        except urllib.error.HTTPError as error:
+            raw = error.read()
+            message = None
+            parsed = None
+            try:
+                parsed = json.loads(raw.decode("utf-8"))
+                if isinstance(parsed, dict):
+                    message = parsed.get("error") or parsed.get("message")
+            except Exception:
+                message = raw.decode("utf-8", "replace").strip() or None
+            raise ApiError(error.code, message or ("HTTP %d" % error.code), parsed)
+        except urllib.error.URLError as error:
+            reason = getattr(error, "reason", error)
+            if isinstance(reason, ssl.SSLError):
+                raise ApiError(0, "TLS refused the server's certificate: %s. On loopback, --insecure accepts a "
+                                  "self-signed one." % reason)
+            raise ApiError(0, "cannot reach %s: %s" % (self.url, reason))
+
+        with response:
+            raw = response.read()
+            if not raw:
+                return None
+            try:
+                return json.loads(raw.decode("utf-8"))
+            except ValueError:
+                return raw.decode("utf-8", "replace")
+
+
+# ---------------------------------------------------------------------------
+# Output
+# ---------------------------------------------------------------------------
+
+def render(value, as_json, columns=None):
+    if as_json:
+        print(json.dumps(value, indent=2, sort_keys=True))
+        return
+
+    if value is None:
+        return
+
+    if isinstance(value, list):
+        if not value:
+            print("(none)")
+            return
+        if all(isinstance(row, dict) for row in value):
+            print_table(value, columns)
+            return
+        for row in value:
+            print(row)
+        return
+
+    if isinstance(value, dict):
+        width = max(len(str(k)) for k in value)
+        for key in sorted(value):
+            item = value[key]
+            if isinstance(item, (dict, list)):
+                item = json.dumps(item, sort_keys=True)
+            print("%-*s  %s" % (width, key, item))
+        return
+
+    print(value)
+
+
+def print_table(rows, columns=None):
+    if columns:
+        present = [c for c in columns if any(c in row for row in rows)]
+        extra = []
+    else:
+        present = []
+        extra = []
+    if not present:
+        seen = []
+        for row in rows:
+            for key in row:
+                if key not in seen:
+                    seen.append(key)
+        present = seen[:8]
+
+    def cell(row, column):
+        value = row.get(column, "")
+        if isinstance(value, bool):
+            return "yes" if value else "no"
+        if value is None:
+            return ""
+        if isinstance(value, (dict, list)):
+            return json.dumps(value, sort_keys=True)
+        return str(value)
+
+    widths = [len(c) for c in present]
+    for row in rows:
+        for index, column in enumerate(present):
+            widths[index] = max(widths[index], len(cell(row, column)))
+
+    print("  ".join(c.upper().ljust(widths[i]) for i, c in enumerate(present)).rstrip())
+    print("  ".join("-" * widths[i] for i in range(len(present))))
+    for row in rows:
+        print("  ".join(cell(row, c).ljust(widths[i]) for i, c in enumerate(present)).rstrip())
+    if extra:
+        print("")
+
+
+def collection(answer, key):
+    """The rows out of an answer, whether it is a list or an object holding one."""
+    if isinstance(answer, list):
+        return answer
+    if isinstance(answer, dict):
+        if key in answer and isinstance(answer[key], list):
+            return answer[key]
+        for value in answer.values():
+            if isinstance(value, list):
+                return value
+    return answer
+
+
+def parse_set(pairs):
+    """--set name=value, with a value read as JSON when it looks like JSON.
+
+    So --set active=true is a boolean and --set name=true is not a problem
+    either: a string that must stay a string is written --set name:=true... no.
+    Simpler and unambiguous: true, false, null, numbers and anything starting
+    with { or [ are JSON; everything else is a string. A string that must hold
+    the four letters t-r-u-e is written --set-string.
+    """
+    body = {}
+    for pair in pairs or []:
+        if "=" not in pair:
+            raise ApiError(0, "--set takes name=value, not %r" % pair)
+        name, _, value = pair.partition("=")
+        name = name.strip()
+        stripped = value.strip()
+        if stripped in ("true", "false", "null") or stripped[:1] in "{[" or _is_number(stripped):
+            try:
+                body[name] = json.loads(stripped)
+                continue
+            except ValueError:
+                pass
+        body[name] = value
+    return body
+
+
+def _is_number(text):
+    if not text:
+        return False
+    try:
+        float(text)
+        return True
+    except ValueError:
+        return False
+
+
+def body_from(arguments):
+    body = {}
+    if getattr(arguments, "from_json", None):
+        if arguments.from_json == "-":
+            body.update(json.load(sys.stdin))
+        else:
+            with io.open(arguments.from_json, encoding="utf-8") as handle:
+                body.update(json.load(handle))
+    body.update(parse_set(getattr(arguments, "set", None)))
+    for pair in getattr(arguments, "set_string", None) or []:
+        name, _, value = pair.partition("=")
+        body[name.strip()] = value
+    return body
+
+
+# ---------------------------------------------------------------------------
+# The verbs
+# ---------------------------------------------------------------------------
+
+def resource_command(client, arguments):
+    resource = RESOURCES[arguments.resource]
+    verb = arguments.verb
+
+    def collection_path():
+        path = resource["collection"]
+        if "{parent}" in path:
+            parent = getattr(arguments, resource["parent"], None)
+            if not parent:
+                raise ApiError(0, "%s %s needs --%s: the API lists and creates them under it.%s" %
+                               (arguments.resource, verb, resource["parent"],
+                                ("\n  " + resource["create_example"]) if resource.get("create_example") else ""))
+            path = path.replace("{parent}", urllib.parse.quote(parent, safe="@"))
+        return path
+
+    def item_path():
+        path = resource["item"]
+        if "{parent}" in path:
+            parent = getattr(arguments, resource["parent"], None)
+            if not parent:
+                raise ApiError(0, "%s %s needs --%s" % (arguments.resource, verb, resource["parent"]))
+            path = path.replace("{parent}", urllib.parse.quote(parent, safe="@"))
+        return path.replace("{id}", urllib.parse.quote(str(arguments.id), safe="@"))
+
+    if verb == "list":
+        answer = client.request("GET", collection_path())
+        render(collection(answer, resource["key"]), arguments.json, resource["columns"])
+        return EXIT_OK
+
+    if verb == "get":
+        render(client.request("GET", item_path()), arguments.json)
+        return EXIT_OK
+
+    if verb == "create":
+        body = body_from(arguments)
+        if not body:
+            raise ApiError(0, "nothing to create: give --set name=value or --from-json FILE.%s" %
+                           (("\n  " + resource["create_example"]) if resource.get("create_example") else ""))
+        render(client.request("POST", collection_path(), body=body), arguments.json)
+        return EXIT_OK
+
+    if verb == "update":
+        body = body_from(arguments)
+        if not body:
+            raise ApiError(0, "nothing to change: give --set name=value or --from-json FILE")
+        render(client.request("PUT", item_path(), body=body), arguments.json)
+        return EXIT_OK
+
+    if verb == "delete":
+        client.request("DELETE", item_path())
+        if not arguments.json:
+            print("%s %s deleted." % (arguments.resource, arguments.id))
+        return EXIT_OK
+
+    raise ApiError(0, "%s cannot %s" % (arguments.resource, verb))
+
+
+def status_command(client, arguments):
+    render(client.request("GET", "/api/v1/status"), arguments.json)
+    return EXIT_OK
+
+
+def queue_command(client, arguments):
+    if arguments.verb == "list":
+        answer = client.request("GET", "/api/v1/queue")
+        render(collection(answer, "messages"), arguments.json,
+               ["id", "from_address", "to_address", "next_try", "retry_count", "size"])
+    elif arguments.verb == "retry":
+        client.request("POST", "/api/v1/queue/%s/retry" % arguments.id)
+        print("queued for delivery now.")
+    elif arguments.verb == "delete":
+        client.request("DELETE", "/api/v1/queue/%s" % arguments.id)
+        print("message %s deleted from the queue." % arguments.id)
+    return EXIT_OK
+
+
+def quarantine_command(client, arguments):
+    if arguments.verb == "list":
+        answer = client.request("GET", "/api/v1/quarantine")
+        render(collection(answer, "messages"), arguments.json,
+               ["id", "recipient", "from_address", "subject", "reason", "received"])
+    elif arguments.verb == "release":
+        client.request("POST", "/api/v1/quarantine/%s/release" % arguments.id)
+        print("released.")
+    elif arguments.verb == "delete":
+        client.request("DELETE", "/api/v1/quarantine/%s" % arguments.id)
+        print("deleted.")
+    return EXIT_OK
+
+
+def settings_command(client, arguments):
+    group = arguments.group or "settings"
+    if group not in SETTING_GROUPS:
+        raise ApiError(0, "unknown settings group %r; the groups are: %s" % (group, ", ".join(SETTING_GROUPS)))
+    path = "/api/v1/settings" if group == "settings" else "/api/v1/settings/" + group
+
+    if arguments.verb == "get":
+        answer = client.request("GET", path)
+        if arguments.name:
+            if not isinstance(answer, dict) or arguments.name not in answer:
+                raise ApiError(404, "no setting %r in the %s group" % (arguments.name, group))
+            value = answer[arguments.name]
+            print(json.dumps(value) if arguments.json else value)
+            return EXIT_OK
+        render(answer, arguments.json)
+        return EXIT_OK
+
+    body = body_from(arguments)
+    if not body:
+        raise ApiError(0, "nothing to set: give --set name=value")
+    answer = client.request("PUT", path, body=body)
+    render(answer if answer is not None else {"changed": sorted(body)}, arguments.json)
+    return EXIT_OK
+
+
+def ini_command(client, arguments):
+    if arguments.verb == "list":
+        answer = client.request("GET", "/api/v1/settings/ini")
+        render(collection(answer, "settings"), arguments.json, ["name", "value"])
+    elif arguments.verb == "get":
+        render(client.request("GET", "/api/v1/settings/ini/%s" % arguments.name), arguments.json)
+    elif arguments.verb == "set":
+        answer = client.request("PUT", "/api/v1/settings/ini/%s" % arguments.name, body={"value": arguments.value})
+        render(answer if answer is not None else {"name": arguments.name, "value": arguments.value}, arguments.json)
+    elif arguments.verb == "delete":
+        client.request("DELETE", "/api/v1/settings/ini/%s" % arguments.name)
+        print("%s removed; the server's built-in default applies." % arguments.name)
+    return EXIT_OK
+
+
+def log_command(client, arguments):
+    if arguments.verb == "list":
+        render(collection(client.request("GET", "/api/v1/logs"), "logs"), arguments.json, ["name", "size", "modified"])
+    else:
+        answer = client.request("GET", "/api/v1/logs/%s" % arguments.name, query={"lines": arguments.lines})
+        if isinstance(answer, dict) and "lines" in answer:
+            for line in answer["lines"]:
+                print(line)
+        else:
+            render(answer, arguments.json)
+    return EXIT_OK
+
+
+def backup_command(client, arguments):
+    if arguments.verb == "start":
+        render(client.request("POST", "/api/v1/backup", body={}), arguments.json)
+    else:
+        render(client.request("GET", "/api/v1/backup"), arguments.json)
+    return EXIT_OK
+
+
+def rule_match_command(client, arguments):
+    body = {"match_value": arguments.value, "match_type": arguments.type, "test_value": arguments.against}
+    answer = client.request("POST", "/api/v1/rules/match", body=body)
+    if arguments.json:
+        render(answer, True)
+    else:
+        matched = answer.get("match") if isinstance(answer, dict) else answer
+        print("match" if matched else "no match")
+    return EXIT_OK if (not isinstance(answer, dict) or answer.get("match")) else EXIT_OK
+
+
+def apppassword_command(client, arguments):
+    base = "/api/v1/accounts/%s/app-passwords" % urllib.parse.quote(arguments.address, safe="@")
+    if arguments.verb == "list":
+        render(collection(client.request("GET", base), "app_passwords"), arguments.json,
+               ["id", "name", "created", "last_used"])
+    elif arguments.verb == "create":
+        answer = client.request("POST", base, body={"name": arguments.name})
+        render(answer, arguments.json)
+        if not arguments.json and isinstance(answer, dict) and answer.get("password"):
+            print("")
+            print("This is the only time the server will show it.")
+    elif arguments.verb == "delete":
+        client.request("DELETE", "%s/%s" % (base, arguments.id))
+        print("revoked.")
+    return EXIT_OK
+
+
+def member_command(client, arguments):
+    base = "/api/v1/groups/%s/members" % arguments.group
+    if arguments.verb == "list":
+        render(collection(client.request("GET", base), "members"), arguments.json, ["id", "account_id", "address"])
+    elif arguments.verb == "add":
+        key = "address" if "@" in arguments.account else "account_id"
+        value = arguments.account if key == "address" else int(arguments.account)
+        render(client.request("POST", base, body={key: value}), arguments.json)
+    elif arguments.verb == "remove":
+        client.request("DELETE", "%s/%s" % (base, arguments.account))
+        print("removed from the group.")
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
+# Accounts from a spreadsheet
+# ---------------------------------------------------------------------------
+
+CSV_FIELDS = ["address", "password", "name", "active", "max_size_mb", "admin_level"]
+
+
+def accounts_import(client, arguments):
+    """A CSV of accounts into a domain, with a dry run that says what would happen.
+
+    The header row names the fields; address is the only one required. Anything
+    the account resource takes may be a column, so this does not need changing
+    when the account gains a field. A row whose address already exists is left
+    alone and counted, because an import that silently overwrote a password
+    would be a way to lock a hundred people out with one command.
+    """
+    with io.open(arguments.file, encoding="utf-8-sig", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+
+    if not rows:
+        raise ApiError(0, "%s has no rows under its header" % arguments.file)
+
+    if "address" not in (rows[0].keys() if rows else []):
+        raise ApiError(0, "%s has no 'address' column; the columns are: %s" %
+                       (arguments.file, ", ".join(rows[0].keys())))
+
+    # The domains to read the existing addresses from: the ones named, or the
+    # ones the file's own addresses are in. Accounts are listed UNDER their
+    # domain (/api/v1/domains/<domain>/accounts); asking /api/v1/accounts with a
+    # query is not a route, and the 404 it answers would make every address in
+    # the file look new.
+    domains = [d.lower() for d in (arguments.domain or [])]
+    if not domains:
+        seen = set()
+        for row in rows:
+            address = (row.get("address") or "").strip()
+            if "@" in address:
+                seen.add(address.split("@", 1)[1].lower())
+        domains = sorted(seen)
+
+    existing = set()
+    for domain in domains:
+        try:
+            answer = client.request("GET", "/api/v1/domains/%s/accounts" % urllib.parse.quote(domain, safe=""))
+        except ApiError as error:
+            # A domain in the file that the server does not have: every address
+            # in it is new, which is what an empty answer means here. The create
+            # will fail with the server's own words if the domain is missing.
+            if error.status == 404:
+                continue
+            raise
+        for account in collection(answer, "accounts"):
+            existing.add(str(account.get("address", "")).lower())
+
+    made, skipped, failed = [], [], []
+    for number, row in enumerate(rows, start=2):
+        address = (row.get("address") or "").strip()
+        if not address:
+            failed.append((number, "(blank)", "no address"))
+            continue
+        if address.lower() in existing:
+            skipped.append(address)
+            continue
+
+        body = {}
+        for name, value in row.items():
+            if name is None or value is None or value == "":
+                continue
+            name = name.strip()
+            stripped = value.strip()
+            if stripped.lower() in ("true", "yes", "on"):
+                body[name] = True
+            elif stripped.lower() in ("false", "no", "off"):
+                body[name] = False
+            elif _is_number(stripped) and name != "address":
+                body[name] = json.loads(stripped)
+            else:
+                body[name] = value
+
+        if arguments.dry_run:
+            made.append(address)
+            continue
+
+        try:
+            client.request("POST", "/api/v1/domains/%s/accounts"
+                           % urllib.parse.quote(address.split("@", 1)[1], safe=""), body=body)
+            made.append(address)
+        except ApiError as error:
+            failed.append((number, address, error.message))
+
+    if arguments.json:
+        render({"made": made, "skipped": skipped,
+                "failed": [{"row": r, "address": a, "error": e} for r, a, e in failed],
+                "dry_run": bool(arguments.dry_run)}, True)
+    else:
+        verb = "would be made" if arguments.dry_run else "made"
+        print("%d %s, %d already there, %d refused." % (len(made), verb, len(skipped), len(failed)))
+        for address in made:
+            print("  + %s" % address)
+        for address in skipped:
+            print("  = %s (exists; left alone)" % address)
+        for number, address, message in failed:
+            print("  ! line %d %s: %s" % (number, address, message))
+
+    return EXIT_ERROR if failed else EXIT_OK
+
+
+def accounts_export(client, arguments):
+    answer = client.request("GET", "/api/v1/domains/%s/accounts"
+                            % urllib.parse.quote(arguments.domain, safe=""))
+    accounts = collection(answer, "accounts")
+
+    fields = [f for f in CSV_FIELDS if f != "password"]
+    handle = sys.stdout if arguments.file == "-" else io.open(arguments.file, "w", encoding="utf-8", newline="")
+    try:
+        writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
+        for account in accounts:
+            writer.writerow({field: account.get(field, "") for field in fields})
+    finally:
+        if handle is not sys.stdout:
+            handle.close()
+            print("%d accounts written to %s." % (len(accounts), arguments.file))
+    return EXIT_OK
+
+
+def api_command(client, arguments):
+    body = None
+    if arguments.body:
+        body = json.loads(sys.stdin.read()) if arguments.body == "-" else json.loads(arguments.body)
+    answer = client.request(arguments.method.upper(), arguments.path, body=body)
+    render(answer, True if arguments.json else False)
+    return EXIT_OK
+
+
+# ---------------------------------------------------------------------------
+# The command line
+# ---------------------------------------------------------------------------
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="hmctl",
+        description="Administer an hMailServer over its REST API.",
+        epilog="Environment: HMAIL_URL, HMAIL_API_KEY, HMAIL_PASSWORD, HMAIL_PASSWORD_FILE.",
+    )
+    parser.add_argument("--url", default=os.environ.get("HMAIL_URL", DEFAULT_URL),
+                        help="the server's REST address (default %s)" % DEFAULT_URL)
+    parser.add_argument("--api-key", default=os.environ.get("HMAIL_API_KEY"))
+    parser.add_argument("--password", default=os.environ.get("HMAIL_PASSWORD"))
+    parser.add_argument("--password-file", default=os.environ.get("HMAIL_PASSWORD_FILE"))
+    parser.add_argument("--insecure", action="store_true",
+                        help="accept a self-signed certificate; loopback only")
+    parser.add_argument("--json", action="store_true", help="the server's JSON, unformatted by this tool")
+    parser.add_argument("--timeout", type=int, default=30)
+    parser.add_argument("--version", action="version", version="hmctl " + VERSION)
+
+    # The same flags again, for every parser below, because `hmctl domain list
+    # --json` is where a person types it and argparse takes the main parser's
+    # options only before the subcommand. SUPPRESS is what makes that safe: an
+    # inherited flag that was not given leaves no attribute, so it cannot
+    # overwrite the value the main parser already read from the command line or
+    # from the environment with its own default.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--url", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    common.add_argument("--api-key", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    common.add_argument("--password", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    common.add_argument("--password-file", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    common.add_argument("--insecure", action="store_true", default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+    common.add_argument("--json", action="store_true", default=argparse.SUPPRESS,
+                        help="the server's JSON, unformatted by this tool")
+    common.add_argument("--timeout", type=int, default=argparse.SUPPRESS, help=argparse.SUPPRESS)
+
+    commands = parser.add_subparsers(dest="command")
+
+    status = commands.add_parser("status", parents=[common], help="what the server says about itself")
+    status.set_defaults(handler=status_command)
+
+    for name in sorted(RESOURCES):
+        resource = RESOURCES[name]
+        sub = commands.add_parser(name, help=resource["help"])
+        sub.set_defaults(handler=resource_command, resource=name)
+        verbs = sub.add_subparsers(dest="verb")
+        for verb in resource["verbs"]:
+            verb_parser = verbs.add_parser(verb, parents=[common])
+            if verb in ("get", "update", "delete"):
+                verb_parser.add_argument("id", help="the %s" % resource["id"])
+            if verb in ("create", "update"):
+                verb_parser.add_argument("--set", action="append", metavar="NAME=VALUE",
+                                         help="a field; true, false, null, numbers and JSON are read as such")
+                verb_parser.add_argument("--set-string", action="append", metavar="NAME=VALUE",
+                                         help="a field whose value stays a string")
+                verb_parser.add_argument("--from-json", metavar="FILE", help="a JSON object, or - for stdin")
+            if resource.get("parent"):
+                verb_parser.add_argument("--" + resource["parent"],
+                                         help="the %s these belong to" % resource["parent"])
+
+    queue = commands.add_parser("queue", help="the delivery queue")
+    queue.set_defaults(handler=queue_command)
+    queue_verbs = queue.add_subparsers(dest="verb")
+    queue_verbs.add_parser("list", parents=[common])
+    for verb in ("retry", "delete"):
+        p = queue_verbs.add_parser(verb, parents=[common])
+        p.add_argument("id")
+
+    quarantine = commands.add_parser("quarantine", help="held mail")
+    quarantine.set_defaults(handler=quarantine_command)
+    quarantine_verbs = quarantine.add_subparsers(dest="verb")
+    quarantine_verbs.add_parser("list", parents=[common])
+    for verb in ("release", "delete"):
+        p = quarantine_verbs.add_parser(verb, parents=[common])
+        p.add_argument("id")
+
+    settings = commands.add_parser("settings", help="the server settings, by group")
+    settings.set_defaults(handler=settings_command)
+    settings_verbs = settings.add_subparsers(dest="verb")
+    get = settings_verbs.add_parser("get", parents=[common])
+    get.add_argument("group", nargs="?", choices=SETTING_GROUPS, default="settings")
+    get.add_argument("name", nargs="?", help="one setting rather than the group")
+    set_parser = settings_verbs.add_parser("set", parents=[common])
+    set_parser.add_argument("group", nargs="?", choices=SETTING_GROUPS, default="settings")
+    set_parser.add_argument("--set", action="append", metavar="NAME=VALUE", required=False)
+    set_parser.add_argument("--set-string", action="append", metavar="NAME=VALUE")
+    set_parser.add_argument("--from-json", metavar="FILE")
+    set_parser.set_defaults(name=None)
+
+    ini = commands.add_parser("ini", help="hMailServer.ini keys the server exposes")
+    ini.set_defaults(handler=ini_command)
+    ini_verbs = ini.add_subparsers(dest="verb")
+    ini_verbs.add_parser("list", parents=[common])
+    for verb in ("get", "delete"):
+        p = ini_verbs.add_parser(verb, parents=[common])
+        p.add_argument("name")
+    p = ini_verbs.add_parser("set", parents=[common])
+    p.add_argument("name")
+    p.add_argument("value")
+
+    log = commands.add_parser("log", help="the log files")
+    log.set_defaults(handler=log_command)
+    log_verbs = log.add_subparsers(dest="verb")
+    log_verbs.add_parser("list", parents=[common])
+    tail = log_verbs.add_parser("tail", parents=[common])
+    tail.add_argument("name")
+    tail.add_argument("--lines", type=int, default=50)
+
+    backup = commands.add_parser("backup", help="the server's own backup")
+    backup.set_defaults(handler=backup_command)
+    backup_verbs = backup.add_subparsers(dest="verb")
+    backup_verbs.add_parser("status", parents=[common])
+    backup_verbs.add_parser("start", parents=[common])
+
+    match = commands.add_parser("match", parents=[common], help="try a rule criterion against a value")
+    match.set_defaults(handler=rule_match_command)
+    match.add_argument("type", choices=["equals", "contains", "less_than", "greater_than",
+                                        "regex", "not_contains", "not_equals", "wildcard"])
+    match.add_argument("value", help="the criterion's value, as a rule stores it")
+    match.add_argument("against", help="the text to try it against")
+
+    app = commands.add_parser("app-password", help="an account's application passwords")
+    app.set_defaults(handler=apppassword_command)
+    app.add_argument("address")
+    app_verbs = app.add_subparsers(dest="verb")
+    app_verbs.add_parser("list", parents=[common])
+    create = app_verbs.add_parser("create", parents=[common])
+    create.add_argument("name")
+    delete = app_verbs.add_parser("delete", parents=[common])
+    delete.add_argument("id")
+
+    member = commands.add_parser("member", help="the accounts in a group")
+    member.set_defaults(handler=member_command)
+    member.add_argument("group", help="the group's id")
+    member_verbs = member.add_subparsers(dest="verb")
+    member_verbs.add_parser("list", parents=[common])
+    for verb in ("add", "remove"):
+        p = member_verbs.add_parser(verb, parents=[common])
+        p.add_argument("account", help="an address, or an account id")
+
+    accounts = commands.add_parser("accounts", help="accounts in bulk, from and to a CSV file")
+    accounts_verbs = accounts.add_subparsers(dest="verb")
+    importer = accounts_verbs.add_parser("import", parents=[common])
+    importer.set_defaults(handler=accounts_import)
+    importer.add_argument("file")
+    importer.add_argument("--domain", action="append",
+                          help="the domain(s) to read existing addresses from; derived from the file when omitted")
+    importer.add_argument("--dry-run", action="store_true", help="say what would happen and change nothing")
+    exporter = accounts_verbs.add_parser("export", parents=[common])
+    exporter.set_defaults(handler=accounts_export)
+    exporter.add_argument("domain")
+    exporter.add_argument("file", nargs="?", default="-")
+
+    api = commands.add_parser("api", parents=[common], help="any method on any path - the escape hatch")
+    api.set_defaults(handler=api_command)
+    api.add_argument("method")
+    api.add_argument("path")
+    api.add_argument("body", nargs="?", help="a JSON body, or - for stdin")
+
+    return parser
+
+
+def can_prompt():
+    """Whether there is a person at a console to answer a password prompt.
+
+    Not sys.stdin.isatty() alone, which is wrong on Windows in the one case
+    that matters: the NUL device is a character device, so isatty() answers
+    True for it, and a scheduled task or a pipeline that redirected stdin from
+    nul would sit at a prompt nobody can see until something killed it. That is
+    the worst failure a small tool can have - silence - and it is exactly what
+    a check of this file caught.
+
+    GetConsoleMode tells the two apart: it succeeds only for a real console
+    handle. Anywhere else isatty() is the right question.
+    """
+    if os.name != "nt":
+        return sys.stdin.isatty()
+
+    try:
+        import ctypes
+        import msvcrt
+
+        handle = msvcrt.get_osfhandle(sys.stdin.fileno())
+        mode = ctypes.c_uint()
+        return bool(ctypes.windll.kernel32.GetConsoleMode(ctypes.c_void_p(handle), ctypes.byref(mode)))
+    except Exception:
+        return False
+
+
+def resolve_password(arguments):
+    if arguments.api_key:
+        return None
+    if arguments.password:
+        return arguments.password
+    if arguments.password_file:
+        with io.open(arguments.password_file, encoding="utf-8") as handle:
+            return handle.read().strip()
+    if not can_prompt():
+        raise ApiError(0, "no credential: give --api-key, --password, --password-file, or one of "
+                          "HMAIL_API_KEY, HMAIL_PASSWORD, HMAIL_PASSWORD_FILE")
+    return getpass.getpass("Administrator password for %s: " % arguments.url)
+
+
+def main(argv=None):
+    parser = build_parser()
+    arguments = parser.parse_args(argv)
+
+    if not getattr(arguments, "command", None):
+        parser.print_help()
+        return EXIT_USAGE
+    if not getattr(arguments, "handler", None) or (
+            "verb" in vars(arguments) and arguments.verb is None):
+        parser.parse_args([arguments.command, "--help"])
+        return EXIT_USAGE
+
+    # SUPPRESS leaves an inherited flag out of the namespace when it was not
+    # given after the subcommand, so every one of them is read with the main
+    # parser's value behind it.
+    for name, fallback in (("url", DEFAULT_URL), ("api_key", None), ("password", None),
+                           ("password_file", None), ("insecure", False), ("json", False), ("timeout", 30)):
+        if not hasattr(arguments, name):
+            setattr(arguments, name, fallback)
+
+    try:
+        password = resolve_password(arguments)
+        client = Client(arguments.url, api_key=arguments.api_key, password=password,
+                        insecure=arguments.insecure, timeout=arguments.timeout)
+        return arguments.handler(client, arguments)
+    except ApiError as error:
+        if error.status == 401:
+            print("hmctl: the server refused the credential (401). Check the administrator password or the API key.",
+                  file=sys.stderr)
+            return EXIT_AUTH
+        if error.status == 403:
+            print("hmctl: forbidden (403): %s" % error.message, file=sys.stderr)
+            return EXIT_AUTH
+        if error.status == 404:
+            print("hmctl: not found (404): %s" % error.message, file=sys.stderr)
+            return EXIT_NOTFOUND
+        print("hmctl: %s" % error.message, file=sys.stderr)
+        return EXIT_ERROR
+    except KeyboardInterrupt:
+        return EXIT_ERROR
+    except (OSError, IOError, ValueError) as error:
+        print("hmctl: %s" % error, file=sys.stderr)
+        return EXIT_ERROR
+
+
+if __name__ == "__main__":
+    sys.exit(main())
