@@ -1,0 +1,38 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# The mail ports on one address, and the REST listener with them when it is on.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hmailserver.fullname" . }}
+  labels:
+    {{- include "hmailserver.labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if and (eq .Values.service.type "LoadBalancer") .Values.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.service.loadBalancerIP }}
+  {{- end }}
+  {{- if ne .Values.service.type "ClusterIP" }}
+  externalTrafficPolicy: {{ .Values.service.externalTrafficPolicy }}
+  {{- end }}
+  selector:
+    {{- include "hmailserver.selectorLabels" . | nindent 4 }}
+  ports:
+    {{- range $name, $port := .Values.service.ports }}
+    - name: {{ $name }}
+      port: {{ $port }}
+      targetPort: {{ $name }}
+      protocol: TCP
+    {{- end }}
+    {{- if .Values.rest.enabled }}
+    - name: rest
+      port: {{ .Values.rest.port }}
+      targetPort: rest
+      protocol: TCP
+    {{- end }}

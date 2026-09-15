@@ -1,0 +1,92 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# hMailServer beside the PostgreSQL it keeps its data in, the way the image's
+# own smoke test runs it: the two passwords come from files (Compose secrets),
+# never from the environment; the REST API - the administration, on Linux -
+# is bound off loopback and therefore over TLS, with a certificate and key
+# mounted in from ./certs (rest.pem, rest.key; a self-signed pair does for a
+# start: openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes
+# -keyout certs/rest.key -out certs/rest.pem -subj /CN=mail -days 365).
+#
+#   printf '%s' 'a database password' > secrets/db_password
+#   printf '%s' 'the administrator password' > secrets/admin_password
+#   docker compose up -d
+#   # then https://<host>:8045/ is the Control Deck, Administrator and that password
+#
+# The image is the tag's own, from GHCR; pin the version you deployed. Every
+# variable the entrypoint reads is listed in docker-entrypoint.sh beside this
+# file; the packaged hMailServer.ini is the configuration, kept in the hm-etc
+# volume and rewritten from the environment on every start where a variable is
+# set.
+name: hmailserver
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hmailserver
+      POSTGRES_DB: hmailserver
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - hm-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hmailserver -d hmailserver"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  hmailserver:
+    image: ghcr.io/progressiverobot/hmailserver:6.3.3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      HM_DB_TYPE: PostgreSQL
+      HM_DB_HOST: db
+      HM_DB_PORT: "5432"
+      HM_DB_NAME: hmailserver
+      HM_DB_USER: hmailserver
+      HM_DB_PASSWORD_FILE: /run/secrets/db_password
+      HM_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      HM_REST_PORT: "8045"
+      HM_REST_BIND_ADDRESS: 0.0.0.0
+      HM_REST_CERTIFICATE_FILE: /certs/rest.pem
+      HM_REST_PRIVATE_KEY_FILE: /certs/rest.key
+    secrets:
+      - db_password
+      - admin_password
+    ports:
+      - "25:25"       # SMTP
+      - "587:587"     # submission
+      - "465:465"     # submission over TLS
+      - "143:143"     # IMAP
+      - "993:993"     # IMAP over TLS
+      - "110:110"     # POP3
+      - "995:995"     # POP3 over TLS
+      - "4190:4190"   # ManageSieve
+      - "8045:8045"   # the REST API, the Control Deck and the webmail
+    volumes:
+      - hm-data:/var/lib/hmailserver
+      - hm-logs:/var/log/hmailserver
+      - hm-etc:/etc/hmailserver
+      - ./certs:/certs:ro
+    # The image carries its own HEALTHCHECK (port 25 accepts a connection);
+    # nothing to add here.
+
+secrets:
+  db_password:
+    file: ./secrets/db_password
+  admin_password:
+    file: ./secrets/admin_password
+
+volumes:
+  hm-db:
+  hm-data:
+  hm-logs:
+  hm-etc:

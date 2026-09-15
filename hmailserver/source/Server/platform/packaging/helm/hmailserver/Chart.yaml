@@ -1,0 +1,23 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+apiVersion: v2
+name: hmailserver
+description: >-
+  hMailServer - SMTP, IMAP and POP3 with a REST API, the Control Deck and the webmail
+  on one listener - as a StatefulSet beside the PostgreSQL or MariaDB it keeps its
+  data in. The database is not in the chart: point database.host at one.
+type: application
+version: 0.1.0
+appVersion: "6.3.3"
+home: https://github.com/Progressiverobot/hmailserver
+sources:
+  - https://github.com/Progressiverobot/hmailserver
+keywords:
+  - mail
+  - smtp
+  - imap
+  - pop3
+maintainers:
+  - name: Progressive Robot Ltd
+    url: https://www.progressiverobot.com

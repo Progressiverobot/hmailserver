@@ -391,3 +391,32 @@ PKGBUILD builds and installs on Arch Linux (`makepkg`, `pacman -U`,
 `systemd-sysusers`, `/usr/bin/hmailserver --version`); MariaDB 11.8 runs the
 same end-to-end sequence PostgreSQL does (schema created by `--create-database`,
 an account over REST, a message over SMTP, read back over IMAP).
+
+Compose and Helm
+----------------
+
+Beside the image, the two files people expect, in the tree since 15 September
+2026:
+
+* `docker/docker-compose.yml` - the server beside a PostgreSQL 16, the two
+  passwords as Compose secrets from `./secrets/`, the REST listener (the
+  Control Deck and the webmail) bound off loopback and so over TLS with a
+  certificate and key from `./certs/`, the three volumes the image declares,
+  and the image's own health check. `docker compose up -d`, then
+  `https://<host>:8045/` as Administrator.
+* `helm/hmailserver/` - a chart: a StatefulSet of one with its three volumes
+  as claim templates, a LoadBalancer service with the mail ports (and the REST
+  port when the listener is on), a Secret for the two passwords or an existing
+  one named by `existingSecret`, a `kubernetes.io/tls` Secret for the REST
+  listener named by `rest.tlsSecretName`, probes on port 25 or - when the
+  metrics listener is on - on its `/livez` and `/readyz`. The database is not
+  in the chart: point `database.host` at one; the chart refuses to render
+  without it. `helm install mail ./helm/hmailserver --set database.host=... --set
+  database.password=... --set administrator.password=... --set
+  rest.tlsSecretName=...`.
+
+Neither Helm nor Docker is on the Windows bench that gates the code, so the
+workflow `.github/workflows/packaging.yml` lints and renders the chart with a
+real install's values, checks its refusals, and resolves the Compose file, on
+every change to either.
+

@@ -1,0 +1,70 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# The Compose file and the Helm chart beside the container image, checked the
+# way they will be used: the chart linted and rendered with the values a real
+# install needs, the Compose file resolved by Compose itself. Neither tool is on
+# the bench that gates the code, so this is where they are proven.
+name: Packaging
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'hmailserver/source/Server/platform/packaging/helm/**'
+      - 'hmailserver/source/Server/platform/packaging/docker/docker-compose.yml'
+      - '.github/workflows/packaging.yml'
+  pull_request:
+    paths:
+      - 'hmailserver/source/Server/platform/packaging/helm/**'
+      - 'hmailserver/source/Server/platform/packaging/docker/docker-compose.yml'
+      - '.github/workflows/packaging.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  chart-and-compose:
+    name: the chart lints and renders, the Compose file resolves
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden the runner
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Lint the chart
+        run: helm lint hmailserver/source/Server/platform/packaging/helm/hmailserver
+
+      - name: Render the chart with the values a real install needs
+        run: |
+          set -e
+          helm template mail hmailserver/source/Server/platform/packaging/helm/hmailserver \
+            --set database.host=db --set database.password=dbpw --set administrator.password=adminpw \
+            --set rest.tlsSecretName=mail-tls > rendered.yaml
+          grep -q 'kind: StatefulSet' rendered.yaml
+          grep -q 'kind: Service' rendered.yaml
+          grep -q 'kind: Secret' rendered.yaml
+          grep -q 'HM_REST_CERTIFICATE_FILE' rendered.yaml
+          # Without a database host the chart must refuse, not render a broken server.
+          if helm template mail hmailserver/source/Server/platform/packaging/helm/hmailserver --set database.password=x --set administrator.password=y >/dev/null 2>&1; then
+            echo "::error::the chart rendered without database.host"; exit 1
+          fi
+          # An existing Secret leaves the chart's own out.
+          helm template mail hmailserver/source/Server/platform/packaging/helm/hmailserver \
+            --set database.host=db --set existingSecret=mine | grep -q 'kind: Secret' && { echo "::error::the chart wrote a Secret beside existingSecret"; exit 1; } || true
+
+      - name: Resolve the Compose file
+        working-directory: hmailserver/source/Server/platform/packaging/docker
+        run: |
+          mkdir -p secrets certs
+          printf '%s' x > secrets/db_password
+          printf '%s' y > secrets/admin_password
+          docker compose config --quiet

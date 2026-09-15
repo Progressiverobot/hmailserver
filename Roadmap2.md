@@ -125,7 +125,7 @@ Each of these was checked against Roadmap.md before it was written here: none ha
 | ⬜ | **Published numbers** | Messages per second in and out, IMAP sessions per core, memory per session, on named hardware, against Postfix and Dovecot on the same machine, with the load generator in the repository so anyone can repeat it. The claim in this file's first line is not one until this row is done. |
 | ⬜ | **Windows on ARM** | The Linux port builds for AArch64; the Windows build does not. Visual Studio's ARM64 tools and the same installer. |
 | ⬜ | **macOS** | The POSIX port should build on macOS with little work; a Homebrew formula makes it a developer's local server. |
-| ⬜ | **A Helm chart and a compose file** | The container image exists; the two files people expect beside it, with the probes already served. |
+| ✅ | **A Helm chart and a compose file** | **Done 15 September 2026.** `platform/packaging/docker/docker-compose.yml` (the server beside PostgreSQL, secrets from files, the REST listener over TLS from a mounted certificate, the image's own health check) and `platform/packaging/helm/hmailserver` (a StatefulSet of one with its three volumes, a LoadBalancer with the mail ports and the REST port, the two passwords as a Secret or an existing one, the REST certificate from a `kubernetes.io/tls` Secret, probes on port 25 or on the metrics listener's `/livez` and `/readyz`; the database pointed at, never bundled). Neither tool is on the bench, so `.github/workflows/packaging.yml` lints and renders the chart and resolves the Compose file on every change. |
 
 ## 8. Declined in the deep dive, with reasons
 

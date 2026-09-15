@@ -1,0 +1,169 @@
+# https://www.progressiverobot.com
+# Copyright (c) 2026 Christopher Holloway / Progressive Robot Ltd
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# One server, its three volumes kept across restarts: a StatefulSet of one,
+# since a mail server's message store is not something two pods may share.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "hmailserver.fullname" . }}
+  labels:
+    {{- include "hmailserver.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "hmailserver.fullname" . }}
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "hmailserver.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hmailserver.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: hmailserver
+          image: {{ include "hmailserver.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: HM_DB_TYPE
+              value: {{ .Values.database.type | quote }}
+            - name: HM_DB_HOST
+              value: {{ required "database.host is required: the database is not in the chart" .Values.database.host | quote }}
+            - name: HM_DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: HM_DB_NAME
+              value: {{ .Values.database.name | quote }}
+            - name: HM_DB_USER
+              value: {{ .Values.database.user | quote }}
+            - name: HM_DB_PASSWORD_FILE
+              value: /run/secrets/hmailserver/database-password
+            - name: HM_ADMIN_PASSWORD_FILE
+              value: /run/secrets/hmailserver/administrator-password
+            - name: HM_CREATE_DATABASE
+              value: {{ ternary "1" "0" .Values.database.create | quote }}
+            - name: HM_UPGRADE_DATABASE
+              value: {{ ternary "1" "0" .Values.database.upgrade | quote }}
+            {{- if .Values.rest.enabled }}
+            - name: HM_REST_PORT
+              value: {{ .Values.rest.port | quote }}
+            - name: HM_REST_BIND_ADDRESS
+              value: {{ .Values.rest.bindAddress | quote }}
+            {{- if .Values.rest.tlsSecretName }}
+            - name: HM_REST_CERTIFICATE_FILE
+              value: /certs/tls.crt
+            - name: HM_REST_PRIVATE_KEY_FILE
+              value: /certs/tls.key
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            {{- range $name, $port := .Values.service.ports }}
+            - name: {{ $name }}
+              containerPort: {{ $port }}
+              protocol: TCP
+            {{- end }}
+            {{- if .Values.rest.enabled }}
+            - name: rest
+              containerPort: {{ .Values.rest.port }}
+              protocol: TCP
+            {{- end }}
+          startupProbe:
+            tcpSocket:
+              port: smtp
+            periodSeconds: 5
+            failureThreshold: {{ div (add .Values.probes.startupSeconds 4) 5 }}
+          livenessProbe:
+            {{- if .Values.probes.http.enabled }}
+            httpGet:
+              path: /livez
+              port: {{ .Values.probes.http.port }}
+            {{- else }}
+            tcpSocket:
+              port: smtp
+            {{- end }}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            {{- if .Values.probes.http.enabled }}
+            httpGet:
+              path: /readyz
+              port: {{ .Values.probes.http.port }}
+            {{- else }}
+            tcpSocket:
+              port: smtp
+            {{- end }}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/hmailserver
+            - name: logs
+              mountPath: /var/log/hmailserver
+            - name: config
+              mountPath: /etc/hmailserver
+            - name: secrets
+              mountPath: /run/secrets/hmailserver
+              readOnly: true
+            {{- if and .Values.rest.enabled .Values.rest.tlsSecretName }}
+            - name: rest-tls
+              mountPath: /certs
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: secrets
+          secret:
+            secretName: {{ include "hmailserver.secretName" . }}
+            items:
+              - key: {{ .Values.existingSecretKeys.databasePassword }}
+                path: database-password
+              - key: {{ .Values.existingSecretKeys.administratorPassword }}
+                path: administrator-password
+        {{- if and .Values.rest.enabled .Values.rest.tlsSecretName }}
+        - name: rest-tls
+          secret:
+            secretName: {{ .Values.rest.tlsSecretName }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    {{- range $name, $spec := dict "data" .Values.persistence.data "logs" .Values.persistence.logs "config" .Values.persistence.config }}
+    - metadata:
+        name: {{ $name }}
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- with $.Values.persistence.storageClassName }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ $spec.size }}
+    {{- end }}

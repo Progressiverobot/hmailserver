@@ -1,0 +1,26 @@
+hMailServer {{ .Chart.AppVersion }} is starting as {{ include "hmailserver.fullname" . }}.
+
+The service:
+  kubectl get svc --namespace {{ .Release.Namespace }} {{ include "hmailserver.fullname" . }}
+
+The mail ports are on that address: SMTP {{ .Values.service.ports.smtp }}, submission {{ .Values.service.ports.submission }} and {{ .Values.service.ports.smtps }}, IMAP {{ .Values.service.ports.imap }} and {{ .Values.service.ports.imaps }}, POP3 {{ .Values.service.ports.pop3 }} and {{ .Values.service.ports.pop3s }}, ManageSieve {{ .Values.service.ports.managesieve }}.
+{{- if .Values.rest.enabled }}
+
+The REST API, the Control Deck and the webmail are on port {{ .Values.rest.port }}:
+  https://<that address>:{{ .Values.rest.port }}/          the Control Deck (Administrator and the administrator password)
+  https://<that address>:{{ .Values.rest.port }}/portal    the webmail (an account's own address and password)
+{{- if not .Values.rest.tlsSecretName }}
+
+  rest.tlsSecretName is empty: the listener is bound off loopback and the server
+  requires TLS there, so it will refuse to start the REST listener until a
+  kubernetes.io/tls Secret is named. Make one (cert-manager, or openssl) and
+  upgrade the release with rest.tlsSecretName set.
+{{- end }}
+{{- end }}
+
+A domain and an account, over the API:
+  curl -k -u Administrator:... -X POST https://<address>:{{ .Values.rest.port }}/api/v1/domains -H 'Content-Type: application/json' -d '{"name":"example.com"}'
+
+The message store, the logs and the configuration are on the three volumes of
+the StatefulSet; hMailServer.ini on the config volume is rewritten from the
+chart's values on every start where a value is set.
