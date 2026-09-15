@@ -1,3 +1,5 @@
+if exists (select * from sysobjects where id = object_id('hm_calendarobjects') and objectproperty(id, 'isusertable') = 1) drop table hm_calendarobjects
+if exists (select * from sysobjects where id = object_id('hm_calendars') and objectproperty(id, 'isusertable') = 1) drop table hm_calendars
 if exists (select * from sysobjects where id = object_id('hm_contacts') and objectproperty(id, 'isusertable') = 1) drop table hm_contacts
 if exists (select * from sysobjects where id = object_id('hm_accountprefs') and objectproperty(id, 'isusertable') = 1) drop table hm_accountprefs
 if exists (select * from sysobjects where id = object_id('hm_scheduled') and objectproperty(id, 'isusertable') = 1) drop table hm_scheduled
@@ -633,6 +635,45 @@ ALTER TABLE hm_smimekeys ADD CONSTRAINT hm_smimekeys_pk PRIMARY KEY NONCLUSTERED
 CREATE CLUSTERED INDEX idx_hm_smimekeys_account ON hm_smimekeys (smimeaccountid)
 
 CREATE UNIQUE INDEX idx_hm_smimekeys_entry ON hm_smimekeys (smimeaccountid, smimekind, smimefingerprint)
+
+create table hm_calendars
+(
+	calendarid int identity(1,1) not null,
+	calendaraccountid int not null,
+	calendarname nvarchar(255) not null,
+	calendardisplayname nvarchar(255) not null,
+	calendarsynctoken bigint not null,
+	calendarcreated bigint not null
+)
+
+ALTER TABLE hm_calendars ADD CONSTRAINT hm_calendars_pk PRIMARY KEY NONCLUSTERED (calendarid)
+
+CREATE UNIQUE CLUSTERED INDEX idx_hm_calendars_account ON hm_calendars (calendaraccountid, calendarname)
+
+create table hm_calendarobjects
+(
+	objectid int identity(1,1) not null,
+	objectaccountid int not null,
+	objectcalendarid int not null,
+	objecturi nvarchar(255) not null,
+	objectuid nvarchar(255) not null,
+	objectcomponent nvarchar(16) not null,
+	objectdata ntext not null,
+	objectetag nvarchar(64) not null,
+	objectsynctoken bigint not null,
+	objectstart bigint not null,
+	objectend bigint not null,
+	objectfirst bigint not null,
+	objectlast bigint not null,
+	objectdeleted tinyint not null,
+	objectmodified bigint not null
+)
+
+ALTER TABLE hm_calendarobjects ADD CONSTRAINT hm_calendarobjects_pk PRIMARY KEY NONCLUSTERED (objectid)
+
+CREATE UNIQUE CLUSTERED INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi)
+
+CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken)
 
 create table hm_rules
 (
@@ -1299,6 +1340,10 @@ ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccount
 
 ALTER TABLE hm_smimekeys ADD CONSTRAINT fk_hm_smimekeys_account FOREIGN KEY (smimeaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
+ALTER TABLE hm_calendars ADD CONSTRAINT fk_hm_calendars_account FOREIGN KEY (calendaraccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
+ALTER TABLE hm_calendarobjects ADD CONSTRAINT fk_hm_calendarobjects_calendar FOREIGN KEY (objectcalendarid) REFERENCES hm_calendars (calendarid) ON DELETE CASCADE
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE
@@ -1315,4 +1360,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6040)
+insert into hm_dbversion values (6041)

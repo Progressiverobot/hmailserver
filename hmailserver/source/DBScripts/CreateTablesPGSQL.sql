@@ -15,6 +15,10 @@ select hm_drop_table('hm_settings');
 
 select hm_drop_table('hm_inisettings');
 
+select hm_drop_table('hm_calendarobjects');
+
+select hm_drop_table('hm_calendars');
+
 select hm_drop_table('hm_contacts');
 
 select hm_drop_table('hm_accountprefs');
@@ -492,6 +496,40 @@ create table hm_smimekeys
 
 CREATE INDEX idx_hm_smimekeys_account ON hm_smimekeys (smimeaccountid);
 CREATE UNIQUE INDEX idx_hm_smimekeys_entry ON hm_smimekeys (smimeaccountid, smimekind, smimefingerprint);
+
+create table hm_calendars
+(
+	calendarid bigserial not null primary key,
+	calendaraccountid int not null,
+	calendarname varchar(255) not null,
+	calendardisplayname varchar(255) not null,
+	calendarsynctoken bigint not null,
+	calendarcreated bigint not null
+);
+
+CREATE UNIQUE INDEX idx_hm_calendars_account ON hm_calendars (calendaraccountid, calendarname);
+
+create table hm_calendarobjects
+(
+	objectid bigserial not null primary key,
+	objectaccountid int not null,
+	objectcalendarid int not null,
+	objecturi varchar(255) not null,
+	objectuid varchar(255) not null,
+	objectcomponent varchar(16) not null,
+	objectdata text not null,
+	objectetag varchar(64) not null,
+	objectsynctoken bigint not null,
+	objectstart bigint not null,
+	objectend bigint not null,
+	objectfirst bigint not null,
+	objectlast bigint not null,
+	objectdeleted smallint not null,
+	objectmodified bigint not null
+);
+
+CREATE UNIQUE INDEX idx_hm_calendarobjects_uri ON hm_calendarobjects (objectcalendarid, objecturi);
+CREATE INDEX idx_hm_calendarobjects_sync ON hm_calendarobjects (objectcalendarid, objectsynctoken);
 
 create table hm_rules
 (
@@ -1108,6 +1146,10 @@ ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccount
 
 ALTER TABLE hm_smimekeys ADD CONSTRAINT fk_hm_smimekeys_account FOREIGN KEY (smimeaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
 
+ALTER TABLE hm_calendars ADD CONSTRAINT fk_hm_calendars_account FOREIGN KEY (calendaraccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE;
+
+ALTER TABLE hm_calendarobjects ADD CONSTRAINT fk_hm_calendarobjects_calendar FOREIGN KEY (objectcalendarid) REFERENCES hm_calendars (calendarid) ON DELETE CASCADE;
+
 ALTER TABLE hm_rule_criterias ADD CONSTRAINT fk_hm_rule_criterias_rule FOREIGN KEY (criteriaruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
 
 ALTER TABLE hm_rule_actions ADD CONSTRAINT fk_hm_rule_actions_rule FOREIGN KEY (actionruleid) REFERENCES hm_rules (ruleid) ON DELETE CASCADE;
@@ -1124,4 +1166,4 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE;
 
-insert into hm_dbversion values (6040);
+insert into hm_dbversion values (6041);
