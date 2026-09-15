@@ -41,7 +41,11 @@ namespace HM
       relay_requires_auth_(false),
       relay_connection_security_(CSNone),
       vacation_message_on_(false),
-      vacation_external_override_(false)
+      vacation_external_override_(false),
+      external_tag_subject_(false),
+      external_tag_header_(false),
+      first_contact_tip_(false),
+      disclaimer_enabled_(false)
    {
 
    }
@@ -159,6 +163,14 @@ namespace HM
       pNode->AppendAttr(_T("VacationInternalMessage"), vacation_internal_message_);
       pNode->AppendAttr(_T("VacationExternalOverride"), vacation_external_override_ ? _T("1") : _T("0"));
 
+      pNode->AppendAttr(_T("ExternalTagSubject"), external_tag_subject_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("ExternalTagHeader"), external_tag_header_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("ExternalTagText"), external_tag_text_);
+      pNode->AppendAttr(_T("FirstContactTip"), first_contact_tip_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("DisclaimerEnabled"), disclaimer_enabled_ ? _T("1") : _T("0"));
+      pNode->AppendAttr(_T("DisclaimerPlainText"), disclaimer_plain_text_);
+      pNode->AppendAttr(_T("DisclaimerHTML"), disclaimer_html_);
+
       if (!GetDomainAliases()->XMLStore(pNode, iBackupOptions))
          return false;
 
@@ -225,6 +237,18 @@ namespace HM
       vacation_internal_subject_ = pNode->GetAttrValue(_T("VacationInternalSubject"));
       vacation_internal_message_ = pNode->GetAttrValue(_T("VacationInternalMessage"));
       vacation_external_override_ = pNode->GetAttrValue(_T("VacationExternalOverride")) == _T("1");
+
+      // The same restore rule as above: a backup taken before these existed
+      // restores as off with empty texts, which is a domain that transforms
+      // nothing - the shipped state. Assigned to the members, because a restore
+      // is not an administrator's toggle.
+      external_tag_subject_ = pNode->GetAttrValue(_T("ExternalTagSubject")) == _T("1");
+      external_tag_header_ = pNode->GetAttrValue(_T("ExternalTagHeader")) == _T("1");
+      external_tag_text_ = pNode->GetAttrValue(_T("ExternalTagText"));
+      first_contact_tip_ = pNode->GetAttrValue(_T("FirstContactTip")) == _T("1");
+      disclaimer_enabled_ = pNode->GetAttrValue(_T("DisclaimerEnabled")) == _T("1");
+      disclaimer_plain_text_ = pNode->GetAttrValue(_T("DisclaimerPlainText"));
+      disclaimer_html_ = pNode->GetAttrValue(_T("DisclaimerHTML"));
 
       return true;
    }

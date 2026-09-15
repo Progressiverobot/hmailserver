@@ -268,7 +268,9 @@ namespace HM
          "relay_password", "relay_connection_security",
          "vacation_enabled", "vacation_subject", "vacation_message",
          "vacation_internal_subject", "vacation_internal_message", "vacation_external_override",
-         "ad_domain_name"
+         "ad_domain_name",
+         "external_tag_subject", "external_tag_header", "external_tag_text", "first_contact_tip",
+         "disclaimer_enabled", "disclaimer_plain_text", "disclaimer_html"
       };
 
       // Applies the body to the domain. Everything is read and checked first;
@@ -290,6 +292,8 @@ namespace HM
          String dkimSecondarySelector = String(domain->GetDKIMSecondarySelector()), dkimSecondaryKeyFile = domain->GetDKIMSecondaryPrivateKeyFile();
          String vacationInternalSubject = domain->GetVacationInternalSubject(), vacationInternalMessage = domain->GetVacationInternalMessage();
          String adDomainName = domain->GetADDomainName();
+         String externalTagText = domain->GetExternalTagText();
+         String disclaimerPlainText = domain->GetDisclaimerPlainText(), disclaimerHtml = domain->GetDisclaimerHTML();
 
          if (!ReadString(body, "name", name, error) ||
              !ReadString(body, "postmaster", postmaster, error) ||
@@ -312,7 +316,10 @@ namespace HM
              !ReadString(body, "vacation_message", vacationMessage, error) ||
              !ReadString(body, "vacation_internal_subject", vacationInternalSubject, error) ||
              !ReadString(body, "vacation_internal_message", vacationInternalMessage, error) ||
-             !ReadString(body, "ad_domain_name", adDomainName, error))
+             !ReadString(body, "ad_domain_name", adDomainName, error) ||
+             !ReadString(body, "external_tag_text", externalTagText, error) ||
+             !ReadString(body, "disclaimer_plain_text", disclaimerPlainText, error) ||
+             !ReadString(body, "disclaimer_html", disclaimerHtml, error))
             return false;
 
          long maxMessageSize = domain->GetMaxMessageSize(), maxSize = domain->GetMaxSizeMB(), maxAccountSize = domain->GetMaxAccountSize();
@@ -337,6 +344,8 @@ namespace HM
          bool signatureLocal = domain->GetAddSignaturesToLocalMail(), dkimEnabled = domain->GetDKIMEnabled();
          bool relayAuth = domain->GetRelayRequiresAuth(), vacationOn = domain->GetVacationMessageIsOn();
          bool dkimSignAliases = domain->GetDKIMAliasesEnabled(), vacationExternalOverride = domain->GetVacationExternalOverride();
+         bool externalTagSubject = domain->GetExternalTagSubject(), externalTagHeader = domain->GetExternalTagHeader();
+         bool firstContactTip = domain->GetFirstContactTip(), disclaimerEnabled = domain->GetDisclaimerEnabled();
 
          if (!ReadBool(body, "active", active, error) ||
              !ReadBool(body, "max_accounts_enabled", maxAccountsEnabled, error) ||
@@ -351,7 +360,11 @@ namespace HM
              !ReadBool(body, "dkim_sign_aliases", dkimSignAliases, error) ||
              !ReadBool(body, "relay_requires_auth", relayAuth, error) ||
              !ReadBool(body, "vacation_enabled", vacationOn, error) ||
-             !ReadBool(body, "vacation_external_override", vacationExternalOverride, error))
+             !ReadBool(body, "vacation_external_override", vacationExternalOverride, error) ||
+             !ReadBool(body, "external_tag_subject", externalTagSubject, error) ||
+             !ReadBool(body, "external_tag_header", externalTagHeader, error) ||
+             !ReadBool(body, "first_contact_tip", firstContactTip, error) ||
+             !ReadBool(body, "disclaimer_enabled", disclaimerEnabled, error))
             return false;
 
          // The two canonicalisation methods, as put_DKIMHeaderCanonicalizationMethod
@@ -424,6 +437,16 @@ namespace HM
             return false;
          }
 
+         // The column holds a hundred characters. Refused rather than
+         // truncated, as put_ExternalTagText refuses it: a tag cut off in the
+         // middle is a tag every reader learns to ignore.
+         externalTagText.Trim();
+         if (externalTagText.GetLength() > 100)
+         {
+            error = "external_tag_text must be 100 characters or fewer";
+            return false;
+         }
+
          renamed = name.CompareNoCase(domain->GetName()) != 0;
 
          domain->SetName(name);
@@ -470,6 +493,13 @@ namespace HM
          domain->SetVacationInternalMessage(vacationInternalMessage);
          domain->SetVacationExternalOverride(vacationExternalOverride);
          domain->SetADDomainName(adDomainName);
+         domain->SetExternalTagSubject(externalTagSubject);
+         domain->SetExternalTagHeader(externalTagHeader);
+         domain->SetExternalTagText(externalTagText);
+         domain->SetFirstContactTip(firstContactTip);
+         domain->SetDisclaimerEnabled(disclaimerEnabled);
+         domain->SetDisclaimerPlainText(disclaimerPlainText);
+         domain->SetDisclaimerHTML(disclaimerHtml);
          return true;
       }
 
@@ -560,6 +590,13 @@ namespace HM
       text("vacation_internal_message", domain->GetVacationInternalMessage());
       flag("vacation_external_override", domain->GetVacationExternalOverride());
       text("ad_domain_name", domain->GetADDomainName());
+      flag("external_tag_subject", domain->GetExternalTagSubject());
+      flag("external_tag_header", domain->GetExternalTagHeader());
+      text("external_tag_text", domain->GetExternalTagText());
+      flag("first_contact_tip", domain->GetFirstContactTip());
+      flag("disclaimer_enabled", domain->GetDisclaimerEnabled());
+      text("disclaimer_plain_text", domain->GetDisclaimerPlainText());
+      text("disclaimer_html", domain->GetDisclaimerHTML());
       entry += "}";
       return entry;
    }

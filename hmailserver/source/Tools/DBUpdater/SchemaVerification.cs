@@ -507,7 +507,35 @@ namespace DBUpdater
          new SchemaProbe(6041, "hm_calendarobjects.objectdeleted",
                          "update hm_calendarobjects set objectdeleted = objectdeleted where 1 = 0"),
          new SchemaProbe(6041, "hm_calendarobjects.objectmodified",
-                         "update hm_calendarobjects set objectmodified = objectmodified where 1 = 0")
+                         "update hm_calendarobjects set objectmodified = objectmodified where 1 = 0"),
+         // Upgrade6044to6045* - what a domain does to a message: the
+         // external-sender tag, the first-contact note and the disclaimer, and
+         // the memory the note is answered from (hm_knownsenders). The identity
+         // column is never probed.
+         new SchemaProbe(6045, "hm_domains.domainexternaltagsubject",
+                         "update hm_domains set domainexternaltagsubject = domainexternaltagsubject where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domainexternaltagheader",
+                         "update hm_domains set domainexternaltagheader = domainexternaltagheader where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domainexternaltagtext",
+                         "update hm_domains set domainexternaltagtext = domainexternaltagtext where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domainfirstcontacttip",
+                         "update hm_domains set domainfirstcontacttip = domainfirstcontacttip where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domaindisclaimerenabled",
+                         "update hm_domains set domaindisclaimerenabled = domaindisclaimerenabled where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domaindisclaimerplaintext",
+                         "update hm_domains set domaindisclaimerplaintext = domaindisclaimerplaintext where 1 = 0"),
+         new SchemaProbe(6045, "hm_domains.domaindisclaimerhtml",
+                         "update hm_domains set domaindisclaimerhtml = domaindisclaimerhtml where 1 = 0"),
+         new SchemaProbe(6045, "hm_knownsenders.ksaccountid",
+                         "update hm_knownsenders set ksaccountid = ksaccountid where 1 = 0"),
+         new SchemaProbe(6045, "hm_knownsenders.ksaddress",
+                         "update hm_knownsenders set ksaddress = ksaddress where 1 = 0"),
+         new SchemaProbe(6045, "hm_knownsenders.kscount",
+                         "update hm_knownsenders set kscount = kscount where 1 = 0"),
+         new SchemaProbe(6045, "hm_knownsenders.ksfirstseen",
+                         "update hm_knownsenders set ksfirstseen = ksfirstseen where 1 = 0"),
+         new SchemaProbe(6045, "hm_knownsenders.kslastseen",
+                         "update hm_knownsenders set kslastseen = kslastseen where 1 = 0")
       };
 
       /// <summary>

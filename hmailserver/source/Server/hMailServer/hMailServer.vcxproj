@@ -401,6 +401,7 @@ EXIT 0
     <ClCompile Include="..\Common\Persistence\PersistentAppPassword.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentFetchAccountUID.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGreyList.cpp" />
+    <ClCompile Include="..\Common\Persistence\PersistentKnownSender.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGreyListingWhiteAddress.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGroup.cpp" />
     <ClCompile Include="..\Common\Persistence\PersistentGroupMember.cpp" />
@@ -610,6 +611,9 @@ EXIT 0
     <ClCompile Include="..\Common\Util\DmarcRptStore.cpp" />
     <ClCompile Include="..\Common\Util\TlsRptStore.cpp" />
     <ClCompile Include="..\Common\Util\ServiceManager.cpp" />
+    <ClCompile Include="..\Common\Util\DisclaimerAdder.cpp" />
+    <ClCompile Include="..\Common\Util\ExternalSenderTagger.cpp" />
+    <ClCompile Include="..\Common\Util\MessageOrigin.cpp" />
     <ClCompile Include="..\Common\Util\SignatureAdder.cpp" />
     <ClCompile Include="..\Common\Util\SSPIValidation.cpp" />
     <ClCompile Include="..\Common\Util\Strings\FormatArgument.cpp" />
@@ -1130,6 +1134,7 @@ EXIT 0
     <ClInclude Include="..\Common\Persistence\PersistentAppPassword.h" />
     <ClInclude Include="..\Common\Persistence\PersistentFetchAccountUID.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGreyList.h" />
+    <ClInclude Include="..\Common\Persistence\PersistentKnownSender.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGreyListingWhiteAddress.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGroup.h" />
     <ClInclude Include="..\Common\Persistence\PersistentGroupMember.h" />
@@ -1321,6 +1326,9 @@ EXIT 0
     <ClInclude Include="..\Common\Util\ServerStatus.h" />
     <ClInclude Include="..\Common\Util\SecureCompare.h" />
     <ClInclude Include="..\Common\Util\ServiceManager.h" />
+    <ClInclude Include="..\Common\Util\DisclaimerAdder.h" />
+    <ClInclude Include="..\Common\Util\ExternalSenderTagger.h" />
+    <ClInclude Include="..\Common\Util\MessageOrigin.h" />
     <ClInclude Include="..\Common\Util\SignatureAdder.h" />
     <ClInclude Include="..\Common\Util\Singleton.h" />
     <ClInclude Include="..\Common\Util\SSPIValidation.h" />

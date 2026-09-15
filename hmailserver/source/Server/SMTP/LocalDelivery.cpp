@@ -29,6 +29,7 @@
 #include "../Common/Tracking/ChangeNotification.h"
 #include "../Common/Tracking/NotificationServer.h"
 
+#include "../Common/Util/ExternalSenderTagger.h"
 #include "../Common/Util/AWStats.h"
 #include "../Common/Util/TraceHeaderWriter.h"
 #include "../Common/Util/MessageUtilities.h"
@@ -410,6 +411,26 @@ namespace HM
       // would be backscatter to a return path spam rarely uses honestly.
       if (!ApplyAccountSpamOverrides_(account, accountLevelMessage))
          return false;
+
+      // What the RECIPIENT's domain does to a message from outside: the
+      // [EXTERNAL] tag in the subject, the header the webmail turns into a
+      // banner, and the note that says this sender has not written before. All
+      // three are off by default, and while they are off this reads nothing and
+      // writes nothing.
+      //
+      // Here, rather than at reception, for two reasons. The switch belongs to
+      // the RECIPIENT's domain, which is not known until the message has been
+      // split between its recipients; and this rewrites the ACCOUNT'S copy, so
+      // a message addressed both here and to the outside world does not carry
+      // the tag out with it.
+      //
+      // Above the rules and the Sieve script, so both can match on the header,
+      // and below the per-account spam settings, so the subject this reads is
+      // the one the reader will see.
+      ExternalSenderTagger::Apply(account,
+                                  CacheContainer::Instance()->GetDomain(account->GetDomainID()),
+                                  accountLevelMessage,
+                                  _sendersIP);
 
       // The flag on the ACCOUNT'S copy, after the overrides above. The two
       // auto-reply decisions below take this rather than reading the shared

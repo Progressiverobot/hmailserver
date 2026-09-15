@@ -934,6 +934,24 @@ interface IInterfaceDomain : IDispatch
       [propget, id(55), helpstring("When on, senders outside this server receive the domain's text even if the account has a vacation message of its own; local senders still get the account's.")] HRESULT VacationExternalOverride([out, retval] VARIANT_BOOL *pVal);
       [propput, id(55), helpstring("When on, senders outside this server receive the domain's text even if the account has a vacation message of its own; local senders still get the account's.")] HRESULT VacationExternalOverride([in] VARIANT_BOOL newVal);
 
+      /*
+         WHAT THIS DOMAIN DOES TO A MESSAGE. All off by default.
+      */
+      [propget, id(57), helpstring("Put the tag text at the front of the Subject of mail this domain receives from outside. Breaks any DKIM signature the sender made over their Subject, exactly as the anti-spam subject prefix does; ExternalTagHeader costs the sender's signature nothing.")] HRESULT ExternalTagSubject([out, retval] VARIANT_BOOL *pVal);
+      [propput, id(57), helpstring("Put the tag text at the front of the Subject of mail this domain receives from outside. Breaks any DKIM signature the sender made over their Subject, exactly as the anti-spam subject prefix does; ExternalTagHeader costs the sender's signature nothing.")] HRESULT ExternalTagSubject([in] VARIANT_BOOL newVal);
+      [propget, id(58), helpstring("Stamp X-hMailServer-External on mail this domain receives from outside, which the webmail shows as a banner. Prepending a field is signature-safe.")] HRESULT ExternalTagHeader([out, retval] VARIANT_BOOL *pVal);
+      [propput, id(58), helpstring("Stamp X-hMailServer-External on mail this domain receives from outside, which the webmail shows as a banner. Prepending a field is signature-safe.")] HRESULT ExternalTagHeader([in] VARIANT_BOOL newVal);
+      [propget, id(59), helpstring("The text put at the front of the subject. Empty means the shipped tag, EXTERNAL in square brackets. At most 100 characters. Per domain, so a domain whose readers do not read English can say it in the language they do.")] HRESULT ExternalTagText([out, retval] BSTR *pVal);
+      [propput, id(59), helpstring("The text put at the front of the subject. Empty means the shipped tag, EXTERNAL in square brackets. At most 100 characters. Per domain, so a domain whose readers do not read English can say it in the language they do.")] HRESULT ExternalTagText([in] BSTR newVal);
+      [propget, id(60), helpstring("Tell the reader when an outside sender has not written to this account before, by stamping X-hMailServer-First-Contact. Costs a database lookup per delivered copy; see hmailserver/docs/DomainTransforms.md.")] HRESULT FirstContactTip([out, retval] VARIANT_BOOL *pVal);
+      [propput, id(60), helpstring("Tell the reader when an outside sender has not written to this account before, by stamping X-hMailServer-First-Contact. Costs a database lookup per delivered copy; see hmailserver/docs/DomainTransforms.md.")] HRESULT FirstContactTip([in] VARIANT_BOOL newVal);
+      [propget, id(61), helpstring("Append the legal footer below to mail this domain sends outside the organisation. Never added to a signed or encrypted message, to an automatic reply, a bounce or a list posting, and never twice on a reply chain.")] HRESULT DisclaimerEnabled([out, retval] VARIANT_BOOL *pVal);
+      [propput, id(61), helpstring("Append the legal footer below to mail this domain sends outside the organisation. Never added to a signed or encrypted message, to an automatic reply, a bounce or a list posting, and never twice on a reply chain.")] HRESULT DisclaimerEnabled([in] VARIANT_BOOL newVal);
+      [propget, id(62), helpstring("The footer, as plain text.")] HRESULT DisclaimerPlainText([out, retval] BSTR *pVal);
+      [propput, id(62), helpstring("The footer, as plain text.")] HRESULT DisclaimerPlainText([in] BSTR newVal);
+      [propget, id(63), helpstring("The footer, as HTML. Empty means the plain text is used with its line breaks turned into <br>.")] HRESULT DisclaimerHTML([out, retval] BSTR *pVal);
+      [propput, id(63), helpstring("The footer, as HTML. Empty means the plain text is used with its line breaks turned into <br>.")] HRESULT DisclaimerHTML([in] BSTR newVal);
+
 };
 [
    object,

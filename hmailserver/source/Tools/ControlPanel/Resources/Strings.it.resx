@@ -812,6 +812,9 @@ Il Control Panel può leggere i file dei messaggi solo quando è in esecuzione s
   <data name="Add a DNS blacklist; connections from listed addresses gain score or are refused." xml:space="preserve">
     <value>Aggiungi una blacklist DNS; le connessioni da indirizzi elencati guadagnano punteggio o vengono rifiutate.</value>
   </data>
+  <data name="Add a _header the reader shows as a banner" xml:space="preserve">
+    <value>Aggiungi un'_intestazione che il lettore mostra come fascia</value>
+  </data>
   <data name="Add a domain or a mailbox" xml:space="preserve">
     <value>Aggiungi un dominio o una casella</value>
   </data>
@@ -913,6 +916,9 @@ Il Control Panel può leggere i file dei messaggi solo quando è in esecuzione s
   </data>
   <data name="Added at {0}." xml:space="preserve">
     <value>Aggiunto il {0}.</value>
+  </data>
+  <data name="Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it." xml:space="preserve">
+    <value>Aggiunta una volta, alla posta con almeno un destinatario fuori da questo server. Mai a un messaggio firmato o cifrato, a una risposta automatica, a un avviso di mancata consegna o a un invio a una lista, e mai una seconda volta a una risposta che la cita già.</value>
   </data>
   <data name="Address" xml:space="preserve">
     <value>Indirizzo</value>
@@ -3379,6 +3385,9 @@ Nessuna posta viene toccata - l'indice ne è derivato - ma finché la ricostruzi
   <data name="HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list." xml:space="preserve">
     <value>HS256 è in OAuth2AllowedAlgorithms ma OAuth2HmacSecret è vuoto, quindi i token HS256 non potranno mai essere verificati. Imposta il segreto condiviso, oppure rimuovi HS256 dall'elenco.</value>
   </data>
+  <data name="HTM_L disclaimer (empty = the plain text, with its line breaks)" xml:space="preserve">
+    <value>Informativa come HTM_L (vuoto = il testo semplice, con le sue interruzioni di riga)</value>
+  </data>
   <data name="HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set." xml:space="preserve">
     <value>HTTP Basic richiede sia il nome utente sia la password. È impostato solo {0}, quindi l'autenticazione Basic NON è attiva - il server lo registra e si comporta come se nessuno dei due fosse impostato.</value>
   </data>
@@ -4067,6 +4076,9 @@ Il programma di installazione verificato viene passato all'helper di aggiornamen
   </data>
   <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
     <value>La posta con indirizzo mittente vuoto viene negata. Molti server inviano gli avvisi di mancato recapito da &lt;&gt;, che verranno quindi rifiutati.</value>
+  </data>
+  <data name="Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts." xml:space="preserve">
+    <value>La posta proveniente dall'esterno dell'organizzazione può essere contrassegnata perché il lettore la riconosca a colpo d'occhio. Un mittente è esterno quando la sessione non ha effettuato l'accesso, il messaggio non è arrivato tramite un relay in ingresso attendibile e né il mittente della busta né l'indirizzo From appartengono a un dominio ospitato da questo server.</value>
   </data>
   <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
     <value>La posta non si muove e nulla è andato in crash: quale delle due metà si è bloccata, le righe di registro che indicano la causa, e l'impostazione che delimita ogni fase.</value>
@@ -7208,6 +7220,12 @@ Riavviarlo adesso?</value>
   <data name="Tag outbound envelope senders with BATV and validate returning bounces" xml:space="preserve">
     <value>Contrassegna con BATV i mittenti della busta in uscita e convalida i messaggi di mancato recapito che tornano indietro</value>
   </data>
+  <data name="Tag te_xt (empty = [EXTERNAL], at most 100 characters)" xml:space="preserve">
+    <value>Testo dell'etichetta (_vuoto = [EXTERNAL], al massimo 100 caratteri)</value>
+  </data>
+  <data name="Tagging and disclaimer" xml:space="preserve">
+    <value>Etichettatura e informativa</value>
+  </data>
   <data name="Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts." xml:space="preserve">
     <value>Ha effetto immediato, ma è tenuto solo in memoria: nulla memorizza questo valore, quindi ogni riavvio del servizio lo riporta ai 10240 KB (10 MB) integrati. Per mantenere un limite diverso occorre impostarlo di nuovo dopo ogni riavvio, per esempio da uno script di avvio tramite l'API COM. I TTL e l'interruttore di attivazione di questa scheda sono invece memorizzati e sopravvivono ai riavvii.</value>
   </data>
@@ -7231,6 +7249,9 @@ Riavviarlo adesso?</value>
   </data>
   <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
     <value>Insegna a SpamAssassin quando un utente archivia un messaggio come spam o lo riporta fuori</value>
+  </data>
+  <data name="Tell the reader about a _first contact from outside" xml:space="preserve">
+    <value>Avvisa il lettore di un _primo contatto dall'esterno</value>
   </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Comunica ai server mittenti che devono usare TLS quando consegnano ai tuoi domini, chiudendo la falla del downgrade del TLS opportunistico.</value>
@@ -7806,6 +7827,9 @@ Conservare il vecchio record DNS ({1}) ancora per qualche giorno, finché la pos
   <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
     <value>Il server non conserva alcuno storico: MetricsHistoryDays è 0 in hMailServer.ini. Impostarlo ai giorni da conservare e riavviare il servizio.</value>
   </data>
+  <data name="The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off." xml:space="preserve">
+    <value>Il server ricorda chi ha scritto a ciascun account e a chi ciascun account ha scritto, e lo dice nel lettore la prima volta che compare un mittente esterno. Costa una ricerca nel database per ogni messaggio consegnato a questo dominio, e nulla finché questa opzione è disattivata.</value>
+  </data>
   <data name="The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists." xml:space="preserve">
     <value>La parte lato server è a posto: l'hosting è attivo, la porta HTTPS è impostata ed esiste una fonte per il certificato.</value>
   </data>
@@ -7876,6 +7900,12 @@ Continuerà a provare durante l'uso dell'applicazione.</value>
   </data>
   <data name="The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement." xml:space="preserve">
     <value>Non è stato possibile leggere la scadenza memorizzata nel formato che questa pagina si aspetta (YYYY-MM-DD HH:MM:SS), quindi da qui non si può dire se il server accetti ancora questa chiave. Se la riga è stata modificata a mano, correggerla; altrimenti revocare la chiave e crearne una sostitutiva.</value>
+  </data>
+  <data name="The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it." xml:space="preserve">
+    <value>Il contrassegno nell'oggetto rompe qualsiasi firma DKIM che il mittente abbia fatto sul proprio oggetto, esattamente come il prefisso dell'oggetto dell'antispam. L'intestazione no, quindi preferisci l'intestazione dove il lettore sa mostrarla.</value>
+  </data>
+  <data name="The tag text must be 100 characters or fewer." xml:space="preserve">
+    <value>Il testo dell'etichetta deve avere 100 caratteri o meno.</value>
   </data>
   <data name="The test itself failed unexpectedly: {0}" xml:space="preserve">
     <value>Il test stesso è fallito in modo imprevisto: {0}</value>
@@ -8719,6 +8749,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   <data name="_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)" xml:space="preserve">
     <value>Consenti l'_invio della password su una connessione non protetta (AllowUnprotectedPassword)</value>
   </data>
+  <data name="_Append a disclaimer to mail leaving the organisation" xml:space="preserve">
+    <value>_Aggiungi un'informativa alla posta che lascia l'organizzazione</value>
+  </data>
   <data name="_Apply" xml:space="preserve">
     <value>A_pplica</value>
   </data>
@@ -8959,6 +8992,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   <data name="_Permissions" xml:space="preserve">
     <value>A_utorizzazioni</value>
   </data>
+  <data name="_Plain-text disclaimer" xml:space="preserve">
+    <value>Informativa come testo sempli_ce</value>
+  </data>
   <data name="_Plain-text signature" xml:space="preserve">
     <value>Firma in testo _semplice</value>
   </data>
@@ -9063,6 +9099,9 @@ Nessun messaggio viene eliminato e nessun account viene rimosso. Continuare?</va
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Server</value>
+  </data>
+  <data name="_Tag the subject of mail from outside" xml:space="preserve">
+    <value>_Etichetta l'oggetto della posta dall'esterno</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Host SMTP di destinazione</value>

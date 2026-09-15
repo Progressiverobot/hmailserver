@@ -812,6 +812,9 @@ Control Panel může číst soubory zpráv pouze tehdy, když běží na stejné
   <data name="Add a DNS blacklist; connections from listed addresses gain score or are refused." xml:space="preserve">
     <value>Přidejte DNS blacklist; připojení z uvedených adres získají skóre nebo jsou odmítnuta.</value>
   </data>
+  <data name="Add a _header the reader shows as a banner" xml:space="preserve">
+    <value>Přidat _hlavičku, kterou čtenář zobrazí jako pruh</value>
+  </data>
   <data name="Add a domain or a mailbox" xml:space="preserve">
     <value>Přidat doménu nebo poštovní schránku</value>
   </data>
@@ -913,6 +916,9 @@ Control Panel může číst soubory zpráv pouze tehdy, když běží na stejné
   </data>
   <data name="Added at {0}." xml:space="preserve">
     <value>Přidáno {0}.</value>
+  </data>
+  <data name="Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it." xml:space="preserve">
+    <value>Přidá se jednou, k poště, která má alespoň jednoho příjemce mimo tento server. Nikdy k podepsané nebo zašifrované zprávě, k automatické odpovědi, k oznámení o nedoručení ani k příspěvku do konference, a nikdy podruhé k odpovědi, která ji už cituje.</value>
   </data>
   <data name="Address" xml:space="preserve">
     <value>Adresa</value>
@@ -3379,6 +3385,9 @@ Pošty se to nedotkne - index je z ní odvozen - ale dokud přestavba nedožene,
   <data name="HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list." xml:space="preserve">
     <value>HS256 je v OAuth2AllowedAlgorithms, ale OAuth2HmacSecret je prázdné, takže tokeny HS256 nelze nikdy ověřit. Nastavte sdílený tajný klíč, nebo HS256 ze seznamu odstraňte.</value>
   </data>
+  <data name="HTM_L disclaimer (empty = the plain text, with its line breaks)" xml:space="preserve">
+    <value>Doložka jako HTM_L (prázdné = prostý text i s konci řádků)</value>
+  </data>
   <data name="HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set." xml:space="preserve">
     <value>HTTP Basic potřebuje uživatelské jméno i heslo. Je nastaveno jen {0}, takže ověřování Basic NENÍ povoleno - server to zaloguje a chová se, jako by nebylo nastaveno ani jedno.</value>
   </data>
@@ -4067,6 +4076,9 @@ Ověřený instalátor se předá pomocníkovi aktualizace: služba se zastaví,
   </data>
   <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
     <value>Pošta z prázdné adresy odesílatele je odmítána. Mnoho serverů odesílá vrácené zprávy z &lt;&gt;, a ty budou odmítnuty.</value>
+  </data>
+  <data name="Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts." xml:space="preserve">
+    <value>Poštu z vnějšku organizace lze označit tak, aby ji čtenář poznal na první pohled. Odesílatel je zvenčí, když se relace nepřihlásila, zpráva nepřišla přes důvěryhodné příchozí relé a ani odesílatel obálky, ani adresa From nepatří doméně, kterou tento server hostuje.</value>
   </data>
   <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
     <value>Pošta se nehýbe a nic nespadlo: která polovina uvázla, řádky logu, které pojmenují příčinu, a nastavení, které omezuje každou fázi.</value>
@@ -7208,6 +7220,12 @@ Restartovat ji nyní?</value>
   <data name="Tag outbound envelope senders with BATV and validate returning bounces" xml:space="preserve">
     <value>Označovat odesílatele obálky u odchozí pošty pomocí BATV a ověřovat vracející se nedoručenky</value>
   </data>
+  <data name="Tag te_xt (empty = [EXTERNAL], at most 100 characters)" xml:space="preserve">
+    <value>Te_xt značky (prázdné = [EXTERNAL], nejvýše 100 znaků)</value>
+  </data>
+  <data name="Tagging and disclaimer" xml:space="preserve">
+    <value>Označování a doložka</value>
+  </data>
   <data name="Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts." xml:space="preserve">
     <value>Projeví se okamžitě, ale drží se pouze v paměti: tuto hodnotu nic neukládá, takže každý restart služby ji vrátí na vestavěných 10240 KB (10 MB). Chcete-li zachovat jiný limit, je nutné jej po každém restartu nastavit znovu, například ze spouštěcího skriptu přes COM API. Hodnoty TTL a přepínač zapnutí na této kartě se ukládají a restart přežijí.</value>
   </data>
@@ -7231,6 +7249,9 @@ Restartovat ji nyní?</value>
   </data>
   <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
     <value>Učit SpamAssassin, když uživatel zprávu zařadí jako spam nebo ji zase vezme zpět</value>
+  </data>
+  <data name="Tell the reader about a _first contact from outside" xml:space="preserve">
+    <value>Upozornit čtenáře na _první kontakt zvenčí</value>
   </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Říká odesílajícím serverům, že při doručování do vašich domén musí použít TLS, čímž se zavírá díra se snížením úrovně zabezpečení u oportunistického TLS.</value>
@@ -7806,6 +7827,9 @@ Odpovídá vlastní resolver serveru - tentýž, který používá doručování
   <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
     <value>Server neuchovává žádnou historii: MetricsHistoryDays je v hMailServer.ini 0. Nastavte ho na počet dní k uchování a restartujte službu.</value>
   </data>
+  <data name="The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off." xml:space="preserve">
+    <value>Server si pamatuje, kdo psal jednotlivým účtům a komu psaly ony, a řekne to ve čtečce, když se vnější odesílatel objeví poprvé. Stojí to jedno vyhledání v databázi na každou zprávu doručenou do této domény a zcela nic, dokud je to vypnuté.</value>
+  </data>
   <data name="The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists." xml:space="preserve">
     <value>Serverová strana je na místě: hostování je zapnuté, port HTTPS je nastaven a zdroj certifikátu existuje.</value>
   </data>
@@ -7876,6 +7900,12 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement." xml:space="preserve">
     <value>Uložené vypršení nešlo přečíst v podobě, kterou tato stránka očekává (RRRR-MM-DD HH:MM:SS), takže odsud nelze říct, zda server tento klíč ještě přijímá. Pokud byl řádek upraven ručně, opravte ho; jinak klíč odvolejte a vytvořte náhradu.</value>
+  </data>
+  <data name="The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it." xml:space="preserve">
+    <value>Značka v předmětu poruší každý podpis DKIM, který odesílatel vytvořil nad svým předmětem, přesně jako předpona předmětu u antispamu. Hlavička nikoli, takže tam, kde ji čtenář umí zobrazit, dejte přednost hlavičce.</value>
+  </data>
+  <data name="The tag text must be 100 characters or fewer." xml:space="preserve">
+    <value>Text značky musí mít nejvýše 100 znaků.</value>
   </data>
   <data name="The test itself failed unexpectedly: {0}" xml:space="preserve">
     <value>Samotný test nečekaně selhal: {0}</value>
@@ -8719,6 +8749,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)" xml:space="preserve">
     <value>Povolit odeslání hesla přes _nechráněné připojení (AllowUnprotectedPassword)</value>
   </data>
+  <data name="_Append a disclaimer to mail leaving the organisation" xml:space="preserve">
+    <value>Připojit _doložku k poště odcházející z organizace</value>
+  </data>
   <data name="_Apply" xml:space="preserve">
     <value>_Použít</value>
   </data>
@@ -8959,6 +8992,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   <data name="_Permissions" xml:space="preserve">
     <value>_Oprávnění</value>
   </data>
+  <data name="_Plain-text disclaimer" xml:space="preserve">
+    <value>Doložka jako prostý t_ext</value>
+  </data>
   <data name="_Plain-text signature" xml:space="preserve">
     <value>Podpis _v prostém textu</value>
   </data>
@@ -9063,6 +9099,9 @@ Bude to zkoušet dál, zatímco aplikaci používáte.</value>
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Server</value>
+  </data>
+  <data name="_Tag the subject of mail from outside" xml:space="preserve">
+    <value>Označit předmět pošty _zvenčí</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>_Cílový SMTP hostitel</value>

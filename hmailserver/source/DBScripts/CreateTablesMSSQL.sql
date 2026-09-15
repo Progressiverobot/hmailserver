@@ -272,7 +272,14 @@ create table hm_domains (
 	domainvacationmessage nvarchar(1000) not null,
 	domainvacationinternalsubject nvarchar(200) not null,
 	domainvacationinternalmessage nvarchar(1000) not null,
-	domainvacationexternaloverride int not null
+	domainvacationexternaloverride int not null,
+	domainexternaltagsubject int not null default 0,
+	domainexternaltagheader int not null default 0,
+	domainexternaltagtext nvarchar(100) not null default '',
+	domainfirstcontacttip int not null default 0,
+	domaindisclaimerenabled int not null default 0,
+	domaindisclaimerplaintext ntext not null,
+	domaindisclaimerhtml ntext not null
 ) 
 
 ALTER TABLE hm_domains ADD CONSTRAINT hm_domains_pk PRIMARY KEY NONCLUSTERED (domainid) 
@@ -1340,6 +1347,20 @@ ALTER TABLE hm_files ADD CONSTRAINT fk_hm_files_account FOREIGN KEY (fileaccount
 
 ALTER TABLE hm_smimekeys ADD CONSTRAINT fk_hm_smimekeys_account FOREIGN KEY (smimeaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
+create table hm_knownsenders
+(
+	ksid bigint identity(1,1) not null,
+	ksaccountid int not null,
+	ksaddress nvarchar(255) not null,
+	kscount int not null,
+	ksfirstseen nvarchar(32) not null,
+	kslastseen nvarchar(32) not null
+)
+
+ALTER TABLE hm_knownsenders ADD CONSTRAINT hm_knownsenders_pk PRIMARY KEY NONCLUSTERED (ksid)
+
+CREATE UNIQUE CLUSTERED INDEX idx_hm_knownsenders_account ON hm_knownsenders (ksaccountid, ksaddress)
+
 ALTER TABLE hm_calendars ADD CONSTRAINT fk_hm_calendars_account FOREIGN KEY (calendaraccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
 
 ALTER TABLE hm_calendarobjects ADD CONSTRAINT fk_hm_calendarobjects_calendar FOREIGN KEY (objectcalendarid) REFERENCES hm_calendars (calendarid) ON DELETE CASCADE
@@ -1360,4 +1381,6 @@ ALTER TABLE hm_imapexpunged ADD CONSTRAINT fk_hm_imapexpunged_folder FOREIGN KEY
 
 ALTER TABLE hm_messageindexterms ADD CONSTRAINT fk_hm_messageindexterms_message FOREIGN KEY (mitmessageid) REFERENCES hm_messages (messageid) ON DELETE CASCADE
 
-insert into hm_dbversion values (6041)
+ALTER TABLE hm_knownsenders ADD CONSTRAINT fk_hm_knownsenders_account FOREIGN KEY (ksaccountid) REFERENCES hm_accounts (accountid) ON DELETE CASCADE
+
+insert into hm_dbversion values (6045)

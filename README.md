@@ -185,7 +185,7 @@ cache, scripting, indexing, the server messages), certificates and the
 listeners that bind them, application passwords, folder permissions, the
 message store and the account groups with their members; and the Deck reaches every property its views cover, measured
 by `build/check-deck-parity.py` against the desktop Control Panel's every
-field ([DeckParity.md](hmailserver/docs/DeckParity.md): 322 of 330 on 15
+field ([DeckParity.md](hmailserver/docs/DeckParity.md): 329 of 337 on 15
 September 2026, the eight outside the Deck's views being the folder
 permissions, the application passwords and the groups, which it has no page
 for). The wiki's *Installing on Linux* page walks from the package

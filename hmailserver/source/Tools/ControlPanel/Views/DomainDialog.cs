@@ -87,6 +87,21 @@ namespace hMailServer.ControlPanel.Views
          Content = L("_Outside senders always get the domain's text, even when the account has its own")
       };
 
+      // What this domain does to a message: the external-sender tag, the
+      // first-contact note and the disclaimer. See Common/Util/MessageOrigin.h
+      // for the rule that decides who is outside.
+      private readonly CheckBox tagSubject_ = new() { Content = L("_Tag the subject of mail from outside") };
+      private readonly TextBox tagText_ = NewInput();
+      private FieldRow tagTextRow_;
+      private readonly CheckBox tagHeader_ = new() { Content = L("Add a _header the reader shows as a banner") };
+      private readonly CheckBox firstContact_ = new() { Content = L("Tell the reader about a _first contact from outside") };
+      private readonly CheckBox disclaimerOn_ = new()
+      {
+         Content = L("_Append a disclaimer to mail leaving the organisation")
+      };
+      private readonly TextBox disclaimerPlain_ = NewMemo();
+      private readonly TextBox disclaimerHtml_ = NewMemo();
+
       private readonly TextBox relayHost_ = NewInput();
       private readonly TextBox relayPort_ = NewInput();
       private FieldRow relayPortRow_;
@@ -145,6 +160,7 @@ namespace hMailServer.ControlPanel.Views
          tabs.Items.Add(new TabItem { Header = L("Signature"), Content = BuildSignature() });
          tabs.Items.Add(new TabItem { Header = L("Relay"), Content = BuildRelay() });
          tabs.Items.Add(new TabItem { Header = L("Out of office"), Content = BuildOutOfOffice() });
+         tabs.Items.Add(new TabItem { Header = L("Tagging and disclaimer"), Content = BuildTransforms() });
          tabs.Items.Add(new TabItem { Header = L("DKIM"), Content = BuildDkim() });
          DialogFields.FillTabs(tabs);
 
@@ -349,6 +365,27 @@ namespace hMailServer.ControlPanel.Views
          panel.Children.Add(DialogFields.Separator());
          panel.Children.Add(DialogFields.Check(oooExternalOverride_));
          panel.Children.Add(DialogFields.Note(L("With this on, an account's own vacation message still answers colleagues, but outside senders get the domain's generic text instead - so personal detail in a vacation message stays inside the organisation.")));
+         return DialogFields.Scroll(panel);
+      }
+
+      private ScrollViewer BuildTransforms()
+      {
+         var panel = DialogFields.TabPanel();
+         panel.Children.Add(DialogFields.Note(L("Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts.")));
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(tagSubject_));
+         panel.Children.Add(DialogFields.Note(L("The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it.")));
+         tagTextRow_ = Label(L("Tag te_xt (empty = [EXTERNAL], at most 100 characters)"), tagText_);
+         panel.Children.Add(tagTextRow_);
+         panel.Children.Add(DialogFields.Check(tagHeader_));
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(firstContact_));
+         panel.Children.Add(DialogFields.Note(L("The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off.")));
+         panel.Children.Add(DialogFields.Separator());
+         panel.Children.Add(DialogFields.Check(disclaimerOn_));
+         panel.Children.Add(DialogFields.Note(L("Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it.")));
+         panel.Children.Add(Label(L("_Plain-text disclaimer"), disclaimerPlain_));
+         panel.Children.Add(Label(L("HTM_L disclaimer (empty = the plain text, with its line breaks)"), disclaimerHtml_));
          return DialogFields.Scroll(panel);
       }
 
@@ -949,6 +986,14 @@ namespace hMailServer.ControlPanel.Views
             oooInternalMessage_.Text = (string)d.VacationInternalMessage ?? "";
             oooExternalOverride_.IsChecked = (bool)d.VacationExternalOverride;
 
+            tagSubject_.IsChecked = (bool)d.ExternalTagSubject;
+            tagHeader_.IsChecked = (bool)d.ExternalTagHeader;
+            tagText_.Text = (string)d.ExternalTagText ?? "";
+            firstContact_.IsChecked = (bool)d.FirstContactTip;
+            disclaimerOn_.IsChecked = (bool)d.DisclaimerEnabled;
+            disclaimerPlain_.Text = (string)d.DisclaimerPlainText ?? "";
+            disclaimerHtml_.Text = (string)d.DisclaimerHTML ?? "";
+
             dkimOn_.IsChecked = (bool)d.DKIMSignEnabled;
             dkimAliases_.IsChecked = (bool)d.DKIMSignAliasesEnabled;
             dkimSelector_.Text = (string)d.DKIMSelector ?? "";
@@ -987,7 +1032,7 @@ namespace hMailServer.ControlPanel.Views
       {
          notice_.Hide();
          DialogFields.ClearErrors(nameRow_, maxSizeRow_, maxMessageSizeRow_, maxAccountSizeRow_, retentionRow_,
-                                  maxAccountsRow_, maxAliasesRow_, maxDistsRow_, relayPortRow_);
+                                  maxAccountsRow_, maxAliasesRow_, maxDistsRow_, relayPortRow_, tagTextRow_);
 
          // Eight numbers, each said on its own field. They used to share one line
          // at the foot of the dialog, which named the field in words and left the
@@ -1016,6 +1061,14 @@ namespace hMailServer.ControlPanel.Views
 
          if (!NumericField.TryValidate(relayPort_.Text, L("Relay port"), 0, 65535, out int relayPortValue, out bool _, out error))
          { DialogFields.ShowError(relayPortRow_, error); return; }
+
+         // Said here as well as by the server, because a tag the server truncated
+         // would be a tag every reader learns to ignore.
+         if (tagText_.Text.Trim().Length > 100)
+         {
+            DialogFields.ShowError(tagTextRow_, L("The tag text must be 100 characters or fewer."));
+            return;
+         }
 
          string newName = name_.Text.Trim();
          if (newName.Length == 0 || !newName.Contains('.'))
@@ -1087,6 +1140,14 @@ namespace hMailServer.ControlPanel.Views
             d.VacationInternalSubject = oooInternalSubject_.Text.Trim();
             d.VacationInternalMessage = oooInternalMessage_.Text;
             d.VacationExternalOverride = oooExternalOverride_.IsChecked is true;
+
+            d.ExternalTagSubject = tagSubject_.IsChecked is true;
+            d.ExternalTagHeader = tagHeader_.IsChecked is true;
+            d.ExternalTagText = tagText_.Text.Trim();
+            d.FirstContactTip = firstContact_.IsChecked is true;
+            d.DisclaimerEnabled = disclaimerOn_.IsChecked is true;
+            d.DisclaimerPlainText = disclaimerPlain_.Text;
+            d.DisclaimerHTML = disclaimerHtml_.Text;
 
             d.DKIMSignEnabled = dkimOn_.IsChecked is true;
             d.DKIMSignAliasesEnabled = dkimAliases_.IsChecked is true;

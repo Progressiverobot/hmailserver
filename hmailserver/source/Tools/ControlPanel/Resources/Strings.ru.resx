@@ -812,6 +812,9 @@ Control Panel может читать файлы сообщений только
   <data name="Add a DNS blacklist; connections from listed addresses gain score or are refused." xml:space="preserve">
     <value>Добавьте чёрный список DNS; подключения с перечисленных в нём адресов получают оценку или отклоняются.</value>
   </data>
+  <data name="Add a _header the reader shows as a banner" xml:space="preserve">
+    <value>Добавлять _заголовок, который читатель показывает полосой</value>
+  </data>
   <data name="Add a domain or a mailbox" xml:space="preserve">
     <value>Добавить домен или почтовый ящик</value>
   </data>
@@ -913,6 +916,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Added at {0}." xml:space="preserve">
     <value>Добавлено {0}.</value>
+  </data>
+  <data name="Added once, to mail with at least one recipient outside this server. Never to a signed or encrypted message, an automatic reply, a bounce or a list posting, and never a second time to a reply that already quotes it." xml:space="preserve">
+    <value>Добавляется один раз, к почте, у которой есть хотя бы один получатель за пределами этого сервера. Никогда к подписанному или зашифрованному сообщению, к автоответу, к уведомлению о недоставке или к письму в список рассылки, и никогда второй раз к ответу, который её уже цитирует.</value>
   </data>
   <data name="Address" xml:space="preserve">
     <value>Адрес</value>
@@ -3379,6 +3385,9 @@ Control Panel может читать файлы сообщений только
   <data name="HS256 is in OAuth2AllowedAlgorithms but OAuth2HmacSecret is empty, so HS256 tokens can never verify. Set the shared secret, or remove HS256 from the list." xml:space="preserve">
     <value>HS256 есть в OAuth2AllowedAlgorithms, но OAuth2HmacSecret пуст, поэтому токены HS256 никогда не смогут пройти проверку. Задайте общий секрет либо уберите HS256 из списка.</value>
   </data>
+  <data name="HTM_L disclaimer (empty = the plain text, with its line breaks)" xml:space="preserve">
+    <value>Оговорка в HTM_L (пусто = обычный текст с его переводами строк)</value>
+  </data>
   <data name="HTTP Basic needs both the user name and the password. Only {0} is set, so Basic authentication is NOT enabled - the server logs this and behaves as if neither were set." xml:space="preserve">
     <value>Для HTTP Basic нужны и имя пользователя, и пароль. Задан только {0}, поэтому аутентификация Basic НЕ включена — сервер записывает это в журнал и ведёт себя так, как если бы не было задано ни то ни другое.</value>
   </data>
@@ -4067,6 +4076,9 @@ Control Panel может читать файлы сообщений только
   </data>
   <data name="Mail from an empty sender address is denied. Many servers send bounces from &lt;&gt;, which will be rejected." xml:space="preserve">
     <value>Почта с пустым адресом отправителя запрещена. Многие серверы отправляют возвраты от &lt;&gt;, и такие письма будут отклонены.</value>
+  </data>
+  <data name="Mail from outside the organisation can be marked so that a reader sees it at a glance. A sender is outside when the session did not sign in, the message did not arrive through a trusted incoming relay, and neither the envelope sender nor the From address belongs to a domain this server hosts." xml:space="preserve">
+    <value>Почту из-за пределов организации можно пометить, чтобы читатель увидел это сразу. Отправитель считается внешним, когда сеанс не вошёл в систему, сообщение пришло не через доверенный входящий ретранслятор, и ни отправитель конверта, ни адрес From не принадлежат домену, который обслуживает этот сервер.</value>
   </data>
   <data name="Mail is not moving and nothing has crashed: which half has stalled, the log lines that name the cause, and the setting that bounds each stage." xml:space="preserve">
     <value>Почта не движется, и ничего не упало: какая половина застопорилась, какие строки журнала называют причину и какой параметр ограничивает каждый этап.</value>
@@ -7208,6 +7220,12 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="Tag outbound envelope senders with BATV and validate returning bounces" xml:space="preserve">
     <value>Помечать отправителей конверта исходящей почты с помощью BATV и проверять возвращающиеся отчёты о недоставке</value>
   </data>
+  <data name="Tag te_xt (empty = [EXTERNAL], at most 100 characters)" xml:space="preserve">
+    <value>Те_кст метки (пусто = [EXTERNAL], не более 100 символов)</value>
+  </data>
+  <data name="Tagging and disclaimer" xml:space="preserve">
+    <value>Пометка и оговорка</value>
+  </data>
   <data name="Takes effect immediately, but is held in memory only: nothing stores this value, so every service restart resets it to the built-in 10240 KB (10 MB). To keep a different limit it must be set again after each restart, for example from a startup script through the COM API. The TTLs and the enable switch on this card are stored and do survive restarts." xml:space="preserve">
     <value>Вступает в силу немедленно, но хранится только в памяти: это значение нигде не сохраняется, поэтому каждый перезапуск службы возвращает встроенные 10240 КБ (10 МБ). Чтобы удерживать другой предел, его нужно задавать заново после каждого перезапуска — например, из сценария запуска через COM API. Значения TTL и переключатель включения на этой карточке сохраняются и перезапуск переживают.</value>
   </data>
@@ -7231,6 +7249,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="Teach SpamAssassin when a user files a message as spam or takes it back out" xml:space="preserve">
     <value>Обучать SpamAssassin, когда пользователь помещает сообщение в спам или забирает его обратно</value>
+  </data>
+  <data name="Tell the reader about a _first contact from outside" xml:space="preserve">
+    <value>Сообщать читателю о _первом обращении извне</value>
   </data>
   <data name="Tells sending servers they must use TLS when delivering to your domains, closing the downgrade hole in opportunistic TLS." xml:space="preserve">
     <value>Сообщает отправляющим серверам, что при доставке в ваши домены они обязаны использовать TLS, закрывая дыру с понижением защиты в оппортунистическом TLS.</value>
@@ -7806,6 +7827,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="The server keeps no history: MetricsHistoryDays is 0 in hMailServer.ini. Set it to the days to keep and restart the service." xml:space="preserve">
     <value>Сервер не хранит историю: MetricsHistoryDays в hMailServer.ini равен 0. Задайте число дней хранения и перезапустите службу.</value>
   </data>
+  <data name="The server remembers who has written to each account and who each account has written to, and says so in the reader the first time an outside sender appears. It costs one database lookup for each message delivered to this domain, and nothing at all while this is off." xml:space="preserve">
+    <value>Сервер помнит, кто писал каждой учётной записи и кому писала она, и говорит об этом в программе чтения, когда внешний отправитель появляется впервые. Это стоит одного обращения к базе данных на каждое доставленное в этот домен сообщение и совсем ничего, пока это выключено.</value>
+  </data>
   <data name="The server side is in place: hosting is enabled, the HTTPS port is set, and a certificate source exists." xml:space="preserve">
     <value>Серверная сторона на месте: размещение включено, порт HTTPS задан, источник сертификата существует.</value>
   </data>
@@ -7876,6 +7900,12 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="The stored expiry could not be read in the form this page expects (YYYY-MM-DD HH:MM:SS), so whether the server still accepts this key cannot be told from here. If the line was edited by hand, correct it; otherwise revoke the key and create a replacement." xml:space="preserve">
     <value>Сохранённый срок действия не удалось прочитать в форме, которую ожидает эта страница (ГГГГ-ММ-ДД ЧЧ:ММ:СС), поэтому отсюда нельзя сказать, принимает ли сервер ещё этот ключ. Если строка редактировалась вручную, исправьте её; иначе отзовите ключ и создайте замену.</value>
+  </data>
+  <data name="The subject tag breaks any DKIM signature the sender made over their subject, exactly as the anti-spam subject prefix does. The header does not, so prefer the header where the reader can show it." xml:space="preserve">
+    <value>Метка в теме ломает любую подпись DKIM, сделанную отправителем над его темой, точно так же, как префикс темы в защите от спама. Заголовок не ломает, поэтому там, где читатель умеет его показать, выбирайте заголовок.</value>
+  </data>
+  <data name="The tag text must be 100 characters or fewer." xml:space="preserve">
+    <value>Текст метки должен быть не длиннее 100 символов.</value>
   </data>
   <data name="The test itself failed unexpectedly: {0}" xml:space="preserve">
     <value>Сам тест неожиданно завершился ошибкой: {0}</value>
@@ -8719,6 +8749,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="_Allow sending the password over an unprotected connection (AllowUnprotectedPassword)" xml:space="preserve">
     <value>_Разрешить передачу пароля по незащищённому соединению (AllowUnprotectedPassword)</value>
   </data>
+  <data name="_Append a disclaimer to mail leaving the organisation" xml:space="preserve">
+    <value>_Добавлять оговорку к почте, уходящей из организации</value>
+  </data>
   <data name="_Apply" xml:space="preserve">
     <value>П_рименить</value>
   </data>
@@ -8959,6 +8992,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   <data name="_Permissions" xml:space="preserve">
     <value>_Разрешения</value>
   </data>
+  <data name="_Plain-text disclaimer" xml:space="preserve">
+    <value>Оговорка _обычным текстом</value>
+  </data>
   <data name="_Plain-text signature" xml:space="preserve">
     <value>Подпись _обычным текстом</value>
   </data>
@@ -9063,6 +9099,9 @@ SMTP 25 и 587, POP3 110, IMAP 143 — без защиты подключени�
   </data>
   <data name="_Server" xml:space="preserve">
     <value>_Сервер</value>
+  </data>
+  <data name="_Tag the subject of mail from outside" xml:space="preserve">
+    <value>Помечать _тему почты извне</value>
   </data>
   <data name="_Target SMTP host" xml:space="preserve">
     <value>Целевой узел _SMTP</value>
